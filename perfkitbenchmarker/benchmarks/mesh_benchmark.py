@@ -159,8 +159,8 @@ def Run(benchmark_spec):
     args = [((source, netperf_benchmark, vms, result), {}) for source in vms]
     perfkitbenchmarker_lib.RunThreaded(RunNetperf, args, benchmark_spec.num_vms)
     if netperf_benchmark == 'TCP_RR':
-      result[VALUE_INDEX] /= ((
-          benchmark_spec.num_vms - 1) * benchmark_spec.num_vms *
+      result[VALUE_INDEX] /= ((benchmark_spec.num_vms - 1) *
+                              benchmark_spec.num_vms *
                               FLAGS.num_connections)
     results.append(result)
   print results

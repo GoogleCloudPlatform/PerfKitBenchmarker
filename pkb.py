@@ -55,8 +55,6 @@ resources
 """
 
 import getpass
-import os.path
-import shlex
 import sys
 import time
 import uuid
