@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Class to represent a GCE Virtual Machine object.
 
 Zones:
