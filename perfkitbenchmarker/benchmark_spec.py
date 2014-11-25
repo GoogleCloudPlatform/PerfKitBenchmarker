@@ -106,8 +106,8 @@ class BenchmarkSpec(object):
   """Contains the various data required to make a benchmark run."""
 
   def __init__(self, benchmark_info):
-    if FLAGS.benchmark_config_pair and benchmark_info[
-        'name'] in FLAGS.benchmark_config_pair.keys():
+    if (FLAGS.benchmark_config_pair and
+        benchmark_info['name'] in FLAGS.benchmark_config_pair.keys()):
       # TODO(user): Unify naming between config_reader and
       # perfkitbenchmarker.
       self.config = config_reader.ConfigLoader(
@@ -117,7 +117,7 @@ class BenchmarkSpec(object):
     self.networks = {}
     if hasattr(self, 'config'):
       config_dict = {}
-      for section in self.config._config.sections():  # pylint: disable=protected-access
+      for section in self.config._config.sections():
         config_dict[section] = self.config.GetSectionOptionsAsDictionary(
             section)
       self.cloud = config_dict['cluster']['type']
