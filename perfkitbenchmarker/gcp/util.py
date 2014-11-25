@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Utilities for working with Google Cloud Platform resources."""
 
 import gflags as flags

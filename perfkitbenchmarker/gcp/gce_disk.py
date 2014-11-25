@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Module containing classes related to GCE disks.
 
 Disks can be created, deleted, attached to VMs, and detached from VMs.

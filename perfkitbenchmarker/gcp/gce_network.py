@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Module containing classes related to GCE VM networking.
 
 The Firewall class provides a way of opening VM ports. The Network class allows
