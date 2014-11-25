@@ -55,12 +55,12 @@ resources
 """
 
 import getpass
+import logging
 import sys
 import time
 import uuid
 
 import gflags as flags
-import logging
 
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_spec
@@ -133,6 +133,37 @@ flags.DEFINE_string('static_vm_file', None,
 flags.DEFINE_boolean('version', False, 'Display the version and exit.')
 
 MAX_RUN_URI_LENGTH = 10
+
+
+def ConfigureLogging():
+  """Configure logging.
+
+  Note that this will destroy existing logging configuration!
+
+  This configures python logging with a pair of handlers:
+  * Messages at FLAGS.log_level and above are emitted to stderr.
+  * Messages at DEBUG and above are emitted to 'pkb.log' under
+    vm_util.GetTempDir().
+  """
+  logger = logging.getLogger()
+  logger.handlers = []
+  logger.setLevel(logging.DEBUG)
+
+  stream_handler = logging.StreamHandler()
+  stream_handler.setLevel(LOG_LEVELS[FLAGS.log_level])
+  formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+  stream_handler.setFormatter(formatter)
+  logger.addHandler(stream_handler)
+
+  vm_util.GenTempDir()
+  log_path = vm_util.PrependTempDir('pkb.log')
+  logging.info('Verbose logging to: %s', log_path)
+  file_handler = logging.FileHandler(filename=log_path)
+  file_handler.setLevel(logging.DEBUG)
+  formatter = logging.Formatter(
+      '%(asctime)s %(filename)s:%(lineno)d %(levelname)-8s %(message)s')
+  file_handler.setFormatter(formatter)
+  logger.addHandler(file_handler)
 
 
 def ShouldRunBenchmark(benchmark):
@@ -224,9 +255,6 @@ def RunBenchmarks(publish=True):
   Returns:
     Exit status for the process.
   """
-  log_level = LOG_LEVELS[FLAGS.log_level]
-  logging.getLogger().setLevel(log_level)
-
   if FLAGS.version:
     print version.VERSION
     return
@@ -242,6 +270,8 @@ def RunBenchmarks(publish=True):
     logging.error('run_uri must be alphanumeric and less than or equal '
                   'to 10 characters in length.')
     return 1
+
+  ConfigureLogging()
 
   unknown_benchmarks = ListUnknownBenchmarks()
   if unknown_benchmarks:
