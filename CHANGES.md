@@ -1,3 +1,9 @@
+# v0.6.0
+
+Initial release under Apache 2.0 license.
+
+## Unreleased
+
 # v0.5.1
 
 * Fix for HPCC result parser.
