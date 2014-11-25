@@ -1,28 +1,27 @@
-This repo and all files it contains are shared under Google NDA.
-
 PerfKitBenchmarker
 ==================
 
 PerfKit Benchmarker is an open effort to define a canonical set of benchmarks to measure and compare cloud
-offerings.  It's designed to work like the user via vendor provided command line tools. The benchmarks are not
+offerings.  It's designed to operate via vendor provided command line tools. The benchmarks are not
 tuned (ie the defaults) because this is what most users will use.  This should help us drive to great defaults.
 Only in the rare cause where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
 
 KNOWN ISSUES
-==================
+============
 
 
 LICENSING
-==================
-PerfKit Benchmarker provides wrappers and workload definitions around popular benchmark tools. We made it very simple
+=========
+
+PerfKitBenchmarker provides wrappers and workload definitions around popular benchmark tools. We made it very simple
 to use and automate everything we can.  It instantiates VMs on the Cloud provider of your choice, automatically
 installs benchmarks, and run the workloads without user interaction.
 
-Do the the level of automation you will not see prompts for software installed as part of a benchmark run.
+Due to the level of automation you will not see prompts for software installed as part of a benchmark run.
 Therefore you must accept the license of each benchmarks individually, and take responsibility for using them
-before you use the PerfKit Benchmarker.
+before you use the PerfKitBenchmarker.
 
 In its current release these are the benchmarks that are executed:
 
@@ -49,13 +48,13 @@ In its current release these are the benchmarks that are executed:
 Some of the benchmarks invoked require Java. You must also agree with the following license:
   - openjdk-7-jre: GPL v2 with the Classpath Exception (http://openjdk.java.net/legal/gplv2+ce.html)
 
-Coremark setup cannot be automated. EEMBC requires users to agree with their terms and conditions, and PerfKit
+CoreMark setup cannot be automated. EEMBC requires users to agree with their terms and conditions, and PerfKit
 Benchmarker users must manually download the coremark tarball from their website and save it under the
-./data folder (e.g. ~/perfkit_benchmarker/data/coremark_v1.0.tgz)
+`./data` folder (e.g. `~/PerfKitBenchmarker/data/coremark_v1.0.tgz`)
 
 SpecCPU2006 benchmark setup cannot be automated. SPEC requires users to agree with their terms and conditions,
 and PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
-the ./data folder (e.g. ~/perfkit_benchmarker/data/cpu2006v1.2.tgz)
+the `./data` folder (e.g. `~/PerfKitBenchmarker/data/cpu2006v1.2.tgz`)
 
 HOW TO RUN
 ==================
@@ -129,7 +128,7 @@ a file (.publishsettings) file. Copy to the folder you're running PerfKit Benchm
 $ azure account import [path to .publishsettings file]
 ```
 
-Test azure is installed correctly
+Test that azure is installed correctly
 ```
 $ azure vm list
 ```
