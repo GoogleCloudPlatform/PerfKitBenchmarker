@@ -15,14 +15,12 @@ import json
 import re
 
 import gflags as flags
-import logging
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import perfkitbenchmarker_lib
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.gcp import util
-
 
 
 FLAGS = flags.FLAGS
