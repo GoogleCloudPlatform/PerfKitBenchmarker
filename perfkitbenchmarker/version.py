@@ -30,4 +30,4 @@ def _GitVersion():
     return 'unknown'
 
 
-ARTEMIS_VERSION = _GitVersion()
+VERSION = _GitVersion()

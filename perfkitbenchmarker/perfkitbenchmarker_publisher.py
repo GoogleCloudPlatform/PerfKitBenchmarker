@@ -75,7 +75,7 @@ def AddStandardMetadata(metadata, benchmark_spec):
     metadata: The metadata dictionary to be modified.
     benchmark_spec: A BenchmarkSpec instance that describes the benchmark.
   """
-  metadata['perfkitbenchmarker_version'] = version.ARTEMIS_VERSION
+  metadata['perfkitbenchmarker_version'] = version.VERSION
   metadata['cloud'] = benchmark_spec.cloud
   metadata['zones'] = benchmark_spec.zones
   metadata['machine_type'] = benchmark_spec.machine_type

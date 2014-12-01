@@ -228,7 +228,7 @@ def RunBenchmarks(publish=True):
   logging.getLogger().setLevel(log_level)
 
   if FLAGS.version:
-    print version.ARTEMIS_VERSION
+    print version.VERSION
     return
 
   if FLAGS.run_uri is None:
