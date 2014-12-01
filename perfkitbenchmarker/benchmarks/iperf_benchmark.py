@@ -64,7 +64,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   Args:
     sending_vm: The VM sending traffic.
     receiving_vm: The VM receiving traffic.
-    ip_address: The IP address of the iperf server (ie the receiver).
+    receiving_ip_address: The IP address of the iperf server (ie the receiver).
     ip_type: The IP type of 'ip_address' (e.g. 'internal', 'external')
   Returns:
     A single sample (see 'Run' docstring for sample type description).
