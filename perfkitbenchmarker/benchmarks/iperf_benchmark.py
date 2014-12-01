@@ -42,21 +42,60 @@ def GetInfo():
 
 
 def Prepare(benchmark_spec):
-  """Install iperf on the target vm.
+  """Install iperf and start the server on all machines.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
+
+  fw = benchmark_spec.firewall
   vms = benchmark_spec.vms
   for vm in vms:
     vm.InstallPackage('iperf')
+    fw.AllowPort(vm, IPERF_PORT)
+    vm.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
+                     IPERF_PORT)
 
-  fw = benchmark_spec.firewall
-  fw.AllowPort(vms[1], IPERF_PORT)
 
-  vms[1].RemoteCommand(
-      'nohup iperf --server --port %s &> /dev/null &' % IPERF_PORT)
+def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
+  """Run iperf using sending 'vm' to connect to 'ip_address'.
+
+  Args:
+    sending_vm: The VM sending traffic.
+    receiving_vm: The VM receiving traffic.
+    ip_address: The IP address of the iperf server (ie the receiver).
+    ip_type: The IP type of 'ip_address' (e.g. 'internal', 'external')
+  Returns:
+    A single sample (see 'Run' docstring for sample type description).
+  Raises:
+    ValueError: When iperf results are not found in stdout.
+  """
+  iperf_cmd = ('iperf --client %s --port %s --format m --time 60' %
+               (receiving_ip_address, IPERF_PORT))
+  iperf_pattern = re.compile(r'(\d+\.\d+|\d+) Mbits/sec')
+  stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True)
+  match = iperf_pattern.search(stdout)
+  if not match:
+    raise ValueError('Could not find iperf result in stdout:\n\n%s' % stdout)
+  value = match.group(1)
+
+  metadata = {
+      # TODO(voellm): The server and client terminology is being
+      # deprecated.  It does not make clear the direction of the flow.
+      'server_machine_type': receiving_vm.machine_type,
+      'server_zone': receiving_vm.zone,
+      'client_machine_type': sending_vm.machine_type,
+      'client_zone': sending_vm.zone,
+
+      # The meta data defining the environment
+      'receiving_machine_type': receiving_vm.machine_type,
+      'receiving_zone': receiving_vm.zone,
+      'sending_machine_type': sending_vm.machine_type,
+      'sending_zone': sending_vm.zone,
+      'ip_type': ip_type
+  }
+  return ('Throughput', float(value), 'Mbits/sec', metadata)
 
 
 def Run(benchmark_spec):
@@ -73,49 +112,28 @@ def Run(benchmark_spec):
         metadata.
   """
   vms = benchmark_spec.vms
-  vm = vms[0]
-  server_vm = vms[1]
   results = []
-
-  metadata = {
-      'server_machine_type': server_vm.machine_type,
-      'server_zone': server_vm.zone,
-      'receiving_zone': server_vm.zone,
-      'client_machine_type': vm.machine_type,
-      'client_zone': vm.zone,
-      'sending_zone': vm.zone
-  }
-
-  def RunIperf(ip_address, ip_type):
-    """Run iperf using client 'vm' to connect to 'ip_address'.
-
-    Args:
-      ip_address: The IP address of the iperf server.
-      ip_type: The IP type of 'ip_address' (e.g. 'internal', 'external')
-    Returns:
-      A single sample (see 'Run' docstring for sample type description).
-    Raises:
-      ValueError: When iperf results are not found in stdout.
-    """
-    iperf_cmd = ('iperf --client %s --port %s --format m --time 60' %
-                 (ip_address, IPERF_PORT))
-    iperf_pattern = re.compile(r'(\d+\.\d+|\d+) Mbits/sec')
-    stdout, _ = vm.RemoteCommand(iperf_cmd, should_log=True)
-    match = iperf_pattern.search(stdout)
-    if not match:
-      raise ValueError('Could not find iperf result in stdout:\n\n%s' % stdout)
-    value = match.group(1)
-    meta = metadata.copy()
-    meta['ip_type'] = ip_type
-    return ('Throughput', float(value), 'Mbits/sec', meta)
 
   logging.info('Iperf Results:')
 
-  if perfkitbenchmarker_lib.ShouldRunOnExternalIpAddress():
-    results.append(RunIperf(server_vm.ip_address, 'external'))
+  # Send traffic in both directions
+  for originator in [0, 1]:
+    sending_vm = vms[originator]
+    receiving_vm = vms[originator ^ 1]
+    # Send using external IP addresses
+    if perfkitbenchmarker_lib.ShouldRunOnExternalIpAddress():
+      results.append(_RunIperf(sending_vm,
+                               receiving_vm,
+                               receiving_vm.ip_address,
+                               'external'))
 
-  if perfkitbenchmarker_lib.ShouldRunOnInternalIpAddress(vm, server_vm):
-    results.append(RunIperf(server_vm.internal_ip, 'internal'))
+    # Send using internal IP addresses
+    if perfkitbenchmarker_lib.ShouldRunOnInternalIpAddress(sending_vm,
+                                                           receiving_vm):
+      results.append(_RunIperf(sending_vm,
+                               receiving_vm,
+                               receiving_vm.internal_ip,
+                               'internal'))
 
   return results
 
