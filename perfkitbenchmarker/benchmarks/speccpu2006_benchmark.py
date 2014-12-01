@@ -26,6 +26,7 @@ import re
 
 import gflags as flags
 import logging
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 
 FLAGS = flags.FLAGS
@@ -38,7 +39,6 @@ BENCHMARK_INFO = {'name': 'speccpu2006',
                   'scratch_disk': True,
                   'num_machines': 1}
 
-DATA_DIR = 'data'
 SPECCPU2006_TAR = 'cpu2006v1.2.tgz'
 SPECCPU2006_DIR = 'cpu2006'
 
@@ -59,13 +59,12 @@ def Prepare(benchmark_spec):
   logging.info('prepare SpecCPU2006 on %s', vm)
   vm.InstallPackage('build-essential')
   vm.InstallPackage('gfortran')
-  tar_file_path = os.path.join(DATA_DIR, SPECCPU2006_TAR)
-  local_tar_file_path = tar_file_path
-  if not os.path.isfile(local_tar_file_path):
-    logging.error('Please provide %s under %s directory before'
-                  ' running SpecCPU2006 benchmark.', SPECCPU2006_TAR, DATA_DIR)
-    raise errors.Benchmarks.PrepareException(
-        '%s not fount.' % local_tar_file_path)
+  try:
+    local_tar_file_path = data.ResourcePath(SPECCPU2006_TAR)
+  except data.ResourceNotFound as e:
+    logging.error('Please provide %s under perfkitbenchmarker/data directory '
+                  'before running SpecCPU2006 benchmark.', SPECCPU2006_TAR)
+    raise errors.Benchmarks.PrepareException(str(e))
   vm.tar_file_path = os.path.join(vm.GetScratchDir(), SPECCPU2006_TAR)
   vm.spec_dir = os.path.join(vm.GetScratchDir(), SPECCPU2006_DIR)
   vm.RemoteCommand('chmod 777 %s' % vm.GetScratchDir())

@@ -19,9 +19,10 @@ Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
 
-
 import gflags as flags
 import logging
+
+from perfkitbenchmarker import data
 
 FLAGS = flags.FLAGS
 
@@ -31,7 +32,6 @@ flags.DEFINE_string('fio_jobfile', 'fio.job', 'job file that fio will use')
 flags.DEFINE_integer('memory_multiple', 10,
                      'size of fio scratch file compared to main memory size.')
 
-jobfile_directory = 'data/'
 
 BENCHMARK_INFO = {'name': 'fio_benchmark',
                   'description': 'Runs FIO in sequenctial, random, read '
@@ -59,7 +59,7 @@ def Prepare(benchmark_spec):
   vm = vms[0]
   logging.info('FIO prepare on %s', vm)
   vm.InstallPackage(REQUIRED_PACKAGES)
-  file_path = jobfile_directory + flags.FLAGS.fio_jobfile
+  file_path = data.ResourcePath(flags.FLAGS.fio_jobfile)
   vm.PushFile(file_path)
   disk_size_kb = vm.GetDeviceSizeFromPath(vm.GetScratchDir())
   amount_memory_kb = vm.total_memory_kb

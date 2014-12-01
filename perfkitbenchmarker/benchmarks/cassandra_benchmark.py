@@ -25,10 +25,10 @@ import time
 
 
 from perfkitbenchmarker import benchmark_spec as bs
+from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import virtual_machine
 
 
 DEFAULT_CLUSTER_SIZE = 4
@@ -140,8 +140,7 @@ def ConfigureCassandraEnvScript(vm):
                    CASSANDRA_DIR)
   context = {'ip_address': vm.internal_ip}
 
-  file_path = os.path.join(
-      virtual_machine.DATA_DIR, 'cassandra-env.sh.j2')
+  file_path = data.ResourcePath('cassandra-env.sh.j2')
 
   vm.RenderTemplate(file_path,
                     os.path.join(CASSANDRA_DIR, 'conf', 'cassandra-env.sh'),
@@ -161,8 +160,7 @@ def GenerateCassandraYaml(vm, seed_vm):
              'concurrent_writes': vm.num_cpus * 8,
              'eth0_address': vm.internal_ip}
 
-  file_path = os.path.join(
-      virtual_machine.DATA_DIR, 'cassandra.yaml.j2')
+  file_path = data.ResourcePath('cassandra.yaml.j2')
   vm.RenderTemplate(file_path,
                     os.path.join(CASSANDRA_DIR, 'conf', 'cassandra.yaml'),
                     context=context)

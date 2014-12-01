@@ -26,6 +26,7 @@ import re
 
 import gflags as flags
 from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 
@@ -56,8 +57,6 @@ OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
 
 NODE_URL = 'git://github.com/ry/node.git'
 NODE_COMMIT = 'v0.10.30'
-
-CONF_DIR = 'data/'
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data
@@ -298,7 +297,7 @@ def Prepare(benchmark_spec):
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
   # Prepare data on vm, add permission to /run/folder
   vms[0].RemoteCommand('sudo chmod 777 /run/')
-  file_path = CONF_DIR + DATA_FILE
+  file_path = data.ResourcePath(DATA_FILE)
   vms[0].PushFile(file_path, '/run/')
 
 

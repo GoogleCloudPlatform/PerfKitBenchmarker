@@ -26,6 +26,7 @@ import os.path
 import gflags as flags
 import logging
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -40,7 +41,6 @@ HADOOP_VERSION = '2.5.2'
 HADOOP_URL = ('http://apache.mirrors.tds.net/hadoop/common/hadoop-%s/'
               'hadoop-%s.tar.gz') % (HADOOP_VERSION, HADOOP_VERSION)
 
-CONF_DIR = 'data/'
 DATA_FILES = ['core-site.xml.j2', 'yarn-site.xml.j2', 'hdfs-site.xml',
               'mapred-site.xml', 'hadoop-env.sh', 'slaves.j2']
 
@@ -79,7 +79,7 @@ def InstallHadoop(vm, master_ip, worker_ips):
   }
 
   for file_name in DATA_FILES:
-    file_path = os.path.join(CONF_DIR, file_name)
+    file_path = data.ResourcePath(file_name)
     remote_path = os.path.join('hadoop-%s/conf' % HADOOP_VERSION,
                                file_name)
     if file_name.endswith('.j2'):

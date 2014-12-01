@@ -44,6 +44,7 @@ import tempfile
 import gflags as flags
 import logging
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import regex_util
 
 FLAGS = flags.FLAGS
@@ -60,7 +61,6 @@ OPENBLAS_URL = 'git://github.com/xianyi/OpenBLAS'
 OPENBLAS_COMMIT = 'v0.2.11'
 OPENBLAS_DIR = 'OpenBLAS'
 REQUIRED_PACKAGES = 'build-essential git gfortran'
-HPCCINF_DIRECTORY = 'data/'
 HPCCINF_FILE = 'hpccinf.txt'
 MACHINEFILE = 'machinefile'
 BLOCK_SIZE = 192
@@ -124,7 +124,7 @@ def CreateHpccinf(vm, benchmark_spec):
       num_columns = total_cpus / i
       break
 
-  file_path = HPCCINF_DIRECTORY + HPCCINF_FILE
+  file_path = data.ResourcePath(HPCCINF_FILE)
   vm.PushFile(file_path, HPCCINF_FILE)
   sed_cmd = (('sed -i -e "s/problem_size/%s/" -e "s/block_size/%s/" '
               '-e "s/rows/%s/" -e "s/columns/%s/" %s') %
