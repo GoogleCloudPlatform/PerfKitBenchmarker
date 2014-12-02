@@ -27,6 +27,7 @@ import uuid
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.sample import Sample
 
 FLAGS = flags.FLAGS
 
@@ -367,10 +368,7 @@ class SampleCollector(object):
   results via any number of SamplePublishers.
 
   Attributes:
-    samples: a list of 3 or 4-tuples. The tuples contain the metric
-        name (string), the value (float), and unit (string) of
-        each sample. If a 4th element is included, it is a
-        dictionary of metadata associated with the sample.
+    samples: A list of Sample objects.
     metadata_providers: list of MetadataProvider. Metadata providers to use.
       Defaults to DEFAULT_METADATA_PROVIDERS.
     publishers: list of SamplePublishers. If not specified, defaults to a
@@ -422,27 +420,29 @@ class SampleCollector(object):
     """Adds data samples to the publisher.
 
     Args:
-      samples: a list of 3 or 4-tuples. The tuples contain the metric
-          name (string), the value (float), and unit (string) of
-          each sample. If a 4th element is included, it is a
-          dictionary of metadata associated with the sample.
+      samples: Either a list of Sample objects (preferred) or a list of 3 or
+        4-tuples (deprecated). The tuples contain the metric name (string), the
+        value (float), and unit (string) of each sample. If a 4th element is
+        included, it is a dictionary of metadata associated with the sample.
       benchmark: string. The name of the benchmark.
       benchmark_spec: BenchmarkSpec. Benchmark specification.
     """
     for s in samples:
-      sample = dict()
-      sample['test'] = benchmark
-      sample['metric'] = s[0]
-      sample['value'] = s[1]
-      sample['unit'] = s[2]
-      if len(s) == 4:
-        metadata = s[3]
-      else:
-        metadata = dict()
-      for meta_provider in self.metadata_providers:
-        metadata = meta_provider.AddMetadata(metadata, benchmark_spec)
+      # Convert input in deprecated format to Sample objects.
+      if isinstance(s, (list, tuple)):
+        if len(s) not in (3, 4):
+          raise ValueError(
+              'Invalid sample "{0}": should be 3- or 4-tuple.'.format(s))
+        s = Sample(*s)
 
-      sample['metadata'] = metadata
+      # Annotate the sample.
+      sample = dict(s.asdict())
+      sample['test'] = benchmark
+
+      for meta_provider in self.metadata_providers:
+        sample['metadata'] = meta_provider.AddMetadata(
+            sample['metadata'], benchmark_spec)
+
       sample['product_name'] = FLAGS.product_name
       sample['official'] = FLAGS.official
       sample['owner'] = FLAGS.owner
