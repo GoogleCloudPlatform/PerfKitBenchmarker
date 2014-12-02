@@ -319,6 +319,7 @@ def RunBenchmarks(publish=True):
 
 
 def main(argv):  # pylint: disable=unused-argument
+  logging.basicConfig(level=logging.INFO)
   try:
     argv = FLAGS(argv)  # parse flags
   except flags.FlagsError, e:
