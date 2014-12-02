@@ -172,7 +172,7 @@ class ThreadWithExceptions(threading.Thread):
     """Modified join to raise an exception if needed."""
     super(ThreadWithExceptions, self).join(*args, **kwargs)
     if self.exception:
-      raise errors.PerfKitBenchmarkerLib.ThreadException(self.exception)
+      raise errors.VmUtil.ThreadException(self.exception)
 
 
 def RunThreaded(target, thread_params, max_concurrent_threads=200):
@@ -240,7 +240,7 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
       thread.start()
 
   if exceptions:
-    raise errors.PerfKitBenchmarkerLib.ThreadException(
+    raise errors.VmUtil.ThreadException(
         'The following exceptions occurred during threaded execution: %s' %
         '\n'.join([stacktrace for stacktrace in exceptions]))
 
@@ -371,7 +371,7 @@ def IssueRetryableCommand(cmd):
     full_cmd = ' '.join(cmd)
     error_text = ('Command %s returned a non-zero exit code (%d).\n'
                   'STDOUT: %sSTDERR: %s') % (full_cmd, retcode, stdout, stderr)
-    raise errors.PerfKitBenchmarkerLib.CalledProcessException(error_text)
+    raise errors.VmUtil.CalledProcessException(error_text)
   return stdout, stderr
 
 
