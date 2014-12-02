@@ -25,7 +25,7 @@ import re
 import gflags as flags
 import logging
 
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
@@ -121,15 +121,15 @@ def Run(benchmark_spec):
     sending_vm = vms[originator]
     receiving_vm = vms[originator ^ 1]
     # Send using external IP addresses
-    if perfkitbenchmarker_lib.ShouldRunOnExternalIpAddress():
+    if vm_util.ShouldRunOnExternalIpAddress():
       results.append(_RunIperf(sending_vm,
                                receiving_vm,
                                receiving_vm.ip_address,
                                'external'))
 
     # Send using internal IP addresses
-    if perfkitbenchmarker_lib.ShouldRunOnInternalIpAddress(sending_vm,
-                                                           receiving_vm):
+    if vm_util.ShouldRunOnInternalIpAddress(sending_vm,
+                                            receiving_vm):
       results.append(_RunIperf(sending_vm,
                                receiving_vm,
                                receiving_vm.internal_ip,

@@ -20,7 +20,6 @@ import gflags as flags
 import logging
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import perfkitbenchmarker_lib
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -129,7 +128,7 @@ class BenchmarkSpec(object):
         self.vm_dict[node.split(':')[1]] = []
       args = [((config_dict[node],
                 node.split(':')[1]), {}) for node in self.config.node_sections]
-      perfkitbenchmarker_lib.RunThreaded(
+      vm_util.RunThreaded(
           self.CreateVirtualMachineFromNodeSection, args)
       self.num_vms = len(self.vms)
       self.image = ','.join(self.image)
@@ -172,16 +171,16 @@ class BenchmarkSpec(object):
     """Prepares the VMs and networks necessary for the benchmark to run."""
     if self.networks:
       prepare_args = [self.networks[zone] for zone in self.networks]
-      perfkitbenchmarker_lib.RunThreaded(self.PrepareNetwork, prepare_args)
+      vm_util.RunThreaded(self.PrepareNetwork, prepare_args)
     if self.vms:
       prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
-      perfkitbenchmarker_lib.RunThreaded(self.PrepareVm, prepare_args)
+      vm_util.RunThreaded(self.PrepareVm, prepare_args)
 
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
       return
     if self.vms:
-      perfkitbenchmarker_lib.RunThreaded(self.DeleteVm, self.vms)
+      vm_util.RunThreaded(self.DeleteVm, self.vms)
     self.firewall.DisallowAllPorts()
     for zone in self.networks:
       self.networks[zone].Delete()
@@ -266,7 +265,7 @@ class BenchmarkSpec(object):
     vm.AptUpdate()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
-    perfkitbenchmarker_lib.BurnCpu(vm)
+    vm_util.BurnCpu(vm)
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.

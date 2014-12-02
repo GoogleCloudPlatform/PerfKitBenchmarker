@@ -28,8 +28,8 @@ import uuid
 import gflags as flags
 
 from perfkitbenchmarker import network
-from perfkitbenchmarker import perfkitbenchmarker_lib
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import util
 
 FLAGS = flags.FLAGS
@@ -75,9 +75,9 @@ class AwsFirewall(network.BaseFirewall):
                        '--group-id=%s' % vm.group_id,
                        '--port=%s' % port,
                        '--cidr=0.0.0.0/0']
-      perfkitbenchmarker_lib.IssueRetryableCommand(
+      vm_util.IssueRetryableCommand(
           authorize_cmd + ['--protocol=tcp'])
-      perfkitbenchmarker_lib.IssueRetryableCommand(
+      vm_util.IssueRetryableCommand(
           authorize_cmd + ['--protocol=udp'])
       self.firewall_set.add(entry)
 
@@ -101,7 +101,7 @@ class AwsVpc(resource.BaseResource):
                   'create-vpc',
                   '--region=%s' % self.region,
                   '--cidr-block=10.0.0.0/16']
-    stdout, _ = perfkitbenchmarker_lib.IssueRetryableCommand(create_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Vpc']['VpcId']
     self._EnableDnsHostnames()
@@ -123,7 +123,7 @@ class AwsVpc(resource.BaseResource):
                                 '--enable-dns-hostnames',
                                 '{ "Value": true }']
 
-    perfkitbenchmarker_lib.IssueRetryableCommand(enable_hostnames_command)
+    vm_util.IssueRetryableCommand(enable_hostnames_command)
 
   def _Delete(self):
     """Delete's the VPC."""
@@ -132,7 +132,7 @@ class AwsVpc(resource.BaseResource):
                   'delete-vpc',
                   '--region=%s' % self.region,
                   '--vpc-id=%s' % self.id]
-    perfkitbenchmarker_lib.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueRetryableCommand(delete_cmd)
 
 
 class AwsSubnet(resource.BaseResource):
@@ -154,7 +154,7 @@ class AwsSubnet(resource.BaseResource):
                   '--vpc-id=%s' % self.vpc_id,
                   '--cidr-block=10.0.0.0/24',
                   '--availability-zone=%s' % self.zone]
-    stdout, _ = perfkitbenchmarker_lib.IssueRetryableCommand(create_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Subnet']['SubnetId']
     util.AddDefaultTags(self.id, self.region)
@@ -166,7 +166,7 @@ class AwsSubnet(resource.BaseResource):
                   'delete-subnet',
                   '--region=%s' % self.region,
                   '--subnet-id=%s' % self.id]
-    perfkitbenchmarker_lib.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueRetryableCommand(delete_cmd)
 
 
 class AwsInternetGateway(resource.BaseResource):
@@ -185,7 +185,7 @@ class AwsInternetGateway(resource.BaseResource):
                   'ec2',
                   'create-internet-gateway',
                   '--region=%s' % self.region]
-    stdout, _ = perfkitbenchmarker_lib.IssueRetryableCommand(create_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['InternetGateway']['InternetGatewayId']
     util.AddDefaultTags(self.id, self.region)
@@ -197,7 +197,7 @@ class AwsInternetGateway(resource.BaseResource):
                   'delete-internet-gateway',
                   '--region=%s' % self.region,
                   '--internet-gateway-id=%s' % self.id]
-    perfkitbenchmarker_lib.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueRetryableCommand(delete_cmd)
 
   def Attach(self, vpc_id):
     """Attaches the internetgateway to the VPC."""
@@ -209,7 +209,7 @@ class AwsInternetGateway(resource.BaseResource):
                     '--region=%s' % self.region,
                     '--internet-gateway-id=%s' % self.id,
                     '--vpc-id=%s' % self.vpc_id]
-      perfkitbenchmarker_lib.IssueRetryableCommand(attach_cmd)
+      vm_util.IssueRetryableCommand(attach_cmd)
       self.attached = True
 
   def Detach(self):
@@ -221,7 +221,7 @@ class AwsInternetGateway(resource.BaseResource):
                     '--region=%s' % self.region,
                     '--internet-gateway-id=%s' % self.id,
                     '--vpc-id=%s' % self.vpc_id]
-      perfkitbenchmarker_lib.IssueRetryableCommand(detach_cmd)
+      vm_util.IssueRetryableCommand(detach_cmd)
       self.attached = False
 
 
@@ -247,7 +247,7 @@ class AwsRouteTable(resource.BaseResource):
     """
     pass
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def _PostCreate(self):
     """Gets data about the route table."""
     describe_cmd = [util.AWS_PATH,
@@ -255,7 +255,7 @@ class AwsRouteTable(resource.BaseResource):
                     'describe-route-tables',
                     '--region=%s' % self.region,
                     '--filters=Name=vpc-id,Values=%s' % self.vpc_id]
-    stdout, _ = perfkitbenchmarker_lib.IssueRetryableCommand(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     self.id = response['RouteTables'][0]['RouteTableId']
 
@@ -268,7 +268,7 @@ class AwsRouteTable(resource.BaseResource):
                   '--route-table-id=%s' % self.id,
                   '--gateway-id=%s' % internet_gateway_id,
                   '--destination-cidr-block=0.0.0.0/0']
-    perfkitbenchmarker_lib.IssueRetryableCommand(create_cmd)
+    vm_util.IssueRetryableCommand(create_cmd)
 
 
 class AwsPlacementGroup(resource.BaseResource):
@@ -298,7 +298,7 @@ class AwsPlacementGroup(resource.BaseResource):
                   '--region=%s' % self.region,
                   '--group-name=%s' % self.name,
                   '--strategy=cluster']
-    perfkitbenchmarker_lib.IssueRetryableCommand(create_cmd)
+    vm_util.IssueRetryableCommand(create_cmd)
 
   def _Delete(self):
     """Deletes the Placement Group."""
@@ -307,7 +307,7 @@ class AwsPlacementGroup(resource.BaseResource):
                   'delete-placement-group',
                   '--region=%s' % self.region,
                   '--group-name=%s' % self.name]
-    perfkitbenchmarker_lib.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueRetryableCommand(delete_cmd)
 
 
 class AwsNetwork(network.BaseNetwork):

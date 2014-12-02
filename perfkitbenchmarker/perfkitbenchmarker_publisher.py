@@ -26,7 +26,6 @@ import uuid
 import gflags as flags
 import logging
 
-from perfkitbenchmarker import perfkitbenchmarker_lib
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 
@@ -191,7 +190,7 @@ class PerfKitBenchmarkerPublisher(object):
                   '--source_format=NEWLINE_DELIMITED_JSON',
                   FLAGS.bigquery_table,
                   self.json_file]
-      perfkitbenchmarker_lib.IssueRetryableCommand(load_cmd)
+      vm_util.IssueRetryableCommand(load_cmd)
 
     if delete_file:
       self.DeleteFile()

@@ -63,7 +63,6 @@ import gflags as flags
 
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import perfkitbenchmarker_lib
 from perfkitbenchmarker import perfkitbenchmarker_publisher
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import version
@@ -299,7 +298,7 @@ def RunBenchmarks(publish=True):
     if FLAGS.parallelism > 1:
       args = [((benchmark, publisher), {})
               for benchmark in benchmarks.BENCHMARKS]
-      perfkitbenchmarker_lib.RunThreaded(
+      vm_util.RunThreaded(
           RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
     else:
       for benchmark in benchmarks.BENCHMARKS:
@@ -329,7 +328,7 @@ def Main(argv=sys.argv):
       '\nBenchmarks:\n\t%s') % '\n\t'.join(benchmark_list)
   try:
     argv = FLAGS(argv)  # parse flags
-  except flags.FlagsError, e:
+  except flags.FlagsError as e:
     logging.error(
         '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)

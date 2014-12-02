@@ -21,10 +21,10 @@ only a processor's core features.
 Coremark homepage: http://www.eembc.org/coremark/
 """
 
+import logging
 import os.path
 import re
 
-import logging
 from perfkitbenchmarker import errors
 
 BENCHMARK_INFO = {'name': 'coremark',

@@ -26,7 +26,7 @@ import string
 import threading
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import util
 
 
@@ -53,7 +53,7 @@ class AwsDisk(disk.BaseDisk):
                   '--size=%s' % self.disk_size,
                   '--availability-zone=%s' % self.zone,
                   '--volume-type=%s' % self.disk_type]
-    stdout, _ = perfkitbenchmarker_lib.IssueRetryableCommand(create_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['VolumeId']
     util.AddDefaultTags(self.id, self.region)
@@ -65,7 +65,7 @@ class AwsDisk(disk.BaseDisk):
                   'delete-volume',
                   '--region=%s' % self.region,
                   '--volume-id=%s' % self.id]
-    perfkitbenchmarker_lib.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueRetryableCommand(delete_cmd)
 
   def Attach(self, vm):
     """Attaches the disk to a VM.
@@ -88,7 +88,7 @@ class AwsDisk(disk.BaseDisk):
                   '--instance-id=%s' % self.attached_vm_id,
                   '--volume-id=%s' % self.id,
                   '--device=%s' % self.GetDevicePath()]
-    perfkitbenchmarker_lib.IssueRetryableCommand(attach_cmd)
+    vm_util.IssueRetryableCommand(attach_cmd)
 
   def Detach(self):
     """Detaches the disk from a VM."""
@@ -98,7 +98,7 @@ class AwsDisk(disk.BaseDisk):
                   '--region=%s' % self.region,
                   '--instance-id=%s' % self.attached_vm_id,
                   '--volume-id=%s' % self.id]
-    perfkitbenchmarker_lib.IssueRetryableCommand(detach_cmd)
+    vm_util.IssueRetryableCommand(detach_cmd)
 
     with self._lock:
       assert self.attached_vm_id in AwsDisk.vm_devices

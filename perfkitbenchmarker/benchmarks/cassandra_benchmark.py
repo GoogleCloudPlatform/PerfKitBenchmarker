@@ -27,7 +27,7 @@ import time
 from perfkitbenchmarker import benchmark_spec as bs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import virtual_machine
 
 
@@ -113,7 +113,7 @@ def Prepare(benchmark_spec):
   vm_dict[LOADER_NODE][0].AuthenticateVm()
 
   logging.info('Preparing data files and Java on all vms.')
-  perfkitbenchmarker_lib.RunThreaded(PrepareVm, benchmark_spec.vms)
+  vm_util.RunThreaded(PrepareVm, benchmark_spec.vms)
 
 
 def AbandonPastDeployment(vm):
@@ -287,7 +287,7 @@ def InsertTest(benchmark_spec, vm):
   logging.info('Executing the benchmark.')
   args = [((loader_vm, data_nodes_ip_addresses), {})
           for loader_vm in benchmark_spec.vm_dict[LOADER_NODE]]
-  perfkitbenchmarker_lib.RunThreaded(RunTestOnLoader, args)
+  vm_util.RunThreaded(RunTestOnLoader, args)
 
 
 def WaitLoaderForFinishing(vm):
@@ -340,10 +340,10 @@ def InitializeCurrentDeployment(benchmark_spec):
         that is required to run the benchmark.
   """
   logging.info('Unpacking cassandra on all vms.')
-  perfkitbenchmarker_lib.RunThreaded(UnpackCassandra, benchmark_spec.vms)
+  vm_util.RunThreaded(UnpackCassandra, benchmark_spec.vms)
   logging.info('Killing past deployments.')
-  perfkitbenchmarker_lib.RunThreaded(AbandonPastDeployment,
-                                     benchmark_spec.vm_dict[DATA_NODE])
+  vm_util.RunThreaded(AbandonPastDeployment,
+                      benchmark_spec.vm_dict[DATA_NODE])
 
 
 def StartCassandraServers(benchmark_spec):
@@ -356,7 +356,7 @@ def StartCassandraServers(benchmark_spec):
   vm_dict = benchmark_spec.vm_dict
   logging.info('Setting Cassandra up.')
   args = [((vm, vm_dict[DATA_NODE][0]), {}) for vm in vm_dict[DATA_NODE]]
-  perfkitbenchmarker_lib.RunThreaded(StartCassandraDataNodeServer, args)
+  vm_util.RunThreaded(StartCassandraDataNodeServer, args)
   logging.info('Verifying cluster.')
   cluster_ready = VerifyCluster(benchmark_spec,
                                 vm_dict[DATA_NODE][0])
@@ -364,7 +364,7 @@ def StartCassandraServers(benchmark_spec):
   while not cluster_ready and retry_count < MAX_RETRY_START_CLUSTER:
     retry_count += 1
     args = [((vm, vm_dict[DATA_NODE][0]), {}) for vm in vm_dict[DATA_NODE]]
-    perfkitbenchmarker_lib.RunThreaded(VerifyNode, args)
+    vm_util.RunThreaded(VerifyNode, args)
     logging.info('Wait %s seconds for retried node.',
                  WAITING_IN_SECONDS)
     time.sleep(WAITING_IN_SECONDS)
@@ -386,8 +386,8 @@ def RunCassandraStressTest(benchmark_spec):
   """
   InsertTest(benchmark_spec, benchmark_spec.vm_dict[DATA_NODE][0])
   logging.info('Tests running. Watching progress.')
-  perfkitbenchmarker_lib.RunThreaded(WaitLoaderForFinishing,
-                                     benchmark_spec.vm_dict[LOADER_NODE])
+  vm_util.RunThreaded(WaitLoaderForFinishing,
+                      benchmark_spec.vm_dict[LOADER_NODE])
 
 
 def CollectResults(benchmark_spec):
@@ -406,7 +406,7 @@ def CollectResults(benchmark_spec):
   logging.info('Gathering results.')
   vm_dict = benchmark_spec.vm_dict
   cmd = ['mkdir', RESULTS_DIR]
-  perfkitbenchmarker_lib.IssueCommand(cmd)
+  vm_util.IssueCommand(cmd)
   interval_op_rate_list = []
   interval_key_rate_list = []
   latency_median_list = []
@@ -417,7 +417,7 @@ def CollectResults(benchmark_spec):
             latency_median_list, latency_95th_list,
             latency_99_9th_list,
             total_operation_time_list), {}) for vm in vm_dict[LOADER_NODE]]
-  perfkitbenchmarker_lib.RunThreaded(CollectResultFile, args)
+  vm_util.RunThreaded(CollectResultFile, args)
   results = []
   results.append(['Interval_op_rate', math.fsum(interval_op_rate_list),
                   'operations per second', {}])
@@ -478,5 +478,5 @@ def Cleanup(benchmark_spec):
         that is required to run the benchmark.
   """
   vm_dict = benchmark_spec.vm_dict
-  perfkitbenchmarker_lib.RunThreaded(AbandonPastDeployment, vm_dict[DATA_NODE])
-  perfkitbenchmarker_lib.RunThreaded(CleanupVm, benchmark_spec.vms)
+  vm_util.RunThreaded(AbandonPastDeployment, vm_dict[DATA_NODE])
+  vm_util.RunThreaded(CleanupVm, benchmark_spec.vms)
