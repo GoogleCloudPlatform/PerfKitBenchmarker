@@ -63,10 +63,10 @@ import gflags as flags
 
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import perfkitbenchmarker_publisher
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.publisher import PerfKitBenchmarkerPublisher
 
 STAGE_ALL = 'all'
 STAGE_PREPARE = 'prepare'
@@ -278,7 +278,7 @@ def RunBenchmarks(publish=True):
     return 1
 
   vm_util.SSHKeyGen()
-  publisher = perfkitbenchmarker_publisher.PerfKitBenchmarkerPublisher()
+  publisher = PerfKitBenchmarkerPublisher()
 
   if FLAGS.static_vm_file:
     with open(FLAGS.static_vm_file) as fp:
