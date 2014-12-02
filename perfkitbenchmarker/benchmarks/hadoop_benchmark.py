@@ -36,7 +36,7 @@ BENCHMARK_INFO = {'name': 'hadoop_benchmark',
                   'num_machines': 9}
 
 JRE_PKG = 'openjdk-7-jre-headless'
-HADOOP_VERSION = '2.2.0'
+HADOOP_VERSION = '2.5.2'
 HADOOP_URL = ('http://apache.mirrors.tds.net/hadoop/common/hadoop-%s/'
               'hadoop-%s.tar.gz') % (HADOOP_VERSION, HADOOP_VERSION)
 
