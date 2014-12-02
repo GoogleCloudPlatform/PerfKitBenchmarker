@@ -18,6 +18,7 @@ import io
 import json
 import re
 import tempfile
+import uuid
 import unittest
 
 import mock
@@ -142,3 +143,33 @@ class BigQueryPublisherTestCase(unittest.TestCase):
         service_account_private_key_file=mock.MagicMock())
     instance.PublishSamples(self.samples)  # No error
     self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(mock.ANY)
+
+
+class CloudStoragePublisherTestCase(unittest.TestCase):
+
+  def setUp(self):
+    p = mock.patch(publisher.__name__ + '.vm_util', spec=publisher.vm_util)
+    self.mock_vm_util = p.start()
+    self.mock_vm_util.GetTempDir.return_value = tempfile.gettempdir()
+    self.addCleanup(p.stop)
+
+    p = mock.patch(publisher.__name__ + '.time', spec=publisher.time)
+    self.mock_time = p.start()
+    self.addCleanup(p.stop)
+
+    p = mock.patch(publisher.__name__ + '.uuid', spec=publisher.uuid)
+    self.mock_uuid = p.start()
+    self.addCleanup(p.stop)
+
+    self.samples = [{'test': 'testa', 'metadata': {}},
+                    {'test': 'testb', 'metadata': {}}]
+
+  def testPublishSamples(self):
+    self.mock_time.time.return_value = 1417647763.387665
+    self.mock_uuid.uuid4.return_value = uuid.UUID(
+        'be428eb3-a54a-4615-b7ca-f962b729c7ab')
+    instance = publisher.CloudStoragePublisher('test-bucket')
+    instance.PublishSamples(self.samples)
+    self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(
+        ['gsutil', 'cp', mock.ANY,
+         'gs://test-bucket/141764776338_be428eb'])
