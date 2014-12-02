@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Class that publishes data collected from PerfKitBenchmarker.
+"""Classes to collect and publish performance samples to various sinks."""
 
-Contains methods to collect data, write it to a file, and export the data
-to Perfkit.
-"""
-
+import abc
+import itertools
 import json
-import os
+import operator
+import tempfile
 import time
 import uuid
+import sys
 
 import gflags as flags
 import logging
@@ -40,8 +40,18 @@ flags.DEFINE_boolean(
 flags.DEFINE_string(
     'bigquery_table',
     None,
-    'The bigquery table to publish results to. This should be of the form '
-    '"dataset_name.table_name".')
+    'The BigQuery table to publish results to. This should be of the form '
+    '"[project_id:]dataset_name.table_name".')
+flags.DEFINE_string(
+    'bq_path', 'bq', 'Path to the "bq" executable.')
+flags.DEFINE_string(
+    'bq_project', None, 'Project to use for authenticating with BigQuery.')
+flags.DEFINE_string(
+    'service_account', None, 'Service account to use to authenticate with BQ.')
+flags.DEFINE_string(
+    'service_account_private_key', None,
+    'Service private key for authenticating with BQ.')
+
 flags.DEFINE_list(
     'metadata',
     [],
@@ -49,7 +59,7 @@ flags.DEFINE_list(
     'samples as metadata. Each key-value pair in the list should be colon '
     'separated.')
 
-BIGQUERY = 'bq'
+PRODUCT_NAME = 'PerfKitBenchmarker'
 
 
 def GetLabelsFromDict(metadata):
@@ -67,54 +77,260 @@ def GetLabelsFromDict(metadata):
   return ','.join(labels)
 
 
-def AddStandardMetadata(metadata, benchmark_spec):
-  """Adds metadata standard across all benchmarks.
+class MetadataProvider(object):
+  """A provider of sample metadata."""
 
-  Args:
-    metadata: The metadata dictionary to be modified.
-    benchmark_spec: A BenchmarkSpec instance that describes the benchmark.
-  """
-  metadata['perfkitbenchmarker_version'] = version.VERSION
-  metadata['cloud'] = benchmark_spec.cloud
-  metadata['zones'] = benchmark_spec.zones
-  metadata['machine_type'] = benchmark_spec.machine_type
-  metadata['image'] = benchmark_spec.image
-  for pair in FLAGS.metadata:
-    try:
-      key, value = pair.split(':')
-      metadata[key] = value
-    except ValueError:
-      logging.error('Bad metadata flag format. Skipping "%s".', pair)
-      continue
+  __metaclass__ = abc.ABCMeta
 
+  @abc.abstractmethod
+  def AddMetadata(self, metadata, benchmark_spec):
+    """Add metadata to a dictionary.
 
-class PerfKitBenchmarkerPublisher(object):
-  """Class to publish performance benchmark results and their configurations."""
-
-  def __init__(self, json_file=None):
-    """Initialize an PerfKitBenchmarkerPublisher class.
+    Existing values will be overwritten.
 
     Args:
-      json_file: (optional) path to existing json file to be published.
+      metadata: dict. Dictionary of metadata to update.
+      benchmark_spec: BenchmarkSpec. The benchmark specification.
+
+    Returns:
+      Updated 'metadata'.
     """
-    if json_file:
-      self.json_file = json_file
-    else:
-      self.json_file = vm_util.PrependTempDir('perfkitbenchmarker.json')
+    raise NotImplementedError()
+
+
+class DefaultMetadataProvider(MetadataProvider):
+  """Adds default metadata to samples."""
+
+  def AddMetadata(self, metadata, benchmark_spec):
+    metadata = metadata.copy()
+    metadata['perfkitbenchmarker_version'] = version.VERSION
+    metadata['cloud'] = benchmark_spec.cloud
+    metadata['zones'] = ','.join(benchmark_spec.zones)
+    metadata['machine_type'] = benchmark_spec.machine_type
+    metadata['image'] = benchmark_spec.image
+    for pair in FLAGS.metadata:
+      try:
+        key, value = pair.split(':')
+        metadata[key] = value
+      except ValueError:
+          logging.error('Bad metadata flag format. Skipping "%s".', pair)
+          continue
+
+    return metadata
+
+
+DEFAULT_METADATA_PROVIDERS = [DefaultMetadataProvider()]
+
+
+class SamplePublisher(object):
+  """An object that can publish performance samples."""
+
+  __metaclass__ = abc.ABCMeta
+
+  @abc.abstractmethod
+  def PublishSamples(self, samples):
+    """Publishes 'samples'.
+
+    PublishSamples will be called exactly once. Calling
+    SamplePublisher.PublishSamples multiple times may result in data being
+    overwritten.
+
+    Args:
+      samples: list of dicts to publish.
+    """
+    raise NotImplementedError()
+
+
+class PrettyPrintStreamPublisher(SamplePublisher):
+  """Writes samples to an output stream, defaulting to stdout.
+
+  Samples are pretty-printed and summarized. Example output:
+
+    -------------------------PerfKitBenchmarker Results Summary----------------
+    NETPERF_SIMPLE:
+            TCP_RR_Transaction_Rate 714.72 transactions_per_second
+            TCP_RR_Transaction_Rate 2950.92 transactions_per_second
+            TCP_CRR_Transaction_Rate 201.6 transactions_per_second
+            TCP_CRR_Transaction_Rate 793.59 transactions_per_second
+            TCP_STREAM_Throughput 283.25 Mbits/sec
+            TCP_STREAM_Throughput 989.06 Mbits/sec
+            UDP_RR_Transaction_Rate 107.9 transactions_per_second
+            UDP_RR_Transaction_Rate 3018.51 transactions_per_second
+            End to End Runtime 471.35810709 seconds
+
+  Attributes:
+    stream: File-like object. Output stream to print samples.
+  """
+  def __init__(self, stream=sys.stdout):
+    self.stream = stream
+
+  def __repr__(self):
+    return '<{0} stream={1}>'.format(type(self).__name__, self.stream)
+
+  def PublishSamples(self, samples):
+    key = operator.itemgetter('test')
+    samples = sorted(samples, key=key)
+    data = [
+        '\n' + '-' * 25 + 'PerfKitBenchmarker Results Summary' + '-' * 25 +
+        '\n']
+    for benchmark, test_samples in itertools.groupby(samples, key):
+      data.append('%s:\n' % benchmark.upper())
+      for sample in test_samples:
+        data.append('\t%s %s %s\n' %
+                    (sample['metric'], sample['value'], sample['unit']))
+    data.append('\n')
+    self.stream.write(''.join(data))
+
+
+class LogPublisher(SamplePublisher):
+  """Writes samples to a Python Logger.
+
+  Attributes:
+    level: Logging level. Defaults to logging.INFO.
+    logger: Logger to publish to. Defaults to the root logger.
+  """
+
+  def __init__(self, level=logging.INFO, logger=logging.getLogger()):
+    self.level = level
+    self.logger = logger
+
+  def __repr__(self):
+    return '<{0} logger={1} level={2}>'.format(type(self).__name__, self.logger,
+                                               self.level)
+
+  def PublishSamples(self, samples):
+    data = [
+        '\n' + '-' * 25 + 'PerfKitBenchmarker Complete Results' + '-' * 25 +
+        '\n']
+    for sample in samples:
+      data.append('%s\n' % sample)
+    self.logger.log(self.level, ''.join(data))
+
+
+class NewlineDelimitedJSONPublisher(SamplePublisher):
+  """Publishes samples as newline delimited JSON, suitable for upload to BQ.
+
+  Attributes:
+    file_path: string. Destination path to write samples.
+    mode: Open mode for 'file_path'. Set to 'a' to append.
+  """
+
+  def __init__(self, file_path, mode='wb'):
+    self.file_path = file_path
+    self.mode = mode
+
+  def __repr__(self):
+    return '<{0} file_path="{1}" mode="{2}">'.format(
+        type(self).__name__, self.file_path, self.mode)
+
+  def PublishSamples(self, samples):
+    logging.info('Publishing %d samples to %s', len(samples),
+                 self.file_path)
+    with open(self.file_path, self.mode) as fp:
+      for sample in samples:
+        sample = sample.copy()
+        sample['labels'] = GetLabelsFromDict(sample.pop('metadata'))
+        fp.write(json.dumps(sample) + '\n')
+
+
+class BigQueryPublisher(SamplePublisher):
+  """Publishes samples to BigQuery.
+
+  Attributes:
+    bigquery_table: The bigquery table to publish to, of the form
+      '[project_name:]dataset_name.table_name'
+  """
+
+  def __init__(self, bigquery_table):
+    self.bigquery_table = bigquery_table
+
+  def __repr__(self):
+    return '<{0} table="{1}">'.format(type(self).__name__, self.bigquery_table)
+
+  def PublishSamples(self, samples):
+    with tempfile.NamedTemporaryFile(prefix='perfkit-bq-pub',
+                                     dir=vm_util.GetTempDir(),
+                                     suffix='.json') as tf:
+      json_publisher = NewlineDelimitedJSONPublisher(tf.name)
+      json_publisher.PublishSamples(samples)
+      logging.info('Publishing %d samples to %s', len(samples),
+                   self.bigquery_table)
+      load_cmd = [FLAGS.bq_path]
+      if FLAGS.bq_project:
+        load_cmd.append('--project_id=' + FLAGS.bq_project)
+      if ((FLAGS.service_account is None) !=
+          (FLAGS.service_account_private_key is None)):
+        raise ValueError('--service_account and --service_account_private_key '
+                         'must be specified together.')
+      if FLAGS.service_account:
+        load_cmd.extend(['--service_account=' + FLAGS.service_account,
+                         '--service_account_credential_file=' +
+                         vm_util.PrependTempDir('credentials.json'),
+                         '--service_account_private_key_file=' +
+                         FLAGS.service_account_private_key_file])
+      load_cmd.extend(['load',
+                       '--source_format=NEWLINE_DELIMITED_JSON',
+                       self.bigquery_table,
+                       tf.name])
+      vm_util.IssueRetryableCommand(load_cmd)
+
+
+class SampleCollector(object):
+  """A performance sample collector.
+
+  Supports incorporating additional metadata into samples, and publishing
+  results via any number of SamplePublishers.
+
+  Attributes:
+    samples: a list of 3 or 4-tuples. The tuples contain the metric
+        name (string), the value (float), and unit (string) of
+        each sample. If a 4th element is included, it is a
+        dictionary of metadata associated with the sample.
+    metadata_providers: List of MetadataProvider. Metadata providers to use.
+      Defaults to DEFAULT_METADATA_PROVIDERS.
+    publishers: list of SamplePublishers. If not specified, defaults to a
+      LogPublisher, PrettyPrintStreamPublisher, NewlineDelimitedJSONPublisher,
+      and a BigQueryPublisher if FLAGS.bigquery_table is specified. See
+      SampleCollector._DefaultPublishers.
+    run_uri: A unique tag for the run.
+  """
+  def __init__(self, metadata_providers=None, publishers=None):
     self.samples = []
+
+    if metadata_providers is not None:
+      self.metadata_providers = metadata_providers
+    else:
+      self.metadata_providers = DEFAULT_METADATA_PROVIDERS
+
+    if publishers is not None:
+      self.publishers = publishers
+    else:
+      self.publishers = SampleCollector._DefaultPublishers()
+
+    logging.debug('Using publishers: {0}'.format(self.publishers))
+
     self.run_uri = str(uuid.uuid4())
 
-  # TODO(user) Add a Sample class.
+  @classmethod
+  def _DefaultPublishers(cls):
+    """Gets a list of default publishers."""
+    json_path = vm_util.PrependTempDir('perfkitbenchmarker.json')
+    publishers = [LogPublisher(), PrettyPrintStreamPublisher(),
+                  NewlineDelimitedJSONPublisher(json_path)]
+    if FLAGS.bigquery_table:
+      publishers.append(BigQueryPublisher(FLAGS.bigquery_table))
+    return publishers
+
   def AddSamples(self, samples, benchmark, benchmark_spec):
-    """Adds data sample to the perfkitbenchmarker publisher.
+    """Adds data samples to the publisher.
 
     Args:
-      samples: a list of 3or4-tuples. The tuples contain the metric
+      samples: a list of 3 or 4-tuples. The tuples contain the metric
           name (string), the value (float), and unit (string) of
           each sample. If a 4th element is included, it is a
           dictionary of metadata associated with the sample.
-      benchmark: string containing the name of the benchmark.
-      benchmark_spec: BenchmarkSpec object of the benchmark.
+      benchmark: string. The name of the benchmark.
+      benchmark_spec: BenchmarkSpec. Benchmark specification.
     """
     for s in samples:
       sample = dict()
@@ -126,9 +342,11 @@ class PerfKitBenchmarkerPublisher(object):
         metadata = s[3]
       else:
         metadata = dict()
-      AddStandardMetadata(metadata, benchmark_spec)
-      sample['labels'] = GetLabelsFromDict(metadata)
-      sample['product_name'] = 'PerfKitBenchmarker'
+      for meta_provider in self.metadata_providers:
+        metadata = meta_provider.AddMetadata(metadata, benchmark_spec)
+
+      sample['metadata'] = metadata
+      sample['product_name'] = PRODUCT_NAME
       sample['official'] = FLAGS.official
       sample['owner'] = FLAGS.owner
       sample['timestamp'] = time.time()
@@ -136,61 +354,7 @@ class PerfKitBenchmarkerPublisher(object):
       sample['sample_uri'] = str(uuid.uuid4())
       self.samples.append(sample)
 
-  def DumpData(self):
-    """Dumps all information from the samples the publisher has collected."""
-    data = [
-        '\n' + '-' * 25 + 'PerfKitBenchmarker Complete Results' + '-' * 25 +
-        '\n']
-    for sample in self.samples:
-      data.append('%s\n' % sample)
-    logging.info(''.join(data))
-
-  def PrettyPrintData(self):
-    """Pretty prints the samples the publisher has collected."""
-    self.samples.sort(key=lambda k: k['test'])
-    benchmark = None
-    data = [
-        '\n' + '-' * 25 + 'PerfKitBenchmarker Results Summary' + '-' * 25 +
-        '\n']
-    for sample in self.samples:
-      if sample['test'] != benchmark:
-        benchmark = sample['test']
-        data.append('%s:\n' % benchmark.upper())
-      data.append('\t%s %s %s\n' %
-                  (sample['metric'], sample['value'], sample['unit']))
-    logging.info(''.join(data))
-
-  def WriteFile(self):
-    """Writes data collected to a json format that can be exported."""
-    f = open(self.json_file, 'a')
-    encoder = json.JSONEncoder()
-    for sample in self.samples:
-      line = '%s\n' % encoder.encode(sample)
-      f.write(line)
-    f.close()
-
-  def DeleteFile(self):
-    """Deletes the json results file."""
-    try:
-      os.remove(self.json_file)
-    except OSError:
-      pass  # File doesn't exist.
-
-  def PublishData(self, delete_file=True):
-    """Writes data to perfkit. The file must have been written already.
-
-    Args:
-      delete_file: A boolean indicating whether to delete the json file.
-          The file will only be deleted if the upload suceeded and this is
-          set to True.
-    """
-    if FLAGS.bigquery_table:
-      load_cmd = [BIGQUERY,
-                  'load',
-                  '--source_format=NEWLINE_DELIMITED_JSON',
-                  FLAGS.bigquery_table,
-                  self.json_file]
-      vm_util.IssueRetryableCommand(load_cmd)
-
-    if delete_file:
-      self.DeleteFile()
+  def PublishSamples(self):
+    """Publish samples via all registered publishers."""
+    for publisher in self.publishers:
+      publisher.PublishSamples(self.samples)
