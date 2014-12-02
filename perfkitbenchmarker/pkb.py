@@ -287,17 +287,7 @@ def RunBenchmarks(publish=True):
         'To run again with this setup, please use --run_uri=%s', FLAGS.run_uri)
 
 
-def Main(argv):
-  try:
-    argv = FLAGS(argv)  # parse flags
-  except flags.FlagsError, e:
-    logging.error(
-        '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
-    sys.exit(1)
-  return RunBenchmarks()
-
-
-def Run():
+def Main(argv=sys.argv):
   # TODO: Verify if there is other way of appending additional help
   # message.
   # Inject more help documentation
@@ -306,4 +296,10 @@ def Run():
                     for benchmark_module in benchmarks.BENCHMARKS]
   sys.modules['__main__'].__doc__ = __doc__ + (
       '\nBenchmarks:\n\t%s') % '\n\t'.join(benchmark_list)
-  sys.exit(Main(sys.argv))
+  try:
+    argv = FLAGS(argv)  # parse flags
+  except flags.FlagsError, e:
+    logging.error(
+        '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
+    sys.exit(1)
+  return RunBenchmarks()
