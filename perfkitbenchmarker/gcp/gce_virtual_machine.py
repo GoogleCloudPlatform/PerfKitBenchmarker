@@ -168,13 +168,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       A list of strings, where each string is the absolute path to the local
           drives on the VM (e.g. '/dev/sdb').
     """
-    match = re.search('([0-9])x-ssd', self.machine_type)
-    if match:
-      num_ssd = int(match.group(1))
-      return ['/dev/sd%s' % chr(ord(DRIVE_START_LETTER) + i)
-              for i in xrange(num_ssd)]
-    else:
-      return []
+    return ['/dev/disk/by-id/google-local-ssd-%d' % i
+            for i in range(self.num_ssds)]
 
   def SetupLocalDrives(self, mount_path=virtual_machine.LOCAL_MOUNT_PATH):
     """Set up any local drives that exist.
