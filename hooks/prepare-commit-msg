@@ -1,0 +1,39 @@
+#!/bin/bash
+
+set -euo pipefail
+
+HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
+
+files_need_boilerplate=()
+for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.py"); do
+  # Check for files without the required boilerplate.
+  boilerplate=$("${HOOKS_DIR}/boilerplate.sh" "${file}")
+  if [[ "$boilerplate" -eq "0" ]]; then
+    files_need_boilerplate+=("${file}")
+  fi
+done
+
+# Check sh files for boilerplate
+for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh"); do
+  # Check for files without the required boilerplate.
+  boilerplate=$("${HOOKS_DIR}/boilerplate.sh" "${file}")
+  if [[ "$boilerplate" -eq "0" ]]; then
+    files_need_boilerplate+=("${file}")
+  fi
+done
+
+if [[ "${#files_need_boilerplate[@]}" -ne 0 ]]; then
+  (
+    echo
+    echo "# *** ERROR: *** Some files are missing the required boilerplate"
+    echo "# header from hooks/boilerplate.txt:"
+    for file in "${files_need_boilerplate[@]}"; do
+      echo "#   ${file}"
+    done
+    echo "# See hooks/boilerplate.\${EXT}.txt for required header."
+    echo "#"
+    echo "# Your commit will be aborted unless you fix these."
+    echo "#   COMMIT_BLOCKED_ON_BOILERPLATE"
+    echo
+  ) >> $1
+fi
