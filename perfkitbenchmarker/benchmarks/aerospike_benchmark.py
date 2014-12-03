@@ -35,8 +35,7 @@ flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
 
 BENCHMARK_INFO = {'name': 'aerospike',
                   'description': 'Runs Aerospike',
-                  'num_machines': 2
-                 }
+                  'num_machines': 2}
 PACKAGES = ('build-essential git autoconf libtool libssl-dev lua5.1 '
             'liblua5.1-dev')
 AEROSPIKE_SERVER = 'https://github.com/aerospike/aerospike-server.git'
@@ -144,7 +143,7 @@ def Run(benchmark_spec):
                   (CLIENT_DIR, server.internal_ip))
   client.RemoteCommand(load_command, should_log=True)
 
-  for threads in xrange(1,MAX_THREADS):
+  for threads in xrange(1, MAX_THREADS):
     load_command = ('timeout 15 ./%s/benchmarks/target/benchmarks '
                     '-z %s -n test -w RU,%s -o B:1000  -k 1000000 '
                     '--latency 5,1 -h %s;:' %
@@ -158,6 +157,7 @@ def Run(benchmark_spec):
                '\n'.join(samples))
   return []
 
+
 def Cleanup(benchmark_spec):
   """Cleanup Aerospike.
 
@@ -170,4 +170,3 @@ def Cleanup(benchmark_spec):
   client.RemoteCommand('sudo rm -rf aerospike*')
   server.RemoteCommand('cd %s; nohup sudo make stop' % SERVER_DIR)
   server.RemoteCommand('sudo rm -rf aerospike*')
-

@@ -25,7 +25,6 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import json
-import re
 
 import gflags as flags
 
