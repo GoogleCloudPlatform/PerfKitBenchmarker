@@ -195,10 +195,8 @@ def RunScpSingleDirection(sending_vm, receiving_vm):
   if vm_util.ShouldRunOnExternalIpAddress():
     results.append(RunForIpAddress(receiving_vm.ip_address, 'external'))
 
-  if vm_util.ShouldRunOnInternalIpAddress(
-      sending_vm, receiving_vm):
-    results.append(RunForIpAddress(receiving_vm.internal_ip,
-                                   'internal'))
+  if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
+    results.append(RunForIpAddress(receiving_vm.internal_ip, 'internal'))
 
   return results
 
