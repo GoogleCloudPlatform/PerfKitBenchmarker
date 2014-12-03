@@ -161,8 +161,8 @@ class PrettyPrintStreamPublisher(SamplePublisher):
   Attributes:
     stream: File-like object. Output stream to print samples.
   """
-  def __init__(self, stream=sys.stdout):
-    self.stream = stream
+  def __init__(self, stream=None):
+    self.stream = stream or sys.stdout
 
   def __repr__(self):
     return '<{0} stream={1}>'.format(type(self).__name__, self.stream)
@@ -190,9 +190,9 @@ class LogPublisher(SamplePublisher):
     logger: Logger to publish to. Defaults to the root logger.
   """
 
-  def __init__(self, level=logging.INFO, logger=logging.getLogger()):
+  def __init__(self, level=logging.INFO, logger=None):
     self.level = level
-    self.logger = logger
+    self.logger = logger or logging.getLogger()
 
   def __repr__(self):
     return '<{0} logger={1} level={2}>'.format(type(self).__name__, self.logger,
@@ -237,17 +237,38 @@ class BigQueryPublisher(SamplePublisher):
   """Publishes samples to BigQuery.
 
   Attributes:
-    bigquery_table: The bigquery table to publish to, of the form
+    bigquery_table: string. The bigquery table to publish to, of the form
       '[project_name:]dataset_name.table_name'
+    project_id: string. Project to use for authenticating with BigQuery.
+    bq_path: string. Path to the 'bq' executable'.
+    service_account: string. Use this service account email address for
+      authorization. For example, 1234567890@developer.gserviceaccount.com
+    service_account_private_key: Filename that contains the service account
+      private key. Must be specified if service_account is specified.
   """
 
-  def __init__(self, bigquery_table):
+  def __init__(self, bigquery_table, project_id=None, bq_path='bq',
+               service_account=None, service_account_private_key_file=None):
     self.bigquery_table = bigquery_table
+    self.project_id = project_id
+    self.bq_path = bq_path
+    self.service_account = service_account
+    self.service_account_private_key_file = service_account_private_key_file
+    self._credentials_file = vm_util.PrependTempDir('credentials.json')
+
+    if ((self.service_account is None) !=
+        (self.service_account_private_key_file is None)):
+      raise ValueError('service_account and service_account_private_key '
+                       'must be specified together.')
 
   def __repr__(self):
     return '<{0} table="{1}">'.format(type(self).__name__, self.bigquery_table)
 
   def PublishSamples(self, samples):
+    if not samples:
+      logging.warn('No samples: not publishing to BigQuery')
+      return
+
     with tempfile.NamedTemporaryFile(prefix='perfkit-bq-pub',
                                      dir=vm_util.GetTempDir(),
                                      suffix='.json') as tf:
@@ -256,18 +277,15 @@ class BigQueryPublisher(SamplePublisher):
       logging.info('Publishing %d samples to %s', len(samples),
                    self.bigquery_table)
       load_cmd = [FLAGS.bq_path]
-      if FLAGS.bq_project:
-        load_cmd.append('--project_id=' + FLAGS.bq_project)
-      if ((FLAGS.service_account is None) !=
-          (FLAGS.service_account_private_key is None)):
-        raise ValueError('--service_account and --service_account_private_key '
-                         'must be specified together.')
-      if FLAGS.service_account:
-        load_cmd.extend(['--service_account=' + FLAGS.service_account,
+      if self.project_id:
+        load_cmd.append('--project_id=' + self.project_id)
+      if self.service_account:
+        assert self.service_account_private_key_file is not None
+        load_cmd.extend(['--service_account=' + self.service_account,
                          '--service_account_credential_file=' +
-                         vm_util.PrependTempDir('credentials.json'),
+                         self._credentials_file,
                          '--service_account_private_key_file=' +
-                         FLAGS.service_account_private_key_file])
+                         self.service_account_private_key_file])
       load_cmd.extend(['load',
                        '--source_format=NEWLINE_DELIMITED_JSON',
                        self.bigquery_table,
@@ -318,7 +336,12 @@ class SampleCollector(object):
     publishers = [LogPublisher(), PrettyPrintStreamPublisher(),
                   NewlineDelimitedJSONPublisher(json_path)]
     if FLAGS.bigquery_table:
-      publishers.append(BigQueryPublisher(FLAGS.bigquery_table))
+      publishers.append(BigQueryPublisher(
+          FLAGS.bigquery_table,
+          project_id=FLAGS.bq_project,
+          bq_path=FLAGS.bq_path,
+          service_account=FLAGS.service_account,
+          service_account_private_key_file=FLAGS.service_account_private_key))
     return publishers
 
   def AddSamples(self, samples, benchmark, benchmark_spec):
