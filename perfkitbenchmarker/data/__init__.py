@@ -11,6 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This module defines an interface for finding named resources.
+
+Due to license restrictions, not all software dependences can be shipped with
+PerfKitBenchmarker.
+Those that can be included in perfkitbenchmarker/data, and are loaded via a
+PackageResourceLoader.
+
+Users can specify additional paths to search for required data files using the
+`--data_search_paths` flag.
+"""
 
 import abc
 import logging
@@ -22,7 +32,9 @@ import pkg_resources
 FLAGS = flags.FLAGS
 
 flags.DEFINE_multistring('data_search_paths', ['.', 'data'],
-                         'Additional paths to search for data files.')
+                         'Additional paths to search for data files. '
+                         'These paths will be searched prior to using files '
+                         'bundled with PerfKitBenchmarker')
 
 
 class ResourceNotFound(ValueError):
