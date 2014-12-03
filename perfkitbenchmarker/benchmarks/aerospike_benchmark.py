@@ -46,7 +46,6 @@ CLIENT_VERSION = '3.0.84'
 SERVER_DIR = 'aerospike-server'
 SERVER_VERSION = '3.3.19'
 READ_PERCENT = 90
-AEROSPIKE_PORT = 3000
 MAX_THREADS = 128
 
 
@@ -73,7 +72,6 @@ def Prepare(benchmark_spec):
 
   vm_util.RunThreaded(InstallPackages, benchmark_spec.vms)
 
-  benchmark_spec.firewall.AllowPort(server, AEROSPIKE_PORT)
   clone_command = 'git clone %s'
   server.RemoteCommand(clone_command % AEROSPIKE_SERVER)
   client.RemoteCommand(clone_command % AEROSPIKE_CLIENT)
