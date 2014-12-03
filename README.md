@@ -48,11 +48,11 @@ Some of the benchmarks invoked require Java. You must also agree with the follow
 
 CoreMark setup cannot be automated. EEMBC requires users to agree with their terms and conditions, and PerfKit
 Benchmarker users must manually download the coremark tarball from their website and save it under the
-`./data` folder (e.g. `~/PerfKitBenchmarker/data/coremark_v1.0.tgz`)
+`perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/coremark_v1.0.tgz`)
 
 SpecCPU2006 benchmark setup cannot be automated. SPEC requires users to agree with their terms and conditions,
 and PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
-the `./data` folder (e.g. `~/PerfKitBenchmarker/data/cpu2006v1.2.tgz`)
+the `./perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
 
 HOW TO RUN
 ==================

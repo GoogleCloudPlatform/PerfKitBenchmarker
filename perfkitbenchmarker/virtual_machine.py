@@ -31,6 +31,7 @@ import gflags as flags
 
 
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -41,8 +42,6 @@ DEFAULT_USERNAME = 'perfkit'
 SSH_RETRIES = 10
 STRIPED_DEVICE = '/dev/md0'
 LOCAL_MOUNT_PATH = '/local'
-
-DATA_DIR = 'data/'
 
 GUEST_OS_DEBIAN = 'debian'
 GUEST_OS_CENTOS = 'centos'
@@ -407,17 +406,14 @@ class BaseVirtualMachine(resource.BaseResource):
                   REMOTE_KEY_PATH)
 
   def PushDataFile(self, data_file):
-    """Upload a file in data directory.
+    """Upload a file in perfkitbenchmarker.data directory to the VM.
 
     Args:
-      data_file: The data file vm needed.
+      data_file: The filename of the file to upload.
+    Raises:
+      perfkitbenchmarker.data.ResourceNotFound: if 'data_file' does not exist.
     """
-    file_path = DATA_DIR + data_file
-    if not os.path.isfile(file_path):
-      logging.error('File %s not found under %s directory',
-                    data_file, DATA_DIR)
-      raise errors.VirtualMachine.VirtualMachineError(
-          'File %s not found under %s directory', data_file, DATA_DIR)
+    file_path = data.ResourcePath(data_file)
     self.PushFile(file_path)
 
   def CheckJavaVersion(self):

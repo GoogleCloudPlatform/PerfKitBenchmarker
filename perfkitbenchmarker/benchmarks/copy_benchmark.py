@@ -20,6 +20,7 @@ scp copy across different vms using external networks.
 import os.path
 
 import gflags as flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -35,8 +36,6 @@ BENCHMARK_INFO = {'name': 'copy_benchmark',
                   'num_machines': 0}
 
 CIPHER = 'aes128-cbc'
-
-CONF_DIR = 'data/'
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data
@@ -63,7 +62,7 @@ def PrepareDataFile(vm):
   Args:
     vm: The VM needs data file.
   """
-  file_path = CONF_DIR + DATA_FILE
+  file_path = data.ResourcePath(DATA_FILE)
   vm.PushFile(file_path, '%s/' % vm.GetScratchDir(0))
   vm.RemoteCommand('cd %s/; bash cloud-storage-workload.sh'
                    % vm.GetScratchDir(0))
