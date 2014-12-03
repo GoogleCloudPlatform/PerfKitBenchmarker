@@ -108,8 +108,6 @@ flags.DEFINE_string('image', None, 'Default image that will be '
                     'linked to the VM')
 flags.DEFINE_integer('scratch_disk_size', 500, 'Size, in gb, for all scratch '
                      'disks, default is 500')
-flags.DEFINE_string('scratch_disk_type', benchmark_spec.STANDARD, 'Type, in '
-                    'string, for all scratch disks, default is standard')
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'should be alphanumeric and less than or equal to 10 '
                     'characters in length.')
@@ -129,6 +127,13 @@ flags.DEFINE_string('static_vm_file', None,
                     'The file path for the Static Machine file. See '
                     'static_virtual_machine.py for a description of this file.')
 flags.DEFINE_boolean('version', False, 'Display the version and exit.')
+flags.DEFINE_enum(
+    'scratch_disk_type', benchmark_spec.STANDARD,
+    [benchmark_spec.STANDARD, benchmark_spec.SSD, benchmark_spec.IOPS],
+    'Type for all scratch disks. The default is standard')
+flags.DEFINE_boolean('use_local_disk', False, 'For benchmarks that use disks, '
+                     'this indicates that they should run against '
+                     'the local disk(s) instead of remote storage.')
 
 MAX_RUN_URI_LENGTH = 10
 

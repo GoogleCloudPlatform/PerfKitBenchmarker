@@ -1,0 +1,43 @@
+diff -rupN main/latency.c mainnew/latency.c
+--- main/latency.c	2014-10-09 05:51:43.070816173 +0000
++++ mainnew/latency.c	2014-10-09 06:33:18.084487933 +0000
+@@ -31,6 +31,8 @@ latency_init(latency* l, int columns, in
+ 	l->last_bucket = columns - 1;
+ 	l->bit_shift = shift;
+ 	l->buckets = cf_calloc(columns, sizeof(cf_atomic32));
++	l->total_latency = 0;
++	l->total_samples = 0;
+ }
+ 
+ void
+@@ -58,6 +60,8 @@ latency_getindex(latency* l, uint64_t el
+ void
+ latency_add(latency* l, uint64_t elapsed_ms)
+ {
++	cf_atomic64_add(&l->total_latency, elapsed_ms);
++	cf_atomic64_incr(&l->total_samples);
+ 	int index = latency_getindex(l, elapsed_ms);
+ 	cf_atomic32_incr(&l->buckets[index]);
+ }
+@@ -137,5 +141,9 @@ latency_print_results(latency* l, const
+ 		limit <<= shift;
+ 		p += latency_print_column(l, limit, sumDouble, array[i], p);
+ 	}
++
++	if (l->total_samples != 0)
++        	p += sprintf(p, " Overall Average Latency (ms) %f", l->total_latency / (float) l->total_samples);
++
+ 	*p = 0;
+ }
+diff -rupN main/latency.h mainnew/latency.h
+--- main/latency.h	2014-10-09 05:51:12.421313546 +0000
++++ mainnew/latency.h	2014-10-09 06:33:18.084487933 +0000
+@@ -27,6 +27,8 @@ typedef struct latency_t {
+ 	cf_atomic32* buckets;
+ 	int last_bucket;
+ 	int bit_shift;
++	cf_atomic64 total_latency;
++	cf_atomic64 total_samples;
+ } latency;
+ 
+ void latency_init(latency* l, int columns, int shift);
