@@ -25,7 +25,7 @@ import json
 import threading
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import vm_util
 
 AZURE_PATH = 'azure'
 
@@ -53,7 +53,7 @@ class AzureDisk(disk.BaseDisk):
                     'attach-new',
                     self.vm_name,
                     str(self.disk_size)]
-      perfkitbenchmarker_lib.IssueRetryableCommand(create_cmd)
+      vm_util.IssueRetryableCommand(create_cmd)
 
       if self.vm_name not in AzureDisk.num_disks:
         AzureDisk.num_disks[self.vm_name] = 0
@@ -69,7 +69,7 @@ class AzureDisk(disk.BaseDisk):
                   'delete',
                   '--blob-delete',
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the disk exists."""
@@ -83,14 +83,14 @@ class AzureDisk(disk.BaseDisk):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
     try:
       json.loads(stdout)
     except ValueError:
       return False
     return True
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def _PostCreate(self):
     """Get the disk's name."""
     show_cmd = [AZURE_PATH,
@@ -98,7 +98,7 @@ class AzureDisk(disk.BaseDisk):
                 'show',
                 '--json',
                 self.vm_name]
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
     response = json.loads(stdout)
     data_disk = response['DataDisks'][self.lun]
     assert ((self.lun == 0 and 'logicalUnitNumber' not in data_disk)

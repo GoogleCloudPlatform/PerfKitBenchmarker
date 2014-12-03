@@ -26,7 +26,7 @@ import os.path
 import gflags as flags
 import logging
 
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
@@ -114,7 +114,7 @@ def Prepare(benchmark_spec):
   slave_ips = [vm.internal_ip for vm in slaves]
 
   args = [((vm, master_ip, slave_ips), {}) for vm in vms]
-  perfkitbenchmarker_lib.RunThreaded(InstallHadoop, args)
+  vm_util.RunThreaded(InstallHadoop, args)
 
   conf_dir = _ConfDir(master)
   master.RemoteCommand('yes | hadoop-%s/bin/hdfs namenode -format' %
@@ -125,7 +125,7 @@ def Prepare(benchmark_spec):
   master.RemoteCommand(('hadoop-%s/sbin/yarn-daemon.sh --config %s '
                         'start resourcemanager') % (HADOOP_VERSION, conf_dir))
 
-  perfkitbenchmarker_lib.RunThreaded(StartDatanode, slaves)
+  vm_util.RunThreaded(StartDatanode, slaves)
 
 
 def Run(benchmark_spec):
@@ -200,5 +200,5 @@ def Cleanup(benchmark_spec):
                         'stop resourcemanager') % (HADOOP_VERSION,
                                                    conf_dir))
 
-  perfkitbenchmarker_lib.RunThreaded(StopDatanode, slaves)
-  perfkitbenchmarker_lib.RunThreaded(CleanNode, vms)
+  vm_util.RunThreaded(StopDatanode, slaves)
+  vm_util.RunThreaded(CleanNode, vms)

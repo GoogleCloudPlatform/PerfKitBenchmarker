@@ -23,7 +23,7 @@ memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 
 import gflags as flags
 import logging
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import vm_util
 
 flags.DEFINE_integer('redis_numprocesses', 1, 'Number of Redis processes to '
                      'spawn per processor.')
@@ -88,7 +88,7 @@ def Prepare(benchmark_spec):
                            '/dev/null &' % (REDIS_DIR, REDIS_DIR, port))
 
   args = [((vm,), {}) for vm in vms[1:]]
-  perfkitbenchmarker_lib.RunThreaded(PrepareLoadgen, args)
+  vm_util.RunThreaded(PrepareLoadgen, args)
 
 
 def RunLoad(redis_vm, load_vm, threads, port, test_id, results):
@@ -163,7 +163,7 @@ def Run(benchmark_spec):
               FIRST_PORT + i % num_servers, i, iteration_results),
              {}) for i in range(num_loaders)]
     logging.error('BEFORE: %s', args)
-    perfkitbenchmarker_lib.RunThreaded(RunLoad, args)
+    vm_util.RunThreaded(RunLoad, args)
     throughput = 0.0
     latency = 0.0
     logging.error('%s', iteration_results)

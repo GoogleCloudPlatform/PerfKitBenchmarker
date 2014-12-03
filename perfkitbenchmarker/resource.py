@@ -22,7 +22,7 @@ reliably.
 import abc
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import vm_util
 
 
 class BaseResource(object):
@@ -78,7 +78,7 @@ class BaseResource(object):
     """
     pass
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def _CreateResource(self):
     """Reliably creates the underlying resource."""
     if self.created:
@@ -91,7 +91,7 @@ class BaseResource(object):
       pass
     self.created = True
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
     if self.deleted or not self.created:

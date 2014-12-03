@@ -24,7 +24,7 @@ import threading
 import gflags as flags
 
 from perfkitbenchmarker import network
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import util
 
 
@@ -77,7 +77,7 @@ class GceFirewall(network.BaseFirewall):
                       '--allow', 'tcp:%d' % port, 'udp:%d' % port]
       firewall_cmd.extend(util.GetDefaultGcloudFlags(self))
 
-      perfkitbenchmarker_lib.IssueRetryableCommand(firewall_cmd)
+      vm_util.IssueRetryableCommand(firewall_cmd)
       self.firewall_names.append(firewall_name)
 
   def DisallowAllPorts(self):
@@ -89,7 +89,7 @@ class GceFirewall(network.BaseFirewall):
                       'delete',
                       firewall]
       firewall_cmd.extend(util.GetDefaultGcloudFlags(self))
-      perfkitbenchmarker_lib.IssueRetryableCommand(firewall_cmd)
+      vm_util.IssueRetryableCommand(firewall_cmd)
 
 
 class GceNetwork(network.BaseNetwork):

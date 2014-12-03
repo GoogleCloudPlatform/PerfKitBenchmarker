@@ -32,7 +32,6 @@ import gflags as flags
 
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import perfkitbenchmarker_lib
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
@@ -157,7 +156,7 @@ class BaseVirtualMachine(resource.BaseResource):
     for scratch_disk in self.scratch_disks:
       scratch_disk.Delete()
 
-  @perfkitbenchmarker_lib.Retry(log_errors=False, poll_interval=1)
+  @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
     """Waits until VM is has booted."""
     resp, _ = self.RemoteCommand('hostname', retries=1)
@@ -166,7 +165,7 @@ class BaseVirtualMachine(resource.BaseResource):
     if self.hostname is None:
       self.hostname = resp[:-1]
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
     fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0,lazy_journal_init=0 -O '
@@ -223,13 +222,13 @@ class BaseVirtualMachine(resource.BaseResource):
     remote_location = '%s@%s:%s' % (
         self.user_name, self.ip_address, remote_path)
     scp_cmd = ['/usr/bin/scp', '-P', str(remote_port), '-pr']
-    scp_cmd.extend(perfkitbenchmarker_lib.GetSshOptions(self.ssh_private_key))
+    scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
     else:
       scp_cmd.extend([remote_location, file_path])
 
-    stdout, stderr, retcode = perfkitbenchmarker_lib.IssueCommand(scp_cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(scp_cmd)
 
     if retcode:
       full_cmd = ' '.join(scp_cmd)
@@ -304,14 +303,14 @@ class BaseVirtualMachine(resource.BaseResource):
                    user_host]
       else:
         ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(remote_port), user_host]
-    ssh_cmd.extend(perfkitbenchmarker_lib.GetSshOptions(self.ssh_private_key))
+    ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     if login_shell:
       ssh_cmd.extend(['-t', 'bash -l -c "%s"' % command])
     else:
       ssh_cmd.append(command)
 
     for _ in range(retries):
-      stdout, stderr, retcode = perfkitbenchmarker_lib.IssueCommand(
+      stdout, stderr, retcode = vm_util.IssueCommand(
           ssh_cmd, should_log=should_log)
       if retcode != 255:  # Retry on 255 because this indicates an SSH failure
         break
@@ -369,7 +368,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.RemoteCommand('scp -o StrictHostKeyChecking=no -i %s %s %s' %
                        (REMOTE_KEY_PATH, source_path, remote_location))
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def AptUpdate(self):
     """Runs apt-get update until it succeeds or times out."""
     if FLAGS.guest_os == GUEST_OS_DEBIAN:
@@ -379,7 +378,7 @@ class BaseVirtualMachine(resource.BaseResource):
                          '/6/x86_64/epel-release-6-8.noarch.rpm')
       self.RemoteCommand('sudo yum clean expire-cache')
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def InstallPackage(self, package_name):
     """Installs a package on a remote machine.
 

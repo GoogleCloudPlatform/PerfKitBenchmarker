@@ -30,8 +30,8 @@ import re
 import gflags as flags
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import perfkitbenchmarker_lib
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.gcp import util
 
@@ -90,9 +90,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     'sshKeys=%s:%s' % (self.user_name, key),
                     'owner=%s' % FLAGS.owner]
       create_cmd.extend(util.GetDefaultGcloudFlags(self))
-      perfkitbenchmarker_lib.IssueCommand(create_cmd)
+      vm_util.IssueCommand(create_cmd)
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data."""
     getinstance_cmd = [FLAGS.gcloud_path,
@@ -100,7 +100,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                        'instances',
                        'describe', self.name]
     getinstance_cmd.extend(util.GetDefaultGcloudFlags(self))
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(getinstance_cmd)
+    stdout, _, _ = vm_util.IssueCommand(getinstance_cmd)
     response = json.loads(stdout)
     network_interface = response['networkInterfaces'][0]
     self.internal_ip = network_interface['networkIP']
@@ -114,7 +114,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                   'delete', self.name,
                   '--keep-disks', 'all']
     delete_cmd.extend(util.GetDefaultGcloudFlags(self))
-    perfkitbenchmarker_lib.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the VM exists."""
@@ -123,7 +123,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                        'instances',
                        'describe', self.name]
     getinstance_cmd.extend(util.GetDefaultGcloudFlags(self))
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(getinstance_cmd)
+    stdout, _, _ = vm_util.IssueCommand(getinstance_cmd)
     try:
       json.loads(stdout)
     except ValueError:
