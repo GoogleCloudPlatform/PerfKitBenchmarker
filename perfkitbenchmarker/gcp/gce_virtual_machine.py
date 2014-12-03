@@ -36,12 +36,18 @@ from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.gcp import util
 
 
+flags.DEFINE_integer('gce_num_local_ssds', 0,
+                     'The number of ssds that should be added to the VM. Note '
+                     'that this is currently only supported in certain zones '
+                     '(see https://cloud.google.com/compute/docs/local-ssd).')
 FLAGS = flags.FLAGS
 
 SET_INTERRUPTS_SH = 'set-interrupts.sh'
 BOOT_DISK_SIZE_GB = 10
 BOOT_DISK_TYPE = 'pd-standard'
 DRIVE_START_LETTER = 'b'
+NVME = 'nvme'
+SCSI = 'SCSI'
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -61,6 +67,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     disk_spec = disk.BaseDiskSpec(BOOT_DISK_SIZE_GB, BOOT_DISK_TYPE, None)
     self.boot_disk = gce_disk.GceDisk(
         disk_spec, self.name, self.zone, self.project, self.image)
+    self.num_ssds = FLAGS.gce_num_local_ssds
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -89,6 +96,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     '--metadata',
                     'sshKeys=%s:%s' % (self.user_name, key),
                     'owner=%s' % FLAGS.owner]
+      ssd_interface_option = NVME if NVME in self.image else SCSI
+      for _ in range(self.num_ssds):
+        create_cmd.append('--local-ssd')
+        create_cmd.append('interface=%s' % ssd_interface_option)
       create_cmd.extend(util.GetDefaultGcloudFlags(self))
       vm_util.IssueCommand(create_cmd)
 
@@ -111,8 +122,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     delete_cmd = [FLAGS.gcloud_path,
                   'compute',
                   'instances',
-                  'delete', self.name,
-                  '--keep-disks', 'all']
+                  'delete', self.name]
     delete_cmd.extend(util.GetDefaultGcloudFlags(self))
     vm_util.IssueCommand(delete_cmd)
 
