@@ -67,7 +67,9 @@ namespace test {
         memory-size 4G
         default-ttl 30d # 30 days, use 0 to never expire/evict.
         storage-engine device { # Configure the storage-engine to use persistence
-        devices
+        {% for device_path in devices %}
+        device {{ device_path }}
+        {% endfor %}
         write-block-size 128K   # adjust block size to make it efficient for SSDs
         disable-odirect true
         }

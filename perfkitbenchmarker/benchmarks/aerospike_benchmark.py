@@ -47,6 +47,7 @@ SERVER_DIR = 'aerospike-server'
 SERVER_VERSION = '3.3.19'
 READ_PERCENT = 90
 AEROSPIKE_PORT = 3000
+MAX_THREADS = 128
 
 
 def GetInfo():
@@ -95,12 +96,9 @@ def Prepare(benchmark_spec):
     else:
       devices = [disk.GetDevicePath() for disk in server.scratch_disks]
 
-    devices = ['device %s' % device_path for device_path in devices]
-    server.PushDataFile('aerospike.conf')
-    server.RemoteCommand(
-        'sed -i -e \'s,devices,%s,\' aerospike.conf' % '\\n'.join(devices))
-    server.RemoteCommand(
-        'mv aerospike.conf aerospike-server/as/etc/aerospike_dev.conf')
+    server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
+                          'aerospike-server/as/etc/aerospike_dev.conf',
+                          {'devices': devices})
 
   for disk in server.scratch_disks:
     server.RemoteCommand('sudo umount %s' % disk.mount_point)
@@ -148,7 +146,7 @@ def Run(benchmark_spec):
                   (CLIENT_DIR, server.internal_ip))
   client.RemoteCommand(load_command, should_log=True)
 
-  for threads in xrange(1,3):
+  for threads in xrange(1,MAX_THREADS):
     load_command = ('timeout 15 ./%s/benchmarks/target/benchmarks '
                     '-z %s -n test -w RU,%s -o B:1000  -k 1000000 '
                     '--latency 5,1 -h %s;:' %
