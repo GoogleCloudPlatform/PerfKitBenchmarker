@@ -60,6 +60,8 @@ flags.DEFINE_list(
     'separated.')
 
 PRODUCT_NAME = 'PerfKitBenchmarker'
+DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
+DEFAULT_CREDENTIALS_JSON = 'credentials.json'
 
 
 def GetLabelsFromDict(metadata):
@@ -254,7 +256,7 @@ class BigQueryPublisher(SamplePublisher):
     self.bq_path = bq_path
     self.service_account = service_account
     self.service_account_private_key_file = service_account_private_key_file
-    self._credentials_file = vm_util.PrependTempDir('credentials.json')
+    self._credentials_file = vm_util.PrependTempDir(DEFAULT_CREDENTIALS_JSON)
 
     if ((self.service_account is None) !=
         (self.service_account_private_key_file is None)):
@@ -332,7 +334,7 @@ class SampleCollector(object):
   @classmethod
   def _DefaultPublishers(cls):
     """Gets a list of default publishers."""
-    json_path = vm_util.PrependTempDir('perfkitbenchmarker.json')
+    json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
     publishers = [LogPublisher(), PrettyPrintStreamPublisher(),
                   NewlineDelimitedJSONPublisher(json_path)]
     if FLAGS.bigquery_table:
