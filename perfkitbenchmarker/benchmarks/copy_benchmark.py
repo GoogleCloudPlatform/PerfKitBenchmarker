@@ -17,10 +17,12 @@
 cp and dd between two attached disks on same vm.
 scp copy across different vms using external networks.
 """
+import logging
 import os.path
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -93,17 +95,16 @@ def RunCp(vms):
     vms: The VMs running cp benchmarks.
 
   Returns:
-    A list of samples. Each sample is a 4-tuple of (benchmark_name, value, unit,
-    metadata), as accepted by PerfKitBenchmarkerPublisher.AddSamples.
+    A list of sample.Sample objects.
   """
   cmd = ('rm %s/*; sudo sync; sudo sysctl vm.drop_caches=3; '
          'time cp %s/data/* %s/; ' %
          (vms[0].GetScratchDir(1), vms[0].GetScratchDir(0),
           vms[0].GetScratchDir(1)))
   _, res = vms[0].RemoteCommand(cmd)
-  print res
+  logging.info(res)
   time_used = vm_util.ParseTimeCommandResult(res)
-  return [['cp throughput', DATA_SIZE_IN_MB / time_used, UNIT, {}]]
+  return [sample.Sample('cp throughput', DATA_SIZE_IN_MB / time_used, UNIT)]
 
 
 def RunDd(vms):
@@ -123,9 +124,9 @@ def RunDd(vms):
          (vm.GetScratchDir(1), vm.GetScratchDir(0),
           vm.GetScratchDir(1)))
   _, res = vm.RemoteCommand(cmd)
-  print res
+  logging.info(res)
   time_used = vm_util.ParseTimeCommandResult(res)
-  return [['dd throughput', DATA_SIZE_IN_MB / time_used, UNIT, {}]]
+  return [sample.Sample('dd throughput', DATA_SIZE_IN_MB / time_used, UNIT)]
 
 
 def RunScp(vms):
@@ -161,8 +162,7 @@ def RunScpSingleDirection(sending_vm, receiving_vm):
     receiving_vm: The destination VM for the scp command.
 
   Returns:
-    A list of samples. Each sample is a 4-tuple of (benchmark_name, value, unit,
-    metadata), as accepted by PerfKitBenchmarkerPublisher.AddSamples.
+    A list of sample.Sample objects.
   """
   results = []
   metadata = {
@@ -184,13 +184,13 @@ def RunScpSingleDirection(sending_vm, receiving_vm):
     target_dir = os.path.join(receiving_vm.GetScratchDir(0), ip_type)
     cmd = cmd_template % (ip_address, target_dir)
     receiving_vm.RemoteCommand('mkdir %s' % target_dir)
-    result = ['scp throughput', None, UNIT, metadata.copy()]
-    result[-1]['ip_type'] = ip_type
+    meta = metadata.copy()
+    meta['ip_type'] = ip_type
     _, res = sending_vm.RemoteCommand(cmd)
     time_used = vm_util.ParseTimeCommandResult(res)
-    result[1] = DATA_SIZE_IN_MB / time_used
+    result = DATA_SIZE_IN_MB / time_used
     receiving_vm.RemoteCommand('rm -rf %s' % target_dir)
-    return result
+    return sample.Sample('scp throughput', result, UNIT, meta)
 
   if vm_util.ShouldRunOnExternalIpAddress():
     results.append(RunForIpAddress(receiving_vm.ip_address, 'external'))
