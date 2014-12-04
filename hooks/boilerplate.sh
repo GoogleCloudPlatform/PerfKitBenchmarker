@@ -15,6 +15,9 @@
 # limitations under the License.
 
 # Print 1 if the file in $1 has the correct boilerplate header, 0 otherwise.
+#
+# See hooks/boilerplate.py.txt or hooks/boilerplate.sh.txt for examples for
+# python files and bash scripts, respectively.
 FILE=$1
 EXT=${FILE##*.}
 
