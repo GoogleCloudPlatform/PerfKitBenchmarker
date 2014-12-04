@@ -37,6 +37,13 @@ flags.DEFINE_boolean(
     'A boolean indicating whether results are official or not. The '
     'default is False. Official test results are treated and queried '
     'differently from non-official test results.')
+
+flags.DEFINE_boolean(
+    'json_output',
+    True,
+    'A boolean indicating whether to write newline-delimited '
+    'JSON results to the run-specific temporary directory.')
+
 flags.DEFINE_string(
     'bigquery_table',
     None,
@@ -334,9 +341,10 @@ class SampleCollector(object):
   @classmethod
   def _DefaultPublishers(cls):
     """Gets a list of default publishers."""
-    json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
-    publishers = [LogPublisher(), PrettyPrintStreamPublisher(),
-                  NewlineDelimitedJSONPublisher(json_path)]
+    publishers = [LogPublisher(), PrettyPrintStreamPublisher()]
+    if FLAGS.json_output:
+      json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
+      publishers.append(NewlineDelimitedJSONPublisher(json_path))
     if FLAGS.bigquery_table:
       publishers.append(BigQueryPublisher(
           FLAGS.bigquery_table,
