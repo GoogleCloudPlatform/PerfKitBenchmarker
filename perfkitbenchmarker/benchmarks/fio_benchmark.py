@@ -18,11 +18,10 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
-
-import gflags as flags
 import logging
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 

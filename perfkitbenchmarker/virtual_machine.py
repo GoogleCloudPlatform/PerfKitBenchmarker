@@ -24,15 +24,11 @@ import tempfile
 import time
 import uuid
 
-
 import jinja2
-
-import gflags as flags
-
-
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 

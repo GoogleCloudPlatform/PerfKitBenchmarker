@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs Unixbench.
+"""Runs UnixBench.
 
 Documentation & code: http://code.google.com/p/byte-unixbench/
 
@@ -20,10 +20,9 @@ Unix bench is a holistic performance benchmark, measuing CPU performance,
 some memory bandwidth, and disk.
 """
 
-
-
-import gflags as flags
 import logging
+
+from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 

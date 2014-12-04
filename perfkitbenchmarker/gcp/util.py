@@ -13,7 +13,7 @@
 # limitations under the License.
 """Utilities for working with Google Cloud Platform resources."""
 
-import gflags as flags
+from perfkitbenchmarker import flags
 
 flags.DEFINE_string('gcloud_path',
                     'gcloud',

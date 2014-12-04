@@ -24,8 +24,7 @@ for more information about Azure Virtual Networks.
 import json
 import uuid
 
-import gflags as flags
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util

@@ -21,8 +21,9 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
-import gflags as flags
 import logging
+
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_integer('redis_numprocesses', 1, 'Number of Redis processes to '

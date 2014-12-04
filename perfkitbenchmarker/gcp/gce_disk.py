@@ -14,14 +14,13 @@
 """Module containing classes related to GCE disks.
 
 Disks can be created, deleted, attached to VMs, and detached from VMs.
-Use 'gcutil listdisktypes' to determine valid disk types.
+Use 'gcloud compute disk-types list' to determine valid disk types.
 """
 
 import json
 
-import gflags as flags
-
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import util
 

@@ -21,13 +21,14 @@ CleanupX: Cleanup storage tools on vm.
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
 """
 
+import logging
 import os
 import re
 
-import gflags as flags
 from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
@@ -96,14 +97,14 @@ class S3StorageBenchmark(object):
                      % FLAGS.run_uri, ignore_failure=True)
     _, res = vm.RemoteCommand('time aws s3 sync /run/data/ '
                               's3://pkb%s/' % FLAGS.run_uri)
-    print res
+    logging.info(res)
     time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
     vm.RemoteCommand('rm /run/data/*')
     _, res = vm.RemoteCommand('time aws s3 sync '
                               's3://pkb%s/ /run/data/'
                               % FLAGS.run_uri)
-    print res
+    logging.info(res)
     time_used = vm_util.ParseTimeCommandResult(res)
     result[1][1] = DATA_SIZE_IN_MB / time_used
 

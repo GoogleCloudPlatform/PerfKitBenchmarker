@@ -21,8 +21,7 @@ more information about GCE VM networking.
 """
 import threading
 
-import gflags as flags
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import util
