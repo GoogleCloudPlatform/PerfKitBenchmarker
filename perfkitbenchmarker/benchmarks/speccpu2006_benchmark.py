@@ -28,6 +28,7 @@ import re
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
@@ -123,10 +124,7 @@ def ExtractScore(stdout, vm):
        Est. SPECfp(R)_base2006              17.5
 
   Returns:
-      A list of samples in the form of 3 or 4 tuples. The tuples contain
-          the sample metric (string), value (float), and unit (string).
-          If a 4th element is included, it is a dictionary of sample
-          metadata.
+      A list of sample.Sample objects.
   """
   results = []
 
@@ -156,7 +154,7 @@ def ExtractScore(stdout, vm):
       result_section.pop()
 
   metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus}
-  results.append((spec_name, spec_score, '', metadata))
+  results.append(sample.Sample(spec_name, spec_score, '', metadata))
 
   for benchmark in result_section:
     # ignore failed runs
@@ -164,7 +162,7 @@ def ExtractScore(stdout, vm):
       continue
     # name, ref_time, time, score, misc
     name, _, _, score, _ = benchmark.split()
-    results.append((str(name), float(score), '', metadata))
+    results.append(sample.Sample(str(name), float(score), '', metadata))
 
   return results
 
@@ -206,10 +204,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
