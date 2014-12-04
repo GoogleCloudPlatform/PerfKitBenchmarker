@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,18 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from setuptools import setup, find_packages
+# Print 1 if the file in $1 passes linting, 0 otherwise
+FILE=$1
+EXT=${FILE##*.}
 
-setup(
-    name='perfkitbenchmarker',
-    url='https://github.com/GoogleCloudPlatform/PerfKitBenchmarker',
-    version='0.6.0',
-    license='Apache 2.0',
-    packages=find_packages(exclude=['tests']),
-    scripts=['pkb.py'],
-    install_requires=['python-gflags==2.0',
-                      'jinja2>=2.7',
-                      'oauth2client',
-                      'pycrypto',
-                      'pyOpenSSL',
-                      'setuptools'])
+LINTER="$(dirname $0)/lint.${EXT}.sh"
+
+if [ ! -e "$LINTER" ]; then
+  echo "1"
+  exit 0
+fi
+
+LINT=$($LINTER $FILE)
+if [[ ! -z "$LINT" ]]; then
+  >&2 echo "$LINT"
+  echo "0"
+  exit 0
+fi
+
+echo "1"
+exit 0

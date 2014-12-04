@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,18 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from setuptools import setup, find_packages
+set -o errexit
+set -o nounset
+set -o pipefail
 
-setup(
-    name='perfkitbenchmarker',
-    url='https://github.com/GoogleCloudPlatform/PerfKitBenchmarker',
-    version='0.6.0',
-    license='Apache 2.0',
-    packages=find_packages(exclude=['tests']),
-    scripts=['pkb.py'],
-    install_requires=['python-gflags==2.0',
-                      'jinja2>=2.7',
-                      'oauth2client',
-                      'pycrypto',
-                      'pyOpenSSL',
-                      'setuptools'])
+readonly FILE=$1
+
+if [[ -z "$(command -v flake8)" ]]; then
+  >&2 echo "Missing flake8. Install it via 'pip' to enable linting."
+  exit 1
+fi
+
+flake8 $1 2>&1
