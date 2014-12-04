@@ -146,6 +146,7 @@ class BenchmarkSpec(object):
         self.num_vms = FLAGS.num_vms
       else:
         self.num_vms = benchmark_info['num_machines']
+      self.scratch_disk = benchmark_info['scratch_disk']
       self.scratch_disk_size = FLAGS.scratch_disk_size
       self.scratch_disk_type = FLAGS.scratch_disk_type
 
@@ -157,7 +158,7 @@ class BenchmarkSpec(object):
       for i in range(benchmark_info['scratch_disk']):
         disk_spec = disk.BaseDiskSpec(
             self.scratch_disk_size,
-            DISK_TYPE[self.cloud][STANDARD],
+            DISK_TYPE[self.cloud][self.scratch_disk_type],
             '/scratch%d' % i)
         for vm in self.vms:
           vm.disk_specs.append(disk_spec)

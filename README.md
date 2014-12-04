@@ -42,6 +42,7 @@ In its current release these are the benchmarks that are executed:
   * copy_benchmark: No license needed.
   - object_storage_benchmark: No license needed.
   - ping_benchmark: No license needed.
+  - Aerospike: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
   - openjdk-7-jre: GPL v2 with the Classpath Exception (http://openjdk.java.net/legal/gplv2+ce.html)

@@ -25,7 +25,6 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import json
-import re
 
 import gflags as flags
 
@@ -36,12 +35,18 @@ from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.gcp import util
 
 
+flags.DEFINE_integer('gce_num_local_ssds', 0,
+                     'The number of ssds that should be added to the VM. Note '
+                     'that this is currently only supported in certain zones '
+                     '(see https://cloud.google.com/compute/docs/local-ssd).')
 FLAGS = flags.FLAGS
 
 SET_INTERRUPTS_SH = 'set-interrupts.sh'
 BOOT_DISK_SIZE_GB = 10
 BOOT_DISK_TYPE = 'pd-standard'
 DRIVE_START_LETTER = 'b'
+NVME = 'nvme'
+SCSI = 'SCSI'
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -61,6 +66,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     disk_spec = disk.BaseDiskSpec(BOOT_DISK_SIZE_GB, BOOT_DISK_TYPE, None)
     self.boot_disk = gce_disk.GceDisk(
         disk_spec, self.name, self.zone, self.project, self.image)
+    self.num_ssds = FLAGS.gce_num_local_ssds
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -89,6 +95,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     '--metadata',
                     'sshKeys=%s:%s' % (self.user_name, key),
                     'owner=%s' % FLAGS.owner]
+      ssd_interface_option = NVME if NVME in self.image else SCSI
+      for _ in range(self.num_ssds):
+        create_cmd.append('--local-ssd')
+        create_cmd.append('interface=%s' % ssd_interface_option)
       create_cmd.extend(util.GetDefaultGcloudFlags(self))
       vm_util.IssueCommand(create_cmd)
 
@@ -111,8 +121,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     delete_cmd = [FLAGS.gcloud_path,
                   'compute',
                   'instances',
-                  'delete', self.name,
-                  '--keep-disks', 'all']
+                  'delete', self.name]
     delete_cmd.extend(util.GetDefaultGcloudFlags(self))
     vm_util.IssueCommand(delete_cmd)
 
@@ -158,13 +167,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       A list of strings, where each string is the absolute path to the local
           drives on the VM (e.g. '/dev/sdb').
     """
-    match = re.search('([0-9])x-ssd', self.machine_type)
-    if match:
-      num_ssd = int(match.group(1))
-      return ['/dev/sd%s' % chr(ord(DRIVE_START_LETTER) + i)
-              for i in xrange(num_ssd)]
-    else:
-      return []
+    return ['/dev/disk/by-id/google-local-ssd-%d' % i
+            for i in range(self.num_ssds)]
 
   def SetupLocalDrives(self, mount_path=virtual_machine.LOCAL_MOUNT_PATH):
     """Set up any local drives that exist.
