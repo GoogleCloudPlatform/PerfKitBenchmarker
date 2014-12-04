@@ -216,6 +216,7 @@ class LogPublisher(SamplePublisher):
     self.logger.log(self.level, ''.join(data))
 
 
+# TODO: Extract a function to write delimited JSON to a stream.
 class NewlineDelimitedJSONPublisher(SamplePublisher):
   """Publishes samples to a file as newline delimited JSON.
 
