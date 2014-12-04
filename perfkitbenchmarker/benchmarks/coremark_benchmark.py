@@ -22,10 +22,11 @@ Coremark homepage: http://www.eembc.org/coremark/
 """
 
 import logging
-import re
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 
 BENCHMARK_INFO = {'name': 'coremark',
                   'description': 'Run Coremark a simple processor benchmark',
@@ -73,10 +74,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -88,10 +86,9 @@ def Run(benchmark_spec):
   logging.info('Coremark Results:')
   stdout, _ = vm.RemoteCommand(
       'cat %s/run1.log' % COREMARK_DIR, should_log=True)
-  match = re.search(r'CoreMark 1.0 : ([0-9]*\.[0-9]*)', stdout).group(1)
-  value = float(match)
+  value = regex_util.ExtractFloat(r'CoreMark 1.0 : ([0-9]*\.[0-9]*)', stdout)
   metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus}
-  return [('Coremark Score', value, '', metadata)]
+  return [sample.Sample('Coremark Score', value, '', metadata)]
 
 
 def Cleanup(benchmark_spec):
