@@ -79,7 +79,8 @@ def _PrepareClient(client):
   client.PushDataFile('aerospike.patch')
   benchmark_dir = '%s/benchmarks/src/main' % CLIENT_DIR
   client.RemoteCommand('cp aerospike.patch %s' % benchmark_dir)
-  client.RemoteCommand('cd %s && patch -p1 -f  < aerospike.patch' % benchmark_dir)
+  client.RemoteCommand('cd %s && patch -p1 -f  < aerospike.patch'
+                       % benchmark_dir)
   client.RemoteCommand('sed -i -e "s/lpthread/lpthread -lz/" '
                        '%s/benchmarks/Makefile' % CLIENT_DIR)
   client.RemoteCommand('cd %s/benchmarks && make' % CLIENT_DIR)
