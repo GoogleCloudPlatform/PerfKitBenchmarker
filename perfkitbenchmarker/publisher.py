@@ -278,7 +278,7 @@ class BigQueryPublisher(SamplePublisher):
       json_publisher.PublishSamples(samples)
       logging.info('Publishing %d samples to %s', len(samples),
                    self.bigquery_table)
-      load_cmd = [FLAGS.bq_path]
+      load_cmd = [self.bq_path]
       if self.project_id:
         load_cmd.append('--project_id=' + self.project_id)
       if self.service_account:
@@ -306,7 +306,7 @@ class SampleCollector(object):
         name (string), the value (float), and unit (string) of
         each sample. If a 4th element is included, it is a
         dictionary of metadata associated with the sample.
-    metadata_providers: List of MetadataProvider. Metadata providers to use.
+    metadata_providers: list of MetadataProvider. Metadata providers to use.
       Defaults to DEFAULT_METADATA_PROVIDERS.
     publishers: list of SamplePublishers. If not specified, defaults to a
       LogPublisher, PrettyPrintStreamPublisher, NewlineDelimitedJSONPublisher,
