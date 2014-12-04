@@ -66,7 +66,7 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.publisher import PerfKitBenchmarkerPublisher
+from perfkitbenchmarker.publisher import SampleCollector
 
 STAGE_ALL = 'all'
 STAGE_PREPARE = 'prepare'
@@ -191,12 +191,12 @@ def ListUnknownBenchmarks():
   return sorted(specified_benchmark_names - valid_benchmark_names)
 
 
-def RunBenchmark(benchmark, publisher):
-  """Runs a single benchmark and adds the results to the publisher.
+def RunBenchmark(benchmark, collector):
+  """Runs a single benchmark and adds the results to the collector.
 
   Args:
     benchmark: The benchmark module to be run.
-    publisher: The PerfKitBenchmarkerPublisher object to add samples to.
+    collector: The SampleCollector object to add samples to.
   """
   benchmark_info = benchmark.GetInfo()
   benchmark_specification = None
@@ -217,7 +217,7 @@ def RunBenchmark(benchmark, publisher):
     if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
       logging.info('Running benchmark %s', benchmark_info['name'])
       samples = benchmark.Run(benchmark_specification)
-      publisher.AddSamples(samples, benchmark_info['name'],
+      collector.AddSamples(samples, benchmark_info['name'],
                            benchmark_specification)
 
     if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
@@ -229,7 +229,7 @@ def RunBenchmark(benchmark, publisher):
         end_to_end_sample = ['End to End Runtime',
                              end_time - start_time,
                              'seconds', {}]
-        publisher.AddSamples([end_to_end_sample], benchmark_info['name'],
+        collector.AddSamples([end_to_end_sample], benchmark_info['name'],
                              benchmark_specification)
   except Exception:
     # Resource cleanup (below) can take a long time. Log the error to give
@@ -278,7 +278,7 @@ def RunBenchmarks(publish=True):
     return 1
 
   vm_util.SSHKeyGen()
-  publisher = PerfKitBenchmarkerPublisher()
+  collector = SampleCollector()
 
   if FLAGS.static_vm_file:
     with open(FLAGS.static_vm_file) as fp:
@@ -296,20 +296,16 @@ def RunBenchmarks(publish=True):
 
   try:
     if FLAGS.parallelism > 1:
-      args = [((benchmark, publisher), {})
+      args = [((benchmark, collector), {})
               for benchmark in benchmarks.BENCHMARKS]
       vm_util.RunThreaded(
           RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
     else:
       for benchmark in benchmarks.BENCHMARKS:
-        RunBenchmark(benchmark, publisher)
+        RunBenchmark(benchmark, collector)
   finally:
-    if publisher.samples:
-      publisher.WriteFile()
-      publisher.DumpData()
-      publisher.PrettyPrintData()
-      if publish:
-        publisher.PublishData()
+    if collector.samples:
+      collector.PublishSamples()
 
   if FLAGS.run_stage not in [STAGE_ALL, STAGE_CLEANUP]:
     logging.info(
