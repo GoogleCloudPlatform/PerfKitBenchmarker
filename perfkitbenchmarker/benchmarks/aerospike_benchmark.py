@@ -53,7 +53,7 @@ CLIENT_VERSION = '3.0.84'
 SERVER_DIR = 'aerospike-server'
 SERVER_VERSION = '3.3.19'
 READ_PERCENT = 90
-MAX_THREADS = 129
+MAX_THREADS = 128
 MIN_THREADS = 8
 THREAD_STEP = 8
 
@@ -164,14 +164,14 @@ def Run(benchmark_spec):
     average_latency = ((READ_PERCENT / 100.0) * float(read_latency) +
                        ((100 - READ_PERCENT) / 100.0) * float(write_latency))
     tps = map(int, re.findall(r'total\(tps=([0-9]+)', output)[:-1])
-    return float(sum(tps) / len(tps)), average_latency
+    return float(sum(tps)) / len(tps), average_latency
 
   load_command = ('./%s/benchmarks/target/benchmarks -z 32 -n test -w I '
                   '-o B:1000 -k 1000000 -h %s' %
                   (CLIENT_DIR, server.internal_ip))
   client.RemoteCommand(load_command, should_log=True)
 
-  for threads in range(MIN_THREADS, MAX_THREADS, THREAD_STEP):
+  for threads in range(MIN_THREADS, MAX_THREADS + 1, THREAD_STEP):
     load_command = ('timeout 15 ./%s/benchmarks/target/benchmarks '
                     '-z %s -n test -w RU,%s -o B:1000 -k 1000000 '
                     '--latency 5,1 -h %s;:' %
