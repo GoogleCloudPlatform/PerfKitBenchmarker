@@ -12,7 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs aerospike."""
+"""Runs Aerospike (http://www.aerospike.com).
+
+Aerospike is an opensource NoSQL solution. This benchmark runs a read/update
+load test with varying numbers of client threads against an Aerospike server.
+
+This test can be run in a variety of configurations including memory only,
+remote/persistent ssd, and local ssd. The Aerospike configuration is controlled
+by the "aerospike_storage_type", "scratch_disk_type", and "use_local_disk"
+flags.
+"""
 
 import logging
 import re
@@ -56,36 +65,34 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
-def Prepare(benchmark_spec):
-  """Install Aerospike server on one VM and Aerospike C client on the other.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-
-  """
-  server, client = benchmark_spec.vms
-
-  def InstallPackages(vm):
-    vm.InstallPackage(PACKAGES)
-
-  vm_util.RunThreaded(InstallPackages, benchmark_spec.vms)
-
+def _PrepareClient(client):
+  """Prepare the Aerospike C client on a VM."""
+  client.InstallPackage(PACKAGES)
   clone_command = 'git clone %s'
-  server.RemoteCommand(clone_command % AEROSPIKE_SERVER)
   client.RemoteCommand(clone_command % AEROSPIKE_CLIENT)
-
-  build_command = 'cd %s; git checkout %s; git submodule update --init; make'
-  server.RemoteCommand(build_command % (SERVER_DIR, SERVER_VERSION))
+  build_command = ('cd %s && git checkout %s && git submodule update --init '
+                   '&& make')
   client.RemoteCommand(build_command % (CLIENT_DIR, CLIENT_VERSION))
 
+  # Apply a patch to the client benchmark so we have access to average latency
+  # of requests. Switching over to YCSB should obviate this.
   client.PushDataFile('aerospike.patch')
   benchmark_dir = '%s/benchmarks/src/main' % CLIENT_DIR
   client.RemoteCommand('cp aerospike.patch %s' % benchmark_dir)
-  client.RemoteCommand('cd %s; patch -p1 -f  < aerospike.patch' % benchmark_dir)
+  client.RemoteCommand('cd %s && patch -p1 -f  < aerospike.patch' % benchmark_dir)
   client.RemoteCommand('sed -i -e "s/lpthread/lpthread -lz/" '
                        '%s/benchmarks/Makefile' % CLIENT_DIR)
-  client.RemoteCommand('cd %s/benchmarks; make' % CLIENT_DIR)
+  client.RemoteCommand('cd %s/benchmarks && make' % CLIENT_DIR)
+
+
+def _PrepareServer(server):
+  """Prepare the Aerospike server on a VM."""
+  server.InstallPackage(PACKAGES)
+  clone_command = 'git clone %s'
+  server.RemoteCommand(clone_command % AEROSPIKE_SERVER)
+  build_command = ('cd %s && git checkout %s && git submodule update --init '
+                   '&& make')
+  server.RemoteCommand(build_command % (SERVER_DIR, SERVER_VERSION))
 
   if FLAGS.aerospike_storage_type == DISK:
     if FLAGS.use_local_disk:
@@ -100,14 +107,33 @@ def Prepare(benchmark_spec):
   for disk in server.scratch_disks:
     server.RemoteCommand('sudo umount %s' % disk.mount_point)
 
-  server.RemoteCommand('cd %s; make init' % SERVER_DIR)
+  server.RemoteCommand('cd %s && make init' % SERVER_DIR)
   server.RemoteCommand(
       'cd %s; nohup sudo make start &> /dev/null &' % SERVER_DIR)
   time.sleep(5)  # Wait for server to come up
 
 
+def Prepare(benchmark_spec):
+  """Install Aerospike server on one VM and Aerospike C client on the other.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+
+  """
+  server, client = benchmark_spec.vms
+
+  def _Prepare(vm):
+    if vm == client:
+      _PrepareClient(vm)
+    else:
+      _PrepareServer(vm)
+
+  vm_util.RunThreaded(_Prepare, benchmark_spec.vms)
+
+
 def Run(benchmark_spec):
-  """Run Aerospike on the target vm.
+  """Runs a read/update load test on Aerospike.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -139,13 +165,13 @@ def Run(benchmark_spec):
     return float(sum(tps) / len(tps)), average_latency
 
   load_command = ('./%s/benchmarks/target/benchmarks -z 32 -n test -w I '
-                  '-o B:1000  -k 1000000 -h %s' %
+                  '-o B:1000 -k 1000000 -h %s' %
                   (CLIENT_DIR, server.internal_ip))
   client.RemoteCommand(load_command, should_log=True)
 
   for threads in xrange(1, MAX_THREADS):
     load_command = ('timeout 15 ./%s/benchmarks/target/benchmarks '
-                    '-z %s -n test -w RU,%s -o B:1000  -k 1000000 '
+                    '-z %s -n test -w RU,%s -o B:1000 -k 1000000 '
                     '--latency 5,1 -h %s;:' %
                     (CLIENT_DIR, threads, READ_PERCENT,
                      server.internal_ip))
@@ -168,5 +194,5 @@ def Cleanup(benchmark_spec):
   server, client = benchmark_spec.vms
 
   client.RemoteCommand('sudo rm -rf aerospike*')
-  server.RemoteCommand('cd %s; nohup sudo make stop' % SERVER_DIR)
+  server.RemoteCommand('cd %s && nohup sudo make stop' % SERVER_DIR)
   server.RemoteCommand('sudo rm -rf aerospike*')
