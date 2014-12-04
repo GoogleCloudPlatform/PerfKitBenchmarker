@@ -217,7 +217,13 @@ class LogPublisher(SamplePublisher):
 
 
 class NewlineDelimitedJSONPublisher(SamplePublisher):
-  """Publishes samples as newline delimited JSON, suitable for upload to BQ.
+  """Publishes samples to a file as newline delimited JSON.
+
+  The resulting output file is compatible with 'bq load' using
+  format NEWLINE_DELIMITED_JSON.
+
+  Metadata is converted to a flat string with key 'labels' via
+  GetLabelsFromDict.
 
   Attributes:
     file_path: string. Destination path to write samples.
@@ -238,7 +244,7 @@ class NewlineDelimitedJSONPublisher(SamplePublisher):
     with open(self.file_path, self.mode) as fp:
       for sample in samples:
         sample = sample.copy()
-        sample['labels'] = GetLabelsFromDict(sample.pop('metadata'))
+        sample['labels'] = GetLabelsFromDict(sample.pop('metadata', {}))
         fp.write(json.dumps(sample) + '\n')
 
 
