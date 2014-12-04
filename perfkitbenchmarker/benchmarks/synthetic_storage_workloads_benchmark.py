@@ -240,8 +240,8 @@ def RunSimulatedDatabase(vm):
         '--iodepth=%s '
         '--size=%dk '
         '--blocksize=4k ') % (vm.GetScratchDir(),
-                              vm.total_memory_kb,
-                              depth)
+                              depth,
+                              vm.total_memory_kb)
     if FLAGS.maxjobs:
       cmd += '--max-jobs=%s ' % FLAGS.maxjobs
     cmd += (
