@@ -54,7 +54,9 @@ CLIENT_VERSION = '3.0.84'
 SERVER_DIR = 'aerospike-server'
 SERVER_VERSION = '3.3.19'
 READ_PERCENT = 90
-MAX_THREADS = 128
+MAX_THREADS = 129
+MIN_THREADS = 8
+THREAD_STEP = 8
 
 
 def GetInfo():
@@ -170,7 +172,7 @@ def Run(benchmark_spec):
                   (CLIENT_DIR, server.internal_ip))
   client.RemoteCommand(load_command, should_log=True)
 
-  for threads in xrange(1, MAX_THREADS):
+  for threads in range(MIN_THREADS, MAX_THREADS, THREAD_STEP):
     load_command = ('timeout 15 ./%s/benchmarks/target/benchmarks '
                     '-z %s -n test -w RU,%s -o B:1000 -k 1000000 '
                     '--latency 5,1 -h %s;:' %
@@ -178,11 +180,17 @@ def Run(benchmark_spec):
                      server.internal_ip))
     stdout, _ = client.RemoteCommand(load_command, should_log=True)
     tps, latency = ParseOutput(stdout)
-    samples.append('%s,%s' % (tps, latency))
 
-  logging.info('Aerospike Results:\nAverage TPS,Average Latency(ms)\n%s',
-               '\n'.join(samples))
-  return []
+    metadata = {
+        'Average Transactions Per Second': tps,
+        'Client Threads': threads,
+        'Storage Type': FLAGS.aerospike_storage_type,
+    }
+    if FLAGS.aerospike_storage_type == DISK:
+      metadata['Disk Type'] =  'Local' if FLAGS.use_local_disk else 'Remote'
+    samples.append(('Average Latency', latency, 'ms', metadata))
+
+  return samples
 
 
 def Cleanup(benchmark_spec):
