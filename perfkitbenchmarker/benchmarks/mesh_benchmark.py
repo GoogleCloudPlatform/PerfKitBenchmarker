@@ -24,6 +24,7 @@ import re
 import threading
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import netperf
 
@@ -152,10 +153,13 @@ def Run(benchmark_spec):
     result = [metric, value, unit, metadata]
     args = [((source, netperf_benchmark, vms, result), {}) for source in vms]
     vm_util.RunThreaded(RunNetperf, args, benchmark_spec.num_vms)
+    result = sample.Sample(*result)
     if netperf_benchmark == 'TCP_RR':
-      result[VALUE_INDEX] /= ((benchmark_spec.num_vms - 1) *
-                              benchmark_spec.num_vms *
-                              FLAGS.num_connections)
+      denom = ((benchmark_spec.num_vms - 1) *
+               benchmark_spec.num_vms *
+               FLAGS.num_connections)
+      result = result._replace(value=result.value / denom)
+
     results.append(result)
   logging.info(results)
   return results
