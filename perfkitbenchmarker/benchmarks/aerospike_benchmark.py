@@ -23,7 +23,6 @@ by the "aerospike_storage_type", "scratch_disk_type", and "use_local_disk"
 flags.
 """
 
-import logging
 import re
 import time
 
@@ -187,7 +186,7 @@ def Run(benchmark_spec):
         'Storage Type': FLAGS.aerospike_storage_type,
     }
     if FLAGS.aerospike_storage_type == DISK:
-      metadata['Disk Type'] =  'Local' if FLAGS.use_local_disk else 'Remote'
+      metadata['Disk Type'] = 'Local' if FLAGS.use_local_disk else 'Remote'
     samples.append(('Average Latency', latency, 'ms', metadata))
 
   return samples
