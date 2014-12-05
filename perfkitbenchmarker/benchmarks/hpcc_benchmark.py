@@ -37,14 +37,13 @@ http://www.advancedclustering.com/faq/how-do-i-tune-my-hpldat-file.html
 http://www.netlib.org/benchmark/hpl/faqs.html
 """
 
+import logging
 import math
 import re
 import tempfile
 
-import gflags as flags
-import logging
-
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 
 FLAGS = flags.FLAGS

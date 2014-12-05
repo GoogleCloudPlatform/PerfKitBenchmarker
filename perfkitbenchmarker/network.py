@@ -20,7 +20,7 @@ others in the
 same project.
 """
 
-import gflags as flags
+from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 

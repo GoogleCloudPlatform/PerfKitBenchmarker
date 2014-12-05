@@ -17,15 +17,14 @@
 import abc
 import itertools
 import json
+import logging
 import operator
+import sys
 import tempfile
 import time
 import uuid
-import sys
 
-import gflags as flags
-import logging
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 

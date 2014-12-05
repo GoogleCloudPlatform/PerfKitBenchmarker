@@ -21,8 +21,7 @@ operate on the VM: boot, shutdown, etc.
 import json
 import threading
 
-import gflags as flags
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import aws_disk

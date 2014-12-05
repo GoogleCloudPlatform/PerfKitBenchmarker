@@ -25,8 +25,7 @@ import json
 import threading
 import uuid
 
-import gflags as flags
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util

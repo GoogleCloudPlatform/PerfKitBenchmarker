@@ -21,13 +21,13 @@ benchmark suite, stressing a system's processor, memory subsystem and compiler.
 SpecCPU2006 homepage: http://www.spec.org/cpu2006/
 """
 
+import logging
 import os
 import re
 
-import gflags as flags
-import logging
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 

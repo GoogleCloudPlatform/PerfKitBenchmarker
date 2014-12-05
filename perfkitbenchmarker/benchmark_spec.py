@@ -14,12 +14,11 @@
 
 """Container for all data required for a benchmark to run."""
 
+import logging
 import pickle
 
-import gflags as flags
-import logging
-
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util

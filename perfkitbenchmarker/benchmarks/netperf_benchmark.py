@@ -22,11 +22,10 @@ Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
 machines.
 """
 
+import logging
 import re
 
-import gflags as flags
-import logging
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS

@@ -19,8 +19,8 @@ scp copy across different vms using external networks.
 """
 import os.path
 
-import gflags as flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 

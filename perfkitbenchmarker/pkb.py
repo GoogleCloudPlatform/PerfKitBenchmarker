@@ -59,10 +59,9 @@ import sys
 import time
 import uuid
 
-import gflags as flags
-
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util

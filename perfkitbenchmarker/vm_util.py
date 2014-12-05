@@ -25,8 +25,7 @@ import time
 import traceback
 
 from perfkitbenchmarker import errors
-
-import gflags as flags
+from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 

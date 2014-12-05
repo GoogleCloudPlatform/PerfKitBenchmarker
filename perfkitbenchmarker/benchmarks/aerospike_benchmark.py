@@ -26,9 +26,8 @@ flags.
 import re
 import time
 
-import gflags as flags
-
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 

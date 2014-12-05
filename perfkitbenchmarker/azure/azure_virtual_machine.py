@@ -27,9 +27,8 @@ operate on the VM: boot, shutdown, etc.
 
 import json
 
-import gflags as flags
-
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util

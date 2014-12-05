@@ -26,8 +26,9 @@ import abc
 import logging
 import os.path
 
-import gflags as flags
 import pkg_resources
+
+from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 
