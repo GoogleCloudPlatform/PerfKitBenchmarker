@@ -45,6 +45,7 @@ import tempfile
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.packages import hpcc
 
 FLAGS = flags.FLAGS
@@ -166,16 +167,18 @@ def ParseOutput(hpcc_output, benchmark_spec):
   metadata['num_machines'] = benchmark_spec.num_vms
   metadata['memory_size_mb'] = FLAGS.memory_size_mb
   value = regex_util.ExtractFloat('HPL_Tflops=([0-9]*\\.[0-9]*)', hpcc_output)
-  results.append(('HPL Throughput', value, 'Tflops', metadata))
+  results.append(sample.Sample('HPL Throughput', value, 'Tflops', metadata))
 
   value = regex_util.ExtractFloat('SingleRandomAccess_GUPs=([0-9]*\\.[0-9]*)',
                                   hpcc_output)
-  results.append(('Random Access Throughput', value, 'GigaUpdates/sec'))
+  results.append(sample.Sample('Random Access Throughput', value,
+                               'GigaUpdates/sec'))
 
   for metric in STREAM_METRICS:
     regex = 'SingleSTREAM_%s=([0-9]*\\.[0-9]*)' % metric
     value = regex_util.ExtractFloat(regex, hpcc_output)
-    results.append(('STREAM %s Throughput' % metric, value, 'GB/s'))
+    results.append(sample.Sample('STREAM %s Throughput' % metric, value,
+                                 'GB/s'))
 
   return results
 
@@ -188,10 +191,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   master_vm = vms[0]
