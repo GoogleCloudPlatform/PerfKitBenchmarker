@@ -19,6 +19,10 @@ flags.DEFINE_string('gcloud_path',
                     'gcloud',
                     'The path for the gcloud utility.')
 
+flags.DEFINE_list('additional_gcloud_flags',
+                  [],
+                  'Additional flags to pass to gcloud.')
+
 FLAGS = flags.FLAGS
 
 
@@ -38,5 +42,6 @@ def GetDefaultGcloudFlags(resource):
   ]
   if hasattr(resource, 'zone'):
     options.extend(['--zone', resource.zone])
+  options.extend(FLAGS.additional_gcloud_flags)
 
   return options
