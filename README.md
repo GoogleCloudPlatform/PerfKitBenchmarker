@@ -164,6 +164,14 @@ HOW TO RUN ALL BENCHMARKS
 ==================
 Run without the --benchmarks parameter and every benchmark will run serially which can take a couple of hours.  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
 
+USEFUL GLOBAL FLAGS
+==================
+The following are some common flags used when configuring PerfKitBenchmaker.
+* --help         : see all flags
+* --cloud        : Check where the bechmarks are run.  Choices are GCP, AWS, or AZURE
+* --zone         : This flag always you to override the default zone.  It is thats the same value that the Cloud CLI's take such as --zone=us-central1-a is use for GCP, --zone=us-east-1a is used for AWS, and --zone='East US' is used by AZURE.
+* --benchmarks   : A comman separted list of benchmarks to run such as --benchmarks=iperf,ping . To see the full list just run ./pkd.py --help
+
 PLANNED IMPROVEMENTS
 =======================
-Many... add requests via GitHub issues.
+Many... please add new requests via GitHub issues.
