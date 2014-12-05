@@ -35,11 +35,10 @@ def GetDefaultGcloudFlags(resource):
   Returns:
     A common set of gcloud options.
   """
-  options = [
-      '--project', resource.project,
-      '--format', 'json',
-      '--quiet'
-  ]
+  options = []
+  if resource.project is not None:
+    options.extend(['--project', resource.project])
+  options.extend(['--format', 'json', '--quiet'])
   if hasattr(resource, 'zone'):
     options.extend(['--zone', resource.zone])
   options.extend(FLAGS.additional_gcloud_flags)
