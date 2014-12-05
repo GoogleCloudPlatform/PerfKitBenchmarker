@@ -146,8 +146,8 @@ PerfKitBenchmarks can run benchmarks both on Cloud Providers (GCP, AWS, Azure) a
 
 ## Example run on GCP
 ```
-$ ./pkb.py --project=<GCP project name> --benchmarks=iperf --machine_type=f1-micro 
-...
+$ ./pkb.py --project=<GCP project name> --benchmarks=iperf --machine_type=f1-micro
+```
 
 ## Example run on AWS
 ```
