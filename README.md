@@ -54,7 +54,7 @@ SpecCPU2006 benchmark setup cannot be automated. SPEC requires users to agree wi
 and PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
 the `./data` folder (e.g. `~/PerfKitBenchmarker/data/cpu2006v1.2.tgz`)
 
-HOW TO RUN
+HOW TO GET SETUP
 ==================
 Before you can run the PerfKit Benchmaker on Cloud providers you need accounts and access:
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
@@ -140,14 +140,30 @@ $ sudo pip install oauth2client pycrypto pyOpenSSL jinja2
 
 Pull the PerfKit Benchmarker from GitHub.
 
-## Exmaple run
+HOW TO RUN ONE BENCHMARK
+==================
+PerfKitBenchmarks can run benchmarks both on Cloud Providers (GCP, AWS, Azure) as well as any "machine" you can SSH into.
+
+## Example run on GCP
+```
+$ ./pkb.py --project=<GCP project name> --benchmarks=iperf --machine_type=f1-micro 
+...
+
+## Example run on AWS
 ```
 $ cd PerfKitBenchmarker
-$ ./pkb.py --project=[your project] --benchmarks=ping --cloud=AWS --zone=us-east-1b
+$ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro 
 ```
 
-Without parameters it runs everything, and without a cloud provider it defaults to GCE.
+## Example run on Azure
+```
+$ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
+```
+
+HOW TO RUN ALL BENCHMARKS
+==================
+Run without the --benchmarks parameter and every benchmark will run serially which can take a couple of hours.  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
 
 PLANNED IMPROVEMENTS
 =======================
-1. Allow using different type of VMs in same benchmark.
+Many... add requests via GitHub issues.
