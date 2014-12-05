@@ -254,7 +254,8 @@ def ValdiateIP(addr):
 
 
 def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
-          timeout=None, fuzz=FUZZ, log_errors=True):
+          timeout=None, fuzz=FUZZ, log_errors=True,
+          retryable_exceptions=None):
   """A function decorator that will retry when exceptions are thrown.
 
   Args:
@@ -271,6 +272,9 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
         means sleep exactly poll_interval seconds. At 1, this means
         sleep anywhere from 0 to poll_interval seconds.
     log_errors: A boolean describing whether errors should be logged.
+    retryable_exceptions: A tuple of exceptions that should be retried. By
+        default, this is None, which indicates that all exceptions should
+        be retried.
 
   Returns:
     A function that wraps functions in retry logic. It can be
@@ -278,6 +282,9 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
   """
   if timeout is None:
     timeout = FLAGS.default_timeout
+
+  if retryable_exceptions is None:
+    retryable_exceptions = Exception
 
   def Wrap(f):
     """Wraps the supplied function with retry logic."""
@@ -293,7 +300,7 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
         try:
           tries += 1
           return f(*args, **kwargs)
-        except Exception as e:  # pylint: disable=broad-except
+        except retryable_exceptions as e:
           fuzz_multiplier = 1 - fuzz + random.random() * fuzz
           sleep_time = poll_interval * fuzz_multiplier
           if ((time.time() + sleep_time) >= deadline or

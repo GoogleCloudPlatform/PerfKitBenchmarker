@@ -120,3 +120,13 @@ class Benchmarks(object):
 
   class RunError(Error):
     pass
+
+
+class Resource(object):
+  """Errors related to resource creation and deletion."""
+
+  class RetryableCreationError(Error):
+    pass
+
+  class RetryableDeletionError(Error):
+    pass
