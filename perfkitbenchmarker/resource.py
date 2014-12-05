@@ -78,7 +78,7 @@ class BaseResource(object):
     """
     pass
 
-  @vm_util.Retry()
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def _CreateResource(self):
     """Reliably creates the underlying resource."""
     if self.created:
@@ -86,12 +86,13 @@ class BaseResource(object):
     self._Create()
     try:
       if not self._Exists():
-        raise errors.Error('Creation of %s failed.' % type(self).__name__)
+        raise errors.Resource.RetryableCreationError(
+            'Creation of %s failed.' % type(self).__name__)
     except NotImplementedError:
       pass
     self.created = True
 
-  @vm_util.Retry()
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
     if self.deleted or not self.created:
@@ -99,7 +100,8 @@ class BaseResource(object):
     self._Delete()
     try:
       if self._Exists():
-        raise errors.Error('Deletion of %s failed.' % type(self).__name__)
+        raise errors.Resource.RetryableDeletionError(
+            'Deletion of %s failed.' % type(self).__name__)
     except NotImplementedError:
       pass
     self.deleted = True
