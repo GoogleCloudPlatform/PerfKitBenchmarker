@@ -134,9 +134,7 @@ $ azure vm list
 
 ## Install PerfKit dependencies
 ```
-$ sudo pip install python-gflags
-$ sudo apt-get install python-dev libffi-dev -y
-$ sudo pip install oauth2client pycrypto pyOpenSSL jinja2
+$ sudo pip install python-gflags jinja2 setuptools
 ```
 
 Pull the PerfKit Benchmarker from GitHub.
