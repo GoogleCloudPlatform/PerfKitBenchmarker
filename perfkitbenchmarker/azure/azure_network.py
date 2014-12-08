@@ -24,11 +24,10 @@ for more information about Azure Virtual Networks.
 import json
 import uuid
 
-import gflags as flags
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
-from perfkitbenchmarker import perfkitbenchmarker_lib
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 AZURE_PATH = 'azure'
@@ -57,9 +56,9 @@ class AzureFirewall(network.BaseFirewall):
                   'create',
                   vm.name,
                   str(port)]
-    perfkitbenchmarker_lib.IssueRetryableCommand(
+    vm_util.IssueRetryableCommand(
         create_cmd + ['--endpoint-protocol=tcp'])
-    perfkitbenchmarker_lib.IssueRetryableCommand(
+    vm_util.IssueRetryableCommand(
         create_cmd + ['--endpoint-protocol=udp'])
 
   def DisallowAllPorts(self):
@@ -84,7 +83,7 @@ class AzureAffinityGroup(resource.BaseResource):
                   '--location=%s' % self.zone,
                   '--label=%s' % self.name,
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(create_cmd)
+    vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
     """Deletes the affinity group."""
@@ -94,7 +93,7 @@ class AzureAffinityGroup(resource.BaseResource):
                   'delete',
                   '--quiet',
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the affinity group exists."""
@@ -104,7 +103,7 @@ class AzureAffinityGroup(resource.BaseResource):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
     try:
       json.loads(stdout)
     except ValueError:
@@ -127,7 +126,7 @@ class AzureStorageAccount(resource.BaseResource):
                   'create',
                   '--affinity-group=%s' % self.name,
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(create_cmd)
+    vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
     """Deletes the storage account."""
@@ -137,7 +136,7 @@ class AzureStorageAccount(resource.BaseResource):
                   'delete',
                   '--quiet',
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the storage account exists."""
@@ -147,7 +146,7 @@ class AzureStorageAccount(resource.BaseResource):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
     try:
       json.loads(stdout)
     except ValueError:
@@ -170,7 +169,7 @@ class AzureVirtualNetwork(resource.BaseResource):
                   'create',
                   '--affinity-group=%s' % self.name,
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(create_cmd)
+    vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
     """Deletes the virtual network."""
@@ -180,7 +179,7 @@ class AzureVirtualNetwork(resource.BaseResource):
                   'delete',
                   '--quiet',
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the storage account exists."""
@@ -190,7 +189,7 @@ class AzureVirtualNetwork(resource.BaseResource):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
     try:
       json.loads(stdout)
     except ValueError:
@@ -209,7 +208,7 @@ class AzureNetwork(network.BaseNetwork):
     self.storage_account = AzureStorageAccount(name)
     self.vnet = AzureVirtualNetwork(name)
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def Create(self):
     """Creates the actual network."""
     self.affinity_group.Create()

@@ -22,12 +22,11 @@ Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
 machines.
 """
 
+import logging
 import re
 
-import gflags as flags
-import logging
-
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
@@ -68,7 +67,7 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vms = vms[:2]
-  perfkitbenchmarker_lib.RunThreaded(PrepareNetperf, vms)
+  vm_util.RunThreaded(PrepareNetperf, vms)
 
   fw = benchmark_spec.firewall
   # TODO(user): takes too long, change API to take range, put all in the same
@@ -141,13 +140,13 @@ def Run(benchmark_spec):
   }
   for netperf_benchmark in NETPERF_BENCHMARKS:
 
-    if perfkitbenchmarker_lib.ShouldRunOnExternalIpAddress():
+    if vm_util.ShouldRunOnExternalIpAddress():
       external_ip_result = RunNetperf(vm, netperf_benchmark,
                                       server_vm.ip_address)
       external_ip_result[3].update(metadata)
       results.append(external_ip_result)
 
-    if perfkitbenchmarker_lib.ShouldRunOnInternalIpAddress(vm, server_vm):
+    if vm_util.ShouldRunOnInternalIpAddress(vm, server_vm):
       internal_ip_result = RunNetperf(vm, netperf_benchmark,
                                       server_vm.internal_ip)
       metadata['ip_type'] = 'internal'

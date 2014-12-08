@@ -24,10 +24,11 @@ def _GitVersion():
 
   try:
     version = subprocess.check_output(['git', '--git-dir', git_dir,
-                                       'describe', '--always'])
+                                       'describe', '--always'],
+                                      stderr=subprocess.STDOUT)
     return version.rstrip('\n')
   except (OSError, subprocess.CalledProcessError):
     return 'unknown'
 
 
-ARTEMIS_VERSION = _GitVersion()
+VERSION = _GitVersion()

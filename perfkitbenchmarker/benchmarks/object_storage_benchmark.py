@@ -21,13 +21,15 @@ CleanupX: Cleanup storage tools on vm.
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
 """
 
+import logging
 import os
 import re
 
-import gflags as flags
 from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 
 flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
                   [benchmark_spec_class.GCP, benchmark_spec_class.AWS,
@@ -56,8 +58,6 @@ OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
 
 NODE_URL = 'git://github.com/ry/node.git'
 NODE_COMMIT = 'v0.10.30'
-
-CONF_DIR = 'data/'
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data
@@ -97,15 +97,15 @@ class S3StorageBenchmark(object):
                      % FLAGS.run_uri, ignore_failure=True)
     _, res = vm.RemoteCommand('time aws s3 sync /run/data/ '
                               's3://pkb%s/' % FLAGS.run_uri)
-    print res
-    time_used = perfkitbenchmarker_lib.ParseTimeCommandResult(res)
+    logging.info(res)
+    time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
     vm.RemoteCommand('rm /run/data/*')
     _, res = vm.RemoteCommand('time aws s3 sync '
                               's3://pkb%s/ /run/data/'
                               % FLAGS.run_uri)
-    print res
-    time_used = perfkitbenchmarker_lib.ParseTimeCommandResult(res)
+    logging.info(res)
+    time_used = vm_util.ParseTimeCommandResult(res)
     result[1][1] = DATA_SIZE_IN_MB / time_used
 
   def Cleanup(self, vm):
@@ -171,7 +171,7 @@ class AzureBlobStorageBenchmark(object):
                               ' pkb%s %s; done' %
                               (FLAGS.run_uri, vm.azure_command_suffix))
     print res
-    time_used = perfkitbenchmarker_lib.ParseTimeCommandResult(res)
+    time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
     vm.RemoteCommand('rm /run/data/*')
     _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
@@ -179,7 +179,7 @@ class AzureBlobStorageBenchmark(object):
                               'file-$i.dat /run/data/file-$i.dat %s; done' %
                               (FLAGS.run_uri, vm.azure_command_suffix))
     print res
-    time_used = perfkitbenchmarker_lib.ParseTimeCommandResult(res)
+    time_used = vm_util.ParseTimeCommandResult(res)
     result[1][1] = DATA_SIZE_IN_MB / time_used
 
   def Cleanup(self, vm):
@@ -247,14 +247,14 @@ class GoogleCloudStorageBenchmark(object):
                               'gs://pkb%s/' % (vm.gsutil_path, FLAGS.run_uri))
 
     print res
-    time_used = perfkitbenchmarker_lib.ParseTimeCommandResult(res)
+    time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
     vm.RemoteCommand('rm /run/data/*')
     _, res = vm.RemoteCommand('time %s -m cp '
                               'gs://pkb%s/* '
                               '/run/data/' % (vm.gsutil_path, FLAGS.run_uri))
     print res
-    time_used = perfkitbenchmarker_lib.ParseTimeCommandResult(res)
+    time_used = vm_util.ParseTimeCommandResult(res)
     result[1][1] = DATA_SIZE_IN_MB / time_used
 
   def Cleanup(self, vm):
@@ -298,7 +298,7 @@ def Prepare(benchmark_spec):
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
   # Prepare data on vm, add permission to /run/folder
   vms[0].RemoteCommand('sudo chmod 777 /run/')
-  file_path = CONF_DIR + DATA_FILE
+  file_path = data.ResourcePath(DATA_FILE)
   vms[0].PushFile(file_path, '/run/')
 
 

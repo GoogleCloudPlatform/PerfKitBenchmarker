@@ -38,10 +38,10 @@ For AWS, where use PD, we should use EBS-GP and EBS Magnetic, for PD-SSD use
 EBS-GP and PIOPS.
 """
 
+import logging
 import re
 
-import gflags as flags
-import logging
+from perfkitbenchmarker import flags
 
 LOGGING = 'logging'
 DATABASE = 'database'
@@ -49,7 +49,7 @@ STREAMING = 'streaming'
 
 flags.DEFINE_enum('workload_mode', LOGGING,
                   [LOGGING, DATABASE, STREAMING],
-                  'Simuate a senario in logging, database or streaming.')
+                  'Simulate a logging, database or streaming scenario.')
 
 flags.DEFINE_list('iodepth_list', None, 'A list of iodepth parameter used by '
                   'fio command in simulated database and streaming scenarios '
@@ -335,7 +335,7 @@ def RunSimulatedStreaming(vm):
   return results
 
 
-RUN_SENARIO_FUNCTION_DICT = {
+RUN_SCENARIO_FUNCTION_DICT = {
     LOGGING: {DESCRIPTION: 'simulated_logging', METHOD: RunSimulatedLogging},
     DATABASE: {DESCRIPTION: 'simulated_database', METHOD: RunSimulatedDatabase},
     STREAMING: {DESCRIPTION: 'simulated_streaming',
@@ -362,7 +362,7 @@ def Run(benchmark_spec):
   # mode as a different benchmark, instead of mixing them together.
   BENCHMARK_INFO['name'] = '%s:%s' % (BENCHMARK_INFO['name'].split(':')[0],
                                       FLAGS.workload_mode)
-  return RUN_SENARIO_FUNCTION_DICT[FLAGS.workload_mode][METHOD](vm)
+  return RUN_SCENARIO_FUNCTION_DICT[FLAGS.workload_mode][METHOD](vm)
 
 
 def Cleanup(benchmark_spec):

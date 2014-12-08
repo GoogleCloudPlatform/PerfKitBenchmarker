@@ -21,12 +21,12 @@ TODO(user): Make hadoop scale when the number of nodes changes. Also
 investigate other settings and verfiy that we are seeing good performance.
 """
 
+import logging
 import os.path
 
-import gflags as flags
-import logging
-
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
@@ -40,7 +40,6 @@ HADOOP_VERSION = '2.5.2'
 HADOOP_URL = ('http://apache.mirrors.tds.net/hadoop/common/hadoop-%s/'
               'hadoop-%s.tar.gz') % (HADOOP_VERSION, HADOOP_VERSION)
 
-CONF_DIR = 'data/'
 DATA_FILES = ['core-site.xml.j2', 'yarn-site.xml.j2', 'hdfs-site.xml',
               'mapred-site.xml', 'hadoop-env.sh', 'slaves.j2']
 
@@ -79,7 +78,7 @@ def InstallHadoop(vm, master_ip, worker_ips):
   }
 
   for file_name in DATA_FILES:
-    file_path = os.path.join(CONF_DIR, file_name)
+    file_path = data.ResourcePath(file_name)
     remote_path = os.path.join('hadoop-%s/conf' % HADOOP_VERSION,
                                file_name)
     if file_name.endswith('.j2'):
@@ -114,7 +113,7 @@ def Prepare(benchmark_spec):
   slave_ips = [vm.internal_ip for vm in slaves]
 
   args = [((vm, master_ip, slave_ips), {}) for vm in vms]
-  perfkitbenchmarker_lib.RunThreaded(InstallHadoop, args)
+  vm_util.RunThreaded(InstallHadoop, args)
 
   conf_dir = _ConfDir(master)
   master.RemoteCommand('yes | hadoop-%s/bin/hdfs namenode -format' %
@@ -125,7 +124,7 @@ def Prepare(benchmark_spec):
   master.RemoteCommand(('hadoop-%s/sbin/yarn-daemon.sh --config %s '
                         'start resourcemanager') % (HADOOP_VERSION, conf_dir))
 
-  perfkitbenchmarker_lib.RunThreaded(StartDatanode, slaves)
+  vm_util.RunThreaded(StartDatanode, slaves)
 
 
 def Run(benchmark_spec):
@@ -200,5 +199,5 @@ def Cleanup(benchmark_spec):
                         'stop resourcemanager') % (HADOOP_VERSION,
                                                    conf_dir))
 
-  perfkitbenchmarker_lib.RunThreaded(StopDatanode, slaves)
-  perfkitbenchmarker_lib.RunThreaded(CleanNode, vms)
+  vm_util.RunThreaded(StopDatanode, slaves)
+  vm_util.RunThreaded(CleanNode, vms)

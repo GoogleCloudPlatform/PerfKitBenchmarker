@@ -19,8 +19,8 @@ scp copy across different vms using external networks.
 """
 import os.path
 
-import gflags as flags
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -36,8 +36,6 @@ BENCHMARK_INFO = {'name': 'copy_benchmark',
                   'num_machines': 0}
 
 CIPHER = 'aes128-cbc'
-
-CONF_DIR = 'data/'
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data
@@ -64,7 +62,7 @@ def PrepareDataFile(vm):
   Args:
     vm: The VM needs data file.
   """
-  file_path = CONF_DIR + DATA_FILE
+  file_path = data.ResourcePath(DATA_FILE)
   vm.PushFile(file_path, '%s/' % vm.GetScratchDir(0))
   vm.RemoteCommand('cd %s/; bash cloud-storage-workload.sh'
                    % vm.GetScratchDir(0))
@@ -84,8 +82,8 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  perfkitbenchmarker_lib.RunThreaded(PreparePrivateKey, vms)
-  perfkitbenchmarker_lib.RunThreaded(PrepareDataFile, vms)
+  vm_util.RunThreaded(PreparePrivateKey, vms)
+  vm_util.RunThreaded(PrepareDataFile, vms)
 
 
 def RunCp(vms):
@@ -104,7 +102,7 @@ def RunCp(vms):
           vms[0].GetScratchDir(1)))
   _, res = vms[0].RemoteCommand(cmd)
   print res
-  time_used = perfkitbenchmarker_lib.ParseTimeCommandResult(res)
+  time_used = vm_util.ParseTimeCommandResult(res)
   return [['cp throughput', DATA_SIZE_IN_MB / time_used, UNIT, {}]]
 
 
@@ -126,7 +124,7 @@ def RunDd(vms):
           vm.GetScratchDir(1)))
   _, res = vm.RemoteCommand(cmd)
   print res
-  time_used = perfkitbenchmarker_lib.ParseTimeCommandResult(res)
+  time_used = vm_util.ParseTimeCommandResult(res)
   return [['dd throughput', DATA_SIZE_IN_MB / time_used, UNIT, {}]]
 
 
@@ -189,18 +187,16 @@ def RunScpSingleDirection(sending_vm, receiving_vm):
     result = ['scp throughput', None, UNIT, metadata.copy()]
     result[-1]['ip_type'] = ip_type
     _, res = sending_vm.RemoteCommand(cmd)
-    time_used = perfkitbenchmarker_lib.ParseTimeCommandResult(res)
+    time_used = vm_util.ParseTimeCommandResult(res)
     result[1] = DATA_SIZE_IN_MB / time_used
     receiving_vm.RemoteCommand('rm -rf %s' % target_dir)
     return result
 
-  if perfkitbenchmarker_lib.ShouldRunOnExternalIpAddress():
+  if vm_util.ShouldRunOnExternalIpAddress():
     results.append(RunForIpAddress(receiving_vm.ip_address, 'external'))
 
-  if perfkitbenchmarker_lib.ShouldRunOnInternalIpAddress(
-      sending_vm, receiving_vm):
-    results.append(RunForIpAddress(receiving_vm.internal_ip,
-                                   'internal'))
+  if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
+    results.append(RunForIpAddress(receiving_vm.internal_ip, 'internal'))
 
   return results
 

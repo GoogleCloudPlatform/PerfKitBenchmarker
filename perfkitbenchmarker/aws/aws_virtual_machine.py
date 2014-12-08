@@ -21,9 +21,7 @@ operate on the VM: boot, shutdown, etc.
 import json
 import threading
 
-import gflags as flags
-
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import aws_disk
@@ -140,13 +138,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         return
       cat_cmd = ['cat',
                  vm_util.GetPublicKeyPath()]
-      keyfile, _ = perfkitbenchmarker_lib.IssueRetryableCommand(cat_cmd)
+      keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
       import_cmd = [
           util.AWS_PATH, 'ec2', '--region=%s' % self.region,
           'import-key-pair',
           '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
           '--public-key-material=%s' % keyfile]
-      perfkitbenchmarker_lib.IssueRetryableCommand(import_cmd)
+      vm_util.IssueRetryableCommand(import_cmd)
       self.imported_keyfile_set.add(self.region)
       if self.region in self.deleted_keyfile_set:
         self.deleted_keyfile_set.remove(self.region)
@@ -160,12 +158,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           util.AWS_PATH, 'ec2', '--region=%s' % self.region,
           'delete-key-pair',
           '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
-      perfkitbenchmarker_lib.IssueRetryableCommand(delete_cmd)
+      vm_util.IssueRetryableCommand(delete_cmd)
       self.deleted_keyfile_set.add(self.region)
       if self.region in self.imported_keyfile_set:
         self.imported_keyfile_set.remove(self.region)
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data and tag it."""
     describe_cmd = [util.AWS_PATH,
@@ -173,7 +171,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                     'describe-instances',
                     '--region=%s' % self.region,
                     '--instance-ids=%s' % self.id]
-    stdout, _ = perfkitbenchmarker_lib.IssueRetryableCommand(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     instance = response['Reservations'][0]['Instances'][0]
     self.ip_address = instance['PublicIpAddress']
@@ -210,7 +208,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                   '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
-    stdout, _ = perfkitbenchmarker_lib.IssueRetryableCommand(create_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Instances'][0]['InstanceId']
 
@@ -221,7 +219,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                   'terminate-instances',
                   '--region=%s' % self.region,
                   '--instance-ids=%s' % self.id]
-    perfkitbenchmarker_lib.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueRetryableCommand(delete_cmd)
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.

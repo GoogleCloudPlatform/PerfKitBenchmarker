@@ -26,9 +26,8 @@ operate on the VM: boot, shutdown, etc.
 
 
 import json
-import threading
-
 import logging
+import threading
 
 from perfkitbenchmarker import virtual_machine
 

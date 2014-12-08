@@ -27,10 +27,8 @@ operate on the VM: boot, shutdown, etc.
 
 import json
 
-import gflags as flags
-
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -56,7 +54,7 @@ class AzureService(resource.BaseResource):
                   'create',
                   '--affinitygroup=%s' % self.affinity_group_name,
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(create_cmd)
+    vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
     """Deletes the Azure service."""
@@ -65,7 +63,7 @@ class AzureService(resource.BaseResource):
                   'delete',
                   '--quiet',
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the service exists."""
@@ -74,7 +72,7 @@ class AzureService(resource.BaseResource):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
     try:
       json.loads(stdout)
     except ValueError:
@@ -124,7 +122,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                   self.name,
                   self.image,
                   self.user_name]
-    perfkitbenchmarker_lib.IssueCommand(create_cmd)
+    vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
     delete_cmd = [AZURE_PATH,
@@ -132,7 +130,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                   'delete',
                   '--quiet',
                   self.name]
-    perfkitbenchmarker_lib.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the VM exists and attempts to get some data."""
@@ -141,14 +139,14 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
     try:
       json.loads(stdout)
     except ValueError:
       return False
     return True
 
-  @perfkitbenchmarker_lib.Retry()
+  @vm_util.Retry()
   def _PostCreate(self):
     """Get VM data."""
     show_cmd = [AZURE_PATH,
@@ -156,7 +154,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
     response = json.loads(stdout)
     self.os_disk.name = response['OSDisk']['name']
     self.os_disk.created = True

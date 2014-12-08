@@ -42,17 +42,18 @@ In its current release these are the benchmarks that are executed:
   * copy_benchmark: No license needed.
   - object_storage_benchmark: No license needed.
   - ping_benchmark: No license needed.
+  - Aerospike: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
   - openjdk-7-jre: GPL v2 with the Classpath Exception (http://openjdk.java.net/legal/gplv2+ce.html)
 
 CoreMark setup cannot be automated. EEMBC requires users to agree with their terms and conditions, and PerfKit
 Benchmarker users must manually download the coremark tarball from their website and save it under the
-`./data` folder (e.g. `~/PerfKitBenchmarker/data/coremark_v1.0.tgz`)
+`perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/coremark_v1.0.tgz`)
 
 SpecCPU2006 benchmark setup cannot be automated. SPEC requires users to agree with their terms and conditions,
 and PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
-the `./data` folder (e.g. `~/PerfKitBenchmarker/data/cpu2006v1.2.tgz`)
+the `./perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
 
 HOW TO GET SETUP
 ==================

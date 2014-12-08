@@ -13,11 +13,15 @@
 # limitations under the License.
 """Utilities for working with Google Cloud Platform resources."""
 
-import gflags as flags
+from perfkitbenchmarker import flags
 
 flags.DEFINE_string('gcloud_path',
                     'gcloud',
                     'The path for the gcloud utility.')
+
+flags.DEFINE_list('additional_gcloud_flags',
+                  [],
+                  'Additional flags to pass to gcloud.')
 
 FLAGS = flags.FLAGS
 
@@ -31,12 +35,12 @@ def GetDefaultGcloudFlags(resource):
   Returns:
     A common set of gcloud options.
   """
-  options = [
-      '--project', resource.project,
-      '--format', 'json',
-      '--quiet'
-  ]
+  options = []
+  if resource.project is not None:
+    options.extend(['--project', resource.project])
+  options.extend(['--format', 'json', '--quiet'])
   if hasattr(resource, 'zone'):
     options.extend(['--zone', resource.zone])
+  options.extend(FLAGS.additional_gcloud_flags)
 
   return options

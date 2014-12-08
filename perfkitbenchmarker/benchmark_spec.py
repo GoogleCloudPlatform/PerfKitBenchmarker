@@ -14,13 +14,11 @@
 
 """Container for all data required for a benchmark to run."""
 
+import logging
 import pickle
 
-import gflags as flags
-import logging
-
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -51,7 +49,7 @@ DEFAULTS = {
     AZURE: {
         IMAGE: ('b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-'
                 '14_04-LTS-amd64-server-20140724-en-us-30GB'),
-        MACHINE_TYPE: 'small',
+        MACHINE_TYPE: 'Small',
         ZONE: 'East US',
     },
     AWS: {
@@ -106,8 +104,8 @@ class BenchmarkSpec(object):
   """Contains the various data required to make a benchmark run."""
 
   def __init__(self, benchmark_info):
-    if FLAGS.benchmark_config_pair and benchmark_info[
-        'name'] in FLAGS.benchmark_config_pair.keys():
+    if (FLAGS.benchmark_config_pair and
+        benchmark_info['name'] in FLAGS.benchmark_config_pair.keys()):
       # TODO(user): Unify naming between config_reader and
       # perfkitbenchmarker.
       self.config = config_reader.ConfigLoader(
@@ -117,7 +115,7 @@ class BenchmarkSpec(object):
     self.networks = {}
     if hasattr(self, 'config'):
       config_dict = {}
-      for section in self.config._config.sections():  # pylint: disable=protected-access
+      for section in self.config._config.sections():
         config_dict[section] = self.config.GetSectionOptionsAsDictionary(
             section)
       self.cloud = config_dict['cluster']['type']
@@ -129,7 +127,7 @@ class BenchmarkSpec(object):
         self.vm_dict[node.split(':')[1]] = []
       args = [((config_dict[node],
                 node.split(':')[1]), {}) for node in self.config.node_sections]
-      perfkitbenchmarker_lib.RunThreaded(
+      vm_util.RunThreaded(
           self.CreateVirtualMachineFromNodeSection, args)
       self.num_vms = len(self.vms)
       self.image = ','.join(self.image)
@@ -147,6 +145,7 @@ class BenchmarkSpec(object):
         self.num_vms = FLAGS.num_vms
       else:
         self.num_vms = benchmark_info['num_machines']
+      self.scratch_disk = benchmark_info['scratch_disk']
       self.scratch_disk_size = FLAGS.scratch_disk_size
       self.scratch_disk_type = FLAGS.scratch_disk_type
 
@@ -158,7 +157,7 @@ class BenchmarkSpec(object):
       for i in range(benchmark_info['scratch_disk']):
         disk_spec = disk.BaseDiskSpec(
             self.scratch_disk_size,
-            DISK_TYPE[self.cloud][STANDARD],
+            DISK_TYPE[self.cloud][self.scratch_disk_type],
             '/scratch%d' % i)
         for vm in self.vms:
           vm.disk_specs.append(disk_spec)
@@ -172,16 +171,16 @@ class BenchmarkSpec(object):
     """Prepares the VMs and networks necessary for the benchmark to run."""
     if self.networks:
       prepare_args = [self.networks[zone] for zone in self.networks]
-      perfkitbenchmarker_lib.RunThreaded(self.PrepareNetwork, prepare_args)
+      vm_util.RunThreaded(self.PrepareNetwork, prepare_args)
     if self.vms:
       prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
-      perfkitbenchmarker_lib.RunThreaded(self.PrepareVm, prepare_args)
+      vm_util.RunThreaded(self.PrepareVm, prepare_args)
 
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
       return
     if self.vms:
-      perfkitbenchmarker_lib.RunThreaded(self.DeleteVm, self.vms)
+      vm_util.RunThreaded(self.DeleteVm, self.vms)
     self.firewall.DisallowAllPorts()
     for zone in self.networks:
       self.networks[zone].Delete()
@@ -266,7 +265,7 @@ class BenchmarkSpec(object):
     vm.AptUpdate()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
-    perfkitbenchmarker_lib.BurnCpu(vm)
+    vm_util.BurnCpu(vm)
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.

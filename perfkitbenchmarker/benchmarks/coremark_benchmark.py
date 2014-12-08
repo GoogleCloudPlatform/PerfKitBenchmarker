@@ -21,10 +21,10 @@ only a processor's core features.
 Coremark homepage: http://www.eembc.org/coremark/
 """
 
-import os.path
+import logging
 import re
 
-import logging
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 
 BENCHMARK_INFO = {'name': 'coremark',
@@ -32,7 +32,6 @@ BENCHMARK_INFO = {'name': 'coremark',
                   'scratch_disk': False,
                   'num_machines': 1}
 
-DATA_DIR = 'data/'
 COREMARK_TAR = 'coremark_v1.0.tgz'
 COREMARK_DIR = 'coremark_v1.0'
 COREMARK_BUILDFILE = 'linux64/core_portme.mak'
@@ -54,11 +53,12 @@ def Prepare(benchmark_spec):
   vm = vms[0]
   logging.info('prepare Coremark on %s', vm)
   vm.InstallPackage('build-essential')
-  file_path = DATA_DIR + COREMARK_TAR
-  if not os.path.isfile(file_path):
-    logging.error('Please provide %s under %s directory before'
-                  ' running coremark benchmarks.', COREMARK_TAR, DATA_DIR)
-    raise errors.Benchmarks.PrepareException('%s not found' % file_path)
+  try:
+    file_path = data.ResourcePath(COREMARK_TAR)
+  except data.ResourceNotFound:
+    logging.error('Please provide %s under perfkitbenchmarker/data directory '
+                  'before running coremark benchmark.', COREMARK_TAR)
+    raise errors.Benchmarks.PrepareException('%s not found' % COREMARK_TAR)
   vm.PushFile(file_path)
   vm.RemoteCommand('tar xvfz %s' % COREMARK_TAR)
   vm.RemoteCommand('sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt '

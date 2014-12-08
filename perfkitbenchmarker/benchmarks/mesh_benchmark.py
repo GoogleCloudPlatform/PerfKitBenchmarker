@@ -19,12 +19,12 @@ and average latency inside mesh network.
 """
 
 
+import logging
 import re
 import threading
 
-import gflags as flags
-import logging
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 
 
 flags.DEFINE_integer('num_connections', 1,
@@ -83,7 +83,7 @@ def Prepare(benchmark_spec):
   vms[0].RemoteCommand(wget_cmd)
   for vm in vms:
     vms[0].MoveFile(vm, NETPERF_NAME)
-  perfkitbenchmarker_lib.RunThreaded(PrepareVM, vms, benchmark_spec.num_vms)
+  vm_util.RunThreaded(PrepareVM, vms, benchmark_spec.num_vms)
 
 
 def RunNetperf(vm, benchmark_name, servers, result):
@@ -157,10 +157,10 @@ def Run(benchmark_spec):
       value = 0.0
     result = [metric, value, unit, metadata]
     args = [((source, netperf_benchmark, vms, result), {}) for source in vms]
-    perfkitbenchmarker_lib.RunThreaded(RunNetperf, args, benchmark_spec.num_vms)
+    vm_util.RunThreaded(RunNetperf, args, benchmark_spec.num_vms)
     if netperf_benchmark == 'TCP_RR':
-      result[VALUE_INDEX] /= ((
-          benchmark_spec.num_vms - 1) * benchmark_spec.num_vms *
+      result[VALUE_INDEX] /= ((benchmark_spec.num_vms - 1) *
+                              benchmark_spec.num_vms *
                               FLAGS.num_connections)
     results.append(result)
   print results

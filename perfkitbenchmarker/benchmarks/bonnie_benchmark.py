@@ -14,10 +14,9 @@
 
 """Runs plain vanilla bonnie++."""
 
-
-
-import gflags as flags
 import logging
+
+from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 

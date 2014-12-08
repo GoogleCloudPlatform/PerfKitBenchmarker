@@ -102,11 +102,6 @@ class VmUtil(object):
   class UserSetupError(Error):
     pass
 
-
-# TODO(user) Rename this class to match changes to perfkitbenchmarker_lib
-class PerfKitBenchmarkerLib(object):
-  """Errors raised by perfkitbenchmarker_lib.py."""
-
   class ThreadException(Error):
     pass
 
@@ -124,4 +119,14 @@ class Benchmarks(object):
     pass
 
   class RunError(Error):
+    pass
+
+
+class Resource(object):
+  """Errors related to resource creation and deletion."""
+
+  class RetryableCreationError(Error):
+    pass
+
+  class RetryableDeletionError(Error):
     pass

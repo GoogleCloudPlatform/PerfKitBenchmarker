@@ -14,15 +14,14 @@
 """Module containing classes related to GCE disks.
 
 Disks can be created, deleted, attached to VMs, and detached from VMs.
-Use 'gcutil listdisktypes' to determine valid disk types.
+Use 'gcloud compute disk-types list' to determine valid disk types.
 """
 
 import json
 
-import gflags as flags
-
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import util
 
 FLAGS = flags.FLAGS
@@ -56,7 +55,7 @@ class GceDisk(disk.BaseDisk):
       create_cmd.extend(['--image', self.image])
       if FLAGS.image_project:
         create_cmd.extend(['--image-project', FLAGS.image_project])
-    perfkitbenchmarker_lib.IssueCommand(create_cmd)
+    vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
     """Deletes the disk."""
@@ -64,7 +63,7 @@ class GceDisk(disk.BaseDisk):
                   'compute', 'disks',
                   'delete', self.name]
     delete_cmd.extend(util.GetDefaultGcloudFlags(self))
-    perfkitbenchmarker_lib.IssueCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the disk exists."""
@@ -72,7 +71,7 @@ class GceDisk(disk.BaseDisk):
                    'compute', 'disks',
                    'describe', self.name]
     getdisk_cmd.extend(util.GetDefaultGcloudFlags(self))
-    stdout, _, _ = perfkitbenchmarker_lib.IssueCommand(getdisk_cmd)
+    stdout, _, _ = vm_util.IssueCommand(getdisk_cmd)
     try:
       json.loads(stdout)
     except ValueError:
@@ -94,7 +93,7 @@ class GceDisk(disk.BaseDisk):
                   '--device-name', self.name,
                   '--disk', self.name]
     attach_cmd.extend(util.GetDefaultGcloudFlags(self))
-    perfkitbenchmarker_lib.IssueRetryableCommand(attach_cmd)
+    vm_util.IssueRetryableCommand(attach_cmd)
 
   def Detach(self):
     """Detaches the disk from a VM."""
@@ -105,7 +104,7 @@ class GceDisk(disk.BaseDisk):
                   self.attached_vm_name,
                   '--device-name', self.name]
     detach_cmd.extend(util.GetDefaultGcloudFlags(self))
-    perfkitbenchmarker_lib.IssueRetryableCommand(detach_cmd)
+    vm_util.IssueRetryableCommand(detach_cmd)
     self.attached_vm_name = None
 
   def GetDevicePath(self):

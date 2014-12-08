@@ -14,9 +14,8 @@
 
 """Utilities for working with Amazon Web Services resources."""
 
-import gflags as flags
-
-from perfkitbenchmarker import perfkitbenchmarker_lib
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 
 AWS_PATH = 'aws'
 FLAGS = flags.FLAGS
@@ -41,4 +40,4 @@ def AddDefaultTags(resource_id, region):
              '--tags',
              'Key=owner,Value="{0}"'.format(FLAGS.owner),
              'Key=perfkitbenchmarker-run,Value="{0}"'.format(FLAGS.run_uri)]
-  perfkitbenchmarker_lib.IssueRetryableCommand(tag_cmd)
+  vm_util.IssueRetryableCommand(tag_cmd)

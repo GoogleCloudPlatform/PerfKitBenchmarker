@@ -1,3 +1,18 @@
+# v0.7.0
+
+* New benchmark: `aerospike` (GH-13).
+* `iperf`: Run benchmark in both directions (VM A -> VM B and B -> A) (GH-7).
+* `hadoop_benchmark`: Bump Hadoop to version 2.5.2 (GH-5).
+* `synthetic_storage_workloads_benchmark`: Fix IO sizes passed to `fio`.
+* Add a verbose log to `/tmp/perfkitbenchmarker/run_<run_uri>/perfkitbenchmarker.log`
+  (exact file name announced to stderr at start of run) (GH-3).
+* Merge `perfkitbenchmarker_lib` into `vm_util` (GH-9)
+* Refactor result publishing and metadata collection (GH-10).
+* Add a Google Cloud Storage publisher (GH-14)
+* Change the default Azure machine type to "Small".
+* Added unit tests.
+* Style fixes.
+
 # v0.6.0
 
 Initial release under Apache 2.0 license.

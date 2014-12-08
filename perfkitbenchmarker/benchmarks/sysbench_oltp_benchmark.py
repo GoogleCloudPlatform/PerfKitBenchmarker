@@ -17,10 +17,10 @@
 Manual: http://sysbench.sourceforge.net/docs/#database_mode
 """
 
+import logging
 import re
 
-import gflags as flags
-import logging
+from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 
