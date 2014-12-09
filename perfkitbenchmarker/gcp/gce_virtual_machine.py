@@ -25,6 +25,7 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import json
+import tempfile
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
@@ -79,7 +80,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Create a GCE VM instance."""
     super(GceVirtualMachine, self)._Create()
     with open(self.ssh_public_key) as f:
-      key = f.read().rstrip('\n').replace(' ', '\\ ')
+      public_key = f.read().rstrip('\n')
+    with tempfile.NamedTemporaryFile(dir=vm_util.GetTempDir(),
+                                     prefix='key-metadata') as tf:
+      tf.write('%s:%s\n' % (self.user_name, public_key))
+      tf.flush()
       create_cmd = [FLAGS.gcloud_path,
                     'compute',
                     'instances',
@@ -91,8 +96,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     '--machine-type', self.machine_type,
                     '--tags=perfkitbenchmarker',
                     '--maintenance-policy', 'TERMINATE',
+                    '--metadata-from-file',
+                    'sshKeys=%s' % tf.name,
                     '--metadata',
-                    'sshKeys=%s:%s' % (self.user_name, key),
                     'owner=%s' % FLAGS.owner]
       ssd_interface_option = NVME if NVME in self.image else SCSI
       for _ in range(self.num_ssds):
