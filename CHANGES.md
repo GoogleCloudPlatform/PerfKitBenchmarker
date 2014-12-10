@@ -1,3 +1,8 @@
+# v0.7.1
+
+* GCE VM SSH keys are now provided via a temporary file rather than the command
+  line, which fixes a compatibility issue between versions of `gcloud` (GH-19).
+
 # v0.7.0
 
 * New benchmark: `aerospike` (GH-13).
