@@ -23,7 +23,4 @@ setup(
     scripts=['pkb.py'],
     install_requires=['python-gflags==2.0',
                       'jinja2>=2.7',
-                      'oauth2client',
-                      'pycrypto',
-                      'pyOpenSSL',
                       'setuptools'])
