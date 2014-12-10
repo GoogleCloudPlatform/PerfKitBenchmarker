@@ -1,0 +1,200 @@
+{#
+ # Copyright 2014 Google Inc. All rights reserved.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+ # you may not use this file except in compliance with the License.
+ # You may obtain a copy of the License at
+ #
+ #   http://www.apache.org/licenses/LICENSE-2.0
+ #
+ # Unless required by applicable law or agreed to in writing, software
+ # distributed under the License is distributed on an "AS IS" BASIS,
+ # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ #}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>PerfKitBenchmarker comparison: {{ base.name }} to {{ head.name }}</title>
+
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+
+    <style type="text/css">
+
+      body {
+        position: relative;
+        padding-top: 70px;
+      }
+
+      span.diff_chg {
+        color: #8a6d3b;
+        font-weight: bold;
+      }
+
+      span.diff_sub {
+        background-color: #f2dede;
+        color: #a94442;
+        font-weight: bold;
+      }
+
+      span.diff_add {
+        background-color: #dff0d8;
+        color: #3c763d;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">PerfKitBenchmarker</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+            <li><a href="#result-comparison">Value comparison</a></li>
+            <li><a href="#short-differences">Short diff</a></li>
+            <li><a href="#full-differences">Full diff</a></li>
+            <li><a>Base: <kbd>{{ base.name }}</kbd></a></li>
+            <li><a>Head: <kbd>{{ head.name }}</kbd></a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div><!--/.container -->
+    </nav>
+
+    <div class="container">
+      <div class="row">
+        <h1>
+          PerfKitBenchmarker comparison: <kbd>{{ base.name }}</kbd>
+          to <kbd>{{ head.name }}</kbd>
+        </h1>
+
+        <p class="lead">Run with:</p>
+
+        <pre>{{ flags|join(' ') }}</pre>
+
+        <h2 id="result-comparison">Result comparison</h2>
+
+        <table class="table table-striped table-bordered">
+          <thead>
+            <tr>
+              <td></td>
+              <td colspan="4">Base: <kbd>{{ base.name }}</kbd>
+                (<code>{{ base.sha1 }}</code>)</td>
+              <td colspan="4">Head: <kbd>{{ head.name }}</kbd>
+                (<code>{{ head.sha1 }}</code>)</td>
+              <td>Difference</td>
+              <td>Difference (%)</td>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for pair in izip_longest(base.samples, head.samples) -%}
+            {% set base_sample = pair[0] -%}
+            {% set head_sample = pair[1] -%}
+            <tr>
+              <td>{{ loop.index }}</td>
+              {% for sample in pair %}
+              {% if sample %}
+              {% for variable in ['metric', 'test', 'value', 'unit'] %}
+              <td class="{% if base_sample[variable]|default('') != head_sample[variable]|default('') %}bg-warning text-warning{%endif%}">
+                {{ sample[variable] }}
+              </td>
+              {% endfor %}
+              {% else %}
+              {% for i in range(4) %}<td></td>{% endfor %}
+              {% endif %}
+              {% endfor %} {# sample in pair #}
+              {% if base_sample and head_sample %}
+                {% set pct_diff = ((head_sample.value - base_sample.value) / base_sample.value * 100) %}
+                <td>{{ head_sample.value - base_sample.value }}</td>
+                <td class="{{ class_for_percent_diff(pct_diff) }}">{{ pct_diff | round(1) }}%</td>
+              {% else %}
+              {% for i in range(2) %}<td></td>{% endfor %}
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+      </div><!-- /.row -->
+
+      <div class="row">
+
+        <h2 id="short-differences">Short diff</h2>
+
+        <p>Removed the following keys which were expected to vary:</p>
+        <ul>
+          {% for key in varying_keys %}
+          <li><code>{{ key }}</code></li>
+          {% endfor %}
+        </ul>
+
+        {% for sample_diff in sample_context_diffs %}
+
+        {% if sample_diff %}
+        <h3>Sample {{ loop.index }}</h3>
+
+        {{ sample_diff }}
+        {% endif %}
+
+        {% endfor %}
+      </div>
+      <div class="row">
+
+        <h2 id="full-differences">Full diff</h2>
+
+        <p>Removed the following keys which were expected to vary:</p>
+        <ul>
+          {% for key in varying_keys %}
+          <li><code>{{ key }}</code></li>
+          {% endfor %}
+        </ul>
+
+        {% for sample_diff in sample_diffs %}
+
+        {% if sample_diff %}
+        <h3>Sample {{ loop.index }}</h3>
+
+        {{ sample_diff }}
+        {% endif %}
+
+        {% endfor %}
+      </div>
+
+    </div><!-- /.container -->
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <script type="text/javascript">
+
+    $(function() {
+      $('table.diff').addClass('table').addClass('table-condensed');
+      $('body').scrollspy({ target: '#navbar' });
+      $('span.diff_sub').wrap('<del></del>');
+      $('span.diff_add').wrap('<ins></ins>');
+      $('span.diff_chg').wrap('<mark></mark>');
+    });
+
+    </script>
+
+  </body>
+</html>
