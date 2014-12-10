@@ -149,8 +149,8 @@ def Run(benchmark_spec):
     if vm_util.ShouldRunOnInternalIpAddress(vm, server_vm):
       internal_ip_result = RunNetperf(vm, netperf_benchmark,
                                       server_vm.internal_ip)
-      metadata['ip_type'] = 'internal'
       internal_ip_result[3].update(metadata)
+      internal_ip_result[3]['ip_type'] = 'internal'
       results.append(internal_ip_result)
 
   return results
