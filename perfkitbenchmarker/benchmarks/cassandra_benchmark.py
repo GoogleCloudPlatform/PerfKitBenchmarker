@@ -427,22 +427,23 @@ def CollectResults(benchmark_spec):
             total_operation_time_list), {}) for vm in vm_dict[LOADER_NODE]]
   vm_util.RunThreaded(CollectResultFile, args)
   results = []
+  metadata = {'num_keys': FLAGS.num_keys}
   results.append(['Interval_op_rate', math.fsum(interval_op_rate_list),
-                  'operations per second', {}])
+                  'operations per second', metadata])
   results.append(['Interval_key_rate', math.fsum(interval_key_rate_list),
-                  'operations per second', {}])
+                  'operations per second', metadata])
   results.append(['Latency median',
                   math.fsum(latency_median_list) / len(vm_dict[LOADER_NODE]),
-                  'ms', {}])
+                  'ms', metadata])
   results.append(['Latency 95th percentile',
                   math.fsum(latency_95th_list) / len(vm_dict[LOADER_NODE]),
-                  'ms', {}])
+                  'ms', metadata])
   results.append(['Latency 99.9th percentile',
                   math.fsum(latency_99_9th_list) / len(vm_dict[LOADER_NODE]),
-                  'ms', {}])
+                  'ms', metadata])
   results.append(['Total operation time',
                   math.fsum(total_operation_time_list) / len(
-                      vm_dict[LOADER_NODE]), 'seconds', {}])
+                      vm_dict[LOADER_NODE]), 'seconds', metadata])
   print results
   return results
 
