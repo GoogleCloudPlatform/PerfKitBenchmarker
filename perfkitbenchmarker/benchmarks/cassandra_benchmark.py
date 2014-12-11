@@ -264,7 +264,7 @@ def RunTestOnLoader(vm, data_nodes_ip_addresses):
       '--num-keys %s -K %s -t %s' % (
           CASSANDRA_DIR, vm.hostname, data_nodes_ip_addresses,
           REPLICATION_FACTOR, CONSISTENCY_LEVEL,
-          FLAGS.num_keys, RETRIES, THREADS))
+          FLAGS.num_keys, RETRIES, THREADS), ignore_failure=True)
 
 
 def InsertTest(benchmark_spec, vm):
@@ -304,6 +304,10 @@ def WaitLoaderForFinishing(vm):
     resp, _ = vm.RemoteCommand('tail -n 1 *results')
     if re.findall(r'END', resp):
       break
+    if re.findall(r'FAILURE', resp):
+      vm.PullFile(RESULTS_DIR, '*results')
+      raise errors.Benchmarks.RunError(
+          'cassandra-stress tool failed, check %s/ for details.' % RESULTS_DIR)
     time.sleep(SLEEP_BETWEEN_CHECK_IN_SECONDS)
 
 
