@@ -28,8 +28,15 @@ from perfkitbenchmarker import benchmark_spec as bs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
+
+flags.DEFINE_integer('num_keys', 20000000,
+                     'Number of keys used in cassandra-stress tool.')
+
+
+FLAGS = flags.FLAGS
 
 DEFAULT_CLUSTER_SIZE = 4
 
@@ -56,7 +63,6 @@ SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
 # Stress test options.
 CONSISTENCY_LEVEL = 'quorum'
 REPLICATION_FACTOR = '3'
-NUM_KEYS = '100000000'
 RETRIES = '1000'
 THREADS = '300'
 MAX_RETRY_START_CLUSTER = 5
@@ -258,7 +264,7 @@ def RunTestOnLoader(vm, data_nodes_ip_addresses):
       '--num-keys %s -K %s -t %s' % (
           CASSANDRA_DIR, vm.hostname, data_nodes_ip_addresses,
           REPLICATION_FACTOR, CONSISTENCY_LEVEL,
-          NUM_KEYS, RETRIES, THREADS))
+          FLAGS.num_keys, RETRIES, THREADS), ignore_failure=True)
 
 
 def InsertTest(benchmark_spec, vm):
@@ -298,6 +304,10 @@ def WaitLoaderForFinishing(vm):
     resp, _ = vm.RemoteCommand('tail -n 1 *results')
     if re.findall(r'END', resp):
       break
+    if re.findall(r'FAILURE', resp):
+      vm.PullFile(RESULTS_DIR, '*results')
+      raise errors.Benchmarks.RunError(
+          'cassandra-stress tool failed, check %s/ for details.' % RESULTS_DIR)
     time.sleep(SLEEP_BETWEEN_CHECK_IN_SECONDS)
 
 
