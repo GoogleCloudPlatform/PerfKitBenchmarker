@@ -51,6 +51,16 @@
         font-weight: bold;
       }
     </style>
+    <script type="text/javascript">
+
+    function initialize() {
+      $('table.diff').addClass('table').addClass('table-condensed');
+      $('body').scrollspy({ target: '#navbar' });
+      $('span.diff_sub').wrap('<del></del>');
+      $('span.diff_add').wrap('<ins></ins>');
+      $('span.diff_chg').wrap('<mark></mark>');
+    }
+    </script>
   </head>
 
   <body>
@@ -185,15 +195,7 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
     <script type="text/javascript">
-
-    $(function() {
-      $('table.diff').addClass('table').addClass('table-condensed');
-      $('body').scrollspy({ target: '#navbar' });
-      $('span.diff_sub').wrap('<del></del>');
-      $('span.diff_add').wrap('<ins></ins>');
-      $('span.diff_chg').wrap('<mark></mark>');
-    });
-
+      $(initialize);
     </script>
 
   </body>
