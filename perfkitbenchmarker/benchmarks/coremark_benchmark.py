@@ -52,7 +52,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('prepare Coremark on %s', vm)
-  vm.InstallPackage('build-essential')
+  vm.InstallBuildTools()
   try:
     file_path = data.ResourcePath(COREMARK_TAR)
   except data.ResourceNotFound:
@@ -105,4 +105,3 @@ def Cleanup(benchmark_spec):
   vm = vms[0]
   vm.RemoteCommand('rm -rf %s' % COREMARK_DIR)
   vm.RemoteCommand('rm -f %s' % COREMARK_TAR)
-  vm.UninstallPackage('build-essential')

@@ -43,13 +43,6 @@ SSH_RETRIES = 10
 STRIPED_DEVICE = '/dev/md0'
 LOCAL_MOUNT_PATH = '/local'
 
-GUEST_OS_DEBIAN = 'debian'
-GUEST_OS_CENTOS = 'centos'
-
-flags.DEFINE_enum('guest_os', GUEST_OS_DEBIAN,
-                  [GUEST_OS_CENTOS, GUEST_OS_DEBIAN],
-                  'Determines what command set to run in the guest.')
-
 
 class BaseVirtualMachineSpec(object):
   """Storing various data about a single vm.
@@ -167,7 +160,7 @@ class BaseVirtualMachine(resource.BaseResource):
   @vm_util.Retry()
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
-    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0,lazy_journal_init=0 -O '
+    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0 -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteCommand(fmt_cmd)
 
@@ -291,17 +284,7 @@ class BaseVirtualMachine(resource.BaseResource):
       SshConnectionError: If there was a problem establishing the connection.
     """
     user_host = '%s@%s' % (self.user_name, self.ip_address)
-    if FLAGS.guest_os == GUEST_OS_DEBIAN:
-      ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(remote_port), user_host]
-    elif FLAGS.guest_os == GUEST_OS_CENTOS:
-      if 'sudo' in command:
-        # The -t option forces a ptty for the connection.  This is required
-        # on Centos to run sudo.  However there is a side-effect that
-        # running backgroud jobs with "&" will fail in this mode.
-        ssh_cmd = ['/usr/bin/ssh', '-t', '-A', '-p', str(remote_port),
-                   user_host]
-      else:
-        ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(remote_port), user_host]
+    ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(remote_port), user_host]
     ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     if login_shell:
       ssh_cmd.extend(['-t', 'bash -l -c "%s"' % command])
@@ -366,39 +349,6 @@ class BaseVirtualMachine(resource.BaseResource):
         target.user_name, target.ip_address, remote_path)
     self.RemoteCommand('scp -o StrictHostKeyChecking=no -i %s %s %s' %
                        (REMOTE_KEY_PATH, source_path, remote_location))
-
-  @vm_util.Retry()
-  def AptUpdate(self):
-    """Runs apt-get update until it succeeds or times out."""
-    if FLAGS.guest_os == GUEST_OS_DEBIAN:
-      self.RemoteCommand('sudo apt-get update')
-    elif FLAGS.guest_os == GUEST_OS_CENTOS:
-      self.RemoteCommand('sudo rpm -ivh http://dl.fedoraproject.org/pub/epel'
-                         '/6/x86_64/epel-release-6-8.noarch.rpm')
-      self.RemoteCommand('sudo yum clean expire-cache')
-
-  @vm_util.Retry()
-  def InstallPackage(self, package_name):
-    """Installs a package on a remote machine.
-
-    Args:
-      package_name: A string containing space-delimited package names understood
-          by debian APT.
-    """
-    for package in package_name.split():
-      if self.PackageIsInstalled(package):
-        continue
-      try:
-        if FLAGS.guest_os in [GUEST_OS_DEBIAN]:
-          install_command = ('sudo DEBIAN_FRONTEND=\'noninteractive\' '
-                             '/usr/bin/apt-get -y install %s' % (package))
-        elif FLAGS.guest_os in [GUEST_OS_CENTOS]:
-          install_command = ('sudo yum -y install %s' % (package))
-        self.RemoteCommand(install_command)
-        self._installed_packages.add(package)
-      except errors.VmUtil.SshConnectionError as e:
-        self.AptUpdate()
-        raise e
 
   def AuthenticateVm(self):
     """Authenticate a remote machine to access all peers."""

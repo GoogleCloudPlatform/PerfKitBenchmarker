@@ -23,6 +23,7 @@ import threading
 
 import gflags as flags
 
+from perfkitbenchmarker import package_managers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import aws_disk
@@ -264,3 +265,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.RemoteCommand('sudo umount /mnt')
     return super(AwsVirtualMachine, self).SetupLocalDrives(
         mount_path=mount_path)
+
+
+class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
+                                   package_managers.AptMixin):
+  pass
+
+
+class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
+                                 package_managers.YumMixin):
+  pass

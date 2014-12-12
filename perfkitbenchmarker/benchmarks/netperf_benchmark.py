@@ -28,6 +28,7 @@ import gflags as flags
 import logging
 
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.packages import netperf
 
 FLAGS = flags.FLAGS
 
@@ -36,9 +37,6 @@ BENCHMARKS_INFO = {'name': 'netperf_simple',
                    'scratch_disk': False,
                    'num_machines': 2}
 
-NETPERF_NAME = 'netperf-2.6.0.tar.gz'
-NETPERF_SRC = 'netperf-2.6.0/src'
-NETPERF_LOC = 'ftp://ftp.netperf.org/netperf/%s' % NETPERF_NAME
 NETPERF_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 COMMAND_PORT = 20000
 DATA_PORT = 20001
@@ -50,13 +48,7 @@ def GetInfo():
 
 def PrepareNetperf(vm):
   """Installs netperf on a single vm."""
-  logging.info('netperf prepare on %s', vm)
-  vm.InstallPackage('build-essential')
-  wget_cmd = '/usr/bin/wget %s' % NETPERF_LOC
-  vm.RemoteCommand(wget_cmd)
-  vm.RemoteCommand('tar xvfz %s' % NETPERF_NAME)
-  make_cmd = 'cd netperf-2.6.0;./configure;make'
-  vm.RemoteCommand(make_cmd)
+  vm.Install('netperf')
 
 
 def Prepare(benchmark_spec):
@@ -71,13 +63,12 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(PrepareNetperf, vms)
 
   fw = benchmark_spec.firewall
-  # TODO(user): takes too long, change API to take range, put all in the same
-  #    range.
 
   fw.AllowPort(vms[1], COMMAND_PORT)
   fw.AllowPort(vms[1], DATA_PORT)
 
-  vms[1].RemoteCommand('%s/netserver -p %s' % (NETPERF_SRC, COMMAND_PORT))
+  vms[1].RemoteCommand('%s/src/netserver -p %s' %
+                       (netperf.NETPERF_DIR, COMMAND_PORT))
 
 
 def RunNetperf(vm, benchmark_name, server_ip):
@@ -93,11 +84,12 @@ def RunNetperf(vm, benchmark_name, server_ip):
         the sample metric (string), value (float), unit (string),
         and empty metadata dictionary (to be filled out later).
   """
-  netperf_cmd = ('{src}/netperf -p {command_port} -t {benchmark_name} '
-                 '-H {server_ip} -- -P {data_port}').format(
-                     src=NETPERF_SRC, benchmark_name=benchmark_name,
-                     server_ip=server_ip, command_port=COMMAND_PORT,
-                     data_port=DATA_PORT)
+  netperf_cmd = ('{netperf_dir}/src/netperf -p {command_port} '
+                 '-t {benchmark_name} -H {server_ip} -- '
+                 '-P {data_port}').format(
+                     netperf_dir=netperf.NETPERF_DIR,
+                     benchmark_name=benchmark_name, server_ip=server_ip,
+                     command_port=COMMAND_PORT, data_port=DATA_PORT)
   logging.info('Netperf Results:')
   stdout, _ = vm.RemoteCommand(netperf_cmd, should_log=True)
   match = re.search(r'(\d+\.\d+)\s+\n', stdout).group(1)

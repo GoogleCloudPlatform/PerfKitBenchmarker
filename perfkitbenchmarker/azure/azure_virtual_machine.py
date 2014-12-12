@@ -30,6 +30,7 @@ import json
 import gflags as flags
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import package_managers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -202,3 +203,13 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.RemoteCommand('sudo umount /mnt')
     return super(AzureVirtualMachine, self).SetupLocalDrives(
         mount_path=mount_path)
+
+
+class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
+                                     package_managers.AptMixin):
+  pass
+
+
+class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
+                                   package_managers.YumMixin):
+  pass

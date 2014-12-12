@@ -52,7 +52,7 @@ def Prepare(benchmark_spec):
   fw = benchmark_spec.firewall
   vms = benchmark_spec.vms
   for vm in vms:
-    vm.InstallPackage('iperf')
+    vm.Install('iperf')
     fw.AllowPort(vm, IPERF_PORT)
     vm.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
                      IPERF_PORT)

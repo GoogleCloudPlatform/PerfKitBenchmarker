@@ -38,7 +38,6 @@ BENCHMARK_INFO = {'name': 'fio_benchmark',
                                  'and write modes.',
                   'scratch_disk': True,
                   'num_machines': 1}
-REQUIRED_PACKAGES = 'bc fio libaio1'
 
 
 def GetInfo():
@@ -58,7 +57,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO prepare on %s', vm)
-  vm.InstallPackage(REQUIRED_PACKAGES)
+  vm.Install('fio')
   file_path = data.ResourcePath(flags.FLAGS.fio_jobfile)
   vm.PushFile(file_path)
   disk_size_kb = vm.GetDeviceSizeFromPath(vm.GetScratchDir())
@@ -92,7 +91,7 @@ def Run(benchmark_spec):
   vm = vms[0]
   # TODO(user): what, this doesn't need the scratch directory?
   logging.info('FIO running on %s', vm)
-  fio_command = 'fio %s' % (flags.FLAGS.fio_jobfile)
+  fio_command = 'pkb/fio/fio %s' % (flags.FLAGS.fio_jobfile)
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
@@ -113,5 +112,4 @@ def Cleanup(benchmark_spec):
   vm = vms[0]
   logging.info('FIO Cleanup up on %s', vm)
   vm.RemoveFile(flags.FLAGS.fio_jobfile)
-  vm.UninstallPackage(REQUIRED_PACKAGES)
   vm.RemoveFile(vm.GetScratchDir() + flags.FLAGS.fio_benchmark_filename)

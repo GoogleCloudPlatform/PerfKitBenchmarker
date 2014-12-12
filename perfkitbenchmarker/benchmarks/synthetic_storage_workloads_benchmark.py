@@ -65,7 +65,6 @@ BENCHMARK_INFO = {'name': 'synthetic_storage_workloads_benchmark',
                                  'and write modes to simulate logging.',
                   'scratch_disk': True,
                   'num_machines': 1}
-REQUIRED_PACKAGES = 'bc fio libaio1'
 DESCRIPTION = 'description'
 METHOD = 'method'
 
@@ -93,7 +92,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO prepare on %s', vm)
-  vm.InstallPackage(REQUIRED_PACKAGES)
+  vm.Install('fio')
 
 
 def ParseFioResult(res):
@@ -176,7 +175,7 @@ def RunSimulatedLogging(vm):
         metadata.
   """
   cmd = (
-      'fio '
+      'pkb/fio/fio '
       '--filesize=100g '
       '--directory=%s '
       '--ioengine=libaio '
@@ -228,7 +227,7 @@ def RunSimulatedDatabase(vm):
   results = []
   for depth in iodepth_list:
     cmd = (
-        'fio '
+        'pkb/fio/fio '
         '--filesize=10g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -297,7 +296,7 @@ def RunSimulatedStreaming(vm):
   results = []
   for depth in iodepth_list:
     cmd = (
-        'fio '
+        'pkb/fio/fio '
         '--filesize=100g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -375,5 +374,4 @@ def Cleanup(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO Cleanup up on %s', vm)
-  vm.UninstallPackage(REQUIRED_PACKAGES)
   vm.RemoveFile(vm.GetScratchDir() + '/fio_test_file')

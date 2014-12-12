@@ -29,6 +29,7 @@ import json
 import gflags as flags
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import package_managers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import gce_disk
@@ -189,3 +190,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.RemoteCommand(
           'chmod +rx set-interrupts.sh; sudo ./set-interrupts.sh')
     return ret
+
+
+class DebianBasedGceVirtualMachine(GceVirtualMachine,
+                                   package_managers.AptMixin):
+  pass
+
+
+class RhelBasedGceVirtualMachine(GceVirtualMachine,
+                                 package_managers.YumMixin):
+  pass
