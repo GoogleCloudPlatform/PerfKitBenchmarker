@@ -21,12 +21,11 @@ TODO(user): Make hadoop scale when the number of nodes changes. Also
 investigate other settings and verfiy that we are seeing good performance.
 """
 
+import logging
 import os.path
 
-import gflags as flags
-import logging
-
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS

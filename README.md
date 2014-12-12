@@ -55,7 +55,7 @@ SpecCPU2006 benchmark setup cannot be automated. SPEC requires users to agree wi
 and PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
 the `./perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
 
-HOW TO RUN
+HOW TO GET SETUP
 ==================
 Before you can run the PerfKit Benchmaker on Cloud providers you need accounts and access:
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
@@ -134,21 +134,75 @@ $ azure vm list
 
 ## Install PerfKit dependencies
 ```
-$ sudo pip install python-gflags
-$ sudo apt-get install python-dev libffi-dev -y
-$ sudo pip install oauth2client pycrypto pyOpenSSL jinja2
+$ sudo pip install python-gflags jinja2 setuptools
 ```
 
 Pull the PerfKit Benchmarker from GitHub.
 
-## Exmaple run
+HOW TO RUN ONE BENCHMARK
+==================
+PerfKitBenchmarks can run benchmarks both on Cloud Providers (GCP, AWS, Azure) as well as any "machine" you can SSH into.
+
+## Example run on GCP
 ```
-$ cd PerfKitBenchmarker
-$ ./pkb.py --project=[your project] --benchmarks=ping --cloud=AWS --zone=us-east-1b
+$ ./pkb.py --project=<GCP project name> --benchmarks=iperf --machine_type=f1-micro
 ```
 
-Without parameters it runs everything, and without a cloud provider it defaults to GCE.
+## Example run on AWS
+```
+$ cd PerfKitBenchmarker
+$ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro 
+```
+
+## Example run on Azure
+```
+$ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
+```
+
+HOW TO RUN ALL BENCHMARKS
+==================
+Run without the --benchmarks parameter and every benchmark will run serially which can take a couple of hours.  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
+
+USEFUL GLOBAL FLAGS
+==================
+```
+The following are some common flags used when configuring PerfKitBenchmaker.
+--help           : see all flags
+--cloud          : Check where the bechmarks are run.  Choices are GCP, AWS, or AZURE
+--zone           : This flag always you to override the default zone.  It is thats the same value that the Cloud CLI's take such as --zone=us-central1-a is use for GCP, --zone=us-east-1a is used for AWS, and --zone='East US' is used by AZURE.
+--benchmarks     : A comman separted list of benchmarks to run such as --benchmarks=iperf,ping . To see the full list just run ./pkd.py --help
+```
+ADVANCED: HOW TO RUN BENCHMARKS WITHOUT CLOUD PROVISIONING (eg: local workstation)
+==================
+It is possible to run PerfKitBenchmarker without running the Cloud provioning steps.  This is useful if you want to run on a local machine, or have a benchmark like iperf run from an external point to a Cloud VM.
+
+In order to do this you need to make sure:
+* The static (ie not provisioned by PerfKitBenchmarker) machine is ssh'able
+* The user PerfKitBenchmarker will login as has 'sudo' access.  (*** Note we hope to remove this restriction soon ***)
+
+Next you will want to create a JSON file describing how to connect to the machine as follows:
+```
+[
+ {"ip_address": "170.200.60.23",
+  "user_name": "voellm",
+  "keyfile_path": "/home/voellm/perfkitkeys/my_key_file.pem",
+  "zone": "Siberia"}
+]
+```
+
+* The ip_address is the address where you want benchmarks to run.
+* The my_key_file.pem is the same key you pass to the ssh machine using the -i option.
+* keyfile_file is where to find the private ssh key.
+* zone can be anything you want.  It is used when publishing results.
+
+I called my file Siberia.json and used it to run iperf from Siberia to a GCP VM in us-central1-f as follows:
+```
+./pkb.py --benchmarks=iperf --machine_type=f1-micro --static_vm_file=Siberia.json --zone=us-central1-f --ip_addresses=EXTERNAL
+```
+* ip_addresses=EXTERNAL tells PerfKitBechmarker not to use 10.X (ie Internal) machine addresses that all Cloud VMs have.  Just use the external IP address.
+
+If a benchmark requires two machines like iperf you can have two static VM files specified as a comma separated list.  This means you can indeed run between two machines and never provision any VM's in the Cloud.
 
 PLANNED IMPROVEMENTS
 =======================
-1. Allow using different type of VMs in same benchmark.
+Many... please add new requests via GitHub issues.

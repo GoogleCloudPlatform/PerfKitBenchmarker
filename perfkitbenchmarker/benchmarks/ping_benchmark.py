@@ -17,9 +17,8 @@
 This benchmark runs ping using the internal ips of vms in the same zone.
 """
 
-import re
-
 import logging
+import re
 
 
 BENCHMARKS_INFO = {'name': 'ping',

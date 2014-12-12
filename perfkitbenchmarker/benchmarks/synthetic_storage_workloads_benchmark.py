@@ -38,10 +38,10 @@ For AWS, where use PD, we should use EBS-GP and EBS Magnetic, for PD-SSD use
 EBS-GP and PIOPS.
 """
 
+import logging
 import re
 
-import gflags as flags
-import logging
+from perfkitbenchmarker import flags
 
 LOGGING = 'logging'
 DATABASE = 'database'

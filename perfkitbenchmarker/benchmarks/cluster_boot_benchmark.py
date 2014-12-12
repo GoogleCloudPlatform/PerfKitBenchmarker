@@ -14,8 +14,9 @@
 
 """Runs a cluster boot benchmark."""
 
-import gflags as flags
 import logging
+
+from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 BENCHMARK_INFO = {'name': 'cluster boot',

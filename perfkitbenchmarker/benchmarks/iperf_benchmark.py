@@ -20,11 +20,10 @@ http://iperf.fr/
 Runs Iperf to collect network throughput.
 """
 
+import logging
 import re
 
-import gflags as flags
-import logging
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS

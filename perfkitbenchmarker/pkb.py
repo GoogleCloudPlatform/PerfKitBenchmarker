@@ -59,10 +59,9 @@ import sys
 import time
 import uuid
 
-import gflags as flags
-
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
@@ -79,6 +78,9 @@ LOG_LEVELS = {
     INFO: logging.INFO
 }
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
+# List of functions taking a benchmark_spec. Will be called before benchmark.Run
+# with two parameters: the benchmark and benchmark_spec.
+BEFORE_RUN_HOOKS = []
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
@@ -86,8 +88,7 @@ flags.DEFINE_integer('parallelism', 1,
                      'The number of benchmarks to run in parallel.')
 flags.DEFINE_list('benchmarks', [], 'Benchmarks that should be run, '
                   'default is all.')
-# TODO(user): Remove this. It is here to make my life easier for the moment.
-flags.DEFINE_string('project', 'bionic-baton-343', 'Project name under which '
+flags.DEFINE_string('project', None, 'Project name under which '
                     'to create the virtual machines')
 flags.DEFINE_list(
     'zones', None,
@@ -221,6 +222,9 @@ def RunBenchmark(benchmark, collector):
           benchmark_info['name'])
     if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
       logging.info('Running benchmark %s', benchmark_info['name'])
+      for before_run_hook in BEFORE_RUN_HOOKS:
+        before_run_hook(benchmark=benchmark,
+                        benchmark_spec=benchmark_specification)
       samples = benchmark.Run(benchmark_specification)
       collector.AddSamples(samples, benchmark_info['name'],
                            benchmark_specification)

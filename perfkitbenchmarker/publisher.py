@@ -17,15 +17,14 @@
 import abc
 import itertools
 import json
+import logging
 import operator
+import sys
 import tempfile
 import time
 import uuid
-import sys
 
-import gflags as flags
-import logging
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 
@@ -59,6 +58,13 @@ flags.DEFINE_string(
     'service_account_private_key', None,
     'Service private key for authenticating with BQ.')
 
+flags.DEFINE_string(
+    'gsutil_path', 'gsutil', 'path to the "gsutil" executable')
+flags.DEFINE_string(
+    'cloud_storage_bucket',
+    None,
+    'GCS bucket to upload records to. Bucket must exist.')
+
 flags.DEFINE_list(
     'metadata',
     [],
@@ -69,6 +75,7 @@ flags.DEFINE_list(
 PRODUCT_NAME = 'PerfKitBenchmarker'
 DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
+GCS_OBJECT_NAME_LENGTH = 20
 
 
 def GetLabelsFromDict(metadata):
@@ -309,6 +316,46 @@ class BigQueryPublisher(SamplePublisher):
       vm_util.IssueRetryableCommand(load_cmd)
 
 
+class CloudStoragePublisher(SamplePublisher):
+  """Publishes samples to a Google Cloud Storage bucket using gsutil.
+
+  Samples are formatted using a NewlineDelimitedJSONPublisher, and written to a
+  the destination file within the specified bucket named:
+
+    <time>_<uri>
+
+  where <time> is the number of milliseconds since the Epoch, and <uri> is a
+  random UUID.
+
+  Attributes:
+    bucket: string. The GCS bucket name to publish to.
+    gsutil_path: string. The path to the 'gsutil' tool.
+  """
+
+  def __init__(self, bucket, gsutil_path='gsutil'):
+    self.bucket = bucket
+    self.gsutil_path = gsutil_path
+
+  def __repr__(self):
+    return '<{0} bucket="{1}">'.format(type(self).__name__, self.bucket)
+
+  def _GenerateObjectName(self):
+      object_name = str(int(time.time() * 100)) + '_' + str(uuid.uuid4())
+      return object_name[:GCS_OBJECT_NAME_LENGTH]
+
+  def PublishSamples(self, samples):
+    with tempfile.NamedTemporaryFile(prefix='perfkit-gcs-pub',
+                                     dir=vm_util.GetTempDir(),
+                                     suffix='.json') as tf:
+      json_publisher = NewlineDelimitedJSONPublisher(tf.name)
+      json_publisher.PublishSamples(samples)
+      object_name = self._GenerateObjectName()
+      storage_uri = 'gs://{0}/{1}'.format(self.bucket, object_name)
+      logging.info('Publishing %d samples to %s', len(samples), storage_uri)
+      copy_cmd = [self.gsutil_path, 'cp', tf.name, storage_uri]
+      vm_util.IssueRetryableCommand(copy_cmd)
+
+
 class SampleCollector(object):
   """A performance sample collector.
 
@@ -323,8 +370,9 @@ class SampleCollector(object):
     metadata_providers: list of MetadataProvider. Metadata providers to use.
       Defaults to DEFAULT_METADATA_PROVIDERS.
     publishers: list of SamplePublishers. If not specified, defaults to a
-      LogPublisher, PrettyPrintStreamPublisher, NewlineDelimitedJSONPublisher,
-      and a BigQueryPublisher if FLAGS.bigquery_table is specified. See
+      LogPublisher, PrettyPrintStreamPublisher, NewlineDelimitedJSONPublisher, a
+      BigQueryPublisher if FLAGS.bigquery_table is specified, and a
+      CloudStoragePublisher if FLAGS.cloud_storage_bucket is specified. See
       SampleCollector._DefaultPublishers.
     run_uri: A unique tag for the run.
   """
@@ -359,6 +407,11 @@ class SampleCollector(object):
           bq_path=FLAGS.bq_path,
           service_account=FLAGS.service_account,
           service_account_private_key_file=FLAGS.service_account_private_key))
+
+    if FLAGS.cloud_storage_bucket:
+      publishers.append(CloudStoragePublisher(FLAGS.cloud_storage_bucket,
+                                              gsutil_path=FLAGS.gsutil_path))
+
     return publishers
 
   def AddSamples(self, samples, benchmark, benchmark_spec):

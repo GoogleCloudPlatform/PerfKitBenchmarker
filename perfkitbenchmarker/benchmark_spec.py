@@ -14,12 +14,11 @@
 
 """Container for all data required for a benchmark to run."""
 
+import logging
 import pickle
 
-import gflags as flags
-import logging
-
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -52,7 +51,7 @@ DEFAULTS = {
     AZURE: {
         IMAGE: ('b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-'
                 '14_04-LTS-amd64-server-20140724-en-us-30GB'),
-        MACHINE_TYPE: 'small',
+        MACHINE_TYPE: 'Small',
         ZONE: 'East US',
     },
     AWS: {

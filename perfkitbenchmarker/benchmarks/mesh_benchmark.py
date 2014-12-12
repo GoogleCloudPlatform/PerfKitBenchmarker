@@ -19,11 +19,11 @@ and average latency inside mesh network.
 """
 
 
+import logging
 import re
 import threading
 
-import gflags as flags
-import logging
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 

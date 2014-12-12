@@ -14,8 +14,7 @@
 
 """Utilities for working with Amazon Web Services resources."""
 
-import gflags as flags
-
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 AWS_PATH = 'aws'
