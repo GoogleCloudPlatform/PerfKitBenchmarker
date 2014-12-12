@@ -51,7 +51,6 @@ CASSANDRA_DIR = 'dsc-cassandra-2.0.0'
 JAVA_TAR = 'server-jre-7u40-linux-x64.tar.gz'
 CASSANDRA_YAML = 'cassandra.yaml'
 CASSANDRA_PID = 'cassandra_pid'
-RESULTS_DIR = 'cassandra-results'
 
 REQUIRED_JAVA_VERSION = '1.7.0_40'
 
@@ -102,7 +101,7 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vm_dict = benchmark_spec.vm_dict
-  print 'VM dictionary %s' % vm_dict
+  logging.info('VM dictionary %s', vm_dict)
 
   if vm_dict['default']:
     logging.info('No config file is provided, use default settings: '
@@ -218,7 +217,7 @@ def VerifyCluster(benchmark_spec, vm):
   Returns:
     A boolean indicates the cluster is ready.
   """
-  print 'Verify Cluster'
+  logging.info('Verify Cluster')
   num_expected_data_nodes = len(benchmark_spec.vm_dict[DATA_NODE])
   ret, _ = vm.RemoteCommand(
       '%s/bin/nodetool status | grep UN | wc -l' % CASSANDRA_DIR)
@@ -305,9 +304,10 @@ def WaitLoaderForFinishing(vm):
     if re.findall(r'END', resp):
       break
     if re.findall(r'FAILURE', resp):
-      vm.PullFile(RESULTS_DIR, '*results')
+      vm.PullFile(vm_util.GetTempDir(), '*results')
       raise errors.Benchmarks.RunError(
-          'cassandra-stress tool failed, check %s/ for details.' % RESULTS_DIR)
+          'cassandra-stress tool failed, check %s/ for details.'
+          % vm_util.GetTempDir())
     time.sleep(SLEEP_BETWEEN_CHECK_IN_SECONDS)
 
 
@@ -326,7 +326,7 @@ def CollectResultFile(vm, interval_op_rate_list, interval_key_rate_list,
     latency_99_9th_list: The list stores latency 99.9th percentile.
     total_operation_time_list: The list stores total operation time.
   """
-  vm.PullFile(RESULTS_DIR, '*results')
+  vm.PullFile(vm_util.GetTempDir(), '*results')
   resp, _ = vm.RemoteCommand('tail *results')
   match = re.findall(r'[\w\t ]: +([\d\.:]+)', resp)
   interval_op_rate_list.append(int(match[0]))
@@ -413,8 +413,6 @@ def CollectResults(benchmark_spec):
   """
   logging.info('Gathering results.')
   vm_dict = benchmark_spec.vm_dict
-  cmd = ['mkdir', RESULTS_DIR]
-  vm_util.IssueCommand(cmd)
   interval_op_rate_list = []
   interval_key_rate_list = []
   latency_median_list = []
@@ -427,7 +425,9 @@ def CollectResults(benchmark_spec):
             total_operation_time_list), {}) for vm in vm_dict[LOADER_NODE]]
   vm_util.RunThreaded(CollectResultFile, args)
   results = []
-  metadata = {'num_keys': FLAGS.num_keys}
+  metadata = {'num_keys': FLAGS.num_keys,
+              'num_data_nodes': len(vm_dict[DATA_NODE]),
+              'num_loader_nodes': len(vm_dict[LOADER_NODE])}
   results.append(['Interval_op_rate', math.fsum(interval_op_rate_list),
                   'operations per second', metadata])
   results.append(['Interval_key_rate', math.fsum(interval_key_rate_list),
@@ -444,7 +444,6 @@ def CollectResults(benchmark_spec):
   results.append(['Total operation time',
                   math.fsum(total_operation_time_list) / len(
                       vm_dict[LOADER_NODE]), 'seconds', metadata])
-  print results
   return results
 
 
