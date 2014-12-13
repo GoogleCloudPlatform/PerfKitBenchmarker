@@ -52,7 +52,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('prepare Coremark on %s', vm)
-  vm.InstallBuildTools()
+  vm.Install('build_tools')
   try:
     file_path = data.ResourcePath(COREMARK_TAR)
   except data.ResourceNotFound:

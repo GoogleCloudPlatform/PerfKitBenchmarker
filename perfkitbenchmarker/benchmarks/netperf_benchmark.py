@@ -148,17 +148,6 @@ def Run(benchmark_spec):
   return results
 
 
-def StopNetserver(vm):
-  """Stops Netserver on the specified vm.
-
-  Args:
-    vm: The VM upon which the stop command will be run.
-  """
-  vm.InstallPackage('psmisc')
-  vm.RemoteCommand('killall netserver')
-  vm.UninstallPackage('psmisc')
-
-
 def Cleanup(benchmark_spec):
   """Cleanup netperf on the target vm (by uninstalling).
 
@@ -167,10 +156,4 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms = vms[:2]
-  StopNetserver(vms[1])
-  for vm in vms:
-    logging.info('uninstalling netperf on %s', vm)
-    vm.RemoteCommand('rm -rf netperf-2.6.0')
-    vm.RemoteCommand('rm -f %s' % NETPERF_NAME)
-    vm.UninstallPackage('build-essential')
+  vms[1].RemoteCommand('sudo pkill netserver')

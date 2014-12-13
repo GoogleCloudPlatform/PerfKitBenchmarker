@@ -57,8 +57,8 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('prepare SpecCPU2006 on %s', vm)
-  vm.InstallPackage('build-essential')
-  vm.InstallPackage('gfortran')
+  vm.Install('build_tools')
+  vm.Install('fortran')
   try:
     local_tar_file_path = data.ResourcePath(SPECCPU2006_TAR)
   except data.ResourceNotFound as e:

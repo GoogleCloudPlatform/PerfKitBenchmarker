@@ -15,25 +15,25 @@
 
 """Module containing iperf installation and cleanup functions."""
 
-
-NETPERF_TAR = 'netperf-2.6.0.tar.gz'
-NETPERF_URL = 'ftp://ftp.netperf.org/netperf/%s' % NETPERF_TAR
-NETPERF_DIR = 'pkb/netperf-2.6.0'
-
+REDIS_TAR = 'redis-2.8.9.tar.gz'
+REDIS_DIR = 'pkb/redis-2.8.9'
+REDIS_URL = 'http://download.redis.io/releases/' + REDIS_TAR
 
 def _Install(vm):
   """Installs the iperf package on the VM."""
   vm.Install('build_tools')
-  vm.RemoteCommand('wget %s -P pkb' % NETPERF_URL)
-  vm.RemoteCommand('cd pkb && tar xvzf %s' % NETPERF_TAR)
-  vm.RemoteCommand('cd %s && ./configure && make' % NETPERF_DIR)
+  vm.RemoteCommand('wget %s -P pkb' % REDIS_URL)
+  vm.RemoteCommand('cd pkb && tar xvfz %s' % REDIS_TAR)
+  vm.RemoteCommand('cd %s && make' % REDIS_DIR)
 
 
 def YumInstall(vm):
   """Installs the iperf package on the VM."""
+  vm.InstallPackages('tcl-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the iperf package on the VM."""
+  vm.InstallPackages('tcl-dev')
   _Install(vm)
