@@ -104,7 +104,6 @@ def Run(benchmark_spec):
         If a 4th element is included, it is a dictionary of sample
         metadata.
   """
-  """
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('UnixBench running on %s', vm)
@@ -112,8 +111,6 @@ def Run(benchmark_spec):
   logging.info('Unixbench Results:')
   stdout, _ = vm.RemoteCommand(unixbench_command, should_log=True)
   return UnixBenchParser(stdout)
-  """
-  return UnixBenchParser(open('/usr/local/google/home/yuyanting/Documents/PkbUnixParser/PerfKitBenchmarker/perfkitbenchmarker/benchmarks/result').read())
 
 
 def Cleanup(benchmark_spec):
