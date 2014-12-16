@@ -23,6 +23,7 @@ some memory bandwidth, and disk.
 import logging
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import regex_util
 
 FLAGS = flags.FLAGS
 
@@ -34,6 +35,14 @@ BENCHMARK_INFO = {'name': 'UnixBench++_benchmark',
 
 UNIXBENCH_NAME = 'UnixBench5.1.3.tgz'
 UNIXBENCH_LOC = 'http://byte-unixbench.googlecode.com/files/%s' % UNIXBENCH_NAME
+
+SYSTEM_SCORE_REGEX = '\nSystem Benchmarks Index Score\s+([-+]?[0-9]*\.?[0-9]+)'
+RESULT_REGEX = (
+    '\n([\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+) (\w+)\s+\(([-+]?[0-9]*\.?[0-9]+) '
+    '(\w+), (\d+) samples\)')
+SCORE_REGEX = (
+    '\n([\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+'
+    '([-+]?[0-9]*\.?[0-9]+)')
 
 
 def GetInfo():
@@ -56,6 +65,32 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand('tar xvfz %s -C %s' % (UNIXBENCH_NAME, vm.GetScratchDir()))
 
 
+def UnixBenchParser(result):
+  """Result parser for UnixBench.
+
+  Args:
+    result: UnixBench result.
+
+  Returns:
+    A list of samples in the form of 3 or 4 tuples. The tuples contain
+        the sample metric (string), value (float), and unit (string).
+        If a 4th element is included, it is a dictionary of sample
+        metadata.
+  """
+  samples = []
+  match = regex_util.ExtractAllMatch(RESULT_REGEX, result)
+  for groups in match:
+    samples.append([groups[0].strip(), float(groups[1]), groups[2],
+                    {'samples': groups[5], 'time': groups[3] + groups[4]}])
+  match = regex_util.ExtractAllMatch(SCORE_REGEX, result)
+  for groups in match:
+    samples.append(['%s:score' % groups[0].strip(), float(groups[2]), '',
+                    {'baseline': float(groups[1]), 'index': float(groups[3])}])
+  match = regex_util.ExtractAllMatch(SYSTEM_SCORE_REGEX, result)
+  samples.append(['System Benchmarks Index Score', float(match[0]), '', {}])
+  return samples
+
+
 def Run(benchmark_spec):
   """Run UnixBench on the target vm.
 
@@ -69,14 +104,16 @@ def Run(benchmark_spec):
         If a 4th element is included, it is a dictionary of sample
         metadata.
   """
+  """
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('UnixBench running on %s', vm)
   unixbench_command = 'cd %s/UnixBench;./Run' % vm.GetScratchDir()
   logging.info('Unixbench Results:')
-  vm.RemoteCommand(unixbench_command, should_log=True)
-  # TODO(user): The hard work! Parsing this output. For now just print out.
-  return []
+  stdout, _ = vm.RemoteCommand(unixbench_command, should_log=True)
+  return UnixBenchParser(stdout)
+  """
+  return UnixBenchParser(open('/usr/local/google/home/yuyanting/Documents/PkbUnixParser/PerfKitBenchmarker/perfkitbenchmarker/benchmarks/result').read())
 
 
 def Cleanup(benchmark_spec):
