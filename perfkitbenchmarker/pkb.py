@@ -88,7 +88,7 @@ flags.DEFINE_integer('parallelism', 1,
                      'The number of benchmarks to run in parallel.')
 flags.DEFINE_list('benchmarks', [], 'Benchmarks that should be run, '
                   'default is all.')
-flags.DEFINE_string('project', None, 'Project name under which '
+flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
 flags.DEFINE_list(
     'zones', None,
