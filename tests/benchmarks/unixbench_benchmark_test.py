@@ -23,6 +23,8 @@ from perfkitbenchmarker.benchmarks import unixbench_benchmark
 
 class UnixBenchBenchmarkTestCase(unittest.TestCase):
 
+  maxDiff = None
+
   def setUp(self):
     path = os.path.join('tests/data',
                         'unix-bench-sample-result.txt')
@@ -35,28 +37,30 @@ class UnixBenchBenchmarkTestCase(unittest.TestCase):
   def testParseUnixBench(self):
     result = unixbench_benchmark.UnixBenchParser(self.contents)
     expected_result = [
+        ['Dhrystone 2 using register variables', 34872897.7, 'lps',
+         {'samples': 7, 'time': '10.0s'}],
         ['Double-Precision Whetstone', 4022.0, 'MWIPS',
-         {'samples': '7', 'time': '9.9s'}],
+         {'samples': 7, 'time': '9.9s'}],
         ['Execl Throughput', 4735.8, 'lps',
-         {'samples': '2', 'time': '29.8s'}],
+         {'samples': 2, 'time': '29.8s'}],
         ['File Copy 1024 bufsize 2000 maxblocks', 1294367.0, 'KBps',
-         {'samples': '2', 'time': '30.0s'}],
+         {'samples': 2, 'time': '30.0s'}],
         ['File Copy 256 bufsize 500 maxblocks', 396912.9, 'KBps',
-         {'samples': '2', 'time': '30.0s'}],
+         {'samples': 2, 'time': '30.0s'}],
         ['File Copy 4096 bufsize 8000 maxblocks', 2513158.7, 'KBps',
-         {'samples': '2', 'time': '30.0s'}],
+         {'samples': 2, 'time': '30.0s'}],
         ['Pipe Throughput', 2221775.6, 'lps',
-         {'samples': '7', 'time': '10.0s'}],
+         {'samples': 7, 'time': '10.0s'}],
         ['Pipe-based Context Switching', 369000.7, 'lps',
-         {'samples': '7', 'time': '10.0s'}],
+         {'samples': 7, 'time': '10.0s'}],
         ['Process Creation', 12587.7, 'lps',
-         {'samples': '2', 'time': '30.0s'}],
+         {'samples': 2, 'time': '30.0s'}],
         ['Shell Scripts (1 concurrent)', 8234.3, 'lpm',
-         {'samples': '2', 'time': '60.0s'}],
+         {'samples': 2, 'time': '60.0s'}],
         ['Shell Scripts (8 concurrent)', 1064.5, 'lpm',
-         {'samples': '2', 'time': '60.0s'}],
+         {'samples': 2, 'time': '60.0s'}],
         ['System Call Overhead', 4439274.5, 'lps',
-         {'samples': '7', 'time': '10.0s'}],
+         {'samples': 7, 'time': '10.0s'}],
         ['Dhrystone 2 using register variables:score', 34872897.7, '',
          {'index': 2988.3, 'baseline': 116700.0}],
         ['Double-Precision Whetstone:score', 4022.0, '',
