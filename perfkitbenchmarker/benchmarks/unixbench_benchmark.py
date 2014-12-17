@@ -38,10 +38,10 @@ UNIXBENCH_LOC = 'http://byte-unixbench.googlecode.com/files/%s' % UNIXBENCH_NAME
 
 SYSTEM_SCORE_REGEX = '\nSystem Benchmarks Index Score\s+([-+]?[0-9]*\.?[0-9]+)'
 RESULT_REGEX = (
-    '\n([\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+) (\w+)\s+\(([-+]?[0-9]*\.?[0-9]+) '
-    '(\w+), (\d+) samples\)')
+    '\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+) (\w+)\s+\('
+    '([-+]?[0-9]*\.?[0-9]+) (\w+), (\d+) samples\)')
 SCORE_REGEX = (
-    '\n([\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+'
+    '\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+'
     '([-+]?[0-9]*\.?[0-9]+)')
 
 
@@ -81,7 +81,7 @@ def UnixBenchParser(result):
   match = regex_util.ExtractAllMatch(RESULT_REGEX, result)
   for groups in match:
     samples.append([groups[0].strip(), float(groups[1]), groups[2],
-                    {'samples': groups[5], 'time': groups[3] + groups[4]}])
+                    {'samples': int(groups[5]), 'time': groups[3] + groups[4]}])
   match = regex_util.ExtractAllMatch(SCORE_REGEX, result)
   for groups in match:
     samples.append(['%s:score' % groups[0].strip(), float(groups[2]), '',
