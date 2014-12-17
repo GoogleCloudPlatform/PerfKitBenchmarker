@@ -30,7 +30,6 @@ def ExtractGroup(regex, text, group=1):
     text: string. Text to search.
     group: int. Group containing a floating point value. Use '0' for the whole
       string.
-    findall: Find all that apply to the regular expression.
   Returns:
     A floating point number matched by 'regex' on 'text'.
   Raises:
