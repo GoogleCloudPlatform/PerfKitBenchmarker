@@ -16,8 +16,6 @@
 import os
 import unittest
 
-import mock
-
 from perfkitbenchmarker.benchmarks import unixbench_benchmark
 
 
