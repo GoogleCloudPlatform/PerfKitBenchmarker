@@ -422,6 +422,31 @@ def BurnCpu(vm, burn_cpu_threads=None, burn_cpu_seconds=None):
       vm.UninstallPackage('sysbench')
 
 
+def StartAntagnoist(vm):
+  """Setup an antagnost on the vm to stress cpu, io, memory in background.
+
+  Args:
+    vm: The target vm.
+  """
+  vm.InstallPackage('stress')
+  stress_cmd = ['nohup', 'stress']
+  if FLAGS.antagonist_num_cpu_process:
+    stress_cmd.append('--cpu %s' % FLAGS.antagonist_num_cpu_process)
+  if FLAGS.antagonist_num_io_process:
+    stress_cmd.append('--io %s' % FLAGS.antagonist_num_io_process)
+  if FLAGS.antagonist_num_memory_process:
+    stress_cmd.append('--vm %s' % FLAGS.antagonist_num_memory_process)
+    if FLAGS.antagonist_vm_bytes:
+      stress_cmd.append('--vm-bytes %s' %
+                        FLAGS.antagonist_vm_bytes)
+    if FLAGS.antagonist_vm_hang:
+      stress_cmd.append('--vm-hang %s' %
+                        FLAGS.antagonist_vm_hang)
+  stress_cmd.append('1> /dev/null 2> /dev/null &')
+  stress_cmd = ' '.join(stress_cmd)
+  vm.RemoteCommand(stress_cmd)
+
+
 def ShouldRunOnExternalIpAddress():
   """Returns whether a test should be run on an instance's external IP."""
   return FLAGS.ip_addresses in (IpAddressSubset.EXTERNAL,
