@@ -46,6 +46,22 @@ flags.DEFINE_integer('default_timeout', TIMEOUT, 'The default timeout for '
 flags.DEFINE_integer('burn_cpu_seconds', 0,
                      'Amount of time in seconds to burn cpu on vm.')
 flags.DEFINE_integer('burn_cpu_threads', 1, 'Number of threads to burn cpu.')
+flags.DEFINE_integer('antagonist_num_cpu_process', 0,
+                     'Spawn FORKS processes each spinning on sqrt().')
+flags.DEFINE_integer('antagonist_num_io_process', 0,
+                     'Spawn FORKS processes each spinning on sync().')
+flags.DEFINE_integer('antagonist_num_memory_process', 0,
+                     'Spawn FORKS processes each spinning on malloc().')
+flags.DEFINE_string('antagonist_vm_bytes', None,
+                    'Allocate BYTES number of bytes.  The default is 1.')
+flags.DEFINE_string('antagonist_vm_hang', None,
+                    'Instruct each vm hog process to go to sleep after '
+                    'allocating memory.  This contrasts with their normal '
+                    'behavior, which is to free the memory and reallocate '
+                    '_ad infinitum_.  This is useful for simulating low '
+                    'memory conditions on a machine.  For example, the '
+                    'following command allocates 256M of RAM and holds '
+                    'it until killed.')
 
 
 class IpAddressSubset(object):
@@ -422,26 +438,44 @@ def BurnCpu(vm, burn_cpu_threads=None, burn_cpu_seconds=None):
       vm.UninstallPackage('sysbench')
 
 
-def StartAntagnoist(vm):
+def StartAntagnoist(vm, num_cpu_process=None,
+                    num_io_process=None,
+                    num_memory_process=None,
+                    vm_bytes=None,
+                    vm_hang=None):
   """Setup an antagnost on the vm to stress cpu, io, memory in background.
 
   Args:
     vm: The target vm.
+    num_cpu_process: Number of the processes that each spinning on 'sqrt()'.
+    num_io_process: Number of the processes that each spinning on 'sync()'.
+    num_memory_process: Number of the processes that each spinning on
+        'malloc()'.
+    vm_bytes: Allocate BYTES number of bytes. The default is 1.
+    vm_hang: Allocate BYTES number of bytes. Instruct each vm hog process to
+        go to sleep after allocating memory.
   """
+  num_cpu_process = num_cpu_process or FLAGS.antagonist_num_cpu_process
+  num_io_process = num_io_process or FLAGS.antagonist_num_io_process
+  num_memory_process = num_memory_process or FLAGS.antagonist_num_memory_process
+  vm_bytes = vm_bytes or FLAGS.antagonist_vm_bytes
+  vm_hang = vm_hang or FLAGS.antagonist_vm_hang
+
+  if not (num_cpu_process or num_io_process or num_memory_process):
+    return
+  vm.RemoteCommand('pkill stress', ignore_failure=True)
   vm.InstallPackage('stress')
   stress_cmd = ['nohup', 'stress']
-  if FLAGS.antagonist_num_cpu_process:
-    stress_cmd.append('--cpu %s' % FLAGS.antagonist_num_cpu_process)
-  if FLAGS.antagonist_num_io_process:
-    stress_cmd.append('--io %s' % FLAGS.antagonist_num_io_process)
-  if FLAGS.antagonist_num_memory_process:
-    stress_cmd.append('--vm %s' % FLAGS.antagonist_num_memory_process)
-    if FLAGS.antagonist_vm_bytes:
-      stress_cmd.append('--vm-bytes %s' %
-                        FLAGS.antagonist_vm_bytes)
-    if FLAGS.antagonist_vm_hang:
-      stress_cmd.append('--vm-hang %s' %
-                        FLAGS.antagonist_vm_hang)
+  if num_cpu_process:
+    stress_cmd.append('--cpu %s' % num_cpu_process)
+  if num_io_process:
+    stress_cmd.append('--io %s' % num_io_process)
+  if num_memory_process:
+    stress_cmd.append('--vm %s' % num_memory_process)
+    if vm_bytes:
+      stress_cmd.append('--vm-bytes %s' % vm_bytes)
+    if vm_hang:
+      stress_cmd.append('--vm-hang %s' % vm_hang)
   stress_cmd.append('1> /dev/null 2> /dev/null &')
   stress_cmd = ' '.join(stress_cmd)
   vm.RemoteCommand(stress_cmd)
