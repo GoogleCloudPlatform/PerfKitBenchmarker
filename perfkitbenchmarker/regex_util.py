@@ -50,3 +50,20 @@ def ExtractGroup(regex, text, group=1):
 def ExtractFloat(regex, text, group=1):
   """Extracts a float from a regular expression matched to 'text'."""
   return float(ExtractGroup(regex, text, group=group))
+
+
+def ExtractAllMatch(regex, text):
+  """Extracts all from a regular expression matched to 'text'.
+  Args:
+    regex: string. Regular expression.
+    text: string. Text to search.
+  Returns:
+    A list of tuples of strings that matached by 'regex' on 'text'.
+  Raises:
+    NoMatchError: when 'regex' does not match 'text'.
+  """
+  match = re.findall(regex, text)
+  if not match:
+    raise NoMatchError('No match for pattern "{0}" in "{1}"'.format(
+        regex, text))
+  return match

@@ -22,6 +22,7 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
 import logging
+from perfkitbenchmarker import regex_util
 
 REQUIRED_PACKAGES_LOAD_GEN = 'git maven openjdk-7-jdk'
 YCSB_CMD = ('cd YCSB; ./bin/ycsb %s mongodb -s -P workloads/workloada '
@@ -34,6 +35,9 @@ BENCHMARK_INFO = {'name': 'mongodb',
                   'description': 'Run YCSB against MongoDB.',
                   'scratch_disk': False,
                   'num_machines': 2}
+
+RESULT_REGEX = '\[(\w+)\], (\w+)\(([\w/]+)\), ([-+]?[0-9]*\.?[0-9]+)'
+OPERATIONS_REGEX = '\[(\w+)\], Operations, ([-+]?[0-9]*\.?[0-9]+)'
 
 
 def GetInfo():
@@ -73,6 +77,29 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand(YCSB_CMD % ('load', vms[0].internal_ip))
 
 
+def ParseResult(output):
+  """Parse YCSB output.
+
+  Args:
+    output: String output of YCSB tool from commandline.
+
+  Returns:
+    A list of samples in the form of 3 or 4 tuples. The tuples contain
+        the sample metric (string), value (float), and unit (string).
+        If a 4th element is included, it is a dictionary of sample
+        metadata.
+  """
+  samples = []
+  result_match = regex_util.ExtractAllMatch(RESULT_REGEX, output)
+  for groups in result_match:
+    samples.append(
+        [groups[1], float(groups[3]), groups[2], {'stage': groups[0]}])
+  operations_match = regex_util.ExtractAllMatch(OPERATIONS_REGEX, output)
+  for groups in operations_match:
+    samples.append(['Operations', float(groups[1]), '', {'stage': groups[0]}])
+  return samples
+
+
 def Run(benchmark_spec):
   """Run run YCSB with workloada against MongoDB.
 
@@ -91,9 +118,9 @@ def Run(benchmark_spec):
   # TODO(user): We are running workloada with default parameters.
   #    This does not seem like a rigorous benchmark.
   logging.info('MongoDb Results:')
-  vm.RemoteCommand(
+  stdout, _ = vm.RemoteCommand(
       YCSB_CMD % ('run', vms[0].internal_ip), should_log=True)
-  return []
+  return ParseResult(stdout)
 
 
 def Cleanup(benchmark_spec):
