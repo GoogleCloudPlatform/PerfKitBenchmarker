@@ -46,8 +46,8 @@ BENCHMARK_INFO = {'name': 'cassandra',
                   'scratch_disk': False,
                   'num_machines': DEFAULT_CLUSTER_SIZE}
 
-CASSANDRA_TAR = 'dsc.tar.gz'
 CASSANDRA_DIR = 'dsc-cassandra-2.0.0'
+CASSANDRA_TAR = '%s-bin.tar.gz' % CASSANDRA_DIR
 JAVA_TAR = 'server-jre-7u40-linux-x64.tar.gz'
 CASSANDRA_YAML = 'cassandra.yaml'
 CASSANDRA_PID = 'cassandra_pid'
@@ -86,11 +86,11 @@ def PrepareVm(vm):
   Args:
     vm: The target vm.
   """
+  vm.RemoteCommand('curl -OL http://downloads.datastax.com/community/%s' % CASSANDRA_TAR)
   try:
-    vm.PushDataFile(CASSANDRA_TAR)
     vm.PrepareJava(JAVA_TAR, REQUIRED_JAVA_VERSION)
-  except errors.VirtualMachine.VirtualMachineError as e:
-    raise errors.Benchmarks.PrepareException(e)
+  except data.ResourceNotFound:
+    raise errors.Benchmarks.PrepareException('%s not found' % JAVA_TAR)
 
 
 def Prepare(benchmark_spec):
