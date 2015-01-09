@@ -65,8 +65,38 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand('tar xvfz %s -C %s' % (UNIXBENCH_NAME, vm.GetScratchDir()))
 
 
-def UnixBenchParser(result):
+def ParseResult(result):
   """Result parser for UnixBench.
+
+  Sample Results:
+  Double-Precision Whetstone                    4022.0 MWIPS (9.9 s, 7 samples)
+  Execl Throughput                              4735.8 lps   (29.8 s, 2 samples)
+  File Copy 1024 bufsize 2000 maxblocks      1294367.0 KBps  (30.0 s, 2 samples)
+  File Copy 256 bufsize 500 maxblocks         396912.9 KBps  (30.0 s, 2 samples)
+  File Copy 4096 bufsize 8000 maxblocks      2513158.7 KBps  (30.0 s, 2 samples)
+  Pipe Throughput                            2221775.6 lps   (10.0 s, 7 samples)
+  Pipe-based Context Switching                369000.7 lps   (10.0 s, 7 samples)
+  Process Creation                             12587.7 lps   (30.0 s, 2 samples)
+  Shell Scripts (1 concurrent)                  8234.3 lpm   (60.0 s, 2 samples)
+  Shell Scripts (8 concurrent)                  1064.5 lpm   (60.0 s, 2 samples)
+  System Call Overhead                       4439274.5 lps   (10.0 s, 7 samples)
+
+  System Benchmarks Index Values               BASELINE       RESULT    INDEX
+  Dhrystone 2 using register variables         116700.0   34872897.7   2988.3
+  Double-Precision Whetstone                       55.0       4022.0    731.3
+  Execl Throughput                                 43.0       4735.8   1101.4
+  File Copy 1024 bufsize 2000 maxblocks          3960.0    1294367.0   3268.6
+  File Copy 256 bufsize 500 maxblocks            1655.0     396912.9   2398.3
+  File Copy 4096 bufsize 8000 maxblocks          5800.0    2513158.7   4333.0
+  Pipe Throughput                               12440.0    2221775.6   1786.0
+  Pipe-based Context Switching                   4000.0     369000.7    922.5
+  Process Creation                                126.0      12587.7    999.0
+  Shell Scripts (1 concurrent)                     42.4       8234.3   1942.1
+  Shell Scripts (8 concurrent)                      6.0       1064.5   1774.2
+  System Call Overhead                          15000.0    4439274.5   2959.5
+  ========
+  System Benchmarks Index Score                                        1825.8
+
 
   Args:
     result: UnixBench result.
@@ -82,11 +112,11 @@ def UnixBenchParser(result):
   for groups in match:
     samples.append([groups[0].strip(), float(groups[1]), groups[2],
                     {'samples': int(groups[5]), 'time': groups[3] + groups[4]}])
-  match = regex_util.ExtractAllMatch(SCORE_REGEX, result)
+  match = regex_util.ExtractAllMatches(SCORE_REGEX, result)
   for groups in match:
     samples.append(['%s:score' % groups[0].strip(), float(groups[2]), '',
                     {'baseline': float(groups[1]), 'index': float(groups[3])}])
-  match = regex_util.ExtractAllMatch(SYSTEM_SCORE_REGEX, result)
+  match = regex_util.ExtractAllMatches(SYSTEM_SCORE_REGEX, result)
   samples.append(['System Benchmarks Index Score', float(match[0]), '', {}])
   return samples
 
@@ -110,7 +140,7 @@ def Run(benchmark_spec):
   unixbench_command = 'cd %s/UnixBench;./Run' % vm.GetScratchDir()
   logging.info('Unixbench Results:')
   stdout, _ = vm.RemoteCommand(unixbench_command, should_log=True)
-  return UnixBenchParser(stdout)
+  return ParseResult(stdout)
 
 
 def Cleanup(benchmark_spec):
