@@ -55,6 +55,12 @@ def ExtractFloat(regex, text, group=1):
 def ExtractAllMatches(regex, text):
   """Extracts all matches from a regular expression matched within 'text'.
 
+  Extracts all matches from a regular expression matched within 'text'. Please
+  note that this function will return a list of strings if regex does not
+  contain any capturing groups, matching the behavior of re.findall:
+  >>> re.findall(r'bar', 'foo foo bar foo bar foo')
+  ['bar', 'bar']
+
   Args:
     regex: string. Regular expression.
     text: string. Text to search.
