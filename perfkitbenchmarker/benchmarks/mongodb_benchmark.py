@@ -77,8 +77,19 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand(YCSB_CMD % ('load', vms[0].internal_ip))
 
 
-def ParseResult(output):
+def ParseResults(output):
   """Parse YCSB output.
+
+  Sample Output:
+  [OVERALL], RunTime(ms), 723.0
+  [OVERALL], Throughput(ops/sec), 1383.1258644536654
+  [UPDATE], Operations, 496
+  [UPDATE], AverageLatency(us), 5596.689516129032
+  [UPDATE], MinLatency(us), 2028
+  [UPDATE], MaxLatency(us), 46240
+  [UPDATE], 95thPercentileLatency(ms), 10
+  [UPDATE], 99thPercentileLatency(ms), 43
+  [UPDATE], Return=0, 496
 
   Args:
     output: String output of YCSB tool from commandline.
@@ -90,11 +101,11 @@ def ParseResult(output):
         metadata.
   """
   samples = []
-  result_match = regex_util.ExtractAllMatch(RESULT_REGEX, output)
+  result_match = regex_util.ExtractAllMatches(RESULT_REGEX, output)
   for groups in result_match:
     samples.append(
         [groups[1], float(groups[3]), groups[2], {'stage': groups[0]}])
-  operations_match = regex_util.ExtractAllMatch(OPERATIONS_REGEX, output)
+  operations_match = regex_util.ExtractAllMatches(OPERATIONS_REGEX, output)
   for groups in operations_match:
     samples.append(['Operations', float(groups[1]), '', {'stage': groups[0]}])
   return samples
@@ -120,7 +131,7 @@ def Run(benchmark_spec):
   logging.info('MongoDb Results:')
   stdout, _ = vm.RemoteCommand(
       YCSB_CMD % ('run', vms[0].internal_ip), should_log=True)
-  return ParseResult(stdout)
+  return ParseResults(stdout)
 
 
 def Cleanup(benchmark_spec):

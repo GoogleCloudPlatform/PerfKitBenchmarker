@@ -33,7 +33,7 @@ class MongoDbBenchmarkTestCase(unittest.TestCase):
     pass
 
   def testParseResult(self):
-    result = mongodb_benchmark.ParseResult(self.contents)
+    result = mongodb_benchmark.ParseResults(self.contents)
     expected_result = [
         ['RunTime', 723.0, 'ms', {'stage': 'OVERALL'}],
         ['Throughput', 1383.1258644536654, 'ops/sec', {'stage': 'OVERALL'}],
