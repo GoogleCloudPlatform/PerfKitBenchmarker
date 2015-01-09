@@ -13,14 +13,19 @@
 # limitations under the License.
 
 
-"""Module containing build tools installation and cleanup functions."""
+"""Module containing iperf installation and cleanup functions."""
+
+
+def _Install(vm):
+  """Install pip on the VM."""
+  vm.InstallPackages('python-pip')
 
 
 def YumInstall(vm):
-  """Installs build tools on the VM."""
-  vm.InstallPackageGroup('Development Tools')
+  """Installs the iperf package on the VM."""
+  _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs build tools on the VM."""
-  vm.InstallPackages('build-essential git libtool autoconf automake')
+  """Installs the iperf package on the VM."""
+  _Install(vm)

@@ -83,7 +83,7 @@ def PrepareVm(vm):
   """
   try:
     vm.PushDataFile(CASSANDRA_TAR)
-    vm.PrepareJava(JAVA_TAR, REQUIRED_JAVA_VERSION)
+    vm.Install('java7')
   except errors.VirtualMachine.VirtualMachineError as e:
     raise errors.Benchmarks.PrepareException(e)
 

@@ -43,8 +43,6 @@ flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
 BENCHMARK_INFO = {'name': 'aerospike',
                   'description': 'Runs Aerospike',
                   'num_machines': 2}
-PACKAGES = ('build-essential git autoconf libtool libssl-dev lua5.1 '
-            'liblua5.1-dev')
 AEROSPIKE_SERVER = 'https://github.com/aerospike/aerospike-server.git'
 AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
 CLIENT_DIR = 'aerospike-client-c'
@@ -67,7 +65,9 @@ def GetInfo():
 
 def _PrepareClient(client):
   """Prepare the Aerospike C client on a VM."""
-  client.InstallPackage(PACKAGES)
+  client.Install('build_tools')
+  client.Install('lua5_1')
+  client.Install('openssl')
   clone_command = 'git clone %s'
   client.RemoteCommand(clone_command % AEROSPIKE_CLIENT)
   build_command = ('cd %s && git checkout %s && git submodule update --init '
@@ -88,7 +88,9 @@ def _PrepareClient(client):
 
 def _PrepareServer(server):
   """Prepare the Aerospike server on a VM."""
-  server.InstallPackage(PACKAGES)
+  server.Install('build_tools')
+  server.Install('lua5_1')
+  server.Install('openssl')
   clone_command = 'git clone %s'
   server.RemoteCommand(clone_command % AEROSPIKE_SERVER)
   build_command = ('cd %s && git checkout %s && git submodule update --init '

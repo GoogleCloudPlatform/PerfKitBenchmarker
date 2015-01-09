@@ -13,14 +13,14 @@
 # limitations under the License.
 
 
-"""Module containing build tools installation and cleanup functions."""
+"""Module containing iperf installation and cleanup functions."""
 
 
 def YumInstall(vm):
-  """Installs build tools on the VM."""
-  vm.InstallPackageGroup('Development Tools')
+  """Installs the iperf package on the VM."""
+  vm.InstallPackages('java-1.7.0-openjdk-devel')
 
 
 def AptInstall(vm):
-  """Installs build tools on the VM."""
-  vm.InstallPackages('build-essential git libtool autoconf automake')
+  """Installs the iperf package on the VM."""
+  vm.InstallPackages('openjdk-7-jdk')

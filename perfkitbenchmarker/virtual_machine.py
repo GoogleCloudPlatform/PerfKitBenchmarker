@@ -385,8 +385,8 @@ class BaseVirtualMachine(resource.BaseResource):
     """
 
     # TODO(user): 10/28/2014 - Make this work with other OSes
-    if FLAGS.guest_os not in [GUEST_OS_DEBIAN]:
-      raise ValueError('JAVA is only supported on Debian based images.')
+    #if FLAGS.guest_os not in [GUEST_OS_DEBIAN]:
+    #  raise ValueError('JAVA is only supported on Debian based images.')
 
     self.InstallPackage('libjna-java')
     version = self.CheckJavaVersion()

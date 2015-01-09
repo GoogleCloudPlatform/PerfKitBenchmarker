@@ -13,14 +13,26 @@
 # limitations under the License.
 
 
-"""Module containing build tools installation and cleanup functions."""
+"""Module containing iperf installation and cleanup functions."""
+
+MVN_TAR = 'apache-maven-3.2.5-bin.tar.gz'
+MVN_URL = ('http://download.nextag.com/apache/maven/maven-3/3.2.5/binaries/' +
+           MVN_TAR)
+MVN_DIR = 'pkb/apache-maven-3.2.5'
+
+
+def _Install(vm):
+  """Installs the fio package on the VM."""
+  vm.Install('java7')
+  vm.RemoteCommand('wget %s -P pkb' % MVN_URL)
+  vm.RemoteCommand('cd pkb && tar xvzf %s' % MVN_TAR)
 
 
 def YumInstall(vm):
-  """Installs build tools on the VM."""
-  vm.InstallPackageGroup('Development Tools')
+  """Installs the iperf package on the VM."""
+  _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs build tools on the VM."""
-  vm.InstallPackages('build-essential git libtool autoconf automake')
+  """Installs the iperf package on the VM."""
+  _Install(vm)

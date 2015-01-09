@@ -18,9 +18,9 @@
 
 def YumInstall(vm):
   """Installs build tools on the VM."""
-  vm.InstallPackageGroup('Development Tools')
+  vm.InstallPackages('openssl openssl-devel openssl-static')
 
 
 def AptInstall(vm):
   """Installs build tools on the VM."""
-  vm.InstallPackages('build-essential git libtool autoconf automake')
+  vm.InstallPackages('openssl libssl-dev')

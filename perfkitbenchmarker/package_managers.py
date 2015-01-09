@@ -52,13 +52,20 @@ class BasePackageMixin(object):
   def Install(self, package_name):
     pass
 
+  def GetPathToConfig(self, package_name):
+    pass
+
+  def GetServiceName(self, package_name):
+    pass
+
 
 class YumMixin(BasePackageMixin):
 
   def Startup(self):
     self.RemoteCommand('sudo sed -i "/requiretty/d" /etc/sudoers',
                        login_shell=True)
-    self.RemoteCommand('sudo rpm -ivh http://dl.fedoraproject.org/pub/epel'
+    self.RemoteCommand('sudo rpm -ivh --force '
+                       'http://dl.fedoraproject.org/pub/epel'
                        '/6/x86_64/epel-release-6-8.noarch.rpm')
 
   def InstallPackages(self, packages):
@@ -71,6 +78,13 @@ class YumMixin(BasePackageMixin):
     package = packages.PACKAGES[package_name]
     package.YumInstall(self)
 
+  def GetPathToConfig(self, package_name):
+    package = packages.PACKAGES[package_name]
+    return package.YumGetPathToConfig(self)
+
+  def GetServiceName(self, package_name):
+    package = packages.PACKAGES[package_name]
+    return package.YumGetServiceName(self)
 
 
 class AptMixin(BasePackageMixin):
@@ -94,3 +108,12 @@ class AptMixin(BasePackageMixin):
   def Install(self, package_name):
     package = packages.PACKAGES[package_name]
     package.AptInstall(self)
+
+  def GetPathToConfig(self, package_name):
+    package = packages.PACKAGES[package_name]
+    return package.AptGetPathToConfig(self)
+
+  def GetServiceName(self, package_name):
+    package = packages.PACKAGES[package_name]
+    return package.AptGetServiceName(self)
+

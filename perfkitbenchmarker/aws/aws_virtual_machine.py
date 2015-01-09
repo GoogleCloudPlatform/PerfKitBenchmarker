@@ -30,6 +30,11 @@ from perfkitbenchmarker.aws import util
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_string('aws_user_name', 'ubuntu',
+                    'This determines the user name that Perfkit will '
+                    'attempt to use. This must be changed in order to '
+                    'use any image other than ubuntu.')
+
 HVM = 'HVM'
 PV = 'PV'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
@@ -130,7 +135,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AwsVirtualMachine, self).__init__(vm_spec)
     self.region = self.zone[:-1]
     self.image = self.image or GetImage(self.machine_type, self.region)
-    self.user_name = 'ubuntu'
+    self.user_name = FLAGS.aws_user_name
 
   def ImportKeyfile(self):
     """Imports the public keyfile to AWS."""

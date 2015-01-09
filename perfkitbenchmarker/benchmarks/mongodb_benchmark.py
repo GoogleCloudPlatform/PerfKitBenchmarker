@@ -23,12 +23,9 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 
 import logging
 
-REQUIRED_PACKAGES_LOAD_GEN = 'git maven openjdk-7-jdk'
-YCSB_CMD = ('cd YCSB; ./bin/ycsb %s mongodb -s -P workloads/workloada '
-            '-threads 10 -p mongodb.url=mongodb://%s:27017')
-
-YCSB_URL = 'git://github.com/brianfrankcooper/YCSB.git'
-YCSB_COMMIT = '5659fc582c8280e1431ebcfa0891979f806c70ed'
+YCSB_CMD = ('cd pkb/YCSB; ./bin/ycsb %s mongodb -s -P workloads/workloada '
+            '-threads 10 -p mongodb.url=mongodb://%s:27017 '
+            '-p mongodb.writeConcern=normal')
 
 BENCHMARK_INFO = {'name': 'mongodb',
                   'description': 'Run YCSB against MongoDB.',
@@ -51,25 +48,10 @@ def Prepare(benchmark_spec):
   assert len(vms) == BENCHMARK_INFO['num_machines']
   vm = vms[0]
   # Install mongodb on the 1st machine.
-  vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackage('mongodb-server')
-  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' /etc/mongodb.conf')
-  vm.RemoteCommand('sudo service mongodb restart')
+  vm.Install('mongodb_server')
   # Setup YCSB load generator on the 2nd machine.
   vm = vms[1]
-  vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackage(REQUIRED_PACKAGES_LOAD_GEN)
-  vm.RemoteCommand('git clone %s' % YCSB_URL)
-  vm.RemoteCommand('cd YCSB; '
-                   'git checkout -q %s' % YCSB_COMMIT)
-  # TODO(user): remove this and update the commit referenced above
-  #    when https://github.com/brianfrankcooper/YCSB/issues/181 is fixed.
-  vm.RemoteCommand('cd YCSB; '
-                   'sed -i -e '
-                   "'s,<module>mapkeeper</module>,<!--&-->,' pom.xml")
-  # TODO(user): This build requires a lot of IO, investigate moving TCSB on
-  #    a data drive.
-  vm.RemoteCommand('cd YCSB; mvn clean package')
+  vm.Install('ycsb')
   vm.RemoteCommand(YCSB_CMD % ('load', vms[0].internal_ip))
 
 
@@ -103,9 +85,4 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
-  vm.UninstallPackage('mongodb-server')
-  vm = vms[1]
-  vm.RemoteCommand('rm -rf YCSB')
-  vm.UninstallPackage(REQUIRED_PACKAGES_LOAD_GEN)
+  pass

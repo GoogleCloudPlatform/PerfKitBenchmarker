@@ -23,17 +23,14 @@ some memory bandwidth, and disk.
 import logging
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.packages import unixbench
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'UnixBench++_benchmark',
+BENCHMARK_INFO = {'name': 'unixbench',
                   'description': 'Runs UnixBench.',
                   'scratch_disk': True,
                   'num_machines': 1}
-
-
-UNIXBENCH_NAME = 'UnixBench5.1.3.tgz'
-UNIXBENCH_LOC = 'http://byte-unixbench.googlecode.com/files/%s' % UNIXBENCH_NAME
 
 
 def GetInfo():
@@ -50,10 +47,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('Unixbench prepare on %s', vm)
-  vm.InstallPackage('build-essential libx11-dev libgl1-mesa-dev libxext-dev')
-  wget_cmd = '/usr/bin/wget %s' % UNIXBENCH_LOC
-  vm.RemoteCommand(wget_cmd)
-  vm.RemoteCommand('tar xvfz %s -C %s' % (UNIXBENCH_NAME, vm.GetScratchDir()))
+  vm.Install('unixbench')
 
 
 def Run(benchmark_spec):
@@ -72,7 +66,7 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('UnixBench running on %s', vm)
-  unixbench_command = 'cd %s/UnixBench;./Run' % vm.GetScratchDir()
+  unixbench_command = 'cd {0} && UB_TMPDIR={1} ./Run'.format(unixbench.UNIXBENCH_DIR, vm.GetScratchDir())
   logging.info('Unixbench Results:')
   vm.RemoteCommand(unixbench_command, should_log=True)
   # TODO(user): The hard work! Parsing this output. For now just print out.
@@ -89,5 +83,3 @@ def Cleanup(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('UnixBench Cleanup on %s', vm)
-  vm.RemoteCommand('rm -f ~/%s' % UNIXBENCH_NAME)
-  vm.RemoteCommand('rm -rf %s/UnixBench' % vm.GetScratchDir())

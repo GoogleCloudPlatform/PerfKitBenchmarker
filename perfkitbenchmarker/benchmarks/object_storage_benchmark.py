@@ -56,9 +56,6 @@ OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
     benchmark_spec_class.AWS: '~/' + AWS_CREDENTIAL_LOCATION,
     benchmark_spec_class.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION}
 
-NODE_URL = 'git://github.com/ry/node.git'
-NODE_COMMIT = 'v0.10.30'
-
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data
 DATA_SIZE_IN_MB = 256.1
@@ -78,8 +75,7 @@ class S3StorageBenchmark(object):
     Args:
       vm: The vm being used to run the benchmark.
     """
-    vm.InstallPackage('python-setuptools')
-    vm.RemoteCommand('sudo easy_install -U pip')
+    vm.Install('pip')
     vm.RemoteCommand('sudo pip install awscli')
     vm.PushFile(FLAGS.object_storage_credential_file, AWS_CREDENTIAL_LOCATION)
     vm.RemoteCommand(
@@ -95,14 +91,14 @@ class S3StorageBenchmark(object):
     """
     vm.RemoteCommand('aws s3 rm s3://pkb%s --recursive'
                      % FLAGS.run_uri, ignore_failure=True)
-    _, res = vm.RemoteCommand('time aws s3 sync /run/data/ '
+    _, res = vm.RemoteCommand('time aws s3 sync /dev/shm/data/ '
                               's3://pkb%s/' % FLAGS.run_uri)
     logging.info(res)
     time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
-    vm.RemoteCommand('rm /run/data/*')
+    vm.RemoteCommand('rm /dev/shm/data/*')
     _, res = vm.RemoteCommand('time aws s3 sync '
-                              's3://pkb%s/ /run/data/'
+                              's3://pkb%s/ /dev/shm/data/'
                               % FLAGS.run_uri)
     logging.info(res)
     time_used = vm_util.ParseTimeCommandResult(res)
@@ -117,8 +113,6 @@ class S3StorageBenchmark(object):
     vm.RemoteCommand('aws s3 rm s3://pkb%s --recursive'
                      % FLAGS.run_uri, ignore_failure=True)
     vm.RemoteCommand('aws s3 rb s3://pkb%s' % FLAGS.run_uri)
-    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
-    vm.RemoteCommand('sudo easy_install -m pip')
 
 
 class AzureBlobStorageBenchmark(object):
@@ -132,11 +126,7 @@ class AzureBlobStorageBenchmark(object):
     Args:
       vm: The vm being used to run the benchmark.
     """
-    vm.InstallPackage(' '.join(['g++', 'curl', 'libssl-dev', 'apache2-utils',
-                                'make', 'git-core']))
-    vm.RemoteCommand('git clone %s' % NODE_URL)
-    vm.RemoteCommand('cd node; git checkout -q %s' % NODE_COMMIT)
-    vm.RemoteCommand('cd node; ./configure; make; sudo make install')
+    vm.Install('node_js')
     vm.RemoteCommand('sudo npm install azure-cli -g')
     vm.PushFile(FLAGS.object_storage_credential_file, AZURE_CREDENTIAL_LOCATION)
     vm.RemoteCommand(
@@ -167,16 +157,16 @@ class AzureBlobStorageBenchmark(object):
                      (FLAGS.run_uri, vm.azure_command_suffix),
                      ignore_failure=True)
     _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
-                              'upload /run/data/file-$i.dat'
+                              'upload /dev/shm/data/file-$i.dat'
                               ' pkb%s %s; done' %
                               (FLAGS.run_uri, vm.azure_command_suffix))
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
-    vm.RemoteCommand('rm /run/data/*')
+    vm.RemoteCommand('rm /dev/shm/data/*')
     _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
                               'download pkb%s '
-                              'file-$i.dat /run/data/file-$i.dat %s; done' %
+                              'file-$i.dat /dev/shm/data/file-$i.dat %s; done' %
                               (FLAGS.run_uri, vm.azure_command_suffix))
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
@@ -197,11 +187,6 @@ class AzureBlobStorageBenchmark(object):
         (FLAGS.run_uri, vm.azure_command_suffix))
     vm.RemoteCommand('azure storage account delete -q pkb%s' %
                      FLAGS.run_uri)
-    vm.RemoteCommand('sudo npm uninstall azure-cli -g')
-    vm.RemoteCommand('cd node; sudo make clean')
-    vm.RemoteCommand('rm -rf node')
-    vm.UninstallPackage(' '.join(['g++', 'curl', 'libssl-dev', 'apache2-utils',
-                                  'make', 'git-core']))
 
 
 class GoogleCloudStorageBenchmark(object):
@@ -243,16 +228,16 @@ class GoogleCloudStorageBenchmark(object):
     """
     vm.RemoteCommand('%s rm gs://pkb%s/*' %
                      (vm.gsutil_path, FLAGS.run_uri), ignore_failure=True)
-    _, res = vm.RemoteCommand('time %s -m cp /run/data/* '
+    _, res = vm.RemoteCommand('time %s -m cp /dev/shm/data/* '
                               'gs://pkb%s/' % (vm.gsutil_path, FLAGS.run_uri))
 
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
-    vm.RemoteCommand('rm /run/data/*')
+    vm.RemoteCommand('rm /dev/shm/data/*')
     _, res = vm.RemoteCommand('time %s -m cp '
                               'gs://pkb%s/* '
-                              '/run/data/' % (vm.gsutil_path, FLAGS.run_uri))
+                              '/dev/shm/data/' % (vm.gsutil_path, FLAGS.run_uri))
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
     result[1][1] = DATA_SIZE_IN_MB / time_used
@@ -296,10 +281,10 @@ def Prepare(benchmark_spec):
         'Credential cannot be found in %s',
         FLAGS.object_storage_credential_file)
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
-  # Prepare data on vm, add permission to /run/folder
-  vms[0].RemoteCommand('sudo chmod 777 /run/')
+  # Prepare data on vm, add permission to /dev/shm folder
+  vms[0].RemoteCommand('sudo chmod 777 /dev/shm')
   file_path = data.ResourcePath(DATA_FILE)
-  vms[0].PushFile(file_path, '/run/')
+  vms[0].PushFile(file_path, '/dev/shm')
 
 
 def Run(benchmark_spec):
@@ -319,7 +304,7 @@ def Run(benchmark_spec):
   results = [['storage upload', value, unit, metadata],
              ['storage download', value, unit, metadata]]
   vms = benchmark_spec.vms
-  vms[0].RemoteCommand('cd /run/; bash cloud-storage-workload.sh')
+  vms[0].RemoteCommand('cd /dev/shm/; bash cloud-storage-workload.sh')
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0], results)
   print results
   return results
@@ -333,5 +318,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms[0].RemoteCommand('rm -rf /run/data/')
+  vms[0].RemoteCommand('rm -rf /dev/shm/data/')
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Cleanup(vms[0])

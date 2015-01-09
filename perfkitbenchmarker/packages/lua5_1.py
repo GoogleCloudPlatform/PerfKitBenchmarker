@@ -18,9 +18,9 @@
 
 def YumInstall(vm):
   """Installs build tools on the VM."""
-  vm.InstallPackageGroup('Development Tools')
+  vm.InstallPackages('lua lua-devel lua-static')
 
 
 def AptInstall(vm):
   """Installs build tools on the VM."""
-  vm.InstallPackages('build-essential git libtool autoconf automake')
+  vm.InstallPackages('lua5.1 liblua5.1-dev')

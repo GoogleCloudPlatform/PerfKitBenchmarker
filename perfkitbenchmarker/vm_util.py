@@ -333,8 +333,8 @@ def IssueCommand(cmd, should_log=False):
                              stderr=subprocess.PIPE)
   stdout, stderr = process.communicate()
 
-  stdout = stdout.decode('ascii', 'ignore')
-  stderr = stderr.decode('ascii', 'ignore')
+  stdout = stdout.decode('ascii', 'ignore').replace('\r', '\n')
+  stderr = stderr.decode('ascii', 'ignore').replace('\r', '\n')
 
   debug_text = ('Ran %s. Got return code (%s). STDOUT: %sSTDERR: %s' %
                 (full_cmd, process.returncode, stdout, stderr))

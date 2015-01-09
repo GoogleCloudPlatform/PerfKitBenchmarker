@@ -30,12 +30,11 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'hadoop_benchmark',
+BENCHMARK_INFO = {'name': 'hadoop',
                   'description': 'Runs Terasort',
                   'scratch_disk': True,
                   'num_machines': 9}
 
-JRE_PKG = 'openjdk-7-jre-headless'
 HADOOP_VERSION = '2.5.2'
 HADOOP_URL = ('http://apache.mirrors.tds.net/hadoop/common/hadoop-%s/'
               'hadoop-%s.tar.gz') % (HADOOP_VERSION, HADOOP_VERSION)
@@ -63,7 +62,7 @@ def InstallHadoop(vm, master_ip, worker_ips):
   """
   vm.RemoteCommand('wget %s' % HADOOP_URL)
   vm.RemoteCommand('tar xvzf hadoop-%s.tar.gz' % HADOOP_VERSION)
-  vm.InstallPackage(JRE_PKG)
+  vm.Install('java7')
   vm.RemoteCommand('mkdir hadoop-%s/conf' % HADOOP_VERSION)
 
   # Set available memory to 90% of that on the system
@@ -173,7 +172,6 @@ def StopDatanode(vm):
 def CleanNode(vm):
   """Uninstall packages and delete files needed for hadoop on a single VM."""
   logging.info('Hadoop Cleanup up on %s', vm)
-  vm.UninstallPackage(JRE_PKG)
   vm.RemoteCommand('rm -rf /scratch/*')
   vm.RemoteCommand('rm -rf /home/%s/hadoop-%s*' % (vm.user_name,
                                                    HADOOP_VERSION))

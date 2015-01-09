@@ -13,14 +13,18 @@
 # limitations under the License.
 
 
-"""Module containing build tools installation and cleanup functions."""
+"""Module containing iperf installation and cleanup functions."""
 
 
 def YumInstall(vm):
-  """Installs build tools on the VM."""
-  vm.InstallPackageGroup('Development Tools')
+  """Installs the iperf package on the VM."""
+  vm.InstallPackages('mongodb-server')
+  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' /etc/mongodb.conf')
+  vm.RemoteCommand('sudo service mongod restart')
 
 
 def AptInstall(vm):
-  """Installs build tools on the VM."""
-  vm.InstallPackages('build-essential git libtool autoconf automake')
+  """Installs the iperf package on the VM."""
+  vm.InstallPackages('mongodb-server')
+  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' /etc/mongodb.conf')
+  vm.RemoteCommand('sudo service mongodb restart')
