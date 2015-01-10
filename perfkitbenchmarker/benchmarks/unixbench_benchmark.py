@@ -36,14 +36,14 @@ BENCHMARK_INFO = {'name': 'UnixBench++_benchmark',
 UNIXBENCH_NAME = 'UnixBench5.1.3.tgz'
 UNIXBENCH_LOC = 'http://byte-unixbench.googlecode.com/files/%s' % UNIXBENCH_NAME
 
-SYSTEM_SCORE_REGEX = '\nSystem Benchmarks Index Score\s+([-+]?[0-9]*\.?[0-9]+)'
+SYSTEM_SCORE_REGEX = r'\nSystem Benchmarks Index Score\s+([-+]?[0-9]*\.?[0-9]+)'
 RESULT_REGEX = (
-    '\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+) (\w+)\s+\('
+    r'\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+) (\w+)\s+\('
     '([-+]?[0-9]*\.?[0-9]+) (\w+), (\d+) samples\)')
 SCORE_REGEX = (
-    '\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+'
-    '([-+]?[0-9]*\.?[0-9]+)')
-PARALLEL_COPIES_REGEX = 'running (\d+) parallel cop[yies]+ of tests'
+    r'\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)'
+    '\s+([-+]?[0-9]*\.?[0-9]+)')
+PARALLEL_COPIES_REGEX = r'running (\d+) parallel cop[yies]+ of tests'
 RESULT_START_STRING = 'Benchmark Run:'
 
 
