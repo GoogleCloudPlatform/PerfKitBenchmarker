@@ -36,8 +36,8 @@ BENCHMARK_INFO = {'name': 'mongodb',
                   'scratch_disk': False,
                   'num_machines': 2}
 
-RESULT_REGEX = '\[(\w+)\], (\w+)\(([\w/]+)\), ([-+]?[0-9]*\.?[0-9]+)'
-OPERATIONS_REGEX = '\[(\w+)\], Operations, ([-+]?[0-9]*\.?[0-9]+)'
+RESULT_REGEX = r'\[(\w+)\], (\w+)\(([\w/]+)\), ([-+]?[0-9]*\.?[0-9]+)'
+OPERATIONS_REGEX = r'\[(\w+)\], Operations, ([-+]?[0-9]*\.?[0-9]+)'
 
 
 def GetInfo():
