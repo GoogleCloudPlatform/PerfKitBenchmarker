@@ -22,6 +22,7 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
 import logging
+from perfkitbenchmarker import regex_util
 
 REQUIRED_PACKAGES_LOAD_GEN = 'git maven openjdk-7-jdk'
 YCSB_CMD = ('cd YCSB; ./bin/ycsb %s mongodb -s -P workloads/workloada '
@@ -34,6 +35,9 @@ BENCHMARK_INFO = {'name': 'mongodb',
                   'description': 'Run YCSB against MongoDB.',
                   'scratch_disk': False,
                   'num_machines': 2}
+
+RESULT_REGEX = r'\[(\w+)\], (\w+)\(([\w/]+)\), ([-+]?[0-9]*\.?[0-9]+)'
+OPERATIONS_REGEX = r'\[(\w+)\], Operations, ([-+]?[0-9]*\.?[0-9]+)'
 
 
 def GetInfo():
@@ -73,6 +77,40 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand(YCSB_CMD % ('load', vms[0].internal_ip))
 
 
+def ParseResults(output):
+  """Parse YCSB output.
+
+  Sample Output:
+  [OVERALL], RunTime(ms), 723.0
+  [OVERALL], Throughput(ops/sec), 1383.1258644536654
+  [UPDATE], Operations, 496
+  [UPDATE], AverageLatency(us), 5596.689516129032
+  [UPDATE], MinLatency(us), 2028
+  [UPDATE], MaxLatency(us), 46240
+  [UPDATE], 95thPercentileLatency(ms), 10
+  [UPDATE], 99thPercentileLatency(ms), 43
+  [UPDATE], Return=0, 496
+
+  Args:
+    output: String output of YCSB tool from commandline.
+
+  Returns:
+    A list of samples in the form of 3 or 4 tuples. The tuples contain
+        the sample metric (string), value (float), and unit (string).
+        If a 4th element is included, it is a dictionary of sample
+        metadata.
+  """
+  samples = []
+  result_match = regex_util.ExtractAllMatches(RESULT_REGEX, output)
+  for groups in result_match:
+    samples.append(
+        [groups[1], float(groups[3]), groups[2], {'stage': groups[0]}])
+  operations_match = regex_util.ExtractAllMatches(OPERATIONS_REGEX, output)
+  for groups in operations_match:
+    samples.append(['Operations', float(groups[1]), '', {'stage': groups[0]}])
+  return samples
+
+
 def Run(benchmark_spec):
   """Run run YCSB with workloada against MongoDB.
 
@@ -91,9 +129,9 @@ def Run(benchmark_spec):
   # TODO(user): We are running workloada with default parameters.
   #    This does not seem like a rigorous benchmark.
   logging.info('MongoDb Results:')
-  vm.RemoteCommand(
+  stdout, _ = vm.RemoteCommand(
       YCSB_CMD % ('run', vms[0].internal_ip), should_log=True)
-  return []
+  return ParseResults(stdout)
 
 
 def Cleanup(benchmark_spec):

@@ -24,19 +24,13 @@ from perfkitbenchmarker.benchmarks import hpcc_benchmark
 class HPCCTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.patches = []
-    self.patches.append(mock.patch(hpcc_benchmark.__name__ + '.FLAGS'))
-
-    for p in self.patches:
-      p.start()
+    p = mock.patch(hpcc_benchmark.__name__ + '.FLAGS')
+    p.start()
+    self.addCleanup(p.stop)
 
     path = os.path.join(os.path.dirname(__file__), 'data', 'hpcc-sample.txt')
     with open(path) as fp:
       self.contents = fp.read()
-
-  def tearDown(self):
-    for p in self.patches:
-      p.stop()
 
   def testParseHpcc(self):
     benchmark_spec = mock.MagicMock()
