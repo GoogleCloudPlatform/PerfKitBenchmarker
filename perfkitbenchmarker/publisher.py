@@ -402,9 +402,10 @@ class SampleCollector(object):
   def _DefaultPublishers(cls):
     """Gets a list of default publishers."""
     publishers = [LogPublisher(), PrettyPrintStreamPublisher()]
-    default_json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
-    publishers.append(NewlineDelimitedJSONPublisher(
-        FLAGS.json_path or default_json_path))
+    if FLAGS.json_output or FLAGS.json_path:
+      default_json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
+      publishers.append(NewlineDelimitedJSONPublisher(
+          FLAGS.json_path or default_json_path))
     if FLAGS.bigquery_table:
       publishers.append(BigQueryPublisher(
           FLAGS.bigquery_table,
