@@ -116,7 +116,8 @@ def ParseResults(results):
   while start_index != -1:
     next_start_index = results.find(RESULT_START_STRING, start_index + 1)
     result = results[start_index: next_start_index]
-    parallel_copies = regex_util.ExtractAllMatches(PARALLEL_COPIES_REGEX, result)
+    parallel_copies = regex_util.ExtractAllMatches(
+        PARALLEL_COPIES_REGEX, result)
     parallel_copy_metadata = {'num_parallel_copies': int(parallel_copies[0])}
 
     match = regex_util.ExtractAllMatches(RESULT_REGEX, result)
