@@ -42,7 +42,7 @@ NETWORK = 'network'
 FIREWALL = 'firewall'
 DEFAULTS = {
     GCP: {
-        IMAGE: 'debian-7-backports',
+        IMAGE: 'ubuntu-14-04',
         MACHINE_TYPE: 'n1-standard-1',
         ZONE: 'us-central1-a',
     },
