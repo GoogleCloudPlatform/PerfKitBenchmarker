@@ -133,7 +133,7 @@ def ParseResults(results):
                       metadata])
     match = regex_util.ExtractAllMatches(SYSTEM_SCORE_REGEX, result)
     samples.append(['System Benchmarks Index Score', float(match[0]), '',
-                    metadata])
+                    parallel_copy_metadata])
     start_index = next_start_index
 
   return samples

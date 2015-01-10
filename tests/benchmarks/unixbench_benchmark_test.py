@@ -84,7 +84,7 @@ class UnixBenchBenchmarkTestCase(unittest.TestCase):
         ['System Call Overhead:score', 4439274.5, '',
          {'index': 2959.5, 'baseline': 15000.0, 'num_parallel_copies': 1}],
         ['System Benchmarks Index Score', 1825.8, '',
-         {'index': 2959.5, 'baseline': 15000.0, 'num_parallel_copies': 1}],
+         {'num_parallel_copies': 1}],
         ['Dhrystone 2 using register variables', 155391896.7, 'lps',
          {'num_parallel_copies': 8, 'samples': 7, 'time': '10.0s'}],
         ['Double-Precision Whetstone', 28632.5, 'MWIPS',
@@ -134,7 +134,7 @@ class UnixBenchBenchmarkTestCase(unittest.TestCase):
         ['System Call Overhead:score', 10288762.3, '',
          {'index': 6859.2, 'baseline': 15000.0, 'num_parallel_copies': 8}],
         ['System Benchmarks Index Score', 4596.2, '',
-         {'index': 6859.2, 'baseline': 15000.0, 'num_parallel_copies': 8}]]
+         {'num_parallel_copies': 8}]]
     self.assertEqual(result, expected_result)
 
 
