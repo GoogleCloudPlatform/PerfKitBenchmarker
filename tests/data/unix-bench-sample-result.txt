@@ -81,4 +81,37 @@ System Call Overhead                          15000.0    4439274.5   2959.5
                                                                    ========
 System Benchmarks Index Score                                        1825.8
 
+------------------------------------------------------------------------
+Benchmark Run: Fri Jan 09 2015 20:26:37 - 20:54:46
+8 CPUs in system; running 8 parallel copies of tests
+
+Dhrystone 2 using register variables      155391896.7 lps   (10.0 s, 7 samples)
+Double-Precision Whetstone                    28632.5 MWIPS (9.8 s, 7 samples)
+Execl Throughput                              15184.0 lps   (30.0 s, 2 samples)
+File Copy 1024 bufsize 2000 maxblocks        985484.8 KBps  (30.0 s, 2 samples)
+File Copy 256 bufsize 500 maxblocks          269732.2 KBps  (30.0 s, 2 samples)
+File Copy 4096 bufsize 8000 maxblocks       2706156.4 KBps  (30.0 s, 2 samples)
+Pipe Throughput                             8525928.8 lps   (10.0 s, 7 samples)
+Pipe-based Context Switching                1017270.4 lps   (10.0 s, 7 samples)
+Process Creation                              31563.7 lps   (30.0 s, 2 samples)
+Shell Scripts (1 concurrent)                  32516.3 lpm   (60.0 s, 2 samples)
+Shell Scripts (8 concurrent)                   5012.2 lpm   (60.0 s, 2 samples)
+System Call Overhead                       10288762.3 lps   (10.0 s, 7 samples)
+
+System Benchmarks Index Values               BASELINE       RESULT    INDEX
+Dhrystone 2 using register variables         116700.0  155391896.7  13315.5
+Double-Precision Whetstone                       55.0      28632.5   5205.9
+Execl Throughput                                 43.0      15184.0   3531.2
+File Copy 1024 bufsize 2000 maxblocks          3960.0     985484.8   2488.6
+File Copy 256 bufsize 500 maxblocks            1655.0     269732.2   1629.8
+File Copy 4096 bufsize 8000 maxblocks          5800.0    2706156.4   4665.8
+Pipe Throughput                               12440.0    8525928.8   6853.6
+Pipe-based Context Switching                   4000.0    1017270.4   2543.2
+Process Creation                                126.0      31563.7   2505.1
+Shell Scripts (1 concurrent)                     42.4      32516.3   7668.9
+Shell Scripts (8 concurrent)                      6.0       5012.2   8353.6
+System Call Overhead                          15000.0   10288762.3   6859.2
+                                                                   ========
+System Benchmarks Index Score					     4596.2
+
 

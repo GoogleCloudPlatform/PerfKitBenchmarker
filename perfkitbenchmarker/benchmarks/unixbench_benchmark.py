@@ -43,6 +43,8 @@ RESULT_REGEX = (
 SCORE_REGEX = (
     '\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+'
     '([-+]?[0-9]*\.?[0-9]+)')
+PARALLEL_COPIES_REGEX = 'running (\d+) parallel cop[yies]+ of tests'
+RESULT_START_STRING = 'Benchmark Run:'
 
 
 def GetInfo():
@@ -65,10 +67,12 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand('tar xvfz %s -C %s' % (UNIXBENCH_NAME, vm.GetScratchDir()))
 
 
-def ParseResult(result):
+def ParseResults(results):
   """Result parser for UnixBench.
 
   Sample Results:
+  1 CPUs in system; running 1 parallel copy of tests
+  8 CPUs in system; running 8 parallel copies of tests
   Double-Precision Whetstone                    4022.0 MWIPS (9.9 s, 7 samples)
   Execl Throughput                              4735.8 lps   (29.8 s, 2 samples)
   File Copy 1024 bufsize 2000 maxblocks      1294367.0 KBps  (30.0 s, 2 samples)
@@ -99,7 +103,7 @@ def ParseResult(result):
 
 
   Args:
-    result: UnixBench result.
+    results: UnixBench result.
 
   Returns:
     A list of samples in the form of 3 or 4 tuples. The tuples contain
@@ -108,16 +112,29 @@ def ParseResult(result):
         metadata.
   """
   samples = []
-  match = regex_util.ExtractAllMatch(RESULT_REGEX, result)
-  for groups in match:
-    samples.append([groups[0].strip(), float(groups[1]), groups[2],
-                    {'samples': int(groups[5]), 'time': groups[3] + groups[4]}])
-  match = regex_util.ExtractAllMatches(SCORE_REGEX, result)
-  for groups in match:
-    samples.append(['%s:score' % groups[0].strip(), float(groups[2]), '',
-                    {'baseline': float(groups[1]), 'index': float(groups[3])}])
-  match = regex_util.ExtractAllMatches(SYSTEM_SCORE_REGEX, result)
-  samples.append(['System Benchmarks Index Score', float(match[0]), '', {}])
+  start_index = results.find(RESULT_START_STRING)
+  while start_index != -1:
+    next_start_index = results.find(RESULT_START_STRING, start_index + 1)
+    result = results[start_index: next_start_index]
+    parallel_copies = regex_util.ExtractAllMatches(PARALLEL_COPIES_REGEX, result)
+    parallel_copy_metadata = {'num_parallel_copies': int(parallel_copies[0])}
+
+    match = regex_util.ExtractAllMatches(RESULT_REGEX, result)
+    for groups in match:
+      metadata = {'samples': int(groups[5]), 'time': groups[3] + groups[4]}
+      metadata.update(parallel_copy_metadata)
+      samples.append([groups[0].strip(), float(groups[1]), groups[2], metadata])
+    match = regex_util.ExtractAllMatches(SCORE_REGEX, result)
+    for groups in match:
+      metadata = {'baseline': float(groups[1]), 'index': float(groups[3])}
+      metadata.update(parallel_copy_metadata)
+      samples.append(['%s:score' % groups[0].strip(), float(groups[2]), '',
+                      metadata])
+    match = regex_util.ExtractAllMatches(SYSTEM_SCORE_REGEX, result)
+    samples.append(['System Benchmarks Index Score', float(match[0]), '',
+                    metadata])
+    start_index = next_start_index
+
   return samples
 
 
@@ -140,7 +157,7 @@ def Run(benchmark_spec):
   unixbench_command = 'cd %s/UnixBench;./Run' % vm.GetScratchDir()
   logging.info('Unixbench Results:')
   stdout, _ = vm.RemoteCommand(unixbench_command, should_log=True)
-  return ParseResult(stdout)
+  return ParseResults(stdout)
 
 
 def Cleanup(benchmark_spec):
