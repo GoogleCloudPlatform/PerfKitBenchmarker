@@ -203,7 +203,25 @@ I called my file Siberia.json and used it to run iperf from Siberia to a GCP VM 
 ```
 * ip_addresses=EXTERNAL tells PerfKitBechmarker not to use 10.X (ie Internal) machine addresses that all Cloud VMs have.  Just use the external IP address.
 
-If a benchmark requires two machines like iperf you can have two static VM files specified as a comma separated list.  This means you can indeed run between two machines and never provision any VM's in the Cloud.
+If a benchmark requires two machines like iperf you can have two both machines into the same json file as shown below.  This means you can indeed run between two machines and never provision any VM's in the Cloud.
+
+```
+[
+  {
+    "ip_address": "<ip1>",
+    "user_name": "connormccoy",
+    "keyfile_path": "/home/connormccoy/.ssh/google_compute_engine",
+    "internal_ip": "10.240.223.37"
+  },
+  {
+    "ip_address": "<ip2>",
+    "user_name": "connormccoy",
+    "keyfile_path": "/home/connormccoy/.ssh/google_compute_engine",
+    "internal_ip": "10.240.234.189"
+  }
+]
+```
+
 
 PLANNED IMPROVEMENTS
 =======================
