@@ -18,9 +18,9 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 
 Simulated logging benchmark does the following things (PD only):
-1) Write a 1GB file using 1K sequential writes.
-2) Random read of the 1GB file using 1K IOs.
-3) Sequential read of the 1GB file using 1K IOs.
+1) Write a 10GB file using 1K sequential writes.
+2) Random read of the 10GB file using 1K IOs.
+3) Sequential read of the 10GB file using 1K IOs.
 
 Simulated database benchmark does the following things (PD, PD-SSD, local SSD):
 1) 4K Random R on a 10GB file using queue depths 1, 16 and 64 (each queue depth
@@ -177,7 +177,7 @@ def RunSimulatedLogging(vm):
   """
   cmd = (
       'fio '
-      '--filesize=100g '
+      '--filesize=10g '
       '--directory=%s '
       '--ioengine=libaio '
       '--filename=fio_test_file '
@@ -298,7 +298,7 @@ def RunSimulatedStreaming(vm):
   for depth in iodepth_list:
     cmd = (
         'fio '
-        '--filesize=100g '
+        '--filesize=10g '
         '--directory=%s '
         '--ioengine=libaio '
         '--overwrite=0 '
