@@ -18,6 +18,7 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 
 Simulated logging benchmark does the following things (PD only):
+TODO:Consider changing these to 4K IOs.
 1) Write a 10GB file using 1K sequential writes.
 2) Random read of the 10GB file using 1K IOs.
 3) Sequential read of the 10GB file using 1K IOs.
