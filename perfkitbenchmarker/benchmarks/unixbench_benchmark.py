@@ -39,10 +39,10 @@ UNIXBENCH_LOC = 'http://byte-unixbench.googlecode.com/files/%s' % UNIXBENCH_NAME
 SYSTEM_SCORE_REGEX = r'\nSystem Benchmarks Index Score\s+([-+]?[0-9]*\.?[0-9]+)'
 RESULT_REGEX = (
     r'\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+) (\w+)\s+\('
-    '([-+]?[0-9]*\.?[0-9]+) (\w+), (\d+) samples\)')
+    r'([-+]?[0-9]*\.?[0-9]+) (\w+), (\d+) samples\)')
 SCORE_REGEX = (
     r'\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)'
-    '\s+([-+]?[0-9]*\.?[0-9]+)')
+    r'\s+([-+]?[0-9]*\.?[0-9]+)')
 PARALLEL_COPIES_REGEX = r'running (\d+) parallel cop[yies]+ of tests'
 RESULT_START_STRING = 'Benchmark Run:'
 
