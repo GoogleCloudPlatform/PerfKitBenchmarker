@@ -133,7 +133,7 @@
               {% if base_sample and head_sample %}
                 {% set pct_diff = ((head_sample.value - base_sample.value) / base_sample.value * 100) %}
                 <td>{{ head_sample.value - base_sample.value }}</td>
-                <td class="{{ class_for_percent_diff(pct_diff) }}">{{ pct_diff | round(1) }}%</td>
+                <td class="{{ class_for_percent_diff(pct_diff) }}">{{ "{0:+0.1f}".format(pct_diff) }}%</td>
               {% else %}
               {% for i in range(2) %}<td></td>{% endfor %}
               {% endif %}
