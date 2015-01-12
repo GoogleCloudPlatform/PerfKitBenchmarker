@@ -90,7 +90,8 @@ class ExtractAllMatchesTestCase(unittest.TestCase):
   def testNoMatch(self):
     regex = r'test (\d\w\d) no match'
     string = 'test no match'
-    self.assertRaises(regex_util.NoMatchError, regex_util.ExtractAllMatches, regex, string)
+    self.assertRaises(regex_util.NoMatchError, regex_util.ExtractAllMatches,
+                      regex, string)
 
 if __name__ == '__main__':
   unittest.main()

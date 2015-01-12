@@ -33,7 +33,7 @@ def ExtractGroup(regex, text, group=1):
   Returns:
     A floating point number matched by 'regex' on 'text'.
   Raises:
-    NoMatchError: when 'regex' does not match 'text'
+    NoMatchError: when 'regex' does not match 'text'.
     IndexError: when 'group' is not present in the match.
   """
   match = re.search(regex, text)
