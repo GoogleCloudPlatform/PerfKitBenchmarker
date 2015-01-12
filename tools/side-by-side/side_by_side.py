@@ -191,6 +191,46 @@ def _CompareSamples(a, b, context=True, numlines=1):
   return differ.make_table(astr, bstr, context=context, numlines=numlines)
 
 
+def _MatchSamples(base_samples, head_samples):
+  """Match items from base_samples with items from head_samples.
+
+  Rows are matched using 'test', 'metric', and 'unit' fields.
+
+  Args:
+    base_samples: List of dicts.
+    head_samples: List of dicts.
+
+  Returns:
+    List of pairs, each item of the pair containing either a dict or None.
+  """
+  def ExtractKeys(samples):
+    return [(i['test'], i['metric'], i['unit']) for i in samples]
+
+  base_keys = ExtractKeys(base_samples)
+  head_keys = ExtractKeys(head_samples)
+
+  sm = difflib.SequenceMatcher('', base_keys, head_keys)
+
+  result = []
+
+  for opcode, base_begin, base_end, head_begin, head_end in sm.get_opcodes():
+    if opcode == 'equal':
+      result.extend(zip(base_samples[base_begin:base_end],
+                        head_samples[head_begin:head_end]))
+    elif opcode == 'replace':
+      result.extend(itertools.izip_longest(base_samples[base_begin:base_end],
+                                           head_samples[head_begin:head_end]))
+    elif opcode == 'delete':
+      result.extend(zip(base_samples[base_begin:base_end],
+                        [None] * (base_end - base_begin)))
+    elif opcode == 'insert':
+      result.extend(zip([None] * (head_end - head_begin),
+                        head_samples[head_begin:head_end]))
+    else:
+      raise AssertionError('Unknown op: ' + opcode)
+  return result
+
+
 def RenderResults(base_result, head_result, flags, template_name=TEMPLATE,
                   **kwargs):
   """Render the results of a comparison as an HTML page.
@@ -232,11 +272,16 @@ def RenderResults(base_result, head_result, flags, template_name=TEMPLATE,
 
   template = env.get_template('side_by_side.html.j2')
 
+  matched = _MatchSamples(base_result.samples,
+                          head_result.samples)
+
   # Generate sample diffs
   sample_context_diffs = []
   sample_diffs = []
-  for base_sample, head_sample in itertools.izip(base_result.samples,
-                                                 head_result.samples):
+  for base_sample, head_sample in matched:
+    if not base_sample or not head_sample:
+      # Sample inserted or deleted.
+      continue
     sample_context_diffs.append(
         _CompareSamples(base_sample, head_sample))
     sample_diffs.append(
@@ -245,6 +290,7 @@ def RenderResults(base_result, head_result, flags, template_name=TEMPLATE,
   return template.render(flags=flags,
                          base=base_result,
                          head=head_result,
+                         matched_samples=matched,
                          sample_diffs=sample_diffs,
                          sample_context_diffs=sample_context_diffs,
                          **kwargs)

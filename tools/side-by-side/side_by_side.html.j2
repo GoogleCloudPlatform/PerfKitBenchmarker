@@ -114,7 +114,7 @@
           </thead>
 
           <tbody>
-            {% for pair in izip_longest(base.samples, head.samples) -%}
+            {% for pair in matched_samples -%}
             {% set base_sample = pair[0] -%}
             {% set head_sample = pair[1] -%}
             <tr>
