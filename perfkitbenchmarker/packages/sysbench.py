@@ -13,19 +13,20 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing sysbench installation and cleanup functions."""
 
 
 def _Install(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the sysbench package on the VM."""
   vm.InstallPackages('sysbench')
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the sysbench package on the VM."""
+  vm.Install('epel')
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the sysbench package on the VM."""
   _Install(vm)

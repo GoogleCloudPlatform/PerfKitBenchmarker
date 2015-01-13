@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing pip installation and cleanup functions."""
 
 
 def _Install(vm):
@@ -22,10 +22,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the pip package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the pip package on the VM."""
   _Install(vm)

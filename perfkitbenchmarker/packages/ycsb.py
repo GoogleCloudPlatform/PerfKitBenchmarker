@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing ycsb installation and cleanup functions."""
 
 from perfkitbenchmarker.packages import maven
 
@@ -23,7 +23,7 @@ YCSB_DIR = 'pkb/YCSB'
 
 
 def _Install(vm):
-  """Installs the fio package on the VM."""
+  """Installs the ycsb package on the VM."""
   vm.Install('java7')
   vm.Install('maven')
   vm.Install('build_tools')
@@ -39,10 +39,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the ycsb package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the ycsb package on the VM."""
   _Install(vm)

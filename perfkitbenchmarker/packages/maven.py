@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing maven installation and cleanup functions."""
 
 MVN_TAR = 'apache-maven-3.2.5-bin.tar.gz'
 MVN_URL = ('http://download.nextag.com/apache/maven/maven-3/3.2.5/binaries/' +
@@ -22,17 +22,17 @@ MVN_DIR = 'pkb/apache-maven-3.2.5'
 
 
 def _Install(vm):
-  """Installs the fio package on the VM."""
+  """Installs the maven package on the VM."""
   vm.Install('java7')
   vm.RemoteCommand('wget %s -P pkb' % MVN_URL)
   vm.RemoteCommand('cd pkb && tar xvzf %s' % MVN_TAR)
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the maven package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the maven package on the VM."""
   _Install(vm)

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing memtier installation and cleanup functions."""
 
 GIT_REPO = 'git://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '1.2.0'
@@ -27,7 +27,7 @@ YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
   vm.RemoteCommand('wget {0} -P pkb'.format(LIBEVENT_URL))
@@ -37,13 +37,15 @@ def YumInstall(vm):
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
   vm.RemoteCommand('cd {0} && git clone {1}'.format(MEMTIER_DIR, GIT_TAG))
   pkg_config = 'PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}'
-  vm.RemoteCommand('cd {0} && autoreconf -ivf && {1} ./configure && sudo make install'.format(MEMTIER_DIR, pkg_config))
+  vm.RemoteCommand('cd {0} && autoreconf -ivf && {1} ./configure && '
+                   'sudo make install'.format(MEMTIER_DIR, pkg_config))
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(APT_PACKAGES)
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
   vm.RemoteCommand('cd {0} && git clone {1}'.format(MEMTIER_DIR, GIT_TAG))
-  vm.RemoteCommand('cd {0} && autoreconf -ivf && ./configure && sudo make install'.format(MEMTIER_DIR))
+  vm.RemoteCommand('cd {0} && autoreconf -ivf && ./configure && '
+                   'sudo make install'.format(MEMTIER_DIR))

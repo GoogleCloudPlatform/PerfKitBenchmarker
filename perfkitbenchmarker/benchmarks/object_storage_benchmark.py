@@ -235,9 +235,8 @@ class GoogleCloudStorageBenchmark(object):
     time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
     vm.RemoteCommand('rm /dev/shm/data/*')
-    _, res = vm.RemoteCommand('time %s -m cp '
-                              'gs://pkb%s/* '
-                              '/dev/shm/data/' % (vm.gsutil_path, FLAGS.run_uri))
+    _, res = vm.RemoteCommand('time %s -m cp gs://pkb%s/* /dev/shm/data/' %
+                              (vm.gsutil_path, FLAGS.run_uri))
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
     result[1][1] = DATA_SIZE_IN_MB / time_used

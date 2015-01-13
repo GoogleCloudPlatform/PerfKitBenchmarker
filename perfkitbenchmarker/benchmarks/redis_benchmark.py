@@ -70,12 +70,15 @@ def Prepare(benchmark_spec):
 
   for i in range(redis_vm.num_cpus * FLAGS.redis_numprocesses):
     port = FIRST_PORT + i
-    redis_vm.RemoteCommand('cp %s/redis.conf %s/redis-%d.conf' %
-                           (redis_server.REDIS_DIR, redis_server.REDIS_DIR, port))
-    redis_vm.RemoteCommand(r'sed -i -e "s/port 6379/port %d/g" '
-                           '%s/redis-%d.conf' % (port, redis_server.REDIS_DIR, port))
-    redis_vm.RemoteCommand('nohup sudo %s/src/redis-server %s/redis-%d.conf &> '
-                           '/dev/null &' % (redis_server.REDIS_DIR, redis_server.REDIS_DIR, port))
+    redis_vm.RemoteCommand(
+        'cp %s/redis.conf %s/redis-%d.conf' %
+        (redis_server.REDIS_DIR, redis_server.REDIS_DIR, port))
+    redis_vm.RemoteCommand(
+        r'sed -i -e "s/port 6379/port %d/g" %s/redis-%d.conf' %
+        (port, redis_server.REDIS_DIR, port))
+    redis_vm.RemoteCommand(
+        'nohup sudo %s/src/redis-server %s/redis-%d.conf &> /dev/null &' %
+        (redis_server.REDIS_DIR, redis_server.REDIS_DIR, port))
 
   args = [((vm,), {}) for vm in vms[1:]]
   vm_util.RunThreaded(PrepareLoadgen, args)
@@ -178,6 +181,4 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  redis_vm = vms[0]
-  load_vms = vms[1:]
+  pass

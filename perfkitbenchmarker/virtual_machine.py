@@ -18,9 +18,9 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-import logging
 import os.path
 import tempfile
+import threading
 import time
 import uuid
 
@@ -86,6 +86,7 @@ class BaseVirtualMachine(resource.BaseResource):
   """
 
   is_static = False
+  pseudo_tty_lock = threading.Lock()
 
   def __init__(self, vm_spec):
     """Initialize BaseVirtualMachine class.
@@ -114,12 +115,12 @@ class BaseVirtualMachine(resource.BaseResource):
     self.disk_specs = []
     self.scratch_disks = []
     self.hostname = None
+    self._installed_packages = set()
 
     # Cached values
     self._reachable = {}
     self._total_memory_kb = None
     self._num_cpus = None
-    self._installed_packages = set()
 
   def _Create(self):
     self.create_time = time.time()
@@ -284,6 +285,7 @@ class BaseVirtualMachine(resource.BaseResource):
     ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     if login_shell:
       ssh_cmd.extend(['-t', 'bash -l -c "%s"' % command])
+      self.pseudo_tty_lock.acquire()
     else:
       ssh_cmd.append(command)
 
@@ -292,6 +294,9 @@ class BaseVirtualMachine(resource.BaseResource):
           ssh_cmd, should_log=should_log)
       if retcode != 255:  # Retry on 255 because this indicates an SSH failure
         break
+
+    if login_shell:
+      self.pseudo_tty_lock.release()
 
     if retcode:
       full_cmd = ' '.join(ssh_cmd)
@@ -372,80 +377,6 @@ class BaseVirtualMachine(resource.BaseResource):
                                     'grep version | '
                                     'awk \'{print $3}\'')
     return version[:-1]
-
-  def PrepareJava(self, tarball, expected_version):
-    """Install Java on a remote machine.
-
-    Args:
-      tarball: The Java tarball on local machine to install.
-      expected_version: The expected Java version after installiation.
-
-    Raises:
-      ValueError: This is used to alert benchmarks that wont work yet.
-    """
-
-    # TODO(user): 10/28/2014 - Make this work with other OSes
-    #if FLAGS.guest_os not in [GUEST_OS_DEBIAN]:
-    #  raise ValueError('JAVA is only supported on Debian based images.')
-
-    self.InstallPackage('libjna-java')
-    version = self.CheckJavaVersion()
-    if version != '"%s"' % expected_version:
-      self.PushDataFile(tarball)
-      self.RemoteCommand('sudo rm -rf /usr/lib/jvm', ignore_failure=True)
-      self.RemoteCommand('sudo mkdir /usr/lib/jvm', ignore_failure=True)
-      self.RemoteCommand('sudo tar -xzmpf %s -C /usr/lib/jvm' % tarball)
-      self.RemoteCommand(
-          'sudo update-alternatives --install '
-          '"/usr/bin/java" "java" '
-          '"/usr/lib/jvm/jdk%s/bin/java" 1' % expected_version)
-      self.RemoteCommand('sudo update-alternatives --set java '
-                         '/usr/lib/jvm/jdk%s/bin/java' % expected_version)
-      version = self.CheckJavaVersion()
-      if version != '"%s"' % expected_version:
-        logging.warning('Failed to update Java to version %s on vm %s. '
-                        'Current Java version is %s. '
-                        'This will likely fail.',
-                        expected_version, self.hostname, version)
-
-  def UninstallPackage(self, package_name, force=False):
-    """Uninstalls a package on a remote machine.
-
-    Args:
-      package_name: A string containing space-delimited package names understood
-          by debian APT.
-      force: Remove the package even if it was not installed by this VM.
-    """
-    for package in package_name.split():
-      if force or package_name in self._installed_packages:
-        if FLAGS.guest_os in [GUEST_OS_DEBIAN]:
-          uninstall_command = 'sudo apt-get -y --purge remove {0}'.format(
-              package)
-        elif FLAGS.guest_os in [GUEST_OS_CENTOS]:
-          uninstall_command = 'sudo yum -y remove {0}'.format(package_name)
-        self.RemoteCommand(uninstall_command)
-      else:
-        logging.info('Not removing pre-existing package {0}'.format(
-            package))
-
-  def PackageIsInstalled(self, package_name):
-    """Indicates if a package is installed on the vm or not.
-
-    Args:
-      package_name: A package name which is understood by debian APT.
-    Returns:
-      True if the package is installed, false otherwise.
-    """
-    if FLAGS.guest_os in [GUEST_OS_DEBIAN]:
-      cmd = 'dpkg -s %s 2> /dev/null | grep Status' % package_name
-    elif FLAGS.guest_os in [GUEST_OS_CENTOS]:
-      cmd = 'rpm -q  %s 2> /dev/null | grep -v not' % package_name
-    ret = self.RemoteCommand(cmd, ignore_failure=True)
-
-    if ret[0]:
-      return True
-    else:
-      return False
 
   def RemoveFile(self, filename):
     """Deletes a file on a remote machine.

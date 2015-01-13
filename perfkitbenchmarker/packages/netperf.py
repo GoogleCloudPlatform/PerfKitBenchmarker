@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing netperf installation and cleanup functions."""
 
 
 NETPERF_TAR = 'netperf-2.6.0.tar.gz'
@@ -22,7 +22,7 @@ NETPERF_DIR = 'pkb/netperf-2.6.0'
 
 
 def _Install(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the netperf package on the VM."""
   vm.Install('build_tools')
   vm.RemoteCommand('wget %s -P pkb' % NETPERF_URL)
   vm.RemoteCommand('cd pkb && tar xvzf %s' % NETPERF_TAR)
@@ -30,10 +30,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the netperf package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the netperf package on the VM."""
   _Install(vm)

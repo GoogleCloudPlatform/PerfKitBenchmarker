@@ -278,6 +278,7 @@ class BenchmarkSpec(object):
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
     vm_util.BurnCpu(vm)
+    vm.SnapshotPackages()
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.
@@ -285,6 +286,7 @@ class BenchmarkSpec(object):
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
+    vm.PackageCleanup()
     vm.Delete()
     vm.DeleteScratchDisks()
 

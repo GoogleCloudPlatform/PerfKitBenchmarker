@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing aerospike installation and cleanup functions."""
 
 GIT_REPO = 'git://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '1.2.0'
@@ -27,7 +27,7 @@ YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the aerospike_server package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
   vm.RemoteCommand('wget {0} -P pkb'.format(LIBEVENT_URL))
@@ -35,12 +35,14 @@ def YumInstall(vm):
   vm.RemoteCommand('cd {0} && {1} ./configure && sudo make install'.format(
       LIBEVENT_DIR, pkg_config))
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
-  vm.RemoteCommand('cd {0} && autoreconf -ivf && ./configure && sudo make install'.format(MEMTIER_DIR))
+  vm.RemoteCommand('cd {0} && autoreconf -ivf && ./configure && '
+                   'sudo make install'.format(MEMTIER_DIR))
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the aerospike_server package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(APT_PACKAGES)
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
-  vm.RemoteCommand('cd {0} && autoreconf -ivf && ./configure && sudo make install'.format(MEMTIER_DIR))
+  vm.RemoteCommand('cd {0} && autoreconf -ivf && ./configure && '
+                   'sudo make install'.format(MEMTIER_DIR))

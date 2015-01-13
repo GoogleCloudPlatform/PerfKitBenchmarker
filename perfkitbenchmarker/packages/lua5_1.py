@@ -13,14 +13,14 @@
 # limitations under the License.
 
 
-"""Module containing build tools installation and cleanup functions."""
+"""Module containing lua installation and cleanup functions."""
 
 
 def YumInstall(vm):
-  """Installs build tools on the VM."""
+  """Installs lua on the VM."""
   vm.InstallPackages('lua lua-devel lua-static')
 
 
 def AptInstall(vm):
-  """Installs build tools on the VM."""
+  """Installs lua on the VM."""
   vm.InstallPackages('lua5.1 liblua5.1-dev')

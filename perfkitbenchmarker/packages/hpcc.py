@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing hpcc installation and cleanup functions."""
 
 
 HPCC_TAR = 'hpcc-1.4.3.tar.gz'
@@ -25,7 +25,7 @@ HPCC_MAKEFILE_PATH = HPCC_DIR + '/hpl/' + HPCC_MAKEFILE
 
 
 def _Install(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the hpcc package on the VM."""
   vm.Install('openmpi')
   vm.Install('openblas')
   vm.RemoteCommand('wget %s -P pkb' % HPCC_URL)

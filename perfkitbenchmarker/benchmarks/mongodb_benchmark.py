@@ -47,8 +47,13 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   assert len(vms) == BENCHMARK_INFO['num_machines']
   vm = vms[0]
+
   # Install mongodb on the 1st machine.
   vm.Install('mongodb_server')
+  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' /etc/mongodb.conf')
+  vm.RemoteCommand('sudo service %s restart' %
+                   vm.GetServiceName('mongodb_server'))
+
   # Setup YCSB load generator on the 2nd machine.
   vm = vms[1]
   vm.Install('ycsb')

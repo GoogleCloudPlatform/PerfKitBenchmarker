@@ -13,14 +13,15 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing redis installation and cleanup functions."""
 
 REDIS_TAR = 'redis-2.8.9.tar.gz'
 REDIS_DIR = 'pkb/redis-2.8.9'
 REDIS_URL = 'http://download.redis.io/releases/' + REDIS_TAR
 
+
 def _Install(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the redis package on the VM."""
   vm.Install('build_tools')
   vm.RemoteCommand('wget %s -P pkb' % REDIS_URL)
   vm.RemoteCommand('cd pkb && tar xvfz %s' % REDIS_TAR)
@@ -28,12 +29,12 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the redis package on the VM."""
   vm.InstallPackages('tcl-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the redis package on the VM."""
   vm.InstallPackages('tcl-dev')
   _Install(vm)

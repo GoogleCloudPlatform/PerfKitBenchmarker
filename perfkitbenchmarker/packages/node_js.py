@@ -13,9 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
-
-from perfkitbenchmarker.packages import maven
+"""Module containing node.js installation and cleanup functions."""
 
 GIT_REPO = 'https://github.com/joyent/node.git'
 GIT_TAG = 'v0.11.14'
@@ -23,7 +21,7 @@ NODE_DIR = 'pkb/node'
 
 
 def _Install(vm):
-  """Installs the fio package on the VM."""
+  """Installs the node.js package on the VM."""
   vm.Install('build_tools')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, NODE_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(NODE_DIR, GIT_TAG))
@@ -32,10 +30,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the node.js package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the node.js package on the VM."""
   _Install(vm)

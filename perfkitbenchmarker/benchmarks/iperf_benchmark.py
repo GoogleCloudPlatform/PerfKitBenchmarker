@@ -146,6 +146,3 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vms[1].RemoteCommand('pkill -9 iperf')
-
-  for vm in vms:
-    vm.UninstallPackage('iperf')

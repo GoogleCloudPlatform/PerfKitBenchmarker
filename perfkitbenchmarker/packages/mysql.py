@@ -13,14 +13,14 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing mysql installation and cleanup functions."""
 
 MYSQL_RPM = 'http://dev.mysql.com/get/mysql-community-release-el6-5.noarch.rpm'
 MYSQL_PSWD = 'perfkitbenchmarker'
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the mysql package on the VM."""
   vm.RemoteCommand('sudo setenforce 0')
   vm.RemoteCommand('sudo rpm -ivh --force %s' % MYSQL_RPM)
   vm.InstallPackages('mysql-server')
@@ -29,7 +29,7 @@ def YumInstall(vm):
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the mysql package on the VM."""
   vm.RemoteCommand('echo "mysql-server-5.5 mysql-server/root_password password '
                    '%s" | sudo debconf-set-selections' % MYSQL_PSWD)
   vm.RemoteCommand('echo "mysql-server-5.5 mysql-server/root_password_again '

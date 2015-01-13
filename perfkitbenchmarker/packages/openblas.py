@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing fio installation and cleanup functions."""
+"""Module containing openblas installation and cleanup functions."""
 
 OPENBLAS_DIR = 'pkb/OpenBLAS'
 GIT_REPO = 'git://github.com/xianyi/OpenBLAS'
@@ -20,7 +20,7 @@ GIT_TAG = 'v0.2.11'
 
 
 def _Install(vm):
-  """Installs the fio package on the VM."""
+  """Installs the openblas package on the VM."""
   vm.Install('build_tools')
   vm.Install('fortran')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, OPENBLAS_DIR))
@@ -29,10 +29,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the fio package on the VM."""
+  """Installs the openblas package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the fio package on the VM."""
+  """Installs the openblas package on the VM."""
   _Install(vm)

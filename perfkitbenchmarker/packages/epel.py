@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing fortran installation and cleanup functions."""
+
+"""Module containing EPEL installation and cleanup functions."""
+
+EPEL_RPM = ('http://dl.fedoraproject.org/pub/epel/'
+            '6/x86_64/epel-release-6-8.noarch.rpm')
 
 
 def YumInstall(vm):
-  """Installs the fortran package on the VM."""
-  vm.InstallPackages('gcc-gfortran libgfortran')
+  """Installs the Extra Packages for Enterprise Linux repository."""
+  vm.RemoteCommand('sudo rpm -ivh --force %s' % EPEL_RPM)
 
 
 def AptInstall(vm):
-  """Installs the fortan package on the VM."""
-  vm.InstallPackages('gfortran')
+  """Debian based VMs don't have an EPEL package."""
+  pass

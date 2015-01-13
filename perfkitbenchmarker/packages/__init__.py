@@ -15,6 +15,23 @@
 
 All modules within this package are considered packages, and are loaded
 dynamically. Add non-package code to other packages.
+
+Packages should, at a minimum, define install functions for each type of
+package manager (e.g. YumInstall(vm) and AptInstall(vm)).
+They may also define functions that return the path to a configuration file
+(e.g. AptGetPathToConfig(vm)) and functions that return the linux service
+name (e.g. YumGetServiceName(vm)). If the package only installs
+packages through the package manager or places files in the temp directory
+on the VM (~/pkb/), then it does not need to define an uninstall function.
+If the package manually places files in other locations (e.g. /user/bin), then
+it also needs to define uninstall functions (e.g. YumUninstall(vm)).
+
+All functions in each package module should be prefixed with the type of package
+manager, and all functions should accept a BaseVirtualMachine object as their
+only arguments.
+
+See perfkitbenchmarker/package_managers.py for more information on how to use
+packages in benchmarks.
 """
 
 import importlib

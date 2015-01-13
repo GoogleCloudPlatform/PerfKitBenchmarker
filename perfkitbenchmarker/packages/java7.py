@@ -13,14 +13,14 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing java7 installation and cleanup functions."""
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the java7 package on the VM."""
   vm.InstallPackages('java-1.7.0-openjdk-devel')
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the java7 package on the VM."""
   vm.InstallPackages('openjdk-7-jdk')

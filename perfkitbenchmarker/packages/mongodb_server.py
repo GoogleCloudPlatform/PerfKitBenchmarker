@@ -13,18 +13,25 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
+"""Module containing mongodb installation and cleanup functions."""
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the mongodb package on the VM."""
+  vm.Install('epel')
   vm.InstallPackages('mongodb-server')
-  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' /etc/mongodb.conf')
-  vm.RemoteCommand('sudo service mongod restart')
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the mongodb package on the VM."""
   vm.InstallPackages('mongodb-server')
-  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' /etc/mongodb.conf')
-  vm.RemoteCommand('sudo service mongodb restart')
+
+
+def YumGetServiceName(vm):
+  """Returns the name of the mongodb service."""
+  return 'mongod'
+
+
+def AptGetServiceName(vm):
+  """Returns the name of the mongodb service."""
+  return 'mongodb'
