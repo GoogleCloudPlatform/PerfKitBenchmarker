@@ -17,6 +17,7 @@
 import logging
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 BENCHMARK_INFO = {'name': 'cluster boot',
@@ -50,8 +51,10 @@ def Run(benchmark_spec):
 
   samples = []
   vm_number = 0
+
   logging.info('Boot Results:')
   vms = benchmark_spec.vms
+  vm_util.StopAntagnoist(vms[0])
   for vm in vms:
     metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus,
                 'machine_instance': vm_number}
