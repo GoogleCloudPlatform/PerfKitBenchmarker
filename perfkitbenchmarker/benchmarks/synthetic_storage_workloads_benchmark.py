@@ -62,8 +62,8 @@ flags.DEFINE_integer('maxjobs', 0,
 FLAGS = flags.FLAGS
 
 BENCHMARK_INFO = {'name': 'synthetic_storage_workloads_benchmark',
-                  'description': 'Runs FIO in sequenctial, random, read '
-                                 'and write modes to simulate logging.',
+                  'description': 'Runs FIO in sequenctial, random, read and '
+                                 'write modes to simulate various scenarios.',
                   'scratch_disk': True,
                   'num_machines': 1}
 REQUIRED_PACKAGES = 'bc fio libaio1'
