@@ -201,5 +201,3 @@ class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
 class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
                                     package_managers.YumMixin):
   pass
-
-

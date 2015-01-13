@@ -164,6 +164,4 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
-  logging.info('UnixBench Cleanup on %s', vm)
+  pass

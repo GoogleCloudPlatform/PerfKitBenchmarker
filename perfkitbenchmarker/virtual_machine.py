@@ -479,7 +479,7 @@ class BaseVirtualMachine(resource.BaseResource):
       devices: A list of device paths that should be striped together.
       striped_device: The path to the device that will be created.
     """
-    self.InstallPackage('mdadm')
+    self.Install('mdadm')
     stripe_cmd = ('yes | sudo mdadm --create %s --level=stripe --raid-devices='
                   '%s %s' % (striped_device, len(devices), ' '.join(devices)))
     self.RemoteCommand(stripe_cmd)

@@ -104,11 +104,16 @@ class YumMixin(BasePackageMixin):
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
-    pass
+    self.RemoteCommand('mkdir -p pkb')
+    self.RemoteCommand('rpm -qa > pkb/package_snapshot1')
 
   def RestorePackages(self):
     """Restores the currently installed packages to those snapshotted."""
-    pass
+    self.RemoteCommand('rpm -qa > pkb/package_snapshot2')
+    stdout, _ = self.RemoteCommand(
+        'grep -F -x -v -f pkb/package_snapshot1 pkb/package_snapshot2')
+    packages = stdout.replace('\n', ' ')
+    self.RemoteCommand('sudo rpm -e %s' % packages)
 
   def InstallPackages(self, packages):
     """Installs packages using the yum package manager."""

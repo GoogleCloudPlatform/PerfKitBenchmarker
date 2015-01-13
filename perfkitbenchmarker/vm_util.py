@@ -333,8 +333,8 @@ def IssueCommand(cmd, should_log=False):
                              stderr=subprocess.PIPE)
   stdout, stderr = process.communicate()
 
-  stdout = stdout.decode('ascii', 'ignore').replace('\r', '\n')
-  stderr = stderr.decode('ascii', 'ignore').replace('\r', '\n')
+  stdout = stdout.decode('ascii', 'ignore')
+  stderr = stderr.decode('ascii', 'ignore')
 
   debug_text = ('Ran %s. Got return code (%s). STDOUT: %sSTDERR: %s' %
                 (full_cmd, process.returncode, stdout, stderr))
@@ -407,10 +407,7 @@ def BurnCpu(vm, burn_cpu_threads=None, burn_cpu_seconds=None):
   burn_cpu_seconds = burn_cpu_seconds or FLAGS.burn_cpu_seconds
   if burn_cpu_seconds:
     package_installed = False
-    if vm.PackageIsInstalled('sysbench'):
-      package_installed = True
-    else:
-      vm.InstallPackage('sysbench')
+    vm.Install('sysbench')
     end_time = time.time() + burn_cpu_seconds
     vm.RemoteCommand(
         'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
