@@ -1,3 +1,12 @@
+# v0.8.0
+
+* Documentation cleanup (GH-19, GH-34).
+* Fix incorrect assignment of `ip_type` metadata in `netperf_simple` benchmark (GH-26).
+* Added `--gcloud_scopes` flag, to support providing permissions to created instances on GCP.
+* Changed GCP default image from `debian-7-backports` to `ubuntu-14-04`. All cloud providers now run Ubuntu 14.04 by default (GH-43).
+* Added results parser for MongoDB (GH-36) and UnixBench++ (GH-45).
+* Improved unit test coverage (GH-21).
+
 # v0.7.1
 
 * GCE VM SSH keys are now provided via a temporary file rather than the command
