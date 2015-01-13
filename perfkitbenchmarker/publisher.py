@@ -44,6 +44,11 @@ flags.DEFINE_boolean(
     'JSON results to the run-specific temporary directory.')
 
 flags.DEFINE_string(
+    'json_path',
+    None,
+    'A path to write newline-delimited JSON results')
+
+flags.DEFINE_string(
     'bigquery_table',
     None,
     'The BigQuery table to publish results to. This should be of the form '
@@ -397,9 +402,9 @@ class SampleCollector(object):
   def _DefaultPublishers(cls):
     """Gets a list of default publishers."""
     publishers = [LogPublisher(), PrettyPrintStreamPublisher()]
-    if FLAGS.json_output:
-      json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
-      publishers.append(NewlineDelimitedJSONPublisher(json_path))
+    default_json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
+    publishers.append(NewlineDelimitedJSONPublisher(
+        FLAGS.json_path or default_json_path))
     if FLAGS.bigquery_table:
       publishers.append(BigQueryPublisher(
           FLAGS.bigquery_table,

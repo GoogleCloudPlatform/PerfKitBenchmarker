@@ -74,5 +74,24 @@ class ExtractFloatTestCase(unittest.TestCase):
     self.assertRaises(ValueError, regex_util.ExtractFloat, regex, string,
                       group=1)
 
+
+class ExtractAllMatchesTestCase(unittest.TestCase):
+
+  def testParseSuccessfully(self):
+    regex = r'(\d+) (\w+)'
+    string = 'test 10 sec 33 Mbps multiple matching'
+    matches = regex_util.ExtractAllMatches(regex, string)
+    self.assertEqual(len(matches), 2)
+    self.assertEqual(matches[0][0], '10')
+    self.assertEqual(matches[0][1], 'sec')
+    self.assertEqual(matches[1][0], '33')
+    self.assertEqual(matches[1][1], 'Mbps')
+
+  def testNoMatch(self):
+    regex = r'test (\d\w\d) no match'
+    string = 'test no match'
+    self.assertRaises(regex_util.NoMatchError, regex_util.ExtractAllMatches,
+                      regex, string)
+
 if __name__ == '__main__':
   unittest.main()

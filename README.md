@@ -81,7 +81,7 @@ it lists, copy the access token and give it to the shell prompt.
 $ gcloud auth login
 ```
 
-You will need a project name before you can run. Please navigate to https://console.developers.google.com and
+You will need a project ID before you can run. Please navigate to https://console.developers.google.com and
 create one.
 
 ## Install AWS CLI and setup authentication
@@ -134,9 +134,7 @@ $ azure vm list
 
 ## Install PerfKit dependencies
 ```
-$ sudo pip install python-gflags
-$ sudo apt-get install python-dev libffi-dev -y
-$ sudo pip install oauth2client pycrypto pyOpenSSL jinja2
+$ sudo pip install python-gflags jinja2 setuptools
 ```
 
 Pull the PerfKit Benchmarker from GitHub.
@@ -147,7 +145,7 @@ PerfKitBenchmarks can run benchmarks both on Cloud Providers (GCP, AWS, Azure) a
 
 ## Example run on GCP
 ```
-$ ./pkb.py --project=<GCP project name> --benchmarks=iperf --machine_type=f1-micro
+$ ./pkb.py --project=<GCP project ID> --benchmarks=iperf --machine_type=f1-micro
 ```
 
 ## Example run on AWS
