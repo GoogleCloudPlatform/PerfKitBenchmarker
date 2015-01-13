@@ -18,18 +18,21 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 
 Simulated logging benchmark does the following things (PD only):
-TODO:Consider changing these to 4K IOs.
-1) Write a 10GB file using 1K sequential writes.
-2) Random read of the 10GB file using 1K IOs.
-3) Sequential read of the 10GB file using 1K IOs.
+0) Do NOT use direct IO for any tests below, simply go through the FS.
+1) Sequentially write x GB with queue depth equal to 8, where x is decided by
+   the test VM's total memory. (A larger VM will write more bytes)
+2) Random read of 10% of the bytes written.
+3) Sequential read of all of the bytes written.
 
 Simulated database benchmark does the following things (PD, PD-SSD, local SSD):
-1) 4K Random R on a 10GB file using queue depths 1, 16 and 64 (each queue depth
+1) 4K Random R on a file using queue depths 1, 16 and 64 (each queue depth
    is a different benchmark).
-2) 4K Random W on a 10GB file using queue depths 1, 16 and 64 (each queue depth
+2) 4K Random W on a file using queue depths 1, 16 and 64 (each queue depth
    is a different benchmark).
-3) 4K Random 90% R/ 10% W on a 10GB file using queue depths 1, 16 and 64 (each
+3) 4K Random 90% R/ 10% W on a file using queue depths 1, 16 and 64 (each
    queue depth is a different benchmark).
+4) The size of the test file is decided by the test VM's total memory and capped
+   at 1GB to ensure this test finishes within reasonable time.
 
 Simulated streaming benchmark (PD only):
 1) 1M Seq R at queue depth 1 and 16 (streaming).
@@ -70,6 +73,7 @@ REQUIRED_PACKAGES = 'bc fio libaio1'
 DESCRIPTION = 'description'
 METHOD = 'method'
 
+DEFAULT_IODEPTH = 8
 DEFAULT_DATABASE_SIMULATION_IODEPTH_LIST = [1, 16, 64]
 DEFAULT_STREAMING_SIMULATION_IODEPTH_LIST = [1, 16]
 
@@ -121,7 +125,7 @@ def ParseFioResult(res):
   return latency, bandwidth
 
 
-def CreateSampleFromBandwidthTuple(result, test, iodepth=1):
+def CreateSampleFromBandwidthTuple(result, test, iodepth=DEFAULT_IODEPTH):
   """Create a sample from bandwidth result tuple.
 
   Args:
@@ -144,7 +148,7 @@ def CreateSampleFromBandwidthTuple(result, test, iodepth=1):
            'iodepth': iodepth}]
 
 
-def CreateSampleFromLatencyTuple(result, test, iodepth=1):
+def CreateSampleFromLatencyTuple(result, test, iodepth=DEFAULT_IODEPTH):
   """Create a sample from latency result tuple.
 
   Args:
@@ -167,7 +171,6 @@ def CreateSampleFromLatencyTuple(result, test, iodepth=1):
 
 def RunSimulatedLogging(vm):
   """Spawn fio to simulate logging and gather the results.
-
   Args:
     vm: The vm that synthetic_storage_workloads_benchmark will be run upon.
   Returns:
@@ -176,6 +179,7 @@ def RunSimulatedLogging(vm):
         If a 4th element is included, it is a dictionary of sample
         metadata.
   """
+  test_size = vm.total_memory_kb
   cmd = (
       'fio '
       '--filesize=10g '
@@ -184,9 +188,11 @@ def RunSimulatedLogging(vm):
       '--filename=fio_test_file '
       '--invalidate=1 '
       '--randrepeat=0 '
-      '--direct=1 '
-      '--size=%dk ') % (vm.GetScratchDir(),
-                        vm.total_memory_kb)
+      '--direct=0 '
+      '--size=%dk '
+      '--iodepth=%d ') % (vm.GetScratchDir(),
+                          test_size,
+                          DEFAULT_IODEPTH)
   if FLAGS.maxjobs:
     cmd += '--max-jobs=%s ' % FLAGS.maxjobs
   cmd += (
@@ -195,11 +201,12 @@ def RunSimulatedLogging(vm):
       '--rw=write '
       '--end_fsync=1 '
       '--name=random_read '
+      '--size=%dk '
       '--stonewall '
       '--rw=randread '
       '--name=sequential_read '
       '--stonewall '
-      '--rw=read ')
+      '--rw=read ') % (test_size / 10)
   logging.info('FIO Results for simulated %s', LOGGING)
   res, _ = vm.RemoteCommand(cmd, should_log=True)
   latency, bandwidth = ParseFioResult(res)
@@ -225,6 +232,7 @@ def RunSimulatedDatabase(vm):
         If a 4th element is included, it is a dictionary of sample
         metadata.
   """
+  test_size = min(vm.total_memory_kb / 10, 1000000)
   iodepth_list = FLAGS.iodepth_list or DEFAULT_DATABASE_SIMULATION_IODEPTH_LIST
   results = []
   for depth in iodepth_list:
@@ -242,7 +250,7 @@ def RunSimulatedDatabase(vm):
         '--size=%dk '
         '--blocksize=4k ') % (vm.GetScratchDir(),
                               depth,
-                              vm.total_memory_kb)
+                              test_size)
     if FLAGS.maxjobs:
       cmd += '--max-jobs=%s ' % FLAGS.maxjobs
     cmd += (
@@ -294,6 +302,7 @@ def RunSimulatedStreaming(vm):
         If a 4th element is included, it is a dictionary of sample
         metadata.
   """
+  test_size = min(vm.total_memory_kb / 10, 1000000)
   iodepth_list = FLAGS.iodepth_list or DEFAULT_STREAMING_SIMULATION_IODEPTH_LIST
   results = []
   for depth in iodepth_list:
@@ -309,8 +318,9 @@ def RunSimulatedStreaming(vm):
         '--iodepth=%s '
         '--blocksize=1m '
         '--size=%dk '
-        '--filename=fio_test_file ') % (vm.GetScratchDir(), depth,
-                                        vm.total_memory_kb)
+        '--filename=fio_test_file ') % (vm.GetScratchDir(),
+                                        depth,
+                                        test_size)
     if FLAGS.maxjobs:
       cmd += '--max-jobs=%s ' % FLAGS.maxjobs
     cmd += (
