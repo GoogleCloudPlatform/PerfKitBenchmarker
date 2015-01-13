@@ -47,6 +47,16 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  for resource in DATA_FILES:
+    data.ResourcePath(resource)
+
+
 def _ConfDir(vm):
   return '/home/%s/hadoop-%s/conf' % (vm.user_name, HADOOP_VERSION)
 

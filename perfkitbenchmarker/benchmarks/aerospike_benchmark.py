@@ -47,6 +47,7 @@ BENCHMARK_INFO = {'name': 'aerospike',
 AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
 CLIENT_DIR = 'aerospike-client-c'
 CLIENT_VERSION = '3.0.84'
+PATCH_FILE = 'aerospike.patch'
 READ_PERCENT = 90
 MAX_THREADS = 128
 MIN_THREADS = 8
@@ -59,6 +60,15 @@ def GetInfo():
   else:
     BENCHMARK_INFO['scratch_disk'] = False
   return BENCHMARK_INFO
+
+
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(PATCH_FILE)
 
 
 def _PrepareClient(client):
@@ -74,7 +84,7 @@ def _PrepareClient(client):
 
   # Apply a patch to the client benchmark so we have access to average latency
   # of requests. Switching over to YCSB should obviate this.
-  client.PushDataFile('aerospike.patch')
+  client.PushDataFile(PATCH_FILE)
   benchmark_dir = '%s/benchmarks/src/main' % CLIENT_DIR
   client.RemoteCommand('cp aerospike.patch %s' % benchmark_dir)
   client.RemoteCommand('cd %s && patch -p1 -f  < aerospike.patch'
