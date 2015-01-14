@@ -125,7 +125,7 @@ def ParseFioResult(res):
   return latency, bandwidth
 
 
-def CreateSampleFromBandwidthTuple(result, test, iodepth=DEFAULT_IODEPTH):
+def CreateSampleFromBandwidthTuple(result, test, iodepth, test_size):
   """Create a sample from bandwidth result tuple.
 
   Args:
@@ -145,10 +145,11 @@ def CreateSampleFromBandwidthTuple(result, test, iodepth=DEFAULT_IODEPTH):
            'mint': result[6] + result[7],
            'maxt': result[8] + result[9],
            'max_jobs': FLAGS.maxjobs,
-           'iodepth': iodepth}]
+           'iodepth': iodepth,
+           'test_size': test_size}]
 
 
-def CreateSampleFromLatencyTuple(result, test, iodepth=DEFAULT_IODEPTH):
+def CreateSampleFromLatencyTuple(result, test, iodepth, test_size):
   """Create a sample from latency result tuple.
 
   Args:
@@ -166,7 +167,8 @@ def CreateSampleFromLatencyTuple(result, test, iodepth=DEFAULT_IODEPTH):
            'max': result[2] + result[0],
            'stdev': result[4] + result[0],
            'max_jobs': FLAGS.maxjobs,
-           'iodepth': iodepth}]
+           'iodepth': iodepth,
+           'test_size': test_size}]
 
 
 def RunSimulatedLogging(vm):
@@ -212,12 +214,18 @@ def RunSimulatedLogging(vm):
   latency, bandwidth = ParseFioResult(res)
   results = [
       CreateSampleFromBandwidthTuple(bandwidth[0],
-                                     'sequential_write:bandwidth'),
-      CreateSampleFromBandwidthTuple(bandwidth[1], 'random_read:bandwidth'),
-      CreateSampleFromBandwidthTuple(bandwidth[2], 'sequential_read:bandwidth'),
-      CreateSampleFromLatencyTuple(latency[0], 'sequential_write:latency'),
-      CreateSampleFromLatencyTuple(latency[1], 'random_read:latency'),
-      CreateSampleFromLatencyTuple(latency[2], 'sequential_read:latency')]
+                                     'sequential_write:bandwidth',
+                                     DEFAULT_IODEPTH, test_size),
+      CreateSampleFromBandwidthTuple(bandwidth[1], 'random_read:bandwidth',
+                                     DEFAULT_IODEPTH, test_size),
+      CreateSampleFromBandwidthTuple(bandwidth[2], 'sequential_read:bandwidth',
+                                     DEFAULT_IODEPTH, test_size),
+      CreateSampleFromLatencyTuple(latency[0], 'sequential_write:latency',
+                                   DEFAULT_IODEPTH, test_size),
+      CreateSampleFromLatencyTuple(latency[1], 'random_read:latency',
+                                   DEFAULT_IODEPTH, test_size),
+      CreateSampleFromLatencyTuple(latency[2], 'sequential_read:latency',
+                                   DEFAULT_IODEPTH, test_size)]
   return results
 
 
@@ -270,23 +278,27 @@ def RunSimulatedDatabase(vm):
     res, _ = vm.RemoteCommand(cmd, should_log=True)
     latency, bandwidth = ParseFioResult(res)
     result = [CreateSampleFromBandwidthTuple(bandwidth[0],
-                                             'random_write:bandwidth', depth),
+                                             'random_write:bandwidth', depth,
+                                             test_size),
               CreateSampleFromBandwidthTuple(bandwidth[1],
-                                             'random_read:bandwidth', depth),
+                                             'random_read:bandwidth', depth,
+                                             test_size),
               CreateSampleFromBandwidthTuple(bandwidth[2],
                                              'mixed_randrw:read:bandwidth',
-                                             depth),
+                                             depth, test_size),
               CreateSampleFromBandwidthTuple(bandwidth[3],
                                              'mixed_randrw:write:bandwidth',
-                                             depth),
+                                             depth, test_size),
               CreateSampleFromLatencyTuple(latency[0], 'random_write:latency',
-                                           depth),
+                                           depth, test_size),
               CreateSampleFromLatencyTuple(latency[1], 'random_read:latency',
-                                           depth),
+                                           depth, test_size),
               CreateSampleFromLatencyTuple(latency[2],
-                                           'mixed_randrw:read:latency', depth),
+                                           'mixed_randrw:read:latency', depth,
+                                           test_size),
               CreateSampleFromLatencyTuple(latency[3],
-                                           'mixed_randrw:write:latency', depth)]
+                                           'mixed_randrw:write:latency', depth,
+                                           test_size)]
     results.extend(result)
   return results
 
@@ -335,13 +347,17 @@ def RunSimulatedStreaming(vm):
     latency, bandwidth = ParseFioResult(res)
     result = [
         CreateSampleFromBandwidthTuple(bandwidth[0],
-                                       'sequential_write:bandwidth', depth),
+                                       'sequential_write:bandwidth', depth,
+                                       test_size),
         CreateSampleFromBandwidthTuple(bandwidth[1],
-                                       'sequential_read:bandwidth', depth),
+                                       'sequential_read:bandwidth', depth,
+                                       test_size),
         CreateSampleFromLatencyTuple(latency[0],
-                                     'sequential_write:latency', depth),
+                                     'sequential_write:latency', depth,
+                                     test_size),
         CreateSampleFromLatencyTuple(latency[1],
-                                     'sequential_read:latency', depth)]
+                                     'sequential_read:latency', depth,
+                                     test_size)]
     results.extend(result)
   return results
 
