@@ -17,7 +17,7 @@
 
 
 def _Install(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the bonnie++ package on the VM."""
   vm.InstallPackages('bonnie++')
 
 

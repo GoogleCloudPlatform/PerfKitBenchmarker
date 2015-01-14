@@ -22,6 +22,7 @@ import logging
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.packages import fio
 
 FLAGS = flags.FLAGS
 
@@ -90,7 +91,7 @@ def Run(benchmark_spec):
   vm = vms[0]
   # TODO(user): what, this doesn't need the scratch directory?
   logging.info('FIO running on %s', vm)
-  fio_command = 'pkb/fio/fio %s' % (flags.FLAGS.fio_jobfile)
+  fio_command = '%s %s' % (fio.FIO_PATH, flags.FLAGS.fio_jobfile)
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.

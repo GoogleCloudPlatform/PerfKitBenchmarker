@@ -19,6 +19,7 @@
 def _Install(vm):
   """Install pip on the VM."""
   vm.InstallPackages('python-pip')
+  vm.RemoteCommand('mkdir -p pkb/ && pip freeze > pkb/requirements.txt')
 
 
 def YumInstall(vm):
@@ -29,3 +30,20 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the pip package on the VM."""
   _Install(vm)
+
+
+def _Uninstall(vm):
+  """Uninstalls the pip package on the VM."""
+  vm.RemoteCommand('pip freeze | grep --fixed-strings --line-regexp '
+                   '--invert-match --file pkb/requirements.txt | '
+                   'xargs --no-run-if-empty sudo pip uninstall -y')
+
+
+def YumUninstall(vm):
+  """Uninstalls the pip package on the VM."""
+  _Uninstall(vm)
+
+
+def AptUninstall(vm):
+  """Uninstalls the pip package on the VM."""
+  _Uninstall(vm)

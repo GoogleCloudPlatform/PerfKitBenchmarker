@@ -19,6 +19,8 @@
 NETPERF_TAR = 'netperf-2.6.0.tar.gz'
 NETPERF_URL = 'ftp://ftp.netperf.org/netperf/%s' % NETPERF_TAR
 NETPERF_DIR = 'pkb/netperf-2.6.0'
+NETSERVER_PATH = NETPERF_DIR + '/src/netserver'
+NETPERF_PATH = NETPERF_DIR + '/src/netperf'
 
 
 def _Install(vm):

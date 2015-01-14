@@ -23,7 +23,7 @@ MVN_DIR = 'pkb/apache-maven-3.2.5'
 
 def _Install(vm):
   """Installs the maven package on the VM."""
-  vm.Install('java7')
+  vm.Install('openjdk7')
   vm.RemoteCommand('wget %s -P pkb' % MVN_URL)
   vm.RemoteCommand('cd pkb && tar xvzf %s' % MVN_TAR)
 

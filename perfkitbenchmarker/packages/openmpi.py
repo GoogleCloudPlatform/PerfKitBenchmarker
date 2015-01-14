@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing openmpi installation and cleanup functions."""
+"""Module containing OpenMPI installation and cleanup functions."""
 
 MPI_DIR = 'pkb/openmpi-1.6.5'
 MPI_TAR = 'openmpi-1.6.5.tar.gz'
@@ -21,7 +21,7 @@ MPI_URL = 'http://www.open-mpi.org/software/ompi/v1.6/downloads/' + MPI_TAR
 
 
 def _Install(vm):
-  """Installs the openmpi package on the VM."""
+  """Installs the OpenMPI package on the VM."""
   vm.Install('build_tools')
   vm.RemoteCommand('wget %s -P pkb' % MPI_URL)
   vm.RemoteCommand('cd pkb && tar xvfz %s' % MPI_TAR)
@@ -33,10 +33,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the openmpi package on the VM."""
+  """Installs the OpenMPI package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the openmpi package on the VM."""
+  """Installs the OpenMPI package on the VM."""
   _Install(vm)

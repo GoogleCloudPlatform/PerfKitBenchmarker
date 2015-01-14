@@ -75,8 +75,8 @@ def Prepare(benchmark_spec):
   logging.info('Preparing netperf on %s', vms[0])
   vms[0].Install('netperf')
   for vm in vms:
-    vms[0].MoveFile(vm, '%s/src/netperf' % netperf.NETPERF_DIR)
-    vms[0].MoveFile(vm, '%s/src/netserver' % netperf.NETPERF_DIR)
+    vms[0].MoveFile(vm, netperf.NETPERF_PATH)
+    vms[0].MoveFile(vm, netperf.NETSERVER_PATH)
   vm_util.RunThreaded(PrepareVM, vms, benchmark_spec.num_vms)
 
 

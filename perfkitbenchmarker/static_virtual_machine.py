@@ -130,7 +130,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     required_keys = frozenset(['ip_address', 'user_name', 'keyfile_path'])
     optional_keys = frozenset(['internal_ip', 'zone', 'local_disks',
-                               'scratch_disk_mountpoints'])
+                               'scratch_disk_mountpoints', 'os_type'])
     allowed_keys = required_keys | optional_keys
 
     def VerifyItemFormat(item):

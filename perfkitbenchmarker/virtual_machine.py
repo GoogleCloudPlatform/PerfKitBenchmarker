@@ -86,6 +86,10 @@ class BaseVirtualMachine(resource.BaseResource):
   """
 
   is_static = False
+
+  # If multiple ssh calls are made in parallel using -t it will mess
+  # the stty settings up and the terminal will become very hard to use.
+  # Serializing calls to ssh with the -t option fixes the problem.
   pseudo_tty_lock = threading.Lock()
 
   def __init__(self, vm_spec):
@@ -283,20 +287,21 @@ class BaseVirtualMachine(resource.BaseResource):
     user_host = '%s@%s' % (self.user_name, self.ip_address)
     ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(remote_port), user_host]
     ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
-    if login_shell:
-      ssh_cmd.extend(['-t', 'bash -l -c "%s"' % command])
-      self.pseudo_tty_lock.acquire()
-    else:
-      ssh_cmd.append(command)
+    try:
+      if login_shell:
+        ssh_cmd.extend(['-t', 'bash -l -c "%s"' % command])
+        self.pseudo_tty_lock.acquire()
+      else:
+        ssh_cmd.append(command)
 
-    for _ in range(retries):
-      stdout, stderr, retcode = vm_util.IssueCommand(
-          ssh_cmd, should_log=should_log)
-      if retcode != 255:  # Retry on 255 because this indicates an SSH failure
-        break
-
-    if login_shell:
-      self.pseudo_tty_lock.release()
+      for _ in range(retries):
+        stdout, stderr, retcode = vm_util.IssueCommand(
+            ssh_cmd, should_log=should_log)
+        if retcode != 255:  # Retry on 255 because this indicates an SSH failure
+          break
+    finally:
+      if login_shell:
+        self.pseudo_tty_lock.release()
 
     if retcode:
       full_cmd = ' '.join(ssh_cmd)

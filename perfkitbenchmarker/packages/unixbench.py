@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing unixbench installation and cleanup functions."""
+"""Module containing UnixBench installation and cleanup functions."""
 
 UNIXBENCH_TAR = 'UnixBench5.1.3.tgz'
 UNIXBENCH_URL = 'http://byte-unixbench.googlecode.com/files/' + UNIXBENCH_TAR
@@ -21,20 +21,20 @@ UNIXBENCH_DIR = 'pkb/UnixBench'
 
 
 def _Install(vm):
-  """Installs the unixbench package on the VM."""
+  """Installs the UnixBench package on the VM."""
   vm.Install('build_tools')
   vm.RemoteCommand('wget {0} -P pkb'.format(UNIXBENCH_URL))
   vm.RemoteCommand('cd pkb && tar xvzf {0}'.format(UNIXBENCH_TAR))
 
 
 def YumInstall(vm):
-  """Installs the unixbench package on the VM."""
+  """Installs the UnixBench package on the VM."""
   vm.InstallPackages('libX11-devel mesa-libGL-devel '
                      'perl-Time-HiRes libXext-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the unixbench package on the VM."""
+  """Installs the UnixBench package on the VM."""
   vm.InstallPackages('libx11-dev libgl1-mesa-dev libxext-dev')
   _Install(vm)

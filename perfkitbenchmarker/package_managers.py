@@ -61,7 +61,7 @@ class BasePackageMixin(object):
     """Cleans up all installed packages.
 
     Deletes the temp directory, restores packages, and uninstalls all
-    Perfkit packages.
+    PerfKit packages.
     """
     for package_name in self._installed_packages:
       self.Uninstall(package_name)
@@ -69,15 +69,15 @@ class BasePackageMixin(object):
     self.RemoteCommand('rm -rf pkb')
 
   def Install(self, package_name):
-    """Installs a Perfkit package on the VM."""
+    """Installs a PerfKit package on the VM."""
     pass
 
   def Uninstall(self, package_name):
-    """Uninstalls a Perfkit package on the VM."""
+    """Uninstalls a PerfKit package on the VM."""
     pass
 
   def GetPathToConfig(self, package_name):
-    """Returns the path to the config file for Perfkit packages.
+    """Returns the path to the config file for PerfKit packages.
 
     This function is mostly useful when config files locations
     don't match across distributions (such as mysql). Packages don't
@@ -86,7 +86,7 @@ class BasePackageMixin(object):
     pass
 
   def GetServiceName(self, package_name):
-    """Returns the service name of a Perfkit package.
+    """Returns the service name of a PerfKit package.
 
     This function is mostly useful when service names don't
     match across distributions (such as mongodb). Packages don't
@@ -99,8 +99,20 @@ class YumMixin(BasePackageMixin):
 
   def Startup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    self.RemoteCommand('sudo sed -i "/requiretty/d" /etc/sudoers',
+    self.RemoteCommand('echo \'Defaults:%s !requiretty\' | '
+                       'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                        login_shell=True)
+    self.SnapshotPackages()
+
+
+  def PackageCleanup(self):
+    """Cleans up all installed packages.
+
+    Performs the normal package cleanup, then deletes the file
+    added to the /etc/sudoers.d directory during startup.
+    """
+    super(YumMixin, self).PackageCleanup()
+    self.RemoteCommand('sudo rm /etc/sudoers.d/pkb')
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
@@ -109,11 +121,10 @@ class YumMixin(BasePackageMixin):
 
   def RestorePackages(self):
     """Restores the currently installed packages to those snapshotted."""
-    self.RemoteCommand('rpm -qa > pkb/package_snapshot2')
-    stdout, _ = self.RemoteCommand(
-        'grep -F -x -v -f pkb/package_snapshot1 pkb/package_snapshot2')
-    packages = stdout.replace('\n', ' ')
-    self.RemoteCommand('sudo rpm -e %s' % packages)
+    self.RemoteCommand(
+        'rpm -qa | grep --fixed-strings --line-regexp --invert-match --file '
+        'pkb/package_snapshot1 | xargs --no-run-if-empty sudo rpm -e',
+        ignore_failure=True)
 
   def InstallPackages(self, packages):
     """Installs packages using the yum package manager."""
@@ -124,20 +135,20 @@ class YumMixin(BasePackageMixin):
     self.RemoteCommand('sudo yum groupinstall -y "%s"' % package_group)
 
   def Install(self, package_name):
-    """Installs a Perfkit package on the VM."""
+    """Installs a PerfKit package on the VM."""
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
       package.YumInstall(self)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
-    """Uninstalls a Perfkit package on the VM."""
+    """Uninstalls a PerfKit package on the VM."""
     package = packages.PACKAGES[package_name]
     if hasattr(package, 'YumUninstall'):
       package.YumUninstall(self)
 
   def GetPathToConfig(self, package_name):
-    """Returns the path to the config file for Perfkit packages.
+    """Returns the path to the config file for PerfKit packages.
 
     This function is mostly useful when config files locations
     don't match across distributions (such as mysql). Packages don't
@@ -147,7 +158,7 @@ class YumMixin(BasePackageMixin):
     return package.YumGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
-    """Returns the service name of a Perfkit package.
+    """Returns the service name of a PerfKit package.
 
     This function is mostly useful when service names don't
     match across distributions (such as mongodb). Packages don't
@@ -162,6 +173,7 @@ class AptMixin(BasePackageMixin):
   def Startup(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""
     self.AptUpdate()
+    self.SnapshotPackages()
 
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
@@ -191,20 +203,20 @@ class AptMixin(BasePackageMixin):
       raise e
 
   def Install(self, package_name):
-    """Installs a Perfkit package on the VM."""
+    """Installs a PerfKit package on the VM."""
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
       package.AptInstall(self)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
-    """Uninstalls a Perfkit package on the VM."""
+    """Uninstalls a PerfKit package on the VM."""
     package = packages.PACKAGES[package_name]
     if hasattr(package, 'AptUninstall'):
       package.AptUninstall(self)
 
   def GetPathToConfig(self, package_name):
-    """Returns the path to the config file for Perfkit packages.
+    """Returns the path to the config file for PerfKit packages.
 
     This function is mostly useful when config files locations
     don't match across distributions (such as mysql). Packages don't
@@ -214,7 +226,7 @@ class AptMixin(BasePackageMixin):
     return package.AptGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
-    """Returns the service name of a Perfkit package.
+    """Returns the service name of a PerfKit package.
 
     This function is mostly useful when service names don't
     match across distributions (such as mongodb). Packages don't

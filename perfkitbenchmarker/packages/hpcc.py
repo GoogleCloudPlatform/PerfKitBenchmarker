@@ -13,7 +13,12 @@
 # limitations under the License.
 
 
-"""Module containing hpcc installation and cleanup functions."""
+"""Module containing HPCC installation and cleanup functions.
+
+The HPC Challenge is a collection of High Performance Computing benchmarks,
+including High Performance Linpack (HPL). More information can be found here:
+http://icl.cs.utk.edu/hpcc/
+"""
 
 
 HPCC_TAR = 'hpcc-1.4.3.tar.gz'
@@ -25,7 +30,7 @@ HPCC_MAKEFILE_PATH = HPCC_DIR + '/hpl/' + HPCC_MAKEFILE
 
 
 def _Install(vm):
-  """Installs the hpcc package on the VM."""
+  """Installs the HPCC package on the VM."""
   vm.Install('openmpi')
   vm.Install('openblas')
   vm.RemoteCommand('wget %s -P pkb' % HPCC_URL)
@@ -41,10 +46,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the HPCC package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the HPCC package on the VM."""
   _Install(vm)

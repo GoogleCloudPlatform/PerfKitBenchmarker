@@ -17,6 +17,7 @@
 FIO_DIR = 'pkb/fio'
 GIT_REPO = 'git://git.kernel.dk/fio.git'
 GIT_TAG = 'fio-2.1.14'
+FIO_PATH = FIO_DIR + '/fio'
 
 
 def _Install(vm):

@@ -66,8 +66,8 @@ def Prepare(benchmark_spec):
   fw.AllowPort(vms[1], COMMAND_PORT)
   fw.AllowPort(vms[1], DATA_PORT)
 
-  vms[1].RemoteCommand('%s/src/netserver -p %s' %
-                       (netperf.NETPERF_DIR, COMMAND_PORT))
+  vms[1].RemoteCommand('%s -p %s' %
+                       (netperf.NETSERVER_PATH, COMMAND_PORT))
 
 
 def RunNetperf(vm, benchmark_name, server_ip):
@@ -83,10 +83,10 @@ def RunNetperf(vm, benchmark_name, server_ip):
         the sample metric (string), value (float), unit (string),
         and empty metadata dictionary (to be filled out later).
   """
-  netperf_cmd = ('{netperf_dir}/src/netperf -p {command_port} '
+  netperf_cmd = ('{netperf_path} -p {command_port} '
                  '-t {benchmark_name} -H {server_ip} -- '
                  '-P {data_port}').format(
-                     netperf_dir=netperf.NETPERF_DIR,
+                     netperf_path=netperf.NETPERF_PATH,
                      benchmark_name=benchmark_name, server_ip=server_ip,
                      command_port=COMMAND_PORT, data_port=DATA_PORT)
   logging.info('Netperf Results:')

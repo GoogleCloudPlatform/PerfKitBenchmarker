@@ -42,6 +42,7 @@ import logging
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.packages import fio
 
 LOGGING = 'logging'
 DATABASE = 'database'
@@ -175,7 +176,7 @@ def RunSimulatedLogging(vm):
         metadata.
   """
   cmd = (
-      'pkb/fio/fio '
+      '%s '
       '--filesize=100g '
       '--directory=%s '
       '--ioengine=libaio '
@@ -183,7 +184,8 @@ def RunSimulatedLogging(vm):
       '--invalidate=1 '
       '--randrepeat=0 '
       '--direct=1 '
-      '--size=%dk ') % (vm.GetScratchDir(),
+      '--size=%dk ') % (fio.FIO_PATH,
+                        vm.GetScratchDir(),
                         vm.total_memory_kb)
   if FLAGS.maxjobs:
     cmd += '--max-jobs=%s ' % FLAGS.maxjobs
@@ -227,7 +229,7 @@ def RunSimulatedDatabase(vm):
   results = []
   for depth in iodepth_list:
     cmd = (
-        'pkb/fio/fio '
+        '%s '
         '--filesize=10g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -238,7 +240,8 @@ def RunSimulatedDatabase(vm):
         '--randrepeat=0 '
         '--iodepth=%s '
         '--size=%dk '
-        '--blocksize=4k ') % (vm.GetScratchDir(),
+        '--blocksize=4k ') % (fio.FIO_PATH,
+                              vm.GetScratchDir(),
                               depth,
                               vm.total_memory_kb)
     if FLAGS.maxjobs:
@@ -296,7 +299,7 @@ def RunSimulatedStreaming(vm):
   results = []
   for depth in iodepth_list:
     cmd = (
-        'pkb/fio/fio '
+        '%s '
         '--filesize=100g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -307,7 +310,9 @@ def RunSimulatedStreaming(vm):
         '--iodepth=%s '
         '--blocksize=1m '
         '--size=%dk '
-        '--filename=fio_test_file ') % (vm.GetScratchDir(), depth,
+        '--filename=fio_test_file ') % (fio.FIO_PATH,
+                                        vm.GetScratchDir(),
+                                        depth,
                                         vm.total_memory_kb)
     if FLAGS.maxjobs:
       cmd += '--max-jobs=%s ' % FLAGS.maxjobs

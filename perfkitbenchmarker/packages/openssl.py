@@ -13,14 +13,14 @@
 # limitations under the License.
 
 
-"""Module containing openssl installation and cleanup functions."""
+"""Module containing OpenSSL installation and cleanup functions."""
 
 
 def YumInstall(vm):
-  """Installs openssl on the VM."""
+  """Installs OpenSSL on the VM."""
   vm.InstallPackages('openssl openssl-devel openssl-static')
 
 
 def AptInstall(vm):
-  """Installs openssl on the VM."""
+  """Installs OpenSSL on the VM."""
   vm.InstallPackages('openssl libssl-dev')

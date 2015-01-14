@@ -30,7 +30,7 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'hadoop',
+BENCHMARK_INFO = {'name': 'hadoop_benchmark',
                   'description': 'Runs Terasort',
                   'scratch_disk': True,
                   'num_machines': 9}
@@ -62,7 +62,7 @@ def InstallHadoop(vm, master_ip, worker_ips):
   """
   vm.RemoteCommand('wget %s' % HADOOP_URL)
   vm.RemoteCommand('tar xvzf hadoop-%s.tar.gz' % HADOOP_VERSION)
-  vm.Install('java7')
+  vm.Install('openjdk7')
   vm.RemoteCommand('mkdir hadoop-%s/conf' % HADOOP_VERSION)
 
   # Set available memory to 90% of that on the system

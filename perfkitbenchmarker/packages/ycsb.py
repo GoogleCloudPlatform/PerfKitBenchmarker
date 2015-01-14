@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing ycsb installation and cleanup functions."""
+"""Module containing YCSB installation and cleanup functions."""
 
 from perfkitbenchmarker.packages import maven
 
@@ -23,8 +23,8 @@ YCSB_DIR = 'pkb/YCSB'
 
 
 def _Install(vm):
-  """Installs the ycsb package on the VM."""
-  vm.Install('java7')
+  """Installs the YCSB package on the VM."""
+  vm.Install('openjdk7')
   vm.Install('maven')
   vm.Install('build_tools')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, YCSB_DIR))
@@ -39,10 +39,10 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the ycsb package on the VM."""
+  """Installs the YCSB package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the ycsb package on the VM."""
+  """Installs the YCSB package on the VM."""
   _Install(vm)
