@@ -139,6 +139,8 @@ $ azure vm list
 $ sudo pip install -r requirements.txt
 ```
 
+## Install PerfKit
+
 [Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
 
 RUNNING A SINGLE BENCHMARK
