@@ -315,9 +315,17 @@ def RenderResults(base_result, head_result, template_name=TEMPLATE,
   flag_diffs = difflib.HtmlDiff().make_table(
       base_result.flags, head_result.flags, context=False)
 
+  # Used for generating a chart with differences.
+  matched_json = json.dumps(matched)\
+      .replace(u'<', u'\\u003c') \
+      .replace(u'>', u'\\u003e') \
+      .replace(u'&', u'\\u0026') \
+      .replace(u"'", u'\\u0027')
+
   return template.render(base=base_result,
                          head=head_result,
                          matched_samples=matched,
+                         matched_samples_json=matched_json,
                          sample_diffs=sample_diffs,
                          sample_context_diffs=sample_context_diffs,
                          flag_diffs=flag_diffs,
@@ -374,8 +382,8 @@ def main():
         base_res = base_res_fut.result()
         head_res = head_res_fut.result()
     else:
-        base_res = RunPerfKitBenchmarker(a.base, a.base_flags)
-        head_res = RunPerfKitBenchmarker(a.head, a.head_flags)
+      base_res = RunPerfKitBenchmarker(a.base, a.base_flags)
+      head_res = RunPerfKitBenchmarker(a.head, a.head_flags)
 
     logging.info('Base result: %s', base_res)
     logging.info('Head result: %s', head_res)

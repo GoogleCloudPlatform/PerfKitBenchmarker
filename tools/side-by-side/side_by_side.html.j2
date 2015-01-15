@@ -34,9 +34,15 @@
         padding-top: 70px;
       }
 
+      #table-result-comparison {
+        font-size: 95%;
+      }
+
       span.diff_chg {
-        color: #8a6d3b;
+        background-color: #FFFF77;
+        color: #292A0A;
         font-weight: bold;
+        text-decoration: underline;
       }
 
       span.diff_sub {
@@ -80,19 +86,74 @@
         background-color: #bf812d;
         color: white;
       }
-
-      #table-result-comparison {
-        font-size: 95%;
-      }
     </style>
     <script type="text/javascript">
+    var matchedSamples = {{ matched_samples_json }};
 
-    function initialize() {
-      $('table.diff').addClass('table').addClass('table-condensed');
+    // Draw a chart showing differences between matched samples.
+    function drawChart() {
+       var data = new google.visualization.DataTable();
+       data.addColumn('string', 'metric');
+       data.addColumn('number', 'relative to left');
+       data.addColumn({type: 'string', role: 'tooltip'});
+       data.addColumn({type: 'string', role: 'style'});
+
+       // Build up the data table.
+       var rows = _.map(matchedSamples, function(i) {
+         var left = i[0];
+         var right = i[1];
+         var first = _.filter(i)[0];
+         var label = first.metric + ' (' + first.test + ')';
+         var tooltip = [label];
+         var rel = null;
+         var style = null;
+
+         if (left && right) {
+           rel = right.value / left.value;
+           tooltip.push('Relative value: ' + String(rel) + '\n');
+           if (rel < 1) {
+             style = 'fill-color: #ef8a62';
+           }
+         }
+
+         if (left) {
+           tooltip.push('left: ' + String(left.value) + ' ' + left.unit);
+         }
+         if (right) {
+           tooltip.push('right: ' + String(right.value) + ' ' + right.unit);
+         }
+         tooltip = tooltip.join('\n');
+
+         return [label, rel, tooltip, style];
+       });
+
+       data.addRows(rows);
+
+       // Log scale ensures that equivalent changes in either direction
+       // (10x, 0.1x) are // shown with equal magnitude.
+       var options = {
+         title: 'Result comparison (relative to left sample)',
+         legend: {position: 'none'},
+         height: 350 * 10 / rows.length,
+         bar: { groupWidth: '95%' },
+         hAxis: { logScale: true },
+         chartArea: {left: '30%', width: '70%'}
+       };
+
+       var chart = new google.visualization.BarChart($('#result-comparison-chart')[0]);
+       chart.draw(data, options);
+    }
+
+    function initializePage() {
       $('body').scrollspy({ target: '#navbar' });
+
+      // We can't control the table output by Python's difflib.HtmlDiff
+      // So we add appropriate classes here.
+      $('table.diff').addClass('table').addClass('table-condensed');
+      // Style up the diff changes: strikethrough deletions, underline
+      // insertions, highlight substitutions.
       $('span.diff_sub').wrap('<del></del>');
       $('span.diff_add').wrap('<ins></ins>');
-      $('span.diff_chg').wrap('<mark></mark>');
     }
     </script>
   </head>
@@ -111,6 +172,7 @@
         </div>
         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav">
+            <li><a href="#result-comparison-chart">Chart</a></li>
             <li><a href="#result-comparison">Value comparison</a></li>
             <li><a href="#short-differences">Short diff</a></li>
             <li><a href="#full-differences">Full diff</a></li>
@@ -147,6 +209,10 @@
       {{ flag_diffs }}
 
       </div>
+
+      <div class="row">
+        <div id="result-comparison-chart"></div>
+      </div>
       <div class="row">
         <h2 id="result-comparison">Result comparison</h2>
 
@@ -159,7 +225,7 @@
               <td colspan="4">Head: <kbd>{{ head.name }}</kbd>
                 (<code>{{ head.description }}</code>)</td>
               <td>Difference</td>
-              <td>Difference (%)</td>
+              <td>Difference (relative)</td>
             </tr>
           </thead>
 
@@ -185,9 +251,9 @@
                 <td>{{ head_sample.value - base_sample.value }}</td>
                 <td class="{{ class_for_percent_diff(pct_diff) }}">
                   {%- if class_for_percent_diff(pct_diff) %}
-                  <span class="glyphicon glyphicon-arrow-{% if pct_diff > 0 %}up{% else %}down{% endif %}"></span>
+                  <span class="glyphicon glyphicon-arrow-{% if head_sample.value > base_sample.value %}up{% else %}down{% endif %}"></span>
                   {% endif %}
-                  {{ "{0:+0.1f}".format(pct_diff) }}%
+                  {{ "{0:.3f}".format(head_sample.value / base_sample.value) }}x
                 </td>
               {% else %}
               {% for i in range(2) %}<td></td>{% endfor %}
@@ -249,8 +315,15 @@
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/2.4.1/lodash.min.js"></script>
     <script type="text/javascript">
-      $(initialize);
+      $(initializePage);
+
+      // Load a chart.
+      google.load('visualization', '1.0', {'packages':['corechart']});
+      // Set a callback to run when the Google Visualization API is loaded.
+      google.setOnLoadCallback(drawChart);
     </script>
 
   </body>
