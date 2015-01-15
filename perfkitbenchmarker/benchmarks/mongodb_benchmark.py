@@ -23,8 +23,9 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 
 import logging
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker.packages import ycsb
 
-YCSB_CMD = ('cd pkb/YCSB; ./bin/ycsb %s mongodb -s -P workloads/workloada '
+YCSB_CMD = ('cd %s; ./bin/ycsb %s mongodb -s -P workloads/workloada '
             '-threads 10 -p mongodb.url=mongodb://%s:27017 '
             '-p mongodb.writeConcern=normal')
 
@@ -61,7 +62,7 @@ def Prepare(benchmark_spec):
   # Setup YCSB load generator on the 2nd machine.
   vm = vms[1]
   vm.Install('ycsb')
-  vm.RemoteCommand(YCSB_CMD % ('load', vms[0].internal_ip))
+  vm.RemoteCommand(YCSB_CMD % (ycsb.YCSB_DIR, 'load', vms[0].internal_ip))
 
 
 def ParseResults(output):
@@ -116,8 +117,8 @@ def Run(benchmark_spec):
   # TODO(user): We are running workloada with default parameters.
   #    This does not seem like a rigorous benchmark.
   logging.info('MongoDb Results:')
-  stdout, _ = vm.RemoteCommand(
-      YCSB_CMD % ('run', vms[0].internal_ip), should_log=True)
+  ycsb_cmd = YCSB_CMD % (ycsb.YCSB_DIR, 'run', vms[0].internal_ip)
+  stdout, _ = vm.RemoteCommand(ycsb_cmd, should_log=True)
   return ParseResults(stdout)
 
 

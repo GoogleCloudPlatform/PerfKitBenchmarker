@@ -18,7 +18,7 @@
 
 def YumInstall(vm):
   """Installs the mongodb package on the VM."""
-  vm.Install('epel')
+  vm.InstallEpelRepo()
   vm.InstallPackages('mongodb-server')
 
 

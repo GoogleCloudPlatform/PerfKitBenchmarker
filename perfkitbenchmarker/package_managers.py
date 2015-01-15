@@ -35,6 +35,8 @@ from perfkitbenchmarker import vm_util
 
 RHEL = 'rhel'
 DEBIAN = 'debian'
+EPEL_RPM = ('http://dl.fedoraproject.org/pub/epel/'
+            '6/x86_64/epel-release-6-8.noarch.rpm')
 
 flags.DEFINE_enum('os_type', DEBIAN,
                   [DEBIAN, RHEL],
@@ -104,6 +106,9 @@ class YumMixin(BasePackageMixin):
                        login_shell=True)
     self.SnapshotPackages()
 
+  def InstallEpelRepo(self):
+    """Installs the Extra Packages for Enterprise Linux repository."""
+    self.RemoteCommand('sudo rpm -ivh --force %s' % EPEL_RPM)
 
   def PackageCleanup(self):
     """Cleans up all installed packages.
@@ -117,13 +122,13 @@ class YumMixin(BasePackageMixin):
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
     self.RemoteCommand('mkdir -p pkb')
-    self.RemoteCommand('rpm -qa > pkb/package_snapshot1')
+    self.RemoteCommand('rpm -qa > pkb/rpm_package_list')
 
   def RestorePackages(self):
     """Restores the currently installed packages to those snapshotted."""
     self.RemoteCommand(
         'rpm -qa | grep --fixed-strings --line-regexp --invert-match --file '
-        'pkb/package_snapshot1 | xargs --no-run-if-empty sudo rpm -e',
+        'pkb/rpm_package_list | xargs --no-run-if-empty sudo rpm -e',
         ignore_failure=True)
 
   def InstallPackages(self, packages):
@@ -182,12 +187,12 @@ class AptMixin(BasePackageMixin):
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
     self.RemoteCommand('mkdir -p pkb')
-    self.RemoteCommand('dpkg --get-selections > pkb/package_snapshot')
+    self.RemoteCommand('dpkg --get-selections > pkb/dpkg_selections')
 
   def RestorePackages(self):
     """Restores the currently installed packages to those snapshotted."""
     self.RemoteCommand('sudo dpkg --clear-selections')
-    self.RemoteCommand('sudo dpkg --set-selections < pkb/package_snapshot')
+    self.RemoteCommand('sudo dpkg --set-selections < pkb/dpkg_selections')
     self.RemoteCommand('sudo DEBIAN_FRONTEND=\'noninteractive\' '
                        'apt-get --purge -y dselect-upgrade')
 

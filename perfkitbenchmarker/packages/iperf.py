@@ -23,7 +23,7 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the iperf package on the VM."""
-  vm.Install('epel')
+  vm.InstallEpelRepo()
   _Install(vm)
 
 
