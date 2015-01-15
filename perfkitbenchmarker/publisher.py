@@ -37,16 +37,11 @@ flags.DEFINE_boolean(
     'default is False. Official test results are treated and queried '
     'differently from non-official test results.')
 
-flags.DEFINE_boolean(
-    'json_output',
-    True,
-    'A boolean indicating whether to write newline-delimited '
-    'JSON results to the run-specific temporary directory.')
-
 flags.DEFINE_string(
     'json_path',
     None,
-    'A path to write newline-delimited JSON results')
+    'A path to write newline-delimited JSON results '
+    'Default: write to a run-specific temporary directory')
 
 flags.DEFINE_string(
     'bigquery_table',

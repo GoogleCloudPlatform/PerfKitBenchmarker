@@ -45,19 +45,21 @@ In its current release these are the benchmarks that are executed:
   - Aerospike: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
+
   - openjdk-7-jre: GPL v2 with the Classpath Exception (http://openjdk.java.net/legal/gplv2+ce.html)
 
-CoreMark setup cannot be automated. EEMBC requires users to agree with their terms and conditions, and PerfKit
-Benchmarker users must manually download the coremark tarball from their website and save it under the
+[CoreMark](http://www.eembc.org/coremark/) setup cannot be automated. EEMBC requires users to agree with their terms and conditions, and PerfKit
+Benchmarker users must manually download the CoreMark tarball from their website and save it under the
 `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/coremark_v1.0.tgz`)
 
-SpecCPU2006 benchmark setup cannot be automated. SPEC requires users to agree with their terms and conditions,
-and PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
-the `./perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
+[SpecCPU2006](https://www.spec.org/cpu2006/) benchmark setup cannot be automated. SPEC requires users to purchase a license and agree with their terms and conditions.
+PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
+the `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
 
-HOW TO GET SETUP
-==================
+HOW TO GET SET UP
+=================
 Before you can run the PerfKit Benchmaker on Cloud providers you need accounts and access:
+
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
 * Get an AWS account to run tests on AWS. Their site is http://aws.amazon.com/
 * Get an Azure account to run tests on Azure. Their site is http://azure.microsoft.com/
@@ -65,7 +67,7 @@ Before you can run the PerfKit Benchmaker on Cloud providers you need accounts a
 You also need the software dependencies, which are mostly command line tools and credentials to access your
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
 
-## Install gcloud and setup authentication
+## Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using linux you can run the command below.
 
 When prompted pick the local folder, then Python project, then the defaults for all the rest
@@ -85,7 +87,7 @@ You will need a project ID before you can run. Please navigate to https://consol
 create one.
 
 ## Install AWS CLI and setup authentication
-Install pip. http://pip.readthedocs.org/en/latest/installing.html
+Install [pip](http://pip.readthedocs.org/en/latest/installing.html).
 ```
 $ sudo apt-get install python-pip -y
 ```
@@ -134,13 +136,15 @@ $ azure vm list
 
 ## Install PerfKit dependencies
 ```
-$ sudo pip install python-gflags jinja2 setuptools
+$ sudo pip install -r requirements.txt
 ```
 
-Pull the PerfKit Benchmarker from GitHub.
+## Install PerfKit
 
-HOW TO RUN ONE BENCHMARK
-==================
+[Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
+
+RUNNING A SINGLE BENCHMARK
+==========================
 PerfKitBenchmarks can run benchmarks both on Cloud Providers (GCP, AWS, Azure) as well as any "machine" you can SSH into.
 
 ## Example run on GCP
@@ -151,7 +155,7 @@ $ ./pkb.py --project=<GCP project ID> --benchmarks=iperf --machine_type=f1-micro
 ## Example run on AWS
 ```
 $ cd PerfKitBenchmarker
-$ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro 
+$ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro
 ```
 
 ## Example run on Azure
