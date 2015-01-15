@@ -16,9 +16,9 @@
 # -*- coding: utf-8 -*-
 """Runs a side-by-side comparison of two PerfKitBenchmarker revisions.
 
-Given a pair of revisions (e.g., 'dev', 'master'), this tool runs 'pkb.py' with
-identical command line flags for both revisions and creates a report showing
-the differences in the results between the two runs.
+Given a pair of revisions (e.g., 'dev', 'master') and command-line arguments,
+this tool runs 'pkb.py' with for each and creates a report showing the
+differences in the results between the two runs.
 """
 
 import argparse
@@ -38,16 +38,23 @@ import tempfile
 import jinja2
 
 
+DEFAULT_FLAGS = ('--cloud=GCP', '--machine_type=n1-standard-4',
+                 '--benchmarks=netperf_simple')
 # Keys in the sample JSON we expect to vary between runs.
 # These will be removed prior to diffing samples.
 VARYING_KEYS = 'run_uri', 'sample_uri', 'timestamp', 'value'
 # Template name, in same directory as this file.
 TEMPLATE = 'side_by_side.html.j2'
 
+# Thresholds for highlighting results
+SMALL_CHANGE_THRESHOLD = 5
+MEDIUM_CHANGE_THRESHOLD = 10
+LARGE_CHANGE_THRESHOLD = 25
+
 
 PerfKitBenchmarkerResult = collections.namedtuple(
     'PerfKitBenchmarkerResult',
-    ['name', 'sha1', 'samples', 'flags'])
+    ['name', 'description', 'sha1', 'samples', 'flags'])
 
 
 @contextlib.contextmanager
@@ -96,13 +103,20 @@ def _GitRevParse(revision):
   return output.rstrip()
 
 
+def _GitDescribe(revision):
+  """Returns the output of 'git describe' for 'revision'."""
+  output = subprocess.check_output(_GitCommandPrefix() +
+                                   ['describe', '--always', revision])
+  return output.rstrip()
+
+
 @contextlib.contextmanager
 def PerfKitBenchmarkerCheckout(revision):
   """Yields a directory with PerfKitBenchmarker checked out to 'revision'."""
   archive_cmd = _GitCommandPrefix() + ['archive', revision]
   logging.info('Running: %s', archive_cmd)
   p_archive = subprocess.Popen(archive_cmd, stdout=subprocess.PIPE)
-  with TempDir(prefix='pkb-test-', suffix=revision[:4]) as td:
+  with TempDir(prefix='pkb-test-') as td:
     tar_cmd = ['tar', 'xf', '-']
     logging.info('Running %s in %s', tar_cmd, td)
     p_tar = subprocess.Popen(tar_cmd, stdin=p_archive.stdout, cwd=td)
@@ -129,6 +143,7 @@ def RunPerfKitBenchmarker(revision, flags):
       `--json_path`.
   """
   sha1 = _GitRevParse(revision)
+  description = _GitDescribe(revision)
   with PerfKitBenchmarkerCheckout(revision) as td:
     with tempfile.NamedTemporaryFile(suffix='.json') as tf:
       flags = flags + ['--json_path=' + tf.name]
@@ -137,7 +152,7 @@ def RunPerfKitBenchmarker(revision, flags):
       subprocess.check_call(cmd, cwd=td)
       samples = [json.loads(line) for line in tf]
       return PerfKitBenchmarkerResult(name=revision, sha1=sha1, flags=flags,
-                                      samples=samples)
+                                      samples=samples, description=description)
 
 
 def _SplitLabels(labels):
@@ -231,7 +246,7 @@ def _MatchSamples(base_samples, head_samples):
   return result
 
 
-def RenderResults(base_result, head_result, flags, template_name=TEMPLATE,
+def RenderResults(base_result, head_result, template_name=TEMPLATE,
                   **kwargs):
   """Render the results of a comparison as an HTML page.
 
@@ -256,13 +271,22 @@ def RenderResults(base_result, head_result, flags, template_name=TEMPLATE,
     Args:
       percent_diff: float. percent difference between values.
     """
-    percent_diff = abs(percent_diff)
-    if percent_diff > 25:
-      return 'bg-danger text-danger'
-    elif percent_diff > 5:
-      return 'bg-warning text-warning'
+    if percent_diff < 0:
+      direction = 'decrease'
     else:
-      return 'bg-success text-success'
+      direction = 'increase'
+
+    percent_diff = abs(percent_diff)
+    if percent_diff > LARGE_CHANGE_THRESHOLD:
+      size = 'large'
+    elif percent_diff > MEDIUM_CHANGE_THRESHOLD:
+      size = 'medium'
+    elif percent_diff > SMALL_CHANGE_THRESHOLD:
+      size = 'small'
+    else:
+      return ''
+
+    return 'value-{0}-{1}'.format(direction, size)
 
   env = jinja2.Environment(
       loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
@@ -287,12 +311,16 @@ def RenderResults(base_result, head_result, flags, template_name=TEMPLATE,
     sample_diffs.append(
         _CompareSamples(base_sample, head_sample, context=False))
 
-  return template.render(flags=flags,
-                         base=base_result,
+  # Generate flag diffs
+  flag_diffs = difflib.HtmlDiff().make_table(
+      base_result.flags, head_result.flags, context=False)
+
+  return template.render(base=base_result,
                          head=head_result,
                          matched_samples=matched,
                          sample_diffs=sample_diffs,
                          sample_context_diffs=sample_context_diffs,
+                         flag_diffs=flag_diffs,
                          **kwargs)
 
 
@@ -300,47 +328,78 @@ def main():
   p = argparse.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter,
       description=__doc__)
+  p.add_argument('-t', '--title', default='PerfKitBenchmarker Comparison',
+                 help="""HTML report title""")
   p.add_argument('--base', default='master', help="""Base revision.""")
   p.add_argument('--head', default='dev', help="""Head revision.""")
-  p.add_argument('-f', '--flags', help="""Command line flags""",
-                 default=['--cloud=GCP', '--machine_type=n1-standard-4',
-                          '--benchmarks=netperf_simple'],
+  p.add_argument('--base-flags', default=None, help="""Flags for run against
+                 '--base' revision. Will be combined with --flags.""",
                  type=shlex.split)
+  p.add_argument('--head-flags', default=None, help="""Flags for run against
+                 '--head' revision. Will be combined with --flags.""",
+                 type=shlex.split)
+  p.add_argument('-f', '--flags', type=shlex.split,
+                 help="""Command line flags (Default: {0})""".format(
+                     ' '.join(DEFAULT_FLAGS)))
   p.add_argument('-p', '--parallel', default=False, action='store_true',
                  help="""Run concurrently""")
+  p.add_argument('--rerender', help="""Re-render the HTML report from a JSON
+                 file [for developers].""", action='store_true')
   p.add_argument('json_output', help="""JSON output path.""")
   p.add_argument('html_output', help="""HTML output path.""")
   a = p.parse_args()
 
-  if a.parallel:
-    from concurrent import futures
-    with futures.ThreadPoolExecutor(max_workers=2) as executor:
-      base_res_fut = executor.submit(RunPerfKitBenchmarker, a.base, a.flags)
-      head_res_fut = executor.submit(RunPerfKitBenchmarker, a.head, a.flags)
-      base_res = base_res_fut.result()
-      head_res = head_res_fut.result()
+  if (a.base_flags or a.head_flags):
+    if not (a.base_flags and a.head_flags):
+      p.error('--base-flags and --head-flags must be specified together.\n'
+              '\tbase flags={0}\n\thead flags={1}'.format(
+                  a.base_flags, a.head_flags))
+    a.base_flags = a.base_flags + (a.flags or [])
+    a.head_flags = a.head_flags + (a.flags or [])
   else:
-      base_res = RunPerfKitBenchmarker(a.base, a.flags)
-      head_res = RunPerfKitBenchmarker(a.head, a.flags)
+    # Just --flags
+    assert not a.base_flags, a.base_flags
+    assert not a.head_flags, a.head_flags
+    a.base_flags = a.flags or list(DEFAULT_FLAGS)
+    a.head_flags = a.flags or list(DEFAULT_FLAGS)
 
-  logging.info('Base result: %s', base_res)
-  logging.info('Head result: %s', head_res)
+  if not a.rerender:
+    if a.parallel:
+      from concurrent import futures
+      with futures.ThreadPoolExecutor(max_workers=2) as executor:
+        base_res_fut = executor.submit(RunPerfKitBenchmarker, a.base,
+                                       a.base_flags)
+        head_res_fut = executor.submit(RunPerfKitBenchmarker, a.head,
+                                       a.head_flags)
+        base_res = base_res_fut.result()
+        head_res = head_res_fut.result()
+    else:
+        base_res = RunPerfKitBenchmarker(a.base, a.base_flags)
+        head_res = RunPerfKitBenchmarker(a.head, a.head_flags)
 
-  with argparse.FileType('w')(a.json_output) as json_fp:
-    logging.info('Writing JSON to %s', a.json_output)
-    json.dump({'head': head_res._asdict(),
-               'base': base_res._asdict(),
-               'flags': a.flags},
-              json_fp,
-              indent=2)
-    json_fp.write('\n')
+    logging.info('Base result: %s', base_res)
+    logging.info('Head result: %s', head_res)
+
+    with argparse.FileType('w')(a.json_output) as json_fp:
+      logging.info('Writing JSON to %s', a.json_output)
+      json.dump({'head': head_res._asdict(),
+                 'base': base_res._asdict()},
+                json_fp,
+                indent=2)
+      json_fp.write('\n')
+  else:
+    logging.info('Loading results from %s', a.json_output)
+    with argparse.FileType('r')(a.json_output) as json_fp:
+      d = json.load(json_fp)
+      base_res = PerfKitBenchmarkerResult(**d['base'])
+      head_res = PerfKitBenchmarkerResult(**d['head'])
 
   with argparse.FileType('w')(a.html_output) as html_fp:
     logging.info('Writing HTML to %s', a.html_output)
     html_fp.write(RenderResults(base_result=base_res,
                                 head_result=head_res,
-                                flags=a.flags,
-                                varying_keys=VARYING_KEYS))
+                                varying_keys=VARYING_KEYS,
+                                title=a.title))
 
 
 if __name__ == '__main__':
