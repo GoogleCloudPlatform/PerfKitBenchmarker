@@ -45,7 +45,7 @@ flags.DEFINE_string('object_storage_credential_file', None,
 FLAGS = flags.FLAGS
 
 # User a scratch disk here to simulate what most users would do when they
-# use CLI tools to interact with storage providers.
+# use CLI tools to interact with their storage providers.
 BENCHMARK_INFO = {'name': 'object_storage_benchmark',
                   'description':
                   'Benchmark upload/download to Cloud Storage using CLI tools.',
