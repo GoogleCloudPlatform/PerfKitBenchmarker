@@ -35,7 +35,7 @@ def _Install(vm):
   vm.RemoteCommand(
       'cd {0} && sed -i -e "s,<module>mapkeeper</module>,<!--&-->," '
       'pom.xml'.format(YCSB_DIR))
-  vm.RemoteCommand('cd {0} && ../../{1}/bin/mvn clean package'.format(
+  vm.RemoteCommand('cd {0} && {1}/bin/mvn clean package'.format(
       YCSB_DIR, maven.MVN_DIR))
 
 

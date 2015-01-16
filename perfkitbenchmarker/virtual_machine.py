@@ -288,7 +288,7 @@ class BaseVirtualMachine(resource.BaseResource):
     ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     try:
       if login_shell:
-        ssh_cmd.extend(['-t', 'bash -l -c "%s"' % command])
+        ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
         self.pseudo_tty_lock.acquire()
       else:
         ssh_cmd.append(command)
