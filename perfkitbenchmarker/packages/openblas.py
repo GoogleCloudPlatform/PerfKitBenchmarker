@@ -14,7 +14,9 @@
 
 """Module containing OpenBLAS installation and cleanup functions."""
 
-OPENBLAS_DIR = 'pkb/OpenBLAS'
+from perfkitbenchmarker import vm_util
+
+OPENBLAS_DIR = '%s/OpenBLAS' % vm_util.VM_TMP_DIR
 GIT_REPO = 'git://github.com/xianyi/OpenBLAS'
 GIT_TAG = 'v0.2.11'
 

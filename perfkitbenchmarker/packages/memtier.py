@@ -15,12 +15,14 @@
 
 """Module containing memtier installation and cleanup functions."""
 
+from perfkitbenchmarker import vm_util
+
 GIT_REPO = 'git://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '1.2.0'
 LIBEVENT_TAR = 'libevent-2.0.21-stable.tar.gz'
 LIBEVENT_URL = 'https://github.com/downloads/libevent/libevent/' + LIBEVENT_TAR
-LIBEVENT_DIR = 'pkb/libevent-2.0.21-stable'
-MEMTIER_DIR = 'pkb/memtier_benchmark'
+LIBEVENT_DIR = '%s/libevent-2.0.21-stable' % vm_util.VM_TMP_DIR
+MEMTIER_DIR = '%s/memtier_benchmark' % vm_util.VM_TMP_DIR
 APT_PACKAGES = ('autoconf automake libpcre3-dev '
                 'libevent-dev pkg-config zlib1g-dev')
 YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
@@ -30,12 +32,13 @@ def YumInstall(vm):
   """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
-  vm.RemoteCommand('wget {0} -P pkb'.format(LIBEVENT_URL))
-  vm.RemoteCommand('cd pkb && tar xvzf {0}'.format(LIBEVENT_TAR))
+  vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL, vm_util.VM_TMP_DIR))
+  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(vm_util.VM_TMP_DIR,
+                                                   LIBEVENT_TAR))
   vm.RemoteCommand('cd {0} && ./configure && sudo make install'.format(
       LIBEVENT_DIR))
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
-  vm.RemoteCommand('cd {0} && git clone {1}'.format(MEMTIER_DIR, GIT_TAG))
+  vm.RemoteCommand('cd {0} && git checkout {1}'.format(MEMTIER_DIR, GIT_TAG))
   pkg_config = 'PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}'
   vm.RemoteCommand('cd {0} && autoreconf -ivf && {1} ./configure && '
                    'sudo make install'.format(MEMTIER_DIR, pkg_config))
@@ -46,6 +49,21 @@ def AptInstall(vm):
   vm.Install('build_tools')
   vm.InstallPackages(APT_PACKAGES)
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
-  vm.RemoteCommand('cd {0} && git clone {1}'.format(MEMTIER_DIR, GIT_TAG))
+  vm.RemoteCommand('cd {0} && git checkout {1}'.format(MEMTIER_DIR, GIT_TAG))
   vm.RemoteCommand('cd {0} && autoreconf -ivf && ./configure && '
                    'sudo make install'.format(MEMTIER_DIR))
+
+
+def _Uninstall(vm):
+  """Uninstalls the memtier package on the VM."""
+  vm.RemoteCommand('cd {0} && sudo make uninstall'.format(MEMTIER_DIR))
+
+
+def YumUninstall(vm):
+  """Uninstalls the memtier package on the VM."""
+  _Uninstall(vm)
+
+
+def AptUninstall(vm):
+  """Uninstalls the memtier package on the VM."""
+  _Uninstall(vm)

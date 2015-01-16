@@ -15,11 +15,14 @@
 
 """Module containing pip installation and cleanup functions."""
 
+from perfkitbenchmarker import vm_util
+
 
 def _Install(vm):
   """Install pip on the VM."""
   vm.InstallPackages('python-pip')
-  vm.RemoteCommand('mkdir -p pkb/ && pip freeze > pkb/requirements.txt')
+  vm.RemoteCommand('mkdir -p {0} && pip freeze > {0}/requirements.txt'.format(
+      vm_util.VM_TMP_DIR))
 
 
 def YumInstall(vm):
@@ -35,8 +38,9 @@ def AptInstall(vm):
 def _Uninstall(vm):
   """Uninstalls the pip package on the VM."""
   vm.RemoteCommand('pip freeze | grep --fixed-strings --line-regexp '
-                   '--invert-match --file pkb/requirements.txt | '
-                   'xargs --no-run-if-empty sudo pip uninstall -y')
+                   '--invert-match --file {0}/requirements.txt | '
+                   'xargs --no-run-if-empty sudo pip uninstall -y'.format(
+                       vm_util.VM_TMP_DIR))
 
 
 def YumUninstall(vm):

@@ -34,6 +34,11 @@ PUBLIC_KEYFILE = 'perfkitbenchmarker_keyfile.pub'
 CERT_FILE = 'perfkitbenchmarker.pem'
 TEMP_DIR = '/tmp/perfkitbenchmarker'
 
+# The temporary directory on VMs. We cannot reuse GetTempDir()
+# because run_uri will not be available at time of module load and we need
+# to use this directory as a base for other module level constants.
+VM_TMP_DIR = '/tmp/pkb'
+
 # Defaults for retrying commands.
 POLL_INTERVAL = 30
 TIMEOUT = 1200

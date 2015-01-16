@@ -1,16 +1,16 @@
 # Copyright 2014 Google Inc. All rights reserved.
-# #
-# # Licensed under the Apache License, Version 2.0 (the "License");
-# # you may not use this file except in compliance with the License.
-# # You may obtain a copy of the License at
-# #
-# #   http://www.apache.org/licenses/LICENSE-2.0
-# #
-# # Unless required by applicable law or agreed to in writing, software
-# # distributed under the License is distributed on an "AS IS" BASIS,
-# # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# # See the License for the specific language governing permissions and
-# # limitations under the License.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """Module containing mixin classes for package management.
 
@@ -26,9 +26,8 @@ file name minus .py). The framework will take care of all cleanup
 for you.
 """
 
-import gflags as flags
-
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import packages
 from perfkitbenchmarker import vm_util
 
@@ -68,7 +67,7 @@ class BasePackageMixin(object):
     for package_name in self._installed_packages:
       self.Uninstall(package_name)
     self.RestorePackages()
-    self.RemoteCommand('rm -rf pkb')
+    self.RemoteCommand('rm -rf %s' % vm_util.VM_TMP_DIR)
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
@@ -104,7 +103,7 @@ class YumMixin(BasePackageMixin):
     self.RemoteCommand('echo \'Defaults:%s !requiretty\' | '
                        'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                        login_shell=True)
-    self.SnapshotPackages()
+    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
@@ -121,14 +120,14 @@ class YumMixin(BasePackageMixin):
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
-    self.RemoteCommand('mkdir -p pkb')
-    self.RemoteCommand('rpm -qa > pkb/rpm_package_list')
+    self.RemoteCommand('rpm -qa > %s/rpm_package_list' % vm_util.VM_TMP_DIR)
 
   def RestorePackages(self):
     """Restores the currently installed packages to those snapshotted."""
     self.RemoteCommand(
         'rpm -qa | grep --fixed-strings --line-regexp --invert-match --file '
-        'pkb/rpm_package_list | xargs --no-run-if-empty sudo rpm -e',
+        '%s/rpm_package_list | xargs --no-run-if-empty sudo rpm -e' %
+        vm_util.VM_TMP_DIR,
         ignore_failure=True)
 
   def InstallPackages(self, packages):
@@ -178,7 +177,7 @@ class AptMixin(BasePackageMixin):
   def Startup(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""
     self.AptUpdate()
-    self.SnapshotPackages()
+    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
@@ -186,13 +185,14 @@ class AptMixin(BasePackageMixin):
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
-    self.RemoteCommand('mkdir -p pkb')
-    self.RemoteCommand('dpkg --get-selections > pkb/dpkg_selections')
+    self.RemoteCommand(
+        'dpkg --get-selections > %s/dpkg_selections' % vm_util.VM_TMP_DIR)
 
   def RestorePackages(self):
     """Restores the currently installed packages to those snapshotted."""
     self.RemoteCommand('sudo dpkg --clear-selections')
-    self.RemoteCommand('sudo dpkg --set-selections < pkb/dpkg_selections')
+    self.RemoteCommand(
+        'sudo dpkg --set-selections < %s/dpkg_selections' % vm_util.VM_TMP_DIR)
     self.RemoteCommand('sudo DEBIAN_FRONTEND=\'noninteractive\' '
                        'apt-get --purge -y dselect-upgrade')
 

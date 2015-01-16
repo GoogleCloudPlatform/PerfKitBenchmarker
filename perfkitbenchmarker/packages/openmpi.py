@@ -15,7 +15,9 @@
 
 """Module containing OpenMPI installation and cleanup functions."""
 
-MPI_DIR = 'pkb/openmpi-1.6.5'
+from perfkitbenchmarker import vm_util
+
+MPI_DIR = '%s/openmpi-1.6.5' % vm_util.VM_TMP_DIR
 MPI_TAR = 'openmpi-1.6.5.tar.gz'
 MPI_URL = 'http://www.open-mpi.org/software/ompi/v1.6/downloads/' + MPI_TAR
 
@@ -23,8 +25,8 @@ MPI_URL = 'http://www.open-mpi.org/software/ompi/v1.6/downloads/' + MPI_TAR
 def _Install(vm):
   """Installs the OpenMPI package on the VM."""
   vm.Install('build_tools')
-  vm.RemoteCommand('wget %s -P pkb' % MPI_URL)
-  vm.RemoteCommand('cd pkb && tar xvfz %s' % MPI_TAR)
+  vm.RemoteCommand('wget %s -P %s' % (MPI_URL, vm_util.VM_TMP_DIR))
+  vm.RemoteCommand('cd %s && tar xvfz %s' % (vm_util.VM_TMP_DIR, MPI_TAR))
   make_jobs = vm.num_cpus
   config_cmd = ('./configure --enable-static --disable-shared --disable-dlopen '
                 '--prefix=/usr')
@@ -40,3 +42,18 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the OpenMPI package on the VM."""
   _Install(vm)
+
+
+def _Uninstall(vm):
+  """Uninstalls the OpenMPI package on the VM."""
+  vm.RemoteCommand('cd {0} && sudo make uninstall'.format(MPI_DIR))
+
+
+def YumUninstall(vm):
+  """Uninstalls the OpenMPI package on the VM."""
+  _Uninstall(vm)
+
+
+def AptUninstall(vm):
+  """Uninstalls the OpenMPI package on the VM."""
+  _Uninstall(vm)

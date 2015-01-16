@@ -15,16 +15,19 @@
 
 """Module containing UnixBench installation and cleanup functions."""
 
+from perfkitbenchmarker import vm_util
+
 UNIXBENCH_TAR = 'UnixBench5.1.3.tgz'
 UNIXBENCH_URL = 'http://byte-unixbench.googlecode.com/files/' + UNIXBENCH_TAR
-UNIXBENCH_DIR = 'pkb/UnixBench'
+UNIXBENCH_DIR = '%s/UnixBench' % vm_util.VM_TMP_DIR
 
 
 def _Install(vm):
   """Installs the UnixBench package on the VM."""
   vm.Install('build_tools')
-  vm.RemoteCommand('wget {0} -P pkb'.format(UNIXBENCH_URL))
-  vm.RemoteCommand('cd pkb && tar xvzf {0}'.format(UNIXBENCH_TAR))
+  vm.RemoteCommand('wget {0} -P {1}'.format(UNIXBENCH_URL, vm_util.VM_TMP_DIR))
+  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(vm_util.VM_TMP_DIR,
+                                                   UNIXBENCH_TAR))
 
 
 def YumInstall(vm):

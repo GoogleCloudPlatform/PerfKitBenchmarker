@@ -22,9 +22,10 @@ They may also define functions that return the path to a configuration file
 (e.g. AptGetPathToConfig(vm)) and functions that return the linux service
 name (e.g. YumGetServiceName(vm)). If the package only installs
 packages through the package manager or places files in the temp directory
-on the VM (~/pkb/), then it does not need to define an uninstall function.
-If the package manually places files in other locations (e.g. /user/bin), then
-it also needs to define uninstall functions (e.g. YumUninstall(vm)).
+on the VM (vm_util.VM_TMP_DIR), then it does not need to define an uninstall
+function. If the package manually places files in other locations
+(e.g. /user/bin), then it also needs to define uninstall functions
+(e.g. YumUninstall(vm)).
 
 All functions in each package module should be prefixed with the type of package
 manager, and all functions should accept a BaseVirtualMachine object as their
@@ -34,35 +35,12 @@ See perfkitbenchmarker/package_managers.py for more information on how to use
 packages in benchmarks.
 """
 
-import importlib
-import pkgutil
-
-
-def _LoadModulesForPath(path, package_prefix=None):
-  """Load all modules on 'path', with prefix 'package_prefix'.
-
-  Example usage:
-    _LoadModulesForPath(__path__, __name__)
-
-  Args:
-    path: Path containing python modules.
-    package_prefix: prefix (e.g., package name) to prefix all modules.
-      'path' and 'package_prefix' will be joined with a '.'.
-  Yields:
-    Imported modules.
-  """
-  prefix = ''
-  if package_prefix:
-    prefix = package_prefix + '.'
-  module_iter = pkgutil.iter_modules(path, prefix=prefix)
-  for _, modname, ispkg in module_iter:
-    if not ispkg:
-      yield importlib.import_module(modname)
+from perfkitbenchmarker import import_util
 
 
 def _LoadPackages():
-  return dict([(module.__name__.split('.')[-1], module)
-               for module in _LoadModulesForPath(__path__, __name__)])
+  return dict([(module.__name__.split('.')[-1], module) for module in
+               import_util.LoadModulesForPath(__path__, __name__)])
 
 
 PACKAGES = _LoadPackages()

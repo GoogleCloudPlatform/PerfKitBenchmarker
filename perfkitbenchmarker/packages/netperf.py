@@ -15,10 +15,11 @@
 
 """Module containing netperf installation and cleanup functions."""
 
+from perfkitbenchmarker import vm_util
 
 NETPERF_TAR = 'netperf-2.6.0.tar.gz'
 NETPERF_URL = 'ftp://ftp.netperf.org/netperf/%s' % NETPERF_TAR
-NETPERF_DIR = 'pkb/netperf-2.6.0'
+NETPERF_DIR = '%s/netperf-2.6.0' % vm_util.VM_TMP_DIR
 NETSERVER_PATH = NETPERF_DIR + '/src/netserver'
 NETPERF_PATH = NETPERF_DIR + '/src/netperf'
 
@@ -26,8 +27,8 @@ NETPERF_PATH = NETPERF_DIR + '/src/netperf'
 def _Install(vm):
   """Installs the netperf package on the VM."""
   vm.Install('build_tools')
-  vm.RemoteCommand('wget %s -P pkb' % NETPERF_URL)
-  vm.RemoteCommand('cd pkb && tar xvzf %s' % NETPERF_TAR)
+  vm.RemoteCommand('wget %s -P %s' % (NETPERF_URL, vm_util.VM_TMP_DIR))
+  vm.RemoteCommand('cd %s && tar xvzf %s' % (vm_util.VM_TMP_DIR, NETPERF_TAR))
   vm.RemoteCommand('cd %s && ./configure && make' % NETPERF_DIR)
 
 

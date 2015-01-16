@@ -15,11 +15,12 @@
 
 """Module containing YCSB installation and cleanup functions."""
 
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import maven
 
 GIT_REPO = 'git://github.com/brianfrankcooper/YCSB.git'
 GIT_TAG = '5659fc582c8280e1431ebcfa0891979f806c70ed'
-YCSB_DIR = 'pkb/YCSB'
+YCSB_DIR = '%s/YCSB' % vm_util.VM_TMP_DIR
 
 
 def _Install(vm):

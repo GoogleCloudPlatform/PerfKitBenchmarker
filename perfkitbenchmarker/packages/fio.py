@@ -14,7 +14,9 @@
 
 """Module containing fio installation and cleanup functions."""
 
-FIO_DIR = 'pkb/fio'
+from perfkitbenchmarker import vm_util
+
+FIO_DIR = '%s/fio' % vm_util.VM_TMP_DIR
 GIT_REPO = 'git://git.kernel.dk/fio.git'
 GIT_TAG = 'fio-2.1.14'
 FIO_PATH = FIO_DIR + '/fio'

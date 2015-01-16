@@ -15,9 +15,11 @@
 
 """Module containing node.js installation and cleanup functions."""
 
+from perfkitbenchmarker import vm_util
+
 GIT_REPO = 'https://github.com/joyent/node.git'
 GIT_TAG = 'v0.11.14'
-NODE_DIR = 'pkb/node'
+NODE_DIR = '%s/node' % vm_util.VM_TMP_DIR
 
 
 def _Install(vm):
@@ -37,3 +39,18 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the node.js package on the VM."""
   _Install(vm)
+
+
+def _Uninstall(vm):
+  """Uninstalls the node.js package on the VM."""
+  vm.RemoteCommand('cd {0} && sudo make uninstall'.format(NODE_DIR))
+
+
+def YumUninstall(vm):
+  """Uninstalls the node.js package on the VM."""
+  _Uninstall(vm)
+
+
+def AptUninstall(vm):
+  """Uninstalls the node.js package on the VM."""
+  _Uninstall(vm)
