@@ -15,7 +15,7 @@
 """Using storage tools from providers to upload/download files in directory.
 
 Benchmarks here use CLI tools to communicate with storage providers, this
-simulates a set of common use cases that are based on CLI tools.   
+simulates a set of common use cases that are based on CLI tools.
 
 Naming Conventions (X refers to cloud providers):
 PrepareX: Prepare vm with necessary storage tools from cloud providers.
@@ -45,7 +45,7 @@ flags.DEFINE_string('object_storage_credential_file', None,
 FLAGS = flags.FLAGS
 
 # User a scratch disk here to simulate what most users would do when they
-# use CLI tools to interact with storage providers.   
+# use CLI tools to interact with storage providers.
 BENCHMARK_INFO = {'name': 'object_storage_benchmark',
                   'description':
                   'Benchmark upload/download to Cloud Storage using CLI tools.',
@@ -100,14 +100,14 @@ class S3StorageBenchmark(object):
     """
     vm.RemoteCommand('aws s3 rm s3://pkb%s --recursive'
                      % FLAGS.run_uri, ignore_failure=True)
-    
+
     scratch_dir = vm.GetScratchDir()
     _, res = vm.RemoteCommand('time aws s3 sync %s/run/data/ '
                               's3://pkb%s/' % (scratch_dir, FLAGS.run_uri))
     logging.info(res)
     time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
-    
+
     vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
     _, res = vm.RemoteCommand('time aws s3 sync '
                               's3://pkb%s/ %s/run/data/'
@@ -174,7 +174,7 @@ class AzureBlobStorageBenchmark(object):
                      'pkb%s file-$i.dat %s; done' %
                      (FLAGS.run_uri, vm.azure_command_suffix),
                      ignore_failure=True)
-    
+
     scratch_dir = vm.GetScratchDir()
     _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
                               'upload %s/run/data/file-$i.dat'
@@ -255,7 +255,7 @@ class GoogleCloudStorageBenchmark(object):
     """
     vm.RemoteCommand('%s rm gs://pkb%s/*' %
                      (vm.gsutil_path, FLAGS.run_uri), ignore_failure=True)
-    
+
     scratch_dir = vm.GetScratchDir()
     _, res = vm.RemoteCommand('time %s -m cp %s/run/data/* '
                               'gs://pkb%s/' % (vm.gsutil_path, scratch_dir,
@@ -314,7 +314,7 @@ def Prepare(benchmark_spec):
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
   # Prepare data on vm, create a run directory on scratch drive, and add
   # permission.
-  scratch_dir = vms[0].GetScratchDir();
+  scratch_dir = vms[0].GetScratchDir()
   vms[0].RemoteCommand('sudo mkdir %s/run/' % scratch_dir)
   vms[0].RemoteCommand('sudo chmod 777 %s/run/' % scratch_dir)
   file_path = data.ResourcePath(DATA_FILE)
