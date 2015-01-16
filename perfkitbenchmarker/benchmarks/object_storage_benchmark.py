@@ -14,6 +14,9 @@
 
 """Using storage tools from providers to upload/download files in directory.
 
+Benchmarks here use CLI tools to communicate with storage providers, this
+simulates a set of common use cases that are based on CLI tools.   
+
 Naming Conventions (X refers to cloud providers):
 PrepareX: Prepare vm with necessary storage tools from cloud providers.
 RunX: Run upload/download on vm using storage tools from cloud providers.
@@ -41,10 +44,12 @@ flags.DEFINE_string('object_storage_credential_file', None,
 
 FLAGS = flags.FLAGS
 
+# User a scratch disk here to simulate what most users would do when they
+# use CLI tools to interact with storage providers.   
 BENCHMARK_INFO = {'name': 'object_storage_benchmark',
                   'description':
                   'Benchmark upload/download to Cloud Storage using CLI tools.',
-                  'scratch_disk': False,
+                  'scratch_disk': True,
                   'num_machines': 1}
 
 AWS_CREDENTIAL_LOCATION = '.aws'
@@ -61,7 +66,7 @@ NODE_COMMIT = 'v0.10.30'
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data
-DATA_SIZE_IN_MB = 256.1
+DATA_SIZE_IN_MB = 2561
 
 
 def GetInfo():
@@ -95,15 +100,18 @@ class S3StorageBenchmark(object):
     """
     vm.RemoteCommand('aws s3 rm s3://pkb%s --recursive'
                      % FLAGS.run_uri, ignore_failure=True)
-    _, res = vm.RemoteCommand('time aws s3 sync /run/data/ '
-                              's3://pkb%s/' % FLAGS.run_uri)
+    
+    scratch_dir = vm.GetScratchDir()
+    _, res = vm.RemoteCommand('time aws s3 sync %s/run/data/ '
+                              's3://pkb%s/' % (scratch_dir, FLAGS.run_uri))
     logging.info(res)
     time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
-    vm.RemoteCommand('rm /run/data/*')
+    
+    vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
     _, res = vm.RemoteCommand('time aws s3 sync '
-                              's3://pkb%s/ /run/data/'
-                              % FLAGS.run_uri)
+                              's3://pkb%s/ %s/run/data/'
+                              % (FLAGS.run_uri, scratch_dir))
     logging.info(res)
     time_used = vm_util.ParseTimeCommandResult(res)
     result[1][1] = DATA_SIZE_IN_MB / time_used
@@ -166,18 +174,22 @@ class AzureBlobStorageBenchmark(object):
                      'pkb%s file-$i.dat %s; done' %
                      (FLAGS.run_uri, vm.azure_command_suffix),
                      ignore_failure=True)
+    
+    scratch_dir = vm.GetScratchDir()
     _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
-                              'upload /run/data/file-$i.dat'
+                              'upload %s/run/data/file-$i.dat'
                               ' pkb%s %s; done' %
-                              (FLAGS.run_uri, vm.azure_command_suffix))
+                              (scratch_dir, FLAGS.run_uri,
+                               vm.azure_command_suffix))
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
-    vm.RemoteCommand('rm /run/data/*')
+    vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
     _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
                               'download pkb%s '
-                              'file-$i.dat /run/data/file-$i.dat %s; done' %
-                              (FLAGS.run_uri, vm.azure_command_suffix))
+                              'file-$i.dat %s/run/data/file-$i.dat %s; done' %
+                              (FLAGS.run_uri, scratch_dir,
+                               vm.azure_command_suffix))
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
     result[1][1] = DATA_SIZE_IN_MB / time_used
@@ -243,16 +255,20 @@ class GoogleCloudStorageBenchmark(object):
     """
     vm.RemoteCommand('%s rm gs://pkb%s/*' %
                      (vm.gsutil_path, FLAGS.run_uri), ignore_failure=True)
-    _, res = vm.RemoteCommand('time %s -m cp /run/data/* '
-                              'gs://pkb%s/' % (vm.gsutil_path, FLAGS.run_uri))
+    
+    scratch_dir = vm.GetScratchDir()
+    _, res = vm.RemoteCommand('time %s -m cp %s/run/data/* '
+                              'gs://pkb%s/' % (vm.gsutil_path, scratch_dir,
+                                               FLAGS.run_uri))
 
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
     result[0][1] = DATA_SIZE_IN_MB / time_used
-    vm.RemoteCommand('rm /run/data/*')
+    vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
     _, res = vm.RemoteCommand('time %s -m cp '
                               'gs://pkb%s/* '
-                              '/run/data/' % (vm.gsutil_path, FLAGS.run_uri))
+                              '%s/run/data/' % (vm.gsutil_path, FLAGS.run_uri,
+                                                scratch_dir))
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
     result[1][1] = DATA_SIZE_IN_MB / time_used
@@ -296,10 +312,13 @@ def Prepare(benchmark_spec):
         'Credential cannot be found in %s',
         FLAGS.object_storage_credential_file)
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
-  # Prepare data on vm, add permission to /run/folder
-  vms[0].RemoteCommand('sudo chmod 777 /run/')
+  # Prepare data on vm, create a run directory on scratch drive, and add
+  # permission.
+  scratch_dir = vms[0].GetScratchDir();
+  vms[0].RemoteCommand('sudo mkdir %s/run/' % scratch_dir)
+  vms[0].RemoteCommand('sudo chmod 777 %s/run/' % scratch_dir)
   file_path = data.ResourcePath(DATA_FILE)
-  vms[0].PushFile(file_path, '/run/')
+  vms[0].PushFile(file_path, '%s/run/' % scratch_dir)
 
 
 def Run(benchmark_spec):
@@ -319,7 +338,8 @@ def Run(benchmark_spec):
   results = [['storage upload', value, unit, metadata],
              ['storage download', value, unit, metadata]]
   vms = benchmark_spec.vms
-  vms[0].RemoteCommand('cd /run/; bash cloud-storage-workload.sh')
+  vms[0].RemoteCommand(
+      'cd %s/run/; bash cloud-storage-workload.sh' % vms[0].GetScratchDir())
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0], results)
   print results
   return results
@@ -333,5 +353,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms[0].RemoteCommand('rm -rf /run/data/')
+  vms[0].RemoteCommand('rm -rf %s/run/data/' % vms[0].GetScratchDir())
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Cleanup(vms[0])
