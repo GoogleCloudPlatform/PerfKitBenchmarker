@@ -353,5 +353,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms[0].RemoteCommand('rm -rf %s/run/data/' % vms[0].GetScratchDir())
+  vms[0].RemoteCommand('rm -rf %s/run/' % vms[0].GetScratchDir())
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Cleanup(vms[0])
