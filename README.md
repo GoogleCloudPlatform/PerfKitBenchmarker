@@ -134,14 +134,32 @@ Test that azure is installed correctly
 $ azure vm list
 ```
 
-## Install PerfKit dependencies
+## Install PerfKit
+This can optionally done within a virtualenv.
+
+* Install Python 2.7
+* Install pip:
+```
+$ sudo apt-get install -y python-pip
+```
+* Clone the PerfKitBenchmarker repository 
+```
+$ git clone git@github.com:GoogleCloudPlatform/PerfKitBenchmarker.git -b dev && cd PerfKitBenchmarker
+```
+* Install PerfKitBenchmarker python dependencies:
 ```
 $ sudo pip install -r requirements.txt
 ```
 
-## Install PerfKit
-
-[Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
+## If you plan to make changes to PerfKit
+* Install PerfKitBenchmarker test dependencies:
+```
+$ sudo  pip install -r test-requirements.txt
+```
+* Install git pre-commit hooks, to enable linting and copyright checks:
+```
+$ hooks/install.sh
+```
 
 RUNNING A SINGLE BENCHMARK
 ==========================
