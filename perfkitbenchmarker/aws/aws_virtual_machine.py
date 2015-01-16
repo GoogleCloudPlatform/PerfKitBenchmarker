@@ -273,13 +273,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    package_managers.AptMixin):
-
-  def __init__(self, *args):
-    super(DebianBasedAwsVirtualMachine, self).__init__(*args)
+  pass
 
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
                                  package_managers.YumMixin):
-
-  def __init__(self, *args):
-    super(RhelBasedAwsVirtualMachine, self).__init__(*args)
+  pass

@@ -102,9 +102,6 @@ class BasePackageMixin(object):
 
 class YumMixin(BasePackageMixin):
 
-  def __init__(self):
-    super(YumMixin, self).__init__()
-
   def Startup(self):
     """Eliminates the need to have a tty to run sudo commands."""
     self.RemoteCommand('echo \'Defaults:%s !requiretty\' | '
@@ -180,9 +177,6 @@ class YumMixin(BasePackageMixin):
 
 
 class AptMixin(BasePackageMixin):
-
-  def __init__(self):
-    super(AptMixin, self).__init__()
 
   def Startup(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""

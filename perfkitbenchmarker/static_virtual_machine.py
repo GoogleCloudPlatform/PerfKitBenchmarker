@@ -195,12 +195,9 @@ def GetStaticVirtualMachineClass(os_type):
 
 class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
                                       package_managers.AptMixin):
-
-  def __init__(self, *args):
-    super(DebianBasedStaticVirtualMachine, self).__init__(*args)
+  pass
 
 
 class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
                                     package_managers.YumMixin):
-  def __init__(self, *args):
-    super(RhelBasedStaticVirtualMachine, self).__init__(*args)
+  pass

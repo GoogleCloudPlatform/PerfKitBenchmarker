@@ -206,12 +206,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
                                      package_managers.AptMixin):
-
-  def __init__(self, *args):
-    super(DebianBasedAzureVirtualMachine, self).__init__(*args)
+  pass
 
 
 class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
                                    package_managers.YumMixin):
-  def __init__(self, *args):
-    super(RhelBasedAzureVirtualMachine, self).__init__(*args)
+  pass
