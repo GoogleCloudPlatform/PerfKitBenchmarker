@@ -46,6 +46,10 @@ flags.DEFINE_enum('os_type', DEBIAN,
 
 class BasePackageMixin(object):
 
+  def __init__(self):
+    self._installed_packages = set()
+    super(BasePackageMixin, self).__init__()
+
   def Startup(self):
     """Performs any necessary setup on the VM specific to the OS."""
     pass
@@ -97,6 +101,9 @@ class BasePackageMixin(object):
 
 
 class YumMixin(BasePackageMixin):
+
+  def __init__(self):
+    super(YumMixin, self).__init__()
 
   def Startup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -173,6 +180,9 @@ class YumMixin(BasePackageMixin):
 
 
 class AptMixin(BasePackageMixin):
+
+  def __init__(self):
+    super(AptMixin, self).__init__()
 
   def Startup(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""

@@ -13,7 +13,11 @@
 # limitations under the License.
 
 
-"""Module containing pip installation and cleanup functions."""
+"""Module containing pip installation and cleanup functions.
+
+Uninstalling the pip package will also remove all python packages
+added after installation.
+"""
 
 from perfkitbenchmarker import vm_util
 

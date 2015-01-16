@@ -23,8 +23,8 @@ some memory bandwidth, and disk.
 import logging
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.packages import unixbench
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker.packages import unixbench
 
 FLAGS = flags.FLAGS
 

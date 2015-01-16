@@ -206,9 +206,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedGceVirtualMachine(GceVirtualMachine,
                                    package_managers.AptMixin):
-  pass
+
+  def __init__(self, *args):
+    super(DebianBasedGceVirtualMachine, self).__init__(*args)
 
 
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  package_managers.YumMixin):
-  pass
+
+  def __init__(self, *args):
+    super(RhelBasedGceVirtualMachine, self).__init__(*args)

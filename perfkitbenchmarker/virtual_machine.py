@@ -119,7 +119,6 @@ class BaseVirtualMachine(resource.BaseResource):
     self.disk_specs = []
     self.scratch_disks = []
     self.hostname = None
-    self._installed_packages = set()
 
     # Cached values
     self._reachable = {}
