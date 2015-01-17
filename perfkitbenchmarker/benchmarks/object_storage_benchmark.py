@@ -45,7 +45,7 @@ flags.DEFINE_string('object_storage_credential_file', None,
 FLAGS = flags.FLAGS
 
 # User a scratch disk here to simulate what most users would do when they
-# use CLI tools to interact with storage providers.
+# use CLI tools to interact with the storage provider.
 BENCHMARK_INFO = {'name': 'object_storage_benchmark',
                   'description':
                   'Benchmark upload/download to Cloud Storage using CLI tools.',
@@ -353,5 +353,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms[0].RemoteCommand('rm -rf %s/run/data/' % vms[0].GetScratchDir())
+  vms[0].RemoteCommand('rm -rf %s/run/' % vms[0].GetScratchDir())
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Cleanup(vms[0])
