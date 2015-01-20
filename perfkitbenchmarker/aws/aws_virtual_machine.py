@@ -63,17 +63,22 @@ AMIS = {
     }
 }
 PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['c3', 'cc2', 'cg1', 'g2', 'cr1', 'r3', 'hi1', 'i2'])
+    ['c3', 'c4', 'cc2', 'cg1', 'g2', 'cr1', 'r3', 'hi1', 'i2'])
 NUM_LOCAL_VOLUMES = {
-    'c1.medium': 1, 'c1.xlarge': 4, 'c3.large': 2, 'c3.xlarge': 2,
-    'c3.2xlarge': 2, 'c3.4xlarge': 2, 'c3.8xlarge': 2, 'cc2.8xlarge': 4,
-    'cg1.4xlarge': 2, 'cr1.8xlarge': 2, 'g2.2xlarge': 1, 'hi1.4xlarge': 2,
-    'hs1.8xlarge': 24, 'i2.xlarge': 1, 'i2.2xlarge': 2, 'i2.4xlarge': 4,
-    'i2.8xlarge': 8, 'm1.small': 1, 'm1.medium': 1, 'm1.large': 2,
-    'm1.xlarge': 4, 'm2.xlarge': 1, 'm2.2xlarge': 1, 'm2.4xlarge': 2,
+    'c1.medium': 1, 'c1.xlarge': 4,
+    'c3.large': 2, 'c3.xlarge': 2, 'c3.2xlarge': 2, 'c3.4xlarge': 2,
+    'c3.8xlarge': 2, 'cc2.8xlarge': 4,
+    'c4.large': 0, 'c4.xlarge': 0, 'c4.2xlarge': 0, 'c4.4xlarge': 0,
+    'c4.8xlarge': 0,
+    'cg1.4xlarge': 2, 'cr1.8xlarge': 2, 'g2.2xlarge': 1,
+    'hi1.4xlarge': 2, 'hs1.8xlarge': 24,
+    'i2.xlarge': 1, 'i2.2xlarge': 2, 'i2.4xlarge': 4, 'i2.8xlarge': 8,
+    'm1.small': 1, 'm1.medium': 1, 'm1.large': 2, 'm1.xlarge': 4,
+    'm2.xlarge': 1, 'm2.2xlarge': 1, 'm2.4xlarge': 2,
     'm3.medium': 1, 'm3.large': 1, 'm3.xlarge': 2, 'm3.2xlarge': 2,
     'r3.large': 1, 'r3.xlarge': 1, 'r3.2xlarge': 1, 'r3.4xlarge': 1,
-    'r3.8xlarge': 2, 't1.micro': 0, 't2.micro': 0, 't2.small': 0, 't2.medium': 0
+    'r3.8xlarge': 2,
+    't1.micro': 0, 't2.micro': 0, 't2.small': 0, 't2.medium': 0
 }
 DRIVE_START_LETTER = 'b'
 
