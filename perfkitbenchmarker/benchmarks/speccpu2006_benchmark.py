@@ -57,6 +57,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('prepare SpecCPU2006 on %s', vm)
+  vm.Install('wget')
   vm.Install('build_tools')
   vm.Install('fortran')
   try:

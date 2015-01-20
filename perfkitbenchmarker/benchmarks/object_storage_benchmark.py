@@ -210,6 +210,7 @@ class GoogleCloudStorageBenchmark(object):
     Args:
       vm: The vm being used to run the benchmark.
     """
+    vm.Install('wget')
     vm.RemoteCommand(
         'wget '
         'https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz')

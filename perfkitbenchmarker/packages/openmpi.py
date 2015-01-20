@@ -25,6 +25,7 @@ MPI_URL = 'http://www.open-mpi.org/software/ompi/v1.6/downloads/' + MPI_TAR
 def _Install(vm):
   """Installs the OpenMPI package on the VM."""
   vm.Install('build_tools')
+  vm.Install('wget')
   vm.RemoteCommand('wget %s -P %s' % (MPI_URL, vm_util.VM_TMP_DIR))
   vm.RemoteCommand('cd %s && tar xvfz %s' % (vm_util.VM_TMP_DIR, MPI_TAR))
   make_jobs = vm.num_cpus

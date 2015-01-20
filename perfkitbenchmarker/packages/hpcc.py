@@ -35,6 +35,7 @@ HPCC_MAKEFILE_PATH = HPCC_DIR + '/hpl/' + HPCC_MAKEFILE
 
 def _Install(vm):
   """Installs the HPCC package on the VM."""
+  vm.Install('wget')
   vm.Install('openmpi')
   vm.Install('openblas')
   vm.RemoteCommand('wget %s -P %s' % (HPCC_URL, vm_util.VM_TMP_DIR))

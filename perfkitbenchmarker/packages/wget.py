@@ -13,29 +13,19 @@
 # limitations under the License.
 
 
-"""Module containing maven installation and cleanup functions."""
-
-from perfkitbenchmarker import vm_util
-
-MVN_TAR = 'apache-maven-3.2.5-bin.tar.gz'
-MVN_URL = ('http://download.nextag.com/apache/maven/maven-3/3.2.5/binaries/' +
-           MVN_TAR)
-MVN_DIR = '%s/apache-maven-3.2.5' % vm_util.VM_TMP_DIR
+"""Module containing wget installation and cleanup functions."""
 
 
 def _Install(vm):
-  """Installs the maven package on the VM."""
-  vm.Install('openjdk7')
-  vm.Install('wget')
-  vm.RemoteCommand('wget %s -P %s' % (MVN_URL, vm_util.VM_TMP_DIR))
-  vm.RemoteCommand('cd %s && tar xvzf %s' % (vm_util.VM_TMP_DIR, MVN_TAR))
+  """Installs the wget package on the VM."""
+  vm.InstallPackages('wget')
 
 
 def YumInstall(vm):
-  """Installs the maven package on the VM."""
+  """Installs the wget package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the maven package on the VM."""
+  """Installs the wget package on the VM."""
   _Install(vm)

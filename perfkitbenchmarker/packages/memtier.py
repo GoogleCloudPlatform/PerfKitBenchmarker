@@ -32,6 +32,7 @@ def YumInstall(vm):
   """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
+  vm.Install('wget')
   vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL, vm_util.VM_TMP_DIR))
   vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(vm_util.VM_TMP_DIR,
                                                    LIBEVENT_TAR))

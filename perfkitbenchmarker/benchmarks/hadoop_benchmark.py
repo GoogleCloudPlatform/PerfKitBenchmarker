@@ -60,6 +60,7 @@ def InstallHadoop(vm, master_ip, worker_ips):
     master_ip: A string of the master VM's ip.
     worker_ips: A list of all slave ips.
   """
+  vm.Install('wget')
   vm.RemoteCommand('wget %s' % HADOOP_URL)
   vm.RemoteCommand('tar xvzf hadoop-%s.tar.gz' % HADOOP_VERSION)
   vm.Install('openjdk7')

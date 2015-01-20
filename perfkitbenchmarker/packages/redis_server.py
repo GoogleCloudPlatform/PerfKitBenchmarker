@@ -25,6 +25,7 @@ REDIS_URL = 'http://download.redis.io/releases/' + REDIS_TAR
 def _Install(vm):
   """Installs the redis package on the VM."""
   vm.Install('build_tools')
+  vm.Install('wget')
   vm.RemoteCommand('wget %s -P %s' % (REDIS_URL, vm_util.VM_TMP_DIR))
   vm.RemoteCommand('cd %s && tar xvfz %s' % (vm_util.VM_TMP_DIR, REDIS_TAR))
   vm.RemoteCommand('cd %s && make' % REDIS_DIR)
