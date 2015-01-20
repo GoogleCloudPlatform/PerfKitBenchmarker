@@ -411,7 +411,6 @@ def BurnCpu(vm, burn_cpu_threads=None, burn_cpu_seconds=None):
   burn_cpu_threads = burn_cpu_threads or FLAGS.burn_cpu_threads
   burn_cpu_seconds = burn_cpu_seconds or FLAGS.burn_cpu_seconds
   if burn_cpu_seconds:
-    package_installed = False
     vm.Install('sysbench')
     end_time = time.time() + burn_cpu_seconds
     vm.RemoteCommand(
@@ -420,8 +419,6 @@ def BurnCpu(vm, burn_cpu_threads=None, burn_cpu_seconds=None):
     if time.time() < end_time:
       time.sleep(end_time - time.time())
     vm.RemoteCommand('pkill -9 sysbench')
-    if not package_installed:
-      vm.UninstallPackage('sysbench')
 
 
 def ShouldRunOnExternalIpAddress():

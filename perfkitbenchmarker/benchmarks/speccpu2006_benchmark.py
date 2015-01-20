@@ -233,5 +233,3 @@ def Cleanup(benchmark_spec):
   vm = vms[0]
   vm.RemoteCommand('rm -rf %s' % vm.spec_dir)
   vm.RemoteCommand('rm -f %s' % vm.tar_file_path)
-  vm.UninstallPackage('build-essential')
-  vm.UninstallPackage('gfortran')
