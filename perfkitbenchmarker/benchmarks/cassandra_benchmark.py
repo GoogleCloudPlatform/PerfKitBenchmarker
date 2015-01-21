@@ -292,8 +292,8 @@ def InsertTest(benchmark_spec, vm):
   if not FLAGS.num_keys:
     logging.info('Num keys not set, using %s*num_cpu in stress test.',
                  NUM_KEYS_PER_CORE)
-    FLAGS.num_keys = str(
-        NUM_KEYS_PER_CORE * benchmark_spec.vm_dict[DATA_NODE][0].num_cpus)
+    FLAGS.num_keys = NUM_KEYS_PER_CORE * benchmark_spec.vm_dict[
+        DATA_NODE][0].num_cpus
 
   logging.info('Executing the benchmark.')
   args = [((loader_vm, data_nodes_ip_addresses), {})
