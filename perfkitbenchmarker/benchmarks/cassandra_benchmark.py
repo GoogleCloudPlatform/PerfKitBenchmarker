@@ -66,6 +66,11 @@ RETRIES = '1000'
 THREADS = '300'
 MAX_RETRY_START_CLUSTER = 5
 
+# The ratio of total amount memory allocated to the JVM at start-up.
+MAX_HEAP_RATIO = 5.0 / 6
+# The size of the newly allocated memory per core.
+HEAP_NEWSIZE_PERCORE_IN_MB = 100
+
 
 def GetInfo():
   return BENCHMARK_INFO
@@ -86,7 +91,8 @@ def PrepareVm(vm):
   Args:
     vm: The target vm.
   """
-  vm.RemoteCommand('curl -OL http://downloads.datastax.com/community/%s' % CASSANDRA_TAR)
+  vm.RemoteCommand('curl -OL http://downloads.datastax.com/community/%s'
+                   % CASSANDRA_TAR)
   try:
     vm.PrepareJava(JAVA_TAR, REQUIRED_JAVA_VERSION)
   except data.ResourceNotFound:
@@ -392,7 +398,7 @@ def RunCassandraStressTest(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data
         that is required to run the benchmark.
   """
-  InsertTest(benchmark_spec, benchmark_spec.vm_dict[DATA_NODE][0])
+  InsertTest(benchmark_spec, benchmark_spec.vm_dict[LOADER_NODE][0])
   logging.info('Tests running. Watching progress.')
   vm_util.RunThreaded(WaitLoaderForFinishing,
                       benchmark_spec.vm_dict[LOADER_NODE])
