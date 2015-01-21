@@ -32,7 +32,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 
-flags.DEFINE_integer('num_keys', 20000000,
+flags.DEFINE_integer('num_keys', 0,
                      'Number of keys used in cassandra-stress tool.')
 
 
@@ -63,13 +63,9 @@ SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
 CONSISTENCY_LEVEL = 'quorum'
 REPLICATION_FACTOR = '3'
 RETRIES = '1000'
-THREADS = '300'
+THREADS = '30'
 MAX_RETRY_START_CLUSTER = 5
-
-# The ratio of total amount memory allocated to the JVM at start-up.
-MAX_HEAP_RATIO = 5.0 / 6
-# The size of the newly allocated memory per core.
-HEAP_NEWSIZE_PERCORE_IN_MB = 100
+NUM_KEYS_PER_CORE = 10000000
 
 
 def GetInfo():
@@ -293,6 +289,12 @@ def InsertTest(benchmark_spec, vm):
           REPLICATION_FACTOR, CONSISTENCY_LEVEL))
   logging.info('Waiting %s for keyspace to propagate.', WAITING_IN_SECONDS)
   time.sleep(WAITING_IN_SECONDS)
+  if not FLAGS.num_keys:
+    logging.info('Num keys not set, using %s*num_cpu in stress test.',
+                 NUM_KEYS_PER_CORE)
+    FLAGS.num_keys = str(
+        NUM_KEYS_PER_CORE * benchmark_spec.vm_dict[DATA_NODE][0].num_cpus)
+
   logging.info('Executing the benchmark.')
   args = [((loader_vm, data_nodes_ip_addresses), {})
           for loader_vm in benchmark_spec.vm_dict[LOADER_NODE]]
