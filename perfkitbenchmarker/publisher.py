@@ -15,6 +15,7 @@
 """Classes to collect and publish performance samples to various sinks."""
 
 import abc
+import io
 import itertools
 import json
 import logging
@@ -227,12 +228,16 @@ class PrettyPrintStreamPublisher(SamplePublisher):
                     for k, v in sorted(metadata.iteritems()))
 
   def PublishSamples(self, samples):
+    stream = io.BytesIO()
     dashes = '-' * 25
-    self.stream.write('\n' + dashes +
-                      'PerfKitBenchmarker Results Summary' +
-                      dashes + '\n')
+    stream.write('\n' + dashes +
+                 'PerfKitBenchmarker Results Summary' +
+                 dashes + '\n')
 
     if not samples:
+      logging.debug('Pretty-printing results to %s:\n%s', self.stream,
+                    stream.getvalue())
+      self.stream.write(stream.getvalue())
       return
 
     key = operator.itemgetter('test')
@@ -251,26 +256,30 @@ class PrettyPrintStreamPublisher(SamplePublisher):
 
       benchmark_meta = {k: v for k, v in test_samples[0]['metadata'].iteritems()
                         if k in locally_constant_keys}
-      self.stream.write('{0}:\n'.format(benchmark.upper()))
+      stream.write('{0}:\n'.format(benchmark.upper()))
 
       if benchmark_meta:
-        self.stream.write('  {0}\n'.format(
+        stream.write('  {0}\n'.format(
             self._FormatMetadata(benchmark_meta)))
 
       for sample in test_samples:
         meta = {k: v for k, v in sample['metadata'].iteritems()
                 if k not in all_constant_meta}
-        self.stream.write('  {0:<30s} {1:>15f} {2:<30s}'.format(
+        stream.write('  {0:<30s} {1:>15f} {2:<30s}'.format(
             sample['metric'], sample['value'], sample['unit']))
         if meta:
-          self.stream.write(' ({0})'.format(self._FormatMetadata(meta)))
-        self.stream.write('\n')
+          stream.write(' ({0})'.format(self._FormatMetadata(meta)))
+        stream.write('\n')
 
     global_meta = {k: v for k, v in samples[0]['metadata'].iteritems()
                    if k in globally_constant_keys}
-    self.stream.write('\n' + dashes + '\n')
-    self.stream.write('For all tests: {0}\n'.format(
+    stream.write('\n' + dashes + '\n')
+    stream.write('For all tests: {0}\n'.format(
         self._FormatMetadata(global_meta)))
+
+    value = stream.getvalue()
+    logging.debug('Pretty-printing results to %s:\n%s', self.stream, value)
+    self.stream.write(value)
 
 
 class LogPublisher(SamplePublisher):

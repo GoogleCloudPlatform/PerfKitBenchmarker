@@ -370,7 +370,7 @@ def RunBenchmarks(publish=True):
     if collector.samples:
       collector.PublishSamples()
 
-    logging.info('Verbose logs can be found at: %s',
+    logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
 
   if FLAGS.run_stage not in [STAGE_ALL, STAGE_CLEANUP]:
