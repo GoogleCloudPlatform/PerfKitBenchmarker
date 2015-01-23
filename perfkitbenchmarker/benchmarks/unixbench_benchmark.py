@@ -27,7 +27,7 @@ from perfkitbenchmarker import regex_util
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'UnixBench++_benchmark',
+BENCHMARK_INFO = {'name': 'UnixBench_benchmark',
                   'description': 'Runs UnixBench.',
                   'scratch_disk': True,
                   'num_machines': 1}
@@ -52,7 +52,7 @@ def GetInfo():
 
 
 def Prepare(benchmark_spec):
-  """Install Unixbench++ on the target vm.
+  """Install Unixbench on the target vm.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
