@@ -33,8 +33,8 @@ flags.DEFINE_integer('memory_multiple', 10,
                      'size of fio scratch file compared to main memory size.')
 
 
-BENCHMARK_INFO = {'name': 'fio_benchmark',
-                  'description': 'Runs FIO in sequenctial, random, read '
+BENCHMARK_INFO = {'name': 'fio',
+                  'description': 'Runs fio in sequential, random, read '
                                  'and write modes.',
                   'scratch_disk': True,
                   'num_machines': 1}

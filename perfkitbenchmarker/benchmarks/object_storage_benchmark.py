@@ -46,7 +46,7 @@ FLAGS = flags.FLAGS
 
 # User a scratch disk here to simulate what most users would do when they
 # use CLI tools to interact with the storage provider.
-BENCHMARK_INFO = {'name': 'object_storage_benchmark',
+BENCHMARK_INFO = {'name': 'object_storage',
                   'description':
                   'Benchmark upload/download to Cloud Storage using CLI tools.',
                   'scratch_disk': True,

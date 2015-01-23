@@ -30,7 +30,7 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'hadoop_benchmark',
+BENCHMARK_INFO = {'name': 'hadoop_terasort',
                   'description': 'Runs Terasort',
                   'scratch_disk': True,
                   'num_machines': 9}
