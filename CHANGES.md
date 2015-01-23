@@ -1,3 +1,12 @@
+# v0.9.0 (in development)
+
+* **Breaking change**: Fixed typo in UnixBench benchmark name: now `UnixBench_benchmark` (GH-50).
+* Added support for C4 instance types on EC2 (GH-63).
+* Improvements to object_storage_benchmark (GH-59).
+* Added support for specifying `--product_name` on the command line (GH-55).
+* Added side-by-side comparison tool (GH-39, GH-61).
+* Factored out package management to support RHEL, CentOS (GH-54).
+
 # v0.8.0
 
 * Documentation cleanup (GH-19, GH-34).
