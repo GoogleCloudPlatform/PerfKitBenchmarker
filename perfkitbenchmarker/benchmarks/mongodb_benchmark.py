@@ -55,7 +55,8 @@ def Prepare(benchmark_spec):
 
   # Install mongodb on the 1st machine.
   vm.Install('mongodb_server')
-  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' /etc/mongodb.conf')
+  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' %s' %
+                   vm.GetPathToConfig('mongodb_server'))
   vm.RemoteCommand('sudo service %s restart' %
                    vm.GetServiceName('mongodb_server'))
 

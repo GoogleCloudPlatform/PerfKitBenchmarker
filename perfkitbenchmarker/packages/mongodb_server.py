@@ -18,13 +18,23 @@
 
 def YumInstall(vm):
   """Installs the mongodb package on the VM."""
-  vm.InstallEpelRepo()
-  vm.InstallPackages('mongodb-server')
+  mongodb_repo = (
+      '[mongodb]\nname=MongoDB Repository\nbaseurl='
+      'http://downloads-distro.mongodb.org/repo/redhat/os/x86_64/\n'
+      'gpgcheck=0\nenabled=1')
+  vm.RemoteCommand('echo "%s" | sudo tee /etc/yum.repos.d/mongodb.repo' %
+                   mongodb_repo)
+  vm.InstallPackages('mongodb-org-server')
 
 
 def AptInstall(vm):
   """Installs the mongodb package on the VM."""
   vm.InstallPackages('mongodb-server')
+
+
+def YumUninstall(vm):
+  """Uninstalls the mongodb package on the VM."""
+  vm.RemoteCommand('sudo rm /etc/yum.repos.d/mongodb.repo')
 
 
 def YumGetServiceName(vm):
@@ -35,3 +45,13 @@ def YumGetServiceName(vm):
 def AptGetServiceName(vm):
   """Returns the name of the mongodb service."""
   return 'mongodb'
+
+
+def YumGetPathToConfig(vm):
+  """Returns the path to the mongodb config file."""
+  return '/etc/mongod.conf'
+
+
+def AptGetPathToConfig(vm):
+  """Returns the path to the mongodb config file."""
+  return '/etc/mongodb.conf'
