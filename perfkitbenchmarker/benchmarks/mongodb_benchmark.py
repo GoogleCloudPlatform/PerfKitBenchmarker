@@ -22,7 +22,9 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
 import logging
+
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.packages import ycsb
 
 YCSB_CMD = ('cd %s; ./bin/ycsb %s mongodb -s -P workloads/workloada '
@@ -92,11 +94,12 @@ def ParseResults(output):
   samples = []
   result_match = regex_util.ExtractAllMatches(RESULT_REGEX, output)
   for groups in result_match:
-    samples.append(
-        [groups[1], float(groups[3]), groups[2], {'stage': groups[0]}])
+    samples.append(sample.Sample(
+        groups[1], float(groups[3]), groups[2], {'stage': groups[0]}))
   operations_match = regex_util.ExtractAllMatches(OPERATIONS_REGEX, output)
   for groups in operations_match:
-    samples.append(['Operations', float(groups[1]), '', {'stage': groups[0]}])
+    samples.append(sample.Sample(
+        'Operations', float(groups[1]), '', {'stage': groups[0]}))
   return samples
 
 
