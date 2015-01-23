@@ -28,6 +28,7 @@ import time
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import aerospike_server
 
@@ -134,10 +135,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   server, client = benchmark_spec.vms
   samples = []
@@ -179,7 +177,7 @@ def Run(benchmark_spec):
     }
     if FLAGS.aerospike_storage_type == DISK:
       metadata['Disk Type'] = 'Local' if FLAGS.use_local_disk else 'Remote'
-    samples.append(('Average Latency', latency, 'ms', metadata))
+    samples.append(sample.Sample('Average Latency', latency, 'ms', metadata))
 
   return samples
 
