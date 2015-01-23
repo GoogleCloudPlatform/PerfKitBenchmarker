@@ -22,12 +22,18 @@ import json
 import threading
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import package_managers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import aws_disk
 from perfkitbenchmarker.aws import util
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_string('aws_user_name', 'ubuntu',
+                    'This determines the user name that Perfkit will '
+                    'attempt to use. This must be changed in order to '
+                    'use any image other than ubuntu.')
 
 HVM = 'HVM'
 PV = 'PV'
@@ -134,7 +140,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AwsVirtualMachine, self).__init__(vm_spec)
     self.region = self.zone[:-1]
     self.image = self.image or GetImage(self.machine_type, self.region)
-    self.user_name = 'ubuntu'
+    self.user_name = FLAGS.aws_user_name
 
   def ImportKeyfile(self):
     """Imports the public keyfile to AWS."""
@@ -268,3 +274,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.RemoteCommand('sudo umount /mnt')
     return super(AwsVirtualMachine, self).SetupLocalDrives(
         mount_path=mount_path)
+
+
+class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
+                                   package_managers.AptMixin):
+  pass
+
+
+class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
+                                 package_managers.YumMixin):
+  pass

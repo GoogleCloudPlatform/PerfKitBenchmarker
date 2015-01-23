@@ -29,6 +29,7 @@ import time
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.packages import aerospike_server
 
 
 FLAGS = flags.FLAGS
@@ -43,14 +44,9 @@ flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
 BENCHMARK_INFO = {'name': 'aerospike',
                   'description': 'Runs Aerospike',
                   'num_machines': 2}
-PACKAGES = ('build-essential git autoconf libtool libssl-dev lua5.1 '
-            'liblua5.1-dev')
-AEROSPIKE_SERVER = 'https://github.com/aerospike/aerospike-server.git'
 AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
 CLIENT_DIR = 'aerospike-client-c'
 CLIENT_VERSION = '3.0.84'
-SERVER_DIR = 'aerospike-server'
-SERVER_VERSION = '3.3.19'
 READ_PERCENT = 90
 MAX_THREADS = 128
 MIN_THREADS = 8
@@ -67,7 +63,9 @@ def GetInfo():
 
 def _PrepareClient(client):
   """Prepare the Aerospike C client on a VM."""
-  client.InstallPackage(PACKAGES)
+  client.Install('build_tools')
+  client.Install('lua5_1')
+  client.Install('openssl')
   clone_command = 'git clone %s'
   client.RemoteCommand(clone_command % AEROSPIKE_CLIENT)
   build_command = ('cd %s && git checkout %s && git submodule update --init '
@@ -88,12 +86,7 @@ def _PrepareClient(client):
 
 def _PrepareServer(server):
   """Prepare the Aerospike server on a VM."""
-  server.InstallPackage(PACKAGES)
-  clone_command = 'git clone %s'
-  server.RemoteCommand(clone_command % AEROSPIKE_SERVER)
-  build_command = ('cd %s && git checkout %s && git submodule update --init '
-                   '&& make')
-  server.RemoteCommand(build_command % (SERVER_DIR, SERVER_VERSION))
+  server.Install('aerospike_server')
 
   if FLAGS.aerospike_storage_type == DISK:
     if FLAGS.use_local_disk:
@@ -102,15 +95,15 @@ def _PrepareServer(server):
       devices = [disk.GetDevicePath() for disk in server.scratch_disks]
 
     server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
-                          'aerospike-server/as/etc/aerospike_dev.conf',
+                          aerospike_server.AEROSPIKE_CONF_PATH,
                           {'devices': devices})
 
   for disk in server.scratch_disks:
     server.RemoteCommand('sudo umount %s' % disk.mount_point)
 
-  server.RemoteCommand('cd %s && make init' % SERVER_DIR)
-  server.RemoteCommand(
-      'cd %s; nohup sudo make start &> /dev/null &' % SERVER_DIR)
+  server.RemoteCommand('cd %s && make init' % aerospike_server.AEROSPIKE_DIR)
+  server.RemoteCommand('cd %s; nohup sudo make start &> /dev/null &' %
+                       aerospike_server.AEROSPIKE_DIR)
   time.sleep(5)  # Wait for server to come up
 
 
@@ -201,5 +194,6 @@ def Cleanup(benchmark_spec):
   server, client = benchmark_spec.vms
 
   client.RemoteCommand('sudo rm -rf aerospike*')
-  server.RemoteCommand('cd %s && nohup sudo make stop' % SERVER_DIR)
+  server.RemoteCommand('cd %s && nohup sudo make stop' %
+                       aerospike_server.AEROSPIKE_DIR)
   server.RemoteCommand('sudo rm -rf aerospike*')

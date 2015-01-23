@@ -29,6 +29,7 @@ import json
 import logging
 import threading
 
+from perfkitbenchmarker import package_managers
 from perfkitbenchmarker import virtual_machine
 
 
@@ -111,6 +112,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       zone: string, optional.
       local_disks: array of strings, optional.
       scratch_disk_mountpoints: string, optional
+      os_type: string, optional (see package_managers)
 
     See the constructor for descriptions.
 
@@ -128,7 +130,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     required_keys = frozenset(['ip_address', 'user_name', 'keyfile_path'])
     optional_keys = frozenset(['internal_ip', 'zone', 'local_disks',
-                               'scratch_disk_mountpoints'])
+                               'scratch_disk_mountpoints', 'os_type'])
     allowed_keys = required_keys | optional_keys
 
     def VerifyItemFormat(item):
@@ -152,8 +154,10 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       zone = item.get('zone')
       local_disks = item.get('local_disks')
       scratch_disk_mountpoints = item.get('scratch_disk_mountpoints')
-      vm = cls(ip_address, user_name, keyfile_path, internal_ip, zone,
-               local_disks, scratch_disk_mountpoints)
+      os_type = item.get('os_type')
+      vm_class = GetStaticVirtualMachineClass(os_type)
+      vm = vm_class(ip_address, user_name, keyfile_path, internal_ip, zone,
+                    local_disks, scratch_disk_mountpoints)
       cls.vm_pool.append(vm)
 
   @classmethod
@@ -174,3 +178,26 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
   def GetLocalDrives(self):
     """Returns a list of local drives on the VM."""
     return self.local_disks
+
+
+def GetStaticVirtualMachineClass(os_type):
+  """Returns the static VM class that corresponds to the os_type."""
+  class_dict = {
+      'debian': DebianBasedStaticVirtualMachine,
+      'rhel': RhelBasedStaticVirtualMachine,
+  }
+  if os_type in class_dict:
+    return class_dict[os_type]
+  else:
+    logging.warning('Could not find os type for VM. Defaulting to debian.')
+    return DebianBasedStaticVirtualMachine
+
+
+class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
+                                      package_managers.AptMixin):
+  pass
+
+
+class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
+                                    package_managers.YumMixin):
+  pass

@@ -18,9 +18,9 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-import logging
 import os.path
 import tempfile
+import threading
 import time
 import uuid
 
@@ -38,13 +38,6 @@ DEFAULT_USERNAME = 'perfkit'
 SSH_RETRIES = 10
 STRIPED_DEVICE = '/dev/md0'
 LOCAL_MOUNT_PATH = '/local'
-
-GUEST_OS_DEBIAN = 'debian'
-GUEST_OS_CENTOS = 'centos'
-
-flags.DEFINE_enum('guest_os', GUEST_OS_DEBIAN,
-                  [GUEST_OS_CENTOS, GUEST_OS_DEBIAN],
-                  'Determines what command set to run in the guest.')
 
 
 class BaseVirtualMachineSpec(object):
@@ -94,6 +87,11 @@ class BaseVirtualMachine(resource.BaseResource):
 
   is_static = False
 
+  # If multiple ssh calls are made in parallel using -t it will mess
+  # the stty settings up and the terminal will become very hard to use.
+  # Serializing calls to ssh with the -t option fixes the problem.
+  pseudo_tty_lock = threading.Lock()
+
   def __init__(self, vm_spec):
     """Initialize BaseVirtualMachine class.
 
@@ -126,7 +124,6 @@ class BaseVirtualMachine(resource.BaseResource):
     self._reachable = {}
     self._total_memory_kb = None
     self._num_cpus = None
-    self._installed_packages = set()
 
   def _Create(self):
     self.create_time = time.time()
@@ -163,7 +160,7 @@ class BaseVirtualMachine(resource.BaseResource):
   @vm_util.Retry()
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
-    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0,lazy_journal_init=0 -O '
+    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0 -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteCommand(fmt_cmd)
 
@@ -287,28 +284,23 @@ class BaseVirtualMachine(resource.BaseResource):
       SshConnectionError: If there was a problem establishing the connection.
     """
     user_host = '%s@%s' % (self.user_name, self.ip_address)
-    if FLAGS.guest_os == GUEST_OS_DEBIAN:
-      ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(remote_port), user_host]
-    elif FLAGS.guest_os == GUEST_OS_CENTOS:
-      if 'sudo' in command:
-        # The -t option forces a ptty for the connection.  This is required
-        # on Centos to run sudo.  However there is a side-effect that
-        # running backgroud jobs with "&" will fail in this mode.
-        ssh_cmd = ['/usr/bin/ssh', '-t', '-A', '-p', str(remote_port),
-                   user_host]
-      else:
-        ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(remote_port), user_host]
+    ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(remote_port), user_host]
     ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
-    if login_shell:
-      ssh_cmd.extend(['-t', 'bash -l -c "%s"' % command])
-    else:
-      ssh_cmd.append(command)
+    try:
+      if login_shell:
+        ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
+        self.pseudo_tty_lock.acquire()
+      else:
+        ssh_cmd.append(command)
 
-    for _ in range(retries):
-      stdout, stderr, retcode = vm_util.IssueCommand(
-          ssh_cmd, should_log=should_log)
-      if retcode != 255:  # Retry on 255 because this indicates an SSH failure
-        break
+      for _ in range(retries):
+        stdout, stderr, retcode = vm_util.IssueCommand(
+            ssh_cmd, should_log=should_log)
+        if retcode != 255:  # Retry on 255 because this indicates an SSH failure
+          break
+    finally:
+      if login_shell:
+        self.pseudo_tty_lock.release()
 
     if retcode:
       full_cmd = ' '.join(ssh_cmd)
@@ -363,39 +355,6 @@ class BaseVirtualMachine(resource.BaseResource):
     self.RemoteCommand('scp -o StrictHostKeyChecking=no -i %s %s %s' %
                        (REMOTE_KEY_PATH, source_path, remote_location))
 
-  @vm_util.Retry()
-  def AptUpdate(self):
-    """Runs apt-get update until it succeeds or times out."""
-    if FLAGS.guest_os == GUEST_OS_DEBIAN:
-      self.RemoteCommand('sudo apt-get update')
-    elif FLAGS.guest_os == GUEST_OS_CENTOS:
-      self.RemoteCommand('sudo rpm -ivh http://dl.fedoraproject.org/pub/epel'
-                         '/6/x86_64/epel-release-6-8.noarch.rpm')
-      self.RemoteCommand('sudo yum clean expire-cache')
-
-  @vm_util.Retry()
-  def InstallPackage(self, package_name):
-    """Installs a package on a remote machine.
-
-    Args:
-      package_name: A string containing space-delimited package names understood
-          by debian APT.
-    """
-    for package in package_name.split():
-      if self.PackageIsInstalled(package):
-        continue
-      try:
-        if FLAGS.guest_os in [GUEST_OS_DEBIAN]:
-          install_command = ('sudo DEBIAN_FRONTEND=\'noninteractive\' '
-                             '/usr/bin/apt-get -y install %s' % (package))
-        elif FLAGS.guest_os in [GUEST_OS_CENTOS]:
-          install_command = ('sudo yum -y install %s' % (package))
-        self.RemoteCommand(install_command)
-        self._installed_packages.add(package)
-      except errors.VmUtil.SshConnectionError as e:
-        self.AptUpdate()
-        raise e
-
   def AuthenticateVm(self):
     """Authenticate a remote machine to access all peers."""
     self.PushFile(vm_util.GetPrivateKeyPath(),
@@ -422,80 +381,6 @@ class BaseVirtualMachine(resource.BaseResource):
                                     'grep version | '
                                     'awk \'{print $3}\'')
     return version[:-1]
-
-  def PrepareJava(self, tarball, expected_version):
-    """Install Java on a remote machine.
-
-    Args:
-      tarball: The Java tarball on local machine to install.
-      expected_version: The expected Java version after installiation.
-
-    Raises:
-      ValueError: This is used to alert benchmarks that wont work yet.
-    """
-
-    # TODO(user): 10/28/2014 - Make this work with other OSes
-    if FLAGS.guest_os not in [GUEST_OS_DEBIAN]:
-      raise ValueError('JAVA is only supported on Debian based images.')
-
-    self.InstallPackage('libjna-java')
-    version = self.CheckJavaVersion()
-    if version != '"%s"' % expected_version:
-      self.PushDataFile(tarball)
-      self.RemoteCommand('sudo rm -rf /usr/lib/jvm', ignore_failure=True)
-      self.RemoteCommand('sudo mkdir /usr/lib/jvm', ignore_failure=True)
-      self.RemoteCommand('sudo tar -xzmpf %s -C /usr/lib/jvm' % tarball)
-      self.RemoteCommand(
-          'sudo update-alternatives --install '
-          '"/usr/bin/java" "java" '
-          '"/usr/lib/jvm/jdk%s/bin/java" 1' % expected_version)
-      self.RemoteCommand('sudo update-alternatives --set java '
-                         '/usr/lib/jvm/jdk%s/bin/java' % expected_version)
-      version = self.CheckJavaVersion()
-      if version != '"%s"' % expected_version:
-        logging.warning('Failed to update Java to version %s on vm %s. '
-                        'Current Java version is %s. '
-                        'This will likely fail.',
-                        expected_version, self.hostname, version)
-
-  def UninstallPackage(self, package_name, force=False):
-    """Uninstalls a package on a remote machine.
-
-    Args:
-      package_name: A string containing space-delimited package names understood
-          by debian APT.
-      force: Remove the package even if it was not installed by this VM.
-    """
-    for package in package_name.split():
-      if force or package_name in self._installed_packages:
-        if FLAGS.guest_os in [GUEST_OS_DEBIAN]:
-          uninstall_command = 'sudo apt-get -y --purge remove {0}'.format(
-              package)
-        elif FLAGS.guest_os in [GUEST_OS_CENTOS]:
-          uninstall_command = 'sudo yum -y remove {0}'.format(package_name)
-        self.RemoteCommand(uninstall_command)
-      else:
-        logging.info('Not removing pre-existing package {0}'.format(
-            package))
-
-  def PackageIsInstalled(self, package_name):
-    """Indicates if a package is installed on the vm or not.
-
-    Args:
-      package_name: A package name which is understood by debian APT.
-    Returns:
-      True if the package is installed, false otherwise.
-    """
-    if FLAGS.guest_os in [GUEST_OS_DEBIAN]:
-      cmd = 'dpkg -s %s 2> /dev/null | grep Status' % package_name
-    elif FLAGS.guest_os in [GUEST_OS_CENTOS]:
-      cmd = 'rpm -q  %s 2> /dev/null | grep -v not' % package_name
-    ret = self.RemoteCommand(cmd, ignore_failure=True)
-
-    if ret[0]:
-      return True
-    else:
-      return False
 
   def RemoveFile(self, filename):
     """Deletes a file on a remote machine.
@@ -598,7 +483,7 @@ class BaseVirtualMachine(resource.BaseResource):
       devices: A list of device paths that should be striped together.
       striped_device: The path to the device that will be created.
     """
-    self.InstallPackage('mdadm')
+    self.Install('mdadm')
     stripe_cmd = ('yes | sudo mdadm --create %s --level=stripe --raid-devices='
                   '%s %s' % (striped_device, len(devices), ' '.join(devices)))
     self.RemoteCommand(stripe_cmd)
