@@ -155,13 +155,12 @@ def Run(benchmark_spec):
                                                         HADOOP_VERSION)
   master.RemoteCommand('%s teragen %s /teragen'
                        % (hadoop_cmd, FLAGS.terasort_num_rows))
-
-  start_time = time.time()
-  _, stderr = master.RemoteCommand('%s terasort /teragen /terasort'
-                                   % hadoop_cmd)
   num_cpus = 0
   for vm in vms[1:]:
     num_cpus += vm.num_cpus
+  start_time = time.time()
+  _, stderr = master.RemoteCommand('%s terasort /teragen /terasort'
+                                   % hadoop_cmd)
   time_elapsed = time.time() - start_time
   data_processed_in_mbytes = FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW / (
       1024 * 1024.0)
@@ -173,11 +172,12 @@ def Run(benchmark_spec):
                        HADOOP_VERSION)
   master.RemoteCommand('hadoop-%s/bin/hadoop fs -rm -r /teravalidate' %
                        HADOOP_VERSION)
-  metadata = {'time_elapsed': time_elapsed,
-              'num_rows': FLAGS.terasort_num_rows}
+  metadata = {'num_rows': FLAGS.terasort_num_rows,
+              'data_size_in_byte': FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW}
   return [['Terasort Throughput Per Core',
            data_processed_in_mbytes / time_elapsed / num_cpus,
-           'MB/sec', metadata]]
+           'MB/sec', metadata],
+          ['Terasort Throughput Total Time', time_elapsed, 'sec', metadata]]
 
 
 def StopDatanode(vm):
