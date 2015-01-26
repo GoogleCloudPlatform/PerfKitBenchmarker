@@ -34,8 +34,8 @@ from perfkitbenchmarker import vm_util
 DEFAULT_CLUSTER_SIZE = 4
 
 # Disks and machines are set in config file.
-BENCHMARK_INFO = {'name': 'cassandra',
-                  'description': 'Run Cassandra',
+BENCHMARK_INFO = {'name': 'cassandra_stress',
+                  'description': 'Benchmark Cassandra using cassandra-stress',
                   'scratch_disk': False,
                   'num_machines': DEFAULT_CLUSTER_SIZE}
 
