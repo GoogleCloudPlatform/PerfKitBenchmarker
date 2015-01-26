@@ -214,7 +214,12 @@ def RunBenchmark(benchmark, collector):
   # Optional prerequisite checking.
   check_prereqs = getattr(benchmark, 'CheckPrerequisites', None)
   if check_prereqs:
-    check_prereqs()
+    try:
+      check_prereqs()
+    except:
+      logging.exception('Prerequisite check failed for %s',
+                        benchmark_info['name'])
+      raise
 
   start_time = time.time()
   try:
