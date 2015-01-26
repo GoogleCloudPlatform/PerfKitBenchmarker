@@ -103,64 +103,64 @@ def ParseCSVResults(results):
   if IsValueValid(results[3]):
     metadata['chunk_size'] = results[3]
   if IsValueValid(results[7]):
-    samples.extend(['Sequential Output:Per Char:Throughput',
+    samples.append(['Sequential Output:Per Char:Throughput',
                     float(results[7]), 'K/sec', metadata])
   if IsValueValid(results[8]):
-    samples.extend(['Sequential Output:Per Char:Cpu Percentage',
+    samples.append(['Sequential Output:Per Char:Cpu Percentage',
                     float(results[8]), '%', metadata])
   if IsValueValid(results[36]):
     value, unit = ParseLatencyResult(results[36])
-    samples.extend(['Sequential Output:Per Char:Latency',
+    samples.append(['Sequential Output:Per Char:Latency',
                     value, unit, metadata])
   if IsValueValid(results[9]):
-    samples.extend(['Sequential Output:Block:Throughput',
+    samples.append(['Sequential Output:Block:Throughput',
                     float(results[9]), 'K/sec', metadata])
   if IsValueValid(results[10]):
-    samples.extend(['Sequential Output:Block:Cpu Percentage',
+    samples.append(['Sequential Output:Block:Cpu Percentage',
                     float(results[10]), '%', metadata])
   if IsValueValid(results[37]):
     value, unit = ParseLatencyResult(results[37])
-    samples.extend(['Sequential Output:Block:Latency',
+    samples.append(['Sequential Output:Block:Latency',
                     value, unit, metadata])
   if IsValueValid(results[11]):
-    samples.extend(['Sequential Output:Rewrite:Throughput',
+    samples.append(['Sequential Output:Rewrite:Throughput',
                     float(results[11]), 'K/sec', metadata])
   if IsValueValid(results[12]):
-    samples.extend(['Sequential Output:Rewrite:Cpu Percentage',
+    samples.append(['Sequential Output:Rewrite:Cpu Percentage',
                     float(results[12]), '%', metadata])
   if IsValueValid(results[38]):
     value, unit = ParseLatencyResult(results[38])
-    samples.extend(['Sequential Output:Rewrite:Latency',
+    samples.append(['Sequential Output:Rewrite:Latency',
                     value, unit, metadata])
   if IsValueValid(results[13]):
-    samples.extend(['Sequential Input:Per Char:Throughput',
+    samples.append(['Sequential Input:Per Char:Throughput',
                     float(results[13]), 'K/sec', metadata])
   if IsValueValid(results[14]):
-    samples.extend(['Sequential Input:Per Char:Cpu Percentage',
+    samples.append(['Sequential Input:Per Char:Cpu Percentage',
                     float(results[14]), '%', metadata])
   if IsValueValid(results[39]):
     value, unit = ParseLatencyResult(results[39])
-    samples.extend(['Sequential Iutput:Per Char:Latency',
+    samples.append(['Sequential Iutput:Per Char:Latency',
                     value, unit, metadata])
   if IsValueValid(results[15]):
-    samples.extend(['Sequential Input:Block:Throughput',
+    samples.append(['Sequential Input:Block:Throughput',
                     float(results[15]), 'K/sec', metadata])
   if IsValueValid(results[16]):
-    samples.extend(['Sequential Input:Block:Cpu Percentage',
+    samples.append(['Sequential Input:Block:Cpu Percentage',
                     float(results[16]), '%', metadata])
   if IsValueValid(results[40]):
     value, unit = ParseLatencyResult(results[40])
-    samples.extend(['Sequential Iutput:Block:Latency',
+    samples.append(['Sequential Iutput:Block:Latency',
                     value, unit, metadata])
   if IsValueValid(results[17]):
-    samples.extend(['Random Seeks:Throughput',
+    samples.append(['Random Seeks:Throughput',
                     float(results[17]), 'K/sec', metadata])
   if IsValueValid(results[18]):
-    samples.extend(['Random Seeks:Cpu Percentage',
+    samples.append(['Random Seeks:Cpu Percentage',
                     float(results[18]), '%', metadata])
   if IsValueValid(results[41]):
     value, unit = ParseLatencyResult(results[41])
-    samples.extend(['Random Seeks:Latency',
+    samples.append(['Random Seeks:Latency',
                     value, unit, metadata])
   metadata = copy.deepcopy(metadata)
   if IsValueValid(results[19]):
@@ -174,65 +174,66 @@ def ParseCSVResults(results):
   if IsValueValid(results[23]):
     metadata['chunk_size'] = results[23]
   if IsValueValid(results[24]):
-    samples.extend(['Sequential Create:Create:Throughput',
+    samples.append(['Sequential Create:Create:Throughput',
                     float(results[24]), 'K/sec', metadata])
   if IsValueValid(results[25]):
-    samples.extend(['Sequential Create:Create:Cpu Percentage',
+    samples.append(['Sequential Create:Create:Cpu Percentage',
                     float(results[25]), '%', metadata])
   if IsValueValid(results[42]):
     value, unit = ParseLatencyResult(results[42])
-    samples.extend(['Sequential Create:Create:Latency',
+    samples.append(['Sequential Create:Create:Latency',
                     value, unit, metadata])
   if IsValueValid(results[26]):
-    samples.extend(['Sequential Create:Read:Throughput',
+    samples.append(['Sequential Create:Read:Throughput',
                     float(results[26]), 'K/sec', metadata])
   if IsValueValid(results[27]):
-    samples.extend(['Sequential Create:Read:Cpu Percentage',
+    samples.append(['Sequential Create:Read:Cpu Percentage',
                     float(results[27]), '%', metadata])
   if IsValueValid(results[43]):
     value, unit = ParseLatencyResult(results[43])
-    samples.extend(['Sequential Create:Read:Latency',
+    samples.append(['Sequential Create:Read:Latency',
                     value, unit, metadata])
   if IsValueValid(results[28]):
-    samples.extend(['Sequential Create:Delete:Throughput',
+    samples.append(['Sequential Create:Delete:Throughput',
                     float(results[28]), 'K/sec', metadata])
   if IsValueValid(results[29]):
-    samples.extend(['Sequential Create:Delete:Cpu Percentage',
+    samples.append(['Sequential Create:Delete:Cpu Percentage',
                     float(results[29]), '%', metadata])
   if IsValueValid(results[44]):
     value, unit = ParseLatencyResult(results[44])
-    samples.extend(['Sequential Create:Delete:Latency',
+    samples.append(['Sequential Create:Delete:Latency',
                     value, unit, metadata])
   if IsValueValid(results[30]):
-    samples.extend(['Random Create:Create:Throughput',
+    samples.append(['Random Create:Create:Throughput',
                     float(results[30]), 'K/sec', metadata])
   if IsValueValid(results[31]):
-    samples.extend(['Random Create:Create:Cpu Percentage',
+    samples.append(['Random Create:Create:Cpu Percentage',
                     float(results[31]), '%', metadata])
   if IsValueValid(results[45]):
     value, unit = ParseLatencyResult(results[45])
-    samples.extend(['Random Create:Create:Latency',
+    samples.append(['Random Create:Create:Latency',
                     value, unit, metadata])
   if IsValueValid(results[32]):
-    samples.extend(['Random Create:Read:Throughput',
+    samples.append(['Random Create:Read:Throughput',
                     float(results[32]), 'K/sec', metadata])
   if IsValueValid(results[33]):
-    samples.extend(['Random Create:Read:Cpu Percentage',
+    samples.append(['Random Create:Read:Cpu Percentage',
                     float(results[33]), '%', metadata])
   if IsValueValid(results[46]):
     value, unit = ParseLatencyResult(results[46])
-    samples.extend(['Random Create:Read:Latency',
+    samples.append(['Random Create:Read:Latency',
                     value, unit, metadata])
   if IsValueValid(results[34]):
-    samples.extend(['Random Create:Delete:Throughput',
+    samples.append(['Random Create:Delete:Throughput',
                     float(results[34]), 'K/sec', metadata])
   if IsValueValid(results[35]):
-    samples.extend(['Random Create:Delete:Cpu Percentage',
+    samples.append(['Random Create:Delete:Cpu Percentage',
                     float(results[35]), '%', metadata])
   if IsValueValid(results[47]):
     value, unit = ParseLatencyResult(results[47])
-    samples.extend(['Random Create:Delete:Latency',
+    samples.append(['Random Create:Delete:Latency',
                     value, unit, metadata])
+  print '|%s|' % samples
   return samples
 
 
@@ -257,7 +258,7 @@ def Run(benchmark_spec):
                      2 * vm.total_memory_kb / 1024))
   logging.info('Bonnie++ Results:')
   out, _ = vm.RemoteCommand(bonnie_command, should_log=True)
-  return ParseCSVResults(out)
+  return ParseCSVResults(out.strip())
 
 
 def Cleanup(benchmark_spec):
