@@ -34,7 +34,8 @@ from perfkitbenchmarker import vm_util
 
 flags.DEFINE_integer('num_keys', 0,
                      'Number of keys used in cassandra-stress tool.')
-
+flags.DEFINE_integer('num_stress_threads', 30,
+                     'Number of stress threads on each loader node.')
 
 FLAGS = flags.FLAGS
 
@@ -53,7 +54,6 @@ CASSANDRA_YAML = 'cassandra.yaml'
 CASSANDRA_PID = 'cassandra_pid'
 
 REQUIRED_JAVA_VERSION = '1.7.0_40'
-
 LOADER_NODE = 'loader'
 DATA_NODE = 'cas'
 WAITING_IN_SECONDS = 30
@@ -63,7 +63,6 @@ SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
 CONSISTENCY_LEVEL = 'quorum'
 REPLICATION_FACTOR = '3'
 RETRIES = '1000'
-THREADS = '30'
 MAX_RETRY_START_CLUSTER = 5
 NUM_KEYS_PER_CORE = 5000000
 
@@ -264,8 +263,8 @@ def RunTestOnLoader(vm, data_nodes_ip_addresses):
       '--replication-factor %s --consistency-level %s '
       '--num-keys %s -K %s -t %s' % (
           CASSANDRA_DIR, vm.hostname, data_nodes_ip_addresses,
-          REPLICATION_FACTOR, CONSISTENCY_LEVEL,
-          FLAGS.num_keys, RETRIES, THREADS), ignore_failure=True)
+          REPLICATION_FACTOR, CONSISTENCY_LEVEL, FLAGS.num_keys,
+          RETRIES, FLAGS.num_stress_threads), ignore_failure=True)
 
 
 def InsertTest(benchmark_spec, vm):
@@ -435,7 +434,8 @@ def CollectResults(benchmark_spec):
   results = []
   metadata = {'num_keys': FLAGS.num_keys,
               'num_data_nodes': len(vm_dict[DATA_NODE]),
-              'num_loader_nodes': len(vm_dict[LOADER_NODE])}
+              'num_loader_nodes': len(vm_dict[LOADER_NODE]),
+              'num_stress_threads': FLAGS.num_stress_threads}
   results.append(['Interval_op_rate', math.fsum(interval_op_rate_list),
                   'operations per second', metadata])
   results.append(['Interval_key_rate', math.fsum(interval_key_rate_list),
