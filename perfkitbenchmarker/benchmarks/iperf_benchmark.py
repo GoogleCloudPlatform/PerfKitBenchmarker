@@ -34,6 +34,7 @@ BENCHMARKS_INFO = {'name': 'iperf',
                    'num_machines': 2}
 
 IPERF_PORT = 20000
+IPERF_RETRIES = 5
 
 
 def GetInfo():
@@ -73,8 +74,11 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   iperf_cmd = ('iperf --client %s --port %s --format m --time 60' %
                (receiving_ip_address, IPERF_PORT))
   iperf_pattern = re.compile(r'(\d+\.\d+|\d+) Mbits/sec')
-  stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True)
-  match = iperf_pattern.search(stdout)
+  for _ in range(IPERF_RETRIES):
+    stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True)
+    match = iperf_pattern.search(stdout)
+    if match:
+      break
   if not match:
     raise ValueError('Could not find iperf result in stdout:\n\n%s' % stdout)
   value = match.group(1)
