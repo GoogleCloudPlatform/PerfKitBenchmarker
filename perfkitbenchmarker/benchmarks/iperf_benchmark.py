@@ -36,6 +36,7 @@ BENCHMARKS_INFO = {'name': 'iperf',
                    'num_machines': 2}
 
 IPERF_PORT = 20000
+IPERF_RETRIES = 5
 
 
 def GetInfo():
