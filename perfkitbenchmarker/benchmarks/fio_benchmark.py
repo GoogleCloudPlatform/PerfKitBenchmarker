@@ -23,7 +23,9 @@ import logging
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.benchmarks.util import fio
+from perfkitbenchmarker.benchmarks.util import fio as fio_util
+from perfkitbenchmarker.packages import fio
+
 
 FLAGS = flags.FLAGS
 
@@ -58,7 +60,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO prepare on %s', vm)
-  fio.PrepareFio(vm)
+  vm.Install('fio')
   file_path = data.ResourcePath(flags.FLAGS.fio_jobfile)
   vm.PushFile(file_path)
   disk_size_kb = vm.GetDeviceSizeFromPath(vm.GetScratchDir())
@@ -92,7 +94,7 @@ def Run(benchmark_spec):
   vm = vms[0]
   logging.info('FIO running on %s', vm)
   fio_command = '%s/fio --output-format=json %s' % (
-      fio.FIO_FOLDER, flags.FLAGS.fio_jobfile)
+      fio.FIO_PATH, flags.FLAGS.fio_jobfile)
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
@@ -100,7 +102,7 @@ def Run(benchmark_spec):
   stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
   with open(data.ResourcePath(flags.FLAGS.fio_jobfile)) as f:
     job_file = f.read()
-  return fio.ParseResults(job_file, json.loads(stdout))
+  return fio_util.ParseResults(job_file, json.loads(stdout))
 
 
 def Cleanup(benchmark_spec):
@@ -114,5 +116,4 @@ def Cleanup(benchmark_spec):
   vm = vms[0]
   logging.info('FIO Cleanup up on %s', vm)
   vm.RemoveFile(flags.FLAGS.fio_jobfile)
-  vm.UninstallPackage(fio.REQUIRED_PACKAGES)
   vm.RemoveFile(vm.GetScratchDir() + flags.FLAGS.fio_benchmark_filename)

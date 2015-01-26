@@ -31,6 +31,7 @@ class BaseResource(object):
   __metaclass__ = abc.ABCMeta
 
   def __init__(self):
+    super(BaseResource, self).__init__()
     self.created = False
     self.deleted = False
 

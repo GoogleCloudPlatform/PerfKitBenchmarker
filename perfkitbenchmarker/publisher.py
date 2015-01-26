@@ -30,6 +30,11 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_string(
+    'product_name',
+    'PerfKitBenchmarker',
+    'The product name to use when publishing results.')
+
 flags.DEFINE_boolean(
     'official',
     False,
@@ -37,16 +42,11 @@ flags.DEFINE_boolean(
     'default is False. Official test results are treated and queried '
     'differently from non-official test results.')
 
-flags.DEFINE_boolean(
-    'json_output',
-    True,
-    'A boolean indicating whether to write newline-delimited '
-    'JSON results to the run-specific temporary directory.')
-
 flags.DEFINE_string(
     'json_path',
     None,
-    'A path to write newline-delimited JSON results')
+    'A path to write newline-delimited JSON results '
+    'Default: write to a run-specific temporary directory')
 
 flags.DEFINE_string(
     'bigquery_table',
@@ -77,7 +77,6 @@ flags.DEFINE_list(
     'samples as metadata. Each key-value pair in the list should be colon '
     'separated.')
 
-PRODUCT_NAME = 'PerfKitBenchmarker'
 DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
 GCS_OBJECT_NAME_LENGTH = 20
@@ -444,7 +443,7 @@ class SampleCollector(object):
         metadata = meta_provider.AddMetadata(metadata, benchmark_spec)
 
       sample['metadata'] = metadata
-      sample['product_name'] = PRODUCT_NAME
+      sample['product_name'] = FLAGS.product_name
       sample['official'] = FLAGS.official
       sample['owner'] = FLAGS.owner
       sample['timestamp'] = time.time()
