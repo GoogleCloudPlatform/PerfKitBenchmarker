@@ -368,13 +368,7 @@ class BaseVirtualMachine(resource.BaseResource):
     Raises:
       perfkitbenchmarker.data.ResourceNotFound: if 'data_file' does not exist.
     """
-    try:
-      file_path = data.ResourcePath(data_file)
-    except data.ResourceNotFound:
-      logging.error(
-          'Please provide %s under perfkitbenchmarker/data directory.'
-          % data_file)
-      raise
+    file_path = data.ResourcePath(data_file)
     self.PushFile(file_path)
 
   def CheckJavaVersion(self):
