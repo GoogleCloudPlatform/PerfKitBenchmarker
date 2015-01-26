@@ -11,17 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Contains benchmark imports and a list of benchmarks.
-
-All modules within this package are considered benchmarks, and are loaded
-dynamically. Add non-benchmark code to other packages.
-"""
-
-from perfkitbenchmarker import import_util
 
 
-def _LoadBenchmarks():
-  return list(import_util.LoadModulesForPath(__path__, __name__))
+"""Module containing lua installation and cleanup functions."""
 
 
-BENCHMARKS = _LoadBenchmarks()
+def YumInstall(vm):
+  """Installs lua on the VM."""
+  vm.InstallPackages('lua lua-devel lua-static')
+
+
+def AptInstall(vm):
+  """Installs lua on the VM."""
+  vm.InstallPackages('lua5.1 liblua5.1-dev')

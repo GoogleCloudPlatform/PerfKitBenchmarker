@@ -46,6 +46,7 @@ import logging
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.packages import fio
 
 LOGGING = 'logging'
 DATABASE = 'database'
@@ -69,7 +70,6 @@ BENCHMARK_INFO = {'name': 'synthetic_storage_workloads_benchmark',
                                  'write modes to simulate various scenarios.',
                   'scratch_disk': True,
                   'num_machines': 1}
-REQUIRED_PACKAGES = 'bc fio libaio1'
 DESCRIPTION = 'description'
 METHOD = 'method'
 
@@ -98,7 +98,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO prepare on %s', vm)
-  vm.InstallPackage(REQUIRED_PACKAGES)
+  vm.Install('fio')
 
 
 def ParseFioResult(res):
@@ -183,7 +183,7 @@ def RunSimulatedLogging(vm):
   """
   test_size = vm.total_memory_kb
   cmd = (
-      'fio '
+      '%s '
       '--filesize=10g '
       '--directory=%s '
       '--ioengine=libaio '
@@ -192,7 +192,8 @@ def RunSimulatedLogging(vm):
       '--randrepeat=0 '
       '--direct=0 '
       '--size=%dk '
-      '--iodepth=%d ') % (vm.GetScratchDir(),
+      '--iodepth=%d ') % (fio.FIO_PATH,
+                          vm.GetScratchDir(),
                           test_size,
                           DEFAULT_IODEPTH)
   if FLAGS.maxjobs:
@@ -245,7 +246,7 @@ def RunSimulatedDatabase(vm):
   results = []
   for depth in iodepth_list:
     cmd = (
-        'fio '
+        '%s '
         '--filesize=10g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -256,7 +257,8 @@ def RunSimulatedDatabase(vm):
         '--randrepeat=0 '
         '--iodepth=%s '
         '--size=%dk '
-        '--blocksize=4k ') % (vm.GetScratchDir(),
+        '--blocksize=4k ') % (fio.FIO_PATH,
+                              vm.GetScratchDir(),
                               depth,
                               test_size)
     if FLAGS.maxjobs:
@@ -319,7 +321,7 @@ def RunSimulatedStreaming(vm):
   results = []
   for depth in iodepth_list:
     cmd = (
-        'fio '
+        '%s '
         '--filesize=10g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -330,7 +332,8 @@ def RunSimulatedStreaming(vm):
         '--iodepth=%s '
         '--blocksize=1m '
         '--size=%dk '
-        '--filename=fio_test_file ') % (vm.GetScratchDir(),
+        '--filename=fio_test_file ') % (fio.FIO_PATH,
+                                        vm.GetScratchDir(),
                                         depth,
                                         test_size)
     if FLAGS.maxjobs:
@@ -402,5 +405,4 @@ def Cleanup(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO Cleanup up on %s', vm)
-  vm.UninstallPackage(REQUIRED_PACKAGES)
   vm.RemoveFile(vm.GetScratchDir() + '/fio_test_file')
