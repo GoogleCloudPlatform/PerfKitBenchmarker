@@ -6,6 +6,7 @@
 * Added support for specifying `--product_name` on the command line (GH-55).
 * Added side-by-side comparison tool (GH-39, GH-61).
 * Factored out package management to support RHEL, CentOS (GH-54).
+* Improved accuracy of cluster boot time (GH-69, GH-73).
 
 # v0.8.0
 
