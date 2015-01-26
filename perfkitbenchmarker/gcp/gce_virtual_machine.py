@@ -25,10 +25,12 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import json
+import re
 import tempfile
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import package_managers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import gce_disk
@@ -39,6 +41,9 @@ flags.DEFINE_integer('gce_num_local_ssds', 0,
                      'The number of ssds that should be added to the VM. Note '
                      'that this is currently only supported in certain zones '
                      '(see https://cloud.google.com/compute/docs/local-ssd).')
+flags.DEFINE_string('gcloud_scopes', None, 'If set, space-separated list of '
+                    'scopes to apply to every created machine')
+
 FLAGS = flags.FLAGS
 
 SET_INTERRUPTS_SH = 'set-interrupts.sh'
@@ -104,6 +109,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       for _ in range(self.num_ssds):
         create_cmd.append('--local-ssd')
         create_cmd.append('interface=%s' % ssd_interface_option)
+      if FLAGS.gcloud_scopes:
+        create_cmd.extend(['--scopes'] +
+                          re.split(r'[,; ]', FLAGS.gcloud_scopes))
       create_cmd.extend(util.GetDefaultGcloudFlags(self))
       vm_util.IssueCommand(create_cmd)
 
@@ -194,3 +202,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.RemoteCommand(
           'chmod +rx set-interrupts.sh; sudo ./set-interrupts.sh')
     return ret
+
+
+class DebianBasedGceVirtualMachine(GceVirtualMachine,
+                                   package_managers.AptMixin):
+  pass
+
+
+class RhelBasedGceVirtualMachine(GceVirtualMachine,
+                                 package_managers.YumMixin):
+  pass

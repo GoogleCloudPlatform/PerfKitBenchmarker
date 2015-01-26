@@ -33,7 +33,7 @@ def ExtractGroup(regex, text, group=1):
   Returns:
     A floating point number matched by 'regex' on 'text'.
   Raises:
-    NoMatchError: when 'regex' does not match 'text'
+    NoMatchError: when 'regex' does not match 'text'.
     IndexError: when 'group' is not present in the match.
   """
   match = re.search(regex, text)
@@ -50,3 +50,27 @@ def ExtractGroup(regex, text, group=1):
 def ExtractFloat(regex, text, group=1):
   """Extracts a float from a regular expression matched to 'text'."""
   return float(ExtractGroup(regex, text, group=group))
+
+
+def ExtractAllMatches(regex, text):
+  """Extracts all matches from a regular expression matched within 'text'.
+
+  Extracts all matches from a regular expression matched within 'text'. Please
+  note that this function will return a list of strings if regex does not
+  contain any capturing groups, matching the behavior of re.findall:
+  >>> re.findall(r'bar', 'foo foo bar foo bar foo')
+  ['bar', 'bar']
+
+  Args:
+    regex: string. Regular expression.
+    text: string. Text to search.
+  Returns:
+    A list of tuples of strings that matched by 'regex' within 'text'.
+  Raises:
+    NoMatchError: when 'regex' does not match 'text'.
+  """
+  match = re.findall(regex, text)
+  if not match:
+    raise NoMatchError('No match for pattern "{0}" in "{1}"'.format(
+        regex, text))
+  return match

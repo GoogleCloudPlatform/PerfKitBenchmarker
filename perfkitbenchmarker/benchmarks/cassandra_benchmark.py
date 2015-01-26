@@ -89,9 +89,9 @@ def PrepareVm(vm):
   vm.RemoteCommand('curl -OL http://downloads.datastax.com/community/%s'
                    % CASSANDRA_TAR)
   try:
-    vm.PrepareJava(JAVA_TAR, REQUIRED_JAVA_VERSION)
-  except data.ResourceNotFound:
-    raise errors.Benchmarks.PrepareException('%s not found' % JAVA_TAR)
+    vm.Install('openjdk7')
+  except errors.VirtualMachine.VirtualMachineError as e:
+    raise errors.Benchmarks.PrepareException(e)
 
 
 def Prepare(benchmark_spec):

@@ -1,3 +1,27 @@
+# v0.9.0 (in development)
+
+* **Breaking change**: Fixed typo in UnixBench benchmark name: now `UnixBench_benchmark` (GH-50).
+* Added support for C4 instance types on EC2 (GH-63).
+* Improvements to object_storage_benchmark (GH-59).
+* Added support for specifying `--product_name` on the command line (GH-55).
+* Added side-by-side comparison tool (GH-39, GH-61).
+* Factored out package management to support RHEL, CentOS (GH-54).
+* Improved accuracy of cluster boot time (GH-69, GH-73).
+
+# v0.8.0
+
+* Documentation cleanup (GH-19, GH-34).
+* Fix incorrect assignment of `ip_type` metadata in `netperf_simple` benchmark (GH-26).
+* Added `--gcloud_scopes` flag, to support providing permissions to created instances on GCP.
+* Changed GCP default image from `debian-7-backports` to `ubuntu-14-04`. All cloud providers now run Ubuntu 14.04 by default (GH-43).
+* Added results parser for MongoDB (GH-36) and UnixBench++ (GH-45).
+* Improved unit test coverage (GH-21).
+
+# v0.7.1
+
+* GCE VM SSH keys are now provided via a temporary file rather than the command
+  line, which fixes a compatibility issue between versions of `gcloud` (GH-19).
+
 # v0.7.0
 
 * New benchmark: `aerospike` (GH-13).
