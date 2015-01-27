@@ -32,11 +32,14 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 
+NUM_KEYS_PER_CORE = 5000000
+
 flags.DEFINE_integer('num_keys', 0,
                      'Number of keys used in cassandra-stress tool. '
                      'If not set, this benchmark will use '
                      'NUM_KEYS_PER_CORE * num_cpus '
-                     'on the data node as the value.')
+                     'on data nodes as the value.')
+
 flags.DEFINE_integer('num_cassandra_stress_threads', 50,
                      'Number of threads used in cassanrda-stress tool '
                      'on each loader node.')
@@ -70,7 +73,6 @@ CONSISTENCY_LEVEL = 'quorum'
 REPLICATION_FACTOR = '3'
 RETRIES = '1000'
 MAX_RETRY_START_CLUSTER = 5
-NUM_KEYS_PER_CORE = 5000000
 
 
 def GetInfo():
@@ -306,11 +308,10 @@ def InsertTest(benchmark_spec, vm):
   logging.info('Waiting %s for keyspace to propagate.', WAITING_IN_SECONDS)
   time.sleep(WAITING_IN_SECONDS)
   if not FLAGS.num_keys:
-    logging.info('Num keys not set, using %s*num_cpu in stress test.',
-                 NUM_KEYS_PER_CORE)
     FLAGS.num_keys = NUM_KEYS_PER_CORE * benchmark_spec.vm_dict[
         DATA_NODE][0].num_cpus
-
+    logging.info('Num keys not set, using %s in cassandra-stress test.',
+                 FLAGS.num_keys)
   logging.info('Executing the benchmark.')
   args = [((loader_vm, data_nodes_ip_addresses), {})
           for loader_vm in benchmark_spec.vm_dict[LOADER_NODE]]
