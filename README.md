@@ -163,9 +163,15 @@ $ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro
 $ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
 ```
 
-HOW TO RUN ALL BENCHMARKS
+HOW TO RUN ALL STANDARD BENCHMARKS
 ==================
-Run without the --benchmarks parameter and every benchmark will run serially which can take a couple of hours.  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
+Run without the --benchmarks parameter and every benchmark in the standard set will run serially which can take a couple of hours (alternatively run with --benchmarks="standard_set").  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
+
+
+HOW TO RUN ALL BENCHMARKS IN A NAMED SET
+==================
+To run all benchmarks in a named set, specify the set name in the benchmarks parameter (e.g. --benchmarks="standard_set"). Sets can be combined with individual benchmarks or other named sets.
+
 
 USEFUL GLOBAL FLAGS
 ==================
