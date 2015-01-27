@@ -28,7 +28,7 @@ from perfkitbenchmarker.packages import unixbench
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'UnixBench_benchmark',
+BENCHMARK_INFO = {'name': 'unixbench',
                   'description': 'Runs UnixBench.',
                   'scratch_disk': True,
                   'num_machines': 1}
