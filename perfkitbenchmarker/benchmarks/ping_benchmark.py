@@ -63,11 +63,11 @@ def Run(benchmark_spec):
   ping_cmd = 'ping -c 100 %s' % vms[1].internal_ip
   stdout, _ = vm.RemoteCommand(ping_cmd, should_log=True)
   stats = re.findall('([0-9]*\\.[0-9]*)', stdout.splitlines()[-1])
-  assert len(stats) == 4, stats
+  assert len(stats) == len(METRICS), stats
   results = []
   metadata = {'ip_type': 'internal'}
-  for i in range(4):
-    results.append(sample.Sample(METRICS[i], float(stats[i]), 'ms', metadata))
+  for i, metric in enumerate(METRICS):
+    results.append(sample.Sample(metric, float(stats[i]), 'ms', metadata))
   return results
 
 

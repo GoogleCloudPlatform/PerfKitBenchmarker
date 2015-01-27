@@ -133,7 +133,7 @@ def CreateSampleFromBandwidthTuple(result, test, iodepth, test_size):
     result: A tuple, containing (aggrb, unit of aggrb, minb, unit of minb,
         maxb, unit of maxb, mint, unit of mint, maxt, unit of maxt).
     test: Name of test.
-    iodepth: io depth parameter used by fio command.
+    iodepth: IO depth parameter used by fio command.
   Returns:
     A sample.Sample.
   """

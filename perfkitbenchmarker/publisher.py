@@ -369,11 +369,11 @@ class SampleCollector(object):
 
   Attributes:
     samples: A list of Sample objects.
-    metadata_providers: list of MetadataProvider. Metadata providers to use.
-      Defaults to DEFAULT_METADATA_PROVIDERS.
-    publishers: list of SamplePublishers. If not specified, defaults to a
-      LogPublisher, PrettyPrintStreamPublisher, NewlineDelimitedJSONPublisher, a
-      BigQueryPublisher if FLAGS.bigquery_table is specified, and a
+    metadata_providers: A list of MetadataProvider objects. Metadata providers
+      to use.  Defaults to DEFAULT_METADATA_PROVIDERS.
+    publishers: A list of SamplePublisher objects. If not specified, defaults to
+      a LogPublisher, PrettyPrintStreamPublisher, NewlineDelimitedJSONPublisher,
+      a BigQueryPublisher if FLAGS.bigquery_table is specified, and a
       CloudStoragePublisher if FLAGS.cloud_storage_bucket is specified. See
       SampleCollector._DefaultPublishers.
     run_uri: A unique tag for the run.
