@@ -153,7 +153,7 @@ def CreateSampleFromLatencyTuple(result, test, iodepth, test_size):
   Args:
     result: A tuple, containing (unit, min, max, avg, stdev).
     test: Name of test.
-    iodepth: iodepth parameter used by fio command.
+    iodepth: IO depth parameter used by fio command.
   Returns:
     A sample.Sample.
   """
