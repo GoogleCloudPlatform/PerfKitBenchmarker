@@ -7,6 +7,20 @@
 * Added side-by-side comparison tool (GH-39, GH-61).
 * Factored out package management to support RHEL, CentOS (GH-54).
 * Improved accuracy of cluster boot time (GH-69, GH-73).
+* **Breaking change:** updated benchmark names to be more consistent (GH-72).
+  Specific changes:
+
+    + `cassandra` → `cassandra_stress`
+    + `copy_benchmark` → `copy_throughput`
+    + `fio_benchmark` → `fio`
+    + `hadoop_benchmark` → `hadoop_terasort`
+    + `mesh_benchmark` → `mesh_network`
+    + `netperf_simple` → `netperf`
+    + `object_storage_benchmark` → `cloud_storage`
+    + `synthetic_storage_workloads_benchmark` → `synthetic_storage_workload`
+    + `sysbench_oltp_benchmark` → `sysbench_oltp`
+    + `UnixBench_benchmark` → `unixbench`
+
 
 # v0.8.0
 

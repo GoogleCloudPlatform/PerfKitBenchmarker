@@ -68,6 +68,15 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(HPCCINF_FILE)
+
+
 def CreateMachineFile(vms):
   """Create a file with the IP of each machine in the cluster on its own line.
 

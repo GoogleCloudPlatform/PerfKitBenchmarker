@@ -37,9 +37,9 @@ flags.DEFINE_integer('num_iterations', 1,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'mesh_benchmark',
-                  'description': 'Get VM to VM cross section bandwidth for '
-                                 'mesh network.',
+BENCHMARK_INFO = {'name': 'mesh_network',
+                  'description': 'Measures VM to VM cross section bandwidth in '
+                  'a mesh network.',
                   'scratch_disk': False,
                   'num_machines': None}  # Set in GetInfo()
 
