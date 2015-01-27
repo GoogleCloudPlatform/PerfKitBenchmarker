@@ -33,8 +33,9 @@ from perfkitbenchmarker import vm_util
 
 
 flags.DEFINE_integer('num_keys', 0,
-                     'Number of keys used in cassandra-stress tool. If not set, '
-                     'this benchmark will use NUM_KEYS_PER_CORE * num_cpus '
+                     'Number of keys used in cassandra-stress tool. '
+                     'If not set, this benchmark will use '
+                     'NUM_KEYS_PER_CORE * num_cpus '
                      'on the data node as the value.')
 flags.DEFINE_integer('num_cassandra_stress_threads', 50,
                      'Number of threads used in cassanrda-stress tool '
@@ -273,7 +274,6 @@ def RunTestOnLoader(vm, data_nodes_ip_addresses):
     vm: The target vm.
     data_nodes_ip_addresses: Ip addresses for all data nodes seperated by ','.
   """
-  # cassandra-stress tool will report Unable to create stress keyspace error to stderr.
   vm.RemoteCommand(
       './%s/tools/bin/cassandra-stress '
       '--file "./%s.results" --nodes %s '
