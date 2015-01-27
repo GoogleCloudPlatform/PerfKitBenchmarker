@@ -34,12 +34,11 @@ flags.DEFINE_integer('terasort_num_rows', 100000000,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'hadoop_benchmark',
+BENCHMARK_INFO = {'name': 'hadoop_terasort',
                   'description': 'Runs Terasort',
                   'scratch_disk': True,
                   'num_machines': 9}
 
-JRE_PKG = 'openjdk-7-jre-headless'
 HADOOP_VERSION = '2.5.2'
 HADOOP_URL = ('http://apache.mirrors.tds.net/hadoop/common/hadoop-%s/'
               'hadoop-%s.tar.gz') % (HADOOP_VERSION, HADOOP_VERSION)
@@ -51,6 +50,16 @@ NUM_BYTES_PER_ROW = 100
 
 def GetInfo():
   return BENCHMARK_INFO
+
+
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  for resource in DATA_FILES:
+    data.ResourcePath(resource)
 
 
 def _ConfDir(vm):
@@ -66,9 +75,10 @@ def InstallHadoop(vm, master_ip, worker_ips):
     master_ip: A string of the master VM's ip.
     worker_ips: A list of all slave ips.
   """
+  vm.Install('wget')
   vm.RemoteCommand('wget %s' % HADOOP_URL)
   vm.RemoteCommand('tar xvzf hadoop-%s.tar.gz' % HADOOP_VERSION)
-  vm.InstallPackage(JRE_PKG)
+  vm.Install('openjdk7')
   vm.RemoteCommand('mkdir hadoop-%s/conf' % HADOOP_VERSION)
 
   # Set available memory to 90% of that on the system
@@ -193,7 +203,6 @@ def StopDatanode(vm):
 def CleanNode(vm):
   """Uninstall packages and delete files needed for hadoop on a single VM."""
   logging.info('Hadoop Cleanup up on %s', vm)
-  vm.UninstallPackage(JRE_PKG)
   vm.RemoteCommand('rm -rf /scratch/*')
   vm.RemoteCommand('rm -rf /home/%s/hadoop-%s*' % (vm.user_name,
                                                    HADOOP_VERSION))

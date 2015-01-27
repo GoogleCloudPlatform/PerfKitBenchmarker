@@ -42,6 +42,15 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(COREMARK_TAR)
+
+
 def Prepare(benchmark_spec):
   """Install Coremark on the target vm.
 
@@ -52,7 +61,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('prepare Coremark on %s', vm)
-  vm.InstallPackage('build-essential')
+  vm.Install('build_tools')
   try:
     file_path = data.ResourcePath(COREMARK_TAR)
   except data.ResourceNotFound:
@@ -105,4 +114,3 @@ def Cleanup(benchmark_spec):
   vm = vms[0]
   vm.RemoteCommand('rm -rf %s' % COREMARK_DIR)
   vm.RemoteCommand('rm -f %s' % COREMARK_TAR)
-  vm.UninstallPackage('build-essential')

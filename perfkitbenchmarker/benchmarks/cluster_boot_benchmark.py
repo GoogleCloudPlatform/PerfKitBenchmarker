@@ -17,9 +17,10 @@
 import logging
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-BENCHMARK_INFO = {'name': 'cluster boot',
+BENCHMARK_INFO = {'name': 'cluster_boot',
                   'description': 'Create a cluster, record all times to boot',
                   'scratch_disk': False,
                   'num_machines': None}  # Set in GetInfo()
@@ -32,6 +33,14 @@ def GetInfo():
 
 def Prepare(unused_benchmark_spec):
   pass
+
+
+def _GetTimeToBoot(vm, vm_index, result_list):
+  metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus,
+              'machine_instance': vm_index}
+  value = vm.TimeToBoot()
+  assert value is not None
+  result_list.append(('Boot Time', value, 'seconds', metadata))
 
 
 def Run(benchmark_spec):
@@ -49,18 +58,12 @@ def Run(benchmark_spec):
   """
 
   samples = []
-  vm_number = 0
   logging.info('Boot Results:')
   vms = benchmark_spec.vms
-  for vm in vms:
-    metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus,
-                'machine_instance': vm_number}
-    value = vm.TimeToBoot()
-    assert value is not None
-    samples.append(('Boot Time', value, 'seconds', metadata))
-    vm_number += 1
+  params = [((vm, i, samples), {}) for i, vm in enumerate(vms)]
+  vm_util.RunThreaded(_GetTimeToBoot, params)
   logging.info(samples)
-  assert vm_number == benchmark_spec.num_vms
+  assert len(samples) == benchmark_spec.num_vms
   return samples
 
 

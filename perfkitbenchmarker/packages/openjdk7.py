@@ -11,17 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Contains benchmark imports and a list of benchmarks.
-
-All modules within this package are considered benchmarks, and are loaded
-dynamically. Add non-benchmark code to other packages.
-"""
-
-from perfkitbenchmarker import import_util
 
 
-def _LoadBenchmarks():
-  return list(import_util.LoadModulesForPath(__path__, __name__))
+"""Module containing OpenJDK7 installation and cleanup functions."""
 
 
-BENCHMARKS = _LoadBenchmarks()
+def YumInstall(vm):
+  """Installs the OpenJDK7 package on the VM."""
+  vm.InstallPackages('java-1.7.0-openjdk-devel')
+
+
+def AptInstall(vm):
+  """Installs the OpenJDK7 package on the VM."""
+  vm.InstallPackages('openjdk-7-jdk')

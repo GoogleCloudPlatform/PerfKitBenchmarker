@@ -34,6 +34,11 @@ PUBLIC_KEYFILE = 'perfkitbenchmarker_keyfile.pub'
 CERT_FILE = 'perfkitbenchmarker.pem'
 TEMP_DIR = '/tmp/perfkitbenchmarker'
 
+# The temporary directory on VMs. We cannot reuse GetTempDir()
+# because run_uri will not be available at time of module load and we need
+# to use this directory as a base for other module level constants.
+VM_TMP_DIR = '/tmp/pkb'
+
 # Defaults for retrying commands.
 POLL_INTERVAL = 30
 TIMEOUT = 1200
@@ -406,11 +411,7 @@ def BurnCpu(vm, burn_cpu_threads=None, burn_cpu_seconds=None):
   burn_cpu_threads = burn_cpu_threads or FLAGS.burn_cpu_threads
   burn_cpu_seconds = burn_cpu_seconds or FLAGS.burn_cpu_seconds
   if burn_cpu_seconds:
-    package_installed = False
-    if vm.PackageIsInstalled('sysbench'):
-      package_installed = True
-    else:
-      vm.InstallPackage('sysbench')
+    vm.Install('sysbench')
     end_time = time.time() + burn_cpu_seconds
     vm.RemoteCommand(
         'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
@@ -418,8 +419,6 @@ def BurnCpu(vm, burn_cpu_threads=None, burn_cpu_seconds=None):
     if time.time() < end_time:
       time.sleep(end_time - time.time())
     vm.RemoteCommand('pkill -9 sysbench')
-    if not package_installed:
-      vm.UninstallPackage('sysbench')
 
 
 def ShouldRunOnExternalIpAddress():
