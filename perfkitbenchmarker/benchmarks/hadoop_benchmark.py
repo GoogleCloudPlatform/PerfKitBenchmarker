@@ -161,6 +161,7 @@ def Run(benchmark_spec):
   start_time = time.time()
   _, stderr = master.RemoteCommand('%s terasort /teragen /terasort'
                                    % hadoop_cmd)
+  logging.info('Terasort ourput: %s', stderr)
   time_elapsed = time.time() - start_time
   data_processed_in_mbytes = FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW / (
       1024 * 1024.0)
@@ -173,7 +174,7 @@ def Run(benchmark_spec):
   master.RemoteCommand('hadoop-%s/bin/hadoop fs -rm -r /teravalidate' %
                        HADOOP_VERSION)
   metadata = {'num_rows': FLAGS.terasort_num_rows,
-              'data_size_in_byte': FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW}
+              'data_size_in_bytes': FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW}
   return [['Terasort Throughput Per Core',
            data_processed_in_mbytes / time_elapsed / num_cpus,
            'MB/sec', metadata],
