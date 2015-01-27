@@ -56,6 +56,15 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(DATA_FILE)
+
+
 def PrepareDataFile(vm):
   """Generate data file on vm to destination directory.
 

@@ -43,6 +43,8 @@ CASSANDRA_TAR = 'dsc.tar.gz'
 CASSANDRA_DIR = 'dsc-cassandra-2.0.0'
 JAVA_TAR = 'server-jre-7u40-linux-x64.tar.gz'
 CASSANDRA_YAML = 'cassandra.yaml'
+CASSANDRA_YAML_TEMPLATE = CASSANDRA_YAML + '.j2'
+CASSANDRA_ENV_TEMPLATE = 'cassandra-env.sh.j2'
 CASSANDRA_PID = 'cassandra_pid'
 RESULTS_DIR = 'cassandra-results'
 
@@ -64,6 +66,17 @@ MAX_RETRY_START_CLUSTER = 5
 
 def GetInfo():
   return BENCHMARK_INFO
+
+
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  for resource in (JAVA_TAR, CASSANDRA_TAR, CASSANDRA_YAML_TEMPLATE,
+                   CASSANDRA_ENV_TEMPLATE):
+    data.ResourcePath(resource)
 
 
 def UnpackCassandra(vm):
@@ -140,7 +153,7 @@ def ConfigureCassandraEnvScript(vm):
                    CASSANDRA_DIR)
   context = {'ip_address': vm.internal_ip}
 
-  file_path = data.ResourcePath('cassandra-env.sh.j2')
+  file_path = data.ResourcePath(CASSANDRA_ENV_TEMPLATE)
 
   vm.RenderTemplate(file_path,
                     os.path.join(CASSANDRA_DIR, 'conf', 'cassandra-env.sh'),
@@ -160,9 +173,9 @@ def GenerateCassandraYaml(vm, seed_vm):
              'concurrent_writes': vm.num_cpus * 8,
              'eth0_address': vm.internal_ip}
 
-  file_path = data.ResourcePath('cassandra.yaml.j2')
+  file_path = data.ResourcePath(CASSANDRA_YAML_TEMPLATE)
   vm.RenderTemplate(file_path,
-                    os.path.join(CASSANDRA_DIR, 'conf', 'cassandra.yaml'),
+                    os.path.join(CASSANDRA_DIR, 'conf', CASSANDRA_YAML),
                     context=context)
 
 

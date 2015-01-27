@@ -71,6 +71,15 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(DATA_FILE)
+
+
 class S3StorageBenchmark(object):
   """S3 version of storage benchmark."""
 
