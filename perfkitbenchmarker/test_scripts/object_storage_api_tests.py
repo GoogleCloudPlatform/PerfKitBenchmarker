@@ -390,11 +390,13 @@ def Main(argv=sys.argv):
 
     if len(list_inconsistency_window) > 0:
       logging.info('List inconsistency window: %s',
-                   json.dumps(_PercentileCalculator(list_inconsistency_window)))
+                   json.dumps(_PercentileCalculator(list_inconsistency_window),
+                              sort_keys=True))
 
     if len(list_latency) > 0:
       logging.info('List latency: %s',
-                   json.dumps(_PercentileCalculator(list_latency)))
+                   json.dumps(_PercentileCalculator(list_latency),
+                              sort_keys=True))
 
     return 0
   elif FLAGS.scenario == 'SingleStreamThroughput':
