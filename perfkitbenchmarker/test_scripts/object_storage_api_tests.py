@@ -50,7 +50,8 @@ flags.DEFINE_enum(
                               'SingleStreamThroughput'],
     'The various scenarios to test. OneByteRW: read and write of single byte. '
     'ListConsistency: List-after-write and list-after-update consistency. '
-    'SingleStreamThroughput: Throughput of single stream large object RW.')
+    'SingleStreamThroughput: Throughput of single stream large object RW. (not '
+    'implemented yet)')
 
 flags.DEFINE_integer('iterations', 1, 'The number of iterations to run for the '
                      'particular test scenario. Currently only applicable to '
@@ -73,15 +74,15 @@ class LowAvailabilityError(Exception):
     pass
 
 
-def _TpCalc(numbers):
+def _PercentileCalculator(numbers):
   numbers_sorted = sorted(numbers)
   count = len(numbers_sorted)
-  output = json.dumps({'tp50': numbers_sorted[int(count * 0.5)],
-                       'tp90': numbers_sorted[int(count * 0.9)],
-                       'tp99': numbers_sorted[int(count * 0.99)],
-                       'tp99.9': numbers_sorted[int(count * 0.999)]
-                       }, sort_keys=True)
-  return output
+  result = {}
+  result['tp50'] = numbers_sorted[int(count * 0.5)]
+  result['tp90'] = numbers_sorted[int(count * 0.9)]
+  result['tp99'] = numbers_sorted[int(count * 0.99)]
+  result['tp99.9'] = numbers_sorted[int(count * 0.999)]
+  return result
 
 
 def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
@@ -99,34 +100,22 @@ def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
 def WriteOneByteObjects(storage_schema, bucket, object_prefix, count,
                         objects_written, latency_results=None,
                         host_to_connect=None):
+  """Write a number of one byte objects to a storage provider.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    bucket: Name of the bucket to write to.
+    object_prefix: The prefix of names of objects to be written.
+    count: The total number of objects that need to be written.
+    objects_written: A list of names of objects that have been successfully
+        written by this function. Caller supplies the list and this function
+        fills in the name of the objects.
+    latency_results: An optional parameter that caller can supply to hold
+        a latency numbers, in seconds, for each object that is successfully
+        written.
+    host_to_connect: An optional endpoint string to connect to.
   """
-  Write a number of one byte objects to a storage provider.
 
-  :type storage_schema: string
-  :param storage_schema: The address schema identifying a storage. e.g., "gs"
-
-  :type bucket: string
-  :param bucket: Name of the bucket to write to.
-
-  :type object_prefix: string
-  :param object_prefix: The prefix of names of objects to be written.
-
-  :type count: integer
-  :param count: The total number of objects that need to be written.
-
-  :type objects_written: list of strings
-  :param objects_written: A list of names of objects that have been successfully
-      written by this function. Caller supplies the list and this function fills
-      in the name of the objects.
-
-  :type latency_results: list of floats
-  :param latency_results: An optional parameter that caller can supply to hold
-      a latency numbers, in seconds, for each object that is succeessfully
-      written.
-
-  :type host_to_connect: string
-  :param host_to_connect: An optional endpoint string to connect to.
-  """
   for i in range(count):
     object_name = '%s_%d' % (object_prefix, i)
     object_path = '%s/%s' % (bucket, object_name)
@@ -158,17 +147,19 @@ def WriteOneByteObjects(storage_schema, bucket, object_prefix, count,
 
 
 def OneByteRWBenchmark(storage_schema, host_to_connect=None):
-  """
-  This is a benchmark test for one byte object read and write. It uploads and
+  """ A benchmark test for one byte object read and write. It uploads and
   downloads ONE_BYTE_OBJECT_COUNT number of 1-byte objects to the storage
   provider, keeps track of the latency of these operations, and print out the
   result in JSON format at the end of the test.
 
-  :type storage_schema: string
-  :param storage_schema: The schema of the storage provider to use, e.g., "gs"
+  Args:
+    storage_schema: The schema of the storage provider to use, e.g., "gs"
+    host_to_connect: An optional host endpoint to connect to.
 
-  :type host_to_connect: string
-  :param host_to_connect: An optional host endpoint to connect to.
+  Raises:
+    LowAvailabilityError: when the storage provider has failed a high number of
+        our RW requests that exceeds a threshold (>5%), we raise this error
+        instead of collecting performance numbers from this run.
   """
 
   # One byte write
@@ -188,7 +179,9 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
     raise LowAvailabilityError('Failed to write required number of objects, '
                                'exiting.')
 
-  print 'One byte upload - %s' % _TpCalc(one_byte_write_latency)
+  logging.info('One byte upload - %s' %
+               json.dumps(_PercentileCalculator(one_byte_write_latency),
+                          sort_keys=True))
 
   # Now download these objects and measure the latencies.
   one_byte_read_latency = []
@@ -213,12 +206,13 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
     raise LowAvailabilityError('Failed to read required number of objects, '
                                'exiting.')
 
-  print 'One byte download - %s' % _TpCalc(one_byte_read_latency)
+  logging.info('One byte download - %s' %
+               json.dumps(_PercentileCalculator(one_byte_read_latency),
+                          sort_keys=True))
 
 
 def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
-  """
-  This is a benchmark test to measure list-after-write consistency. It uploads
+  """ A benchmark test to measure list-after-write consistency. It uploads
   a large number of 1-byte objects in a short amount of time, and then issues
   a list request. If the first list request returns all objects as expected,
   then the result is deemed consistent. Otherwise, it keeps issuing list request
@@ -226,59 +220,65 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
   it takes from the end of the last write to the time the list returns
   consistent result.
 
-  :type storage_schema: string
-  :param storage_schema: The schema of the storage provider to use, e.g., "gs"
+  Args:
+    storage_schema: The schema of the storage provider to use, e.g., "gs"
+    host_to_connect: An optional host endpoint to connect to.
 
-  :type host_to_connect: string
-  :param host_to_connect: An optional host endpoint to connect to.
+  Raises:
+    LowAvailabilityError: when the storage provider has failed a high number of
+        our RW requests that exceeds a threshold (>5%), we raise this error
+        instead of collecting performance numbers from this run.
   """
 
   # The maximum amount of seconds we are willing to wait for list results to be
   # consistent in this benchmark
-  CONSISTENCY_WAIT_TIME_LIMIT = 300
+  LIST_CONSISTENCY_WAIT_TIME_LIMIT = 300
 
   # Total number of objects we will provision before we do the list
-  TOTAL_OBJECT_COUNT = 5000
+  LIST_CONSISTENCY_OBJECT_COUNT = 5000
 
   # Provisioning is done in parallel threads to reduce test iteration time!
-  TOTAL_THREAD_COUNT = 100
+  LIST_CONSISTENCY_THREAD_COUNT = 100
 
   # Provision the test with tons of one byte objects. Write them all at once.
   object_prefix = 'pkb_list_consistency_%f' % time.time()
   final_objects_written = []
 
-  per_thread_objects_written = [[] for i in range(TOTAL_THREAD_COUNT)]
+  per_thread_objects_written = [[] for i in
+                                 range(LIST_CONSISTENCY_THREAD_COUNT)]  # noqa
+
   threads = []
 
-  for i in range(TOTAL_THREAD_COUNT):
+  for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     my_prefix = '%s_%d' % (object_prefix, i)
     thread = Thread(target=WriteOneByteObjects,
                     args=(storage_schema, FLAGS.bucket, my_prefix,
-                          TOTAL_OBJECT_COUNT / TOTAL_THREAD_COUNT,
+                          LIST_CONSISTENCY_OBJECT_COUNT /
+                          LIST_CONSISTENCY_THREAD_COUNT,
                           per_thread_objects_written[i], None, host_to_connect))
     thread.daemon = True
     thread.start()
     threads.append(thread)
 
-  print 'All threads started, waiting for them to end...'
+  logging.info('All threads started, waiting for them to end...')
 
-  for i in range(TOTAL_THREAD_COUNT):
+  for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     try:
       threads[i].join()
       final_objects_written += per_thread_objects_written[i]
     except:
       logging.exception('Caught exception waiting for the %dth thread.' % i)
-  print 'All threads ended...'
+  logging.info('All threads ended...')
 
   write_finish_time = time.time()
 
   final_count = len(final_objects_written)
-  if final_count < TOTAL_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
+  if final_count < LIST_CONSISTENCY_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
     raise LowAvailabilityError('Failed to provision required number of '
                                'objects, exiting.')
 
-  print ('Done provisioning the objects, objects written %d. Now start doing'
-         ' the lists...') % final_count
+  logging.info(('Done provisioning the objects, objects written %d. Now start '
+                'doing the lists...') % final_count)
 
   # Now list this bucket under this prefix, compare the list results with
   # objects_written. If they are not the same, keep doing it until they
@@ -289,7 +289,7 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
   list_count = 0
   result_consistent = False
   list_latency = 0
-  while total_wait_time < CONSISTENCY_WAIT_TIME_LIMIT:
+  while total_wait_time < LIST_CONSISTENCY_WAIT_TIME_LIMIT:
 
     list_start_time = time.time()
     list_result = _ListObjects(storage_schema, FLAGS.bucket, object_prefix,
@@ -305,13 +305,15 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
       break
 
   if result_consistent:
-    print "Listed %d times until results are consistent." % list_count
+    logging.info('Listed %d times until results are consistent.' % list_count)
     if list_count == 1:
-      print "List latency is: %f" % list_latency
+      logging.info('List latency is: %f' % list_latency)
     else:
-      print "list-after-write inconsistency window is: %f" % total_wait_time
+      logging.info('List-after-write inconsistency window is: %f' %
+                   total_wait_time)
   else:
-    print "Results are still inconsistent after waiting for the max limit!"
+    logging.info('Results are still inconsistent after waiting for the max '
+                 'limit!')
 
 
 def Main(argv=sys.argv):
@@ -328,14 +330,12 @@ def Main(argv=sys.argv):
   if FLAGS.bucket is None:
     raise ValueError('Must specify a valid bucket for this test.')
 
-  print 'Storage is %s, bucket is %s, scenario is %s' % (FLAGS.storage,
-                                                         FLAGS.bucket,
-                                                         FLAGS.scenario)
+  logging.info('Storage is %s, bucket is %s, scenario is %s' % (FLAGS.storage,
+                                                                FLAGS.bucket,
+                                                                FLAGS.scenario))
   host_to_connect = None
-  storage_schema = None
-
   if FLAGS.host is not None:
-    print 'Will use user-specified host endpoint: %s' % FLAGS.host
+    logging.info('Will use user-specified host endpoint: %s' % FLAGS.host)
     host_to_connect = FLAGS.host
 
   if FLAGS.storage == 'AZURE':
