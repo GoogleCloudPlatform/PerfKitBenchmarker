@@ -239,6 +239,13 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
     storage_schema: The schema of the storage provider to use, e.g., "gs"
     host_to_connect: An optional host endpoint to connect to.
 
+  Returns:
+    A dictionary that contains the test results:
+      'is-list-consistent': True/False
+      'list-latency': if list is consistent, what is its latency
+      'inconsistency-window': if list is inconsistent, how long did it take to
+          reach consistency.
+
   Raises:
     LowAvailabilityError: when the storage provider has failed a high number of
         our RW requests that exceeds a threshold (>5%), we raise this error
@@ -309,16 +316,27 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
       result_consistent = True
       break
 
+  final_result = {}
   if result_consistent:
     logging.info('Listed %d times until results are consistent.', list_count)
     if list_count == 1:
       logging.info('List latency is: %f' % list_latency)
+
+      final_result['is-list-consistent'] = True
+      final_result['list-latency'] = list_latency
     else:
       logging.info('List-after-write inconsistency window is: %f',
                    total_wait_time)
+
+      final_result['is-list-consistent'] = False
+      final_result['inconsistency-window'] = total_wait_time
   else:
     logging.info('Results are still inconsistent after waiting for the max '
                  'limit!')
+    final_result['is-list-consistent'] = False
+    final_result['inconsistency-window'] = LIST_CONSISTENCY_WAIT_TIME_LIMIT
+
+  return final_result
 
 
 def Main(argv=sys.argv):
@@ -353,8 +371,31 @@ def Main(argv=sys.argv):
   if FLAGS.scenario == 'OneByteRW':
     return OneByteRWBenchmark(storage_schema, host_to_connect)
   elif FLAGS.scenario == 'ListConsistency':
+    list_latency = []
+    list_inconsistency_window = []
+    inconsistent_list_count = 0
+
     for _ in range(FLAGS.iterations):
-      ListConsistencyBenchmark(storage_schema, host_to_connect)
+      result = ListConsistencyBenchmark(storage_schema, host_to_connect)
+      if result['is-list-consistent']:
+        list_latency.append(result['list-latency'])
+      else:
+        inconsistent_list_count += 1
+        list_inconsistency_window.append(result['inconsistency-window'])
+
+    # All iterations completed, ready to print out final stats.
+    logging.info('Final stats: \n')
+    logging.info('List consistency percentage: %f',
+                 100 * (1 - inconsistent_list_count / FLAGS.iterations))
+
+    if len(list_inconsistency_window) > 0:
+      logging.info('List inconsistency window: %s',
+                   json.dumps(_PercentileCalculator(list_inconsistency_window)))
+
+    if len(list_latency) > 0:
+      logging.info('List inconsistency window: %s',
+                   json.dumps(_PercentileCalculator(list_latency)))
+
     return 0
   elif FLAGS.scenario == 'SingleStreamThroughput':
     raise NotImplementedError('Single Stream Throughput is not implemented.')
