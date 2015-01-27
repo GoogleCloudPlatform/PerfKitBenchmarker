@@ -169,9 +169,9 @@ def Run(benchmark_spec):
   for vm in vms[1:]:
     num_cpus += vm.num_cpus
   start_time = time.time()
-  _, stderr = master.RemoteCommand('%s terasort /teragen /terasort'
+  stdout, _ = master.RemoteCommand('%s terasort /teragen /terasort'
                                    % hadoop_cmd)
-  logging.info('Terasort ourput: %s', stderr)
+  logging.info('Terasort ourput: %s', stdout)
   time_elapsed = time.time() - start_time
   data_processed_in_mbytes = FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW / (
       1024 * 1024.0)
