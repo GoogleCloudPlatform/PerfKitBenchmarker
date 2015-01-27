@@ -30,7 +30,7 @@ flags.DEFINE_enum('copy_benchmark_mode', 'cp', ['cp', 'dd', 'scp'],
 FLAGS = flags.FLAGS
 
 # 'num_machines' set in GetInfo, as it depends on 'copy_benchmark_mode'.
-BENCHMARK_INFO = {'name': 'copy_benchmark',
+BENCHMARK_INFO = {'name': 'copy_throughput',
                   'description': 'Get cp and scp performance between vms.',
                   'scratch_disk': True,
                   'num_machines': 0}
@@ -54,6 +54,15 @@ def GetInfo():
   else:
     BENCHMARK_INFO['num_machines'] = 2
   return BENCHMARK_INFO
+
+
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(DATA_FILE)
 
 
 def PrepareDataFile(vm):

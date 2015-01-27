@@ -46,9 +46,10 @@ FLAGS = flags.FLAGS
 
 # User a scratch disk here to simulate what most users would do when they
 # use CLI tools to interact with the storage provider.
-BENCHMARK_INFO = {'name': 'object_storage_benchmark',
+BENCHMARK_INFO = {'name': 'cloud_storage_storage',
                   'description':
-                  'Benchmark upload/download to Cloud Storage using CLI tools.',
+                  'Benchmark upload/download throughput to cloud object '
+                  'storage using cloud provider command-line tools.',
                   'scratch_disk': True,
                   'num_machines': 1}
 
@@ -68,6 +69,15 @@ DATA_SIZE_IN_MB = 2561
 
 def GetInfo():
   return BENCHMARK_INFO
+
+
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(DATA_FILE)
 
 
 class S3StorageBenchmark(object):

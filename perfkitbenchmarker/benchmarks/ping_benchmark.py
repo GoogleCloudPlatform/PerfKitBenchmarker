@@ -21,10 +21,11 @@ import logging
 import re
 
 
-BENCHMARKS_INFO = {'name': 'ping',
-                   'description': 'Run ping',
-                   'scratch_disk': False,
-                   'num_machines': 2}
+BENCHMARKS_INFO = {
+    'name': 'ping',
+    'description': 'Benchmarks ping latency over internal IP addresses',
+    'scratch_disk': False,
+    'num_machines': 2}
 
 METRICS = ['Min Latency', 'Average Latency', 'Max Latency', 'Latency Std Dev']
 

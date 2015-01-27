@@ -20,7 +20,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-BENCHMARK_INFO = {'name': 'cluster boot',
+BENCHMARK_INFO = {'name': 'cluster_boot',
                   'description': 'Create a cluster, record all times to boot',
                   'scratch_disk': False,
                   'num_machines': None}  # Set in GetInfo()

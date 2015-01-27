@@ -30,7 +30,7 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'hadoop_benchmark',
+BENCHMARK_INFO = {'name': 'hadoop_terasort',
                   'description': 'Runs Terasort',
                   'scratch_disk': True,
                   'num_machines': 9}
@@ -45,6 +45,16 @@ DATA_FILES = ['core-site.xml.j2', 'yarn-site.xml.j2', 'hdfs-site.xml',
 
 def GetInfo():
   return BENCHMARK_INFO
+
+
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  for resource in DATA_FILES:
+    data.ResourcePath(resource)
 
 
 def _ConfDir(vm):
