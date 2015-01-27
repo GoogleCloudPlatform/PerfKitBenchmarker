@@ -373,7 +373,7 @@ def Main(argv=sys.argv):
   elif FLAGS.scenario == 'ListConsistency':
     list_latency = []
     list_inconsistency_window = []
-    inconsistent_list_count = 0
+    inconsistent_list_count = 0.0
 
     for _ in range(FLAGS.iterations):
       result = ListConsistencyBenchmark(storage_schema, host_to_connect)
@@ -384,7 +384,7 @@ def Main(argv=sys.argv):
         list_inconsistency_window.append(result['inconsistency-window'])
 
     # All iterations completed, ready to print out final stats.
-    logging.info('Final stats: \n')
+    logging.info('\n\nFinal stats:')
     logging.info('List consistency percentage: %f',
                  100 * (1 - inconsistent_list_count / FLAGS.iterations))
 
@@ -393,7 +393,7 @@ def Main(argv=sys.argv):
                    json.dumps(_PercentileCalculator(list_inconsistency_window)))
 
     if len(list_latency) > 0:
-      logging.info('List inconsistency window: %s',
+      logging.info('List latency: %s',
                    json.dumps(_PercentileCalculator(list_latency)))
 
     return 0
