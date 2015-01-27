@@ -33,9 +33,12 @@ from perfkitbenchmarker import vm_util
 
 
 flags.DEFINE_integer('num_keys', 0,
-                     'Number of keys used in cassandra-stress tool.')
-flags.DEFINE_integer('num_stress_threads', 30,
-                     'Number of stress threads on each loader node.')
+                     'Number of keys used in cassandra-stress tool. If not set, '
+                     'this benchmark will use NUM_KEYS_PER_CORE * num_cpus '
+                     'on the data node as the value.')
+flags.DEFINE_integer('num_cassandra_stress_threads', 50,
+                     'Number of threads used in cassanrda-stress tool '
+                     'on each loader node.')
 
 FLAGS = flags.FLAGS
 
@@ -79,7 +82,7 @@ def CheckPrerequisites():
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  for resource in (JAVA_TAR, CASSANDRA_TAR, CASSANDRA_YAML_TEMPLATE,
+  for resource in (CASSANDRA_YAML_TEMPLATE,
                    CASSANDRA_ENV_TEMPLATE):
     data.ResourcePath(resource)
 
@@ -270,6 +273,7 @@ def RunTestOnLoader(vm, data_nodes_ip_addresses):
     vm: The target vm.
     data_nodes_ip_addresses: Ip addresses for all data nodes seperated by ','.
   """
+  # cassandra-stress tool will report Unable to create stress keyspace error to stderr.
   vm.RemoteCommand(
       './%s/tools/bin/cassandra-stress '
       '--file "./%s.results" --nodes %s '
@@ -277,7 +281,7 @@ def RunTestOnLoader(vm, data_nodes_ip_addresses):
       '--num-keys %s -K %s -t %s' % (
           CASSANDRA_DIR, vm.hostname, data_nodes_ip_addresses,
           REPLICATION_FACTOR, CONSISTENCY_LEVEL, FLAGS.num_keys,
-          RETRIES, FLAGS.num_stress_threads), ignore_failure=True)
+          RETRIES, FLAGS.num_cassandra_stress_threads))
 
 
 def InsertTest(benchmark_spec, vm):
@@ -448,7 +452,8 @@ def CollectResults(benchmark_spec):
   metadata = {'num_keys': FLAGS.num_keys,
               'num_data_nodes': len(vm_dict[DATA_NODE]),
               'num_loader_nodes': len(vm_dict[LOADER_NODE]),
-              'num_stress_threads': FLAGS.num_stress_threads}
+              'num_cassandra_stress_threads':
+              FLAGS.num_cassandra_stress_threads}
   results.append(['Interval_op_rate', math.fsum(interval_op_rate_list),
                   'operations per second', metadata])
   results.append(['Interval_key_rate', math.fsum(interval_key_rate_list),
