@@ -66,6 +66,21 @@ STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3'}
 # instead of a set of benchmark numbers (which will be incorrect).
 FAILURE_TOLERANCE = 0.05
 
+# Here are some constants used by various benchmark tests below.
+
+# The number of objects used by the one byte RW benchmarks.
+ONE_BYTE_OBJECT_COUNT = 1000
+
+# The maximum amount of seconds we are willing to wait for list results to be
+# consistent in this benchmark
+LIST_CONSISTENCY_WAIT_TIME_LIMIT = 300
+
+# Total number of objects we will provision before we do the list
+LIST_CONSISTENCY_OBJECT_COUNT = 5000
+
+# Provisioning is done in parallel threads to reduce test iteration time!
+# This number specifies the thread count.
+LIST_CONSISTENCY_THREAD_COUNT = 100
 
 # When a storage provider fails more than a threshold number of requests, we
 # stop the benchmarking tests and raise a low availability error back to the
@@ -164,7 +179,6 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
 
   # One byte write
   object_prefix = 'pkb_one_byte_%f' % time.time()
-  ONE_BYTE_OBJECT_COUNT = 1000
 
   one_byte_write_latency = []
   one_byte_objects_written = []
@@ -229,16 +243,6 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
         our RW requests that exceeds a threshold (>5%), we raise this error
         instead of collecting performance numbers from this run.
   """
-
-  # The maximum amount of seconds we are willing to wait for list results to be
-  # consistent in this benchmark
-  LIST_CONSISTENCY_WAIT_TIME_LIMIT = 300
-
-  # Total number of objects we will provision before we do the list
-  LIST_CONSISTENCY_OBJECT_COUNT = 5000
-
-  # Provisioning is done in parallel threads to reduce test iteration time!
-  LIST_CONSISTENCY_THREAD_COUNT = 100
 
   # Provision the test with tons of one byte objects. Write them all at once.
   object_prefix = 'pkb_list_consistency_%f' % time.time()
