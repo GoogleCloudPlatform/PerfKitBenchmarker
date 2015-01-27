@@ -14,8 +14,6 @@
 
 """Benchmark set specific functions and definitions."""
 
-import logging
-
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import flags
 
@@ -44,14 +42,12 @@ def GetBenchmarksFromFlags():
 
   If no benchmarks (or sets) are specified, this will return the standard set.
   If multiple sets or mixes of sets and benchmarks are specified, this will
-  return the union of all sets and individual benchmarks. This function will
-  log a set specific message for all specified sets at the info level.
+  return the union of all sets and individual benchmarks.
   """
   benchmark_names = set()
   for benchmark in FLAGS.benchmarks:
     if benchmark in BENCHMARK_SETS:
       benchmark_names |= set(BENCHMARK_SETS[benchmark][BENCHMARK_LIST])
-      logging.info(BENCHMARK_SETS[benchmark][MESSAGE])
     else:
       benchmark_names.add(benchmark)
   return [benchmark for benchmark in benchmarks.BENCHMARKS

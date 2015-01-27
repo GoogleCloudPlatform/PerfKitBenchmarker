@@ -338,8 +338,14 @@ def Main(argv=sys.argv):
   benchmark_list = ['%s:  %s' % (benchmark_module.GetInfo()['name'],
                                  benchmark_module.GetInfo()['description'])
                     for benchmark_module in benchmarks.BENCHMARKS]
+  benchmark_sets_list = [
+      '%s:  %s' %
+      (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
+      for set_name in benchmark_sets.BENCHMARK_SETS]
   sys.modules['__main__'].__doc__ = __doc__ + (
       '\nBenchmarks:\n\t%s') % '\n\t'.join(benchmark_list)
+  sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
+                                      % '\n\t'.join(benchmark_sets_list))
   try:
     argv = FLAGS(argv)  # parse flags
   except flags.FlagsError as e:
