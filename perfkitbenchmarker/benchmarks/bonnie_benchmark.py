@@ -215,8 +215,8 @@ def ParseCSVResults(results):
         metadata.
   """
   field_index_mapping = {}
-  for field in BONNIE_RESULTS_MAPPING:
-    field_index_mapping[BONNIE_RESULTS_MAPPING[field]] = field
+  for field, value in BONNIE_RESULTS_MAPPING.iteritems():
+    field_index_mapping[value] = field
   results = results.split(',')
   assert len(results) == len(BONNIE_RESULTS_MAPPING)
   samples = []
