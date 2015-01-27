@@ -283,7 +283,7 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
                                'objects, exiting.')
 
   logging.info('Done provisioning the objects, objects written %d. Now start '
-                'doing the lists...', final_count)
+               'doing the lists...', final_count)
 
   # Now list this bucket under this prefix, compare the list results with
   # objects_written. If they are not the same, keep doing it until they
@@ -339,7 +339,7 @@ def Main(argv=sys.argv):
                FLAGS.storage,
                FLAGS.bucket,
                FLAGS.scenario)
-  
+
   host_to_connect = None
   if FLAGS.host is not None:
     logging.info('Will use user-specified host endpoint: %s', FLAGS.host)
