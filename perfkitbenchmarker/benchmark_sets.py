@@ -16,6 +16,7 @@
 
 import logging
 
+from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
@@ -39,18 +40,19 @@ BENCHMARK_SETS = {
 
 
 def GetBenchmarksFromFlags():
-  """Returns a set of benchmark names to run based on the benchmarks flag.
+  """Returns a list of benchmarks to run based on the benchmarks flag.
 
   If no benchmarks (or sets) are specified, this will return the standard set.
   If multiple sets or mixes of sets and benchmarks are specified, this will
   return the union of all sets and individual benchmarks. This function will
   log a set specific message for all specified sets at the info level.
   """
-  benchmarks = set()
+  benchmark_names = set()
   for benchmark in FLAGS.benchmarks:
     if benchmark in BENCHMARK_SETS:
-      benchmarks |= set(BENCHMARK_SETS[benchmark][BENCHMARK_LIST])
+      benchmark_names |= set(BENCHMARK_SETS[benchmark][BENCHMARK_LIST])
       logging.info(BENCHMARK_SETS[benchmark][MESSAGE])
     else:
-      benchmarks.add(benchmark)
-  return benchmarks
+      benchmark_names.add(benchmark)
+  return [benchmark for benchmark in benchmarks.BENCHMARKS
+          if benchmark.GetInfo()['name'] in benchmark_names]

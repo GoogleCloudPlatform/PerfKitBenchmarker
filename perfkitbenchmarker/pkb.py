@@ -313,9 +313,7 @@ def RunBenchmarks(publish=True):
     FLAGS.benchmark_config_pair = tmp_dict
 
   try:
-    benchmark_names = benchmark_sets.GetBenchmarksFromFlags()
-    benchmark_list = [benchmark for benchmark in benchmarks.BENCHMARKS
-                      if benchmark.GetInfo()['name'] in benchmark_names]
+    benchmark_list = benchmark_sets.GetBenchmarksFromFlags()
     if FLAGS.parallelism > 1:
       args = [((benchmark, collector), {}) for benchmark in benchmark_list]
       vm_util.RunThreaded(
