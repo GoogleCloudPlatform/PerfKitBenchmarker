@@ -99,7 +99,9 @@ def CreateHpccinf(vm, benchmark_spec):
   if FLAGS.memory_size_mb:
     total_memory = FLAGS.memory_size_mb * 1024 * 1024 * num_vms
   else:
-    total_memory = vm.total_memory_kb * 1024 * num_vms
+    stdout, _ = vm.RemoteCommand('free | sed -n 3p | awk {\'print $4\'}')
+    available_memory = int(stdout)
+    total_memory = available_memory * 1024 * num_vms
   total_cpus = vm.num_cpus * num_vms
   block_size = BLOCK_SIZE
 
