@@ -82,6 +82,7 @@ LIST_CONSISTENCY_OBJECT_COUNT = 5000
 # This number specifies the thread count.
 LIST_CONSISTENCY_THREAD_COUNT = 100
 
+
 # When a storage provider fails more than a threshold number of requests, we
 # stop the benchmarking tests and raise a low availability error back to the
 # caller.
@@ -157,7 +158,7 @@ def WriteOneByteObjects(storage_schema, bucket, object_prefix, count,
 
       objects_written.append(object_name)
     except:
-      logging.exception('Caught exception while writing object %s.' %
+      logging.exception('Caught exception while writing object %s.',
                         object_path)
 
 
@@ -193,7 +194,7 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
     raise LowAvailabilityError('Failed to write required number of objects, '
                                'exiting.')
 
-  logging.info('One byte upload - %s' %
+  logging.info('One byte upload - %s',
                json.dumps(_PercentileCalculator(one_byte_write_latency),
                           sort_keys=True))
 
@@ -213,14 +214,14 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
 
       one_byte_read_latency.append(time.time() - start_time)
     except:
-      logging.exception('Failed to read object %s' % object_path)
+      logging.exception('Failed to read object %s', object_path)
 
   success_count = len(one_byte_read_latency)
   if success_count < ONE_BYTE_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
     raise LowAvailabilityError('Failed to read required number of objects, '
                                'exiting.')
 
-  logging.info('One byte download - %s' %
+  logging.info('One byte download - %s',
                json.dumps(_PercentileCalculator(one_byte_read_latency),
                           sort_keys=True))
 
@@ -271,7 +272,7 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
       threads[i].join()
       final_objects_written += per_thread_objects_written[i]
     except:
-      logging.exception('Caught exception waiting for the %dth thread.' % i)
+      logging.exception('Caught exception waiting for the %dth thread.', i)
   logging.info('All threads ended...')
 
   write_finish_time = time.time()
@@ -281,8 +282,8 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
     raise LowAvailabilityError('Failed to provision required number of '
                                'objects, exiting.')
 
-  logging.info(('Done provisioning the objects, objects written %d. Now start '
-                'doing the lists...') % final_count)
+  logging.info('Done provisioning the objects, objects written %d. Now start '
+                'doing the lists...', final_count)
 
   # Now list this bucket under this prefix, compare the list results with
   # objects_written. If they are not the same, keep doing it until they
@@ -309,11 +310,11 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
       break
 
   if result_consistent:
-    logging.info('Listed %d times until results are consistent.' % list_count)
+    logging.info('Listed %d times until results are consistent.', list_count)
     if list_count == 1:
       logging.info('List latency is: %f' % list_latency)
     else:
-      logging.info('List-after-write inconsistency window is: %f' %
+      logging.info('List-after-write inconsistency window is: %f',
                    total_wait_time)
   else:
     logging.info('Results are still inconsistent after waiting for the max '
@@ -334,12 +335,14 @@ def Main(argv=sys.argv):
   if FLAGS.bucket is None:
     raise ValueError('Must specify a valid bucket for this test.')
 
-  logging.info('Storage is %s, bucket is %s, scenario is %s' % (FLAGS.storage,
-                                                                FLAGS.bucket,
-                                                                FLAGS.scenario))
+  logging.info('Storage is %s, bucket is %s, scenario is %s',
+               FLAGS.storage,
+               FLAGS.bucket,
+               FLAGS.scenario)
+  
   host_to_connect = None
   if FLAGS.host is not None:
-    logging.info('Will use user-specified host endpoint: %s' % FLAGS.host)
+    logging.info('Will use user-specified host endpoint: %s', FLAGS.host)
     host_to_connect = FLAGS.host
 
   if FLAGS.storage == 'AZURE':
