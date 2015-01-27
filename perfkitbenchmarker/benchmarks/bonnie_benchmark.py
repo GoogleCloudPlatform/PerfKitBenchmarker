@@ -14,7 +14,6 @@
 
 """Runs plain vanilla bonnie++."""
 
-import copy
 import logging
 
 from perfkitbenchmarker import flags
@@ -28,6 +27,56 @@ BENCHMARK_INFO = {'name': 'bonnie++',
                   'num_machines': 1}
 
 LATENCY_REGEX = r'([0-9]*\.?[0-9]+)(\w+)'
+# Bonnie++ result fields mapping, see man bon_csv2txt for details.
+BONNIE_RESULTS_MAPPING = {
+    'format_version': 0,
+    'bonnie_version': 1,
+    'name': 2,
+    'concurrency': 3,
+    'seed': 4,
+    'file_size': 5,
+    'chunk_size': 6,
+    'putc': 7,
+    'putc_cpu': 8,
+    'put_block': 9,
+    'put_block_cpu': 10,
+    'rewrite': 11,
+    'rewrite_cpu': 12,
+    'getc': 13,
+    'getc_cpu': 14,
+    'get_block': 15,
+    'get_block_cpu': 16,
+    'seeks': 17,
+    'seeks_cpu': 18,
+    'num_files': 19,
+    'max_size': 20,
+    'min_size': 21,
+    'num_dirs': 22,
+    'file_chunk_size': 23,
+    'seq_create': 24,
+    'seq_create_cpu': 25,
+    'seq_stat': 26,
+    'seq_stat_cpu': 27,
+    'seq_del': 28,
+    'seq_del_cpu': 29,
+    'ran_create': 30,
+    'ran_create_cpu': 31,
+    'ran_stat': 32,
+    'ran_stat_cpu': 33,
+    'ran_del': 34,
+    'ran_del_cpu': 35,
+    'putc_latency': 36,
+    'put_block_latency': 37,
+    'rewrite_latency': 38,
+    'getc_latency': 39,
+    'get_block_latency': 40,
+    'seeks_latency': 41,
+    'seq_create_latency': 42,
+    'seq_stat_latency': 43,
+    'seq_del_latency': 44,
+    'ran_create_latency': 45,
+    'ran_stat_latency': 46,
+    'ran_del_latency': 47}
 
 
 def GetInfo():
@@ -54,21 +103,45 @@ def IsValueValid(value):
   An invalid value is either an empty string or a string of multiple '+'.
 
   Args:
-    value: The value in raw result.
+    value: string. The value in raw result.
 
   Returns:
-    A boolean indicate if the value is valid or not.
+    A boolean indicates if the value is valid or not.
   """
   if value == '' or '+' in value:
     return False
   return True
 
 
+def IsCpuField(field):
+  """Check if the field is cpu percentage.
+
+  Args:
+    field: string. The name of the field.
+
+  Returns:
+    A boolean indicates if the field contains keyword 'cpu'.
+  """
+  return 'cpu' in field
+
+
+def IsLatencyField(field):
+  """Check if the field is latency.
+
+  Args:
+    field: string. The name of the field.
+
+  Returns:
+    A boolean indicates if the field contains keyword 'latency'.
+  """
+  return 'latency' in field
+
+
 def ParseLatencyResult(result):
   """Parse latency result into value and unit.
 
   Args:
-    result: Latency result in string format, contains both value and unit.
+    result: string. Latency value in string format, contains value and unit.
             eg. 200ms
 
   Returns:
@@ -76,6 +149,51 @@ def ParseLatencyResult(result):
   """
   match = regex_util.ExtractAllMatches(LATENCY_REGEX, result)[0]
   return float(match[0]), match[1]
+
+
+def UpdateMetadata(metadata, key, value):
+  """Check if the value is valid, update metadata with the key, value pair.
+
+  Args:
+    metadata: dict. A dictionary of sample metadata.
+    key: string. Key that will be added into metadata dictionary.
+    value: Value that of the key.
+  """
+  if IsValueValid(value):
+    metadata[key] = value
+
+
+def CreateSamples(results, start_index, end_index, metadata,
+                  field_index_mapping):
+  """Create samples with data in results from start_index to end_index.
+
+  Args:
+    results: A list of string representing bonnie++ results.
+    start_index: integer. The start index in results list of the samples.
+    end_index: integer. The end index in results list of the samples.
+    metadata: dict. A dictionary of metadata added into samples.
+    field_index_mapping: dict. A dictionary maps field index to field names.
+
+  Returns:
+    A list of samples in the form of 3 or 4 tuples. The tuples contain
+        the sample metric (string), value (float), and unit (string).
+        If a 4th element is included, it is a dictionary of sample
+        metadata.
+  """
+  samples = []
+  for field_index in range(start_index, end_index):
+    field_name = field_index_mapping[field_index]
+    value = results[field_index]
+    if not IsValueValid(value):
+      continue
+    if IsCpuField(field_name):
+      unit = '%s'
+    elif IsLatencyField(field_name):
+      value, unit = ParseLatencyResult(value)
+    else:
+      unit = 'K/sec'
+    samples.append([field_name, float(value), unit, metadata])
+  return samples
 
 
 def ParseCSVResults(results):
@@ -88,7 +206,7 @@ def ParseCSVResults(results):
     839us
 
   Args:
-    results: bonnie++ results.
+    results: string. Bonnie++ results.
 
   Returns:
     A list of samples in the form of 3 or 4 tuples. The tuples contain
@@ -96,144 +214,30 @@ def ParseCSVResults(results):
         If a 4th element is included, it is a dictionary of sample
         metadata.
   """
+  field_index_mapping = {}
+  for field in BONNIE_RESULTS_MAPPING:
+    field_index_mapping[BONNIE_RESULTS_MAPPING[field]] = field
   results = results.split(',')
+  assert len(results) == len(BONNIE_RESULTS_MAPPING)
   samples = []
-  metadata = {'version': results[0],
-              'test_size': results[5]}
-  if IsValueValid(results[3]):
-    metadata['chunk_size'] = results[3]
-  if IsValueValid(results[7]):
-    samples.append(['Sequential Output:Per Char:Throughput',
-                    float(results[7]), 'K/sec', metadata])
-  if IsValueValid(results[8]):
-    samples.append(['Sequential Output:Per Char:Cpu Percentage',
-                    float(results[8]), '%', metadata])
-  if IsValueValid(results[36]):
-    value, unit = ParseLatencyResult(results[36])
-    samples.append(['Sequential Output:Per Char:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[9]):
-    samples.append(['Sequential Output:Block:Throughput',
-                    float(results[9]), 'K/sec', metadata])
-  if IsValueValid(results[10]):
-    samples.append(['Sequential Output:Block:Cpu Percentage',
-                    float(results[10]), '%', metadata])
-  if IsValueValid(results[37]):
-    value, unit = ParseLatencyResult(results[37])
-    samples.append(['Sequential Output:Block:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[11]):
-    samples.append(['Sequential Output:Rewrite:Throughput',
-                    float(results[11]), 'K/sec', metadata])
-  if IsValueValid(results[12]):
-    samples.append(['Sequential Output:Rewrite:Cpu Percentage',
-                    float(results[12]), '%', metadata])
-  if IsValueValid(results[38]):
-    value, unit = ParseLatencyResult(results[38])
-    samples.append(['Sequential Output:Rewrite:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[13]):
-    samples.append(['Sequential Input:Per Char:Throughput',
-                    float(results[13]), 'K/sec', metadata])
-  if IsValueValid(results[14]):
-    samples.append(['Sequential Input:Per Char:Cpu Percentage',
-                    float(results[14]), '%', metadata])
-  if IsValueValid(results[39]):
-    value, unit = ParseLatencyResult(results[39])
-    samples.append(['Sequential Iutput:Per Char:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[15]):
-    samples.append(['Sequential Input:Block:Throughput',
-                    float(results[15]), 'K/sec', metadata])
-  if IsValueValid(results[16]):
-    samples.append(['Sequential Input:Block:Cpu Percentage',
-                    float(results[16]), '%', metadata])
-  if IsValueValid(results[40]):
-    value, unit = ParseLatencyResult(results[40])
-    samples.append(['Sequential Iutput:Block:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[17]):
-    samples.append(['Random Seeks:Throughput',
-                    float(results[17]), 'K/sec', metadata])
-  if IsValueValid(results[18]):
-    samples.append(['Random Seeks:Cpu Percentage',
-                    float(results[18]), '%', metadata])
-  if IsValueValid(results[41]):
-    value, unit = ParseLatencyResult(results[41])
-    samples.append(['Random Seeks:Latency',
-                    value, unit, metadata])
-  metadata = copy.deepcopy(metadata)
-  if IsValueValid(results[19]):
-    metadata['num_files'] = results[19]
-  if IsValueValid(results[20]):
-    metadata['max_size'] = results[20]
-  if IsValueValid(results[21]):
-    metadata['min_size'] = results[21]
-  if IsValueValid(results[22]):
-    metadata['num_dirs'] = results[22]
-  if IsValueValid(results[23]):
-    metadata['chunk_size'] = results[23]
-  if IsValueValid(results[24]):
-    samples.append(['Sequential Create:Create:Throughput',
-                    float(results[24]), 'K/sec', metadata])
-  if IsValueValid(results[25]):
-    samples.append(['Sequential Create:Create:Cpu Percentage',
-                    float(results[25]), '%', metadata])
-  if IsValueValid(results[42]):
-    value, unit = ParseLatencyResult(results[42])
-    samples.append(['Sequential Create:Create:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[26]):
-    samples.append(['Sequential Create:Read:Throughput',
-                    float(results[26]), 'K/sec', metadata])
-  if IsValueValid(results[27]):
-    samples.append(['Sequential Create:Read:Cpu Percentage',
-                    float(results[27]), '%', metadata])
-  if IsValueValid(results[43]):
-    value, unit = ParseLatencyResult(results[43])
-    samples.append(['Sequential Create:Read:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[28]):
-    samples.append(['Sequential Create:Delete:Throughput',
-                    float(results[28]), 'K/sec', metadata])
-  if IsValueValid(results[29]):
-    samples.append(['Sequential Create:Delete:Cpu Percentage',
-                    float(results[29]), '%', metadata])
-  if IsValueValid(results[44]):
-    value, unit = ParseLatencyResult(results[44])
-    samples.append(['Sequential Create:Delete:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[30]):
-    samples.append(['Random Create:Create:Throughput',
-                    float(results[30]), 'K/sec', metadata])
-  if IsValueValid(results[31]):
-    samples.append(['Random Create:Create:Cpu Percentage',
-                    float(results[31]), '%', metadata])
-  if IsValueValid(results[45]):
-    value, unit = ParseLatencyResult(results[45])
-    samples.append(['Random Create:Create:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[32]):
-    samples.append(['Random Create:Read:Throughput',
-                    float(results[32]), 'K/sec', metadata])
-  if IsValueValid(results[33]):
-    samples.append(['Random Create:Read:Cpu Percentage',
-                    float(results[33]), '%', metadata])
-  if IsValueValid(results[46]):
-    value, unit = ParseLatencyResult(results[46])
-    samples.append(['Random Create:Read:Latency',
-                    value, unit, metadata])
-  if IsValueValid(results[34]):
-    samples.append(['Random Create:Delete:Throughput',
-                    float(results[34]), 'K/sec', metadata])
-  if IsValueValid(results[35]):
-    samples.append(['Random Create:Delete:Cpu Percentage',
-                    float(results[35]), '%', metadata])
-  if IsValueValid(results[47]):
-    value, unit = ParseLatencyResult(results[47])
-    samples.append(['Random Create:Delete:Latency',
-                    value, unit, metadata])
-  print '|%s|' % samples
+  metadata = {}
+  for field_index in range(BONNIE_RESULTS_MAPPING['format_version'],
+                           BONNIE_RESULTS_MAPPING['chunk_size'] + 1):
+    UpdateMetadata(metadata, field_index_mapping[field_index],
+                   results[field_index])
+
+  for field_index in range(BONNIE_RESULTS_MAPPING['num_files'],
+                           BONNIE_RESULTS_MAPPING['file_chunk_size'] + 1):
+    UpdateMetadata(metadata, field_index_mapping[field_index],
+                   results[field_index])
+  samples.extend(CreateSamples(results,
+                               BONNIE_RESULTS_MAPPING['putc'],
+                               BONNIE_RESULTS_MAPPING['num_files'],
+                               metadata, field_index_mapping))
+  samples.extend(CreateSamples(results,
+                               BONNIE_RESULTS_MAPPING['seq_create'],
+                               BONNIE_RESULTS_MAPPING['ran_del_latency'] + 1,
+                               metadata, field_index_mapping))
   return samples
 
 
