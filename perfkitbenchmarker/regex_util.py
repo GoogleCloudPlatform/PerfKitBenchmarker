@@ -26,7 +26,7 @@ def ExtractGroup(regex, text, group=1):
   """Extracts a float from a regular expression matched to 'text'.
 
   Args:
-    regex: string. Regular expression.
+    regex: string or regexp pattern. Regular expression.
     text: string. Text to search.
     group: int. Group containing a floating point value. Use '0' for the whole
       string.

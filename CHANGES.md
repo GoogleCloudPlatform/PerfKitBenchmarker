@@ -20,6 +20,11 @@
     + `synthetic_storage_workloads_benchmark` → `synthetic_storage_workload`
     + `sysbench_oltp_benchmark` → `sysbench_oltp`
     + `UnixBench_benchmark` → `unixbench`
+* Introduced a class to represent performance samples (GH-71)
+* Updated Hadoop benchmark to calculate per-core terasort throughput (GH-75).
+* Added a results parser for bonnie++ benchmark (GH-70).
+* Added prerequisite checking to benchmarks (GH-49).
+
 
 
 # v0.8.0

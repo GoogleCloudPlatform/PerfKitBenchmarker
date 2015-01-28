@@ -24,6 +24,7 @@ import unittest
 import mock
 
 from perfkitbenchmarker import publisher
+from perfkitbenchmarker import sample
 
 
 class PrettyPrintStreamPublisherTestCase(unittest.TestCase):
@@ -173,3 +174,45 @@ class CloudStoragePublisherTestCase(unittest.TestCase):
     self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(
         ['gsutil', 'cp', mock.ANY,
          'gs://test-bucket/141764776338_be428eb'])
+
+
+class SampleCollectorTestCase(unittest.TestCase):
+
+  def setUp(self):
+    self.instance = publisher.SampleCollector(publishers=[])
+    self.sample = sample.Sample('widgets', 100, 'oz', {'foo': 'bar'})
+    self.benchmark = 'test!'
+    self.benchmark_spec = mock.MagicMock()
+
+  def _VerifyResult(self, contains_metadata=True):
+    self.assertEqual(1, len(self.instance.samples))
+    collector_sample = self.instance.samples[0]
+    metadata = collector_sample.pop('metadata')
+    self.assertDictContainsSubset(
+        {
+            'value': 100,
+            'metric': 'widgets',
+            'unit': 'oz',
+            'test': self.benchmark,
+            'product_name': 'PerfKitBenchmarker'
+        },
+        collector_sample)
+    if contains_metadata:
+      self.assertDictContainsSubset({'foo': 'bar'}, metadata)
+    else:
+      self.assertNotIn('foo', metadata)
+
+  def testAddSamples_SampleClass(self):
+    samples = [self.sample]
+    self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
+    self._VerifyResult()
+
+  def testAddSamples_3Tuple(self):
+    samples = [tuple(self.sample[:3])]
+    self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
+    self._VerifyResult(False)
+
+  def testAddSamples_4Tuple(self):
+    samples = [tuple(self.sample)]
+    self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
+    self._VerifyResult()
