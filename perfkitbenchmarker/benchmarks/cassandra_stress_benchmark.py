@@ -417,10 +417,12 @@ def RunCassandraStressTest(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data
         that is required to run the benchmark.
   """
-  InsertTest(benchmark_spec, benchmark_spec.vm_dict[LOADER_NODE][0])
-  logging.info('Tests running. Watching progress.')
-  vm_util.RunThreaded(WaitLoaderForFinishing,
-                      benchmark_spec.vm_dict[LOADER_NODE])
+  try:
+    InsertTest(benchmark_spec, benchmark_spec.vm_dict[LOADER_NODE][0])
+  finally:
+    logging.info('Tests running. Watching progress.')
+    vm_util.RunThreaded(WaitLoaderForFinishing,
+                        benchmark_spec.vm_dict[LOADER_NODE])
 
 
 def CollectResults(benchmark_spec):
