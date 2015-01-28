@@ -25,14 +25,14 @@ STANDARD_SET = 'standard_set'
 
 BENCHMARK_SETS = {
     STANDARD_SET: {
-        MESSAGE: 'This is the standard PKB set.',
+        MESSAGE: ('The standard_set is a community agreed upon set of '
+                  'benchmarks to measure Cloud performance.'),
         BENCHMARK_LIST: [
-            'aerospike', 'bonnie++', 'cassandra_stress',
-            'cloud_storage_storage', 'cluster_boot', 'copy_throughput',
-            'coremark', 'fio', 'hadoop_terasort', 'hpcc', 'iperf',
-            'mesh_network', 'mongodb', 'netperf', 'ping', 'redis',
-            'speccpu2006', 'synthetic_storage_workload', 'sysbench_oltp',
-            'unixbench']
+            'aerospike', 'cassandra_stress', 'cloud_storage_storage',
+            'cluster_boot', 'copy_throughput', 'coremark', 'fio',
+            'hadoop_terasort', 'hpcc', 'iperf', 'mesh_network', 'mongodb',
+            'netperf', 'ping', 'redis', 'speccpu2006',
+            'synthetic_storage_workload', 'sysbench_oltp', 'unixbench']
     }
 }
 
