@@ -43,6 +43,15 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(COREMARK_TAR)
+
+
 def Prepare(benchmark_spec):
   """Install Coremark on the target vm.
 

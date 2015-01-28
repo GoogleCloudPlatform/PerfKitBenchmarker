@@ -25,8 +25,8 @@ from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'sysbench_oltp_benchmark',
-                  'description': 'Runs sysbench oltp ',
+BENCHMARK_INFO = {'name': 'sysbench_oltp',
+                  'description': 'Runs Sysbench OLTP',
                   'scratch_disk': True,
                   'num_machines': 1}
 

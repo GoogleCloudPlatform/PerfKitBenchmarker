@@ -48,6 +48,15 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(SPECCPU2006_TAR)
+
+
 def Prepare(benchmark_spec):
   """Install SpecCPU2006 on the target vm.
 

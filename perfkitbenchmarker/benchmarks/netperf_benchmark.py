@@ -32,8 +32,9 @@ from perfkitbenchmarker.packages import netperf
 
 FLAGS = flags.FLAGS
 
-BENCHMARKS_INFO = {'name': 'netperf_simple',
-                   'description': 'Run Netperf tcp_rr, tcp_crr, and tcp_stream',
+BENCHMARKS_INFO = {'name': 'netperf',
+                   'description': 'Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM '
+                   'Netperf benchmarks',
                    'scratch_disk': False,
                    'num_machines': 2}
 

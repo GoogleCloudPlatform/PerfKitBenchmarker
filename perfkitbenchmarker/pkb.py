@@ -211,6 +211,17 @@ def RunBenchmark(benchmark, collector):
     return
   if not ValidateBenchmarkInfo(benchmark_info):
     return
+
+  # Optional prerequisite checking.
+  check_prereqs = getattr(benchmark, 'CheckPrerequisites', None)
+  if check_prereqs:
+    try:
+      check_prereqs()
+    except:
+      logging.exception('Prerequisite check failed for %s',
+                        benchmark_info['name'])
+      raise
+
   start_time = time.time()
   try:
     if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
