@@ -74,14 +74,14 @@ class FioTestCase(unittest.TestCase):
     self.assertDictEqual(parameter_dict, expected_result)
 
   def testParseFioResults(self):
-    with mock.patch(fio.__name__ + '.ParseJobFile') as p:
-      mock_job_parse_output = p.start()
-      mock_job_parse_output.return_value = {
-          'sequential_write': {},
-          'sequential_read': {},
-          'random_write_test': {},
-          'random_read_test': {},
-          'random_read_test_parallel': {}}
+    with mock.patch(
+        fio.__name__ + '.ParseJobFile',
+        return_value={
+            'sequential_write': {},
+            'sequential_read': {},
+            'random_write_test': {},
+            'random_read_test': {},
+            'random_read_test_parallel': {}}):
       result = fio.ParseResults('', self.result_contents)
       expected_result = [
           ['sequential_write:write:bandwidth', 63936.8, 'KB/s',
@@ -110,7 +110,6 @@ class FioTestCase(unittest.TestCase):
           ['random_read_test_parallel:read:latency', 198058.86, 'usec',
            {'max': 400119, 'stddev': 21711.26, 'min': 6}]]
       self.assertEqual(result, expected_result)
-      p.stop()
 
 
 if __name__ == '__main__':
