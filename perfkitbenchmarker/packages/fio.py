@@ -15,6 +15,7 @@
 """Module containing fio installation, cleanup, parsing functions."""
 
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 FIO_DIR = '%s/fio' % vm_util.VM_TMP_DIR
@@ -107,10 +108,7 @@ def ParseResults(job_file, fio_json_result):
     fio_json_result: Fio results in json format.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   samples = []
   parameter_metadata = ParseJobFile(job_file)
@@ -127,15 +125,17 @@ def ParseResults(job_file, fio_json_result):
             'bw_dev': job[mode]['bw_dev'],
             'bw_agg': job[mode]['bw_agg']}
         bw_metadata.update(parameters)
-        samples.append(['%s:bandwidth' % metric_name,
-                        job[mode]['bw_mean'],
-                        'KB/s', bw_metadata])
+        samples.append(
+            sample.Sample('%s:bandwidth' % metric_name,
+                          job[mode]['bw_mean'],
+                          'KB/s', bw_metadata))
         lat_metadata = {
             'min': job[mode]['lat']['min'],
             'max': job[mode]['lat']['max'],
             'stddev': job[mode]['lat']['stddev']}
         lat_metadata.update(parameters)
-        samples.append(['%s:latency' % metric_name,
-                        job[mode]['lat']['mean'],
-                        'usec', lat_metadata])
+        samples.append(
+            sample.Sample('%s:latency' % metric_name,
+                          job[mode]['lat']['mean'],
+                          'usec', lat_metadata))
   return samples

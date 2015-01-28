@@ -19,6 +19,7 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.packages import fio
 
 
@@ -109,6 +110,8 @@ class FioTestCase(unittest.TestCase):
             'bw_min': 795, 'bw_dev': 88.67}],
           ['random_read_test_parallel:read:latency', 198058.86, 'usec',
            {'max': 400119, 'stddev': 21711.26, 'min': 6}]]
+      expected_result = [sample.Sample(*sample_tuple)
+                         for sample_tuple in expected_result]
       self.assertEqual(result, expected_result)
 
 
