@@ -23,7 +23,6 @@ import logging
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.benchmarks.util import fio as fio_util
 from perfkitbenchmarker.packages import fio
 
 
@@ -102,7 +101,7 @@ def Run(benchmark_spec):
   stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
   with open(data.ResourcePath(flags.FLAGS.fio_jobfile)) as f:
     job_file = f.read()
-  return fio_util.ParseResults(job_file, json.loads(stdout))
+  return fio.ParseResults(job_file, json.loads(stdout))
 
 
 def Cleanup(benchmark_spec):

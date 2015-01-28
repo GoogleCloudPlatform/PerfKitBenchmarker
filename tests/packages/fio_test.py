@@ -17,27 +17,24 @@ import json
 import os
 import unittest
 
-from perfkitbenchmarker.benchmarks.util import fio
+import mock
 
-
-def MockParseJobFile(_):
-  """Mock funtion for ParseJobFile."""
-  return {
-      'sequential_write': {},
-      'sequential_read': {},
-      'random_write_test': {},
-      'random_read_test': {},
-      'random_read_test_parallel': {}}
+from perfkitbenchmarker.packages import fio
 
 
 class FioTestCase(unittest.TestCase):
 
+  maxDiff = None
+
   def setUp(self):
     result_path = os.path.join(
-        'tests/data', 'fio-parser-sample-result.json')
+        os.path.join(os.path.dirname(__file__)),
+        '..', 'data', 'fio-parser-sample-result.json')
     with open(result_path) as result_file:
       self.result_contents = json.loads(result_file.read())
-    job_file_path = os.path.join('tests/data', 'fio.job')
+    job_file_path = os.path.join(
+        os.path.join(os.path.dirname(__file__)),
+        '..', 'data', 'fio.job')
     with open(job_file_path) as job_file:
       self.job_contents = job_file.read()
 
@@ -74,39 +71,46 @@ class FioTestCase(unittest.TestCase):
             'directory': '/scratch0', 'filesize': '10*10*1000*$mb_memory',
             'ioengine': 'libaio', 'iodepth': '64',
             'size': '10*1000*$mb_memory'}}
-
-    self.assertEqual(parameter_dict, expected_result)
+    self.assertDictEqual(parameter_dict, expected_result)
 
   def testParseFioResults(self):
-    fio.ParseJobFile = MockParseJobFile
-    result = fio.ParseResults('', self.result_contents)
-    expected_result = [
-        ['sequential_write:write:bandwidth', 63936.8, 'KB/s',
-         {'bw_max': 74454, 'bw_agg': 63936.8,
-          'bw_min': 19225, 'bw_dev': 20346.28}],
-        ['sequential_write:write:latency', 478737.47, 'usec',
-         {'max': 869970, 'stddev': 92629.54, 'min': 189438}],
-        ['sequential_read:read:bandwidth', 130255.2, 'KB/s',
-         {'bw_max': 162491, 'bw_agg': 130255.2,
-          'bw_min': 115250, 'bw_dev': 18551.37}],
-        ['sequential_read:read:latency', 250770.05, 'usec',
-         {'max': 528583, 'stddev': 70324.58, 'min': 24361}],
-        ['random_write_test:write:bandwidth', 6446.55, 'KB/s',
-         {'bw_max': 7104, 'bw_agg': 6446.55,
-          'bw_min': 5896, 'bw_dev': 336.21}],
-        ['random_write_test:write:latency', 617.69, 'usec',
-         {'max': 81866, 'stddev': 898.09, 'min': 447}],
-        ['random_read_test:read:bandwidth', 1275.52, 'KB/s',
-         {'bw_max': 1745, 'bw_agg': 1275.52,
-          'bw_min': 330, 'bw_dev': 201.59}],
-        ['random_read_test:read:latency', 3146.5, 'usec',
-         {'max': 352781, 'stddev': 5114.68, 'min': 6}],
-        ['random_read_test_parallel:read:bandwidth', 1284.71, 'KB/s',
-         {'bw_max': 1693, 'bw_agg': 1284.71,
-          'bw_min': 795, 'bw_dev': 88.67}],
-        ['random_read_test_parallel:read:latency', 198058.86, 'usec',
-         {'max': 400119, 'stddev': 21711.26, 'min': 6}]]
-    self.assertEqual(result, expected_result)
+    with mock.patch(fio.__name__ + '.ParseJobFile') as p:
+      mock_job_parse_output = p.start()
+      mock_job_parse_output.return_value = {
+          'sequential_write': {},
+          'sequential_read': {},
+          'random_write_test': {},
+          'random_read_test': {},
+          'random_read_test_parallel': {}}
+      result = fio.ParseResults('', self.result_contents)
+      expected_result = [
+          ['sequential_write:write:bandwidth', 63936.8, 'KB/s',
+           {'bw_max': 74454, 'bw_agg': 63936.8,
+            'bw_min': 19225, 'bw_dev': 20346.28}],
+          ['sequential_write:write:latency', 478737.47, 'usec',
+           {'max': 869970, 'stddev': 92629.54, 'min': 189438}],
+          ['sequential_read:read:bandwidth', 130255.2, 'KB/s',
+           {'bw_max': 162491, 'bw_agg': 130255.2,
+            'bw_min': 115250, 'bw_dev': 18551.37}],
+          ['sequential_read:read:latency', 250770.05, 'usec',
+           {'max': 528583, 'stddev': 70324.58, 'min': 24361}],
+          ['random_write_test:write:bandwidth', 6446.55, 'KB/s',
+           {'bw_max': 7104, 'bw_agg': 6446.55,
+            'bw_min': 5896, 'bw_dev': 336.21}],
+          ['random_write_test:write:latency', 617.69, 'usec',
+           {'max': 81866, 'stddev': 898.09, 'min': 447}],
+          ['random_read_test:read:bandwidth', 1275.52, 'KB/s',
+           {'bw_max': 1745, 'bw_agg': 1275.52,
+            'bw_min': 330, 'bw_dev': 201.59}],
+          ['random_read_test:read:latency', 3146.5, 'usec',
+           {'max': 352781, 'stddev': 5114.68, 'min': 6}],
+          ['random_read_test_parallel:read:bandwidth', 1284.71, 'KB/s',
+           {'bw_max': 1693, 'bw_agg': 1284.71,
+            'bw_min': 795, 'bw_dev': 88.67}],
+          ['random_read_test_parallel:read:latency', 198058.86, 'usec',
+           {'max': 400119, 'stddev': 21711.26, 'min': 6}]]
+      self.assertEqual(result, expected_result)
+      p.stop()
 
 
 if __name__ == '__main__':
