@@ -18,6 +18,7 @@ import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
@@ -175,10 +176,7 @@ def CreateSamples(results, start_index, end_index, metadata,
     field_index_mapping: dict. A dictionary maps field index to field names.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample instances.
   """
   samples = []
   for field_index in range(start_index, end_index):
@@ -192,7 +190,7 @@ def CreateSamples(results, start_index, end_index, metadata,
       value, unit = ParseLatencyResult(value)
     else:
       unit = 'K/sec'
-    samples.append([field_name, float(value), unit, metadata])
+    samples.append(sample.Sample(field_name, float(value), unit, metadata))
   return samples
 
 

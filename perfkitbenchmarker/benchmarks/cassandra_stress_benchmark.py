@@ -28,6 +28,7 @@ from perfkitbenchmarker import benchmark_spec as bs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 
@@ -409,10 +410,7 @@ def CollectResults(benchmark_spec):
         that is required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   logging.info('Gathering results.')
   vm_dict = benchmark_spec.vm_dict
@@ -429,24 +427,25 @@ def CollectResults(benchmark_spec):
             latency_99_9th_list,
             total_operation_time_list), {}) for vm in vm_dict[LOADER_NODE]]
   vm_util.RunThreaded(CollectResultFile, args)
-  results = []
-  results.append(['Interval_op_rate', math.fsum(interval_op_rate_list),
-                  'operations per second', {}])
-  results.append(['Interval_key_rate', math.fsum(interval_key_rate_list),
-                  'operations per second', {}])
-  results.append(['Latency median',
-                  math.fsum(latency_median_list) / len(vm_dict[LOADER_NODE]),
-                  'ms', {}])
-  results.append(['Latency 95th percentile',
-                  math.fsum(latency_95th_list) / len(vm_dict[LOADER_NODE]),
-                  'ms', {}])
-  results.append(['Latency 99.9th percentile',
-                  math.fsum(latency_99_9th_list) / len(vm_dict[LOADER_NODE]),
-                  'ms', {}])
-  results.append(['Total operation time',
-                  math.fsum(total_operation_time_list) / len(
-                      vm_dict[LOADER_NODE]), 'seconds', {}])
-  print results
+  results = [
+      sample.Sample('Interval_op_rate', math.fsum(interval_op_rate_list),
+                    'operations per second'),
+      sample.Sample('Interval_key_rate', math.fsum(interval_key_rate_list),
+                    'operations per second'),
+      sample.Sample('Latency median',
+                    math.fsum(latency_median_list) / len(vm_dict[LOADER_NODE]),
+                    'ms'),
+      sample.Sample('Latency 95th percentile',
+                    math.fsum(latency_95th_list) / len(vm_dict[LOADER_NODE]),
+                    'ms'),
+      sample.Sample('Latency 99.9th percentile',
+                    math.fsum(latency_99_9th_list) / len(vm_dict[LOADER_NODE]),
+                    'ms'),
+      sample.Sample('Total operation time',
+                    math.fsum(total_operation_time_list) /
+                    len(vm_dict[LOADER_NODE]),
+                    'seconds')]
+  logging.info('Cassandra results:\n%s', results)
   return results
 
 
@@ -458,10 +457,7 @@ def Run(benchmark_spec):
         that is required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   InitializeCurrentDeployment(benchmark_spec)
   StartCassandraServers(benchmark_spec)

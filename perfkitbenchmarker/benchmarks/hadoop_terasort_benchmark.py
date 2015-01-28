@@ -27,6 +27,7 @@ import time
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_integer('terasort_num_rows', 100000000,
@@ -150,10 +151,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample instances.
   """
   vms = benchmark_spec.vms
   master = vms[0]
@@ -185,10 +183,11 @@ def Run(benchmark_spec):
                        HADOOP_VERSION)
   metadata = {'num_rows': FLAGS.terasort_num_rows,
               'data_size_in_bytes': FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW}
-  return [['Terasort Throughput Per Core',
-           data_processed_in_mbytes / time_elapsed / num_cpus,
-           'MB/sec', metadata],
-          ['Terasort Throughput Total Time', time_elapsed, 'sec', metadata]]
+  return [sample.Sample('Terasort Throughput Per Core',
+                        data_processed_in_mbytes / time_elapsed / num_cpus,
+                        'MB/sec',
+                        metadata),
+          sample.Sample('Terasort Total Time', time_elapsed, 'sec', metadata)]
 
 
 def StopDatanode(vm):

@@ -62,6 +62,7 @@ import uuid
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
@@ -246,9 +247,9 @@ def RunBenchmark(benchmark, collector):
       benchmark_specification.Delete()
       if FLAGS.run_stage == STAGE_ALL:
         end_time = time.time()
-        end_to_end_sample = ['End to End Runtime',
-                             end_time - start_time,
-                             'seconds', {}]
+        end_to_end_sample = sample.Sample('End to End Runtime',
+                                          end_time - start_time,
+                                          'seconds')
         collector.AddSamples([end_to_end_sample], benchmark_info['name'],
                              benchmark_specification)
   except Exception:

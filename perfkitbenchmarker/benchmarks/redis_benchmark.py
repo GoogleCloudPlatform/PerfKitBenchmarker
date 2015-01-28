@@ -24,6 +24,7 @@ memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 import logging
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import redis_server
 
@@ -134,10 +135,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   redis_vm = vms[0]
@@ -165,7 +163,8 @@ def Run(benchmark_spec):
     for result in iteration_results.values():
       latency += result[1] * result[0] / throughput
 
-    results.append(('throughput', throughput, 'req/s', {'latency': latency}))
+    results.append(sample.Sample('throughput', throughput, 'req/s',
+                                 {'latency': latency, 'threads': threads}))
     logging.info('Threads : %d  (%f, %f) < %f', threads, throughput, latency,
                  latency_threshold)
     if threads == 1:

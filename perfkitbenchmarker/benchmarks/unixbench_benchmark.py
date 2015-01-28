@@ -24,6 +24,7 @@ import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.packages import unixbench
 
 FLAGS = flags.FLAGS
@@ -101,10 +102,7 @@ def ParseResults(results):
     results: UnixBench result.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   samples = []
   start_index = results.find(RESULT_START_STRING)
@@ -119,16 +117,20 @@ def ParseResults(results):
     for groups in match:
       metadata = {'samples': int(groups[5]), 'time': groups[3] + groups[4]}
       metadata.update(parallel_copy_metadata)
-      samples.append([groups[0].strip(), float(groups[1]), groups[2], metadata])
+      samples.append(sample.Sample(
+          groups[0].strip(), float(groups[1]), groups[2], metadata))
     match = regex_util.ExtractAllMatches(SCORE_REGEX, result)
     for groups in match:
       metadata = {'baseline': float(groups[1]), 'index': float(groups[3])}
       metadata.update(parallel_copy_metadata)
-      samples.append(['%s:score' % groups[0].strip(), float(groups[2]), '',
-                      metadata])
+      samples.append(sample.Sample('%s:score' % groups[0].strip(),
+                                   value=float(groups[2]),
+                                   unit='',
+                                   metadata=metadata))
     match = regex_util.ExtractAllMatches(SYSTEM_SCORE_REGEX, result)
-    samples.append(['System Benchmarks Index Score', float(match[0]), '',
-                    parallel_copy_metadata])
+    samples.append(sample.Sample('System Benchmarks Index Score',
+                                 float(match[0]), unit='',
+                                 metadata=parallel_copy_metadata))
     start_index = next_start_index
 
   return samples
@@ -142,10 +144,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
