@@ -18,6 +18,7 @@ import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 BENCHMARK_INFO = {'name': 'cluster_boot',
@@ -40,7 +41,7 @@ def _GetTimeToBoot(vm, vm_index, result_list):
               'machine_instance': vm_index}
   value = vm.TimeToBoot()
   assert value is not None
-  result_list.append(('Boot Time', value, 'seconds', metadata))
+  result_list.append(sample.Sample('Boot Time', value, 'seconds', metadata))
 
 
 def Run(benchmark_spec):
@@ -51,10 +52,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects with individual machine boot times.
   """
 
   samples = []

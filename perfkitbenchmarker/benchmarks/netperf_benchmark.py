@@ -26,6 +26,7 @@ import logging
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import netperf
 
@@ -80,9 +81,7 @@ def RunNetperf(vm, benchmark_name, server_ip):
     server_ip: A machine that is running netserver.
 
   Returns:
-    A single sample in the form of a tuple. The tuple contains
-        the sample metric (string), value (float), unit (string),
-        and empty metadata dictionary (to be filled out later).
+    A sample.Sample object with the result.
   """
   netperf_cmd = ('{netperf_path} -p {command_port} '
                  '-t {benchmark_name} -H {server_ip} -- '
@@ -101,7 +100,7 @@ def RunNetperf(vm, benchmark_name, server_ip):
   else:
     metric = '%s_Transaction_Rate' % benchmark_name
     unit = 'transactions_per_second'
-  return (metric, value, unit, {})
+  return sample.Sample(metric, value, unit)
 
 
 def Run(benchmark_spec):
@@ -112,10 +111,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -136,14 +132,14 @@ def Run(benchmark_spec):
     if vm_util.ShouldRunOnExternalIpAddress():
       external_ip_result = RunNetperf(vm, netperf_benchmark,
                                       server_vm.ip_address)
-      external_ip_result[3].update(metadata)
+      external_ip_result.metadata.update(metadata)
       results.append(external_ip_result)
 
     if vm_util.ShouldRunOnInternalIpAddress(vm, server_vm):
       internal_ip_result = RunNetperf(vm, netperf_benchmark,
                                       server_vm.internal_ip)
-      internal_ip_result[3].update(metadata)
-      internal_ip_result[3]['ip_type'] = 'internal'
+      internal_ip_result.metadata.update(metadata)
+      internal_ip_result.metadata['ip_type'] = 'internal'
       results.append(internal_ip_result)
 
   return results
