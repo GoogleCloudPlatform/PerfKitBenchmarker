@@ -46,6 +46,8 @@ import logging
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
+from perfkitbenchmarker.packages import fio
 
 LOGGING = 'logging'
 DATABASE = 'database'
@@ -64,12 +66,11 @@ flags.DEFINE_integer('maxjobs', 0,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'synthetic_storage_workloads_benchmark',
+BENCHMARK_INFO = {'name': 'synthetic_storage_workload',
                   'description': 'Runs FIO in sequential, random, read and '
                                  'write modes to simulate various scenarios.',
                   'scratch_disk': True,
                   'num_machines': 1}
-REQUIRED_PACKAGES = 'bc fio libaio1'
 DESCRIPTION = 'description'
 METHOD = 'method'
 
@@ -98,7 +99,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO prepare on %s', vm)
-  vm.InstallPackage(REQUIRED_PACKAGES)
+  vm.Install('fio')
 
 
 def ParseFioResult(res):
@@ -132,21 +133,18 @@ def CreateSampleFromBandwidthTuple(result, test, iodepth, test_size):
     result: A tuple, containing (aggrb, unit of aggrb, minb, unit of minb,
         maxb, unit of maxb, mint, unit of mint, maxt, unit of maxt).
     test: Name of test.
-    iodepth: Iodepth parameter used by fio command.
+    iodepth: IO depth parameter used by fio command.
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A sample.Sample.
   """
-  return [test, float(result[0]), result[1],
-          {'minb': result[2] + result[3],
-           'maxb': result[4] + result[5],
-           'mint': result[6] + result[7],
-           'maxt': result[8] + result[9],
-           'max_jobs': FLAGS.maxjobs,
-           'iodepth': iodepth,
-           'test_size': test_size}]
+  return sample.Sample(test, float(result[0]), result[1],
+                       {'minb': result[2] + result[3],
+                        'maxb': result[4] + result[5],
+                        'mint': result[6] + result[7],
+                        'maxt': result[8] + result[9],
+                        'max_jobs': FLAGS.maxjobs,
+                        'iodepth': iodepth,
+                        'test_size': test_size})
 
 
 def CreateSampleFromLatencyTuple(result, test, iodepth, test_size):
@@ -155,20 +153,17 @@ def CreateSampleFromLatencyTuple(result, test, iodepth, test_size):
   Args:
     result: A tuple, containing (unit, min, max, avg, stdev).
     test: Name of test.
-    iodepth: Iodepth parameter used by fio command.
+    iodepth: IO depth parameter used by fio command.
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A sample.Sample.
   """
-  return [test, float(result[3]), result[0],
-          {'min': result[1] + result[0],
-           'max': result[2] + result[0],
-           'stdev': result[4] + result[0],
-           'max_jobs': FLAGS.maxjobs,
-           'iodepth': iodepth,
-           'test_size': test_size}]
+  return sample.Sample(test, float(result[3]), result[0],
+                       {'min': result[1] + result[0],
+                        'max': result[2] + result[0],
+                        'stdev': result[4] + result[0],
+                        'max_jobs': FLAGS.maxjobs,
+                        'iodepth': iodepth,
+                        'test_size': test_size})
 
 
 def RunSimulatedLogging(vm):
@@ -176,14 +171,11 @@ def RunSimulatedLogging(vm):
   Args:
     vm: The vm that synthetic_storage_workloads_benchmark will be run upon.
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects
   """
   test_size = vm.total_memory_kb
   cmd = (
-      'fio '
+      '%s '
       '--filesize=10g '
       '--directory=%s '
       '--ioengine=libaio '
@@ -192,7 +184,8 @@ def RunSimulatedLogging(vm):
       '--randrepeat=0 '
       '--direct=0 '
       '--size=%dk '
-      '--iodepth=%d ') % (vm.GetScratchDir(),
+      '--iodepth=%d ') % (fio.FIO_PATH,
+                          vm.GetScratchDir(),
                           test_size,
                           DEFAULT_IODEPTH)
   if FLAGS.maxjobs:
@@ -235,17 +228,14 @@ def RunSimulatedDatabase(vm):
   Args:
     vm: The vm that synthetic_storage_workloads_benchmark will be run upon.
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the same metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects
   """
   test_size = min(vm.total_memory_kb / 10, 1000000)
   iodepth_list = FLAGS.iodepth_list or DEFAULT_DATABASE_SIMULATION_IODEPTH_LIST
   results = []
   for depth in iodepth_list:
     cmd = (
-        'fio '
+        '%s '
         '--filesize=10g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -256,7 +246,8 @@ def RunSimulatedDatabase(vm):
         '--randrepeat=0 '
         '--iodepth=%s '
         '--size=%dk '
-        '--blocksize=4k ') % (vm.GetScratchDir(),
+        '--blocksize=4k ') % (fio.FIO_PATH,
+                              vm.GetScratchDir(),
                               depth,
                               test_size)
     if FLAGS.maxjobs:
@@ -309,17 +300,14 @@ def RunSimulatedStreaming(vm):
   Args:
     vm: The vm that synthetic_storage_workloads_benchmark will be run upon.
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the same metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects
   """
   test_size = min(vm.total_memory_kb / 10, 1000000)
   iodepth_list = FLAGS.iodepth_list or DEFAULT_STREAMING_SIMULATION_IODEPTH_LIST
   results = []
   for depth in iodepth_list:
     cmd = (
-        'fio '
+        '%s '
         '--filesize=10g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -330,7 +318,8 @@ def RunSimulatedStreaming(vm):
         '--iodepth=%s '
         '--blocksize=1m '
         '--size=%dk '
-        '--filename=fio_test_file ') % (vm.GetScratchDir(),
+        '--filename=fio_test_file ') % (fio.FIO_PATH,
+                                        vm.GetScratchDir(),
                                         depth,
                                         test_size)
     if FLAGS.maxjobs:
@@ -377,12 +366,9 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
-  logging.info('Simulating %s senario.', FLAGS.workload_mode)
+  logging.info('Simulating %s scenario.', FLAGS.workload_mode)
   vms = benchmark_spec.vms
   vm = vms[0]
   # Add mode name into benchmark name, so perfkitbenchmarker will publish each
@@ -402,5 +388,4 @@ def Cleanup(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO Cleanup up on %s', vm)
-  vm.UninstallPackage(REQUIRED_PACKAGES)
   vm.RemoveFile(vm.GetScratchDir() + '/fio_test_file')

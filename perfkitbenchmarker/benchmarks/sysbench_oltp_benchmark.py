@@ -21,11 +21,12 @@ import logging
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'sysbench_oltp_benchmark',
-                  'description': 'Runs sysbench oltp ',
+BENCHMARK_INFO = {'name': 'sysbench_oltp',
+                  'description': 'Runs Sysbench OLTP',
                   'scratch_disk': True,
                   'num_machines': 1}
 
@@ -34,7 +35,6 @@ SYSBENCH_CMD = ('sudo sysbench '
                 '--test=oltp --db-driver=mysql '
                 '--mysql-table-engine=myisam '
                 '--oltp-table-size=1000000 '
-                '--mysql-socket=/var/run/mysqld/mysqld.sock '
                 '--mysql-user=root '
                 '--max-requests=0 '
                 '--max-time=60 '
@@ -54,24 +54,20 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vm = vms[0]
-  # TODO(user): Randomize the password.
-  vm.RemoteCommand('echo "mysql-server-5.5 mysql-server/root_password password '
-                   'perfkitbenchmarker" | sudo debconf-set-selections')
-  vm.RemoteCommand('echo "mysql-server-5.5 mysql-server/root_password_again '
-                   'password perfkitbenchmarker" | sudo debconf-set-selections')
-  vm.InstallPackage('mysql-server')
-  vm.RemoteCommand('sudo /etc/init.d/mysql status')
+  vm.Install('mysql')
+  vm.RemoteCommand('sudo service %s status' % vm.GetServiceName('mysql'))
   vm.RemoteCommand('chmod 777 %s' % vm.GetScratchDir())
-  vm.RemoteCommand('sudo /etc/init.d/mysql stop')
-  vm.RemoteCommand('sudo sed -i \'s/\\/var\\/lib\\/mysql/\\%s\\/mysql/g\''
-                   ' /etc/mysql/my.cnf' % vm.GetScratchDir())
+  vm.RemoteCommand('sudo service %s stop' % vm.GetServiceName('mysql'))
+  vm.RemoteCommand('sudo sed -i '
+                   '"s/datadir=\\/var\\/lib\\/mysql/datadir=\\%s\\/mysql/" '
+                   '%s' % (vm.GetScratchDir(), vm.GetPathToConfig('mysql')))
   vm.RemoteCommand('sudo cp -R -p /var/lib/mysql %s/' % vm.GetScratchDir())
-  vm.RemoteCommand('sudo /etc/init.d/mysql restart')
-  vm.RemoteCommand('sudo /etc/init.d/mysql status')
+  vm.RemoteCommand('sudo service %s restart' % vm.GetServiceName('mysql'))
+  vm.RemoteCommand('sudo service %s status' % vm.GetServiceName('mysql'))
   vm.RemoteCommand(
-      'sudo mysql -u root --password=perfkitbenchmarker -e "create '
-      'database sbtest";')
-  vm.InstallPackage('sysbench')
+      'sudo mysql -u root --password=perfkitbenchmarker '
+      '-e "create database sbtest";')
+  vm.Install('sysbench')
   vm.RemoteCommand(SYSBENCH_CMD + 'prepare')
 
 
@@ -83,10 +79,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -95,7 +88,7 @@ def Run(benchmark_spec):
   stdout, _ = vm.RemoteCommand(sysbench_cmd + 'run', should_log=True)
   match = re.search('\\s+transactions:.+\\(([0-9]+\\.[0-9]+)', stdout)
   value = float(match.group(1))
-  return [('OLTP Transaction Rate', value, 'Transactions/sec')]
+  return [sample.Sample('OLTP Transaction Rate', value, 'Transactions/sec')]
 
 
 def Cleanup(benchmark_spec):
@@ -109,5 +102,3 @@ def Cleanup(benchmark_spec):
   vm = vms[0]
   logging.info('Sysbench-read cleanup on %s', vm)
   vm.RemoteCommand(SYSBENCH_CMD + 'cleanup')
-  vm.UninstallPackage('sysbench')
-  vm.UninstallPackage('mysql-server')

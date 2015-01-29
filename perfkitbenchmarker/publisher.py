@@ -27,8 +27,14 @@ import uuid
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.sample import Sample
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_string(
+    'product_name',
+    'PerfKitBenchmarker',
+    'The product name to use when publishing results.')
 
 flags.DEFINE_boolean(
     'official',
@@ -37,16 +43,11 @@ flags.DEFINE_boolean(
     'default is False. Official test results are treated and queried '
     'differently from non-official test results.')
 
-flags.DEFINE_boolean(
-    'json_output',
-    True,
-    'A boolean indicating whether to write newline-delimited '
-    'JSON results to the run-specific temporary directory.')
-
 flags.DEFINE_string(
     'json_path',
     None,
-    'A path to write newline-delimited JSON results')
+    'A path to write newline-delimited JSON results '
+    'Default: write to a run-specific temporary directory')
 
 flags.DEFINE_string(
     'bigquery_table',
@@ -77,7 +78,6 @@ flags.DEFINE_list(
     'samples as metadata. Each key-value pair in the list should be colon '
     'separated.')
 
-PRODUCT_NAME = 'PerfKitBenchmarker'
 DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
 GCS_OBJECT_NAME_LENGTH = 20
@@ -368,15 +368,12 @@ class SampleCollector(object):
   results via any number of SamplePublishers.
 
   Attributes:
-    samples: a list of 3 or 4-tuples. The tuples contain the metric
-        name (string), the value (float), and unit (string) of
-        each sample. If a 4th element is included, it is a
-        dictionary of metadata associated with the sample.
-    metadata_providers: list of MetadataProvider. Metadata providers to use.
-      Defaults to DEFAULT_METADATA_PROVIDERS.
-    publishers: list of SamplePublishers. If not specified, defaults to a
-      LogPublisher, PrettyPrintStreamPublisher, NewlineDelimitedJSONPublisher, a
-      BigQueryPublisher if FLAGS.bigquery_table is specified, and a
+    samples: A list of Sample objects.
+    metadata_providers: A list of MetadataProvider objects. Metadata providers
+      to use.  Defaults to DEFAULT_METADATA_PROVIDERS.
+    publishers: A list of SamplePublisher objects. If not specified, defaults to
+      a LogPublisher, PrettyPrintStreamPublisher, NewlineDelimitedJSONPublisher,
+      a BigQueryPublisher if FLAGS.bigquery_table is specified, and a
       CloudStoragePublisher if FLAGS.cloud_storage_bucket is specified. See
       SampleCollector._DefaultPublishers.
     run_uri: A unique tag for the run.
@@ -423,28 +420,30 @@ class SampleCollector(object):
     """Adds data samples to the publisher.
 
     Args:
-      samples: a list of 3 or 4-tuples. The tuples contain the metric
-          name (string), the value (float), and unit (string) of
-          each sample. If a 4th element is included, it is a
-          dictionary of metadata associated with the sample.
+      samples: Either a list of Sample objects (preferred) or a list of 3 or
+        4-tuples (deprecated). The tuples contain the metric name (string), the
+        value (float), and unit (string) of each sample. If a 4th element is
+        included, it is a dictionary of metadata associated with the sample.
       benchmark: string. The name of the benchmark.
       benchmark_spec: BenchmarkSpec. Benchmark specification.
     """
     for s in samples:
-      sample = dict()
-      sample['test'] = benchmark
-      sample['metric'] = s[0]
-      sample['value'] = s[1]
-      sample['unit'] = s[2]
-      if len(s) == 4:
-        metadata = s[3]
-      else:
-        metadata = dict()
-      for meta_provider in self.metadata_providers:
-        metadata = meta_provider.AddMetadata(metadata, benchmark_spec)
+      # Convert input in deprecated format to Sample objects.
+      if isinstance(s, (list, tuple)):
+        if len(s) not in (3, 4):
+          raise ValueError(
+              'Invalid sample "{0}": should be 3- or 4-tuple.'.format(s))
+        s = Sample(*s)
 
-      sample['metadata'] = metadata
-      sample['product_name'] = PRODUCT_NAME
+      # Annotate the sample.
+      sample = dict(s.asdict())
+      sample['test'] = benchmark
+
+      for meta_provider in self.metadata_providers:
+        sample['metadata'] = meta_provider.AddMetadata(
+            sample['metadata'], benchmark_spec)
+
+      sample['product_name'] = FLAGS.product_name
       sample['official'] = FLAGS.official
       sample['owner'] = FLAGS.owner
       sample['timestamp'] = time.time()

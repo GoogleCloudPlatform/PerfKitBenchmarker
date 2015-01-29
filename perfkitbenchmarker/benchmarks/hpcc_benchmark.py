@@ -45,21 +45,10 @@ import tempfile
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
+from perfkitbenchmarker.packages import hpcc
 
 FLAGS = flags.FLAGS
-HPCC_TAR = 'hpcc-1.4.3.tar.gz'
-HPCC_URL = 'http://icl.cs.utk.edu/projectsfiles/hpcc/download/' + HPCC_TAR
-HPCC_DIR = ' hpcc-1.4.3'
-MAKE_FLAVOR = 'Linux_PII_CBLAS'
-HPCC_MAKEFILE = 'Make.' + MAKE_FLAVOR
-HPCC_MAKEFILE_PATH = HPCC_DIR + '/hpl/' + HPCC_MAKEFILE
-MPI_TAR = 'openmpi-1.6.5.tar.gz'
-MPI_URL = 'http://www.open-mpi.org/software/ompi/v1.6/downloads/' + MPI_TAR
-MPI_DIR = 'openmpi-1.6.5'
-OPENBLAS_URL = 'git://github.com/xianyi/OpenBLAS'
-OPENBLAS_COMMIT = 'v0.2.11'
-OPENBLAS_DIR = 'OpenBLAS'
-REQUIRED_PACKAGES = 'build-essential git gfortran'
 HPCCINF_FILE = 'hpccinf.txt'
 MACHINEFILE = 'machinefile'
 BLOCK_SIZE = 192
@@ -78,6 +67,15 @@ flags.DEFINE_integer('memory_size_mb',
 def GetInfo():
   BENCHMARK_INFO['num_machines'] = FLAGS.num_vms
   return BENCHMARK_INFO
+
+
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(HPCCINF_FILE)
 
 
 def CreateMachineFile(vms):
@@ -102,7 +100,9 @@ def CreateHpccinf(vm, benchmark_spec):
   if FLAGS.memory_size_mb:
     total_memory = FLAGS.memory_size_mb * 1024 * 1024 * num_vms
   else:
-    total_memory = vm.total_memory_kb * 1024 * num_vms
+    stdout, _ = vm.RemoteCommand("free | sed -n 3p | awk {'print $4'}")
+    available_memory = int(stdout)
+    total_memory = available_memory * 1024 * num_vms
   total_cpus = vm.num_cpus * num_vms
   block_size = BLOCK_SIZE
 
@@ -134,30 +134,7 @@ def CreateHpccinf(vm, benchmark_spec):
 def PrepareHpcc(vm):
   """Builds HPCC on a single vm."""
   logging.info('Building HPCC on %s', vm)
-  vm.InstallPackage(REQUIRED_PACKAGES)
-
-  vm.RemoteCommand('wget %s' % MPI_URL)
-  vm.RemoteCommand('tar xvfz %s' % MPI_TAR)
-  make_jobs = vm.num_cpus
-  config_cmd = ('./configure --enable-static --disable-shared --disable-dlopen '
-                '--prefix=/usr')
-  vm.RemoteCommand('cd %s; %s; make -j %s; sudo make install' %
-                   (MPI_DIR, config_cmd, make_jobs))
-  vm.RemoteCommand('git clone %s' % OPENBLAS_URL)
-  vm.RemoteCommand('cd %s; git checkout -q %s' % (OPENBLAS_DIR,
-                                                  OPENBLAS_COMMIT))
-  vm.RemoteCommand('cd %s; make' % OPENBLAS_DIR)
-
-  vm.RemoteCommand('wget %s' % HPCC_URL)
-  vm.RemoteCommand('tar xvfz %s' % HPCC_TAR)
-  vm.RemoteCommand(
-      'cp %s/hpl/setup/%s %s' % (HPCC_DIR, HPCC_MAKEFILE, HPCC_MAKEFILE_PATH))
-  sed_cmd = ('sed -i -e "/^MP/d" -e "s/gcc/mpicc/" -e "s/g77/mpicc/" '
-             '-e "s/netlib\\/ARCHIVES\\/Linux_PII/OpenBLAS/" '
-             '-e "s/libcblas.*/libopenblas.a/" '
-             '-e "s/\\-lm/\\-lgfortran \\-lm/" %s') % HPCC_MAKEFILE_PATH
-  vm.RemoteCommand(sed_cmd)
-  vm.RemoteCommand('cd %s; make arch=Linux_PII_CBLAS' % HPCC_DIR)
+  vm.Install('hpcc')
 
 
 def Prepare(benchmark_spec):
@@ -173,10 +150,11 @@ def Prepare(benchmark_spec):
   PrepareHpcc(master_vm)
   CreateHpccinf(master_vm, benchmark_spec)
   CreateMachineFile(vms)
+  master_vm.RemoteCommand('cp %s/hpcc hpcc' % hpcc.HPCC_DIR)
 
-  for vm in vms:
-    vm.InstallPackage('gfortran')
-    master_vm.MoveFile(vm, '%s/hpcc' % HPCC_DIR, 'hpcc')
+  for vm in vms[1:]:
+    vm.Install('fortran')
+    master_vm.MoveFile(vm, 'hpcc', 'hpcc')
     master_vm.MoveFile(vm, '/usr/bin/orted', 'orted')
     vm.RemoteCommand('sudo mv orted /usr/bin/orted')
 
@@ -200,16 +178,18 @@ def ParseOutput(hpcc_output, benchmark_spec):
   metadata['num_machines'] = benchmark_spec.num_vms
   metadata['memory_size_mb'] = FLAGS.memory_size_mb
   value = regex_util.ExtractFloat('HPL_Tflops=([0-9]*\\.[0-9]*)', hpcc_output)
-  results.append(('HPL Throughput', value, 'Tflops', metadata))
+  results.append(sample.Sample('HPL Throughput', value, 'Tflops', metadata))
 
   value = regex_util.ExtractFloat('SingleRandomAccess_GUPs=([0-9]*\\.[0-9]*)',
                                   hpcc_output)
-  results.append(('Random Access Throughput', value, 'GigaUpdates/sec'))
+  results.append(sample.Sample('Random Access Throughput', value,
+                               'GigaUpdates/sec'))
 
   for metric in STREAM_METRICS:
     regex = 'SingleSTREAM_%s=([0-9]*\\.[0-9]*)' % metric
     value = regex_util.ExtractFloat(regex, hpcc_output)
-    results.append(('STREAM %s Throughput' % metric, value, 'GB/s'))
+    results.append(sample.Sample('STREAM %s Throughput' % metric, value,
+                                 'GB/s'))
 
   return results
 
@@ -222,10 +202,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   master_vm = vms[0]
@@ -250,9 +227,6 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   master_vm = vms[0]
-  master_vm.RemoteCommand('cd %s; sudo make uninstall' % MPI_DIR)
-  master_vm.RemoveFile(MPI_DIR + '*')
-  master_vm.RemoveFile(OPENBLAS_DIR + '*')
   master_vm.RemoveFile('hpcc*')
   master_vm.RemoveFile(MACHINEFILE)
 

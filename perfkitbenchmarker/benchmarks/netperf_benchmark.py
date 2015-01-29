@@ -26,18 +26,18 @@ import logging
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.packages import netperf
 
 FLAGS = flags.FLAGS
 
-BENCHMARKS_INFO = {'name': 'netperf_simple',
-                   'description': 'Run Netperf tcp_rr, tcp_crr, and tcp_stream',
+BENCHMARKS_INFO = {'name': 'netperf',
+                   'description': 'Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM '
+                   'Netperf benchmarks',
                    'scratch_disk': False,
                    'num_machines': 2}
 
-NETPERF_NAME = 'netperf-2.6.0.tar.gz'
-NETPERF_SRC = 'netperf-2.6.0/src'
-NETPERF_LOC = 'ftp://ftp.netperf.org/netperf/%s' % NETPERF_NAME
 NETPERF_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 COMMAND_PORT = 20000
 DATA_PORT = 20001
@@ -49,13 +49,7 @@ def GetInfo():
 
 def PrepareNetperf(vm):
   """Installs netperf on a single vm."""
-  logging.info('netperf prepare on %s', vm)
-  vm.InstallPackage('build-essential')
-  wget_cmd = '/usr/bin/wget %s' % NETPERF_LOC
-  vm.RemoteCommand(wget_cmd)
-  vm.RemoteCommand('tar xvfz %s' % NETPERF_NAME)
-  make_cmd = 'cd netperf-2.6.0;./configure;make'
-  vm.RemoteCommand(make_cmd)
+  vm.Install('netperf')
 
 
 def Prepare(benchmark_spec):
@@ -70,13 +64,12 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(PrepareNetperf, vms)
 
   fw = benchmark_spec.firewall
-  # TODO(user): takes too long, change API to take range, put all in the same
-  #    range.
 
   fw.AllowPort(vms[1], COMMAND_PORT)
   fw.AllowPort(vms[1], DATA_PORT)
 
-  vms[1].RemoteCommand('%s/netserver -p %s' % (NETPERF_SRC, COMMAND_PORT))
+  vms[1].RemoteCommand('%s -p %s' %
+                       (netperf.NETSERVER_PATH, COMMAND_PORT))
 
 
 def RunNetperf(vm, benchmark_name, server_ip):
@@ -88,15 +81,14 @@ def RunNetperf(vm, benchmark_name, server_ip):
     server_ip: A machine that is running netserver.
 
   Returns:
-    A single sample in the form of a tuple. The tuple contains
-        the sample metric (string), value (float), unit (string),
-        and empty metadata dictionary (to be filled out later).
+    A sample.Sample object with the result.
   """
-  netperf_cmd = ('{src}/netperf -p {command_port} -t {benchmark_name} '
-                 '-H {server_ip} -- -P {data_port}').format(
-                     src=NETPERF_SRC, benchmark_name=benchmark_name,
-                     server_ip=server_ip, command_port=COMMAND_PORT,
-                     data_port=DATA_PORT)
+  netperf_cmd = ('{netperf_path} -p {command_port} '
+                 '-t {benchmark_name} -H {server_ip} -- '
+                 '-P {data_port}').format(
+                     netperf_path=netperf.NETPERF_PATH,
+                     benchmark_name=benchmark_name, server_ip=server_ip,
+                     command_port=COMMAND_PORT, data_port=DATA_PORT)
   logging.info('Netperf Results:')
   stdout, _ = vm.RemoteCommand(netperf_cmd, should_log=True)
   match = re.search(r'(\d+\.\d+)\s+\n', stdout).group(1)
@@ -108,7 +100,7 @@ def RunNetperf(vm, benchmark_name, server_ip):
   else:
     metric = '%s_Transaction_Rate' % benchmark_name
     unit = 'transactions_per_second'
-  return (metric, value, unit, {})
+  return sample.Sample(metric, value, unit)
 
 
 def Run(benchmark_spec):
@@ -119,10 +111,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -143,28 +132,17 @@ def Run(benchmark_spec):
     if vm_util.ShouldRunOnExternalIpAddress():
       external_ip_result = RunNetperf(vm, netperf_benchmark,
                                       server_vm.ip_address)
-      external_ip_result[3].update(metadata)
+      external_ip_result.metadata.update(metadata)
       results.append(external_ip_result)
 
     if vm_util.ShouldRunOnInternalIpAddress(vm, server_vm):
       internal_ip_result = RunNetperf(vm, netperf_benchmark,
                                       server_vm.internal_ip)
-      internal_ip_result[3].update(metadata)
-      internal_ip_result[3]['ip_type'] = 'internal'
+      internal_ip_result.metadata.update(metadata)
+      internal_ip_result.metadata['ip_type'] = 'internal'
       results.append(internal_ip_result)
 
   return results
-
-
-def StopNetserver(vm):
-  """Stops Netserver on the specified vm.
-
-  Args:
-    vm: The VM upon which the stop command will be run.
-  """
-  vm.InstallPackage('psmisc')
-  vm.RemoteCommand('killall netserver')
-  vm.UninstallPackage('psmisc')
 
 
 def Cleanup(benchmark_spec):
@@ -175,10 +153,4 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms = vms[:2]
-  StopNetserver(vms[1])
-  for vm in vms:
-    logging.info('uninstalling netperf on %s', vm)
-    vm.RemoteCommand('rm -rf netperf-2.6.0')
-    vm.RemoteCommand('rm -f %s' % NETPERF_NAME)
-    vm.UninstallPackage('build-essential')
+  vms[1].RemoteCommand('sudo pkill netserver')

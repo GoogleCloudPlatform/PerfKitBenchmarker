@@ -22,14 +22,14 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
 import logging
+
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
+from perfkitbenchmarker.packages import ycsb
 
-REQUIRED_PACKAGES_LOAD_GEN = 'git maven openjdk-7-jdk'
-YCSB_CMD = ('cd YCSB; ./bin/ycsb %s mongodb -s -P workloads/workloada '
-            '-threads 10 -p mongodb.url=mongodb://%s:27017')
-
-YCSB_URL = 'git://github.com/brianfrankcooper/YCSB.git'
-YCSB_COMMIT = '5659fc582c8280e1431ebcfa0891979f806c70ed'
+YCSB_CMD = ('cd %s; ./bin/ycsb %s mongodb -s -P workloads/workloada '
+            '-threads 10 -p mongodb.url=mongodb://%s:27017 '
+            '-p mongodb.writeConcern=normal')
 
 BENCHMARK_INFO = {'name': 'mongodb',
                   'description': 'Run YCSB against MongoDB.',
@@ -54,27 +54,18 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   assert len(vms) == BENCHMARK_INFO['num_machines']
   vm = vms[0]
+
   # Install mongodb on the 1st machine.
-  vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackage('mongodb-server')
-  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' /etc/mongodb.conf')
-  vm.RemoteCommand('sudo service mongodb restart')
+  vm.Install('mongodb_server')
+  vm.RemoteCommand('sudo sed -i \'/bind_ip/ s/^/#/\' %s' %
+                   vm.GetPathToConfig('mongodb_server'))
+  vm.RemoteCommand('sudo service %s restart' %
+                   vm.GetServiceName('mongodb_server'))
+
   # Setup YCSB load generator on the 2nd machine.
   vm = vms[1]
-  vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackage(REQUIRED_PACKAGES_LOAD_GEN)
-  vm.RemoteCommand('git clone %s' % YCSB_URL)
-  vm.RemoteCommand('cd YCSB; '
-                   'git checkout -q %s' % YCSB_COMMIT)
-  # TODO(user): remove this and update the commit referenced above
-  #    when https://github.com/brianfrankcooper/YCSB/issues/181 is fixed.
-  vm.RemoteCommand('cd YCSB; '
-                   'sed -i -e '
-                   "'s,<module>mapkeeper</module>,<!--&-->,' pom.xml")
-  # TODO(user): This build requires a lot of IO, investigate moving TCSB on
-  #    a data drive.
-  vm.RemoteCommand('cd YCSB; mvn clean package')
-  vm.RemoteCommand(YCSB_CMD % ('load', vms[0].internal_ip))
+  vm.Install('ycsb')
+  vm.RemoteCommand(YCSB_CMD % (ycsb.YCSB_DIR, 'load', vms[0].internal_ip))
 
 
 def ParseResults(output):
@@ -103,11 +94,12 @@ def ParseResults(output):
   samples = []
   result_match = regex_util.ExtractAllMatches(RESULT_REGEX, output)
   for groups in result_match:
-    samples.append(
-        [groups[1], float(groups[3]), groups[2], {'stage': groups[0]}])
+    samples.append(sample.Sample(
+        groups[1], float(groups[3]), groups[2], {'stage': groups[0]}))
   operations_match = regex_util.ExtractAllMatches(OPERATIONS_REGEX, output)
   for groups in operations_match:
-    samples.append(['Operations', float(groups[1]), '', {'stage': groups[0]}])
+    samples.append(sample.Sample(
+        'Operations', float(groups[1]), '', {'stage': groups[0]}))
   return samples
 
 
@@ -129,8 +121,8 @@ def Run(benchmark_spec):
   # TODO(user): We are running workloada with default parameters.
   #    This does not seem like a rigorous benchmark.
   logging.info('MongoDb Results:')
-  stdout, _ = vm.RemoteCommand(
-      YCSB_CMD % ('run', vms[0].internal_ip), should_log=True)
+  ycsb_cmd = YCSB_CMD % (ycsb.YCSB_DIR, 'run', vms[0].internal_ip)
+  stdout, _ = vm.RemoteCommand(ycsb_cmd, should_log=True)
   return ParseResults(stdout)
 
 
@@ -141,9 +133,4 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
-  vm.UninstallPackage('mongodb-server')
-  vm = vms[1]
-  vm.RemoteCommand('rm -rf YCSB')
-  vm.UninstallPackage(REQUIRED_PACKAGES_LOAD_GEN)
+  pass

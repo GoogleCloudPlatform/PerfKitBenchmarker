@@ -34,6 +34,8 @@ from perfkitbenchmarker.gcp import gce_virtual_machine
 GCP = 'GCP'
 AZURE = 'Azure'
 AWS = 'AWS'
+DEBIAN = 'debian'
+RHEL = 'rhel'
 IMAGE = 'image'
 MACHINE_TYPE = 'machine_type'
 ZONE = 'zone'
@@ -48,7 +50,7 @@ DEFAULTS = {
     },
     AZURE: {
         IMAGE: ('b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-'
-                '14_04-LTS-amd64-server-20140724-en-us-30GB'),
+                '14_04_1-LTS-amd64-server-20150123-en-us-30GB'),
         MACHINE_TYPE: 'Small',
         ZONE: 'East US',
     },
@@ -60,17 +62,26 @@ DEFAULTS = {
 }
 CLASSES = {
     GCP: {
-        VIRTUAL_MACHINE: gce_virtual_machine.GceVirtualMachine,
+        VIRTUAL_MACHINE: {
+            DEBIAN: gce_virtual_machine.DebianBasedGceVirtualMachine,
+            RHEL: gce_virtual_machine.RhelBasedGceVirtualMachine
+        },
         NETWORK: gce_network.GceNetwork,
         FIREWALL: gce_network.GceFirewall
     },
     AZURE: {
-        VIRTUAL_MACHINE: azure_virtual_machine.AzureVirtualMachine,
+        VIRTUAL_MACHINE: {
+            DEBIAN: azure_virtual_machine.DebianBasedAzureVirtualMachine,
+            RHEL: azure_virtual_machine.RhelBasedAzureVirtualMachine
+        },
         NETWORK: azure_network.AzureNetwork,
         FIREWALL: azure_network.AzureFirewall
     },
     AWS: {
-        VIRTUAL_MACHINE: aws_virtual_machine.AwsVirtualMachine,
+        VIRTUAL_MACHINE: {
+            DEBIAN: aws_virtual_machine.DebianBasedAwsVirtualMachine,
+            RHEL: aws_virtual_machine.RhelBasedAwsVirtualMachine
+        },
         NETWORK: aws_network.AwsNetwork,
         FIREWALL: aws_network.AwsFirewall
     }
@@ -202,7 +213,8 @@ class BenchmarkSpec(object):
     vm = static_virtual_machine.StaticVirtualMachine.GetStaticVirtualMachine()
     if vm:
       return vm
-    vm_class = CLASSES[self.cloud][VIRTUAL_MACHINE]
+
+    vm_class = CLASSES[self.cloud][VIRTUAL_MACHINE][FLAGS.os_type]
     zone = opt_zone or self.zones[0]
     if zone not in self.networks:
       network_class = CLASSES[self.cloud][NETWORK]
@@ -262,10 +274,12 @@ class BenchmarkSpec(object):
     logging.info('Waiting for boot completion.')
     firewall.AllowPort(vm, SSH_PORT)
     vm.WaitForBootCompletion()
-    vm.AptUpdate()
+    vm.Startup()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
     vm_util.BurnCpu(vm)
+    if vm.is_static:
+      vm.SnapshotPackages()
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.
@@ -273,6 +287,8 @@ class BenchmarkSpec(object):
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
+    if vm.is_static:
+      vm.PackageCleanup()
     vm.Delete()
     vm.DeleteScratchDisks()
 

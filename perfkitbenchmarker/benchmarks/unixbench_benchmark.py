@@ -24,17 +24,16 @@ import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
+from perfkitbenchmarker.packages import unixbench
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'UnixBench++_benchmark',
+BENCHMARK_INFO = {'name': 'unixbench',
                   'description': 'Runs UnixBench.',
                   'scratch_disk': True,
                   'num_machines': 1}
 
-
-UNIXBENCH_NAME = 'UnixBench5.1.3.tgz'
-UNIXBENCH_LOC = 'http://byte-unixbench.googlecode.com/files/%s' % UNIXBENCH_NAME
 
 SYSTEM_SCORE_REGEX = r'\nSystem Benchmarks Index Score\s+([-+]?[0-9]*\.?[0-9]+)'
 RESULT_REGEX = (
@@ -52,7 +51,7 @@ def GetInfo():
 
 
 def Prepare(benchmark_spec):
-  """Install Unixbench++ on the target vm.
+  """Install Unixbench on the target vm.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -61,10 +60,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('Unixbench prepare on %s', vm)
-  vm.InstallPackage('build-essential libx11-dev libgl1-mesa-dev libxext-dev')
-  wget_cmd = '/usr/bin/wget %s' % UNIXBENCH_LOC
-  vm.RemoteCommand(wget_cmd)
-  vm.RemoteCommand('tar xvfz %s -C %s' % (UNIXBENCH_NAME, vm.GetScratchDir()))
+  vm.Install('unixbench')
 
 
 def ParseResults(results):
@@ -106,10 +102,7 @@ def ParseResults(results):
     results: UnixBench result.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   samples = []
   start_index = results.find(RESULT_START_STRING)
@@ -124,16 +117,20 @@ def ParseResults(results):
     for groups in match:
       metadata = {'samples': int(groups[5]), 'time': groups[3] + groups[4]}
       metadata.update(parallel_copy_metadata)
-      samples.append([groups[0].strip(), float(groups[1]), groups[2], metadata])
+      samples.append(sample.Sample(
+          groups[0].strip(), float(groups[1]), groups[2], metadata))
     match = regex_util.ExtractAllMatches(SCORE_REGEX, result)
     for groups in match:
       metadata = {'baseline': float(groups[1]), 'index': float(groups[3])}
       metadata.update(parallel_copy_metadata)
-      samples.append(['%s:score' % groups[0].strip(), float(groups[2]), '',
-                      metadata])
+      samples.append(sample.Sample('%s:score' % groups[0].strip(),
+                                   value=float(groups[2]),
+                                   unit='',
+                                   metadata=metadata))
     match = regex_util.ExtractAllMatches(SYSTEM_SCORE_REGEX, result)
-    samples.append(['System Benchmarks Index Score', float(match[0]), '',
-                    parallel_copy_metadata])
+    samples.append(sample.Sample('System Benchmarks Index Score',
+                                 float(match[0]), unit='',
+                                 metadata=parallel_copy_metadata))
     start_index = next_start_index
 
   return samples
@@ -147,15 +144,13 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('UnixBench running on %s', vm)
-  unixbench_command = 'cd %s/UnixBench;./Run' % vm.GetScratchDir()
+  unixbench_command = 'cd {0} && UB_TMPDIR={1} ./Run'.format(
+      unixbench.UNIXBENCH_DIR, vm.GetScratchDir())
   logging.info('Unixbench Results:')
   stdout, _ = vm.RemoteCommand(unixbench_command, should_log=True)
   return ParseResults(stdout)
@@ -168,8 +163,4 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
-  logging.info('UnixBench Cleanup on %s', vm)
-  vm.RemoteCommand('rm -f ~/%s' % UNIXBENCH_NAME)
-  vm.RemoteCommand('rm -rf %s/UnixBench' % vm.GetScratchDir())
+  pass

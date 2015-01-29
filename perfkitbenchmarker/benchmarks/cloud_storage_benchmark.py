@@ -31,6 +31,7 @@ Naming Conventions (X refers to cloud providers):
 PrepareX: Prepare vm with necessary storage tools from cloud providers.
 RunX: Run upload/download on vm using storage tools from cloud providers.
 CleanupX: Cleanup storage tools on vm.
+
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
 """
 
@@ -60,7 +61,7 @@ FLAGS = flags.FLAGS
 
 # User a scratch disk here to simulate what most users would do when they
 # use CLI tools to interact with the storage provider.
-BENCHMARK_INFO = {'name': 'object_storage_benchmark',
+BENCHMARK_INFO = {'name': 'cloud_storage_storage',
                   'description':
                   'Object/blob storage benchmarks.',
                   'scratch_disk': True,
@@ -76,9 +77,6 @@ OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
     benchmark_spec_class.GCP: '~/' + GCE_CREDENTIAL_LOCATION,
     benchmark_spec_class.AWS: '~/' + AWS_CREDENTIAL_LOCATION,
     benchmark_spec_class.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION}
-
-NODE_URL = 'git://github.com/ry/node.git'
-NODE_COMMIT = 'v0.10.30'
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data
@@ -191,6 +189,15 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                         metadata])
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  data.ResourcePath(DATA_FILE)
+
+
 class S3StorageBenchmark(object):
   """S3 version of storage benchmark."""
 
@@ -201,12 +208,7 @@ class S3StorageBenchmark(object):
     Args:
       vm: The vm being used to run the benchmark.
     """
-    vm.InstallPackage(' '.join(['gcc',
-                                'python-setuptools',
-                                'python-dev',
-                                'libffi-dev']))
-
-    vm.RemoteCommand('sudo easy_install -U pip')
+    vm.Install('pip')
     vm.RemoteCommand('sudo pip install awscli')
     vm.RemoteCommand('sudo pip install python-gflags==2.0')
     vm.RemoteCommand('sudo pip install gcs-oauth2-boto-plugin==1.8')
@@ -286,7 +288,6 @@ class S3StorageBenchmark(object):
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall gcs-oauth2-boto-plugin')
-    vm.RemoteCommand('sudo easy_install -m pip')
 
 
 class AzureBlobStorageBenchmark(object):
@@ -300,11 +301,7 @@ class AzureBlobStorageBenchmark(object):
     Args:
       vm: The vm being used to run the benchmark.
     """
-    vm.InstallPackage(' '.join(['g++', 'curl', 'libssl-dev', 'apache2-utils',
-                                'make', 'git-core']))
-    vm.RemoteCommand('git clone %s' % NODE_URL)
-    vm.RemoteCommand('cd node; git checkout -q %s' % NODE_COMMIT)
-    vm.RemoteCommand('cd node; ./configure; make; sudo make install')
+    vm.Install('node_js')
     vm.RemoteCommand('sudo npm install azure-cli -g')
     vm.PushFile(FLAGS.object_storage_credential_file, AZURE_CREDENTIAL_LOCATION)
     vm.RemoteCommand(
@@ -395,11 +392,6 @@ class AzureBlobStorageBenchmark(object):
         (FLAGS.run_uri, vm.azure_command_suffix))
     vm.RemoteCommand('azure storage account delete -q pkb%s' %
                      FLAGS.run_uri)
-    vm.RemoteCommand('sudo npm uninstall azure-cli -g')
-    vm.RemoteCommand('cd node; sudo make clean')
-    vm.RemoteCommand('rm -rf node')
-    vm.UninstallPackage(' '.join(['g++', 'curl', 'libssl-dev', 'apache2-utils',
-                                  'make', 'git-core']))
 
 
 class GoogleCloudStorageBenchmark(object):
@@ -411,6 +403,7 @@ class GoogleCloudStorageBenchmark(object):
     Args:
       vm: The vm being used to run the benchmark.
     """
+    vm.Install('wget')
     vm.RemoteCommand(
         'wget '
         'https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz')
@@ -422,12 +415,7 @@ class GoogleCloudStorageBenchmark(object):
                      '--path-update=true '
                      '--bash-completion=true')
 
-    vm.InstallPackage(' '.join(['gcc',
-                                'python-setuptools',
-                                'python-dev',
-                                'libffi-dev']))
-
-    vm.RemoteCommand('sudo easy_install -U pip')
+    vm.Install('pip')
     vm.RemoteCommand('sudo pip install python-gflags==2.0')
     vm.RemoteCommand('sudo pip install gcs-oauth2-boto-plugin==1.8')
 
@@ -516,7 +504,6 @@ class GoogleCloudStorageBenchmark(object):
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall gcs-oauth2-boto-plugin')
-    vm.RemoteCommand('sudo easy_install -m pip')
 
 
 OBJECT_STORAGE_BENCHMARK_DICTIONARY = {
@@ -556,7 +543,7 @@ def Prepare(benchmark_spec):
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)
 
-  vms[0].RemoteCommand('sudo apt-get update')
+  # vms[0].RemoteCommand('sudo apt-get update')
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
 
   # Prepare data on vm, create a run directory on scratch drive, and add

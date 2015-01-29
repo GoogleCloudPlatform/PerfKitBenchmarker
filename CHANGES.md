@@ -1,3 +1,32 @@
+# v0.9.0 (in development)
+
+* **Breaking change**: Fixed typo in UnixBench benchmark name: now `UnixBench_benchmark` (GH-50).
+* Added support for C4 instance types on EC2 (GH-63).
+* Improvements to object_storage_benchmark (GH-59).
+* Added support for specifying `--product_name` on the command line (GH-55).
+* Added side-by-side comparison tool (GH-39, GH-61).
+* Factored out package management to support RHEL, CentOS (GH-54).
+* Improved accuracy of cluster boot time (GH-69, GH-73).
+* **Breaking change:** updated benchmark names to be more consistent (GH-72).
+  Specific changes:
+
+    + `cassandra` → `cassandra_stress`
+    + `copy_benchmark` → `copy_throughput`
+    + `fio_benchmark` → `fio`
+    + `hadoop_benchmark` → `hadoop_terasort`
+    + `mesh_benchmark` → `mesh_network`
+    + `netperf_simple` → `netperf`
+    + `object_storage_benchmark` → `cloud_storage`
+    + `synthetic_storage_workloads_benchmark` → `synthetic_storage_workload`
+    + `sysbench_oltp_benchmark` → `sysbench_oltp`
+    + `UnixBench_benchmark` → `unixbench`
+* Introduced a class to represent performance samples (GH-71)
+* Updated Hadoop benchmark to calculate per-core terasort throughput (GH-75).
+* Added a results parser for bonnie++ benchmark (GH-70).
+* Added prerequisite checking to benchmarks (GH-49).
+
+
+
 # v0.8.0
 
 * Documentation cleanup (GH-19, GH-34).

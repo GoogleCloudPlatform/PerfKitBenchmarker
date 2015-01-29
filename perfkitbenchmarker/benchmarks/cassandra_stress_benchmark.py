@@ -28,14 +28,15 @@ from perfkitbenchmarker import benchmark_spec as bs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 
 DEFAULT_CLUSTER_SIZE = 4
 
 # Disks and machines are set in config file.
-BENCHMARK_INFO = {'name': 'cassandra',
-                  'description': 'Run Cassandra',
+BENCHMARK_INFO = {'name': 'cassandra_stress',
+                  'description': 'Benchmark Cassandra using cassandra-stress',
                   'scratch_disk': False,
                   'num_machines': DEFAULT_CLUSTER_SIZE}
 
@@ -43,6 +44,8 @@ CASSANDRA_TAR = 'dsc.tar.gz'
 CASSANDRA_DIR = 'dsc-cassandra-2.0.0'
 JAVA_TAR = 'server-jre-7u40-linux-x64.tar.gz'
 CASSANDRA_YAML = 'cassandra.yaml'
+CASSANDRA_YAML_TEMPLATE = CASSANDRA_YAML + '.j2'
+CASSANDRA_ENV_TEMPLATE = 'cassandra-env.sh.j2'
 CASSANDRA_PID = 'cassandra_pid'
 RESULTS_DIR = 'cassandra-results'
 
@@ -66,6 +69,17 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  for resource in (JAVA_TAR, CASSANDRA_TAR, CASSANDRA_YAML_TEMPLATE,
+                   CASSANDRA_ENV_TEMPLATE):
+    data.ResourcePath(resource)
+
+
 def UnpackCassandra(vm):
   """Unpacking cassandra on target vm.
 
@@ -83,7 +97,7 @@ def PrepareVm(vm):
   """
   try:
     vm.PushDataFile(CASSANDRA_TAR)
-    vm.PrepareJava(JAVA_TAR, REQUIRED_JAVA_VERSION)
+    vm.Install('openjdk7')
   except errors.VirtualMachine.VirtualMachineError as e:
     raise errors.Benchmarks.PrepareException(e)
 
@@ -140,7 +154,7 @@ def ConfigureCassandraEnvScript(vm):
                    CASSANDRA_DIR)
   context = {'ip_address': vm.internal_ip}
 
-  file_path = data.ResourcePath('cassandra-env.sh.j2')
+  file_path = data.ResourcePath(CASSANDRA_ENV_TEMPLATE)
 
   vm.RenderTemplate(file_path,
                     os.path.join(CASSANDRA_DIR, 'conf', 'cassandra-env.sh'),
@@ -160,9 +174,9 @@ def GenerateCassandraYaml(vm, seed_vm):
              'concurrent_writes': vm.num_cpus * 8,
              'eth0_address': vm.internal_ip}
 
-  file_path = data.ResourcePath('cassandra.yaml.j2')
+  file_path = data.ResourcePath(CASSANDRA_YAML_TEMPLATE)
   vm.RenderTemplate(file_path,
-                    os.path.join(CASSANDRA_DIR, 'conf', 'cassandra.yaml'),
+                    os.path.join(CASSANDRA_DIR, 'conf', CASSANDRA_YAML),
                     context=context)
 
 
@@ -396,10 +410,7 @@ def CollectResults(benchmark_spec):
         that is required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   logging.info('Gathering results.')
   vm_dict = benchmark_spec.vm_dict
@@ -416,24 +427,25 @@ def CollectResults(benchmark_spec):
             latency_99_9th_list,
             total_operation_time_list), {}) for vm in vm_dict[LOADER_NODE]]
   vm_util.RunThreaded(CollectResultFile, args)
-  results = []
-  results.append(['Interval_op_rate', math.fsum(interval_op_rate_list),
-                  'operations per second', {}])
-  results.append(['Interval_key_rate', math.fsum(interval_key_rate_list),
-                  'operations per second', {}])
-  results.append(['Latency median',
-                  math.fsum(latency_median_list) / len(vm_dict[LOADER_NODE]),
-                  'ms', {}])
-  results.append(['Latency 95th percentile',
-                  math.fsum(latency_95th_list) / len(vm_dict[LOADER_NODE]),
-                  'ms', {}])
-  results.append(['Latency 99.9th percentile',
-                  math.fsum(latency_99_9th_list) / len(vm_dict[LOADER_NODE]),
-                  'ms', {}])
-  results.append(['Total operation time',
-                  math.fsum(total_operation_time_list) / len(
-                      vm_dict[LOADER_NODE]), 'seconds', {}])
-  print results
+  results = [
+      sample.Sample('Interval_op_rate', math.fsum(interval_op_rate_list),
+                    'operations per second'),
+      sample.Sample('Interval_key_rate', math.fsum(interval_key_rate_list),
+                    'operations per second'),
+      sample.Sample('Latency median',
+                    math.fsum(latency_median_list) / len(vm_dict[LOADER_NODE]),
+                    'ms'),
+      sample.Sample('Latency 95th percentile',
+                    math.fsum(latency_95th_list) / len(vm_dict[LOADER_NODE]),
+                    'ms'),
+      sample.Sample('Latency 99.9th percentile',
+                    math.fsum(latency_99_9th_list) / len(vm_dict[LOADER_NODE]),
+                    'ms'),
+      sample.Sample('Total operation time',
+                    math.fsum(total_operation_time_list) /
+                    len(vm_dict[LOADER_NODE]),
+                    'seconds')]
+  logging.info('Cassandra results:\n%s', results)
   return results
 
 
@@ -445,10 +457,7 @@ def Run(benchmark_spec):
         that is required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   InitializeCurrentDeployment(benchmark_spec)
   StartCassandraServers(benchmark_spec)
