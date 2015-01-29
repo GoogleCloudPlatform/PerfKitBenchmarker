@@ -76,7 +76,8 @@ ONE_BYTE_OBJECT_COUNT = 1000
 LIST_CONSISTENCY_WAIT_TIME_LIMIT = 300
 
 # Total number of objects we will provision before we do the list
-LIST_CONSISTENCY_OBJECT_COUNT = 5000
+# This covers 3 pages of List (one page == 1000 objects)
+LIST_CONSISTENCY_OBJECT_COUNT = 2100
 
 # Provisioning is done in parallel threads to reduce test iteration time!
 # This number specifies the thread count.
