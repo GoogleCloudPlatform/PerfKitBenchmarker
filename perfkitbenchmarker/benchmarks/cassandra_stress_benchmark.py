@@ -33,7 +33,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 
-NUM_KEYS_PER_CORE = 5000000
+NUM_KEYS_PER_CORE = 2000000
 
 flags.DEFINE_integer('num_keys', 0,
                      'Number of keys used in cassandra-stress tool. '
