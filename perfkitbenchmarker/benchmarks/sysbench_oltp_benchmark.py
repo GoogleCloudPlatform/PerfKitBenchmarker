@@ -21,6 +21,7 @@ import logging
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
@@ -78,10 +79,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -90,7 +88,7 @@ def Run(benchmark_spec):
   stdout, _ = vm.RemoteCommand(sysbench_cmd + 'run', should_log=True)
   match = re.search('\\s+transactions:.+\\(([0-9]+\\.[0-9]+)', stdout)
   value = float(match.group(1))
-  return [('OLTP Transaction Rate', value, 'Transactions/sec')]
+  return [sample.Sample('OLTP Transaction Rate', value, 'Transactions/sec')]
 
 
 def Cleanup(benchmark_spec):

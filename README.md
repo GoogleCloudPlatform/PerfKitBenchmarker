@@ -133,6 +133,34 @@ Test that azure is installed correctly
 ```
 $ azure vm list
 ```
+## Create and Configure a .BOTO file for object storage benchmarks
+
+In order to run object storage benchmark tests, you need to have a properly configured ~/.boto file.
+
+Here is how:
+
+* Create the ~/.boto file (If you already have ~/.boto, you can skip this step. Consider making a backup copy of your existing .boto file.)
+
+To create a new ~/.boto file, issue the following command and follow the instructions given by this command:
+```
+$ gsutil config
+```
+As a result, a .boto file is created under your home directory.
+
+* Open the .boto file and edit the following fields:
+1. In the [Credentials] section:
+
+gs_oauth2_refresh_token: set it to be the same as the "refresh_token" field in your gcloud credential file (~/.config/gcloud/credentials), which was setup as part of the 'gcloud auth login' step.
+
+aws_access_key_id, aws_secret_access_key: set these to be the AWS access keys you intend to use for these tests, or you can use the same keys as those in your existing AWS credentials file (~/.aws/credentials).
+
+2. In the [gsutil] section:
+
+default_project_id: if it is not already set, set it to be the google cloud storage project ID you intend to use for this test. (If you used 'gsutil config' to generate the .boto file, you should have been prompted to supply this information at this step).
+
+3. In the [OAuth2] section:
+client_id, client_secret: set these to be the same as those in your gcloud credentials file (~/.config/gcloud/credentials), which was setup as part of the 'gcloud auth login' step.
+
 
 ## Install PerfKit dependencies
 ```
@@ -163,9 +191,16 @@ $ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro
 $ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
 ```
 
-HOW TO RUN ALL BENCHMARKS
+HOW TO RUN ALL STANDARD BENCHMARKS
 ==================
-Run without the --benchmarks parameter and every benchmark will run serially which can take a couple of hours.  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
+Run without the --benchmarks parameter and every benchmark in the standard set will run serially which can take a couple of hours (alternatively run with --benchmarks="standard_set").  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
+
+
+HOW TO RUN ALL BENCHMARKS IN A NAMED SET
+==================
+Named sets are are grouping of one or more benchmarks in the benchmarking directory. This feature allows parallel innovation of what is important to measure in the Cloud, and is defined by the set owner. For example the GoogleSet is maintained by Google, whereas the StanfordSet is managed by Stanford. Once a quarter a meeting is held to review all the sets to determine what benchmarks should be promoted to the standard_set. The Standard Set is also reviewed to see if anything should be removed.
+To run all benchmarks in a named set, specify the set name in the benchmarks parameter (e.g. --benchmarks="standard_set"). Sets can be combined with individual benchmarks or other named sets.
+
 
 USEFUL GLOBAL FLAGS
 ==================

@@ -24,6 +24,8 @@ import logging
 import re
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -58,6 +60,7 @@ def Prepare(benchmark_spec):
                      IPERF_PORT)
 
 
+@vm_util.Retry(max_retries=IPERF_RETRIES)
 def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   """Run iperf using sending 'vm' to connect to 'ip_address'.
 
@@ -67,21 +70,16 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
     receiving_ip_address: The IP address of the iperf server (ie the receiver).
     ip_type: The IP type of 'ip_address' (e.g. 'internal', 'external')
   Returns:
-    A single sample (see 'Run' docstring for sample type description).
+    A Sample.
   Raises:
-    ValueError: When iperf results are not found in stdout.
+    regex_util.NoMatchError: When iperf results are not found in stdout.
   """
   iperf_cmd = ('iperf --client %s --port %s --format m --time 60' %
                (receiving_ip_address, IPERF_PORT))
+  stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True)
+
   iperf_pattern = re.compile(r'(\d+\.\d+|\d+) Mbits/sec')
-  for _ in range(IPERF_RETRIES):
-    stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True)
-    match = iperf_pattern.search(stdout)
-    if match:
-      break
-  if not match:
-    raise ValueError('Could not find iperf result in stdout:\n\n%s' % stdout)
-  value = match.group(1)
+  value = regex_util.ExtractFloat(iperf_pattern, stdout)
 
   metadata = {
       # TODO(voellm): The server and client terminology is being
@@ -98,7 +96,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
       'sending_zone': sending_vm.zone,
       'ip_type': ip_type
   }
-  return ('Throughput', float(value), 'Mbits/sec', metadata)
+  return sample.Sample('Throughput', float(value), 'Mbits/sec', metadata)
 
 
 def Run(benchmark_spec):
@@ -109,10 +107,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   results = []

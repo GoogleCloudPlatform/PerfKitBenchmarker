@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,4 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:/jre/bin/java::")
+import unittest
+
+from perfkitbenchmarker import sample
+
+
+class SampleTestCase(unittest.TestCase):
+
+  def testMetadataOptional(self):
+    instance = sample.Sample(metric='Test', value=1.0, unit='Mbps')
+    self.assertDictEqual({}, instance.metadata)
+
+  def testProvidedMetadataSet(self):
+    metadata = {'origin': 'unit test'}
+    instance = sample.Sample(metric='Test', value=1.0, unit='Mbps',
+                             metadata=metadata.copy())
+    self.assertDictEqual(metadata, instance.metadata)

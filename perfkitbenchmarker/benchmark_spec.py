@@ -50,7 +50,7 @@ DEFAULTS = {
     },
     AZURE: {
         IMAGE: ('b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-'
-                '14_04-LTS-amd64-server-20140724-en-us-30GB'),
+                '14_04_1-LTS-amd64-server-20150123-en-us-30GB'),
         MACHINE_TYPE: 'Small',
         ZONE: 'East US',
     },

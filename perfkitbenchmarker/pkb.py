@@ -60,8 +60,10 @@ import time
 import uuid
 
 from perfkitbenchmarker import benchmarks
+from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
@@ -86,8 +88,11 @@ FLAGS = flags.FLAGS
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
 flags.DEFINE_integer('parallelism', 1,
                      'The number of benchmarks to run in parallel.')
-flags.DEFINE_list('benchmarks', [], 'Benchmarks that should be run, '
-                  'default is all.')
+flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
+                  'Benchmarks and/or benchmark sets that should be run. The '
+                  'default is the standard set. For more information about '
+                  'benchmarks and benchmark sets, see the README and '
+                  'benchmark_sets.py.')
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
 flags.DEFINE_list(
@@ -170,12 +175,6 @@ def ConfigureLogging():
   logger.addHandler(file_handler)
 
 
-def ShouldRunBenchmark(benchmark):
-  if not FLAGS.benchmarks:
-    return True
-  return benchmark['name'] in FLAGS.benchmarks
-
-
 # TODO(user): Consider moving to benchmark_spec.
 def ValidateBenchmarkInfo(benchmark_info):
   for required_key in REQUIRED_INFO:
@@ -192,9 +191,11 @@ def ListUnknownBenchmarks():
   """Identify invalid benchmark names specified in the command line flags."""
   valid_benchmark_names = frozenset(benchmark.GetInfo()['name']
                                     for benchmark in benchmarks.BENCHMARKS)
+  valid_benchmark_sets = frozenset(benchmark_sets.BENCHMARK_SETS)
   specified_benchmark_names = frozenset(FLAGS.benchmarks)
 
-  return sorted(specified_benchmark_names - valid_benchmark_names)
+  return sorted((specified_benchmark_names - valid_benchmark_names) -
+                valid_benchmark_sets)
 
 
 def RunBenchmark(benchmark, collector):
@@ -206,8 +207,6 @@ def RunBenchmark(benchmark, collector):
   """
   benchmark_info = benchmark.GetInfo()
   benchmark_specification = None
-  if not ShouldRunBenchmark(benchmark_info):
-    return
   if not ValidateBenchmarkInfo(benchmark_info):
     return
 
@@ -246,9 +245,9 @@ def RunBenchmark(benchmark, collector):
       benchmark_specification.Delete()
       if FLAGS.run_stage == STAGE_ALL:
         end_time = time.time()
-        end_to_end_sample = ['End to End Runtime',
-                             end_time - start_time,
-                             'seconds', {}]
+        end_to_end_sample = sample.Sample('End to End Runtime',
+                                          end_time - start_time,
+                                          'seconds')
         collector.AddSamples([end_to_end_sample], benchmark_info['name'],
                              benchmark_specification)
   except Exception:
@@ -315,13 +314,13 @@ def RunBenchmarks(publish=True):
     FLAGS.benchmark_config_pair = tmp_dict
 
   try:
+    benchmark_list = benchmark_sets.GetBenchmarksFromFlags()
     if FLAGS.parallelism > 1:
-      args = [((benchmark, collector), {})
-              for benchmark in benchmarks.BENCHMARKS]
+      args = [((benchmark, collector), {}) for benchmark in benchmark_list]
       vm_util.RunThreaded(
           RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
     else:
-      for benchmark in benchmarks.BENCHMARKS:
+      for benchmark in benchmark_list:
         RunBenchmark(benchmark, collector)
   finally:
     if collector.samples:
@@ -337,11 +336,19 @@ def Main(argv=sys.argv):
   # TODO: Verify if there is other way of appending additional help
   # message.
   # Inject more help documentation
+  # The following appends descriptions of the benchmarks and descriptions of
+  # the benchmark sets to the help text.
   benchmark_list = ['%s:  %s' % (benchmark_module.GetInfo()['name'],
                                  benchmark_module.GetInfo()['description'])
                     for benchmark_module in benchmarks.BENCHMARKS]
+  benchmark_sets_list = [
+      '%s:  %s' %
+      (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
+      for set_name in benchmark_sets.BENCHMARK_SETS]
   sys.modules['__main__'].__doc__ = __doc__ + (
       '\nBenchmarks:\n\t%s') % '\n\t'.join(benchmark_list)
+  sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
+                                      % '\n\t'.join(benchmark_sets_list))
   try:
     argv = FLAGS(argv)  # parse flags
   except flags.FlagsError as e:
