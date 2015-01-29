@@ -113,6 +113,7 @@ def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
 
   return list_result
 
+
 def DeleteObjects(storage_schema, bucket, objects_to_delete,
                   host_to_connect=None):
   """Write a number of one byte objects to a storage provider.
