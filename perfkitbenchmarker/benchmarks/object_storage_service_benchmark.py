@@ -112,6 +112,8 @@ def GetInfo():
 
 
 # Raised when we fail to remove a bucket or its content after many retries.
+# TODO: add a new class of error "ObjectStorageError" to errors.py and remove
+# this one.
 class BucketRemovalError(Exception):
     pass
 
@@ -201,6 +203,7 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
 
 def DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd):
   """ Delete a bucket and all its contents robustly.
+
       First we try to recursively delete its content with retries, if failed,
       we raise the error. If successful, we move on to remove the empty bucket.
       Due to eventual consistency issues, some provider may still think the
@@ -217,43 +220,35 @@ def DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd):
         BucketRemovalError: when we failed multiple times to remove the content
             or the bucket itself.
   """
-  content_removal_successful = False
-  bucket_removal_successful = False
+  retry_limit = 0
+  for cmd in [remove_content_cmd, remove_bucket_cmd]:
+    if cmd is remove_content_cmd:
+      retry_limit = CONTENT_REMOVAL_RETRY_LIMIT
+    else:
+      retry_limit = BUCKET_REMOVAL_RETRY_LIMIT
 
-  for i in range(CONTENT_REMOVAL_RETRY_LIMIT):
-    try:
-        vm.RemoteCommand(remove_content_cmd)
-        content_removal_successful = True
-        logging.info('Successfully removed all contents in the bucket.')
-        break
-    except Exception as e:
-      logging.error('Failed to remove content inside the bucket, number '
-                    'of attempts: %d. Error is %s', i + 1, e)
-      time.sleep(RETRY_WAIT_INTERVAL_SECONDS)
-      pass
+    removal_successful = False
+    logging.info('Performing removal action, cmd is %s', cmd)
+    for i in range(retry_limit):
+      try:
+          vm.RemoteCommand(cmd)
+          removal_successful = True
+          logging.info('Successfully performed the removal operation.')
+          break
+      except Exception as e:
+        logging.error('Failed to perform the removal op. number '
+                      'of attempts: %d. Error is %s', i + 1, e)
+        time.sleep(RETRY_WAIT_INTERVAL_SECONDS)
+        pass
 
-  if not content_removal_successful:
-    logging.error('Exceeded max retry limit for removing the content of bucket')
-    raise BucketRemovalError('Failed to remove contents of the bucket')
-
-  for i in range(BUCKET_REMOVAL_RETRY_LIMIT):
-    try:
-      vm.RemoteCommand(remove_bucket_cmd)
-      bucket_removal_successful = True
-      logging.info('Successfully removed the bucket.')
-      break
-    except Exception as e:
-      # Due to eventual consistency, some bucket deletion operation would return
-      # "bucket not empty" error even though they are actually empty.
-      # we catch the exception and retry for a few times.
-      logging.error('Failed to remove bucket, number of attempts: %d '
-                    'Error is %s', i + 1, e)
-      time.sleep(RETRY_WAIT_INTERVAL_SECONDS)
-      pass
-
-  if not bucket_removal_successful:
-    logging.error('Exceeded max retry limit for removing the empty bucket')
-    raise BucketRemovalError('Failed to remove the empty bucket')
+    if not removal_successful:
+      if cmd is remove_content_cmd:
+        logging.error('Exceeded max retry limit for removing the content of '
+                      'bucket')
+        raise BucketRemovalError('Failed to remove contents of the bucket')
+      else:
+        logging.error('Exceeded max retry limit for removing the empty bucket')
+        raise BucketRemovalError('Failed to remove the empty bucket')
 
 
 def CheckPrerequisites():
@@ -564,8 +559,8 @@ class GoogleCloudStorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    remove_content_cmd = '%s rm -r gs://%s/*' % (vm.gsutil_path,
-                                                 self.bucket_name)
+    remove_content_cmd = '%s rm -m -r gs://%s/*' % (vm.gsutil_path,
+                                                    self.bucket_name)
     remove_bucket_cmd = '%s rb gs://%s' % (vm.gsutil_path, self.bucket_name)
     DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
