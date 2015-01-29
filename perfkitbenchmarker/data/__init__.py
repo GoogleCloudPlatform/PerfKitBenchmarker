@@ -15,8 +15,8 @@
 
 Due to license restrictions, not all software dependences can be shipped with
 PerfKitBenchmarker.
-Those that can be included in perfkitbenchmarker/data, and are loaded via a
-PackageResourceLoader.
+Those that can be included in perfkitbenchmarker/data, or
+ perfkitbenchmarker/scripts and are loaded via a PackageResourceLoader.
 
 Users can specify additional paths to search for required data files using the
 `--data_search_paths` flag.
@@ -125,8 +125,10 @@ class PackageResourceLoader(ResourceLoader):
       raise ResourceNotFound(name)
     return pkg_resources.resource_filename(self.package, name)
 
-
-DEFAULT_RESOURCE_LOADERS = [PackageResourceLoader(__name__)]
+DATA_PACKAGE_NAME = 'perfkitbenchmarker.data'
+SCRIPT_PACKAGE_NAME = 'perfkitbenchmarker.scripts'
+DEFAULT_RESOURCE_LOADERS = [PackageResourceLoader(DATA_PACKAGE_NAME),
+                            PackageResourceLoader(SCRIPT_PACKAGE_NAME)]
 
 
 def _GetResourceLoaders():

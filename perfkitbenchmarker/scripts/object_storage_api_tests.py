@@ -94,10 +94,10 @@ def _PercentileCalculator(numbers):
   numbers_sorted = sorted(numbers)
   count = len(numbers_sorted)
   result = {}
-  result['tp50'] = numbers_sorted[int(count * 0.5)]
-  result['tp90'] = numbers_sorted[int(count * 0.9)]
-  result['tp99'] = numbers_sorted[int(count * 0.99)]
-  result['tp99.9'] = numbers_sorted[int(count * 0.999)]
+  result['p50'] = numbers_sorted[int(count * 0.5)]
+  result['p90'] = numbers_sorted[int(count * 0.9)]
+  result['p99'] = numbers_sorted[int(count * 0.99)]
+  result['p99.9'] = numbers_sorted[int(count * 0.999)]
   return result
 
 
@@ -272,7 +272,7 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
     thread.start()
     threads.append(thread)
 
-  logging.info('All threads started, waiting for them to end...')
+  logging.debug('All threads started, waiting for them to end...')
 
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     try:
@@ -280,7 +280,7 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
       final_objects_written += per_thread_objects_written[i]
     except:
       logging.exception('Caught exception waiting for the %dth thread.', i)
-  logging.info('All threads ended...')
+  logging.debug('All threads ended...')
 
   write_finish_time = time.time()
 
@@ -289,8 +289,8 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
     raise LowAvailabilityError('Failed to provision required number of '
                                'objects, exiting.')
 
-  logging.info('Done provisioning the objects, objects written %d. Now start '
-               'doing the lists...', final_count)
+  logging.debug('Done provisioning the objects, objects written %d. Now start '
+                'doing the lists...', final_count)
 
   # Now list this bucket under this prefix, compare the list results with
   # objects_written. If they are not the same, keep doing it until they
@@ -318,21 +318,21 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
 
   final_result = {}
   if result_consistent:
-    logging.info('Listed %d times until results are consistent.', list_count)
+    logging.debug('Listed %d times until results are consistent.', list_count)
     if list_count == 1:
-      logging.info('List latency is: %f' % list_latency)
+      logging.debug('List latency is: %f' % list_latency)
 
       final_result['is-list-consistent'] = True
       final_result['list-latency'] = list_latency
     else:
-      logging.info('List-after-write inconsistency window is: %f',
-                   total_wait_time)
+      logging.debug('List-after-write inconsistency window is: %f',
+                    total_wait_time)
 
       final_result['is-list-consistent'] = False
       final_result['inconsistency-window'] = total_wait_time
   else:
-    logging.info('Results are still inconsistent after waiting for the max '
-                 'limit!')
+    logging.debug('Results are still inconsistent after waiting for the max '
+                  'limit!')
     final_result['is-list-consistent'] = False
     final_result['inconsistency-window'] = LIST_CONSISTENCY_WAIT_TIME_LIMIT
 
@@ -375,6 +375,8 @@ def Main(argv=sys.argv):
     list_inconsistency_window = []
     inconsistent_list_count = 0.0
 
+    logging.info('Running list consistency tests for %d iterations...' %
+                 FLAGS.iterations)
     for _ in range(FLAGS.iterations):
       result = ListConsistencyBenchmark(storage_schema, host_to_connect)
       if result['is-list-consistent']:
