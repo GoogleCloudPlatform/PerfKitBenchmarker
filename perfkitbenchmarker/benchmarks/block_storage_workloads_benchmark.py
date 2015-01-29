@@ -66,7 +66,7 @@ flags.DEFINE_integer('maxjobs', 0,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'synthetic_storage_workload',
+BENCHMARK_INFO = {'name': 'block_storage_workload',
                   'description': 'Runs FIO in sequential, random, read and '
                                  'write modes to simulate various scenarios.',
                   'scratch_disk': True,
