@@ -74,8 +74,6 @@ NUM_LOCAL_VOLUMES = {
     'c1.medium': 1, 'c1.xlarge': 4,
     'c3.large': 2, 'c3.xlarge': 2, 'c3.2xlarge': 2, 'c3.4xlarge': 2,
     'c3.8xlarge': 2, 'cc2.8xlarge': 4,
-    'c4.large': 0, 'c4.xlarge': 0, 'c4.2xlarge': 0, 'c4.4xlarge': 0,
-    'c4.8xlarge': 0,
     'cg1.4xlarge': 2, 'cr1.8xlarge': 2, 'g2.2xlarge': 1,
     'hi1.4xlarge': 2, 'hs1.8xlarge': 24,
     'i2.xlarge': 1, 'i2.2xlarge': 2, 'i2.4xlarge': 4, 'i2.8xlarge': 8,
@@ -84,7 +82,6 @@ NUM_LOCAL_VOLUMES = {
     'm3.medium': 1, 'm3.large': 1, 'm3.xlarge': 2, 'm3.2xlarge': 2,
     'r3.large': 1, 'r3.xlarge': 1, 'r3.2xlarge': 1, 'r3.4xlarge': 1,
     'r3.8xlarge': 2,
-    't1.micro': 0, 't2.micro': 0, 't2.small': 0, 't2.medium': 0
 }
 DRIVE_START_LETTER = 'b'
 
@@ -100,10 +97,10 @@ def GetBlockDeviceMap(machine_type):
     with the AWS CLI, or if the machine type has no local drives, it will
     return None.
   """
-  mappings = [{'VirtualName': 'ephemeral%s' % i,
-               'DeviceName': '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)}
-              for i in xrange(NUM_LOCAL_VOLUMES[machine_type])]
-  if mappings:
+  if machine_type in NUM_LOCAL_VOLUMES:
+    mappings = [{'VirtualName': 'ephemeral%s' % i,
+                 'DeviceName': '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)}
+                for i in xrange(NUM_LOCAL_VOLUMES[machine_type])]
     return json.dumps(mappings)
   else:
     return None
