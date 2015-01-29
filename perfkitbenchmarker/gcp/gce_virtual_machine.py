@@ -145,7 +145,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                        'instances',
                        'describe', self.name]
     getinstance_cmd.extend(util.GetDefaultGcloudFlags(self))
-    stdout, _, _ = vm_util.IssueCommand(getinstance_cmd)
+    stdout, _, _ = vm_util.IssueCommand(getinstance_cmd, suppress_warning=True)
     try:
       json.loads(stdout)
     except ValueError:
