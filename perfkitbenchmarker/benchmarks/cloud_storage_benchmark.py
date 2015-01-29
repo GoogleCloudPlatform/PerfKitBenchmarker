@@ -46,7 +46,7 @@ FLAGS = flags.FLAGS
 
 # User a scratch disk here to simulate what most users would do when they
 # use CLI tools to interact with the storage provider.
-BENCHMARK_INFO = {'name': 'cloud_storage_storage',
+BENCHMARK_INFO = {'name': 'cloud_storage',
                   'description':
                   'Benchmark upload/download throughput to cloud object '
                   'storage using cloud provider command-line tools.',
