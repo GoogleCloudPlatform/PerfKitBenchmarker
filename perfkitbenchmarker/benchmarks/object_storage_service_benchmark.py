@@ -239,7 +239,7 @@ def DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd):
           logging.info('Successfully performed the removal operation.')
           break
       except Exception as e:
-        logging.error('Failed to perform the removal op. number '
+        logging.error('Failed to perform the removal op. Number '
                       'of attempts: %d. Error is %s', i + 1, e)
         time.sleep(RETRY_WAIT_INTERVAL_SECONDS)
         pass
@@ -562,7 +562,7 @@ class GoogleCloudStorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    remove_content_cmd = '%s rm -m -r gs://%s/*' % (vm.gsutil_path,
+    remove_content_cmd = '%s -m rm -r gs://%s/*' % (vm.gsutil_path,
                                                     self.bucket_name)
     remove_bucket_cmd = '%s rb gs://%s' % (vm.gsutil_path, self.bucket_name)
     DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
