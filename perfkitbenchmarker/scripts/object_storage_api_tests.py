@@ -113,6 +113,29 @@ def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
 
   return list_result
 
+def DeleteObjects(storage_schema, bucket, objects_to_delete,
+                  host_to_connect=None):
+  """Write a number of one byte objects to a storage provider.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    bucket: Name of the bucket.
+    objects_to_delete: A list of names of objects to delete.
+    host_to_connect: An optional endpoint string to connect to.
+  """
+
+  for object_name in objects_to_delete:
+    object_path = '%s/%s' % (bucket, object_name)
+    object_uri = boto.storage_uri(object_path, storage_schema)
+    if host_to_connect is not None:
+      object_uri.connect(host=host_to_connect)
+
+    try:
+      object_uri.delete_key()
+    except:
+      logging.exception('Caught exception while deleting object %s.',
+                        object_path)
+
 
 def WriteOneByteObjects(storage_schema, bucket, object_prefix, count,
                         objects_written, latency_results=None,
@@ -290,8 +313,8 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
     raise LowAvailabilityError('Failed to provision required number of '
                                'objects, exiting.')
 
-  logging.debug('Done provisioning the objects, objects written %d. Now start '
-                'doing the lists...', final_count)
+  logging.info('Done provisioning the objects, objects written %d. Now start '
+               'doing the lists...', final_count)
 
   # Now list this bucket under this prefix, compare the list results with
   # objects_written. If they are not the same, keep doing it until they
@@ -336,6 +359,28 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
                   'limit!')
     final_result['is-list-consistent'] = False
     final_result['inconsistency-window'] = LIST_CONSISTENCY_WAIT_TIME_LIMIT
+
+  # Delete the objects written by individual threads in concurrency:
+  logging.info('One list-after-write iteration completed. result is %s',
+               final_result)
+
+  threads = []
+  for i in range(LIST_CONSISTENCY_THREAD_COUNT):
+    thread = Thread(target=DeleteObjects,
+                    args=(storage_schema, FLAGS.bucket,
+                          per_thread_objects_written[i], host_to_connect))
+    thread.daemon = True
+    thread.start()
+    threads.append(thread)
+
+  for i in range(LIST_CONSISTENCY_THREAD_COUNT):
+    try:
+      threads[i].join()
+    except:
+      logging.exception('Caught exception waiting for the %dth deletion '
+                        'thread.', i)
+
+  logging.info('Finished deleting')
 
   return final_result
 
