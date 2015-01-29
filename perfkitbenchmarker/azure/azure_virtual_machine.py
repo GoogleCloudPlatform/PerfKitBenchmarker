@@ -73,7 +73,7 @@ class AzureService(resource.BaseResource):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = vm_util.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
     try:
       json.loads(stdout)
     except ValueError:
@@ -140,7 +140,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = vm_util.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
     try:
       json.loads(stdout)
     except ValueError:
