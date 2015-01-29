@@ -39,6 +39,7 @@ import json
 import logging
 import os
 import re
+import time
 
 from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
 from perfkitbenchmarker import data
@@ -101,9 +102,23 @@ LAW_CONSISTENCY_PERCENTAGE = 'list-after-write consistency percentage'
 LAW_INCONSISTENCY_WINDOW = 'list-after-write inconsistency window'
 CONSISTENT_LIST_LATENCY = 'consistent list latency'
 
+CONTENT_REMOVAL_RETRY_LIMIT = 5
+# Some times even when a bucket is completely empty, the service provider would
+# refuse to remove the bucket with "BucketNotEmpty" error until up to 1 hour
+# later. We keep trying until we reach the one-hour limit.
+BUCKET_REMOVAL_RETRY_LIMIT = 120
+RETRY_WAIT_INTERVAL_SECONDS = 30
+
 
 def GetInfo():
   return BENCHMARK_INFO
+
+
+# Raised when we fail to remove a bucket or its content after many retries.
+# TODO: add a new class of error "ObjectStorageError" to errors.py and remove
+# this one.
+class BucketRemovalError(Exception):
+    pass
 
 
 def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
@@ -187,6 +202,56 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                         (float)(result[percentile]),
                         LATENCY_UNIT,
                         metadata])
+
+
+def DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd):
+  """ Delete a bucket and all its contents robustly.
+
+      First we try to recursively delete its content with retries, if failed,
+      we raise the error. If successful, we move on to remove the empty bucket.
+      Due to eventual consistency issues, some provider may still think the
+      bucket is not empty, so we will add a few more retries when we attempt to
+      remove the empty bucket.
+
+      Args:
+        vm: the vm to run the command.
+        remove_content_cmd: the command line to run to remove objects in the
+            bucket.
+        remove_bucket_cmd: the command line to run to remove the empty bucket.
+
+      Raises:
+        BucketRemovalError: when we failed multiple times to remove the content
+            or the bucket itself.
+  """
+  retry_limit = 0
+  for cmd in [remove_content_cmd, remove_bucket_cmd]:
+    if cmd is remove_content_cmd:
+      retry_limit = CONTENT_REMOVAL_RETRY_LIMIT
+    else:
+      retry_limit = BUCKET_REMOVAL_RETRY_LIMIT
+
+    removal_successful = False
+    logging.info('Performing removal action, cmd is %s', cmd)
+    for i in range(retry_limit):
+      try:
+          vm.RemoteCommand(cmd)
+          removal_successful = True
+          logging.info('Successfully performed the removal operation.')
+          break
+      except Exception as e:
+        logging.error('Failed to perform the removal op. Number '
+                      'of attempts: %d. Error is %s', i + 1, e)
+        time.sleep(RETRY_WAIT_INTERVAL_SECONDS)
+        pass
+
+    if not removal_successful:
+      if cmd is remove_content_cmd:
+        logging.error('Exceeded max retry limit for removing the content of '
+                      'bucket')
+        raise BucketRemovalError('Failed to remove contents of the bucket')
+      else:
+        logging.error('Exceeded max retry limit for removing the empty bucket')
+        raise BucketRemovalError('Failed to remove the empty bucket')
 
 
 def CheckPrerequisites():
@@ -281,9 +346,9 @@ class S3StorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    vm.RemoteCommand('aws s3 rm s3://%s --recursive'
-                     % self.bucket_name, ignore_failure=True)
-    vm.RemoteCommand('aws s3 rb s3://%s' % self.bucket_name)
+    remove_content_cmd = 'aws s3 rm s3://%s --recursive' % self.bucket_name
+    remove_bucket_cmd = 'aws s3 rb s3://%s' % self.bucket_name
+    DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
@@ -497,10 +562,10 @@ class GoogleCloudStorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    vm.RemoteCommand('%s rm -r gs://%s/*' %
-                     (vm.gsutil_path, self.bucket_name))
-    vm.RemoteCommand('%s rb gs://%s' %
-                     (vm.gsutil_path, self.bucket_name))
+    remove_content_cmd = '%s -m rm -r gs://%s/*' % (vm.gsutil_path,
+                                                    self.bucket_name)
+    remove_bucket_cmd = '%s rb gs://%s' % (vm.gsutil_path, self.bucket_name)
+    DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall gcs-oauth2-boto-plugin')
