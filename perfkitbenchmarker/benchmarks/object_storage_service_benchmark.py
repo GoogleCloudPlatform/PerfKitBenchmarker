@@ -102,6 +102,10 @@ LAW_CONSISTENCY_PERCENTAGE = 'list-after-write consistency percentage'
 LAW_INCONSISTENCY_WINDOW = 'list-after-write inconsistency window'
 CONSISTENT_LIST_LATENCY = 'consistent list latency'
 
+CONTENT_REMOVAL_RETRY_LIMIT = 3
+BUCKET_REMOVAL_RETRY_LIMIT = 10
+RETRY_WAIT_INTERVAL_SECONDS = 30
+
 
 def GetInfo():
   return BENCHMARK_INFO
@@ -200,44 +204,51 @@ def DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd):
       First we try to recursively delete its content with retries, if failed,
       we raise the error. If successful, we move on to remove the empty bucket.
       Due to eventual consistency issues, some provider may still think the
-      bucket is empty, so we will add a few more retries when we attempt to
+      bucket is not empty, so we will add a few more retries when we attempt to
       remove the empty bucket.
-  """
-  content_removal_retry_limit = 3
-  content_removal_successful = False
 
-  bucket_removal_retry_limit = 10
+      Args:
+        vm: the vm to run the command.
+        remove_content_cmd: the command line to run to remove objects in the
+            bucket.
+        remove_bucket_cmd: the command line to run to remove the empty bucket.
+
+      Raises:
+        BucketRemovalError: when we failed multiple times to remove the content
+            or the bucket itself.
+  """
+  content_removal_successful = False
   bucket_removal_successful = False
 
-  retry_wait_interval_seconds = 30
-
-  for i in range(content_removal_retry_limit):
+  for i in range(CONTENT_REMOVAL_RETRY_LIMIT):
     try:
         vm.RemoteCommand(remove_content_cmd)
         content_removal_successful = True
         logging.info('Successfully removed all contents in the bucket.')
+        break
     except Exception as e:
       logging.error('Failed to remove content inside the bucket, number '
                     'of attempts: %d. Error is %s', i + 1, e)
-      time.sleep(retry_wait_interval_seconds)
+      time.sleep(RETRY_WAIT_INTERVAL_SECONDS)
       pass
 
   if not content_removal_successful:
     logging.error('Exceeded max retry limit for removing the content of bucket')
     raise BucketRemovalError('Failed to remove contents of the bucket')
 
-  for i in range(bucket_removal_retry_limit):
+  for i in range(BUCKET_REMOVAL_RETRY_LIMIT):
     try:
       vm.RemoteCommand(remove_bucket_cmd)
       bucket_removal_successful = True
       logging.info('Successfully removed the bucket.')
+      break
     except Exception as e:
       # Due to eventual consistency, some bucket deletion operation would return
       # "bucket not empty" error even though they are actually empty.
       # we catch the exception and retry for a few times.
       logging.error('Failed to remove bucket, number of attempts: %d '
                     'Error is %s', i + 1, e)
-      time.sleep(retry_wait_interval_seconds)
+      time.sleep(RETRY_WAIT_INTERVAL_SECONDS)
       pass
 
   if not bucket_removal_successful:
