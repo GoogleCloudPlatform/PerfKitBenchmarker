@@ -335,6 +335,8 @@ def Main(argv=sys.argv):
   # TODO: Verify if there is other way of appending additional help
   # message.
   # Inject more help documentation
+  # The following appends descriptions of the benchmarks and descriptions of
+  # the benchmark sets to the help text.
   benchmark_list = ['%s:  %s' % (benchmark_module.GetInfo()['name'],
                                  benchmark_module.GetInfo()['description'])
                     for benchmark_module in benchmarks.BENCHMARKS]
