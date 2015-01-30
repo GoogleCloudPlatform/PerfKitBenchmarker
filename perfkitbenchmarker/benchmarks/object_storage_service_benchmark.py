@@ -45,6 +45,7 @@ from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
@@ -152,11 +153,12 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       if len(result_string) > 0:
         result = json.loads(result_string[0])
         for percentile in PERCENTILES_LIST:
-          results.append([('%s %s') % (ONE_BYTE_LATENCY % up_and_down,
-                                       percentile),
-                          float(result[percentile]),
-                          LATENCY_UNIT,
-                          metadata])
+          results.append(sample.Sample(
+              ('%s %s') % (ONE_BYTE_LATENCY % up_and_down,
+                           percentile),
+              float(result[percentile]),
+              LATENCY_UNIT,
+              metadata))
       else:
         raise ValueError(
             'Unexpected test outcome from OneByteRW api test: %s.' % raw_result)
@@ -174,10 +176,10 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     search_string = 'List consistency percentage: (.*)'
     result_string = re.findall(search_string, raw_result)
     if len(result_string) > 0:
-      results.append([LAW_CONSISTENCY_PERCENTAGE,
-                      (float)(result_string[0]),
-                      NA_UNIT,
-                      metadata])
+      results.append(sample.Sample(LAW_CONSISTENCY_PERCENTAGE,
+                                   (float)(result_string[0]),
+                                   NA_UNIT,
+                                   metadata))
     else:
       raise ValueError(
           'Cannot get percentage from ListConsistency test.')
@@ -188,10 +190,11 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     if len(result_string) > 0:
       result = json.loads(result_string[0])
       for percentile in PERCENTILES_LIST:
-        results.append([('%s %s') % (LAW_INCONSISTENCY_WINDOW, percentile),
-                        (float)(result[percentile]),
-                        LATENCY_UNIT,
-                        metadata])
+        results.append(sample.Sample(
+            ('%s %s') % (LAW_INCONSISTENCY_WINDOW, percentile),
+            float(result[percentile]),
+            LATENCY_UNIT,
+            metadata))
 
     # Also report the list latency from those lists that are consistent
     search_string = 'List latency: (.*)'
@@ -199,10 +202,11 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     if len(result_string) > 0:
       result = json.loads(result_string[0])
       for percentile in PERCENTILES_LIST:
-        results.append([('%s %s') % (CONSISTENT_LIST_LATENCY, percentile),
-                        (float)(result[percentile]),
-                        LATENCY_UNIT,
-                        metadata])
+        results.append(sample.Sample(
+            ('%s %s') % (CONSISTENT_LIST_LATENCY, percentile),
+            float(result[percentile]),
+            LATENCY_UNIT,
+            metadata))
 
 
 def DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd):
@@ -313,11 +317,10 @@ class S3StorageBenchmark(object):
 
     results = []
 
-    upload_results = [UPLOAD_THROUGHPUT_VIA_CLI,
-                      DATA_SIZE_IN_MB / time_used,
-                      THROUGHPUT_UNIT,
-                      metadata]
-    results.append(upload_results)
+    results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
+                                 DATA_SIZE_IN_MB / time_used,
+                                 THROUGHPUT_UNIT,
+                                 metadata))
 
     vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
     _, res = vm.RemoteCommand('time aws s3 sync '
@@ -326,12 +329,10 @@ class S3StorageBenchmark(object):
     logging.info(res)
     time_used = vm_util.ParseTimeCommandResult(res)
 
-    download_results = [DOWNLOAD_THROUGHPUT_VIA_CLI,
-                        DATA_SIZE_IN_MB / time_used,
-                        THROUGHPUT_UNIT,
-                        metadata]
-
-    results.append(download_results)
+    results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
+                                 DATA_SIZE_IN_MB / time_used,
+                                 THROUGHPUT_UNIT,
+                                 metadata))
 
     # Now tests the storage provider via APIs
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
@@ -419,11 +420,10 @@ class AzureBlobStorageBenchmark(object):
 
     results = []
 
-    upload_results = [UPLOAD_THROUGHPUT_VIA_CLI,
-                      DATA_SIZE_IN_MB / time_used,
-                      THROUGHPUT_UNIT,
-                      metadata]
-    results.append(upload_results)
+    results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
+                                 DATA_SIZE_IN_MB / time_used,
+                                 THROUGHPUT_UNIT,
+                                 metadata))
 
     vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
     _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
@@ -434,11 +434,10 @@ class AzureBlobStorageBenchmark(object):
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
 
-    download_results = [DOWNLOAD_THROUGHPUT_VIA_CLI,
-                        DATA_SIZE_IN_MB / time_used,
-                        THROUGHPUT_UNIT,
-                        metadata]
-    results.append(download_results)
+    results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
+                                 DATA_SIZE_IN_MB / time_used,
+                                 THROUGHPUT_UNIT,
+                                 metadata))
 
     return results
 
@@ -529,11 +528,10 @@ class GoogleCloudStorageBenchmark(object):
 
     results = []
 
-    upload_results = [UPLOAD_THROUGHPUT_VIA_CLI,
-                      DATA_SIZE_IN_MB / time_used,
-                      THROUGHPUT_UNIT,
-                      metadata]
-    results.append(upload_results)
+    results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
+                                 DATA_SIZE_IN_MB / time_used,
+                                 THROUGHPUT_UNIT,
+                                 metadata))
 
     vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
     _, res = vm.RemoteCommand('time %s -m cp '
@@ -544,11 +542,10 @@ class GoogleCloudStorageBenchmark(object):
     print res
     time_used = vm_util.ParseTimeCommandResult(res)
 
-    download_results = [DOWNLOAD_THROUGHPUT_VIA_CLI,
-                        DATA_SIZE_IN_MB / time_used,
-                        THROUGHPUT_UNIT,
-                        metadata]
-    results.append(download_results)
+    results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
+                                 DATA_SIZE_IN_MB / time_used,
+                                 THROUGHPUT_UNIT,
+                                 metadata))
 
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
     S3orGCSApiBasedBenchmarks(results, metadata, vm, 'GCS', test_script_path,

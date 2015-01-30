@@ -28,8 +28,8 @@ import sys
 from threading import Thread
 import time
 
-import gflags as flags
 import boto
+import gflags as flags
 import gcs_oauth2_boto_plugin  # noqa
 
 FLAGS = flags.FLAGS
