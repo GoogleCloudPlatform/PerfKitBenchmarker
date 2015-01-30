@@ -25,7 +25,7 @@ before you use the PerfKitBenchmarker.
 
 In its current release these are the benchmarks that are executed:
 
-  - Bonnie++: GPL v2 (http://www.coker.com.au/bonnie++/readme.html)
+  - `bonnie++`: GPL v2 (http://www.coker.com.au/bonnie++/readme.html)
   - `cassandra_stress`: Apache v2 (http://cassandra.apache.org/)
   - `cluster_boot`: MIT license.
   - `coremark`: EEMBC (https://www.eembc.org/)
@@ -33,17 +33,18 @@ In its current release these are the benchmarks that are executed:
   - `hadoop_terasort`: Apache v2 (http://hadoop.apache.org/)
   - `hpcc`: Original BSD license (http://icl.cs.utk.edu/hpcc/faq/#263)
   - `iperf`: BSD license(http://iperf.sourceforge.net/)
-  - `netper`f: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
-  - YCSB: Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
-  - memtier_benchmark: GPL v2 (https://github.com/RedisLabs/memtier_benchmark)
-  - sysbench: GPL v2 (https://launchpad.net/sysbench)
-  - unixbench: GPL v2 (https://code.google.com/p/byte-unixbench/)
-  - speccpu2006 - Spec CPU2006 (http://www.spec.org/cpu2006/)
-  - mesh_network: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
-  * copy_throughput: Apache v2.
-  - object_storage_service: Apache v2.
-  - ping: No license needed.
-  - Aerospike: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
+  - `netperf`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
+  - `mongodb`: GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
+  - `ycsb` (used by `mongodb`): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
+  - `memtier_benchmark`: GPL v2 (https://github.com/RedisLabs/memtier_benchmark)
+  - `sysbench_oltp`: GPL v2 (https://launchpad.net/sysbench)
+  - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
+  - `speccpu2006` - Spec CPU2006 (http://www.spec.org/cpu2006/)
+  - `mesh_network`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
+  - `copy_throughput`: Apache v2.
+  - `object_storage_service`: Apache v2.
+  - `ping`: No license needed.
+  - `aerospike`: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
 
