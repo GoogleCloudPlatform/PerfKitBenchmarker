@@ -24,13 +24,10 @@ from perfkitbenchmarker.benchmarks import bonnie_benchmark
 class BonnieBenchmarkTestCase(unittest.TestCase):
 
   def setUp(self):
-    path = os.path.join('tests/data',
+    path = os.path.join(os.path.dirname(__file__), '..', 'data',
                         'bonnie-plus-plus-sample.txt')
     with open(path) as fp:
       self.contents = fp.read()
-
-  def tearDown(self):
-    pass
 
   def testParseCSVResults(self):
     result = bonnie_benchmark.ParseCSVResults(self.contents)

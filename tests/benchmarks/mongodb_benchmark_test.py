@@ -25,13 +25,10 @@ class MongoDbBenchmarkTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
-    path = os.path.join('tests/data',
+    path = os.path.join(os.path.dirname(__file__), '..', 'data',
                         'mongodb-sample-result.txt')
     with open(path) as fp:
       self.contents = fp.read()
-
-  def tearDown(self):
-    pass
 
   def testParseResult(self):
     result = mongodb_benchmark.ParseResults(self.contents)
