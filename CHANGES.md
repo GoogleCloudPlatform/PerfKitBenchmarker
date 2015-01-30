@@ -18,7 +18,7 @@
     + `mesh_benchmark` → `mesh_network`
     + `netperf_simple` → `netperf`
     + `object_storage_benchmark` → `object_storage_service`
-    + `synthetic_storage_workloads_benchmark` → `synthetic_storage_workload`
+    + `synthetic_storage_workloads_benchmark` → `block_storage_workload`
     + `sysbench_oltp_benchmark` → `sysbench_oltp`
     + `UnixBench_benchmark` → `unixbench`
 * Introduced a class to represent performance samples (GH-71)
