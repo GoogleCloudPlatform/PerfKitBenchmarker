@@ -25,7 +25,7 @@ class UnixBenchBenchmarkTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
-    path = os.path.join('tests/data',
+    path = os.path.join(os.path.dirname(__file__), '..', 'data',
                         'unix-bench-sample-result.txt')
     with open(path) as fp:
       self.contents = fp.read()
