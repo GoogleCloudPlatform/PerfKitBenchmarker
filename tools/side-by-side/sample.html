@@ -121,7 +121,8 @@
        // Log scale ensures that equivalent changes in either direction
        // (10x, 0.1x) are // shown with equal magnitude.
        var options = {
-         title: 'Result comparison (relative to left sample)',
+         title: 'Result comparison (bars point in the direction of the ' +
+                'sample with the higher value)',
          legend: {position: 'none'},
          height: 350 * rows.length / 10,
          bar: { groupWidth: '95%' },
