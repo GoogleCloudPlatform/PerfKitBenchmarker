@@ -5,7 +5,7 @@
   written (GH-41).
 * Added support for C4 instance types on EC2 (GH-63).
 * Added support for specifying `--product_name` on the command line (GH-55).
-* Added side-by-side comparison tool (GH-39, GH-61).
+* Added side-by-side comparison tool (GH-39, GH-61, GH-62).
 * Factored out package management to support RHEL, CentOS (GH-54).
 * Improved accuracy of cluster boot time (GH-69, GH-73).
 * **Breaking change:** updated benchmark names to be more consistent (GH-72).
