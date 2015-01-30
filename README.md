@@ -26,6 +26,7 @@ before you use the PerfKitBenchmarker.
 In its current release these are the benchmarks that are executed:
 
   - Bonnie++: GPL v2 (http://www.coker.com.au/bonnie++/readme.html)
+  - cassandra_stress: Apache v2 (http://cassandra.apache.org/)
   - cluster_boot_benchmark: MIT license.
   - coremark: EEMBC (https://www.eembc.org/)
   - fio: GPL v2 (https://github.com/axboe/fio/blob/master/LICENSE)

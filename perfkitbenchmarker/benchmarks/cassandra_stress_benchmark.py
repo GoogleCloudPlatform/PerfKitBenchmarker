@@ -55,7 +55,7 @@ BENCHMARK_INFO = {'name': 'cassandra_stress',
                   'scratch_disk': False,
                   'num_machines': DEFAULT_CLUSTER_SIZE}
 
-CASSANDRA_DIR = 'dsc-cassandra-2.0.0'
+CASSANDRA_DIR = 'apache-cassandra-2.0.0'
 CASSANDRA_TAR = '%s-bin.tar.gz' % CASSANDRA_DIR
 JAVA_TAR = 'server-jre-7u40-linux-x64.tar.gz'
 CASSANDRA_YAML = 'cassandra.yaml'
@@ -106,8 +106,9 @@ def PrepareVm(vm):
   Args:
     vm: The target vm.
   """
-  vm.RemoteCommand('curl -OL http://downloads.datastax.com/community/%s'
-                   % CASSANDRA_TAR)
+  vm.RemoteCommand(
+      'curl -OL http://http://archive.apache.org/dist/cassandra/2.0.0/%s'
+      % CASSANDRA_TAR)
   try:
     vm.Install('openjdk7')
   except errors.VirtualMachine.VirtualMachineError as e:
