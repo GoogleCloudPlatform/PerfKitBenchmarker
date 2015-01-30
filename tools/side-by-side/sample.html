@@ -83,6 +83,7 @@
        data.addColumn('number', 'relative to left');
        data.addColumn({type: 'string', role: 'tooltip'});
        data.addColumn({type: 'string', role: 'style'});
+       data.addColumn({type: 'string', role: 'annotation'});
 
        // Build up the data table.
        var rows = _.map(matchedSamples, function(i) {
@@ -93,6 +94,7 @@
          var tooltip = [label];
          var rel = null;
          var style = null;
+         var annot = null;
 
          if (left && right) {
            rel = right.value / left.value;
@@ -100,6 +102,7 @@
            if (rel < 1) {
              style = 'fill-color: #ef8a62';
            }
+           annot = String(Math.round(rel * 100) / 100) + 'x';
          }
 
          if (left) {
@@ -110,7 +113,7 @@
          }
          tooltip = tooltip.join('\n');
 
-         return [label, rel, tooltip, style];
+         return [label, rel, tooltip, style, annot];
        });
 
        data.addRows(rows);
@@ -120,7 +123,7 @@
        var options = {
          title: 'Result comparison (relative to left sample)',
          legend: {position: 'none'},
-         height: 350 * 10 / rows.length,
+         height: 350 * rows.length / 10,
          bar: { groupWidth: '95%' },
          hAxis: { logScale: true },
          chartArea: {left: '30%', width: '70%'}
