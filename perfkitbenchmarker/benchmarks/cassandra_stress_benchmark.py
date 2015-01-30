@@ -107,7 +107,7 @@ def PrepareVm(vm):
     vm: The target vm.
   """
   vm.RemoteCommand(
-      'curl -OL http://http://archive.apache.org/dist/cassandra/2.0.0/%s'
+      'curl -OL http://archive.apache.org/dist/cassandra/2.0.0/%s'
       % CASSANDRA_TAR)
   try:
     vm.Install('openjdk7')
