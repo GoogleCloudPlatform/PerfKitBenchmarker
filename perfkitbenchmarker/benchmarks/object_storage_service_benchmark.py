@@ -106,6 +106,7 @@ CONTENT_REMOVAL_RETRY_LIMIT = 5
 # Some times even when a bucket is completely empty, the service provider would
 # refuse to remove the bucket with "BucketNotEmpty" error until up to 1 hour
 # later. We keep trying until we reach the one-hour limit.
+# TODO: improve this wait.
 BUCKET_REMOVAL_RETRY_LIMIT = 120
 RETRY_WAIT_INTERVAL_SECONDS = 30
 
@@ -247,11 +248,10 @@ def DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd):
     if not removal_successful:
       if cmd is remove_content_cmd:
         logging.error('Exceeded max retry limit for removing the content of '
-                      'bucket')
-        raise BucketRemovalError('Failed to remove contents of the bucket')
+                      'bucket. But we will try to delete the bucket anyway.')
       else:
         logging.error('Exceeded max retry limit for removing the empty bucket')
-        raise BucketRemovalError('Failed to remove the empty bucket')
+        raise BucketRemovalError('Failed to remove the bucket')
 
 
 def CheckPrerequisites():
