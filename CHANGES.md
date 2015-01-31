@@ -39,8 +39,12 @@
 * Updated the default Azure image (GH-84).
 * Improved the Cassandra stress benchmark to incorporate a user-specified
   number of rows, with defaults that run on all cloud platforms with default
-  quotas (GH-31).
-
+  quotas (GH-31). 
+* Improved the Cassandra stress benchmark to incorporate a user-specified
+  number of cassandra-stress threads on client node, with defaults of 50
+  (originally default was 300 which caused the benchmark to crash on small
+  instance types). As a result, on large instance types, the throughput 
+  reported by cassandra-stress tool is lower than previous version (GH-31).
 
 # v0.8.0
 
