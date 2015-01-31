@@ -3,11 +3,8 @@
 * **Breaking change**: Fixed typo in UnixBench benchmark name: now `UnixBench_benchmark` (GH-50).
 * **Breaking change**: removed `--json_output` flag. JSON samples are always
   written (GH-41).
-* Added support for C4 instance types on EC2 (GH-63).
-* Added support for specifying `--product_name` on the command line (GH-55).
-* Added side-by-side comparison tool (GH-39, GH-61, GH-62).
-* Factored out package management to support RHEL, CentOS (GH-54).
-* Improved accuracy of cluster boot time (GH-69, GH-73).
+* **Breaking change**: `object_storage_service` requires a `.boto` file
+  configured for AWS and GCS to function.
 * **Breaking change:** updated benchmark names to be more consistent (GH-72).
   Specific changes:
 
@@ -21,6 +18,12 @@
     + `synthetic_storage_workloads_benchmark` → `block_storage_workload`
     + `sysbench_oltp_benchmark` → `sysbench_oltp`
     + `UnixBench_benchmark` → `unixbench`
+
+* Added support for C4 instance types on EC2 (GH-63).
+* Added support for specifying `--product_name` on the command line (GH-55).
+* Added side-by-side comparison tool (GH-39, GH-61, GH-62).
+* Factored out package management to support RHEL, CentOS (GH-54).
+* Improved accuracy of cluster boot time (GH-69, GH-73).
 * Introduced a class to represent performance samples (GH-71)
 * Updated Hadoop benchmark to calculate per-core terasort throughput (GH-75).
 * Added a results parser for bonnie++ benchmark (GH-70).
