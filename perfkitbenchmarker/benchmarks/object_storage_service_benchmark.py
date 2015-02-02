@@ -259,8 +259,13 @@ def CheckPrerequisites():
 
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+    NotImplementedError: On unsupported distribution.
   """
   data.ResourcePath(DATA_FILE)
+  # TODO: configure python and dependencies to run on CentOS 6/7
+  if FLAGS.os_type == benchmark_spec_class.RHEL:
+    raise NotImplementedError('{0} benchmark is not implemented for RHEL-based '
+                              'distributions.'.format(BENCHMARK_INFO['name']))
 
 
 class S3StorageBenchmark(object):
