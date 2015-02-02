@@ -1,3 +1,51 @@
+# v0.9.0
+
+* **Breaking change**: Fixed typo in UnixBench benchmark name: now `UnixBench_benchmark` (GH-50).
+* **Breaking change**: removed `--json_output` flag. JSON samples are always
+  written (GH-41).
+* **Breaking change**: `object_storage_service` requires a `.boto` file
+  configured for AWS and GCS to function.
+* **Breaking change:** updated benchmark names to be more consistent (GH-72).
+  Specific changes:
+
+    + `cassandra` → `cassandra_stress`
+    + `copy_benchmark` → `copy_throughput`
+    + `fio_benchmark` → `fio`
+    + `hadoop_benchmark` → `hadoop_terasort`
+    + `mesh_benchmark` → `mesh_network`
+    + `netperf_simple` → `netperf`
+    + `object_storage_benchmark` → `object_storage_service`
+    + `synthetic_storage_workloads_benchmark` → `block_storage_workload`
+    + `sysbench_oltp_benchmark` → `sysbench_oltp`
+    + `UnixBench_benchmark` → `unixbench`
+
+* Added support for C4 instance types on EC2 (GH-63).
+* Added support for specifying `--product_name` on the command line (GH-55).
+* Added side-by-side comparison tool (GH-39, GH-61, GH-62).
+* Factored out package management to support RHEL, CentOS (GH-54).
+* Improved accuracy of cluster boot time (GH-69, GH-73).
+* Introduced a class to represent performance samples (GH-71)
+* Updated Hadoop benchmark to calculate per-core terasort throughput (GH-75).
+* Added a results parser for bonnie++ benchmark (GH-70).
+* Added a results parser for fio benchmark (GH-32).
+* Added prerequisite checking to benchmarks (GH-49).
+* Switch to Apache distribution of Cassandra (GH-92).
+* Improved default behavior for machine types with no local storage (GH-88).
+* Updated `object_storage_service` benchmark to test both command line tool
+  performance and direct API calls (GH-59, GH-90).
+* Added benchmark sets: predefined collections of benchmarks to run (GH-80).
+* Modified HPCC benchmark to use 80% of available memory rather than 80% of
+  total. Prevents crashes on low-memory systems (GH-81).
+* Updated the default Azure image (GH-84).
+* Improved the Cassandra stress benchmark to incorporate a user-specified
+  number of rows, with defaults that run on all cloud platforms with default
+  quotas (GH-31).
+* Improved the Cassandra stress benchmark to incorporate a user-specified
+  number of cassandra-stress threads on client node, with defaults of 50
+  (originally default was 300 which caused the benchmark to crash on small
+  instance types). As a result, on large instance types, the throughput
+  reported by cassandra-stress tool is lower than previous version (GH-31).
+
 # v0.8.0
 
 * Documentation cleanup (GH-19, GH-34).

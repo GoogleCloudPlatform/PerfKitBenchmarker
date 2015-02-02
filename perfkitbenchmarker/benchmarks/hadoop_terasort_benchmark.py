@@ -23,29 +23,44 @@ investigate other settings and verfiy that we are seeing good performance.
 
 import logging
 import os.path
+import time
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+
+flags.DEFINE_integer('terasort_num_rows', 100000000,
+                     'Number of 100-byte rows used in terasort.')
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'hadoop_benchmark',
+BENCHMARK_INFO = {'name': 'hadoop_terasort',
                   'description': 'Runs Terasort',
                   'scratch_disk': True,
                   'num_machines': 9}
 
-JRE_PKG = 'openjdk-7-jre-headless'
 HADOOP_VERSION = '2.5.2'
 HADOOP_URL = ('http://apache.mirrors.tds.net/hadoop/common/hadoop-%s/'
               'hadoop-%s.tar.gz') % (HADOOP_VERSION, HADOOP_VERSION)
 
 DATA_FILES = ['core-site.xml.j2', 'yarn-site.xml.j2', 'hdfs-site.xml',
               'mapred-site.xml', 'hadoop-env.sh', 'slaves.j2']
+NUM_BYTES_PER_ROW = 100
 
 
 def GetInfo():
   return BENCHMARK_INFO
+
+
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  for resource in DATA_FILES:
+    data.ResourcePath(resource)
 
 
 def _ConfDir(vm):
@@ -61,9 +76,10 @@ def InstallHadoop(vm, master_ip, worker_ips):
     master_ip: A string of the master VM's ip.
     worker_ips: A list of all slave ips.
   """
+  vm.Install('wget')
   vm.RemoteCommand('wget %s' % HADOOP_URL)
   vm.RemoteCommand('tar xvzf hadoop-%s.tar.gz' % HADOOP_VERSION)
-  vm.InstallPackage(JRE_PKG)
+  vm.Install('openjdk7')
   vm.RemoteCommand('mkdir hadoop-%s/conf' % HADOOP_VERSION)
 
   # Set available memory to 90% of that on the system
@@ -135,10 +151,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample instances.
   """
   vms = benchmark_spec.vms
   master = vms[0]
@@ -148,17 +161,33 @@ def Run(benchmark_spec):
                 'hadoop-mapreduce-examples-%s.jar ') % (HADOOP_VERSION,
                                                         HADOOP_VERSION,
                                                         HADOOP_VERSION)
-  master.RemoteCommand(hadoop_cmd + 'teragen 100000000 /teragen')
-  master.RemoteCommand('time ' + hadoop_cmd + 'terasort /teragen /terasort')
+  master.RemoteCommand('%s teragen %s /teragen'
+                       % (hadoop_cmd, FLAGS.terasort_num_rows))
+  num_cpus = 0
+  for vm in vms[1:]:
+    num_cpus += vm.num_cpus
+  start_time = time.time()
+  stdout, _ = master.RemoteCommand('%s terasort /teragen /terasort'
+                                   % hadoop_cmd)
+  logging.info('Terasort ourput: %s', stdout)
+  time_elapsed = time.time() - start_time
+  data_processed_in_mbytes = FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW / (
+      1024 * 1024.0)
   master.RemoteCommand(hadoop_cmd + 'teravalidate /terasort /teravalidate')
+
   master.RemoteCommand('hadoop-%s/bin/hadoop fs -rm -r /teragen' %
                        HADOOP_VERSION)
   master.RemoteCommand('hadoop-%s/bin/hadoop fs -rm -r /terasort' %
                        HADOOP_VERSION)
   master.RemoteCommand('hadoop-%s/bin/hadoop fs -rm -r /teravalidate' %
                        HADOOP_VERSION)
-
-  return []
+  metadata = {'num_rows': FLAGS.terasort_num_rows,
+              'data_size_in_bytes': FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW}
+  return [sample.Sample('Terasort Throughput Per Core',
+                        data_processed_in_mbytes / time_elapsed / num_cpus,
+                        'MB/sec',
+                        metadata),
+          sample.Sample('Terasort Total Time', time_elapsed, 'sec', metadata)]
 
 
 def StopDatanode(vm):
@@ -173,7 +202,6 @@ def StopDatanode(vm):
 def CleanNode(vm):
   """Uninstall packages and delete files needed for hadoop on a single VM."""
   logging.info('Hadoop Cleanup up on %s', vm)
-  vm.UninstallPackage(JRE_PKG)
   vm.RemoteCommand('rm -rf /scratch/*')
   vm.RemoteCommand('rm -rf /home/%s/hadoop-%s*' % (vm.user_name,
                                                    HADOOP_VERSION))

@@ -16,6 +16,7 @@
 import os
 import unittest
 
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.benchmarks import mongodb_benchmark
 
 
@@ -24,37 +25,39 @@ class MongoDbBenchmarkTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
-    path = os.path.join('tests/data',
+    path = os.path.join(os.path.dirname(__file__), '..', 'data',
                         'mongodb-sample-result.txt')
     with open(path) as fp:
       self.contents = fp.read()
 
-  def tearDown(self):
-    pass
-
   def testParseResult(self):
     result = mongodb_benchmark.ParseResults(self.contents)
     expected_result = [
-        ['RunTime', 723.0, 'ms', {'stage': 'OVERALL'}],
-        ['Throughput', 1383.1258644536654, 'ops/sec', {'stage': 'OVERALL'}],
-        ['AverageLatency', 5596.689516129032, 'us', {'stage': 'UPDATE'}],
-        ['MinLatency', 2028.0, 'us', {'stage': 'UPDATE'}],
-        ['MaxLatency', 46240.0, 'us', {'stage': 'UPDATE'}],
-        ['95thPercentileLatency', 10.0, 'ms', {'stage': 'UPDATE'}],
-        ['99thPercentileLatency', 43.0, 'ms', {'stage': 'UPDATE'}],
-        ['AverageLatency', 4658.033730158731, 'us', {'stage': 'READ'}],
-        ['MinLatency', 1605.0, 'us', {'stage': 'READ'}],
-        ['MaxLatency', 43447.0, 'us', {'stage': 'READ'}],
-        ['95thPercentileLatency', 10.0, 'ms', {'stage': 'READ'}],
-        ['99thPercentileLatency', 12.0, 'ms', {'stage': 'READ'}],
-        ['AverageLatency', 372.8, 'us', {'stage': 'CLEANUP'}],
-        ['MinLatency', 0.0, 'us', {'stage': 'CLEANUP'}],
-        ['MaxLatency', 3720.0, 'us', {'stage': 'CLEANUP'}],
-        ['95thPercentileLatency', 3.0, 'ms', {'stage': 'CLEANUP'}],
-        ['99thPercentileLatency', 3.0, 'ms', {'stage': 'CLEANUP'}],
-        ['Operations', 496.0, '', {'stage': 'UPDATE'}],
-        ['Operations', 504.0, '', {'stage': 'READ'}],
-        ['Operations', 10.0, '', {'stage': 'CLEANUP'}]]
+        sample.Sample('RunTime', 723.0, 'ms', {'stage': 'OVERALL'}),
+        sample.Sample('Throughput', 1383.1258644536654, 'ops/sec',
+                      {'stage': 'OVERALL'}),
+        sample.Sample('AverageLatency', 5596.689516129032, 'us',
+                      {'stage': 'UPDATE'}),
+        sample.Sample('MinLatency', 2028.0, 'us', {'stage': 'UPDATE'}),
+        sample.Sample('MaxLatency', 46240.0, 'us', {'stage': 'UPDATE'}),
+        sample.Sample('95thPercentileLatency', 10.0, 'ms', {'stage': 'UPDATE'}),
+        sample.Sample('99thPercentileLatency', 43.0, 'ms', {'stage': 'UPDATE'}),
+        sample.Sample('AverageLatency', 4658.033730158731, 'us',
+                      {'stage': 'READ'}),
+        sample.Sample('MinLatency', 1605.0, 'us', {'stage': 'READ'}),
+        sample.Sample('MaxLatency', 43447.0, 'us', {'stage': 'READ'}),
+        sample.Sample('95thPercentileLatency', 10.0, 'ms', {'stage': 'READ'}),
+        sample.Sample('99thPercentileLatency', 12.0, 'ms', {'stage': 'READ'}),
+        sample.Sample('AverageLatency', 372.8, 'us', {'stage': 'CLEANUP'}),
+        sample.Sample('MinLatency', 0.0, 'us', {'stage': 'CLEANUP'}),
+        sample.Sample('MaxLatency', 3720.0, 'us', {'stage': 'CLEANUP'}),
+        sample.Sample('95thPercentileLatency', 3.0, 'ms',
+                      {'stage': 'CLEANUP'}),
+        sample.Sample('99thPercentileLatency', 3.0, 'ms',
+                      {'stage': 'CLEANUP'}),
+        sample.Sample('Operations', 496.0, '', {'stage': 'UPDATE'}),
+        sample.Sample('Operations', 504.0, '', {'stage': 'READ'}),
+        sample.Sample('Operations', 10.0, '', {'stage': 'CLEANUP'})]
     self.assertEqual(result, expected_result)
 
 

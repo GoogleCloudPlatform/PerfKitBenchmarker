@@ -73,3 +73,19 @@ if [[ "${#files_with_lint_errors[@]}" -ne 0 ]]; then
     echo
   ) >> $1
 fi
+
+if [[ -z $(command -v nosetests) ]]; then
+  >&2 echo "Missing nose. Install it via 'pip' to enable unit testing."
+  exit 1
+else
+  UNITTEST_RESULT=$(nosetests -v || echo "FAILED")
+  if [[ "$UNITTEST_RESULT" == *"FAILED"* ]]; then
+    (
+      echo
+      echo "# *** ERROR: *** Unit test failure."
+      echo "# Your commit will be aborted unless you fix these."
+      echo "#   COMMIT_BLOCKED_ON_UNIT_TESTS"
+      echo
+    ) >> $1
+  fi
+fi

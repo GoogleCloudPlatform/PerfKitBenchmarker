@@ -16,6 +16,7 @@
 import os
 import unittest
 
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.benchmarks import unixbench_benchmark
 
 
@@ -24,7 +25,7 @@ class UnixBenchBenchmarkTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
-    path = os.path.join('tests/data',
+    path = os.path.join(os.path.dirname(__file__), '..', 'data',
                         'unix-bench-sample-result.txt')
     with open(path) as fp:
       self.contents = fp.read()
@@ -135,6 +136,7 @@ class UnixBenchBenchmarkTestCase(unittest.TestCase):
          {'index': 6859.2, 'baseline': 15000.0, 'num_parallel_copies': 8}],
         ['System Benchmarks Index Score', 4596.2, '',
          {'num_parallel_copies': 8}]]
+    expected_result = [sample.Sample(*exp) for exp in expected_result]
     self.assertEqual(result, expected_result)
 
 

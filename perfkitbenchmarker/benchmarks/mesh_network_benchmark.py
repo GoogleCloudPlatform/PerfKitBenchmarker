@@ -24,7 +24,9 @@ import re
 import threading
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.packages import netperf
 
 
 flags.DEFINE_integer('num_connections', 1,
@@ -36,14 +38,12 @@ flags.DEFINE_integer('num_iterations', 1,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'mesh_benchmark',
-                  'description': 'Get VM to VM cross section bandwidth for '
-                                 'mesh network.',
+BENCHMARK_INFO = {'name': 'mesh_network',
+                  'description': 'Measures VM to VM cross section bandwidth in '
+                  'a mesh network.',
                   'scratch_disk': False,
                   'num_machines': None}  # Set in GetInfo()
 
-NETPERF_NAME = 'netperf-2.6.0.tar.gz'
-NETPERF_LOC = 'ftp://ftp.netperf.org/netperf/%s' % NETPERF_NAME
 NETPERF_BENCHMARKSS = ['TCP_RR', 'TCP_STREAM']
 VALUE_INDEX = 1
 RESULT_LOCK = threading.Lock()
@@ -62,12 +62,7 @@ def PrepareVM(vm):
   Args:
     vm: The VM that needs to install netperf package.
   """
-  logging.info('netperf prepare on %s', vm)
-  vm.InstallPackage('build-essential')
-  vm.RemoteCommand('tar xvfz %s' % NETPERF_NAME)
-  make_cmd = 'cd netperf-2.6.0;./configure;make;sudo make install'
-  vm.RemoteCommand(make_cmd)
-  vm.RemoteCommand('netserver')
+  vm.RemoteCommand('./netserver')
 
 
 def Prepare(benchmark_spec):
@@ -78,11 +73,11 @@ def Prepare(benchmark_spec):
         required to run the banchmark.
   """
   vms = benchmark_spec.vms
-  logging.info('downloading wget on %s', vms[0])
-  wget_cmd = '/usr/bin/wget %s' % NETPERF_LOC
-  vms[0].RemoteCommand(wget_cmd)
+  logging.info('Preparing netperf on %s', vms[0])
+  vms[0].Install('netperf')
   for vm in vms:
-    vms[0].MoveFile(vm, NETPERF_NAME)
+    vms[0].MoveFile(vm, netperf.NETPERF_PATH)
+    vms[0].MoveFile(vm, netperf.NETSERVER_PATH)
   vm_util.RunThreaded(PrepareVM, vms, benchmark_spec.num_vms)
 
 
@@ -102,7 +97,7 @@ def RunNetperf(vm, benchmark_name, servers, result):
     cmd_duration_suffix = ''
   for server in servers:
     if vm != server:
-      cmd += ('/usr/local/bin/netperf -t '
+      cmd += ('./netperf -t '
               '{benchmark_name} -H {server_ip} -i {iterations} '
               '{cmd_suffix} & ').format(
                   benchmark_name=benchmark_name,
@@ -158,12 +153,15 @@ def Run(benchmark_spec):
     result = [metric, value, unit, metadata]
     args = [((source, netperf_benchmark, vms, result), {}) for source in vms]
     vm_util.RunThreaded(RunNetperf, args, benchmark_spec.num_vms)
+    result = sample.Sample(*result)
     if netperf_benchmark == 'TCP_RR':
-      result[VALUE_INDEX] /= ((benchmark_spec.num_vms - 1) *
-                              benchmark_spec.num_vms *
-                              FLAGS.num_connections)
+      denom = ((benchmark_spec.num_vms - 1) *
+               benchmark_spec.num_vms *
+               FLAGS.num_connections)
+      result = result._replace(value=result.value / denom)
+
     results.append(result)
-  print results
+  logging.info(results)
   return results
 
 
@@ -178,8 +176,5 @@ def Cleanup(benchmark_spec):
   for vm in vms:
     logging.info('uninstalling netperf on %s', vm)
     vm.RemoteCommand('pkill -9 netserver')
-    make_cmd = 'cd netperf-2.6.0;sudo make uninstall'
-    vm.RemoteCommand(make_cmd)
-    vm.RemoteCommand('rm -rf netperf-2.6.0')
-    vm.RemoteCommand('rm -f %s' % NETPERF_NAME)
-    vm.UninstallPackage('build-essential')
+    vm.RemoteCommand('rm netserver')
+    vm.RemoteCommand('rm netperf')

@@ -18,15 +18,17 @@ This benchmark runs ping using the internal ips of vms in the same zone.
 """
 
 import logging
+from perfkitbenchmarker import sample
 import re
 
 
-BENCHMARKS_INFO = {'name': 'ping',
-                   'description': 'Run ping',
-                   'scratch_disk': False,
-                   'num_machines': 2}
+BENCHMARKS_INFO = {
+    'name': 'ping',
+    'description': 'Benchmarks ping latency over internal IP addresses',
+    'scratch_disk': False,
+    'num_machines': 2}
 
-METRICS = ['Min Latency', 'Average Latency', 'Max Latency', 'Latency Std Dev']
+METRICS = ('Min Latency', 'Average Latency', 'Max Latency', 'Latency Std Dev')
 
 
 def GetInfo():
@@ -51,24 +53,22 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   if not vms[0].IsReachable(vms[1]):
+    logging.warn('%s is not reachable from %s', vms[1], vms[0])
     return []
   vm = vms[0]
   logging.info('Ping results:')
   ping_cmd = 'ping -c 100 %s' % vms[1].internal_ip
   stdout, _ = vm.RemoteCommand(ping_cmd, should_log=True)
   stats = re.findall('([0-9]*\\.[0-9]*)', stdout.splitlines()[-1])
-  assert len(stats) == 4
+  assert len(stats) == len(METRICS), stats
   results = []
   metadata = {'ip_type': 'internal'}
-  for i in range(4):
-    results.append((METRICS[i], float(stats[i]), 'ms', metadata))
+  for i, metric in enumerate(METRICS):
+    results.append(sample.Sample(metric, float(stats[i]), 'ms', metadata))
   return results
 
 

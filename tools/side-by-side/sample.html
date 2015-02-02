@@ -1,0 +1,1076 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>PerfKitBenchmarker comparison: json-path to netperf-csv</title>
+
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+
+    <style type="text/css">
+
+      body {
+        position: relative;
+        padding-top: 70px;
+      }
+
+      #table-result-comparison {
+        font-size: 95%;
+      }
+
+      span.diff_chg {
+        background-color: #FFFF77;
+        color: #292A0A;
+        font-weight: bold;
+        text-decoration: underline;
+      }
+
+      span.diff_sub {
+        background-color: #f2dede;
+        color: #a94442;
+        font-weight: bold;
+      }
+
+      span.diff_add {
+        background-color: #dff0d8;
+        color: #3c763d;
+        font-weight: bold;
+      }
+
+      .value-increase-small {
+        background-color: #c7eae5;
+        color: black;
+      }
+
+      .value-increase-medium {
+        background-color: #80cdc1;
+        color: white;
+      }
+
+      .value-increase-large {
+        background-color: #35978f;
+        color: white;
+      }
+
+      .value-decrease-small {
+        background-color: #f6e8c3;
+        color: black;
+      }
+
+      .value-decrease-medium {
+        background-color: #dfc27d;
+        color: white;
+      }
+
+      .value-decrease-large {
+        background-color: #bf812d;
+        color: white;
+      }
+    </style>
+    <script type="text/javascript">
+    var matchedSamples = [[{"official": false, "timestamp": 1418334298.972708, "metric": "TCP_RR_Transaction_Rate", "labels": "|client_machine_type:n1-standard-4|,|perfkitbenchmarker_version:unknown|,|zones:us-central1-a|,|server_zone:us-central1-a|,|machine_type:n1-standard-4|,|sending_zone:us-central1-a|,|cloud:GCP|,|client_zone:us-central1-a|,|server_machine_type:n1-standard-4|,|receiving_zone:us-central1-a|,|ip_type:external|,|image:debian-7-backports|", "value": 1280.87, "test": "netperf_simple", "run_uri": "aa016ead-d33f-4dca-9f49-941ca28e67c5", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "3234219a-3dc1-4806-8798-e08e13e307fb"}, {"official": false, "timestamp": 1418335692.972526, "metric": "TCP_RR_Transaction_Rate", "labels": "|client_zone:us-central1-a|,|perfkitbenchmarker_version:unknown|,|server_machine_type:n1-standard-4|,|zones:us-central1-a|,|receiving_zone:us-central1-a|,|machine_type:n1-standard-4|,|client_machine_type:n1-standard-4|,|ip_type:external|,|conf_pct:15.880|,|sending_zone:us-central1-a|,|image:debian-7-backports|,|cloud:GCP|,|server_zone:us-central1-a|", "value": 1333.62, "test": "netperf_simple", "run_uri": "3378d964-934e-439b-b68d-1d63b6d5e3e8", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "f37bb0c2-ae62-46b2-9feb-4d8b569ac89a"}], [{"official": false, "timestamp": 1418334298.972893, "metric": "TCP_RR_Transaction_Rate", "labels": "|client_machine_type:n1-standard-4|,|perfkitbenchmarker_version:unknown|,|zones:us-central1-a|,|server_zone:us-central1-a|,|machine_type:n1-standard-4|,|sending_zone:us-central1-a|,|cloud:GCP|,|client_zone:us-central1-a|,|server_machine_type:n1-standard-4|,|receiving_zone:us-central1-a|,|ip_type:internal|,|image:debian-7-backports|", "value": 4030.92, "test": "netperf_simple", "run_uri": "aa016ead-d33f-4dca-9f49-941ca28e67c5", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "896c9d7f-41bb-4423-a238-cb28c03da0d7"}, {"official": false, "timestamp": 1418335692.972808, "metric": "TCP_RR_Transaction_Rate", "labels": "|client_zone:us-central1-a|,|perfkitbenchmarker_version:unknown|,|server_machine_type:n1-standard-4|,|zones:us-central1-a|,|receiving_zone:us-central1-a|,|machine_type:n1-standard-4|,|client_machine_type:n1-standard-4|,|ip_type:internal|,|conf_pct:4.517|,|sending_zone:us-central1-a|,|image:debian-7-backports|,|cloud:GCP|,|server_zone:us-central1-a|", "value": 4087.38, "test": "netperf_simple", "run_uri": "3378d964-934e-439b-b68d-1d63b6d5e3e8", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "4efc8257-239e-4762-86b7-589c5964daa7"}], [{"official": false, "timestamp": 1418334298.97299, "metric": "TCP_CRR_Transaction_Rate", "labels": "|client_machine_type:n1-standard-4|,|perfkitbenchmarker_version:unknown|,|zones:us-central1-a|,|server_zone:us-central1-a|,|machine_type:n1-standard-4|,|sending_zone:us-central1-a|,|cloud:GCP|,|client_zone:us-central1-a|,|server_machine_type:n1-standard-4|,|receiving_zone:us-central1-a|,|ip_type:internal|,|image:debian-7-backports|", "value": 373.6, "test": "netperf_simple", "run_uri": "aa016ead-d33f-4dca-9f49-941ca28e67c5", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "b8254a1f-2aad-4fd5-a36b-c4f698385279"}, {"official": false, "timestamp": 1418335692.97291, "metric": "TCP_CRR_Transaction_Rate", "labels": "|client_zone:us-central1-a|,|perfkitbenchmarker_version:unknown|,|server_machine_type:n1-standard-4|,|zones:us-central1-a|,|receiving_zone:us-central1-a|,|machine_type:n1-standard-4|,|client_machine_type:n1-standard-4|,|ip_type:internal|,|conf_pct:21.161|,|sending_zone:us-central1-a|,|image:debian-7-backports|,|cloud:GCP|,|server_zone:us-central1-a|", "value": 404.17, "test": "netperf_simple", "run_uri": "3378d964-934e-439b-b68d-1d63b6d5e3e8", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "d7988017-5890-49ce-9985-3d51e9002bef"}], [{"official": false, "timestamp": 1418334298.973098, "metric": "TCP_CRR_Transaction_Rate", "labels": "|client_machine_type:n1-standard-4|,|perfkitbenchmarker_version:unknown|,|zones:us-central1-a|,|server_zone:us-central1-a|,|machine_type:n1-standard-4|,|sending_zone:us-central1-a|,|cloud:GCP|,|client_zone:us-central1-a|,|server_machine_type:n1-standard-4|,|receiving_zone:us-central1-a|,|ip_type:internal|,|image:debian-7-backports|", "value": 1270.88, "test": "netperf_simple", "run_uri": "aa016ead-d33f-4dca-9f49-941ca28e67c5", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "0e832dbb-191b-4674-ae5e-cbe1e3445656"}, {"official": false, "timestamp": 1418335692.972999, "metric": "TCP_CRR_Transaction_Rate", "labels": "|client_zone:us-central1-a|,|perfkitbenchmarker_version:unknown|,|server_machine_type:n1-standard-4|,|zones:us-central1-a|,|receiving_zone:us-central1-a|,|machine_type:n1-standard-4|,|client_machine_type:n1-standard-4|,|ip_type:internal|,|conf_pct:6.473|,|sending_zone:us-central1-a|,|image:debian-7-backports|,|cloud:GCP|,|server_zone:us-central1-a|", "value": 1251.75, "test": "netperf_simple", "run_uri": "3378d964-934e-439b-b68d-1d63b6d5e3e8", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "7a9c45d7-187c-4a23-985e-8ef76d1c4949"}], [{"official": false, "timestamp": 1418334298.97318, "metric": "TCP_STREAM_Throughput", "labels": "|client_machine_type:n1-standard-4|,|perfkitbenchmarker_version:unknown|,|zones:us-central1-a|,|server_zone:us-central1-a|,|machine_type:n1-standard-4|,|sending_zone:us-central1-a|,|cloud:GCP|,|client_zone:us-central1-a|,|server_machine_type:n1-standard-4|,|receiving_zone:us-central1-a|,|ip_type:internal|,|image:debian-7-backports|", "value": 1047.18, "test": "netperf_simple", "run_uri": "aa016ead-d33f-4dca-9f49-941ca28e67c5", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "Mbits/sec", "sample_uri": "4d7d44bd-1ff1-44d2-9696-f65355c8782c"}, {"official": false, "timestamp": 1418335692.973113, "metric": "TCP_STREAM_Throughput", "labels": "|client_zone:us-central1-a|,|perfkitbenchmarker_version:unknown|,|server_machine_type:n1-standard-4|,|zones:us-central1-a|,|receiving_zone:us-central1-a|,|machine_type:n1-standard-4|,|client_machine_type:n1-standard-4|,|ip_type:internal|,|conf_pct:7.383|,|sending_zone:us-central1-a|,|image:debian-7-backports|,|cloud:GCP|,|server_zone:us-central1-a|", "value": 1192.43, "test": "netperf_simple", "run_uri": "3378d964-934e-439b-b68d-1d63b6d5e3e8", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "Mbits/sec", "sample_uri": "dadb20ff-894b-4621-8525-f0045f5623ba"}], [{"official": false, "timestamp": 1418334298.973262, "metric": "TCP_STREAM_Throughput", "labels": "|client_machine_type:n1-standard-4|,|perfkitbenchmarker_version:unknown|,|zones:us-central1-a|,|server_zone:us-central1-a|,|machine_type:n1-standard-4|,|sending_zone:us-central1-a|,|cloud:GCP|,|client_zone:us-central1-a|,|server_machine_type:n1-standard-4|,|receiving_zone:us-central1-a|,|ip_type:internal|,|image:debian-7-backports|", "value": 5095.9, "test": "netperf_simple", "run_uri": "aa016ead-d33f-4dca-9f49-941ca28e67c5", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "Mbits/sec", "sample_uri": "0db84be5-699a-4555-bd05-3d3c912d2d17"}, {"official": false, "timestamp": 1418335692.973194, "metric": "TCP_STREAM_Throughput", "labels": "|client_zone:us-central1-a|,|perfkitbenchmarker_version:unknown|,|server_machine_type:n1-standard-4|,|zones:us-central1-a|,|receiving_zone:us-central1-a|,|machine_type:n1-standard-4|,|client_machine_type:n1-standard-4|,|ip_type:internal|,|conf_pct:34.388|,|sending_zone:us-central1-a|,|image:debian-7-backports|,|cloud:GCP|,|server_zone:us-central1-a|", "value": 2804.9, "test": "netperf_simple", "run_uri": "3378d964-934e-439b-b68d-1d63b6d5e3e8", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "Mbits/sec", "sample_uri": "a14c4420-4e89-48ae-8a3c-f9f85f21aaed"}], [{"official": false, "timestamp": 1418334298.973341, "metric": "UDP_RR_Transaction_Rate", "labels": "|client_machine_type:n1-standard-4|,|perfkitbenchmarker_version:unknown|,|zones:us-central1-a|,|server_zone:us-central1-a|,|machine_type:n1-standard-4|,|sending_zone:us-central1-a|,|cloud:GCP|,|client_zone:us-central1-a|,|server_machine_type:n1-standard-4|,|receiving_zone:us-central1-a|,|ip_type:internal|,|image:debian-7-backports|", "value": 1450.57, "test": "netperf_simple", "run_uri": "aa016ead-d33f-4dca-9f49-941ca28e67c5", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "662155bd-f5c3-4b03-bd46-9e38b5f58d84"}, {"official": false, "timestamp": 1418335692.973271, "metric": "UDP_RR_Transaction_Rate", "labels": "|client_zone:us-central1-a|,|perfkitbenchmarker_version:unknown|,|server_machine_type:n1-standard-4|,|zones:us-central1-a|,|receiving_zone:us-central1-a|,|machine_type:n1-standard-4|,|client_machine_type:n1-standard-4|,|ip_type:internal|,|conf_pct:4.499|,|sending_zone:us-central1-a|,|image:debian-7-backports|,|cloud:GCP|,|server_zone:us-central1-a|", "value": 1307.56, "test": "netperf_simple", "run_uri": "3378d964-934e-439b-b68d-1d63b6d5e3e8", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "5b868094-b93e-4503-ad3d-e720ccd4120c"}], [{"official": false, "timestamp": 1418334298.973418, "metric": "UDP_RR_Transaction_Rate", "labels": "|client_machine_type:n1-standard-4|,|perfkitbenchmarker_version:unknown|,|zones:us-central1-a|,|server_zone:us-central1-a|,|machine_type:n1-standard-4|,|sending_zone:us-central1-a|,|cloud:GCP|,|client_zone:us-central1-a|,|server_machine_type:n1-standard-4|,|receiving_zone:us-central1-a|,|ip_type:internal|,|image:debian-7-backports|", "value": 4275.72, "test": "netperf_simple", "run_uri": "aa016ead-d33f-4dca-9f49-941ca28e67c5", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "a48f4810-62bb-488c-a9ee-29a038c0ba1c"}, {"official": false, "timestamp": 1418335692.973347, "metric": "UDP_RR_Transaction_Rate", "labels": "|client_zone:us-central1-a|,|perfkitbenchmarker_version:unknown|,|server_machine_type:n1-standard-4|,|zones:us-central1-a|,|receiving_zone:us-central1-a|,|machine_type:n1-standard-4|,|client_machine_type:n1-standard-4|,|ip_type:internal|,|conf_pct:5.836|,|sending_zone:us-central1-a|,|image:debian-7-backports|,|cloud:GCP|,|server_zone:us-central1-a|", "value": 4086.7, "test": "netperf_simple", "run_uri": "3378d964-934e-439b-b68d-1d63b6d5e3e8", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "transactions_per_second", "sample_uri": "2fa9f7f3-4c38-456e-99a6-738e29c56952"}], [{"official": false, "timestamp": 1418334438.901931, "metric": "End to End Runtime", "labels": "|zones:us-central1-a|,|perfkitbenchmarker_version:unknown|,|image:debian-7-backports|,|machine_type:n1-standard-4|,|cloud:GCP|", "value": 398.5702109336853, "test": "netperf_simple", "run_uri": "aa016ead-d33f-4dca-9f49-941ca28e67c5", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "seconds", "sample_uri": "7d63488b-6c31-4d69-b533-a3c14b64a1aa"}, {"official": false, "timestamp": 1418335838.13123, "metric": "End to End Runtime", "labels": "|zones:us-central1-a|,|perfkitbenchmarker_version:unknown|,|image:debian-7-backports|,|machine_type:n1-standard-4|,|cloud:GCP|", "value": 1798.0707619190216, "test": "netperf_simple", "run_uri": "3378d964-934e-439b-b68d-1d63b6d5e3e8", "owner": "connormccoy", "product_name": "PerfKitBenchmarker", "unit": "seconds", "sample_uri": "e64bd892-7579-4604-840c-c36c54802390"}]];
+
+    // Draw a chart showing differences between matched samples.
+    function drawChart() {
+       var data = new google.visualization.DataTable();
+       data.addColumn('string', 'metric');
+       data.addColumn('number', 'relative to left');
+       data.addColumn({type: 'string', role: 'tooltip'});
+       data.addColumn({type: 'string', role: 'style'});
+       data.addColumn({type: 'string', role: 'annotation'});
+
+       // Build up the data table.
+       var rows = _.map(matchedSamples, function(i) {
+         var left = i[0];
+         var right = i[1];
+         var first = _.filter(i)[0];
+         var label = first.metric + ' (' + first.test + ')';
+         var tooltip = [label];
+         var rel = null;
+         var style = null;
+         var annot = null;
+
+         if (left && right) {
+           rel = right.value / left.value;
+           tooltip.push('Relative value: ' + String(rel) + '\n');
+           if (rel < 1) {
+             style = 'fill-color: #ef8a62';
+           }
+           annot = String(Math.round(rel * 100) / 100) + 'x';
+         }
+
+         if (left) {
+           tooltip.push('left: ' + String(left.value) + ' ' + left.unit);
+         }
+         if (right) {
+           tooltip.push('right: ' + String(right.value) + ' ' + right.unit);
+         }
+         tooltip = tooltip.join('\n');
+
+         return [label, rel, tooltip, style, annot];
+       });
+
+       data.addRows(rows);
+
+       // Log scale ensures that equivalent changes in either direction
+       // (10x, 0.1x) are // shown with equal magnitude.
+       var options = {
+         title: 'Result comparison (bars point in the direction of the ' +
+                'sample with the higher value)',
+         legend: {position: 'none'},
+         height: 350 * rows.length / 10,
+         bar: { groupWidth: '95%' },
+         hAxis: { logScale: true },
+         chartArea: {left: '30%', width: '70%'}
+       };
+
+       var chart = new google.visualization.BarChart($('#result-comparison-chart')[0]);
+       chart.draw(data, options);
+    }
+
+    function initializePage() {
+      $('body').scrollspy({ target: '#navbar' });
+
+      // We can't control the table output by Python's difflib.HtmlDiff
+      // So we add appropriate classes here.
+      $('table.diff').addClass('table').addClass('table-condensed');
+      // Style up the diff changes: strikethrough deletions, underline
+      // insertions, highlight substitutions.
+      $('span.diff_sub').wrap('<del></del>');
+      $('span.diff_add').wrap('<ins></ins>');
+    }
+    </script>
+  </head>
+
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">PerfKitBenchmarker</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+            <li><a href="#result-comparison-chart">Chart</a></li>
+            <li><a href="#result-comparison">Value comparison</a></li>
+            <li><a href="#short-differences">Short diff</a></li>
+            <li><a href="#full-differences">Full diff</a></li>
+            <li><a>Base: <kbd>json-path</kbd></a></li>
+            <li><a>Head: <kbd>netperf-csv</kbd></a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div><!--/.container -->
+    </nav>
+
+    <div class="container">
+      <div class="row">
+        <h1>PerfKitBenchmarker Comparison</h1>
+      </div>
+      <div class="row">
+      
+        <div class="col-xs-12 col-md-6">
+          <h2><kbd>json-path</kbd></h2>
+          <dl>
+            <dt>Name</dt>
+            <dd>json-path</dd>
+            <dt>Description</dt>
+            <dd>v0.7.1-1-g725a7d7</dd>
+            <dt>sha1</dt>
+            <dd>725a7d7004aa5e706091fec1e4e8f1038e3bf01a</dd>
+            <dt>Flags:</dt>
+            <dd>
+              <pre>--cloud=GCP --machine_type=n1-standard-4 --benchmarks=netperf_simple --json_path=/tmp/tmpxwVNUP.json</pre>
+            </dd>
+          </dl>
+        </div>
+      
+        <div class="col-xs-12 col-md-6">
+          <h2><kbd>netperf-csv</kbd></h2>
+          <dl>
+            <dt>Name</dt>
+            <dd>netperf-csv</dd>
+            <dt>Description</dt>
+            <dd>v0.7.1-4-g36b0d85</dd>
+            <dt>sha1</dt>
+            <dd>36b0d8573fabc5e00aa5b6c10fc8c545eaf1c2b2</dd>
+            <dt>Flags:</dt>
+            <dd>
+              <pre>--cloud=GCP --machine_type=n1-standard-4 --benchmarks=netperf_simple --json_path=/tmp/tmpk_UneO.json</pre>
+            </dd>
+          </dl>
+        </div>
+      
+
+      
+    <table class="diff" id="difflib_chg_to17__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next" id="difflib_chg_to17__0"><a href="#difflib_chg_to17__0">f</a></td><td class="diff_header" id="from17_1">1</td><td nowrap="nowrap">--cloud=GCP</td><td class="diff_next"><a href="#difflib_chg_to17__0">f</a></td><td class="diff_header" id="to17_1">1</td><td nowrap="nowrap">--cloud=GCP</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from17_2">2</td><td nowrap="nowrap">--machine_type=n1-standard-4</td><td class="diff_next"></td><td class="diff_header" id="to17_2">2</td><td nowrap="nowrap">--machine_type=n1-standard-4</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from17_3">3</td><td nowrap="nowrap">--benchmarks=netperf_simple</td><td class="diff_next"></td><td class="diff_header" id="to17_3">3</td><td nowrap="nowrap">--benchmarks=netperf_simple</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to17__top">t</a></td><td class="diff_header" id="from17_4">4</td><td nowrap="nowrap">--json_path=/tmp/tmp<span class="diff_chg">xwVN</span>U<span class="diff_chg">P</span>.json</td><td class="diff_next"><a href="#difflib_chg_to17__top">t</a></td><td class="diff_header" id="to17_4">4</td><td nowrap="nowrap">--json_path=/tmp/tmp<span class="diff_chg">k_</span>U<span class="diff_chg">neO</span>.json</td></tr>
+        </tbody>
+    </table>
+
+      </div>
+
+      <div class="row">
+        <div id="result-comparison-chart"></div>
+      </div>
+      <div class="row">
+        <h2 id="result-comparison">Result comparison</h2>
+
+        <table id="table-result-comparison" class="table table-striped table-bordered">
+          <thead>
+            <tr>
+              <td></td>
+              <td colspan="4">Base: <kbd>json-path</kbd>
+                (<code>v0.7.1-1-g725a7d7</code>)</td>
+              <td colspan="4">Head: <kbd>netperf-csv</kbd>
+                (<code>v0.7.1-4-g36b0d85</code>)</td>
+              <td>Difference</td>
+              <td>Difference (relative)</td>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td class="">
+                TCP_RR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                1280.87
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td class="">
+                TCP_RR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                1333.62
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td>52.75</td>
+                <td class="">
+                  1.041x
+                </td>
+              
+            </tr>
+            <tr>
+              <td>2</td>
+              <td class="">
+                TCP_RR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                4030.92
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td class="">
+                TCP_RR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                4087.38
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td>56.46</td>
+                <td class="">
+                  1.014x
+                </td>
+              
+            </tr>
+            <tr>
+              <td>3</td>
+              <td class="">
+                TCP_CRR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                373.6
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td class="">
+                TCP_CRR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                404.17
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td>30.57</td>
+                <td class="value-increase-small">
+                  <span class="glyphicon glyphicon-arrow-up"></span>
+                  
+                  1.082x
+                </td>
+              
+            </tr>
+            <tr>
+              <td>4</td>
+              <td class="">
+                TCP_CRR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                1270.88
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td class="">
+                TCP_CRR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                1251.75
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td>-19.13</td>
+                <td class="">
+                  0.985x
+                </td>
+              
+            </tr>
+            <tr>
+              <td>5</td>
+              <td class="">
+                TCP_STREAM_Throughput
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                1047.18
+              </td>
+              <td class="">
+                Mbits/sec
+              </td>
+              <td class="">
+                TCP_STREAM_Throughput
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                1192.43
+              </td>
+              <td class="">
+                Mbits/sec
+              </td>
+              <td>145.25</td>
+                <td class="value-increase-medium">
+                  <span class="glyphicon glyphicon-arrow-up"></span>
+                  
+                  1.139x
+                </td>
+              
+            </tr>
+            <tr>
+              <td>6</td>
+              <td class="">
+                TCP_STREAM_Throughput
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                5095.9
+              </td>
+              <td class="">
+                Mbits/sec
+              </td>
+              <td class="">
+                TCP_STREAM_Throughput
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                2804.9
+              </td>
+              <td class="">
+                Mbits/sec
+              </td>
+              <td>-2291.0</td>
+                <td class="value-decrease-large">
+                  <span class="glyphicon glyphicon-arrow-down"></span>
+                  
+                  0.550x
+                </td>
+              
+            </tr>
+            <tr>
+              <td>7</td>
+              <td class="">
+                UDP_RR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                1450.57
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td class="">
+                UDP_RR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                1307.56
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td>-143.01</td>
+                <td class="value-decrease-small">
+                  <span class="glyphicon glyphicon-arrow-down"></span>
+                  
+                  0.901x
+                </td>
+              
+            </tr>
+            <tr>
+              <td>8</td>
+              <td class="">
+                UDP_RR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                4275.72
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td class="">
+                UDP_RR_Transaction_Rate
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                4086.7
+              </td>
+              <td class="">
+                transactions_per_second
+              </td>
+              <td>-189.02</td>
+                <td class="">
+                  0.956x
+                </td>
+              
+            </tr>
+            <tr>
+              <td>9</td>
+              <td class="">
+                End to End Runtime
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                398.570210934
+              </td>
+              <td class="">
+                seconds
+              </td>
+              <td class="">
+                End to End Runtime
+              </td>
+              <td class="">
+                netperf_simple
+              </td>
+              <td class="bg-warning text-warning">
+                1798.07076192
+              </td>
+              <td class="">
+                seconds
+              </td>
+              <td>1399.50055099</td>
+                <td class="value-increase-large">
+                  <span class="glyphicon glyphicon-arrow-up"></span>
+                  
+                  4.511x
+                </td>
+              
+            </tr>
+            
+          </tbody>
+        </table>
+
+      </div><!-- /.row -->
+
+      <div class="row">
+
+        <h2 id="short-differences">Short diff</h2>
+
+        <p>Removed the following keys which were expected to vary:</p>
+        <ul>
+          
+          <li><code>run_uri</code></li>
+          
+          <li><code>sample_uri</code></li>
+          
+          <li><code>timestamp</code></li>
+          
+          <li><code>value</code></li>
+          
+        </ul>
+
+        
+
+        
+        <h3>Sample 1</h3>
+
+        
+    <table class="diff" id="difflib_chg_to0__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next" id="difflib_chg_to0__0"></td><td class="diff_header" id="from0_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to0_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to0__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to0__top">t</a></td><td class="diff_header" id="to0_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'15.880',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from0_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to0_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 2</h3>
+
+        
+    <table class="diff" id="difflib_chg_to2__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next" id="difflib_chg_to2__0"></td><td class="diff_header" id="from2_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to2_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to2__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to2__top">t</a></td><td class="diff_header" id="to2_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'4.517',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from2_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to2_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 3</h3>
+
+        
+    <table class="diff" id="difflib_chg_to4__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next" id="difflib_chg_to4__0"></td><td class="diff_header" id="from4_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to4_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to4__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to4__top">t</a></td><td class="diff_header" id="to4_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'21.161',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from4_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to4_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 4</h3>
+
+        
+    <table class="diff" id="difflib_chg_to6__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next" id="difflib_chg_to6__0"></td><td class="diff_header" id="from6_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to6_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to6__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to6__top">t</a></td><td class="diff_header" id="to6_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'6.473',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from6_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to6_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 5</h3>
+
+        
+    <table class="diff" id="difflib_chg_to8__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next" id="difflib_chg_to8__0"></td><td class="diff_header" id="from8_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to8_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to8__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to8__top">t</a></td><td class="diff_header" id="to8_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'7.383',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from8_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to8_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 6</h3>
+
+        
+    <table class="diff" id="difflib_chg_to10__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next" id="difflib_chg_to10__0"></td><td class="diff_header" id="from10_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to10_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to10__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to10__top">t</a></td><td class="diff_header" id="to10_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'34.388',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from10_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to10_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 7</h3>
+
+        
+    <table class="diff" id="difflib_chg_to12__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next" id="difflib_chg_to12__0"></td><td class="diff_header" id="from12_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to12_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to12__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to12__top">t</a></td><td class="diff_header" id="to12_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'4.499',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from12_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to12_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 8</h3>
+
+        
+    <table class="diff" id="difflib_chg_to14__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next" id="difflib_chg_to14__0"></td><td class="diff_header" id="from14_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to14_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to14__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to14__top">t</a></td><td class="diff_header" id="to14_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'5.836',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from14_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to14_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+
+        
+      </div>
+      <div class="row">
+
+        <h2 id="full-differences">Full diff</h2>
+
+        <p>Removed the following keys which were expected to vary:</p>
+        <ul>
+          
+          <li><code>run_uri</code></li>
+          
+          <li><code>sample_uri</code></li>
+          
+          <li><code>timestamp</code></li>
+          
+          <li><code>value</code></li>
+          
+        </ul>
+
+        
+
+        
+        <h3>Sample 1</h3>
+
+        
+    <table class="diff" id="difflib_chg_to1__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next"><a href="#difflib_chg_to1__0">f</a></td><td class="diff_header" id="from1_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"><a href="#difflib_chg_to1__0">f</a></td><td class="diff_header" id="to1_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to1_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next" id="difflib_chg_to1__0"></td><td class="diff_header" id="from1_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to1_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to1__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to1__top">t</a></td><td class="diff_header" id="to1_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'15.880',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to1_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'external',</td><td class="diff_next"></td><td class="diff_header" id="to1_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'external',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to1_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td><td class="diff_next"></td><td class="diff_header" id="to1_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to1_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to1_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to1_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to1_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td><td class="diff_next"></td><td class="diff_header" id="to1_13">13</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_13">13</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_RR_Transaction_Rate',</td><td class="diff_next"></td><td class="diff_header" id="to1_14">14</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_RR_Transaction_Rate',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_14">14</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td><td class="diff_next"></td><td class="diff_header" id="to1_15">15</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_15">15</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td><td class="diff_next"></td><td class="diff_header" id="to1_16">16</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_16">16</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td><td class="diff_next"></td><td class="diff_header" id="to1_17">17</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_17">17</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td><td class="diff_next"></td><td class="diff_header" id="to1_18">18</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from1_18">18</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td><td class="diff_next"></td><td class="diff_header" id="to1_19">19</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 2</h3>
+
+        
+    <table class="diff" id="difflib_chg_to3__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next"><a href="#difflib_chg_to3__0">f</a></td><td class="diff_header" id="from3_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"><a href="#difflib_chg_to3__0">f</a></td><td class="diff_header" id="to3_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to3_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next" id="difflib_chg_to3__0"></td><td class="diff_header" id="from3_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to3_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to3__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to3__top">t</a></td><td class="diff_header" id="to3_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'4.517',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to3_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td><td class="diff_next"></td><td class="diff_header" id="to3_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to3_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td><td class="diff_next"></td><td class="diff_header" id="to3_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to3_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to3_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to3_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to3_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td><td class="diff_next"></td><td class="diff_header" id="to3_13">13</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_13">13</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_RR_Transaction_Rate',</td><td class="diff_next"></td><td class="diff_header" id="to3_14">14</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_RR_Transaction_Rate',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_14">14</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td><td class="diff_next"></td><td class="diff_header" id="to3_15">15</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_15">15</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td><td class="diff_next"></td><td class="diff_header" id="to3_16">16</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_16">16</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td><td class="diff_next"></td><td class="diff_header" id="to3_17">17</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_17">17</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td><td class="diff_next"></td><td class="diff_header" id="to3_18">18</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from3_18">18</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td><td class="diff_next"></td><td class="diff_header" id="to3_19">19</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 3</h3>
+
+        
+    <table class="diff" id="difflib_chg_to5__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next"><a href="#difflib_chg_to5__0">f</a></td><td class="diff_header" id="from5_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"><a href="#difflib_chg_to5__0">f</a></td><td class="diff_header" id="to5_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to5_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next" id="difflib_chg_to5__0"></td><td class="diff_header" id="from5_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to5_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to5__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to5__top">t</a></td><td class="diff_header" id="to5_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'21.161',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to5_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td><td class="diff_next"></td><td class="diff_header" id="to5_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to5_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td><td class="diff_next"></td><td class="diff_header" id="to5_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to5_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to5_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to5_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to5_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td><td class="diff_next"></td><td class="diff_header" id="to5_13">13</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_13">13</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_CRR_Transaction_Rate',</td><td class="diff_next"></td><td class="diff_header" id="to5_14">14</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_CRR_Transaction_Rate',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_14">14</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td><td class="diff_next"></td><td class="diff_header" id="to5_15">15</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_15">15</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td><td class="diff_next"></td><td class="diff_header" id="to5_16">16</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_16">16</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td><td class="diff_next"></td><td class="diff_header" id="to5_17">17</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_17">17</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td><td class="diff_next"></td><td class="diff_header" id="to5_18">18</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from5_18">18</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td><td class="diff_next"></td><td class="diff_header" id="to5_19">19</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 4</h3>
+
+        
+    <table class="diff" id="difflib_chg_to7__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next"><a href="#difflib_chg_to7__0">f</a></td><td class="diff_header" id="from7_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"><a href="#difflib_chg_to7__0">f</a></td><td class="diff_header" id="to7_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to7_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next" id="difflib_chg_to7__0"></td><td class="diff_header" id="from7_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to7_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to7__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to7__top">t</a></td><td class="diff_header" id="to7_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'6.473',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to7_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td><td class="diff_next"></td><td class="diff_header" id="to7_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to7_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td><td class="diff_next"></td><td class="diff_header" id="to7_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to7_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to7_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to7_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to7_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td><td class="diff_next"></td><td class="diff_header" id="to7_13">13</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_13">13</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_CRR_Transaction_Rate',</td><td class="diff_next"></td><td class="diff_header" id="to7_14">14</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_CRR_Transaction_Rate',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_14">14</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td><td class="diff_next"></td><td class="diff_header" id="to7_15">15</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_15">15</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td><td class="diff_next"></td><td class="diff_header" id="to7_16">16</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_16">16</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td><td class="diff_next"></td><td class="diff_header" id="to7_17">17</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_17">17</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td><td class="diff_next"></td><td class="diff_header" id="to7_18">18</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from7_18">18</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td><td class="diff_next"></td><td class="diff_header" id="to7_19">19</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 5</h3>
+
+        
+    <table class="diff" id="difflib_chg_to9__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next"><a href="#difflib_chg_to9__0">f</a></td><td class="diff_header" id="from9_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"><a href="#difflib_chg_to9__0">f</a></td><td class="diff_header" id="to9_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to9_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next" id="difflib_chg_to9__0"></td><td class="diff_header" id="from9_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to9_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to9__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to9__top">t</a></td><td class="diff_header" id="to9_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'7.383',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to9_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td><td class="diff_next"></td><td class="diff_header" id="to9_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to9_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td><td class="diff_next"></td><td class="diff_header" id="to9_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to9_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to9_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to9_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to9_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td><td class="diff_next"></td><td class="diff_header" id="to9_13">13</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_13">13</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_STREAM_Throughput',</td><td class="diff_next"></td><td class="diff_header" id="to9_14">14</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_STREAM_Throughput',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_14">14</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td><td class="diff_next"></td><td class="diff_header" id="to9_15">15</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_15">15</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td><td class="diff_next"></td><td class="diff_header" id="to9_16">16</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_16">16</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td><td class="diff_next"></td><td class="diff_header" id="to9_17">17</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_17">17</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td><td class="diff_next"></td><td class="diff_header" id="to9_18">18</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from9_18">18</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'Mbits/sec'}</td><td class="diff_next"></td><td class="diff_header" id="to9_19">19</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'Mbits/sec'}</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 6</h3>
+
+        
+    <table class="diff" id="difflib_chg_to11__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next"><a href="#difflib_chg_to11__0">f</a></td><td class="diff_header" id="from11_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"><a href="#difflib_chg_to11__0">f</a></td><td class="diff_header" id="to11_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to11_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next" id="difflib_chg_to11__0"></td><td class="diff_header" id="from11_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to11_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to11__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to11__top">t</a></td><td class="diff_header" id="to11_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'34.388',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to11_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td><td class="diff_next"></td><td class="diff_header" id="to11_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to11_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td><td class="diff_next"></td><td class="diff_header" id="to11_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to11_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to11_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to11_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to11_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td><td class="diff_next"></td><td class="diff_header" id="to11_13">13</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_13">13</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_STREAM_Throughput',</td><td class="diff_next"></td><td class="diff_header" id="to11_14">14</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'TCP_STREAM_Throughput',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_14">14</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td><td class="diff_next"></td><td class="diff_header" id="to11_15">15</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_15">15</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td><td class="diff_next"></td><td class="diff_header" id="to11_16">16</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_16">16</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td><td class="diff_next"></td><td class="diff_header" id="to11_17">17</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_17">17</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td><td class="diff_next"></td><td class="diff_header" id="to11_18">18</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from11_18">18</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'Mbits/sec'}</td><td class="diff_next"></td><td class="diff_header" id="to11_19">19</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'Mbits/sec'}</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 7</h3>
+
+        
+    <table class="diff" id="difflib_chg_to13__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next"><a href="#difflib_chg_to13__0">f</a></td><td class="diff_header" id="from13_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"><a href="#difflib_chg_to13__0">f</a></td><td class="diff_header" id="to13_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to13_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next" id="difflib_chg_to13__0"></td><td class="diff_header" id="from13_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to13_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to13__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to13__top">t</a></td><td class="diff_header" id="to13_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'4.499',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to13_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td><td class="diff_next"></td><td class="diff_header" id="to13_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to13_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td><td class="diff_next"></td><td class="diff_header" id="to13_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to13_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to13_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to13_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to13_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td><td class="diff_next"></td><td class="diff_header" id="to13_13">13</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_13">13</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'UDP_RR_Transaction_Rate',</td><td class="diff_next"></td><td class="diff_header" id="to13_14">14</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'UDP_RR_Transaction_Rate',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_14">14</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td><td class="diff_next"></td><td class="diff_header" id="to13_15">15</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_15">15</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td><td class="diff_next"></td><td class="diff_header" id="to13_16">16</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_16">16</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td><td class="diff_next"></td><td class="diff_header" id="to13_17">17</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_17">17</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td><td class="diff_next"></td><td class="diff_header" id="to13_18">18</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from13_18">18</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td><td class="diff_next"></td><td class="diff_header" id="to13_19">19</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 8</h3>
+
+        
+    <table class="diff" id="difflib_chg_to15__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next"><a href="#difflib_chg_to15__0">f</a></td><td class="diff_header" id="from15_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"><a href="#difflib_chg_to15__0">f</a></td><td class="diff_header" id="to15_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'client_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to15_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'client_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next" id="difflib_chg_to15__0"></td><td class="diff_header" id="from15_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td><td class="diff_next"></td><td class="diff_header" id="to15_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"><a href="#difflib_chg_to15__top">t</a></td><td class="diff_header"></td><td nowrap="nowrap"></td><td class="diff_next"><a href="#difflib_chg_to15__top">t</a></td><td class="diff_header" id="to15_4">4</td><td nowrap="nowrap"><span class="diff_add">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'conf_pct':&nbsp;u'5.836',</span></td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to15_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td><td class="diff_next"></td><td class="diff_header" id="to15_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'ip_type':&nbsp;u'internal',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_6">6</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to15_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_7">7</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td><td class="diff_next"></td><td class="diff_header" id="to15_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_8">8</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to15_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'receiving_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_9">9</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to15_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'sending_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_10">10</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to15_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_11">11</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td><td class="diff_next"></td><td class="diff_header" id="to15_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'server_zone':&nbsp;u'us-central1-a',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_12">12</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td><td class="diff_next"></td><td class="diff_header" id="to15_13">13</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_13">13</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'UDP_RR_Transaction_Rate',</td><td class="diff_next"></td><td class="diff_header" id="to15_14">14</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'UDP_RR_Transaction_Rate',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_14">14</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td><td class="diff_next"></td><td class="diff_header" id="to15_15">15</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_15">15</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td><td class="diff_next"></td><td class="diff_header" id="to15_16">16</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_16">16</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td><td class="diff_next"></td><td class="diff_header" id="to15_17">17</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_17">17</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td><td class="diff_next"></td><td class="diff_header" id="to15_18">18</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from15_18">18</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td><td class="diff_next"></td><td class="diff_header" id="to15_19">19</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'transactions_per_second'}</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+
+        
+        <h3>Sample 9</h3>
+
+        
+    <table class="diff" id="difflib_chg_to16__top"
+           cellspacing="0" cellpadding="0" rules="groups" >
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        <colgroup></colgroup> <colgroup></colgroup> <colgroup></colgroup>
+        
+        <tbody>
+            <tr><td class="diff_next"><a href="#difflib_chg_to16__top">t</a></td><td class="diff_header" id="from16_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'cloud':&nbsp;u'GCP',</td><td class="diff_next"><a href="#difflib_chg_to16__top">t</a></td><td class="diff_header" id="to16_1">1</td><td nowrap="nowrap">{'metadata':&nbsp;{u'cloud':&nbsp;u'GCP',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td><td class="diff_next"></td><td class="diff_header" id="to16_2">2</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'image':&nbsp;u'debian-7-backports',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td><td class="diff_next"></td><td class="diff_header" id="to16_3">3</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'machine_type':&nbsp;u'n1-standard-4',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td><td class="diff_next"></td><td class="diff_header" id="to16_4">4</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'perfkitbenchmarker_version':&nbsp;u'unknown',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td><td class="diff_next"></td><td class="diff_header" id="to16_5">5</td><td nowrap="nowrap">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u'zones':&nbsp;u'us-central1-a'},</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_6">6</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'End&nbsp;to&nbsp;End&nbsp;Runtime',</td><td class="diff_next"></td><td class="diff_header" id="to16_6">6</td><td nowrap="nowrap">&nbsp;u'metric':&nbsp;u'End&nbsp;to&nbsp;End&nbsp;Runtime',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_7">7</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td><td class="diff_next"></td><td class="diff_header" id="to16_7">7</td><td nowrap="nowrap">&nbsp;u'official':&nbsp;False,</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_8">8</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td><td class="diff_next"></td><td class="diff_header" id="to16_8">8</td><td nowrap="nowrap">&nbsp;u'owner':&nbsp;u'connormccoy',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_9">9</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td><td class="diff_next"></td><td class="diff_header" id="to16_9">9</td><td nowrap="nowrap">&nbsp;u'product_name':&nbsp;u'PerfKitBenchmarker',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_10">10</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td><td class="diff_next"></td><td class="diff_header" id="to16_10">10</td><td nowrap="nowrap">&nbsp;u'test':&nbsp;u'netperf_simple',</td></tr>
+            <tr><td class="diff_next"></td><td class="diff_header" id="from16_11">11</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'seconds'}</td><td class="diff_next"></td><td class="diff_header" id="to16_11">11</td><td nowrap="nowrap">&nbsp;u'unit':&nbsp;u'seconds'}</td></tr>
+        </tbody>
+    </table>
+        
+
+        
+      </div>
+
+    </div><!-- /.container -->
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/2.4.1/lodash.min.js"></script>
+    <script type="text/javascript">
+      $(initializePage);
+
+      // Load a chart.
+      google.load('visualization', '1.0', {'packages':['corechart']});
+      // Set a callback to run when the Google Visualization API is loaded.
+      google.setOnLoadCallback(drawChart);
+    </script>
+
+  </body>
+</html>

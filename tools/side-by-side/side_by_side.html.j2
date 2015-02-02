@@ -1,0 +1,334 @@
+{#
+ # Copyright 2014 Google Inc. All rights reserved.
+ #
+ # Licensed under the Apache License, Version 2.0 (the "License");
+ # you may not use this file except in compliance with the License.
+ # You may obtain a copy of the License at
+ #
+ #   http://www.apache.org/licenses/LICENSE-2.0
+ #
+ # Unless required by applicable law or agreed to in writing, software
+ # distributed under the License is distributed on an "AS IS" BASIS,
+ # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ #}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>PerfKitBenchmarker comparison: {{ base.name }} to {{ head.name }}</title>
+
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+
+    <style type="text/css">
+
+      body {
+        position: relative;
+        padding-top: 70px;
+      }
+
+      #table-result-comparison {
+        font-size: 95%;
+      }
+
+      span.diff_chg {
+        background-color: #FFFF77;
+        color: #292A0A;
+        font-weight: bold;
+        text-decoration: underline;
+      }
+
+      span.diff_sub {
+        background-color: #f2dede;
+        color: #a94442;
+        font-weight: bold;
+      }
+
+      span.diff_add {
+        background-color: #dff0d8;
+        color: #3c763d;
+        font-weight: bold;
+      }
+
+      .value-increase-small {
+        background-color: #c7eae5;
+        color: black;
+      }
+
+      .value-increase-medium {
+        background-color: #80cdc1;
+        color: white;
+      }
+
+      .value-increase-large {
+        background-color: #35978f;
+        color: white;
+      }
+
+      .value-decrease-small {
+        background-color: #f6e8c3;
+        color: black;
+      }
+
+      .value-decrease-medium {
+        background-color: #dfc27d;
+        color: white;
+      }
+
+      .value-decrease-large {
+        background-color: #bf812d;
+        color: white;
+      }
+    </style>
+    <script type="text/javascript">
+    var matchedSamples = {{ matched_samples_json }};
+
+    // Draw a chart showing differences between matched samples.
+    function drawChart() {
+       var data = new google.visualization.DataTable();
+       data.addColumn('string', 'metric');
+       data.addColumn('number', 'relative to left');
+       data.addColumn({type: 'string', role: 'tooltip'});
+       data.addColumn({type: 'string', role: 'style'});
+       data.addColumn({type: 'string', role: 'annotation'});
+
+       // Build up the data table.
+       var rows = _.map(matchedSamples, function(i) {
+         var left = i[0];
+         var right = i[1];
+         var first = _.filter(i)[0];
+         var label = first.metric + ' (' + first.test + ')';
+         var tooltip = [label];
+         var rel = null;
+         var style = null;
+         var annot = null;
+
+         if (left && right) {
+           rel = right.value / left.value;
+           tooltip.push('Relative value: ' + String(rel) + '\n');
+           if (rel < 1) {
+             style = 'fill-color: #ef8a62';
+           }
+           annot = String(Math.round(rel * 100) / 100) + 'x';
+         }
+
+         if (left) {
+           tooltip.push('left: ' + String(left.value) + ' ' + left.unit);
+         }
+         if (right) {
+           tooltip.push('right: ' + String(right.value) + ' ' + right.unit);
+         }
+         tooltip = tooltip.join('\n');
+
+         return [label, rel, tooltip, style, annot];
+       });
+
+       data.addRows(rows);
+
+       // Log scale ensures that equivalent changes in either direction
+       // (10x, 0.1x) are // shown with equal magnitude.
+       var options = {
+         title: 'Result comparison (bars point in the direction of the ' +
+                'sample with the higher value)',
+         legend: {position: 'none'},
+         height: 350 * rows.length / 10,
+         bar: { groupWidth: '95%' },
+         hAxis: { logScale: true },
+         chartArea: {left: '30%', width: '70%'}
+       };
+
+       var chart = new google.visualization.BarChart($('#result-comparison-chart')[0]);
+       chart.draw(data, options);
+    }
+
+    function initializePage() {
+      $('body').scrollspy({ target: '#navbar' });
+
+      // We can't control the table output by Python's difflib.HtmlDiff
+      // So we add appropriate classes here.
+      $('table.diff').addClass('table').addClass('table-condensed');
+      // Style up the diff changes: strikethrough deletions, underline
+      // insertions, highlight substitutions.
+      $('span.diff_sub').wrap('<del></del>');
+      $('span.diff_add').wrap('<ins></ins>');
+    }
+    </script>
+  </head>
+
+  <body>
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">PerfKitBenchmarker</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+            <li><a href="#result-comparison-chart">Chart</a></li>
+            <li><a href="#result-comparison">Value comparison</a></li>
+            <li><a href="#short-differences">Short diff</a></li>
+            <li><a href="#full-differences">Full diff</a></li>
+            <li><a>Base: <kbd>{{ base.name }}</kbd></a></li>
+            <li><a>Head: <kbd>{{ head.name }}</kbd></a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div><!--/.container -->
+    </nav>
+
+    <div class="container">
+      <div class="row">
+        <h1>{{ title }}</h1>
+      </div>
+      <div class="row">
+      {% for result in [base, head] %}
+        <div class="col-xs-12 col-md-6">
+          <h2><kbd>{{ result.name}}</kbd></h2>
+          <dl>
+            <dt>Name</dt>
+            <dd>{{ result.name }}</dd>
+            <dt>Description</dt>
+            <dd>{{ result.description }}</dd>
+            <dt>sha1</dt>
+            <dd>{{ result.sha1 }}</dd>
+            <dt>Flags:</dt>
+            <dd>
+              <pre>{{ result.flags|join(' ') }}</pre>
+            </dd>
+          </dl>
+        </div>
+      {% endfor %}
+
+      {{ flag_diffs }}
+
+      </div>
+
+      <div class="row">
+        <div id="result-comparison-chart"></div>
+      </div>
+      <div class="row">
+        <h2 id="result-comparison">Result comparison</h2>
+
+        <table id="table-result-comparison" class="table table-striped table-bordered">
+          <thead>
+            <tr>
+              <td></td>
+              <td colspan="4">Base: <kbd>{{ base.name }}</kbd>
+                (<code>{{ base.description }}</code>)</td>
+              <td colspan="4">Head: <kbd>{{ head.name }}</kbd>
+                (<code>{{ head.description }}</code>)</td>
+              <td>Difference</td>
+              <td>Difference (relative)</td>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for pair in matched_samples -%}
+            {% set base_sample = pair[0] -%}
+            {% set head_sample = pair[1] -%}
+            <tr>
+              <td>{{ loop.index }}</td>
+              {% for sample in pair -%}
+              {%- if sample -%}
+              {%- for variable in ['metric', 'test', 'value', 'unit'] -%}
+              <td class="{% if base_sample[variable]|default('') != head_sample[variable]|default('') %}bg-warning text-warning{%endif%}">
+                {{ sample[variable] }}
+              </td>
+              {% endfor -%}
+              {%- else -%}
+              {% for i in range(4) %}<td></td>{% endfor %}
+              {%- endif -%}
+              {%- endfor -%} {# sample in pair #}
+              {%- if base_sample and head_sample -%}
+                {% set pct_diff = ((head_sample.value - base_sample.value) / base_sample.value * 100) -%}
+                <td>{{ head_sample.value - base_sample.value }}</td>
+                <td class="{{ class_for_percent_diff(pct_diff) }}">
+                  {%- if class_for_percent_diff(pct_diff) %}
+                  <span class="glyphicon glyphicon-arrow-{% if head_sample.value > base_sample.value %}up{% else %}down{% endif %}"></span>
+                  {% endif %}
+                  {{ "{0:.3f}".format(head_sample.value / base_sample.value) }}x
+                </td>
+              {% else %}
+              {% for i in range(2) %}<td></td>{% endfor %}
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+      </div><!-- /.row -->
+
+      <div class="row">
+
+        <h2 id="short-differences">Short diff</h2>
+
+        <p>Removed the following keys which were expected to vary:</p>
+        <ul>
+          {% for key in varying_keys %}
+          <li><code>{{ key }}</code></li>
+          {% endfor %}
+        </ul>
+
+        {% for sample_diff in sample_context_diffs %}
+
+        {% if sample_diff %}
+        <h3>Sample {{ loop.index }}</h3>
+
+        {{ sample_diff }}
+        {% endif %}
+
+        {% endfor %}
+      </div>
+      <div class="row">
+
+        <h2 id="full-differences">Full diff</h2>
+
+        <p>Removed the following keys which were expected to vary:</p>
+        <ul>
+          {% for key in varying_keys %}
+          <li><code>{{ key }}</code></li>
+          {% endfor %}
+        </ul>
+
+        {% for sample_diff in sample_diffs %}
+
+        {% if sample_diff %}
+        <h3>Sample {{ loop.index }}</h3>
+
+        {{ sample_diff }}
+        {% endif %}
+
+        {% endfor %}
+      </div>
+
+    </div><!-- /.container -->
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/2.4.1/lodash.min.js"></script>
+    <script type="text/javascript">
+      $(initializePage);
+
+      // Load a chart.
+      google.load('visualization', '1.0', {'packages':['corechart']});
+      // Set a callback to run when the Google Visualization API is loaded.
+      google.setOnLoadCallback(drawChart);
+    </script>
+
+  </body>
+</html>
