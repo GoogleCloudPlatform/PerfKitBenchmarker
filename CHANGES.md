@@ -1,6 +1,5 @@
 # v0.9.0
 
-* **Breaking change**: Fixed typo in UnixBench benchmark name: now `UnixBench_benchmark` (GH-50).
 * **Breaking change**: removed `--json_output` flag. JSON samples are always
   written (GH-41).
 * **Breaking change**: `object_storage_service` requires a `.boto` file
