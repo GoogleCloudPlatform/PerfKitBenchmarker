@@ -34,8 +34,6 @@ from perfkitbenchmarker import vm_util
 
 RHEL = 'rhel'
 DEBIAN = 'debian'
-EPEL_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-            '6/x86_64/epel-release-6-8.noarch.rpm')
 
 flags.DEFINE_enum('os_type', DEBIAN,
                   [DEBIAN, RHEL],
@@ -111,7 +109,7 @@ class YumMixin(BasePackageMixin):
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
-    self.RemoteCommand('sudo rpm -ivh --force %s' % EPEL_RPM)
+    self.InstallPackages('epel-release')
 
   def PackageCleanup(self):
     """Cleans up all installed packages.

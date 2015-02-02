@@ -15,6 +15,10 @@
 
 """Module containing iperf installation and cleanup functions."""
 
+from perfkitbenchmarker import errors
+
+IPERF_RPM = 'http://pkgs.repoforge.org/iperf/iperf-2.0.4-1.el7.rf.x86_64.rpm'
+
 
 def _Install(vm):
   """Installs the iperf package on the VM."""
@@ -23,8 +27,12 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the iperf package on the VM."""
-  vm.InstallEpelRepo()
-  _Install(vm)
+  try:
+    vm.InstallEpelRepo()
+    _Install(vm)
+  # RHEL 7 does not have an iperf package in the standard/EPEL repositories
+  except errors.VmUtil.SshConnectionError:
+    vm.RemoteCommand('sudo rpm -ivh %s' % IPERF_RPM)
 
 
 def AptInstall(vm):
