@@ -507,7 +507,8 @@ class GoogleCloudStorageBenchmark(object):
     self.bucket_name = 'pkb%s' % FLAGS.run_uri
     vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, self.bucket_name))
 
-    self.regional_bucket_name = '%s-%s' % (self.bucket_name, DEFAULT_GCS_REGION)
+    self.regional_bucket_name = '%s-%s' % (self.bucket_name,
+                                           DEFAULT_GCS_REGION.lower())
     vm.RemoteCommand('%s mb -c DRA -l %s gs://%s' % (vm.gsutil_path,
                                                      DEFAULT_GCS_REGION,
                                                      self.regional_bucket_name))
