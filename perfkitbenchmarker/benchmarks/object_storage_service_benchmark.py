@@ -291,7 +291,7 @@ class S3StorageBenchmark(object):
     vm.Install('pip')
     vm.RemoteCommand('sudo pip install awscli')
     vm.RemoteCommand('sudo pip install python-gflags==2.0')
-    vm.RemoteCommand('sudo pip install gcs-oauth2-boto-plugin==1.8')
+    vm.Install('gcs_boto_plugin')
 
     vm.PushFile(FLAGS.object_storage_credential_file, AWS_CREDENTIAL_LOCATION)
     vm.PushFile(FLAGS.boto_file_location, DEFAULT_BOTO_LOCATION)
@@ -364,7 +364,6 @@ class S3StorageBenchmark(object):
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
-    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall gcs-oauth2-boto-plugin')
 
 
 class AzureBlobStorageBenchmark(object):
@@ -492,7 +491,7 @@ class GoogleCloudStorageBenchmark(object):
 
     vm.Install('pip')
     vm.RemoteCommand('sudo pip install python-gflags==2.0')
-    vm.RemoteCommand('sudo pip install gcs-oauth2-boto-plugin==1.8')
+    vm.Install('gcs_boto_plugin')
 
     try:
       vm.RemoteCommand('mkdir .config')
@@ -582,7 +581,6 @@ class GoogleCloudStorageBenchmark(object):
       DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
-    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall gcs-oauth2-boto-plugin')
 
 
 OBJECT_STORAGE_BENCHMARK_DICTIONARY = {

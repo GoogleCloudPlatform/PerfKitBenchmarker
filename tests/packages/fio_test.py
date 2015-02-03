@@ -28,14 +28,11 @@ class FioTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
-    result_path = os.path.join(
-        os.path.join(os.path.dirname(__file__)),
-        '..', 'data', 'fio-parser-sample-result.json')
+    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+    result_path = os.path.join(data_dir, 'fio-parser-sample-result.json')
     with open(result_path) as result_file:
       self.result_contents = json.loads(result_file.read())
-    job_file_path = os.path.join(
-        os.path.join(os.path.dirname(__file__)),
-        '..', 'data', 'fio.job')
+    job_file_path = os.path.join(data_dir, 'fio.job')
     with open(job_file_path) as job_file:
       self.job_contents = job_file.read()
 

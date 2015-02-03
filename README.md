@@ -25,24 +25,26 @@ before you use the PerfKitBenchmarker.
 
 In its current release these are the benchmarks that are executed:
 
-  - Bonnie++: GPL v2 (http://www.coker.com.au/bonnie++/readme.html)
-  - cluster_boot_benchmark: MIT license.
-  - coremark: EEMBC (https://www.eembc.org/)
-  - fio: GPL v2 (https://github.com/axboe/fio/blob/master/LICENSE)
-  - hadoop: Apache v2 (http://hadoop.apache.org/)
-  - hpcc: Original BSD license (http://icl.cs.utk.edu/hpcc/faq/#263)
-  - iperf: BSD license(http://iperf.sourceforge.net/)
-  - netperf: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
-  - YCSB: Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
-  - memtier_benchmark: GPL v2 (https://github.com/RedisLabs/memtier_benchmark)
-  - sysbench: GPL v2 (https://launchpad.net/sysbench)
-  - unixbench: GPL v2 (https://code.google.com/p/byte-unixbench/)
-  - speccpu2006 - Spec CPU2006 (http://www.spec.org/cpu2006/)
-  - mesh_benchmark: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
-  * copy_benchmark: No license needed.
-  - object_storage_benchmark: No license needed.
-  - ping_benchmark: No license needed.
-  - Aerospike: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
+  - `bonnie++`: GPL v2 (http://www.coker.com.au/bonnie++/readme.html)
+  - `cassandra_stress`: Apache v2 (http://cassandra.apache.org/)
+  - `cluster_boot`: MIT license.
+  - `coremark`: EEMBC (https://www.eembc.org/)
+  - `fio`: GPL v2 (https://github.com/axboe/fio/blob/master/LICENSE)
+  - `hadoop_terasort`: Apache v2 (http://hadoop.apache.org/)
+  - `hpcc`: Original BSD license (http://icl.cs.utk.edu/hpcc/faq/#263)
+  - `iperf`: BSD license(http://iperf.sourceforge.net/)
+  - `netperf`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
+  - `mongodb`: GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
+  - `ycsb` (used by `mongodb`): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
+  - `memtier_benchmark`: GPL v2 (https://github.com/RedisLabs/memtier_benchmark)
+  - `sysbench_oltp`: GPL v2 (https://launchpad.net/sysbench)
+  - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
+  - `speccpu2006` - Spec CPU2006 (http://www.spec.org/cpu2006/)
+  - `mesh_network`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
+  - `copy_throughput`: Apache v2.
+  - `object_storage_service`: Apache v2.
+  - `ping`: No license needed.
+  - `aerospike`: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
 
@@ -133,33 +135,33 @@ Test that azure is installed correctly
 ```
 $ azure vm list
 ```
-## Create and Configure a .BOTO file for object storage benchmarks
+## Create and Configure a `.boto` file for object storage benchmarks
 
 In order to run object storage benchmark tests, you need to have a properly configured ~/.boto file.
 
 Here is how:
 
-* Create the ~/.boto file (If you already have ~/.boto, you can skip this step. Consider making a backup copy of your existing .boto file.)
+* Create the `~/.boto` file (If you already have ~/.boto, you can skip this step. Consider making a backup copy of your existing .boto file.)
 
-To create a new ~/.boto file, issue the following command and follow the instructions given by this command:
+To create a new `~/.boto` file, issue the following command and follow the instructions given by this command:
 ```
 $ gsutil config
 ```
-As a result, a .boto file is created under your home directory.
+As a result, a `.boto` file is created under your home directory.
 
-* Open the .boto file and edit the following fields:
+* Open the `.boto` file and edit the following fields:
 1. In the [Credentials] section:
 
-gs_oauth2_refresh_token: set it to be the same as the "refresh_token" field in your gcloud credential file (~/.config/gcloud/credentials), which was setup as part of the 'gcloud auth login' step.
+`gs_oauth2_refresh_token`: set it to be the same as the `refresh_token` field in your gcloud credential file (~/.config/gcloud/credentials), which was setup as part of the `gcloud auth login` step.
 
-aws_access_key_id, aws_secret_access_key: set these to be the AWS access keys you intend to use for these tests, or you can use the same keys as those in your existing AWS credentials file (~/.aws/credentials).
+`aws_access_key_id`, `aws_secret_access_key`: set these to be the AWS access keys you intend to use for these tests, or you can use the same keys as those in your existing AWS credentials file (`~/.aws/credentials`).
 
-2. In the [gsutil] section:
+2. In the `[GSUtil]` section:
 
-default_project_id: if it is not already set, set it to be the google cloud storage project ID you intend to use for this test. (If you used 'gsutil config' to generate the .boto file, you should have been prompted to supply this information at this step).
+`default_project_id`: if it is not already set, set it to be the google cloud storage project ID you intend to use for this test. (If you used `gsutil config` to generate the `.boto` file, you should have been prompted to supply this information at this step).
 
 3. In the [OAuth2] section:
-client_id, client_secret: set these to be the same as those in your gcloud credentials file (~/.config/gcloud/credentials), which was setup as part of the 'gcloud auth login' step.
+`client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials`), which was setup as part of the 'gcloud auth login' step.
 
 
 ## Install PerfKit dependencies
