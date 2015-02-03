@@ -127,15 +127,15 @@ class BucketRemovalError(Exception):
 
 def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                               bucket_name, regional_bucket_name=None):
-    """Runs the api based benchmarks for s3 or GCS
+    """This runs a collection of api-based benchmarks for s3 or GCS.
 
     Args:
       vm: The vm being used to run the benchmark.
       results: The results array to append to.
       storage: The storage provider to run: S3 or GCS
       test_script_path: The complete path to the test script on the target VM.
-      bucket_name: the name of the bucket caller has created for this test.
-      regional_bucket_name: the name of the "regional" bucket, if applicable.
+      bucket_name: The name of the bucket caller has created for this test.
+      regional_bucket_name: The name of the "regional" bucket, if applicable.
 
     Raises:
       ValueError: unexpected test outcome is found from the API test script.
