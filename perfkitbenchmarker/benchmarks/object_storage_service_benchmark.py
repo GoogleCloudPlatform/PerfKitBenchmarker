@@ -111,6 +111,7 @@ CONTENT_REMOVAL_RETRY_LIMIT = 5
 BUCKET_REMOVAL_RETRY_LIMIT = 120
 RETRY_WAIT_INTERVAL_SECONDS = 30
 
+DEFAULT_GCS_REGION = 'US-CENTRAL1'
 
 def GetInfo():
   return BENCHMARK_INFO
@@ -124,7 +125,7 @@ class BucketRemovalError(Exception):
 
 
 def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
-                              bucket_name):
+                              bucket_name, regional_bucket_name=None):
     """Runs the api based benchmarks for s3 or GCS
 
     Args:
@@ -132,6 +133,8 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       results: The results array to append to.
       storage: The storage provider to run: S3 or GCS
       test_script_path: The complete path to the test script on the target VM.
+      bucket_name: the name of the bucket caller has created for this test.
+      regional_bucket_name: the name of the "regional" bucket, if applicable.
 
     Raises:
       ValueError: unexpected test outcome is found from the API test script.
@@ -139,29 +142,36 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     if storage is not 'S3' and storage is not 'GCS':
       raise ValueError("Storage must be S3 or GCS to invoke this function")
 
-    # One byte RW latency
-    one_byte_rw_cmd = ('%s --bucket=%s --storage=%s --scenario=OneByteRW') % (
-                       test_script_path, bucket_name, storage)  # noqa
+    buckets = [bucket_name]
+    if regional_bucket_name is not None:
+      buckets.append(regional_bucket_name)
 
-    _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
-    logging.info('OneByteRW raw result is %s' % raw_result)
+    for bucket in buckets:
+      # One byte RW latency
+      one_byte_rw_cmd = ('%s --bucket=%s --storage=%s --scenario=OneByteRW') % (
+                         test_script_path, bucket, storage)  # noqa
 
-    for up_and_down in ['upload', 'download']:
-      search_string = 'One byte %s - (.*)' % up_and_down
-      result_string = re.findall(search_string, raw_result)
+      _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
+      logging.info('OneByteRW raw result is %s' % raw_result)
 
-      if len(result_string) > 0:
-        result = json.loads(result_string[0])
-        for percentile in PERCENTILES_LIST:
-          results.append(sample.Sample(
-              ('%s %s') % (ONE_BYTE_LATENCY % up_and_down,
-                           percentile),
-              float(result[percentile]),
-              LATENCY_UNIT,
-              metadata))
-      else:
-        raise ValueError(
-            'Unexpected test outcome from OneByteRW api test: %s.' % raw_result)
+      for up_and_down in ['upload', 'download']:
+        search_string = 'One byte %s - (.*)' % up_and_down
+        result_string = re.findall(search_string, raw_result)
+        sample_name = ONE_BYTE_LATENCY % up_and_down
+        if bucket == regional_bucket_name:
+          sample_name = 'regional %s' % sample_name
+
+        if len(result_string) > 0:
+          result = json.loads(result_string[0])
+          for percentile in PERCENTILES_LIST:
+            results.append(sample.Sample(
+                ('%s %s') % (sample_name, percentile),
+                float(result[percentile]),
+                LATENCY_UNIT,
+                metadata))
+        else:
+          raise ValueError('Unexpected test outcome from OneByteRW api test: '
+                           '%s.' % raw_result)
 
     # list-after-write consistency metrics
     list_consistency_cmd = ('%s --bucket=%s --storage=%s --iterations=%d '
@@ -497,6 +507,11 @@ class GoogleCloudStorageBenchmark(object):
     self.bucket_name = 'pkb%s' % FLAGS.run_uri
     vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, self.bucket_name))
 
+    self.regional_bucket_name = '%s-%s' % (self.bucket_name, DEFAULT_GCS_REGION)
+    vm.RemoteCommand('%s mb -c DRA -l %s gs://%s' % (vm.gsutil_path,
+                                                     DEFAULT_GCS_REGION,
+                                                     self.regional_bucket_name))
+
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with gsutil tool.
@@ -549,7 +564,7 @@ class GoogleCloudStorageBenchmark(object):
 
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
     S3orGCSApiBasedBenchmarks(results, metadata, vm, 'GCS', test_script_path,
-                              self.bucket_name)
+                              self.bucket_name, self.regional_bucket_name)
 
     return results
 
@@ -559,10 +574,11 @@ class GoogleCloudStorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    remove_content_cmd = '%s -m rm -r gs://%s/*' % (vm.gsutil_path,
-                                                    self.bucket_name)
-    remove_bucket_cmd = '%s rb gs://%s' % (vm.gsutil_path, self.bucket_name)
-    DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
+    for bucket in [self.bucket_name, self.regional_bucket_name]:
+      remove_content_cmd = '%s -m rm -r gs://%s/*' % (vm.gsutil_path,
+                                                      bucket)
+      remove_bucket_cmd = '%s rb gs://%s' % (vm.gsutil_path, bucket)
+      DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall gcs-oauth2-boto-plugin')
