@@ -86,7 +86,9 @@ LIST_CONSISTENCY_OBJECT_COUNT = 2100
 LIST_CONSISTENCY_THREAD_COUNT = 100
 
 # Size of large objects used in single stream throughput benchmarking.
-LARGE_OBJECT_SIZE_BYTES = 100 * 1024 * 1024
+# We use 100MiB (100 * 10 ^ 6) rather than 100MB to be consistent with
+# network bandwidth conventions.
+LARGE_OBJECT_SIZE_BYTES = 100 * 1000 * 1000
 
 # The number of large objects we use in single stream throughput benchmarking.
 LARGE_OBJECT_COUNT = 5
@@ -365,6 +367,7 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
                     args=(storage_schema, FLAGS.bucket, my_prefix,
                           LIST_CONSISTENCY_OBJECT_COUNT /
                           LIST_CONSISTENCY_THREAD_COUNT,
+                          1,
                           per_thread_objects_written[i], None, host_to_connect))
     thread.daemon = True
     thread.start()
