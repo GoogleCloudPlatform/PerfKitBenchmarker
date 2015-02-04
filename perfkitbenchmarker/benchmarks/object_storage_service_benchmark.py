@@ -83,7 +83,7 @@ OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data used in the CLI tests.
 DATA_SIZE_IN_BYTES = 256.1 * 1024 * 1024
-DATA_SIZE_IN_MiBITS = 8 * DATA_SIZE_IN_BYTES / 1000 / 1000
+DATA_SIZE_IN_MBITS = 8 * DATA_SIZE_IN_BYTES / 1000 / 1000
 
 API_TEST_SCRIPT = 'object_storage_api_tests.py'
 
@@ -190,7 +190,7 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
 
       if len(result_string) > 0:
         # Convert Bytes per second to Mega Bytes per second
-        # We use MiB (10^6) to be consistent with network
+        # We use MB (10^6) to be consistent with network
         # bandwidth convention.
         result_Mbps = 8 * float(result_string[0]) / 1000 / 1000
         results.append(sample.Sample(SINGLE_STREAM_THROUGHPUT % up_and_down,
@@ -355,7 +355,7 @@ class S3StorageBenchmark(object):
 
     results = []
     results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MiBITS / time_used,
+                                 DATA_SIZE_IN_MBITS / time_used,
                                  THROUGHPUT_UNIT,
                                  metadata))
 
@@ -367,7 +367,7 @@ class S3StorageBenchmark(object):
     time_used = vm_util.ParseTimeCommandResult(res)
 
     results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MiBITS / time_used,
+                                 DATA_SIZE_IN_MBITS / time_used,
                                  THROUGHPUT_UNIT,
                                  metadata))
 
@@ -457,7 +457,7 @@ class AzureBlobStorageBenchmark(object):
     results = []
 
     results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MiBITS / time_used,
+                                 DATA_SIZE_IN_MBITS / time_used,
                                  THROUGHPUT_UNIT,
                                  metadata))
 
@@ -471,7 +471,7 @@ class AzureBlobStorageBenchmark(object):
     time_used = vm_util.ParseTimeCommandResult(res)
 
     results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MiBITS / time_used,
+                                 DATA_SIZE_IN_MBITS / time_used,
                                  THROUGHPUT_UNIT,
                                  metadata))
 
@@ -571,7 +571,7 @@ class GoogleCloudStorageBenchmark(object):
     results = []
 
     results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MiBITS / time_used,
+                                 DATA_SIZE_IN_MBITS / time_used,
                                  THROUGHPUT_UNIT,
                                  metadata))
 
@@ -585,7 +585,7 @@ class GoogleCloudStorageBenchmark(object):
     time_used = vm_util.ParseTimeCommandResult(res)
 
     results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MiBITS / time_used,
+                                 DATA_SIZE_IN_MBITS / time_used,
                                  THROUGHPUT_UNIT,
                                  metadata))
 
