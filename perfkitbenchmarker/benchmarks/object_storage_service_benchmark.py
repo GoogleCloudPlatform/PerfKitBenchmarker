@@ -98,6 +98,8 @@ PERCENTILES_LIST = ['p50', 'p90', 'p99', 'p99.9']
 UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli'
 DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli'
 
+SINGLE_STREAM_THROUGHPUT = 'single stream %s throughput Mbps'
+
 ONE_BYTE_LATENCY = 'one byte %s latency'
 LAW_CONSISTENCY_PERCENTAGE = 'list-after-write consistency percentage'
 LAW_INCONSISTENCY_WINDOW = 'list-after-write inconsistency window'
@@ -173,6 +175,28 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
         else:
           raise ValueError('Unexpected test outcome from OneByteRW api test: '
                            '%s.' % raw_result)
+
+    # Single stream large object throuhput metrics
+    single_stream_throughput_cmd = ('%s --bucket=%s --storage=%s '
+                                    '--scenario=SingleStreamThroughput') % (
+                                    test_script_path, bucket, storage)  # noqa
+    _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
+    logging.info('SingleStreamThroughput raw result is %s' % raw_result)
+
+    for up_and_down in ['upload', 'download']:
+      search_string = 'Single stream %s throughput in Bps: (.*)' % up_and_down
+      result_string = re.findall(search_string, raw_result)
+
+      if len(result_string) > 0:
+        # Convert Bytes per second to Mega Bytes per second
+        result_MBps = float(result_string[0]) / 1024 / 1024
+        results.append(sample.Sample(SINGLE_STREAM_THROUGHPUT % up_and_down,
+                                     result_MBps,
+                                     THROUGHPUT_UNIT,
+                                     metadata))
+      else:
+        raise ValueError('Unexpected test outcome from SingleStreamThroughput '
+                         'api test: %s.' % raw_result)
 
     # list-after-write consistency metrics
     list_consistency_cmd = ('%s --bucket=%s --storage=%s --iterations=%d '
