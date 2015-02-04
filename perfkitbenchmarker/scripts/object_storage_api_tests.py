@@ -26,6 +26,8 @@ import json
 import logging
 import sys
 from threading import Thread
+import string
+import random
 import time
 
 import boto
@@ -83,6 +85,14 @@ LIST_CONSISTENCY_OBJECT_COUNT = 2100
 # This number specifies the thread count.
 LIST_CONSISTENCY_THREAD_COUNT = 100
 
+# Size of large objects used in single stream throughput benchmarking.
+LARGE_OBJECT_SIZE_BYTES = 100 * 1024 * 1024
+
+# The number of large objects we use in single stream throughput benchmarking.
+LARGE_OBJECT_COUNT = 5
+
+LARGE_OBJECT_FAILURE_TOLERANCE = 0.2
+
 
 # When a storage provider fails more than a threshold number of requests, we
 # stop the benchmarking tests and raise a low availability error back to the
@@ -138,16 +148,17 @@ def DeleteObjects(storage_schema, bucket, objects_to_delete,
                         object_path)
 
 
-def WriteOneByteObjects(storage_schema, bucket, object_prefix, count,
-                        objects_written, latency_results=None,
-                        host_to_connect=None):
-  """Write a number of one byte objects to a storage provider.
+def WriteObjects(storage_schema, bucket, object_prefix, count,
+                 size, objects_written, latency_results=None,
+                 host_to_connect=None):
+  """Write a number of objects to a storage provider.
 
   Args:
     storage_schema: The address schema identifying a storage. e.g., "gs"
     bucket: Name of the bucket to write to.
     object_prefix: The prefix of names of objects to be written.
     count: The total number of objects that need to be written.
+    size: The size of each object in bytes.
     objects_written: A list of names of objects that have been successfully
         written by this function. Caller supplies the list and this function
         fills in the name of the objects.
@@ -156,6 +167,11 @@ def WriteOneByteObjects(storage_schema, bucket, object_prefix, count,
         written.
     host_to_connect: An optional endpoint string to connect to.
   """
+  payload_bytes = bytearray(size)
+  for i in range(size):
+    payload_bytes[i] = ord(random.choice(string.letters))
+
+  payload_string = payload_bytes.decode('ascii')
 
   for i in range(count):
     object_name = '%s_%d' % (object_prefix, i)
@@ -176,7 +192,7 @@ def WriteOneByteObjects(storage_schema, bucket, object_prefix, count,
     # the caller to decide if they want to tolerate the failure and accept
     # the results, depending on test scenarios.
     try:
-      object_uri.set_contents_from_string('f')
+      object_uri.set_contents_from_string(payload_string)
 
       if latency_results is not None:
         latency_results.append(time.time() - start_time)
@@ -185,6 +201,72 @@ def WriteOneByteObjects(storage_schema, bucket, object_prefix, count,
     except:
       logging.exception('Caught exception while writing object %s.',
                         object_path)
+
+
+def ReadObjects(storage_schema, bucket, objects_to_read, latency_results,
+                host_to_connect=None):
+  for object_name in objects_to_read:
+    object_path = '%s/%s' % (FLAGS.bucket, object_name)
+    object_uri = boto.storage_uri(object_path, storage_schema)
+    object_uri.connect(host=host_to_connect)
+
+    # Ready to go!
+    start_time = time.time()
+
+    try:
+      object_uri.get_contents_as_string()
+
+      latency_results.append(time.time() - start_time)
+    except:
+      logging.exception('Failed to read object %s', object_path)
+
+
+def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
+  """ A benchmark test for single stream upload and download throughput.
+
+  Args:
+    storage_schema: The schema of the storage provider to use, e.g., "gs"
+    host_to_connect: An optional host endpoint to connect to.
+
+  Raises:
+    LowAvailabilityError: when the storage provider has failed a high number of
+        our RW requests that exceeds a threshold (>5%), we raise this error
+        instead of collecting performance numbers from this run.
+  """
+  object_prefix = 'pkb_single_stream_%f' % time.time()
+  write_latency = []
+  objects_written = []
+
+  WriteObjects(storage_schema, FLAGS.bucket, object_prefix,
+               LARGE_OBJECT_COUNT, LARGE_OBJECT_SIZE_BYTES, objects_written,
+               latency_results=write_latency,
+               host_to_connect=host_to_connect)
+
+  try:
+    if len(objects_written) < LARGE_OBJECT_COUNT * (
+                              1 - LARGE_OBJECT_FAILURE_TOLERANCE):  # noqa
+      raise LowAvailabilityError('Failed to write required number of large '
+                                 'objects, exiting.')
+
+    # Report the p50 as the final result (out of the default 5 run attempts)
+    latency_percentiles = _PercentileCalculator(write_latency)
+    logging.info('Single stream upload throughput in Bps: %s',
+                 LARGE_OBJECT_SIZE_BYTES / float(latency_percentiles['p50']))
+
+    read_latency = []
+    ReadObjects(storage_schema, FLAGS.bucket, objects_written, read_latency,
+                host_to_connect)
+    if len(read_latency) < len(objects_written) * (
+                           1 - LARGE_OBJECT_FAILURE_TOLERANCE):  # noqa
+      raise LowAvailabilityError('Failed to read required number of objects, '
+                                 'exiting.')
+
+    latency_percentiles = _PercentileCalculator(read_latency)
+    logging.info('Single stream download throughput in Bps: %s',
+                 LARGE_OBJECT_SIZE_BYTES / float(latency_percentiles['p50']))
+  finally:
+    DeleteObjects(storage_schema, FLAGS.bucket, objects_written,
+                  host_to_connect=host_to_connect)
 
 
 def OneByteRWBenchmark(storage_schema, host_to_connect=None):
@@ -209,46 +291,37 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
   one_byte_write_latency = []
   one_byte_objects_written = []
 
-  WriteOneByteObjects(storage_schema, FLAGS.bucket, object_prefix,
-                      ONE_BYTE_OBJECT_COUNT, one_byte_objects_written,
-                      latency_results=one_byte_write_latency,
-                      host_to_connect=host_to_connect)
+  WriteObjects(storage_schema, FLAGS.bucket, object_prefix,
+               ONE_BYTE_OBJECT_COUNT, 1, one_byte_objects_written,
+               latency_results=one_byte_write_latency,
+               host_to_connect=host_to_connect)
 
-  success_count = len(one_byte_objects_written)
-  if success_count < ONE_BYTE_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
-    raise LowAvailabilityError('Failed to write required number of objects, '
-                               'exiting.')
+  try:
+    success_count = len(one_byte_objects_written)
+    if success_count < ONE_BYTE_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
+      raise LowAvailabilityError('Failed to write required number of objects, '
+                                 'exiting.')
 
-  logging.info('One byte upload - %s',
-               json.dumps(_PercentileCalculator(one_byte_write_latency),
-                          sort_keys=True))
+    logging.info('One byte upload - %s',
+                 json.dumps(_PercentileCalculator(one_byte_write_latency),
+                            sort_keys=True))
 
-  # Now download these objects and measure the latencies.
-  one_byte_read_latency = []
+    # Now download these objects and measure the latencies.
+    one_byte_read_latency = []
+    ReadObjects(storage_schema, FLAGS.bucket, one_byte_objects_written,
+                one_byte_read_latency, host_to_connect)
 
-  for object_name in one_byte_objects_written:
-    object_path = '%s/%s' % (FLAGS.bucket, object_name)
-    object_uri = boto.storage_uri(object_path, storage_schema)
-    object_uri.connect(host=host_to_connect)
+    success_count = len(one_byte_read_latency)
+    if success_count < ONE_BYTE_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
+      raise LowAvailabilityError('Failed to read required number of objects, '
+                                 'exiting.')
 
-    # Ready to go!
-    start_time = time.time()
-
-    try:
-      object_uri.get_contents_as_string()
-
-      one_byte_read_latency.append(time.time() - start_time)
-    except:
-      logging.exception('Failed to read object %s', object_path)
-
-  success_count = len(one_byte_read_latency)
-  if success_count < ONE_BYTE_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
-    raise LowAvailabilityError('Failed to read required number of objects, '
-                               'exiting.')
-
-  logging.info('One byte download - %s',
-               json.dumps(_PercentileCalculator(one_byte_read_latency),
-                          sort_keys=True))
+    logging.info('One byte download - %s',
+                 json.dumps(_PercentileCalculator(one_byte_read_latency),
+                            sort_keys=True))
+  finally:
+    DeleteObjects(storage_schema, FLAGS.bucket, one_byte_objects_written,
+                  host_to_connect=host_to_connect)
 
 
 def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
@@ -288,7 +361,7 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
 
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     my_prefix = '%s_%d' % (object_prefix, i)
-    thread = Thread(target=WriteOneByteObjects,
+    thread = Thread(target=WriteObjects,
                     args=(storage_schema, FLAGS.bucket, my_prefix,
                           LIST_CONSISTENCY_OBJECT_COUNT /
                           LIST_CONSISTENCY_THREAD_COUNT,
@@ -449,7 +522,7 @@ def Main(argv=sys.argv):
 
     return 0
   elif FLAGS.scenario == 'SingleStreamThroughput':
-    raise NotImplementedError('Single Stream Throughput is not implemented.')
+    return SingleStreamThroughputBenchmark(storage_schema, host_to_connect)
 
 if __name__ == '__main__':
   sys.exit(Main())
