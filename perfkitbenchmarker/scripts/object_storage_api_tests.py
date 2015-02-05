@@ -125,15 +125,6 @@ def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
   return list_result
 
 
-def _LatencyPercentilesToBandwidthPercentiles(size, latency_percentiles):
-  bandwidth_percentiles = {}
-  for percentile in ['p50', 'p90', 'p99', 'p99.9']:
-    bandwidth_percentiles[percentile] = size / float(
-        latency_percentiles[percentile])
-
-  return bandwidth_percentiles
-
-
 def DeleteObjects(storage_schema, bucket, objects_to_delete,
                   host_to_connect=None):
   """Delete a bunch of objects.
@@ -272,7 +263,8 @@ def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
                                  'objects, exiting.')
 
     logging.info('Single stream upload throughput in Bps: %s',
-                 json.dumps(write_bandwidth, sort_keys=True))
+                 json.dumps(_PercentileCalculator(write_bandwidth),
+                            sort_keys=True))
 
     read_bandwidth = []
     ReadObjects(storage_schema, FLAGS.bucket, objects_written,
@@ -285,7 +277,8 @@ def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
                                  'exiting.')
 
     logging.info('Single stream download throughput in Bps: %s',
-                 json.dumps(read_bandwidth, sort_keys=True))
+                 json.dumps(_PercentileCalculator(read_bandwidth),
+                            sort_keys=True))
 
   finally:
     DeleteObjects(storage_schema, FLAGS.bucket, objects_written,
