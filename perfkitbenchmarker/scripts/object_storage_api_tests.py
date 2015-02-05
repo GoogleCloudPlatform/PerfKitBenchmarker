@@ -164,10 +164,10 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
         written by this function. Caller supplies the list and this function
         fills in the name of the objects.
     latency_results: An optional parameter that caller can supply to hold
-        a latency numbers, in seconds, for each object that is successfully
+        latency numbers, in seconds, for each object that is successfully
         written.
     bandwidth_results: An optional parameter that caller can supply to hold
-        a bandwidth numbers, in bytes per second, for each object that is
+        bandwidth numbers, in bytes per second, for each object that is
         successfully written.
     host_to_connect: An optional endpoint string to connect to.
   """
