@@ -177,7 +177,7 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
           raise ValueError('Unexpected test outcome from OneByteRW api test: '
                            '%s.' % raw_result)
 
-    # Single stream large object throuhput metrics
+    # Single stream large object throughput metrics
     single_stream_throughput_cmd = ('%s --bucket=%s --storage=%s '
                                     '--scenario=SingleStreamThroughput') % (
                                     test_script_path, bucket, storage)  # noqa
@@ -187,16 +187,19 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     for up_and_down in ['upload', 'download']:
       search_string = 'Single stream %s throughput in Bps: (.*)' % up_and_down
       result_string = re.findall(search_string, raw_result)
+      sample_name = SINGLE_STREAM_THROUGHPUT % up_and_down
 
       if len(result_string) > 0:
-        # Convert Bytes per second to Mega Bytes per second
+        # Convert Bytes per second to Mega bits per second
         # We use MB (10^6) to be consistent with network
         # bandwidth convention.
-        result_mbps = 8 * float(result_string[0]) / 1000 / 1000
-        results.append(sample.Sample(SINGLE_STREAM_THROUGHPUT % up_and_down,
-                                     result_mbps,
-                                     THROUGHPUT_UNIT,
-                                     metadata))
+        result = json.loads(result_string[0])
+        for percentile in PERCENTILES_LIST:
+          results.append(sample.Sample(
+              ('%s %s') % (sample_name, percentile),
+              8 * float(result[percentile]) / 1000 / 1000,
+              THROUGHPUT_UNIT,
+              metadata))
       else:
         raise ValueError('Unexpected test outcome from SingleStreamThroughput '
                          'api test: %s.' % raw_result)
