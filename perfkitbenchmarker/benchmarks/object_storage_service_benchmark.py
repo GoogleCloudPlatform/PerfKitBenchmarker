@@ -192,9 +192,9 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
         # Convert Bytes per second to Mega Bytes per second
         # We use MB (10^6) to be consistent with network
         # bandwidth convention.
-        result_Mbps = 8 * float(result_string[0]) / 1000 / 1000
+        result_mbps = 8 * float(result_string[0]) / 1000 / 1000
         results.append(sample.Sample(SINGLE_STREAM_THROUGHPUT % up_and_down,
-                                     result_Mbps,
+                                     result_mbps,
                                      THROUGHPUT_UNIT,
                                      metadata))
       else:
