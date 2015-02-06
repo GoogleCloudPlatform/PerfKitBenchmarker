@@ -94,7 +94,8 @@ LIST_CONSISTENCY_ITERATIONS = 200
 THROUGHPUT_UNIT = 'Mbps'
 LATENCY_UNIT = 'seconds'
 NA_UNIT = 'na'
-PERCENTILES_LIST = ['p50', 'p90', 'p99', 'p99.9']
+PERCENTILES_LIST = ['p1', 'p5', 'p50', 'p90', 'p99', 'p99.9', 'average',
+                    'stddev']
 
 UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli'
 DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli'
