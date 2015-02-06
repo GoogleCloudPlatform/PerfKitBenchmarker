@@ -110,8 +110,8 @@ CONSISTENT_LIST_LATENCY = 'consistent list latency'
 CONTENT_REMOVAL_RETRY_LIMIT = 5
 # Some times even when a bucket is completely empty, the service provider would
 # refuse to remove the bucket with "BucketNotEmpty" error until up to 1 hour
-# later. We keep trying until we reach the one-hour limit.
-# TODO: improve this wait.
+# later. We keep trying until we reach the one-hour limit. And this wait is
+# necessary for some providers.
 BUCKET_REMOVAL_RETRY_LIMIT = 120
 RETRY_WAIT_INTERVAL_SECONDS = 30
 
