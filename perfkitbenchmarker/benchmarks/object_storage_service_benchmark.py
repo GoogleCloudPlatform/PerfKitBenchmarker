@@ -94,7 +94,8 @@ LIST_CONSISTENCY_ITERATIONS = 200
 THROUGHPUT_UNIT = 'Mbps'
 LATENCY_UNIT = 'seconds'
 NA_UNIT = 'na'
-PERCENTILES_LIST = ['p50', 'p90', 'p99', 'p99.9']
+PERCENTILES_LIST = ['p1', 'p5', 'p50', 'p90', 'p99', 'p99.9', 'average',
+                    'stddev']
 
 UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli'
 DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli'
@@ -109,8 +110,8 @@ CONSISTENT_LIST_LATENCY = 'consistent list latency'
 CONTENT_REMOVAL_RETRY_LIMIT = 5
 # Some times even when a bucket is completely empty, the service provider would
 # refuse to remove the bucket with "BucketNotEmpty" error until up to 1 hour
-# later. We keep trying until we reach the one-hour limit.
-# TODO: improve this wait.
+# later. We keep trying until we reach the one-hour limit. And this wait is
+# necessary for some providers.
 BUCKET_REMOVAL_RETRY_LIMIT = 120
 RETRY_WAIT_INTERVAL_SECONDS = 30
 
