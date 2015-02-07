@@ -275,6 +275,9 @@ def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
       raise LowAvailabilityError('Failed to write required number of large '
                                  'objects, exiting.')
 
+    logging.info('Single stream upload individual results in Bps:')
+    for bandwidth in write_bandwidth:
+      logging.info('%f', bandwidth)
     logging.info('Single stream upload throughput in Bps: %s',
                  json.dumps(PercentileCalculator(write_bandwidth),
                             sort_keys=True))
@@ -289,6 +292,9 @@ def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
       raise LowAvailabilityError('Failed to read required number of objects, '
                                  'exiting.')
 
+    logging.info('Single stream download individual results in Bps:')
+    for bandwidth in read_bandwidth:
+      logging.info('%f', bandwidth)
     logging.info('Single stream download throughput in Bps: %s',
                  json.dumps(PercentileCalculator(read_bandwidth),
                             sort_keys=True))
@@ -331,6 +337,9 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
       raise LowAvailabilityError('Failed to write required number of objects, '
                                  'exiting.')
 
+    logging.info('Individual results of one byte upload:')
+    for latency in one_byte_write_latency:
+      logging.info('%f', latency)
     logging.info('One byte upload - %s',
                  json.dumps(PercentileCalculator(one_byte_write_latency),
                             sort_keys=True))
@@ -345,6 +354,9 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
       raise LowAvailabilityError('Failed to read required number of objects, '
                                  'exiting.')
 
+    logging.info('Individual results of one byte download:')
+    for latency in one_byte_read_latency:
+      logging.info('%f', latency)
     logging.info('One byte download - %s',
                  json.dumps(PercentileCalculator(one_byte_read_latency),
                             sort_keys=True))

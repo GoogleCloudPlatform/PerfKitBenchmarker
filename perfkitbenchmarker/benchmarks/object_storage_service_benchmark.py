@@ -34,6 +34,15 @@ RunX: Run upload/download on vm using storage tools from cloud providers.
 CleanupX: Cleanup storage tools on vm.
 
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
+
+TODO: Split this benchmark class into the following 3:
+1. Object storage service benchmarking via CLI
+   - CLI based file set upload/download
+2. Object storage service benchmarking via API for data operations.
+   - One byte Upload/download
+   - Single Stream large object throughput.
+3. Object storage service benchmarking via API for name space operations.
+   - List Consistency metrics.
 """
 
 import json
@@ -366,6 +375,8 @@ class S3StorageBenchmark(object):
     results = []
 
     # CLI tool based tests.
+    # TODO: consider making this part into a utility function that can be
+    # called by the GCP and Azure tests too.
     cli_upload_results = []
     cli_download_results = []
     for _ in range(CLI_TEST_ITERATION_COUNT):
@@ -375,18 +386,23 @@ class S3StorageBenchmark(object):
       scratch_dir = vm.GetScratchDir()
       _, res = vm.RemoteCommand('time aws s3 sync %s/run/data/ '
                                 's3://%s/' % (scratch_dir, self.bucket_name))
-      logging.info(res)
-      time_used = vm_util.ParseTimeCommandResult(res)
-      cli_upload_results.append(DATA_SIZE_IN_MBITS / time_used)
+      logging.debug(res)
+      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+      # Output some log traces to show we are making progress
+      logging.info('cli upload throughput %f', throughput)
+      cli_upload_results.append(throughput)
 
       vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
       _, res = vm.RemoteCommand('time aws s3 sync '
                                 's3://%s/ %s/run/temp/'
                                 % (self.bucket_name, scratch_dir))
 
-      logging.info(res)
-      time_used = vm_util.ParseTimeCommandResult(res)
-      cli_download_results.append(DATA_SIZE_IN_MBITS / time_used)
+      logging.debug(res)
+      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+      logging.info('cli download throughput %f', throughput)
+      cli_download_results.append(throughput)
 
     # Report various percentiles.
     _AppendPercentilesToResults(results,
@@ -485,9 +501,12 @@ class AzureBlobStorageBenchmark(object):
                                 ' pkb%s %s; done' %
                                 (scratch_dir, FLAGS.run_uri,
                                  vm.azure_command_suffix))
-      logging.info(res)
-      time_used = vm_util.ParseTimeCommandResult(res)
-      cli_upload_results.append(DATA_SIZE_IN_MBITS / time_used)
+      logging.debug(res)
+      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+      # Output some log traces to show we are making progress
+      logging.info('cli upload throughput %f', throughput)
+      cli_upload_results.append(throughput)
 
       vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
       _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
@@ -495,9 +514,12 @@ class AzureBlobStorageBenchmark(object):
                                 'file-$i.dat %s/run/temp/file-$i.dat %s; done' %
                                 (FLAGS.run_uri, scratch_dir,
                                  vm.azure_command_suffix))
-      logging.info(res)
-      time_used = vm_util.ParseTimeCommandResult(res)
-      cli_download_results.append(DATA_SIZE_IN_MBITS / time_used)
+      logging.debug(res)
+      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+      # Output some log traces to show we are making progress
+      logging.info('cli download throughput %f', throughput)
+      cli_download_results.append(throughput)
 
     _AppendPercentilesToResults(results,
                                 cli_upload_results,
@@ -606,9 +628,12 @@ class GoogleCloudStorageBenchmark(object):
                                 'gs://%s/' % (vm.gsutil_path, scratch_dir,
                                               self.bucket_name))
 
-      logging.info(res)
-      time_used = vm_util.ParseTimeCommandResult(res)
-      cli_upload_results.append(DATA_SIZE_IN_MBITS / time_used)
+      logging.debug(res)
+      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+      # Output some log traces to show we are making progress
+      logging.info('cli upload throughput %f', throughput)
+      cli_upload_results.append(throughput)
 
       vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
       _, res = vm.RemoteCommand('time %s -m cp '
@@ -616,9 +641,12 @@ class GoogleCloudStorageBenchmark(object):
                                 '%s/run/temp/' % (vm.gsutil_path,
                                                   self.bucket_name,
                                                   scratch_dir))
-      logging.info(res)
-      time_used = vm_util.ParseTimeCommandResult(res)
-      cli_download_results.append(DATA_SIZE_IN_MBITS / time_used)
+      logging.debug(res)
+      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+      # Output some log traces to show we are making progress
+      logging.info('cli download throughput %f', throughput)
+      cli_download_results.append(throughput)
 
     _AppendPercentilesToResults(results,
                                 cli_upload_results,
