@@ -111,6 +111,7 @@ PERCENTILES_LIST = ['p1', 'p5', 'p50', 'p90', 'p99', 'p99.9', 'average',
 UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli Mbps'
 DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli Mbps'
 CLI_TEST_ITERATION_COUNT = 100
+CLI_TEST_FAILURE_TOLERANCE = 0.05
 
 SINGLE_STREAM_THROUGHPUT = 'single stream %s throughput Mbps'
 
@@ -138,6 +139,10 @@ def GetInfo():
 # TODO: add a new class of error "ObjectStorageError" to errors.py and remove
 # this one.
 class BucketRemovalError(Exception):
+    pass
+
+
+class NotEnoughResultsError(Exception):
     pass
 
 
@@ -384,25 +389,48 @@ class S3StorageBenchmark(object):
                        % self.bucket_name, ignore_failure=True)
 
       scratch_dir = vm.GetScratchDir()
-      _, res = vm.RemoteCommand('time aws s3 sync %s/run/data/ '
-                                's3://%s/' % (scratch_dir, self.bucket_name))
-      logging.debug(res)
-      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+      upload_successful = False
+      try:
+        _, res = vm.RemoteCommand('time aws s3 sync %s/run/data/ '
+                                  's3://%s/' % (scratch_dir, self.bucket_name))
+        upload_successful = True
+      except:
+        logging.info('failed to upload, skip this iteration.')
+        pass
 
-      # Output some log traces to show we are making progress
-      logging.info('cli upload throughput %f', throughput)
-      cli_upload_results.append(throughput)
+      if upload_successful:
+        logging.debug(res)
+        throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
 
-      vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
-      _, res = vm.RemoteCommand('time aws s3 sync '
-                                's3://%s/ %s/run/temp/'
-                                % (self.bucket_name, scratch_dir))
+        # Output some log traces to show we are making progress
+        logging.info('cli upload throughput %f', throughput)
+        cli_upload_results.append(throughput)
 
-      logging.debug(res)
-      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+        download_successful = False
+        vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
+        try:
+          _, res = vm.RemoteCommand('time aws s3 sync '
+                                    's3://%s/ %s/run/temp/'
+                                    % (self.bucket_name, scratch_dir))
+          download_successful = True
+        except:
+          logging.info('failed to download, skip this iteration.')
+          pass
 
-      logging.info('cli download throughput %f', throughput)
-      cli_download_results.append(throughput)
+        if download_successful:
+          logging.debug(res)
+          throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+          logging.info('cli download throughput %f', throughput)
+          cli_download_results.append(throughput)
+
+    expected_successes = CLI_TEST_ITERATION_COUNT * (1 -
+                                                     CLI_TEST_FAILURE_TOLERANCE)
+
+    if (len(cli_download_results) < expected_successes or
+        len(cli_upload_results) < expected_successes):
+      raise NotEnoughResultsError('Failed to complete the required number of '
+                                  'iterations.')
 
     # Report various percentiles.
     _AppendPercentilesToResults(results,
@@ -496,30 +524,52 @@ class AzureBlobStorageBenchmark(object):
                        ignore_failure=True)
 
       scratch_dir = vm.GetScratchDir()
-      _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
-                                'upload %s/run/data/file-$i.dat'
-                                ' pkb%s %s; done' %
-                                (scratch_dir, FLAGS.run_uri,
-                                 vm.azure_command_suffix))
-      logging.debug(res)
-      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+      upload_successful = False
+      try:
+        _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage '
+                                  'blob upload %s/run/data/file-$i.dat '
+                                  'pkb%s %s; done' %
+                                  (scratch_dir, FLAGS.run_uri,
+                                   vm.azure_command_suffix))
+        upload_successful = True
+      except:
+        pass
 
-      # Output some log traces to show we are making progress
-      logging.info('cli upload throughput %f', throughput)
-      cli_upload_results.append(throughput)
+      if upload_successful:
+        logging.debug(res)
+        throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
 
-      vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
-      _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
-                                'download pkb%s '
-                                'file-$i.dat %s/run/temp/file-$i.dat %s; done' %
-                                (FLAGS.run_uri, scratch_dir,
-                                 vm.azure_command_suffix))
-      logging.debug(res)
-      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+        # Output some log traces to show we are making progress
+        logging.info('cli upload throughput %f', throughput)
+        cli_upload_results.append(throughput)
 
-      # Output some log traces to show we are making progress
-      logging.info('cli download throughput %f', throughput)
-      cli_download_results.append(throughput)
+        vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
+        download_successful = False
+        try:
+          _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage '
+                                    'blob download pkb%s file-$i.dat '
+                                    '%s/run/temp/file-$i.dat %s; done' %
+                                    (FLAGS.run_uri, scratch_dir,
+                                     vm.azure_command_suffix))
+          download_successful = True
+        except:
+          pass
+
+        if download_successful:
+          logging.debug(res)
+          throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+          # Output some log traces to show we are making progress
+          logging.info('cli download throughput %f', throughput)
+          cli_download_results.append(throughput)
+
+    expected_successes = CLI_TEST_ITERATION_COUNT * (1 -
+                                                     CLI_TEST_FAILURE_TOLERANCE)
+
+    if (len(cli_download_results) < expected_successes or
+        len(cli_upload_results) < expected_successes):
+      raise NotEnoughResultsError('Failed to complete the required number of '
+                                  'iterations.')
 
     _AppendPercentilesToResults(results,
                                 cli_upload_results,
@@ -624,29 +674,51 @@ class GoogleCloudStorageBenchmark(object):
                        (vm.gsutil_path, self.bucket_name), ignore_failure=True)
 
       scratch_dir = vm.GetScratchDir()
-      _, res = vm.RemoteCommand('time %s -m cp %s/run/data/* '
-                                'gs://%s/' % (vm.gsutil_path, scratch_dir,
-                                              self.bucket_name))
+      upload_successful = False
+      try:
+        _, res = vm.RemoteCommand('time %s -m cp %s/run/data/* '
+                                  'gs://%s/' % (vm.gsutil_path, scratch_dir,
+                                                self.bucket_name))
+        upload_successful = True
+      except:
+        pass
 
-      logging.debug(res)
-      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+      if upload_successful:
+        logging.debug(res)
+        throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
 
-      # Output some log traces to show we are making progress
-      logging.info('cli upload throughput %f', throughput)
-      cli_upload_results.append(throughput)
+        # Output some log traces to show we are making progress
+        logging.info('cli upload throughput %f', throughput)
+        cli_upload_results.append(throughput)
 
-      vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
-      _, res = vm.RemoteCommand('time %s -m cp '
-                                'gs://%s/* '
-                                '%s/run/temp/' % (vm.gsutil_path,
-                                                  self.bucket_name,
-                                                  scratch_dir))
-      logging.debug(res)
-      throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+        vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
 
-      # Output some log traces to show we are making progress
-      logging.info('cli download throughput %f', throughput)
-      cli_download_results.append(throughput)
+        download_successful = False
+        try:
+          _, res = vm.RemoteCommand('time %s -m cp '
+                                    'gs://%s/* '
+                                    '%s/run/temp/' % (vm.gsutil_path,
+                                                      self.bucket_name,
+                                                      scratch_dir))
+          download_successful = True
+        except:
+          pass
+
+        if download_successful:
+          logging.debug(res)
+          throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+          # Output some log traces to show we are making progress
+          logging.info('cli download throughput %f', throughput)
+          cli_download_results.append(throughput)
+
+    expected_successes = CLI_TEST_ITERATION_COUNT * (1 -
+                                                     CLI_TEST_FAILURE_TOLERANCE)
+
+    if (len(cli_download_results) < expected_successes or
+        len(cli_upload_results) < expected_successes):
+      raise NotEnoughResultsError('Failed to complete the required number of '
+                                  'iterations.')
 
     _AppendPercentilesToResults(results,
                                 cli_upload_results,
