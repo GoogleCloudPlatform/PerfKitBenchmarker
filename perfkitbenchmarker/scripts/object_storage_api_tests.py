@@ -37,7 +37,8 @@ import gcs_oauth2_boto_plugin  # noqa
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum(
-    'storage', 'GCS', ['GCS', 'S3', 'AZURE'], 'The target storage to test.')
+    'storage_provider', 'GCS', ['GCS', 'S3', 'AZURE'],
+    'The target storage provider to test.')
 
 flags.DEFINE_string('host', None, 'The hostname of the storage endpoint.')
 
@@ -102,7 +103,7 @@ class LowAvailabilityError(Exception):
     pass
 
 
-def _PercentileCalculator(numbers):
+def PercentileCalculator(numbers):
   numbers_sorted = sorted(numbers)
   count = len(numbers_sorted)
   total = sum(numbers_sorted)
@@ -275,7 +276,7 @@ def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
                                  'objects, exiting.')
 
     logging.info('Single stream upload throughput in Bps: %s',
-                 json.dumps(_PercentileCalculator(write_bandwidth),
+                 json.dumps(PercentileCalculator(write_bandwidth),
                             sort_keys=True))
 
     read_bandwidth = []
@@ -289,7 +290,7 @@ def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
                                  'exiting.')
 
     logging.info('Single stream download throughput in Bps: %s',
-                 json.dumps(_PercentileCalculator(read_bandwidth),
+                 json.dumps(PercentileCalculator(read_bandwidth),
                             sort_keys=True))
 
   finally:
@@ -331,7 +332,7 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
                                  'exiting.')
 
     logging.info('One byte upload - %s',
-                 json.dumps(_PercentileCalculator(one_byte_write_latency),
+                 json.dumps(PercentileCalculator(one_byte_write_latency),
                             sort_keys=True))
 
     # Now download these objects and measure the latencies.
@@ -345,7 +346,7 @@ def OneByteRWBenchmark(storage_schema, host_to_connect=None):
                                  'exiting.')
 
     logging.info('One byte download - %s',
-                 json.dumps(_PercentileCalculator(one_byte_read_latency),
+                 json.dumps(PercentileCalculator(one_byte_read_latency),
                             sort_keys=True))
   finally:
     DeleteObjects(storage_schema, FLAGS.bucket, one_byte_objects_written,
@@ -503,8 +504,8 @@ def Main(argv=sys.argv):
   if FLAGS.bucket is None:
     raise ValueError('Must specify a valid bucket for this test.')
 
-  logging.info('Storage is %s, bucket is %s, scenario is %s',
-               FLAGS.storage,
+  logging.info('Storage provider is %s, bucket is %s, scenario is %s',
+               FLAGS.storage_provider,
                FLAGS.bucket,
                FLAGS.scenario)
 
@@ -513,10 +514,10 @@ def Main(argv=sys.argv):
     logging.info('Will use user-specified host endpoint: %s', FLAGS.host)
     host_to_connect = FLAGS.host
 
-  if FLAGS.storage == 'AZURE':
+  if FLAGS.storage_provider == 'AZURE':
     raise NotImplementedError('Storage type Azure is not implemented yet.')
 
-  storage_schema = STORAGE_TO_SCHEMA_DICT[FLAGS.storage]
+  storage_schema = STORAGE_TO_SCHEMA_DICT[FLAGS.storage_provider]
 
   if FLAGS.scenario == 'OneByteRW':
     return OneByteRWBenchmark(storage_schema, host_to_connect)
@@ -542,12 +543,12 @@ def Main(argv=sys.argv):
 
     if len(list_inconsistency_window) > 0:
       logging.info('List inconsistency window: %s',
-                   json.dumps(_PercentileCalculator(list_inconsistency_window),
+                   json.dumps(PercentileCalculator(list_inconsistency_window),
                               sort_keys=True))
 
     if len(list_latency) > 0:
       logging.info('List latency: %s',
-                   json.dumps(_PercentileCalculator(list_latency),
+                   json.dumps(PercentileCalculator(list_latency),
                               sort_keys=True))
 
     return 0

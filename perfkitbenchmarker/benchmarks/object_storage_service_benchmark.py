@@ -47,6 +47,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.scripts.object_storage_api_tests import PercentileCalculator  # noqa
 
 flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
                   [benchmark_spec_class.GCP, benchmark_spec_class.AWS,
@@ -97,8 +98,9 @@ NA_UNIT = 'na'
 PERCENTILES_LIST = ['p1', 'p5', 'p50', 'p90', 'p99', 'p99.9', 'average',
                     'stddev']
 
-UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli'
-DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli'
+UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli Mbps'
+DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli Mbps'
+CLI_TEST_ITERATION_COUNT = 100
 
 SINGLE_STREAM_THROUGHPUT = 'single stream %s throughput Mbps'
 
@@ -153,7 +155,8 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
 
     for bucket in buckets:
       # One byte RW latency
-      one_byte_rw_cmd = ('%s --bucket=%s --storage=%s --scenario=OneByteRW') % (
+      one_byte_rw_cmd = ('%s --bucket=%s --storage_provider=%s '
+                         '--scenario=OneByteRW') % (
                          test_script_path, bucket, storage)  # noqa
 
       _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
@@ -179,7 +182,7 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                            '%s.' % raw_result)
 
     # Single stream large object throughput metrics
-    single_stream_throughput_cmd = ('%s --bucket=%s --storage=%s '
+    single_stream_throughput_cmd = ('%s --bucket=%s --storage_provider=%s '
                                     '--scenario=SingleStreamThroughput') % (
                                     test_script_path, bucket, storage)  # noqa
     _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
@@ -206,8 +209,9 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                          'api test: %s.' % raw_result)
 
     # list-after-write consistency metrics
-    list_consistency_cmd = ('%s --bucket=%s --storage=%s --iterations=%d '
-                            '--scenario=ListConsistency') % (test_script_path,
+    list_consistency_cmd = ('%s --bucket=%s --storage_provider=%s '
+                            '--iterations=%d --scenario=ListConsistency') % (
+                            test_script_path,  # noqa
                             bucket_name,  # noqa
                             storage,  # noqa
                             LIST_CONSISTENCY_ITERATIONS)  # noqa
@@ -309,6 +313,16 @@ def CheckPrerequisites():
   data.ResourcePath(DATA_FILE)
 
 
+def _AppendPercentilesToResults(output_results, input_results, metric_name,
+                                metric_unit, metadata):
+  percentiles = PercentileCalculator(input_results)
+  for percentile in PERCENTILES_LIST:
+    output_results.append(sample.Sample(('%s %s') % (metric_name, percentile),
+                                        percentiles[percentile],
+                                        metric_unit,
+                                        metadata))
+
+
 class S3StorageBenchmark(object):
   """S3 version of storage benchmark."""
 
@@ -348,32 +362,42 @@ class S3StorageBenchmark(object):
       Then the final return value is the list of the above list that reflect
       the results of all scenarios run here.
     """
-    vm.RemoteCommand('aws s3 rm s3://%s --recursive'
-                     % self.bucket_name, ignore_failure=True)
-
-    scratch_dir = vm.GetScratchDir()
-    _, res = vm.RemoteCommand('time aws s3 sync %s/run/data/ '
-                              's3://%s/' % (scratch_dir, self.bucket_name))
-    logging.info(res)
-    time_used = vm_util.ParseTimeCommandResult(res)
-
     results = []
-    results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
 
-    vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
-    _, res = vm.RemoteCommand('time aws s3 sync '
-                              's3://%s/ %s/run/data/'
-                              % (self.bucket_name, scratch_dir))
-    logging.info(res)
-    time_used = vm_util.ParseTimeCommandResult(res)
+    # CLI tool based tests.
+    cli_upload_results = []
+    cli_download_results = []
+    for _ in range(CLI_TEST_ITERATION_COUNT):
+      vm.RemoteCommand('aws s3 rm s3://%s --recursive'
+                       % self.bucket_name, ignore_failure=True)
 
-    results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+      scratch_dir = vm.GetScratchDir()
+      _, res = vm.RemoteCommand('time aws s3 sync %s/run/data/ '
+                                's3://%s/' % (scratch_dir, self.bucket_name))
+      logging.info(res)
+      time_used = vm_util.ParseTimeCommandResult(res)
+      cli_upload_results.append(DATA_SIZE_IN_MBITS / time_used)
+
+      vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
+      _, res = vm.RemoteCommand('time aws s3 sync '
+                                's3://%s/ %s/run/temp/'
+                                % (self.bucket_name, scratch_dir))
+
+      logging.info(res)
+      time_used = vm_util.ParseTimeCommandResult(res)
+      cli_download_results.append(DATA_SIZE_IN_MBITS / time_used)
+
+    # Report various percentiles.
+    _AppendPercentilesToResults(results,
+                                cli_upload_results,
+                                UPLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
+    _AppendPercentilesToResults(results,
+                                cli_download_results,
+                                DOWNLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
 
     # Now tests the storage provider via APIs
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
@@ -444,41 +468,48 @@ class AzureBlobStorageBenchmark(object):
       the results of all scenarios run here.
 
     """
-    vm.RemoteCommand('for i in {0..99}; do azure storage blob delete '
-                     'pkb%s file-$i.dat %s; done' %
-                     (FLAGS.run_uri, vm.azure_command_suffix),
-                     ignore_failure=True)
-
-    scratch_dir = vm.GetScratchDir()
-    _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
-                              'upload %s/run/data/file-$i.dat'
-                              ' pkb%s %s; done' %
-                              (scratch_dir, FLAGS.run_uri,
-                               vm.azure_command_suffix))
-    print res
-    time_used = vm_util.ParseTimeCommandResult(res)
-
     results = []
+    # CLI tool based tests.
+    cli_upload_results = []
+    cli_download_results = []
+    for _ in range(CLI_TEST_ITERATION_COUNT):
+      vm.RemoteCommand('for i in {0..99}; do azure storage blob delete '
+                       'pkb%s file-$i.dat %s; done' %
+                       (FLAGS.run_uri, vm.azure_command_suffix),
+                       ignore_failure=True)
 
-    results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+      scratch_dir = vm.GetScratchDir()
+      _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
+                                'upload %s/run/data/file-$i.dat'
+                                ' pkb%s %s; done' %
+                                (scratch_dir, FLAGS.run_uri,
+                                 vm.azure_command_suffix))
+      logging.info(res)
+      time_used = vm_util.ParseTimeCommandResult(res)
+      cli_upload_results.append(DATA_SIZE_IN_MBITS / time_used)
 
-    vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
-    _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
-                              'download pkb%s '
-                              'file-$i.dat %s/run/data/file-$i.dat %s; done' %
-                              (FLAGS.run_uri, scratch_dir,
-                               vm.azure_command_suffix))
-    print res
-    time_used = vm_util.ParseTimeCommandResult(res)
+      vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
+      _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
+                                'download pkb%s '
+                                'file-$i.dat %s/run/temp/file-$i.dat %s; done' %
+                                (FLAGS.run_uri, scratch_dir,
+                                 vm.azure_command_suffix))
+      logging.info(res)
+      time_used = vm_util.ParseTimeCommandResult(res)
+      cli_download_results.append(DATA_SIZE_IN_MBITS / time_used)
 
-    results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+    _AppendPercentilesToResults(results,
+                                cli_upload_results,
+                                UPLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
+    _AppendPercentilesToResults(results,
+                                cli_download_results,
+                                DOWNLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
 
+    # TODO: Add API based tests for Azure.
     return results
 
   def Cleanup(self, vm):
@@ -561,43 +592,51 @@ class GoogleCloudStorageBenchmark(object):
       Then the final return value is the list of the above list that reflect
       the results of all scenarios run here.
     """
-    vm.RemoteCommand('%s rm gs://%s/*' %
-                     (vm.gsutil_path, self.bucket_name), ignore_failure=True)
-
-    scratch_dir = vm.GetScratchDir()
-    _, res = vm.RemoteCommand('time %s -m cp %s/run/data/* '
-                              'gs://%s/' % (vm.gsutil_path, scratch_dir,
-                                            self.bucket_name))
-
-    print res
-    time_used = vm_util.ParseTimeCommandResult(res)
-
     results = []
+    # CLI tool based tests.
+    cli_upload_results = []
+    cli_download_results = []
+    for _ in range(CLI_TEST_ITERATION_COUNT):
+      vm.RemoteCommand('%s rm gs://%s/*' %
+                       (vm.gsutil_path, self.bucket_name), ignore_failure=True)
 
-    results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+      scratch_dir = vm.GetScratchDir()
+      _, res = vm.RemoteCommand('time %s -m cp %s/run/data/* '
+                                'gs://%s/' % (vm.gsutil_path, scratch_dir,
+                                              self.bucket_name))
 
-    vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
-    _, res = vm.RemoteCommand('time %s -m cp '
-                              'gs://%s/* '
-                              '%s/run/data/' % (vm.gsutil_path,
-                                                self.bucket_name,
-                                                scratch_dir))
-    print res
-    time_used = vm_util.ParseTimeCommandResult(res)
+      logging.info(res)
+      time_used = vm_util.ParseTimeCommandResult(res)
+      cli_upload_results.append(DATA_SIZE_IN_MBITS / time_used)
 
-    results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+      vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
+      _, res = vm.RemoteCommand('time %s -m cp '
+                                'gs://%s/* '
+                                '%s/run/temp/' % (vm.gsutil_path,
+                                                  self.bucket_name,
+                                                  scratch_dir))
+      logging.info(res)
+      time_used = vm_util.ParseTimeCommandResult(res)
+      cli_download_results.append(DATA_SIZE_IN_MBITS / time_used)
 
+    _AppendPercentilesToResults(results,
+                                cli_upload_results,
+                                UPLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
+    _AppendPercentilesToResults(results,
+                                cli_download_results,
+                                DOWNLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
+
+    # API-based benchmarking of GCS
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
     S3orGCSApiBasedBenchmarks(results, metadata, vm, 'GCS', test_script_path,
                               self.bucket_name, self.regional_bucket_name)
 
     return results
+
 
   def Cleanup(self, vm):
     """Clean up Google Cloud Storage bucket and uninstall packages on vm.
@@ -651,7 +690,6 @@ def Prepare(benchmark_spec):
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)
 
-  # vms[0].RemoteCommand('sudo apt-get update')
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
 
   # Prepare data on vm, create a run directory on scratch drive, and add
@@ -659,6 +697,9 @@ def Prepare(benchmark_spec):
   scratch_dir = vms[0].GetScratchDir()
   vms[0].RemoteCommand('sudo mkdir %s/run/' % scratch_dir)
   vms[0].RemoteCommand('sudo chmod 777 %s/run/' % scratch_dir)
+
+  vms[0].RemoteCommand('sudo mkdir %s/run/temp/' % scratch_dir)
+  vms[0].RemoteCommand('sudo chmod 777 %s/run/temp/' % scratch_dir)
 
   file_path = data.ResourcePath(DATA_FILE)
   vms[0].PushFile(file_path, '%s/run/' % scratch_dir)
