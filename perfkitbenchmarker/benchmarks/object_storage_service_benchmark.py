@@ -47,7 +47,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.scripts.object_storage_api_tests import PercentileCalculator  # noqa
+from perfkitbenchmarker.sample import PercentileCalculator  # noqa
 
 flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
                   [benchmark_spec_class.GCP, benchmark_spec_class.AWS,
