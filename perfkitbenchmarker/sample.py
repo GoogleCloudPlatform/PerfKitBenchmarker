@@ -17,6 +17,7 @@ import collections
 
 _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata'
 
+
 def PercentileCalculator(numbers):
   numbers_sorted = sorted(numbers)
   count = len(numbers_sorted)
