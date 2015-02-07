@@ -517,7 +517,10 @@ class AzureBlobStorageBenchmark(object):
     # CLI tool based tests.
     cli_upload_results = []
     cli_download_results = []
-    for _ in range(CLI_TEST_ITERATION_COUNT):
+    # TODO: Need to find ways to parallelize Azure's blob operations below.
+    # Currently this test takes 4-5 minutes per iteration, doing 100
+    # iteration by default is too many. We do only 10 for now.
+    for _ in range(10):
       vm.RemoteCommand('for i in {0..99}; do azure storage blob delete '
                        'pkb%s file-$i.dat %s; done' %
                        (FLAGS.run_uri, vm.azure_command_suffix),
