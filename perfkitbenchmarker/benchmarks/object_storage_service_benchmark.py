@@ -18,7 +18,8 @@ There are two categories of tests here: 1) tests based on CLI tools, and 2)
 tests that use APIs to access storage provider.
 
 For 1), we aim to simulate one typical use case of common user using storage
-provider: upload and downloads a set of files from/to a local directory.
+provider: upload and downloads a set of files with different sizes from/to a
+local directory.
 
 For 2), we aim to measure more directly the performance of a storage provider
 by accessing them via APIs. Here are the main scenarios covered in this
