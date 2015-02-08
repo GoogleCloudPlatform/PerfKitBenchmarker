@@ -18,7 +18,8 @@ There are two categories of tests here: 1) tests based on CLI tools, and 2)
 tests that use APIs to access storage provider.
 
 For 1), we aim to simulate one typical use case of common user using storage
-provider: upload and downloads a set of files from/to a local directory.
+provider: upload and downloads a set of files with different sizes from/to a
+local directory.
 
 For 2), we aim to measure more directly the performance of a storage provider
 by accessing them via APIs. Here are the main scenarios covered in this
@@ -33,6 +34,15 @@ RunX: Run upload/download on vm using storage tools from cloud providers.
 CleanupX: Cleanup storage tools on vm.
 
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
+
+TODO: Split this benchmark class into the following 3:
+1. Object storage service benchmarking via CLI
+   - CLI based file set upload/download
+2. Object storage service benchmarking via API for data operations.
+   - One byte Upload/download
+   - Single Stream large object throughput.
+3. Object storage service benchmarking via API for name space operations.
+   - List Consistency metrics.
 """
 
 import json
@@ -47,6 +57,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.sample import PercentileCalculator  # noqa
 
 flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
                   [benchmark_spec_class.GCP, benchmark_spec_class.AWS,
@@ -97,8 +108,10 @@ NA_UNIT = 'na'
 PERCENTILES_LIST = ['p1', 'p5', 'p50', 'p90', 'p99', 'p99.9', 'average',
                     'stddev']
 
-UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli'
-DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli'
+UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli Mbps'
+DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli Mbps'
+CLI_TEST_ITERATION_COUNT = 100
+CLI_TEST_FAILURE_TOLERANCE = 0.05
 
 SINGLE_STREAM_THROUGHPUT = 'single stream %s throughput Mbps'
 
@@ -129,6 +142,10 @@ class BucketRemovalError(Exception):
     pass
 
 
+class NotEnoughResultsError(Exception):
+    pass
+
+
 def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                               bucket_name, regional_bucket_name=None):
     """This runs a collection of api-based benchmarks for s3 or GCS.
@@ -153,7 +170,8 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
 
     for bucket in buckets:
       # One byte RW latency
-      one_byte_rw_cmd = ('%s --bucket=%s --storage=%s --scenario=OneByteRW') % (
+      one_byte_rw_cmd = ('%s --bucket=%s --storage_provider=%s '
+                         '--scenario=OneByteRW') % (
                          test_script_path, bucket, storage)  # noqa
 
       _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
@@ -179,7 +197,7 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                            '%s.' % raw_result)
 
     # Single stream large object throughput metrics
-    single_stream_throughput_cmd = ('%s --bucket=%s --storage=%s '
+    single_stream_throughput_cmd = ('%s --bucket=%s --storage_provider=%s '
                                     '--scenario=SingleStreamThroughput') % (
                                     test_script_path, bucket, storage)  # noqa
     _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
@@ -206,8 +224,9 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                          'api test: %s.' % raw_result)
 
     # list-after-write consistency metrics
-    list_consistency_cmd = ('%s --bucket=%s --storage=%s --iterations=%d '
-                            '--scenario=ListConsistency') % (test_script_path,
+    list_consistency_cmd = ('%s --bucket=%s --storage_provider=%s '
+                            '--iterations=%d --scenario=ListConsistency') % (
+                            test_script_path,  # noqa
                             bucket_name,  # noqa
                             storage,  # noqa
                             LIST_CONSISTENCY_ITERATIONS)  # noqa
@@ -309,6 +328,16 @@ def CheckPrerequisites():
   data.ResourcePath(DATA_FILE)
 
 
+def _AppendPercentilesToResults(output_results, input_results, metric_name,
+                                metric_unit, metadata):
+  percentiles = PercentileCalculator(input_results)
+  for percentile in PERCENTILES_LIST:
+    output_results.append(sample.Sample(('%s %s') % (metric_name, percentile),
+                                        percentiles[percentile],
+                                        metric_unit,
+                                        metadata))
+
+
 class S3StorageBenchmark(object):
   """S3 version of storage benchmark."""
 
@@ -348,32 +377,72 @@ class S3StorageBenchmark(object):
       Then the final return value is the list of the above list that reflect
       the results of all scenarios run here.
     """
-    vm.RemoteCommand('aws s3 rm s3://%s --recursive'
-                     % self.bucket_name, ignore_failure=True)
-
-    scratch_dir = vm.GetScratchDir()
-    _, res = vm.RemoteCommand('time aws s3 sync %s/run/data/ '
-                              's3://%s/' % (scratch_dir, self.bucket_name))
-    logging.info(res)
-    time_used = vm_util.ParseTimeCommandResult(res)
-
     results = []
-    results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
 
-    vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
-    _, res = vm.RemoteCommand('time aws s3 sync '
-                              's3://%s/ %s/run/data/'
-                              % (self.bucket_name, scratch_dir))
-    logging.info(res)
-    time_used = vm_util.ParseTimeCommandResult(res)
+    # CLI tool based tests.
+    # TODO: consider making this part into a utility function that can be
+    # called by the GCP and Azure tests too.
+    cli_upload_results = []
+    cli_download_results = []
+    for _ in range(CLI_TEST_ITERATION_COUNT):
+      vm.RemoteCommand('aws s3 rm s3://%s --recursive'
+                       % self.bucket_name, ignore_failure=True)
 
-    results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+      scratch_dir = vm.GetScratchDir()
+      upload_successful = False
+      try:
+        _, res = vm.RemoteCommand('time aws s3 sync %s/run/data/ '
+                                  's3://%s/' % (scratch_dir, self.bucket_name))
+        upload_successful = True
+      except:
+        logging.info('failed to upload, skip this iteration.')
+        pass
+
+      if upload_successful:
+        logging.debug(res)
+        throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+        # Output some log traces to show we are making progress
+        logging.info('cli upload throughput %f', throughput)
+        cli_upload_results.append(throughput)
+
+        download_successful = False
+        vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
+        try:
+          _, res = vm.RemoteCommand('time aws s3 sync '
+                                    's3://%s/ %s/run/temp/'
+                                    % (self.bucket_name, scratch_dir))
+          download_successful = True
+        except:
+          logging.info('failed to download, skip this iteration.')
+          pass
+
+        if download_successful:
+          logging.debug(res)
+          throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+          logging.info('cli download throughput %f', throughput)
+          cli_download_results.append(throughput)
+
+    expected_successes = CLI_TEST_ITERATION_COUNT * (1 -
+                                                     CLI_TEST_FAILURE_TOLERANCE)
+
+    if (len(cli_download_results) < expected_successes or
+        len(cli_upload_results) < expected_successes):
+      raise NotEnoughResultsError('Failed to complete the required number of '
+                                  'iterations.')
+
+    # Report various percentiles.
+    _AppendPercentilesToResults(results,
+                                cli_upload_results,
+                                UPLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
+    _AppendPercentilesToResults(results,
+                                cli_download_results,
+                                DOWNLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
 
     # Now tests the storage provider via APIs
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
@@ -444,41 +513,79 @@ class AzureBlobStorageBenchmark(object):
       the results of all scenarios run here.
 
     """
-    vm.RemoteCommand('for i in {0..99}; do azure storage blob delete '
-                     'pkb%s file-$i.dat %s; done' %
-                     (FLAGS.run_uri, vm.azure_command_suffix),
-                     ignore_failure=True)
-
-    scratch_dir = vm.GetScratchDir()
-    _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
-                              'upload %s/run/data/file-$i.dat'
-                              ' pkb%s %s; done' %
-                              (scratch_dir, FLAGS.run_uri,
-                               vm.azure_command_suffix))
-    print res
-    time_used = vm_util.ParseTimeCommandResult(res)
-
     results = []
+    # CLI tool based tests.
+    cli_upload_results = []
+    cli_download_results = []
+    # TODO: Need to find ways to parallelize Azure's blob operations below.
+    # Currently this test takes 4-5 minutes per iteration, doing 100
+    # iteration by default is too many. We do only 10 for now.
+    for _ in range(10):
+      vm.RemoteCommand('for i in {0..99}; do azure storage blob delete '
+                       'pkb%s file-$i.dat %s; done' %
+                       (FLAGS.run_uri, vm.azure_command_suffix),
+                       ignore_failure=True)
 
-    results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+      scratch_dir = vm.GetScratchDir()
+      upload_successful = False
+      try:
+        _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage '
+                                  'blob upload %s/run/data/file-$i.dat '
+                                  'pkb%s %s; done' %
+                                  (scratch_dir, FLAGS.run_uri,
+                                   vm.azure_command_suffix))
+        upload_successful = True
+      except:
+        pass
 
-    vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
-    _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage blob '
-                              'download pkb%s '
-                              'file-$i.dat %s/run/data/file-$i.dat %s; done' %
-                              (FLAGS.run_uri, scratch_dir,
-                               vm.azure_command_suffix))
-    print res
-    time_used = vm_util.ParseTimeCommandResult(res)
+      if upload_successful:
+        logging.debug(res)
+        throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
 
-    results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+        # Output some log traces to show we are making progress
+        logging.info('cli upload throughput %f', throughput)
+        cli_upload_results.append(throughput)
 
+        vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
+        download_successful = False
+        try:
+          _, res = vm.RemoteCommand('time for i in {0..99}; do azure storage '
+                                    'blob download pkb%s file-$i.dat '
+                                    '%s/run/temp/file-$i.dat %s; done' %
+                                    (FLAGS.run_uri, scratch_dir,
+                                     vm.azure_command_suffix))
+          download_successful = True
+        except:
+          pass
+
+        if download_successful:
+          logging.debug(res)
+          throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+          # Output some log traces to show we are making progress
+          logging.info('cli download throughput %f', throughput)
+          cli_download_results.append(throughput)
+
+    expected_successes = CLI_TEST_ITERATION_COUNT * (1 -
+                                                     CLI_TEST_FAILURE_TOLERANCE)
+
+    if (len(cli_download_results) < expected_successes or
+        len(cli_upload_results) < expected_successes):
+      raise NotEnoughResultsError('Failed to complete the required number of '
+                                  'iterations.')
+
+    _AppendPercentilesToResults(results,
+                                cli_upload_results,
+                                UPLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
+    _AppendPercentilesToResults(results,
+                                cli_download_results,
+                                DOWNLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
+
+    # TODO: Add API based tests for Azure.
     return results
 
   def Cleanup(self, vm):
@@ -561,43 +668,79 @@ class GoogleCloudStorageBenchmark(object):
       Then the final return value is the list of the above list that reflect
       the results of all scenarios run here.
     """
-    vm.RemoteCommand('%s rm gs://%s/*' %
-                     (vm.gsutil_path, self.bucket_name), ignore_failure=True)
-
-    scratch_dir = vm.GetScratchDir()
-    _, res = vm.RemoteCommand('time %s -m cp %s/run/data/* '
-                              'gs://%s/' % (vm.gsutil_path, scratch_dir,
-                                            self.bucket_name))
-
-    print res
-    time_used = vm_util.ParseTimeCommandResult(res)
-
     results = []
+    # CLI tool based tests.
+    cli_upload_results = []
+    cli_download_results = []
+    for _ in range(CLI_TEST_ITERATION_COUNT):
+      vm.RemoteCommand('%s rm gs://%s/*' %
+                       (vm.gsutil_path, self.bucket_name), ignore_failure=True)
 
-    results.append(sample.Sample(UPLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+      scratch_dir = vm.GetScratchDir()
+      upload_successful = False
+      try:
+        _, res = vm.RemoteCommand('time %s -m cp %s/run/data/* '
+                                  'gs://%s/' % (vm.gsutil_path, scratch_dir,
+                                                self.bucket_name))
+        upload_successful = True
+      except:
+        pass
 
-    vm.RemoteCommand('rm %s/run/data/*' % scratch_dir)
-    _, res = vm.RemoteCommand('time %s -m cp '
-                              'gs://%s/* '
-                              '%s/run/data/' % (vm.gsutil_path,
-                                                self.bucket_name,
-                                                scratch_dir))
-    print res
-    time_used = vm_util.ParseTimeCommandResult(res)
+      if upload_successful:
+        logging.debug(res)
+        throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
 
-    results.append(sample.Sample(DOWNLOAD_THROUGHPUT_VIA_CLI,
-                                 DATA_SIZE_IN_MBITS / time_used,
-                                 THROUGHPUT_UNIT,
-                                 metadata))
+        # Output some log traces to show we are making progress
+        logging.info('cli upload throughput %f', throughput)
+        cli_upload_results.append(throughput)
 
+        vm.RemoteCommand('rm %s/run/temp/*' % scratch_dir, ignore_failure=True)
+
+        download_successful = False
+        try:
+          _, res = vm.RemoteCommand('time %s -m cp '
+                                    'gs://%s/* '
+                                    '%s/run/temp/' % (vm.gsutil_path,
+                                                      self.bucket_name,
+                                                      scratch_dir))
+          download_successful = True
+        except:
+          pass
+
+        if download_successful:
+          logging.debug(res)
+          throughput = DATA_SIZE_IN_MBITS / vm_util.ParseTimeCommandResult(res)
+
+          # Output some log traces to show we are making progress
+          logging.info('cli download throughput %f', throughput)
+          cli_download_results.append(throughput)
+
+    expected_successes = CLI_TEST_ITERATION_COUNT * (1 -
+                                                     CLI_TEST_FAILURE_TOLERANCE)
+
+    if (len(cli_download_results) < expected_successes or
+        len(cli_upload_results) < expected_successes):
+      raise NotEnoughResultsError('Failed to complete the required number of '
+                                  'iterations.')
+
+    _AppendPercentilesToResults(results,
+                                cli_upload_results,
+                                UPLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
+    _AppendPercentilesToResults(results,
+                                cli_download_results,
+                                DOWNLOAD_THROUGHPUT_VIA_CLI,
+                                THROUGHPUT_UNIT,
+                                metadata)
+
+    # API-based benchmarking of GCS
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
     S3orGCSApiBasedBenchmarks(results, metadata, vm, 'GCS', test_script_path,
                               self.bucket_name, self.regional_bucket_name)
 
     return results
+
 
   def Cleanup(self, vm):
     """Clean up Google Cloud Storage bucket and uninstall packages on vm.
@@ -651,7 +794,6 @@ def Prepare(benchmark_spec):
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)
 
-  # vms[0].RemoteCommand('sudo apt-get update')
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
 
   # Prepare data on vm, create a run directory on scratch drive, and add
@@ -659,6 +801,9 @@ def Prepare(benchmark_spec):
   scratch_dir = vms[0].GetScratchDir()
   vms[0].RemoteCommand('sudo mkdir %s/run/' % scratch_dir)
   vms[0].RemoteCommand('sudo chmod 777 %s/run/' % scratch_dir)
+
+  vms[0].RemoteCommand('sudo mkdir %s/run/temp/' % scratch_dir)
+  vms[0].RemoteCommand('sudo chmod 777 %s/run/temp/' % scratch_dir)
 
   file_path = data.ResourcePath(DATA_FILE)
   vms[0].PushFile(file_path, '%s/run/' % scratch_dir)
