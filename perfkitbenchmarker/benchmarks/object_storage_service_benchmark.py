@@ -34,13 +34,6 @@ RunX: Run upload/download on vm using storage tools from cloud providers.
 CleanupX: Cleanup storage tools on vm.
 
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
-
-To select a particular benchmarking scenario, use the --scenario flag:
-1. 'all' runs all scenarios. This is the default.
-2. 'cli' runs the command line only scenario.
-3. 'apiData' runs API based benchmarking for data paths.
-4. 'apiNameSpace' runs API based benchmarking for namespace operations, e.g.:
-   list consistency benchmarking.
 """
 
 import json
@@ -62,9 +55,14 @@ flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
                    benchmark_spec_class.AZURE],
                   'storage provider (GCP/AZURE/AWS) to use.')
 
-flags.DEFINE_enum('scenario', 'all',
-                  ['all', 'cli', 'apiData', 'apiNameSpace'],
-                  'select all, or one particular scenario to run.')
+flags.DEFINE_enum('object_storage_scenario', 'all',
+                  ['all', 'cli', 'api_data', 'api_namespace'],
+                  'select all, or one particular scenario to run: '
+                  'all: runs all scenarios. This is the default. '
+                  'cli: runs the command line only scenario. '
+                  'api_data: runs API based benchmarking for data paths. '
+                  'api_namespace: runs API based benchmarking for namespace '
+                  'operations')
 
 flags.DEFINE_string('object_storage_credential_file', None,
                     'Directory of credential file.')
@@ -78,7 +76,8 @@ FLAGS = flags.FLAGS
 # use CLI tools to interact with the storage provider.
 BENCHMARK_INFO = {'name': 'object_storage_service',
                   'description':
-                  'Object/blob storage service benchmarks. Specify --scenario '
+                  'Object/blob storage service benchmarks. Specify '
+                  '--object_storage_scenario '
                   'to select a set of sub-benchmarks to run. default is all.',
                   'scratch_disk': True,
                   'num_machines': 1}
@@ -115,6 +114,10 @@ UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli Mbps'
 DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli Mbps'
 CLI_TEST_ITERATION_COUNT = 100
 CLI_TEST_FAILURE_TOLERANCE = 0.05
+# TODO: Need to find ways to parallelize Azure's blob operations below.
+# Currently this test takes 4-5 minutes per iteration, doing 100
+# iteration by default is too many. We do only 8 for now.
+CLI_TEST_ITERATION_COUNT_AZURE = 8
 
 SINGLE_STREAM_THROUGHPUT = 'single stream %s throughput Mbps'
 
@@ -149,6 +152,8 @@ class NotEnoughResultsError(Exception):
     pass
 
 
+# TODO: Add api-based benchmarks for Azure here and then consider splitting this
+# into multiple functions, one for each scenario.
 def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                               bucket_name, regional_bucket_name=None):
     """This runs a collection of api-based benchmarks for s3 or GCS.
@@ -164,14 +169,15 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     Raises:
       ValueError: unexpected test outcome is found from the API test script.
     """
-    if FLAGS.scenario == 'cli':
+    if FLAGS.object_storage_scenario == 'cli':
       # User only wants to run the CLI based tests, do nothing here:
       return
 
     if storage is not 'S3' and storage is not 'GCS':
       raise ValueError("Storage must be S3 or GCS to invoke this function")
 
-    if FLAGS.scenario == 'all' or FLAGS.scenario == 'apiData':
+    if FLAGS.object_storage_scenario == 'all' or \
+       FLAGS.object_storage_scenario == 'api_data':
       # One byte RW latency
       buckets = [bucket_name]
       if regional_bucket_name is not None:
@@ -231,7 +237,8 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
           raise ValueError('Unexpected test outcome from '
                            'SingleStreamThroughput api test: %s.' % raw_result)
 
-    if FLAGS.scenario == 'all' or FLAGS.scenario == 'apiNameSpace':
+    if FLAGS.object_storage_scenario == 'all' or \
+       FLAGS.object_storage_scenario == 'api_namespace':
       # list-after-write consistency metrics
       list_consistency_cmd = ('%s --bucket=%s --storage_provider=%s '
                               '--iterations=%d --scenario=ListConsistency') % (
@@ -347,10 +354,29 @@ def _AppendPercentilesToResults(output_results, input_results, metric_name,
                                         metadata))
 
 
-def _cliBasedTests(output_results, metadata, vm, iteration_count,
+def _CliBasedTests(output_results, metadata, vm, iteration_count,
                    clean_up_bucket_cmd, upload_cmd,
                    cleanup_local_temp_cmd, download_cmd):
-  if FLAGS.scenario != 'all' and FLAGS.scenario != 'cli':
+  """ Performs tests via cli tools
+
+    We will upload and download a set of files from/to a local directory via
+    cli tools and observe the throughput.
+
+    Args:
+      output_results: the collection to put results in.
+      metadata: the metadata to be included in the result.
+      vm: the vm to run the tests.
+      iteration_count: the number of iterations to run for this test.
+      clean_up_bucket_cmd: the command to run to cleanup the bucket.
+      upload_cmd: the command to run to upload the objects.
+      cleanup_local_temp_cmd: the command to run to cleanup the local temp dir.
+      download_cmd: the command to run to download the content.
+
+    Raises:
+      NotEnoughResultsError: if we failed too many times to upload or download.
+  """
+  if FLAGS.object_storage_scenario != 'all' and \
+     FLAGS.object_storage_scenario != 'cli':
     # User does not want to run this scenario, do nothing.
     return
 
@@ -463,7 +489,7 @@ class S3StorageBenchmark(object):
     download_cmd = 'time aws s3 sync s3://%s/ %s/run/temp/' % (
                    self.bucket_name, scratch_dir)
 
-    _cliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT,
+    _CliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT,
                    clean_up_bucket_cmd, upload_cmd, cleanup_local_temp_cmd,
                    download_cmd)
 
@@ -551,15 +577,12 @@ class AzureBlobStorageBenchmark(object):
                     'pkb%s file-$i.dat %s/run/temp/file-$i.dat %s; done') % (
                     FLAGS.run_uri, scratch_dir, vm.azure_command_suffix)  # noqa
 
-    # TODO: Need to find ways to parallelize Azure's blob operations below.
-    # Currently this test takes 4-5 minutes per iteration, doing 100
-    # iteration by default is too many. We do only 10 for now.
-    _cliBasedTests(results, metadata, vm, 10,
+    _CliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT_AZURE,
                    clean_up_bucket_cmd, upload_cmd, cleanup_local_temp_cmd,
                    download_cmd)
 
     # TODO: Add API based tests for Azure.
-    if FLAGS.scenario != 'cli':
+    if FLAGS.object_storage_scenario != 'cli':
       # We have not implemented API based tests for Azure yet, print a warning.
       logging.info('API based tests for Azure has not been implemented yet. '
                    'The returned result set will likely be empty.')
@@ -658,7 +681,7 @@ class GoogleCloudStorageBenchmark(object):
                                                              self.bucket_name,
                                                              scratch_dir)
 
-    _cliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT,
+    _CliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT,
                    clean_up_bucket_cmd, upload_cmd, cleanup_local_temp_cmd,
                    download_cmd)
 
@@ -753,7 +776,7 @@ def Run(benchmark_spec):
   """
   logging.info('Start benchmarking object storage service, '
                'scenario is %s, storage provider is %s.',
-               FLAGS.scenario, FLAGS.storage)
+               FLAGS.object_storage_scenario, FLAGS.storage)
 
   metadata = {'storage provider': FLAGS.storage}
 
