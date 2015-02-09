@@ -363,14 +363,14 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
     cli tools and observe the throughput.
 
     Args:
-      output_results: the collection to put results in.
-      metadata: the metadata to be included in the result.
-      vm: the vm to run the tests.
-      iteration_count: the number of iterations to run for this test.
-      clean_up_bucket_cmd: the command to run to cleanup the bucket.
-      upload_cmd: the command to run to upload the objects.
-      cleanup_local_temp_cmd: the command to run to cleanup the local temp dir.
-      download_cmd: the command to run to download the content.
+      output_results: The collection to put results in.
+      metadata: The metadata to be included in the result.
+      vm: The vm to run the tests.
+      iteration_count: The number of iterations to run for this test.
+      clean_up_bucket_cmd: The command to run to cleanup the bucket.
+      upload_cmd: The command to run to upload the objects.
+      cleanup_local_temp_cmd: The command to run to cleanup the local temp dir.
+      download_cmd: The command to run to download the content.
 
     Raises:
       NotEnoughResultsError: if we failed too many times to upload or download.
