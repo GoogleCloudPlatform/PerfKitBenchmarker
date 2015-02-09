@@ -28,11 +28,6 @@ category:
   b: List-after-write and list-after-update consistency measurement.
   c: Single stream large object upload and download, measures throughput.
 
-Naming Conventions (X refers to cloud providers):
-PrepareX: Prepare vm with necessary storage tools from cloud providers.
-RunX: Run upload/download on vm using storage tools from cloud providers.
-CleanupX: Cleanup storage tools on vm.
-
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
 """
 
