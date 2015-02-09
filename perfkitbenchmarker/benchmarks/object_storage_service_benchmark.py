@@ -57,12 +57,12 @@ flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
 
 flags.DEFINE_enum('object_storage_scenario', 'all',
                   ['all', 'cli', 'api_data', 'api_namespace'],
-                  'select all, or one particular scenario to run: '
-                  'all: runs all scenarios. This is the default. '
-                  'cli: runs the command line only scenario. '
-                  'api_data: runs API based benchmarking for data paths. '
+                  'select all, or one particular scenario to run: \n'
+                  'ALL: runs all scenarios. This is the default. \n'
+                  'cli: runs the command line only scenario. \n'
+                  'api_data: runs API based benchmarking for data paths. \n'
                   'api_namespace: runs API based benchmarking for namespace '
-                  'operations')
+                  'operations.')
 
 flags.DEFINE_string('object_storage_credential_file', None,
                     'Directory of credential file.')
@@ -176,8 +176,8 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     if storage is not 'S3' and storage is not 'GCS':
       raise ValueError("Storage must be S3 or GCS to invoke this function")
 
-    if FLAGS.object_storage_scenario == 'all' or \
-       FLAGS.object_storage_scenario == 'api_data':
+    if (FLAGS.object_storage_scenario == 'all' or
+        FLAGS.object_storage_scenario == 'api_data'):
       # One byte RW latency
       buckets = [bucket_name]
       if regional_bucket_name is not None:
@@ -237,15 +237,15 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
           raise ValueError('Unexpected test outcome from '
                            'SingleStreamThroughput api test: %s.' % raw_result)
 
-    if FLAGS.object_storage_scenario == 'all' or \
-       FLAGS.object_storage_scenario == 'api_namespace':
+    if (FLAGS.object_storage_scenario == 'all' or
+        FLAGS.object_storage_scenario == 'api_namespace'):
       # list-after-write consistency metrics
       list_consistency_cmd = ('%s --bucket=%s --storage_provider=%s '
                               '--iterations=%d --scenario=ListConsistency') % (
-                              test_script_path,  # noqa
-                              bucket_name,  # noqa
-                              storage,  # noqa
-                              LIST_CONSISTENCY_ITERATIONS)  # noqa
+                                  test_script_path,
+                                  bucket_name,
+                                  storage,
+                                  LIST_CONSISTENCY_ITERATIONS)
 
       _, raw_result = vm.RemoteCommand(list_consistency_cmd)
       logging.info('ListConsistency raw result is %s' % raw_result)
@@ -375,8 +375,8 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
     Raises:
       NotEnoughResultsError: if we failed too many times to upload or download.
   """
-  if FLAGS.object_storage_scenario != 'all' and \
-     FLAGS.object_storage_scenario != 'cli':
+  if (FLAGS.object_storage_scenario != 'all' and
+      FLAGS.object_storage_scenario != 'cli'):
     # User does not want to run this scenario, do nothing.
     return
 
