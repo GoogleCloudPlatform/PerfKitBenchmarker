@@ -79,13 +79,13 @@ ONE_BYTE_OBJECT_COUNT = 1000
 LIST_CONSISTENCY_WAIT_TIME_LIMIT = 300
 
 # Total number of objects we will provision before we do the list
-# This covers 3 pages of List (one page == 1000 objects)
-LIST_CONSISTENCY_OBJECT_COUNT = 2100
+# This covers 5 pages of List (one page == 1000 objects)
+LIST_CONSISTENCY_OBJECT_COUNT = 5000
 
 # List-after-update (delete) consistency:
 # We will randomly delete X% number of objects we have just written, and then
 # do a list immediately to check consistency. The number below defines the X
-LIST_AFTER_UPDATE_DELETION_RATIO = 0.4
+LIST_AFTER_UPDATE_DELETION_RATIO = 0.1
 
 # Provisioning is done in parallel threads to reduce test iteration time!
 # This number specifies the thread count.
@@ -160,6 +160,8 @@ def DeleteObjects(storage_schema, bucket, objects_to_delete,
     bucket: Name of the bucket.
     objects_to_delete: A list of names of objects to delete.
     host_to_connect: An optional endpoint string to connect to.
+    objects_deleted: An optional list to record the objects that have been
+        successfully deleted.
   """
 
   for object_name in objects_to_delete:
@@ -241,6 +243,17 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
 
 def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
                 bandwidth_results=None, object_size=None, host_to_connect=None):
+  """Read a bunch of objects.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    bucket: Name of the bucket.
+    objects_to_read: A list of names of objects to read.
+    latency_results: An optional list to receive latency results.
+    bandwidth_results: An optional list to receive bandwidth results.
+    object_size: Size of the object that will be read, used to calculate bw.
+    host_to_connect: An optional endpoint string to connect to.
+  """
   for object_name in objects_to_read:
     object_path = '%s/%s' % (FLAGS.bucket, object_name)
     object_uri = boto.storage_uri(object_path, storage_schema)
@@ -265,6 +278,16 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
 
 def DeleteObjectsConcurrently(storage_schema, per_thread_objects_to_delete,
                               host_to_connect, per_thread_objects_deleted):
+  """Delete a bunch of objects concurrently.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    per_thread_objects_to_delete: A 2-d list of objects to delete per thread.
+
+    host_to_connect: An optional endpoint string to connect to.
+    per_thread_objects_deleted: A list to record the objects that have been
+        successfully deleted per thread.
+  """
   threads = []
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     thread = Thread(target=DeleteObjects,
@@ -287,6 +310,17 @@ def DeleteObjectsConcurrently(storage_schema, per_thread_objects_to_delete,
 
 def ListAndWaitForObjects(counting_start_time, expected_set_of_objects,
                           storage_schema, object_prefix, host_to_connect):
+  """List objects and wait for consistency.
+
+  Args:
+    counting_start_time: The start time used to count for the inconsistency
+        window.
+    expected_set_of_objects: The set of expectation.
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    object_prefix: The prefix of objects to list from.
+    host_to_connect: An optional endpoint string to connect to.
+  """
+
   total_wait_time = 0
   list_count = 0
   result_consistent = False
@@ -310,6 +344,17 @@ def ListAndWaitForObjects(counting_start_time, expected_set_of_objects,
 
 def AnalyzeListResults(final_result, result_consistent, list_count,
                        list_latency, total_wait_time, list_scenario):
+  """Analyze the results of list consistency test, and fill in the final result.
+
+  Args:
+    final_result: The final result array to fill in.
+    result_consistent: Is the final result consistent.
+    list_count: The number of lists done.
+    list_latency: The latency of the lists.
+    total_wait_time: Time spent waiting for the list to be consistent.
+    list_scenario: The scenario that was tested: list-after-update,
+        list-after-write.
+  """
   result_string_consistency = '%s%s' % (list_scenario,
                                         LIST_RESULT_SUFFIX_CONSISTENT)
   result_string_latency = '%s%s' % (list_scenario, LIST_RESULT_SUFFIX_LATENCY)

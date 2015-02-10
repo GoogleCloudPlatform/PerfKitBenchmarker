@@ -149,6 +149,17 @@ class NotEnoughResultsError(Exception):
     pass
 
 
+def _JsonStringToPercentileResults(results, json_input, metric_name,
+                                   metric_unit, metadata):
+  result = json.loads(json_input)
+  for percentile in PERCENTILES_LIST:
+    results.append(sample.Sample(
+        ('%s %s') % (metric_name, percentile),
+        float(result[percentile]),
+        metric_unit,
+        metadata))
+
+
 # TODO: Add api-based benchmarks for Azure here and then consider splitting this
 # into multiple functions, one for each scenario.
 def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
@@ -196,13 +207,11 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
             sample_name = 'regional %s' % sample_name
 
           if len(result_string) > 0:
-            result = json.loads(result_string[0])
-            for percentile in PERCENTILES_LIST:
-              results.append(sample.Sample(
-                  ('%s %s') % (sample_name, percentile),
-                  float(result[percentile]),
-                  LATENCY_UNIT,
-                  metadata))
+            _JsonStringToPercentileResults(results,
+                                           result_string[0],
+                                           sample_name,
+                                           LATENCY_UNIT,
+                                           metadata)
           else:
             raise ValueError('Unexpected test outcome from OneByteRW api test: '
                              '%s.' % raw_result)
@@ -265,13 +274,11 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
         search_string = '%s: (.*)' % metric_name
         result_string = re.findall(search_string, raw_result)
         if len(result_string) > 0:
-          result = json.loads(result_string[0])
-          for percentile in PERCENTILES_LIST:
-            results.append(sample.Sample(
-                ('%s %s') % (metric_name, percentile),
-                float(result[percentile]),
-                LATENCY_UNIT,
-                metadata))
+          _JsonStringToPercentileResults(results,
+                                         result_string[0],
+                                         metric_name,
+                                         LATENCY_UNIT,
+                                         metadata)
 
         # Also report the list latency. These latencies are from the lists
         # that were consistent.
@@ -279,13 +286,11 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
         search_string = '%s: (.*)' % metric_name
         result_string = re.findall(search_string, raw_result)
         if len(result_string) > 0:
-          result = json.loads(result_string[0])
-          for percentile in PERCENTILES_LIST:
-            results.append(sample.Sample(
-                ('%s %s') % (metric_name, percentile),
-                float(result[percentile]),
-                LATENCY_UNIT,
-                metadata))
+          _JsonStringToPercentileResults(results,
+                                         result_string[0],
+                                         metric_name,
+                                         LATENCY_UNIT,
+                                         metadata)
 
 
 def DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd):
