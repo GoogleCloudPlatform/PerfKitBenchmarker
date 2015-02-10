@@ -356,8 +356,8 @@ def AnalyzeListResults(final_result, result_consistent, list_count,
     final_result: The final result array to fill in.
     result_consistent: Is the final result consistent.
     list_count: The number of lists done.
-    list_latency: The latency of the lists.
-    total_wait_time: Time spent waiting for the list to be consistent.
+    list_latency: The latency of the lists in seconds.
+    total_wait_time: Time spent waiting for the list to be consistent (seconds).
     list_scenario: The scenario that was tested: list-after-update,
         list-after-write.
   """
