@@ -319,6 +319,12 @@ def ListAndWaitForObjects(counting_start_time, expected_set_of_objects,
     storage_schema: The address schema identifying a storage. e.g., "gs"
     object_prefix: The prefix of objects to list from.
     host_to_connect: An optional endpoint string to connect to.
+
+  Returns:
+    result_consistent: Is the list consistent
+    list_count: Count of the lists before the result is consistent.
+    list_latency: Latency of the list request that is consistent.
+    total_wait_time: Total time waited before it's consistent.
   """
 
   total_wait_time = 0
@@ -376,8 +382,8 @@ def AnalyzeListResults(final_result, result_consistent, list_count,
     logging.debug('Results are still inconsistent after waiting for the max '
                   'limit!')
     final_result[result_string_consistency] = False
-    final_result[result_string_inconsistency_window] = \
-        LIST_CONSISTENCY_WAIT_TIME_LIMIT
+    final_result[result_string_inconsistency_window] = (
+        LIST_CONSISTENCY_WAIT_TIME_LIMIT)
 
 
 def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
@@ -568,9 +574,9 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
   # Now list this bucket under this prefix, compare the list results with
   # objects_written. If they are not the same, keep doing it until they
   # are the same.
-  result_consistent, list_count, list_latency, total_wait_time = \
+  result_consistent, list_count, list_latency, total_wait_time = (
       ListAndWaitForObjects(write_finish_time, set(final_objects_written),
-                            storage_schema, object_prefix, host_to_connect)
+                            storage_schema, object_prefix, host_to_connect))
 
   final_result = {}
   AnalyzeListResults(final_result, result_consistent, list_count, list_latency,
@@ -590,18 +596,18 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
 
   # Now delete some objects and do list again, this measures list-after-update
   # consistency
-  per_thread_objects_to_delete = [[] for i in
-                                  range(LIST_CONSISTENCY_THREAD_COUNT)]  # noqa
+  per_thread_objects_to_delete = [
+      [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)]
 
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     for j in range(len(per_thread_objects_written[i])):
-      # Delete about 30% of the objects writte so far.
+      # Delete about 30% of the objects written so far.
       if random.Random() < LIST_AFTER_UPDATE_DELETION_RATIO:
         per_thread_objects_to_delete[i].append(per_thread_objects_written[i][j])
 
   # Now issue the delete concurrently.
-  per_thread_objects_deleted = [[] for i in
-                                range(LIST_CONSISTENCY_THREAD_COUNT)]  # noqa
+  per_thread_objects_deleted = [
+      [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)]
 
   DeleteObjectsConcurrently(storage_schema,
                             per_thread_objects_to_delete,
@@ -615,9 +621,9 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
       per_thread_objects_written[i].remove(per_thread_objects_deleted[i][k])
     final_expectation += per_thread_objects_written[i]
 
-  result_consistent, list_count, list_latency, total_wait_time = \
-      ListAndWaitForObjects(delete_finish_time, set(final_expectation),  # noqa
-                            storage_schema, object_prefix, host_to_connect)  # noqa
+  result_consistent, list_count, list_latency, total_wait_time = (
+      ListAndWaitForObjects(delete_finish_time, set(final_expectation),
+                            storage_schema, object_prefix, host_to_connect))
 
   AnalyzeListResults(final_result, result_consistent, list_count, list_latency,
                      total_wait_time, LIST_AFTER_UPDATE_SCENARIO)
@@ -700,8 +706,8 @@ def Main(argv=sys.argv):
       if len(list_inconsistency_window[scenario]) > 0:
         logging.info('%s inconsistency window: %s', scenario,
                      json.dumps(PercentileCalculator(
-                                    list_inconsistency_window[scenario]),  # noqa
-                                sort_keys=True))
+                         list_inconsistency_window[scenario]),
+                         sort_keys=True))
 
       if len(list_latency[scenario]) > 0:
         logging.info('%s latency: %s', scenario,

@@ -151,6 +151,15 @@ class NotEnoughResultsError(Exception):
 
 def _JsonStringToPercentileResults(results, json_input, metric_name,
                                    metric_unit, metadata):
+  """This function parses a percentile result string in Json format.
+
+  Args:
+    results: The final result set to put result in.
+    json_input: The input in Json format about percentiles.
+    metric_name: Name of the metric.
+    metric_unit: Unit of the metric.
+    metadata: The metadata to be included.
+  """
   result = json.loads(json_input)
   for percentile in PERCENTILES_LIST:
     results.append(sample.Sample(
