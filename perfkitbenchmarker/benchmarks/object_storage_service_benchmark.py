@@ -117,9 +117,11 @@ CLI_TEST_ITERATION_COUNT_AZURE = 8
 SINGLE_STREAM_THROUGHPUT = 'single stream %s throughput Mbps'
 
 ONE_BYTE_LATENCY = 'one byte %s latency'
-LAW_CONSISTENCY_PERCENTAGE = 'list-after-write consistency percentage'
-LAW_INCONSISTENCY_WINDOW = 'list-after-write inconsistency window'
-CONSISTENT_LIST_LATENCY = 'consistent list latency'
+
+LIST_CONSISTENCY_SCENARIOS = ['list-after-write', 'list-after-update']
+LIST_CONSISTENCY_PERCENTAGE = 'consistency percentage'
+LIST_INCONSISTENCY_WINDOW = 'inconsistency window'
+LIST_LATENCY = 'latency'
 
 CONTENT_REMOVAL_RETRY_LIMIT = 5
 # Some times even when a bucket is completely empty, the service provider would
@@ -145,6 +147,26 @@ class BucketRemovalError(Exception):
 
 class NotEnoughResultsError(Exception):
     pass
+
+
+def _JsonStringToPercentileResults(results, json_input, metric_name,
+                                   metric_unit, metadata):
+  """This function parses a percentile result string in Json format.
+
+  Args:
+    results: The final result set to put result in.
+    json_input: The input in Json format about percentiles.
+    metric_name: Name of the metric.
+    metric_unit: Unit of the metric.
+    metadata: The metadata to be included.
+  """
+  result = json.loads(json_input)
+  for percentile in PERCENTILES_LIST:
+    results.append(sample.Sample(
+        ('%s %s') % (metric_name, percentile),
+        float(result[percentile]),
+        metric_unit,
+        metadata))
 
 
 # TODO: Add api-based benchmarks for Azure here and then consider splitting this
@@ -194,13 +216,11 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
             sample_name = 'regional %s' % sample_name
 
           if len(result_string) > 0:
-            result = json.loads(result_string[0])
-            for percentile in PERCENTILES_LIST:
-              results.append(sample.Sample(
-                  ('%s %s') % (sample_name, percentile),
-                  float(result[percentile]),
-                  LATENCY_UNIT,
-                  metadata))
+            _JsonStringToPercentileResults(results,
+                                           result_string[0],
+                                           sample_name,
+                                           LATENCY_UNIT,
+                                           metadata)
           else:
             raise ValueError('Unexpected test outcome from OneByteRW api test: '
                              '%s.' % raw_result)
@@ -245,40 +265,41 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       _, raw_result = vm.RemoteCommand(list_consistency_cmd)
       logging.info('ListConsistency raw result is %s' % raw_result)
 
-      search_string = 'List consistency percentage: (.*)'
-      result_string = re.findall(search_string, raw_result)
-      if len(result_string) > 0:
-        results.append(sample.Sample(LAW_CONSISTENCY_PERCENTAGE,
-                                     (float)(result_string[0]),
-                                     NA_UNIT,
-                                     metadata))
-      else:
-        raise ValueError(
-            'Cannot get percentage from ListConsistency test.')
+      for scenario in LIST_CONSISTENCY_SCENARIOS:
+        metric_name = '%s %s' % (scenario, LIST_CONSISTENCY_PERCENTAGE)
+        search_string = '%s: (.*)' % metric_name
+        result_string = re.findall(search_string, raw_result)
+        if len(result_string) > 0:
+          results.append(sample.Sample(metric_name,
+                                       (float)(result_string[0]),
+                                       NA_UNIT,
+                                       metadata))
+        else:
+          raise ValueError(
+              'Cannot get percentage from ListConsistency test.')
 
-      # Parse the list inconsistency window if there is any.
-      search_string = 'List inconsistency window: (.*)'
-      result_string = re.findall(search_string, raw_result)
-      if len(result_string) > 0:
-        result = json.loads(result_string[0])
-        for percentile in PERCENTILES_LIST:
-          results.append(sample.Sample(
-              ('%s %s') % (LAW_INCONSISTENCY_WINDOW, percentile),
-              float(result[percentile]),
-              LATENCY_UNIT,
-              metadata))
+        # Parse the list inconsistency window if there is any.
+        metric_name = '%s %s' % (scenario, LIST_INCONSISTENCY_WINDOW)
+        search_string = '%s: (.*)' % metric_name
+        result_string = re.findall(search_string, raw_result)
+        if len(result_string) > 0:
+          _JsonStringToPercentileResults(results,
+                                         result_string[0],
+                                         metric_name,
+                                         LATENCY_UNIT,
+                                         metadata)
 
-      # Also report the list latency from those lists that are consistent
-      search_string = 'List latency: (.*)'
-      result_string = re.findall(search_string, raw_result)
-      if len(result_string) > 0:
-        result = json.loads(result_string[0])
-        for percentile in PERCENTILES_LIST:
-          results.append(sample.Sample(
-              ('%s %s') % (CONSISTENT_LIST_LATENCY, percentile),
-              float(result[percentile]),
-              LATENCY_UNIT,
-              metadata))
+        # Also report the list latency. These latencies are from the lists
+        # that were consistent.
+        metric_name = '%s %s' % (scenario, LIST_LATENCY)
+        search_string = '%s: (.*)' % metric_name
+        result_string = re.findall(search_string, raw_result)
+        if len(result_string) > 0:
+          _JsonStringToPercentileResults(results,
+                                         result_string[0],
+                                         metric_name,
+                                         LATENCY_UNIT,
+                                         metadata)
 
 
 def DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd):

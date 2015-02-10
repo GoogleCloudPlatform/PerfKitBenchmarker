@@ -79,12 +79,24 @@ ONE_BYTE_OBJECT_COUNT = 1000
 LIST_CONSISTENCY_WAIT_TIME_LIMIT = 300
 
 # Total number of objects we will provision before we do the list
-# This covers 3 pages of List (one page == 1000 objects)
-LIST_CONSISTENCY_OBJECT_COUNT = 2100
+# This covers 5 pages of List (one page == 1000 objects)
+LIST_CONSISTENCY_OBJECT_COUNT = 5000
+
+# List-after-update (delete) consistency:
+# We will randomly delete X% number of objects we have just written, and then
+# do a list immediately to check consistency. The number below defines the X
+LIST_AFTER_UPDATE_DELETION_RATIO = 0.1
 
 # Provisioning is done in parallel threads to reduce test iteration time!
 # This number specifies the thread count.
 LIST_CONSISTENCY_THREAD_COUNT = 100
+
+# Names of the list consistency scenarios we test in this benchmark
+LIST_AFTER_WRITE_SCENARIO = 'list-after-write'
+LIST_AFTER_UPDATE_SCENARIO = 'list-after-update'
+LIST_RESULT_SUFFIX_CONSISTENT = '-consistent'
+LIST_RESULT_SUFFIX_LATENCY = '-latency'
+LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW = '-inconsistency-window'
 
 # Size of large objects used in single stream throughput benchmarking.
 # 100 MiB (100 * 2 ^ 20)
@@ -139,7 +151,8 @@ def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
 
 
 def DeleteObjects(storage_schema, bucket, objects_to_delete,
-                  host_to_connect=None):
+                  host_to_connect=None,
+                  objects_deleted=None):
   """Delete a bunch of objects.
 
   Args:
@@ -147,6 +160,8 @@ def DeleteObjects(storage_schema, bucket, objects_to_delete,
     bucket: Name of the bucket.
     objects_to_delete: A list of names of objects to delete.
     host_to_connect: An optional endpoint string to connect to.
+    objects_deleted: An optional list to record the objects that have been
+        successfully deleted.
   """
 
   for object_name in objects_to_delete:
@@ -157,6 +172,8 @@ def DeleteObjects(storage_schema, bucket, objects_to_delete,
 
     try:
       object_uri.delete_key()
+      if objects_deleted is not None:
+        objects_deleted.append(object_name)
     except:
       logging.exception('Caught exception while deleting object %s.',
                         object_path)
@@ -226,6 +243,17 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
 
 def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
                 bandwidth_results=None, object_size=None, host_to_connect=None):
+  """Read a bunch of objects.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    bucket: Name of the bucket.
+    objects_to_read: A list of names of objects to read.
+    latency_results: An optional list to receive latency results.
+    bandwidth_results: An optional list to receive bandwidth results.
+    object_size: Size of the object that will be read, used to calculate bw.
+    host_to_connect: An optional endpoint string to connect to.
+  """
   for object_name in objects_to_read:
     object_path = '%s/%s' % (FLAGS.bucket, object_name)
     object_uri = boto.storage_uri(object_path, storage_schema)
@@ -246,6 +274,116 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
         bandwidth_results.append(object_size / latency)
     except:
       logging.exception('Failed to read object %s', object_path)
+
+
+def DeleteObjectsConcurrently(storage_schema, per_thread_objects_to_delete,
+                              host_to_connect, per_thread_objects_deleted):
+  """Delete a bunch of objects concurrently.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    per_thread_objects_to_delete: A 2-d list of objects to delete per thread.
+
+    host_to_connect: An optional endpoint string to connect to.
+    per_thread_objects_deleted: A list to record the objects that have been
+        successfully deleted per thread.
+  """
+  threads = []
+  for i in range(LIST_CONSISTENCY_THREAD_COUNT):
+    thread = Thread(target=DeleteObjects,
+                    args=(storage_schema, FLAGS.bucket,
+                          per_thread_objects_to_delete[i], host_to_connect,
+                          per_thread_objects_deleted[i]))
+    thread.daemon = True
+    thread.start()
+    threads.append(thread)
+
+  for i in range(LIST_CONSISTENCY_THREAD_COUNT):
+    try:
+      threads[i].join()
+    except:
+      logging.exception('Caught exception waiting for the %dth deletion '
+                        'thread.', i)
+
+  logging.info('Finished deleting')
+
+
+def ListAndWaitForObjects(counting_start_time, expected_set_of_objects,
+                          storage_schema, object_prefix, host_to_connect):
+  """List objects and wait for consistency.
+
+  Args:
+    counting_start_time: The start time used to count for the inconsistency
+        window.
+    expected_set_of_objects: The set of expectation.
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    object_prefix: The prefix of objects to list from.
+    host_to_connect: An optional endpoint string to connect to.
+
+  Returns:
+    result_consistent: Is the list consistent
+    list_count: Count of the lists before the result is consistent.
+    list_latency: Latency of the list request that is consistent.
+    total_wait_time: Total time waited before it's consistent.
+  """
+
+  total_wait_time = 0
+  list_count = 0
+  result_consistent = False
+  list_latency = 0
+  while total_wait_time < LIST_CONSISTENCY_WAIT_TIME_LIMIT:
+    list_start_time = time.time()
+    list_result = _ListObjects(storage_schema, FLAGS.bucket, object_prefix,
+                               host_to_connect)
+    list_count += 1
+    list_latency = time.time() - list_start_time
+
+    if expected_set_of_objects.difference(set(list_result)):
+      total_wait_time = time.time() - counting_start_time
+      continue
+    else:
+      result_consistent = True
+      break
+
+  return result_consistent, list_count, list_latency, total_wait_time
+
+
+def AnalyzeListResults(final_result, result_consistent, list_count,
+                       list_latency, total_wait_time, list_scenario):
+  """Analyze the results of list consistency test, and fill in the final result.
+
+  Args:
+    final_result: The final result array to fill in.
+    result_consistent: Is the final result consistent.
+    list_count: The number of lists done.
+    list_latency: The latency of the lists in seconds.
+    total_wait_time: Time spent waiting for the list to be consistent (seconds).
+    list_scenario: The scenario that was tested: list-after-update,
+        list-after-write.
+  """
+  result_string_consistency = '%s%s' % (list_scenario,
+                                        LIST_RESULT_SUFFIX_CONSISTENT)
+  result_string_latency = '%s%s' % (list_scenario, LIST_RESULT_SUFFIX_LATENCY)
+  result_string_inconsistency_window = '%s%s' % (list_scenario,
+      LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW)  # noqa
+
+  if result_consistent:
+    logging.debug('Listed %d times until results are consistent.', list_count)
+    if list_count == 1:
+      logging.debug('List latency is: %f', list_latency)
+      final_result[result_string_consistency] = True
+      final_result[result_string_latency] = list_latency
+    else:
+      logging.debug('List inconsistency window is: %f', total_wait_time)
+
+      final_result[result_string_consistency] = False
+      final_result[result_string_inconsistency_window] = total_wait_time
+  else:
+    logging.debug('Results are still inconsistent after waiting for the max '
+                  'limit!')
+    final_result[result_string_consistency] = False
+    final_result[result_string_inconsistency_window] = (
+        LIST_CONSISTENCY_WAIT_TIME_LIMIT)
 
 
 def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
@@ -436,69 +574,68 @@ def ListConsistencyBenchmark(storage_schema, host_to_connect=None):
   # Now list this bucket under this prefix, compare the list results with
   # objects_written. If they are not the same, keep doing it until they
   # are the same.
-
-  total_wait_time = 0
-  final_objects_written_set = set(final_objects_written)
-  list_count = 0
-  result_consistent = False
-  list_latency = 0
-  while total_wait_time < LIST_CONSISTENCY_WAIT_TIME_LIMIT:
-
-    list_start_time = time.time()
-    list_result = _ListObjects(storage_schema, FLAGS.bucket, object_prefix,
-                               host_to_connect)
-    list_count += 1
-    list_latency = time.time() - list_start_time
-
-    if final_objects_written_set.difference(set(list_result)):
-      total_wait_time = time.time() - write_finish_time
-      continue
-    else:
-      result_consistent = True
-      break
+  result_consistent, list_count, list_latency, total_wait_time = (
+      ListAndWaitForObjects(write_finish_time, set(final_objects_written),
+                            storage_schema, object_prefix, host_to_connect))
 
   final_result = {}
-  if result_consistent:
-    logging.debug('Listed %d times until results are consistent.', list_count)
-    if list_count == 1:
-      logging.debug('List latency is: %f' % list_latency)
+  AnalyzeListResults(final_result, result_consistent, list_count, list_latency,
+                     total_wait_time, LIST_AFTER_WRITE_SCENARIO)
 
-      final_result['is-list-consistent'] = True
-      final_result['list-latency'] = list_latency
-    else:
-      logging.debug('List-after-write inconsistency window is: %f',
-                    total_wait_time)
-
-      final_result['is-list-consistent'] = False
-      final_result['inconsistency-window'] = total_wait_time
-  else:
-    logging.debug('Results are still inconsistent after waiting for the max '
-                  'limit!')
-    final_result['is-list-consistent'] = False
-    final_result['inconsistency-window'] = LIST_CONSISTENCY_WAIT_TIME_LIMIT
-
-  # Delete the objects written by individual threads in concurrency:
   logging.info('One list-after-write iteration completed. result is %s',
                final_result)
+  if not result_consistent:
+    # There is no point continuing testing the list-after-update consistency if
+    # list-after-write is still not consistent after waiting for extended
+    # period of time.
+    logging.info('Not doing list-after-update tests because results are still '
+                 'not consistent after max wait time for list-after-write.')
+    return final_result
 
-  threads = []
+  logging.info('Start benchmarking list-after-update consistency.')
+
+  # Now delete some objects and do list again, this measures list-after-update
+  # consistency
+  per_thread_objects_to_delete = [
+      [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)]
+
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
-    thread = Thread(target=DeleteObjects,
-                    args=(storage_schema, FLAGS.bucket,
-                          per_thread_objects_written[i], host_to_connect))
-    thread.daemon = True
-    thread.start()
-    threads.append(thread)
+    for j in range(len(per_thread_objects_written[i])):
+      # Delete about 30% of the objects written so far.
+      if random.Random() < LIST_AFTER_UPDATE_DELETION_RATIO:
+        per_thread_objects_to_delete[i].append(per_thread_objects_written[i][j])
 
+  # Now issue the delete concurrently.
+  per_thread_objects_deleted = [
+      [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)]
+
+  DeleteObjectsConcurrently(storage_schema,
+                            per_thread_objects_to_delete,
+                            host_to_connect,
+                            per_thread_objects_deleted)
+
+  delete_finish_time = time.time()
+  final_expectation = []
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
-    try:
-      threads[i].join()
-    except:
-      logging.exception('Caught exception waiting for the %dth deletion '
-                        'thread.', i)
+    for k in range(len(per_thread_objects_deleted[i])):
+      per_thread_objects_written[i].remove(per_thread_objects_deleted[i][k])
+    final_expectation += per_thread_objects_written[i]
 
-  logging.info('Finished deleting')
+  result_consistent, list_count, list_latency, total_wait_time = (
+      ListAndWaitForObjects(delete_finish_time, set(final_expectation),
+                            storage_schema, object_prefix, host_to_connect))
 
+  AnalyzeListResults(final_result, result_consistent, list_count, list_latency,
+                     total_wait_time, LIST_AFTER_UPDATE_SCENARIO)
+
+  logging.info('One list-after-update iteration completed. result is %s',
+               final_result)
+
+  # Final clean up: delete the objects still remaining.
+  DeleteObjectsConcurrently(storage_schema,
+                            per_thread_objects_written,
+                            host_to_connect,
+                            per_thread_objects_deleted)
   return final_result
 
 
@@ -534,34 +671,48 @@ def Main(argv=sys.argv):
   if FLAGS.scenario == 'OneByteRW':
     return OneByteRWBenchmark(storage_schema, host_to_connect)
   elif FLAGS.scenario == 'ListConsistency':
-    list_latency = []
-    list_inconsistency_window = []
-    inconsistent_list_count = 0.0
+    list_latency = {}
+    list_inconsistency_window = {}
+    inconsistent_list_count = {}
+    for scenario in [LIST_AFTER_WRITE_SCENARIO, LIST_AFTER_UPDATE_SCENARIO]:
+      list_latency[scenario] = []
+      list_inconsistency_window[scenario] = []
+      inconsistent_list_count[scenario] = 0.0
 
     logging.info('Running list consistency tests for %d iterations...' %
                  FLAGS.iterations)
     for _ in range(FLAGS.iterations):
       result = ListConsistencyBenchmark(storage_schema, host_to_connect)
-      if result['is-list-consistent']:
-        list_latency.append(result['list-latency'])
-      else:
-        inconsistent_list_count += 1
-        list_inconsistency_window.append(result['inconsistency-window'])
+      # Analyze the result for both scenarios.
+      for scenario in [LIST_AFTER_WRITE_SCENARIO, LIST_AFTER_UPDATE_SCENARIO]:
+        result_consistent = '%s%s' % (scenario, LIST_RESULT_SUFFIX_CONSISTENT)
+        if result_consistent in result:
+          if result[result_consistent]:
+            list_latency[scenario].append(
+                result['%s%s' % (scenario, LIST_RESULT_SUFFIX_LATENCY)])
+          else:
+            inconsistent_list_count[scenario] += 1
+            list_inconsistency_window[scenario].append(
+                result['%s%s' % (scenario,
+                                 LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW)])
 
     # All iterations completed, ready to print out final stats.
     logging.info('\n\nFinal stats:')
-    logging.info('List consistency percentage: %f',
-                 100 * (1 - inconsistent_list_count / FLAGS.iterations))
+    for scenario in [LIST_AFTER_WRITE_SCENARIO, LIST_AFTER_UPDATE_SCENARIO]:
+      logging.info('%s consistency percentage: %f', scenario,
+                   100 *
+                   (1 - inconsistent_list_count[scenario] / FLAGS.iterations))
 
-    if len(list_inconsistency_window) > 0:
-      logging.info('List inconsistency window: %s',
-                   json.dumps(PercentileCalculator(list_inconsistency_window),
-                              sort_keys=True))
+      if len(list_inconsistency_window[scenario]) > 0:
+        logging.info('%s inconsistency window: %s', scenario,
+                     json.dumps(PercentileCalculator(
+                         list_inconsistency_window[scenario]),
+                         sort_keys=True))
 
-    if len(list_latency) > 0:
-      logging.info('List latency: %s',
-                   json.dumps(PercentileCalculator(list_latency),
-                              sort_keys=True))
+      if len(list_latency[scenario]) > 0:
+        logging.info('%s latency: %s', scenario,
+                     json.dumps(PercentileCalculator(list_latency[scenario]),
+                                sort_keys=True))
 
     return 0
   elif FLAGS.scenario == 'SingleStreamThroughput':
