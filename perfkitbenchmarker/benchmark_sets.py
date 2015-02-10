@@ -35,37 +35,37 @@ BENCHMARK_SETS = {
             'block_storage_workload', 'sysbench_oltp', 'unixbench']
     },
     'arm_set': {
-        MESSAGE: ('ARM benchmark set.'),
+        MESSAGE: 'ARM benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'broadcom_set': {
-        MESSAGE: ('Broadcom benchmark set.'),
+        MESSAGE: 'Broadcom benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'canonical_set': {
-        MESSAGE: ('Canonical benchmark set.'),
+        MESSAGE: 'Canonical benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'centurylinkcloud_set': {
-        MESSAGE: ('This benchmark set is supported on CenturyLink Cloud.'),
+        MESSAGE: 'This benchmark set is supported on CenturyLink Cloud.',
         BENCHMARK_LIST: ['hpcc', 'unixbench', 'sysbench_oltp', 'mongodb',
                          'mesh_network', 'ping', 'iperf', 'redis',
                          'cassandra_stress', 'copy_throughput']
     },
     'cisco_set': {
-        MESSAGE: ('Cisco benchmark set.'),
+        MESSAGE: 'Cisco benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'cloudharmony_set': {
-        MESSAGE: ('CloudHarmony benchmark set.'),
+        MESSAGE: 'CloudHarmony benchmark set.',
         BENCHMARK_LIST: ['speccpu2006', 'unixbench']
     },
     'cloudspectator_set': {
-        MESSAGE: ('CloudSpecator benchmark set.'),
+        MESSAGE: 'CloudSpecator benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'ecocloud_epfl_set': {
-        MESSAGE: ('EcoCloud/EPFL benchmark set.'),
+        MESSAGE: 'EcoCloud/EPFL benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'google_set': {
@@ -74,43 +74,43 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'intel_set': {
-        MESSAGE: ('Intel benchmark set.'),
+        MESSAGE: 'Intel benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'mellanox_set': {
-        MESSAGE: ('Mellanox benchmark set.'),
+        MESSAGE: 'Mellanox benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'microsoft_set': {
-        MESSAGE: ('Microsoft benchmark set.'),
+        MESSAGE: 'Microsoft benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'qualcomm_technologies_set': {
-        MESSAGE: ('Qualcomm Technologies, Inc. benchmark set.'),
+        MESSAGE: 'Qualcomm Technologies, Inc. benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'rackspace_set': {
-        MESSAGE: ('Rackspace benchmark set.'),
+        MESSAGE: 'Rackspace benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'red_hat_set': {
-        MESSAGE: ('Red Hat benchmark set.'),
+        MESSAGE: 'Red Hat benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'tradeworx_set': {
-        MESSAGE: ('Tradeworx Inc. benchmark set.'),
+        MESSAGE: 'Tradeworx Inc. benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'thesys_technologies_set': {
-        MESSAGE: ('Thesys Technologies LLC. benchmark set.'),
+        MESSAGE: 'Thesys Technologies LLC. benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'stanford_set': {
-        MESSAGE: ('Stanford University benchmark set.'),
+        MESSAGE: 'Stanford University benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'mit_set': {
-        MESSAGE: ('Massachusetts Institute of Technology benchmark set.'),
+        MESSAGE: 'Massachusetts Institute of Technology benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     }
 }
@@ -133,7 +133,7 @@ def GetBenchmarksFromFlags():
   # Expand recursive sets
   expanded = set()
   did_expansion = True
-  while (did_expansion):
+  while did_expansion:
     did_expansion = False
     for benchmark_name in benchmark_names:
       if (benchmark_name in BENCHMARK_SETS):
