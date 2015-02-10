@@ -61,7 +61,7 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: ['speccpu2006', 'unixbench']
     },
     'cloudspectator_set': {
-        MESSAGE: 'CloudSpecator benchmark set.',
+        MESSAGE: 'CloudSpectator benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'ecocloud_epfl_set': {

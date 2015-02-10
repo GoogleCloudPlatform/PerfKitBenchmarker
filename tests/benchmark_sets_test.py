@@ -15,6 +15,7 @@
 """Tests for perfkitbenchmarker.benchmark_sets."""
 
 import unittest
+from mock import patch
 
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
@@ -47,50 +48,47 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # check all the benchmark sets to make sure they contain valid names
     valid_benchmark_and_set_names = (self.valid_benchmark_names |
                                      self.valid_benchmark_set_names)
-    for key_name, benchmark_description in \
-            benchmark_sets.BENCHMARK_SETS.items():
-      for benchmark_name in \
-              benchmark_description[benchmark_sets.BENCHMARK_LIST]:
+    benchmark_set_items = benchmark_sets.BENCHMARK_SETS.items()
+    for key_name, key_value in benchmark_set_items:
+      benchmark_def_list = key_value[benchmark_sets.BENCHMARK_LIST]
+      for benchmark_name in benchmark_def_list:
         self.assertIn(benchmark_name, valid_benchmark_and_set_names)
 
   def testBenchmarkDerivedSets(self):
     # make sure that sets which are derived from the standard_set
     # expands into a valid set of benchmarks
-    temp = benchmark_sets.BENCHMARK_SETS.copy()
-    benchmark_sets.BENCHMARK_SETS['test_derived_set'] = {
-        benchmark_sets.MESSAGE: ('test derived benchmark set.'),
-        benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]}
-    FLAGS.benchmarks = ['test_derived_set']
-    benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    self.assertTrue((benchmark_module_list is not None) and
-                    (len(benchmark_module_list) > 0))
-    for benchmark_module in benchmark_module_list:
-      self.assertIn(benchmark_module.GetInfo()['name'],
-                    self.valid_benchmark_names)
-    benchmark_sets.BENCHMARK_SETS = temp
+    with patch.dict(benchmark_sets.BENCHMARK_SETS, {
+            'test_derived_set': {
+            benchmark_sets.MESSAGE: ('test derived benchmark set.'),
+            benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]}}):
+      FLAGS.benchmarks = ['test_derived_set']
+      benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
+      self.assertTrue(benchmark_module_list is not None)
+      self.assertTrue(len(benchmark_module_list) > 0)
+      for benchmark_module in benchmark_module_list:
+        self.assertIn(benchmark_module.GetInfo()['name'],
+                      self.valid_benchmark_names)
 
   def testBenchmarkNestedDerivedSets(self):
     # make sure that sets which are derived from the standard_set
     # expands into a valid set of benchmarks
     FLAGS.benchmarks = [benchmark_sets.STANDARD_SET]
     standard_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    temp = benchmark_sets.BENCHMARK_SETS.copy()
-    benchmark_sets.BENCHMARK_SETS['test_derived_set'] = {
-        benchmark_sets.MESSAGE: ('test derived benchmark set.'),
-        benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]}
-    benchmark_sets.BENCHMARK_SETS['test_nested_derived_set'] = {
-        benchmark_sets.MESSAGE: ('test nested derived benchmark set.'),
-        benchmark_sets.BENCHMARK_LIST: ['test_derived_set']}
-    FLAGS.benchmarks = ['test_nested_derived_set']
-    benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    # TODO(voellm): better check would be to make sure both lists are the same
-    self.assertTrue((benchmark_module_list is not None) and
-                    (standard_module_list is not None) and
-                    (len(benchmark_module_list) == len(standard_module_list)))
-    for benchmark_module in benchmark_module_list:
-      self.assertIn(benchmark_module.GetInfo()['name'],
-                    self.valid_benchmark_names)
-    benchmark_sets.BENCHMARK_SETS = temp
+    with patch.dict(benchmark_sets.BENCHMARK_SETS, {
+            'test_derived_set': {
+            benchmark_sets.MESSAGE: ('test derived benchmark set.'),
+            benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]},
+            'test_nested_derived_set': {
+            benchmark_sets.MESSAGE: ('test nested derived benchmark set.'),
+            benchmark_sets.BENCHMARK_LIST: ['test_derived_set']}}):
+      # TODO(voellm): better check would be to make sure both lists are the same
+      benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
+      self.assertTrue(benchmark_module_list is not None)
+      self.assertTrue(standard_module_list is not None)
+      self.assertTrue(len(benchmark_module_list) == len(standard_module_list))
+      for benchmark_module in benchmark_module_list:
+        self.assertIn(benchmark_module.GetInfo()['name'],
+                      self.valid_benchmark_names)
 
   def testBenchmarkValidCommandLine1(self):
     # make sure the standard_set expands to a valid set of benchmarks
@@ -106,7 +104,6 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def _ContainsModule(module_name, module_list):
     has_module = False
     for module in module_list:
-      print module.GetInfo()['name']
       if module.GetInfo()['name'] == module_name:
         has_module = True
     return has_module
@@ -128,8 +125,8 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # make sure the command with two benchmarks is processed correctly
     FLAGS.benchmarks = ['iperf', 'fio']
     benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    self.assertTrue((benchmark_module_list is not None) and
-                    (len(benchmark_module_list) == 2))
+    self.assertTrue(benchmark_module_list is not None)
+    self.assertTrue(len(benchmark_module_list) == 2)
     for benchmark_module in benchmark_module_list:
       self.assertIn(benchmark_module.GetInfo()['name'],
                     self.valid_benchmark_names)
