@@ -28,11 +28,90 @@ BENCHMARK_SETS = {
         MESSAGE: ('The standard_set is a community agreed upon set of '
                   'benchmarks to measure Cloud performance.'),
         BENCHMARK_LIST: [
-            'aerospike', 'cassandra_stress', 'cloud_storage_storage',
+            'aerospike', 'cassandra_stress', 'object_storage_service',
             'cluster_boot', 'copy_throughput', 'coremark', 'fio',
             'hadoop_terasort', 'hpcc', 'iperf', 'mesh_network', 'mongodb',
             'netperf', 'ping', 'redis', 'speccpu2006',
-            'synthetic_storage_workload', 'sysbench_oltp', 'unixbench']
+            'block_storage_workload', 'sysbench_oltp', 'unixbench']
+    },
+    'arm_set': {
+        MESSAGE: ('ARM benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'broadcom_set': {
+        MESSAGE: ('Broadcom benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'canonical_set': {
+        MESSAGE: ('Canonical benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'centurylinkcloud_set': {
+        MESSAGE: ('This benchmark set is supported on CenturyLink Cloud.'),
+        BENCHMARK_LIST: ['hpcc', 'unixbench', 'sysbench_oltp', 'mongodb',
+                         'mesh_network', 'ping', 'iperf', 'redis',
+                         'cassandra_stress', 'copy_throughput']
+    },
+    'cisco_set': {
+        MESSAGE: ('Cisco benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'cloudharmony_set': {
+        MESSAGE: ('CloudHarmony benchmark set.'),
+        BENCHMARK_LIST: ['speccpu2006', 'unixbench']
+    },
+    'cloudspectator_set': {
+        MESSAGE: ('CloudSpecator benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'ecocloud_epfl_set': {
+        MESSAGE: ('EcoCloud/EPFL benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'google_set': {
+        MESSAGE: ('This benchmark set is maintained by Google Cloud Platform '
+                  'Performance Team.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'intel_set': {
+        MESSAGE: ('Intel benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'mellanox_set': {
+        MESSAGE: ('Mellanox benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'microsoft_set': {
+        MESSAGE: ('Microsoft benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'qualcomm_technologies_set': {
+        MESSAGE: ('Qualcomm Technologies, Inc. benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'rackspace_set': {
+        MESSAGE: ('Rackspace benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'red_hat_set': {
+        MESSAGE: ('Red Hat benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'tradeworx_set': {
+        MESSAGE: ('Tradeworx Inc. benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'thesys_technologies_set': {
+        MESSAGE: ('Thesys Technologies LLC. benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'stanford_set': {
+        MESSAGE: ('Stanford University benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
+    'mit_set': {
+        MESSAGE: ('Massachusetts Institute of Technology benchmark set.'),
+        BENCHMARK_LIST: [STANDARD_SET]
     }
 }
 
@@ -50,5 +129,35 @@ def GetBenchmarksFromFlags():
       benchmark_names |= set(BENCHMARK_SETS[benchmark][BENCHMARK_LIST])
     else:
       benchmark_names.add(benchmark)
-  return [benchmark for benchmark in benchmarks.BENCHMARKS
-          if benchmark.GetInfo()['name'] in benchmark_names]
+
+  # Expand recursive sets
+  expanded = set()
+  did_expansion = True
+  while (did_expansion):
+    did_expansion = False
+    for benchmark_name in benchmark_names:
+      if (benchmark_name in BENCHMARK_SETS):
+        did_expansion = True
+        benchmark_names.remove(benchmark_name)
+        if (benchmark_name not in expanded):
+            expanded.add(benchmark_name)
+            benchmark_names |= set(BENCHMARK_SETS[
+                benchmark_name][BENCHMARK_LIST])
+        break
+
+  # Create a dictionary of valid benchmark names and modules
+  # TODO(voellm): I really think the benchmarks package init should
+  # build the dictionary
+  valid_benchmarks = {}
+  for benchmark_module in benchmarks.BENCHMARKS:
+    valid_benchmarks[benchmark_module.GetInfo()['name']] = benchmark_module
+
+  # create a list of modules to return
+  benchmark_module_list = []
+  for benchmark_name in benchmark_names:
+    if benchmark_name in valid_benchmarks:
+      benchmark_module_list.append(valid_benchmarks[benchmark_name])
+    else:
+      raise ValueError('Invalid benchmark %s' % benchmark_name)
+
+  return benchmark_module_list
