@@ -63,8 +63,8 @@ class BenchmarkSetsTestCase(unittest.TestCase):
             benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]}}):
       FLAGS.benchmarks = ['test_derived_set']
       benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-      self.assertTrue(benchmark_module_list is not None)
-      self.assertTrue(len(benchmark_module_list) > 0)
+      self.assertIsNotNone(benchmark_module_list)
+      self.assertGreater(len(benchmark_module_list), 0)
       for benchmark_module in benchmark_module_list:
         self.assertIn(benchmark_module.GetInfo()['name'],
                       self.valid_benchmark_names)
@@ -83,9 +83,9 @@ class BenchmarkSetsTestCase(unittest.TestCase):
             benchmark_sets.BENCHMARK_LIST: ['test_derived_set']}}):
       # TODO(voellm): better check would be to make sure both lists are the same
       benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-      self.assertTrue(benchmark_module_list is not None)
-      self.assertTrue(standard_module_list is not None)
-      self.assertTrue(len(benchmark_module_list) == len(standard_module_list))
+      self.assertIsNotNone(benchmark_module_list)
+      self.assertIsNotNone(standard_module_list)
+      self.assertEqual(len(benchmark_module_list), len(standard_module_list))
       for benchmark_module in benchmark_module_list:
         self.assertIn(benchmark_module.GetInfo()['name'],
                       self.valid_benchmark_names)
@@ -94,8 +94,8 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # make sure the standard_set expands to a valid set of benchmarks
     FLAGS.benchmarks = ['standard_set']
     benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    self.assertTrue((benchmark_module_list is not None) and
-                    (len(benchmark_module_list) > 0))
+    self.assertIsNotNone(benchmark_module_list)
+    self.assertGreater(len(benchmark_module_list), 0)
     for benchmark_module in benchmark_module_list:
       self.assertIn(benchmark_module.GetInfo()['name'],
                     self.valid_benchmark_names)
@@ -113,8 +113,8 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # to a valid set of benchmarks
     FLAGS.benchmarks = ['standard_set', 'bonnie++']
     benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    self.assertTrue((benchmark_module_list is not None) and
-                    (len(benchmark_module_list) > 0))
+    self.assertIsNotNone(benchmark_module_list)
+    self.assertGreater(len(benchmark_module_list), 0)
     for benchmark_module in benchmark_module_list:
       self.assertIn(benchmark_module.GetInfo()['name'],
                     self.valid_benchmark_names)
@@ -125,8 +125,8 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # make sure the command with two benchmarks is processed correctly
     FLAGS.benchmarks = ['iperf', 'fio']
     benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    self.assertTrue(benchmark_module_list is not None)
-    self.assertTrue(len(benchmark_module_list) == 2)
+    self.assertIsNotNone(benchmark_module_list)
+    self.assertEqual(len(benchmark_module_list), 2)
     for benchmark_module in benchmark_module_list:
       self.assertIn(benchmark_module.GetInfo()['name'],
                     self.valid_benchmark_names)
