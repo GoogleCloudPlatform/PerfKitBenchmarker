@@ -17,14 +17,14 @@
 import unittest
 from mock import patch
 
+# This import to ensure required FLAGS are defined.
+from perfkitbenchmarker import pkb  # NOQA
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
-from perfkitbenchmarker import flags
-
-FLAGS = flags.FLAGS
 
 
 class BenchmarkSetsTestCase(unittest.TestCase):
+
   def setUp(self):
     # create set of valid benchmark names from the benchmark directory
     self.valid_benchmark_names = set()
@@ -36,6 +36,11 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # as a valid name.  At runtime they get expanded.
     for benchmark_set_name in benchmark_sets.BENCHMARK_SETS:
       self.valid_benchmark_set_names.add(benchmark_set_name)
+
+    # Mock flags to simulate setting --benchmarks.
+    p = patch(benchmark_sets.__name__ + '.FLAGS')
+    self.mock_flags = p.start()
+    self.addCleanup(p.stop)
 
   def testStandardSet(self):
     self.assertIn(benchmark_sets.STANDARD_SET, benchmark_sets.BENCHMARK_SETS)
@@ -59,9 +64,9 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # expands into a valid set of benchmarks
     with patch.dict(benchmark_sets.BENCHMARK_SETS, {
             'test_derived_set': {
-            benchmark_sets.MESSAGE: ('test derived benchmark set.'),
+            benchmark_sets.MESSAGE: 'test derived benchmark set.',
             benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]}}):
-      FLAGS.benchmarks = ['test_derived_set']
+      self.mock_flags.benchmarks = ['test_derived_set']
       benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
       self.assertIsNotNone(benchmark_module_list)
       self.assertGreater(len(benchmark_module_list), 0)
@@ -72,14 +77,14 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testBenchmarkNestedDerivedSets(self):
     # make sure that sets which are derived from the standard_set
     # expands into a valid set of benchmarks
-    FLAGS.benchmarks = [benchmark_sets.STANDARD_SET]
+    self.mock_flags.benchmarks = [benchmark_sets.STANDARD_SET]
     standard_module_list = benchmark_sets.GetBenchmarksFromFlags()
     with patch.dict(benchmark_sets.BENCHMARK_SETS, {
             'test_derived_set': {
-            benchmark_sets.MESSAGE: ('test derived benchmark set.'),
+            benchmark_sets.MESSAGE: 'test derived benchmark set.',
             benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]},
             'test_nested_derived_set': {
-            benchmark_sets.MESSAGE: ('test nested derived benchmark set.'),
+            benchmark_sets.MESSAGE: 'test nested derived benchmark set.',
             benchmark_sets.BENCHMARK_LIST: ['test_derived_set']}}):
       # TODO(voellm): better check would be to make sure both lists are the same
       benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -92,7 +97,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testBenchmarkValidCommandLine1(self):
     # make sure the standard_set expands to a valid set of benchmarks
-    FLAGS.benchmarks = ['standard_set']
+    self.mock_flags.benchmarks = ['standard_set']
     benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertIsNotNone(benchmark_module_list)
     self.assertGreater(len(benchmark_module_list), 0)
@@ -102,16 +107,15 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   @staticmethod
   def _ContainsModule(module_name, module_list):
-    has_module = False
     for module in module_list:
       if module.GetInfo()['name'] == module_name:
-        has_module = True
-    return has_module
+        return True
+    return False
 
   def testBenchmarkValidCommandLine2(self):
     # make sure the standard_set plus a listed benchmark expands
     # to a valid set of benchmarks
-    FLAGS.benchmarks = ['standard_set', 'bonnie++']
+    self.mock_flags.benchmarks = ['standard_set', 'bonnie++']
     benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertIsNotNone(benchmark_module_list)
     self.assertGreater(len(benchmark_module_list), 0)
@@ -123,7 +127,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testBenchmarkValidCommandLine3(self):
     # make sure the command with two benchmarks is processed correctly
-    FLAGS.benchmarks = ['iperf', 'fio']
+    self.mock_flags.benchmarks = ['iperf', 'fio']
     benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertIsNotNone(benchmark_module_list)
     self.assertEqual(len(benchmark_module_list), 2)
@@ -136,13 +140,10 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testBenchmarkInvalidCommandLine1(self):
     # make sure invalid benchmark names and sets cause a failure
-    FLAGS.benchmarks = ['standard_set_invalid_name']
+    self.mock_flags.benchmarks = ['standard_set_invalid_name']
     self.assertRaises(ValueError, benchmark_sets.GetBenchmarksFromFlags)
 
   def testBenchmarkInvalidCommandLine2(self):
     # make sure invalid benchmark names and sets cause a failure
-    FLAGS.benchmarks = ['standard_set', 'iperf_invalid_name']
+    self.mock_flags.benchmarks = ['standard_set', 'iperf_invalid_name']
     self.assertRaises(ValueError, benchmark_sets.GetBenchmarksFromFlags)
-
-if __name__ == '__main__':
-  unittest.main()
