@@ -1,4 +1,4 @@
-# v0.10.0
+# v0.10.0 (in development)
 
 * Various improvements to object_storage_service benchmarks. (GH-99 through GH110).
 * Rename test_sample to sample_test. (GH111)
