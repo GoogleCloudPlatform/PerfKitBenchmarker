@@ -1,3 +1,4 @@
 /build
 /setuptools-*.egg
 /setuptools*.zip
+*.py[co]

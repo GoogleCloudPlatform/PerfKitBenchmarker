@@ -13,28 +13,22 @@
 # limitations under the License.
 
 
-"""Module containing iperf installation and cleanup functions."""
-
-from perfkitbenchmarker import errors
-
-IPERF_RPM = 'http://pkgs.repoforge.org/iperf/iperf-2.0.4-1.el7.rf.x86_64.rpm'
+"""Module containing gcs-oauth2-boto-plugin functions."""
 
 
 def _Install(vm):
   """Installs the iperf package on the VM."""
-  vm.InstallPackages('iperf')
+  vm.Install('pip')
+  vm.RemoteCommand('sudo pip install gcs-oauth2-boto-plugin==1.8')
 
 
 def YumInstall(vm):
   """Installs the iperf package on the VM."""
-  try:
-    vm.InstallEpelRepo()
-    _Install(vm)
-  # RHEL 7 does not have an iperf package in the standard/EPEL repositories
-  except errors.VmUtil.SshConnectionError:
-    vm.RemoteCommand('sudo rpm -ivh %s' % IPERF_RPM)
+  vm.InstallPackages('gcc openssl-devel python-devel libffi-devel')
+  _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the iperf package on the VM."""
+  vm.InstallPackages('gcc python-dev libffi-dev')
   _Install(vm)
