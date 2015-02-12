@@ -1,3 +1,8 @@
+# v0.1.0
+
+* Various improvements to object_storage_service benchmarks. (GH-99 through GH110).
+* Rename test_sample to sample_test. (GH111)
+
 # v0.9.0
 
 * **Breaking change**: removed `--json_output` flag. JSON samples are always
