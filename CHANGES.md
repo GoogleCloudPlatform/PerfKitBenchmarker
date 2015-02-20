@@ -1,3 +1,13 @@
+# v0.10.0
+
+* Various improvements to object_storage_service benchmarks. This includes
+  reporting results in percentiles, adding a list consistency benchmark,
+  and more. (GH-100 through GH110).
+* Rename test_sample to sample_test. (GH-111)
+* Updated the EPEL repo on RHEL and CentOS to use `epel-release` available
+  through yum rather than a downloaded rpm. (GH-99)
+* Added more benchmark sets
+
 # v0.9.0
 
 * **Breaking change**: removed `--json_output` flag. JSON samples are always
