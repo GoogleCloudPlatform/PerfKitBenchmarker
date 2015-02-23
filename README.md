@@ -29,7 +29,7 @@ In its current release these are the benchmarks that are executed:
   - `cassandra_stress`: Apache v2 (http://cassandra.apache.org/)
   - `cluster_boot`: MIT license.
   - `coremark`: EEMBC (https://www.eembc.org/)
-  - `fio`: GPL v2 (https://github.com/axboe/fio/blob/master/LICENSE)
+  - `fio`: GPL v2 (https://github.com/axboe/fio/blob/master/COPYING)
   - `hadoop_terasort`: Apache v2 (http://hadoop.apache.org/)
   - `hpcc`: Original BSD license (http://icl.cs.utk.edu/hpcc/faq/#263)
   - `iperf`: BSD license(http://iperf.sourceforge.net/)
