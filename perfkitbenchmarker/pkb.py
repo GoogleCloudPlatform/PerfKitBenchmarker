@@ -16,7 +16,7 @@
 
 All benchmarks in PerfKitBenchmarker export the following interface:
 
-GetInfo: this returns, the name of the benchmark, the number of mahcines
+GetInfo: this returns, the name of the benchmark, the number of machines
           required to run one instance of the benchmark, a detailed description
           of the benchmark, and if the benchmark requires a scratch disk.
 Prepare: this function takes a list of VMs as an input parameter. The benchmark

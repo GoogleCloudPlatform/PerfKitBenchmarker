@@ -164,14 +164,14 @@ As a result, a `.boto` file is created under your home directory.
 `client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials`), which was setup as part of the 'gcloud auth login' step.
 
 
+## Install PerfKit
+
+[Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
+
 ## Install PerfKit dependencies
 ```
 $ sudo pip install -r requirements.txt
 ```
-
-## Install PerfKit
-
-[Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
 
 RUNNING A SINGLE BENCHMARK
 ==========================
