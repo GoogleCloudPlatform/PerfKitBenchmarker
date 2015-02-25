@@ -24,22 +24,27 @@ Contributions made by corporations are covered by a different agreement than
 the one above, the Software Grant and Corporate Contributor License Agreement.
 
 ### Configuring a local development environment
-This can optionally done within a virtualenv.
+This can optionally done within a [`virtualenv`](https://virtualenv.pypa.io/en/latest/).
+
+### Fork the repository
+
+If you plan on contributing, create your own fork of PerfKitBenchmarker to publish your changes.
+GitHub has [a great tutorial](https://help.github.com/articles/fork-a-repo/) (we follow the *Fork & pull* model).
 
 - Clone the repository:
 ```
-$ git clone git@github.com:GoogleCloudPlatform/PerfKitBenchmarker.git -b dev && cd PerfKitBenchmarker
+$ git clone git@github.com:<your-user-name>/PerfKitBenchmarker.git -b dev && cd PerfKitBenchmarker
 ```
 - Install Python 2.7.
-- Install pip: 
+- Install [pip](https://pypi.python.org/pypi/pip):
 ```
 $ sudo apt-get install -y python-pip
 ```
-- Install PerfKitBenchmarker python dependencies:
+- Install PerfKitBenchmarker's Python dependencies:
 ```
 $ [sudo] pip install -r requirements.txt
 ```
-- Install PerfKitBenchmarker test dependencies:
+- Install PerfKitBenchmarker's test dependencies:
 ```
 $ [sudo] pip install -r test-requirements.txt
 ```
@@ -48,23 +53,23 @@ $ [sudo] pip install -r test-requirements.txt
 $ hooks/install.sh
 ```
 
-### Create a change list (CL)
-- Start on GitHub and create a fork off of the project.  This will remain private unit the top level project is public.
-- From your new repository clone the code using the steps detailed in configuring a local dev environment above.
-- Start from dev in your fork
+### Create a branch
+- Start from the `dev` branch in your forked repository.
 ```
 $ git checkout dev
 ```
-- Create a branch for your changes.
+- Create a branch to contain your changes.
 ```
 $ git checkout -b <your-branch-name>
 ```
-- Make your modifications to the code in one or more commits (guidelines for useful git commit messages).
+- Make your modifications to the code in one or more commits [(guidelines for useful git commit messages)](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
 - Push your changes to GitHub
 ```
 $ git push origin
 ```
-- Create a pull-request to integrate your change into dev. This can be done on github.com, or by installing and using the command line tool gh.
+- Create a pull request to integrate your change into the `dev` branch.
+This can be done on github.com, or by installing and using the command line tool [`hub`](https://github.com/github/hub).
 ```
-$ gh pull-request -h <your-branch-name> -b dev
+$ hub pull-request -h <your-branch-name> -b dev
 ```
+**When making a pull request on GitHub, please set the base branch of the Pull Request to `dev`.**
