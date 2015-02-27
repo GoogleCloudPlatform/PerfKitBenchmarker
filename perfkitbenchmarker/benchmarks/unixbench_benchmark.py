@@ -36,8 +36,9 @@ BENCHMARK_INFO = {'name': 'unixbench',
                   'num_machines': 1}
 
 flags.DEFINE_boolean('unixbench_all_cores', default=False,
-                     help='Applies patch to UnixBench to fix limitation of '
-                     '16 cores limit.')
+                     help='Setting this flag changes the default behavior of '
+                     'Unix bench. It will now scale to the number of CPUs on '
+                     'the machine vs the limit of 16 CPUs today.')
 
 UNIXBENCH_PATCH_FILE = 'unixbench-16core-limitation.patch'
 SYSTEM_SCORE_REGEX = r'\nSystem Benchmarks Index Score\s+([-+]?[0-9]*\.?[0-9]+)'
