@@ -55,4 +55,4 @@ def AddDefaultTags(resource_id, region):
     region: The AWS region 'resource_id' was created in.
   """
   tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
-  return AddTags(resource_id, region, **tags)
+  AddTags(resource_id, region, **tags)
