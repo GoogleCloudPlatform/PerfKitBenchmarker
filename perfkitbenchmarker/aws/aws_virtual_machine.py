@@ -272,6 +272,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     return super(AwsVirtualMachine, self).SetupLocalDrives(
         mount_path=mount_path)
 
+  def AddMetadata(self, **kwargs):
+    """Adds metadata to the VM."""
+    util.AddTags(self.id, self.region, **kwargs)
+
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    package_managers.AptMixin):

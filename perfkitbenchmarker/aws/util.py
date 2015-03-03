@@ -21,6 +21,28 @@ AWS_PATH = 'aws'
 FLAGS = flags.FLAGS
 
 
+def AddTags(resource_id, region, **kwargs):
+  """Adds tags to an AWS resource created by PerfKitBenchmarker.
+
+  Args:
+    resource_id: An extant AWS resource to operate on.
+    region: The AWS region 'resource_id' was created in.
+    **kwargs: dict. Key-value pairs to set on the instance.
+  """
+  if not kwargs:
+    return
+
+  tag_cmd = [AWS_PATH,
+             'ec2',
+             'create-tags',
+             '--region=%s' % region,
+             '--resources', resource_id,
+             '--tags']
+  for key, value in kwargs.iteritems():
+    tag_cmd.append('Key={0},Value={1}'.format(key, value))
+  vm_util.IssueRetryableCommand(tag_cmd)
+
+
 def AddDefaultTags(resource_id, region):
   """Adds tags to an AWS resource created by PerfKitBenchmarker.
 
@@ -32,12 +54,5 @@ def AddDefaultTags(resource_id, region):
     resource_id: An extant AWS resource to operate on.
     region: The AWS region 'resource_id' was created in.
   """
-  tag_cmd = [AWS_PATH,
-             'ec2',
-             'create-tags',
-             '--region=%s' % region,
-             '--resources', resource_id,
-             '--tags',
-             'Key=owner,Value="{0}"'.format(FLAGS.owner),
-             'Key=perfkitbenchmarker-run,Value="{0}"'.format(FLAGS.run_uri)]
-  vm_util.IssueRetryableCommand(tag_cmd)
+  tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
+  AddTags(resource_id, region, **tags)
