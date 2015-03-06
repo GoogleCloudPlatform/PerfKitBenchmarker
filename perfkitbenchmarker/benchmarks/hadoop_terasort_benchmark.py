@@ -140,6 +140,9 @@ def Prepare(benchmark_spec):
   master.RemoteCommand(('hadoop-%s/sbin/yarn-daemon.sh --config %s '
                         'start resourcemanager') % (HADOOP_VERSION, conf_dir))
 
+  master.RemoteCommand(('hadoop-%s/sbin/mr-jobhistory-daemon.sh --config %s '
+                        'start historyserver') % (HADOOP_VERSION, conf_dir))
+
   vm_util.RunThreaded(StartDatanode, slaves)
 
 
@@ -226,6 +229,8 @@ def Cleanup(benchmark_spec):
   master.RemoteCommand(('hadoop-%s/sbin/yarn-daemon.sh --config %s '
                         'stop resourcemanager') % (HADOOP_VERSION,
                                                    conf_dir))
+  master.RemoteCommand(('hadoop-%s/sbin/mr-jobhistory-daemon.sh --config %s '
+                        'stop historyserver') % (HADOOP_VERSION, conf_dir))
 
   vm_util.RunThreaded(StopDatanode, slaves)
   vm_util.RunThreaded(CleanNode, vms)
