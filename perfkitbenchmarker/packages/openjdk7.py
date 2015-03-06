@@ -14,7 +14,7 @@
 
 
 """Module containing OpenJDK7 installation and cleanup functions."""
-from perfkitbenchmarker import errors
+
 
 def YumInstall(vm):
   """Installs the OpenJDK7 package on the VM."""
@@ -23,9 +23,4 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the OpenJDK7 package on the VM."""
-  try:
-    vm.InstallPackages('openjdk-7-jdk')
-  except errors.VmUtil.SshConnectionError as e:
-    # Using Ubuntu official repository and retry installation later.
-    vm.RemoteCommand('sudo sed -i "s/azure.//g" /etc/apt/sources.list')
-    raise e
+  vm.InstallPackages('openjdk-7-jdk')
