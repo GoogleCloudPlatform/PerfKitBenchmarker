@@ -206,6 +206,7 @@ class AptMixin(BasePackageMixin):
                          '/usr/bin/apt-get -y install %s' % (packages))
       self.RemoteCommand(install_command)
     except errors.VmUtil.SshConnectionError as e:
+      self.RemoteCommand('sudo sed -i "s/azure.//g" /etc/apt/sources.list')
       self.AptUpdate()
       raise e
 
