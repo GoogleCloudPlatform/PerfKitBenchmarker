@@ -120,14 +120,14 @@ class YumMixin(BasePackageMixin):
       self.InstallPackages('epel-release')
     except errors.VmUtil.SshConnectionError as e:
       stdout, _ = self.RemoteCommand('cat /etc/redhat-release')
-      major_version = int(re.search('[0-9]', stdout).group(0))
+      major_version = int(re.search('release ([0-9])', stdout).group(1))
       if major_version == 6:
-        self.RemoteCommand('sudo rpm -ivh --force %s' % EPEL6_RPM)
+        epel_rpm = EPEL6_RPM
       elif major_version == 7:
-        self.RemoteCommand('sudo rpm -ivh --force %s' % EPEL7_RPM)
+        epel_rpm = EPEL7_RPM
       else:
         raise e
-
+      self.RemoteCommand('sudo rpm -ivh --force %s' % epel_rpm)
 
   def PackageCleanup(self):
     """Cleans up all installed packages.
