@@ -206,7 +206,11 @@ class AptMixin(BasePackageMixin):
                          '/usr/bin/apt-get -y install %s' % (packages))
       self.RemoteCommand(install_command)
     except errors.VmUtil.SshConnectionError as e:
-      self.RemoteCommand('sudo sed -i "s/azure.//g" /etc/apt/sources.list')
+      # TODO(user): Remove code below after Azure fix their package repository,
+      # or add code to recover the sources.list
+      self.RemoteCommand(
+          'sudo sed -i.bk "s/azure.archive.ubuntu.com/archive.ubuntu.com/g" '
+          '/etc/apt/sources.list')
       self.AptUpdate()
       raise e
 
