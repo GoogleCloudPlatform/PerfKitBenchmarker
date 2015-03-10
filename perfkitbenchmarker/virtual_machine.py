@@ -395,12 +395,12 @@ class BaseVirtualMachine(resource.BaseResource):
 
     Args:
       path: The function will return the amount of space on the file system
-            that conatins this file name.
+            that contains this file name.
 
     Returns:
       The size in 1K blocks of the file system containing the file.
     """
-    df_command = 'df -k | grep %s | awk \'{ print $2 }\'' % (path)
+    df_command = "df -k -P %s | tail -n +2 | awk '{ print $2 }'" % path
     stdout, _ = self.RemoteCommand(df_command)
     return int(stdout)
 
