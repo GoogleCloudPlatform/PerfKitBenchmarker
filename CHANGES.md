@@ -1,3 +1,11 @@
+# v0.11.0
+
+* Create Intel benchmark set (integrate from main v0.10.1)
+* Support adding custom resource tags to AWS and GCE runs
+* Limited hadoop terasort resource usage to 90% of the VM available memory
+* Download and install package epel-release if not present
+* Fixed dead link in README.md
+
 # v0.10.0
 
 * Various improvements to object_storage_service benchmarks. This includes
