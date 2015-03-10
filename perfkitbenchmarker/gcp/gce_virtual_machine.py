@@ -168,7 +168,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.FormatDisk(scratch_disk.GetDevicePath())
     self.MountDisk(scratch_disk.GetDevicePath(), disk_spec.mount_point)
 
-
   def GetName(self):
     """Get a GCE VM's unique name."""
     return self.name
@@ -202,6 +201,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.RemoteCommand(
           'chmod +rx set-interrupts.sh; sudo ./set-interrupts.sh')
     return ret
+
+  def AddMetadata(self, **kwargs):
+    """Adds metadata to the VM via 'gcloud compute instances add-metadata'."""
+    if not kwargs:
+      return
+    cmd = [FLAGS.gcloud_path, 'compute', 'instances', 'add-metadata',
+           '--zone', self.zone, self.name, '--metadata']
+    for key, value in kwargs.iteritems():
+      cmd.append('{0}={1}'.format(key, value))
+    vm_util.IssueCommand(cmd)
 
 
 class DebianBasedGceVirtualMachine(GceVirtualMachine,

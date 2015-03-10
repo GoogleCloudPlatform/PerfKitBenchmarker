@@ -26,6 +26,8 @@ file name minus .py). The framework will take care of all cleanup
 for you.
 """
 
+import re
+
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import packages
@@ -34,6 +36,11 @@ from perfkitbenchmarker import vm_util
 
 RHEL = 'rhel'
 DEBIAN = 'debian'
+
+EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
+             '6/x86_64/epel-release-6-8.noarch.rpm')
+EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
+             '7/x86_64/e/epel-release-7-5.noarch.rpm')
 
 flags.DEFINE_enum('os_type', DEBIAN,
                   [DEBIAN, RHEL],
@@ -109,7 +116,18 @@ class YumMixin(BasePackageMixin):
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
-    self.InstallPackages('epel-release')
+    try:
+      self.InstallPackages('epel-release')
+    except errors.VmUtil.SshConnectionError as e:
+      stdout, _ = self.RemoteCommand('cat /etc/redhat-release')
+      major_version = int(re.search('release ([0-9])', stdout).group(1))
+      if major_version == 6:
+        epel_rpm = EPEL6_RPM
+      elif major_version == 7:
+        epel_rpm = EPEL7_RPM
+      else:
+        raise e
+      self.RemoteCommand('sudo rpm -ivh --force %s' % epel_rpm)
 
   def PackageCleanup(self):
     """Cleans up all installed packages.
@@ -206,6 +224,11 @@ class AptMixin(BasePackageMixin):
                          '/usr/bin/apt-get -y install %s' % (packages))
       self.RemoteCommand(install_command)
     except errors.VmUtil.SshConnectionError as e:
+      # TODO(user): Remove code below after Azure fix their package repository,
+      # or add code to recover the sources.list
+      self.RemoteCommand(
+          'sudo sed -i.bk "s/azure.archive.ubuntu.com/archive.ubuntu.com/g" '
+          '/etc/apt/sources.list')
       self.AptUpdate()
       raise e
 

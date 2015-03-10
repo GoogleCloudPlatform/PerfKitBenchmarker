@@ -521,3 +521,18 @@ class BaseVirtualMachine(resource.BaseResource):
       self.FormatDisk(device_path)
       self.MountDisk(device_path, mount_path)
     return True
+
+  def AddMetadata(self, **kwargs):
+    """Add key/value metadata to the instance.
+
+    Adds metadata in the form of key value pairs to the instance. Useful for
+    debugging / introspection.
+
+    The default implementation is a noop. Cloud providers supporting instance
+    metadata should override.
+
+    Args:
+      **kwargs: dict. (tag name, tag value) pairs to set as metadata on the
+        instance.
+    """
+    pass

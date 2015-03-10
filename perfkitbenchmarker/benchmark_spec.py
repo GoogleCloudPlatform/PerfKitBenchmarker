@@ -124,6 +124,7 @@ class BenchmarkSpec(object):
     self.vms = []
     self.vm_dict = {'default': []}
     self.networks = {}
+    self.benchmark_name = benchmark_info['name']
     if hasattr(self, 'config'):
       config_dict = {}
       for section in self.config._config.sections():
@@ -273,6 +274,7 @@ class BenchmarkSpec(object):
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
     firewall.AllowPort(vm, SSH_PORT)
+    vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.Startup()
     for disk_spec in vm.disk_specs:
