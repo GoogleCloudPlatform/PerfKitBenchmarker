@@ -1,3 +1,7 @@
+# v0.11.1
+
+* Fixed CHANGES.md
+
 # v0.11.0
 
 * Create Intel benchmark set (integrate from main v0.10.1)
