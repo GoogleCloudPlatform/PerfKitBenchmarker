@@ -60,7 +60,12 @@ class ThreadLogContext(object):
       self._label = ''
 
   @contextmanager
-  def LabelExtension(self, label_extension):
+  def ExtendLabel(self, label_extension):
+    """Extends the string label used to prepend log messages.
+
+    Args:
+      label_extension: A string appended to the end of the current label.
+    """
     self._label_list.append(label_extension)
     self._RecalculateLabel()
     yield
@@ -89,6 +94,8 @@ def GetThreadLogContext():
 
 class PkbLogFilter(logging.Filter):
   """Filter that injects a thread's ThreadLogContext label into log messages.
+
+  Sets the LogRecord's pkb_label attribute with the ThreadLogContext label.
   """
   def filter(self, record):
     record.pkb_label = GetThreadLogContext().label

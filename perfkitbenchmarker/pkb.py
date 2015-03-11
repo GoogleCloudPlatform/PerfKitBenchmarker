@@ -185,7 +185,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
   label_extension = '{}({}/{})'.format(
       benchmark_name, sequence_number, total_benchmarks)
   log_context = log_util.GetThreadLogContext()
-  with log_context.LabelExtension(label_extension):
+  with log_context.ExtendLabel(label_extension):
     # Optional prerequisite checking.
     check_prereqs = getattr(benchmark, 'CheckPrerequisites', None)
     if check_prereqs:

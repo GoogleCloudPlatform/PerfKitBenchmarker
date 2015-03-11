@@ -23,28 +23,28 @@ from perfkitbenchmarker import vm_util
 class LogUtilTestCase(unittest.TestCase):
   """Tests exercising the utilities in log_util."""
 
-  def testThreadLogContextLabelExtension(self):
-    """Verify ThreadLogContext.LabelExtension behavior."""
+  def testThreadLogContextExtendLabel(self):
+    """Verify ThreadLogContext.ExtendLabel behavior."""
     context = log_util.ThreadLogContext()
     self.assertEqual(context.label, '')
-    with context.LabelExtension('LABEL-A'):
+    with context.ExtendLabel('LABEL-A'):
       self.assertEqual(context.label, 'LABEL-A ')
-      with context.LabelExtension('LABEL-B'):
+      with context.ExtendLabel('LABEL-B'):
         self.assertEqual(context.label, 'LABEL-A LABEL-B ')
       self.assertEqual(context.label, 'LABEL-A ')
     self.assertEqual(context.label, '')
 
-  def testThreadLogContextLabelExtensionEmptyStrings(self):
-    """Verify ThreadLogContext.LabelExtension behavior with empty strings."""
+  def testThreadLogContextExtendLabelEmptyStrings(self):
+    """Verify ThreadLogContext.ExtendLabel behavior with empty strings."""
     context = log_util.ThreadLogContext()
     self.assertEqual(context.label, '')
-    with context.LabelExtension(''):
+    with context.ExtendLabel(''):
       self.assertEqual(context.label, '')
-      with context.LabelExtension('LABEL-A'):
+      with context.ExtendLabel('LABEL-A'):
         self.assertEqual(context.label, 'LABEL-A ')
-        with context.LabelExtension(''):
+        with context.ExtendLabel(''):
           self.assertEqual(context.label, 'LABEL-A ')
-          with context.LabelExtension('LABEL-B'):
+          with context.ExtendLabel('LABEL-B'):
             self.assertEqual(context.label, 'LABEL-A LABEL-B ')
           self.assertEqual(context.label, 'LABEL-A ')
         self.assertEqual(context.label, 'LABEL-A ')
@@ -58,11 +58,23 @@ class LogUtilTestCase(unittest.TestCase):
     """
     original = log_util.ThreadLogContext()
     self.assertEqual(original.label, '')
-    with original.LabelExtension('LABEL-A'):
+    with original.ExtendLabel('LABEL-A'):
       self.assertEqual(original.label, 'LABEL-A ')
       copied = log_util.ThreadLogContext(original)
+      self.assertEqual(original.label, 'LABEL-A ')
       self.assertEqual(copied.label, 'LABEL-A ')
-      self.assertIsNot(copied.label, original.label)
+      with original.ExtendLabel('LABEL-B'):
+        self.assertEqual(original.label, 'LABEL-A LABEL-B ')
+        self.assertEqual(copied.label, 'LABEL-A ')
+        with copied.ExtendLabel('LABEL-C'):
+          self.assertEqual(original.label, 'LABEL-A LABEL-B ')
+          self.assertEqual(copied.label, 'LABEL-A LABEL-C ')
+        self.assertEqual(original.label, 'LABEL-A LABEL-B ')
+        self.assertEqual(copied.label, 'LABEL-A ')
+      self.assertEqual(original.label, 'LABEL-A ')
+      self.assertEqual(copied.label, 'LABEL-A ')
+    self.assertEqual(original.label, '')
+    self.assertEqual(copied.label, 'LABEL-A ')
 
   def testRunThreadedContextCopy(self):
     """Verify that ThreadLogContext is copied to threads by vm_util.RunThreaded.
@@ -72,7 +84,7 @@ class LogUtilTestCase(unittest.TestCase):
     t1_list = ['T1']
     t2_list = ['T2']
     self.assertEqual(original.label, '')
-    with original.LabelExtension('T0'):
+    with original.ExtendLabel('T0'):
       self.assertEqual(original.label, 'T0 ')
       vm_util.RunThreaded(
           target=LogUtilTestCase.RunThreadedContextCopyHelper,
@@ -86,7 +98,7 @@ class LogUtilTestCase(unittest.TestCase):
     """Helper method used by testRunThreadedContextCopy."""
     context = log_util.GetThreadLogContext()
     my_list.append(context.label)
-    with context.LabelExtension(my_list[0]):
+    with context.ExtendLabel(my_list[0]):
       my_list.append(context.label)
     my_list.append(context.label)
 
@@ -94,16 +106,14 @@ class LogUtilTestCase(unittest.TestCase):
     """Verify that PkbLogFilter sets the pkb_label of LogRecords it processes.
     """
     logger_name = 'log_util_test.LogUtilTestCase.testPkbLogFilter'
-    logger = logging.getLogger(logger_name)
     context = log_util.ThreadLogContext()
     log_util.SetThreadLogContext(context)
-    with context.LabelExtension('LABEL-A'):
-      logger.addFilter(log_util.PkbLogFilter())
+    with context.ExtendLabel('LABEL-A'):
       log_record = logging.LogRecord(
           name=logger_name, level=logging.INFO, pathname=__file__,
           lineno=inspect.getframeinfo(inspect.currentframe()).lineno + 1,
           msg="Log message.", args=None, exc_info=None)
-      logger.handle(log_record)
+      log_util.PkbLogFilter().filter(log_record)
       self.assertEqual(log_record.pkb_label, 'LABEL-A ')
 
 
