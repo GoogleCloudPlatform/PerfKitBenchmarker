@@ -26,6 +26,7 @@ import traceback
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import log_util
 
 FLAGS = flags.FLAGS
 
@@ -160,9 +161,12 @@ class ThreadWithExceptions(threading.Thread):
   def __init__(self, *args, **kwargs):
     super(ThreadWithExceptions, self).__init__(*args, **kwargs)
     self.exception = None
+    self._log_context = log_util.ThreadLogContext(
+        log_util.GetThreadLogContext())
 
   def run(self):
     try:
+      log_util.SetThreadLogContext(self._log_context)
       self.RunWithExceptions()
     except Exception:  # pylint: disable=broad-except
       self.exception = ('Exception occured in thread %s:\n%s' %
