@@ -53,8 +53,9 @@ class ThreadLogContext(object):
 
     The label is the concatenation of all non-empty strings in the _label_list.
     """
-    if len(self._label_list):
-      self._label = ' '.join(s for s in self._label_list if s) + ' '
+    non_empty_string_list = [s for s in self._label_list if s]
+    if len(non_empty_string_list):
+      self._label = ' '.join(non_empty_string_list) + ' '
     else:
       self._label = ''
 

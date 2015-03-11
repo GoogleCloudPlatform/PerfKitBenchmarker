@@ -21,24 +21,34 @@ from perfkitbenchmarker import vm_util
 
 
 class LogUtilTestCase(unittest.TestCase):
-  """Tests exercising the utilities in log_util.
-  """
+  """Tests exercising the utilities in log_util."""
 
   def testThreadLogContextLabelExtension(self):
-    """Verify ThreadLogContext.LabelExtension behavior.
-    """
+    """Verify ThreadLogContext.LabelExtension behavior."""
     context = log_util.ThreadLogContext()
-    self.assertEqual(context._label_list, [])
     self.assertEqual(context.label, '')
     with context.LabelExtension('LABEL-A'):
-      self.assertEqual(context._label_list, ['LABEL-A'])
       self.assertEqual(context.label, 'LABEL-A ')
       with context.LabelExtension('LABEL-B'):
-        self.assertEqual(context._label_list, ['LABEL-A', 'LABEL-B'])
         self.assertEqual(context.label, 'LABEL-A LABEL-B ')
-      self.assertEqual(context._label_list, ['LABEL-A'])
       self.assertEqual(context.label, 'LABEL-A ')
-    self.assertEqual(context._label_list, [])
+    self.assertEqual(context.label, '')
+
+  def testThreadLogContextLabelExtensionEmptyStrings(self):
+    """Verify ThreadLogContext.LabelExtension behavior with empty strings."""
+    context = log_util.ThreadLogContext()
+    self.assertEqual(context.label, '')
+    with context.LabelExtension(''):
+      self.assertEqual(context.label, '')
+      with context.LabelExtension('LABEL-A'):
+        self.assertEqual(context.label, 'LABEL-A ')
+        with context.LabelExtension(''):
+          self.assertEqual(context.label, 'LABEL-A ')
+          with context.LabelExtension('LABEL-B'):
+            self.assertEqual(context.label, 'LABEL-A LABEL-B ')
+          self.assertEqual(context.label, 'LABEL-A ')
+        self.assertEqual(context.label, 'LABEL-A ')
+      self.assertEqual(context.label, '')
     self.assertEqual(context.label, '')
 
   def testThreadLogContextCopyConstruct(self):
@@ -47,15 +57,11 @@ class LogUtilTestCase(unittest.TestCase):
     The label state of the first ThreadLogContext should be copied.
     """
     original = log_util.ThreadLogContext()
-    self.assertEqual(original._label_list, [])
     self.assertEqual(original.label, '')
     with original.LabelExtension('LABEL-A'):
-      self.assertEqual(original._label_list, ['LABEL-A'])
       self.assertEqual(original.label, 'LABEL-A ')
       copied = log_util.ThreadLogContext(original)
-      self.assertEqual(copied._label_list, ['LABEL-A'])
       self.assertEqual(copied.label, 'LABEL-A ')
-      self.assertIsNot(copied._label_list, original._label_list)
       self.assertIsNot(copied.label, original.label)
 
   def testRunThreadedContextCopy(self):
@@ -65,29 +71,24 @@ class LogUtilTestCase(unittest.TestCase):
     log_util.SetThreadLogContext(original)
     t1_list = ['T1']
     t2_list = ['T2']
-    self.assertEqual(original._label_list, [])
     self.assertEqual(original.label, '')
     with original.LabelExtension('T0'):
-      self.assertEqual(original._label_list, ['T0'])
       self.assertEqual(original.label, 'T0 ')
       vm_util.RunThreaded(
           target=LogUtilTestCase.RunThreadedContextCopyHelper,
           thread_params=[t1_list, t2_list])
-      self.assertEqual(original._label_list, ['T0'])
       self.assertEqual(original.label, 'T0 ')
-      self.assertEqual(t1_list, ['T1', ['T0'], 'T0 ', ['T0', 'T1'], 'T0 T1 '])
-      self.assertEqual(t2_list, ['T2', ['T0'], 'T0 ', ['T0', 'T2'], 'T0 T2 '])
+      self.assertEqual(t1_list, ['T1', 'T0 ', 'T0 T1 ', 'T0 '])
+      self.assertEqual(t2_list, ['T2', 'T0 ', 'T0 T2 ', 'T0 '])
 
   @staticmethod
   def RunThreadedContextCopyHelper(my_list):
-    """Helper method used by testRunThreadedContextCopy.
-    """
+    """Helper method used by testRunThreadedContextCopy."""
     context = log_util.GetThreadLogContext()
-    my_list.append(context._label_list[:])
     my_list.append(context.label)
     with context.LabelExtension(my_list[0]):
-      my_list.append(context._label_list[:])
       my_list.append(context.label)
+    my_list.append(context.label)
 
   def testPkbLogFilter(self):
     """Verify that PkbLogFilter sets the pkb_label of LogRecords it processes.
