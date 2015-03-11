@@ -23,6 +23,7 @@ import logging
 import re
 import threading
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -113,6 +114,8 @@ def RunNetperf(vm, benchmark_name, servers, result):
 
   match = re.findall(r'(\d+\.\d+)\s+\n', output)
   value = 0
+  if len(match) != (len(servers) - 1) * FLAGS.num_connections:
+    raise errors.Benchmarks.RunError('Netserver not started on remote vm.')
   for res in match:
     if benchmark_name == 'TCP_RR':
       value += 1.0 / float(res) * 1000.0
