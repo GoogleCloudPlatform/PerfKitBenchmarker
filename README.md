@@ -45,6 +45,7 @@ In its current release these are the benchmarks that are executed:
   - `object_storage_service`: Apache v2.
   - `ping`: No license needed.
   - `aerospike`: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
+  - `oldisim`: Apache V2.
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
 
