@@ -19,6 +19,7 @@ YUM_PACKAGES = ('bc gengetopt libevent-devel '
 APT_PACKAGES = ('bc gengetopt libevent-dev '
                 'libgoogle-perftools-dev scons')
 
+
 def YumInstall(vm):
   """Installs oldisim dependencies on the VM."""
   vm.Install('build_tools')
