@@ -88,7 +88,7 @@ def InstallAndBuild(vm):
   local_tar_file_path = data.ResourcePath(OLDISIM_TAR)
   vm.PushFile(local_tar_file_path)
   vm.RemoteCommand('tar xvfz %s' % OLDISIM_TAR)
-  #vm.RemoteCommand('git clone --recursive %s' % OLDISIM_GIT)
+  # vm.RemoteCommand('git clone --recursive %s' % OLDISIM_GIT)
   vm.RemoteCommand('cd %s && scons' % OLDISIM_DIR)
 
 
