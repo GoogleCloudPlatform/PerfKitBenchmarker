@@ -111,7 +111,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       internal_ip: string, optional.
       zone: string, optional.
       local_disks: array of strings, optional.
-      scratch_disk_mountpoints: string, optional
+      scratch_disk_mountpoints: array of strings, optional
       os_type: string, optional (see package_managers)
 
     See the constructor for descriptions.
@@ -152,8 +152,15 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       keyfile_path = item['keyfile_path']
       internal_ip = item.get('internal_ip')
       zone = item.get('zone')
-      local_disks = item.get('local_disks')
-      scratch_disk_mountpoints = item.get('scratch_disk_mountpoints')
+      local_disks = item.get('local_disks', [])
+      if not isinstance(local_disks, list):
+        raise ValueError('Expected a list of local disks, got: {0}'.format(
+            local_disks))
+      scratch_disk_mountpoints = item.get('scratch_disk_mountpoints', [])
+      if not isinstance(scratch_disk_mountpoints, list):
+        raise ValueError(
+            'Expected a list of disk mount points, got: {0}'.format(
+                scratch_disk_mountpoints))
       os_type = item.get('os_type')
       vm_class = GetStaticVirtualMachineClass(os_type)
       vm = vm_class(ip_address, user_name, keyfile_path, internal_ip, zone,
