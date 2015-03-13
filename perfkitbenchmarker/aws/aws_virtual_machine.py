@@ -147,8 +147,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       cat_cmd = ['cat',
                  vm_util.GetPublicKeyPath()]
       keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
-      import_cmd = [
-          util.AWS_PATH, 'ec2', '--region=%s' % self.region,
+      import_cmd = util.AWS_PREFIX + [
+          'ec2', '--region=%s' % self.region,
           'import-key-pair',
           '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
           '--public-key-material=%s' % keyfile]
@@ -162,8 +162,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     with self._lock:
       if self.region in self.deleted_keyfile_set:
         return
-      delete_cmd = [
-          util.AWS_PATH, 'ec2', '--region=%s' % self.region,
+      delete_cmd = util.AWS_PREFIX + [
+          'ec2', '--region=%s' % self.region,
           'delete-key-pair',
           '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
       vm_util.IssueRetryableCommand(delete_cmd)
@@ -174,11 +174,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data and tag it."""
-    describe_cmd = [util.AWS_PATH,
-                    'ec2',
-                    'describe-instances',
-                    '--region=%s' % self.region,
-                    '--instance-ids=%s' % self.id]
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-instances',
+        '--region=%s' % self.region,
+        '--instance-ids=%s' % self.id]
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     instance = response['Reservations'][0]['Instances'][0]
@@ -204,16 +204,16 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       placement += ',GroupName=%s' % self.network.placement_group.name
     block_device_map = GetBlockDeviceMap(self.machine_type)
 
-    create_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'run-instances',
-                  '--region=%s' % self.region,
-                  '--subnet-id=%s' % self.network.subnet.id,
-                  '--associate-public-ip-address',
-                  '--image-id=%s' % self.image,
-                  '--instance-type=%s' % self.machine_type,
-                  '--placement=%s' % placement,
-                  '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'run-instances',
+        '--region=%s' % self.region,
+        '--subnet-id=%s' % self.network.subnet.id,
+        '--associate-public-ip-address',
+        '--image-id=%s' % self.image,
+        '--instance-type=%s' % self.machine_type,
+        '--placement=%s' % placement,
+        '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
@@ -222,11 +222,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Delete(self):
     """Delete a VM instance."""
-    delete_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'terminate-instances',
-                  '--region=%s' % self.region,
-                  '--instance-ids=%s' % self.id]
+    delete_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'terminate-instances',
+        '--region=%s' % self.region,
+        '--instance-ids=%s' % self.id]
     vm_util.IssueRetryableCommand(delete_cmd)
 
   def CreateScratchDisk(self, disk_spec):

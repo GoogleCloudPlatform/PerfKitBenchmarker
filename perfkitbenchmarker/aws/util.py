@@ -18,6 +18,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 AWS_PATH = 'aws'
+AWS_PREFIX = [AWS_PATH, '--output', 'json']
 FLAGS = flags.FLAGS
 
 
@@ -32,12 +33,12 @@ def AddTags(resource_id, region, **kwargs):
   if not kwargs:
     return
 
-  tag_cmd = [AWS_PATH,
-             'ec2',
-             'create-tags',
-             '--region=%s' % region,
-             '--resources', resource_id,
-             '--tags']
+  tag_cmd = AWS_PREFIX + [
+      'ec2',
+      'create-tags',
+      '--region=%s' % region,
+      '--resources', resource_id,
+      '--tags']
   for key, value in kwargs.iteritems():
     tag_cmd.append('Key={0},Value={1}'.format(key, value))
   vm_util.IssueRetryableCommand(tag_cmd)

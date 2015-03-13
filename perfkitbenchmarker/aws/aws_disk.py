@@ -46,13 +46,13 @@ class AwsDisk(disk.BaseDisk):
 
   def _Create(self):
     """Creates the disk."""
-    create_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'create-volume',
-                  '--region=%s' % self.region,
-                  '--size=%s' % self.disk_size,
-                  '--availability-zone=%s' % self.zone,
-                  '--volume-type=%s' % self.disk_type]
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-volume',
+        '--region=%s' % self.region,
+        '--size=%s' % self.disk_size,
+        '--availability-zone=%s' % self.zone,
+        '--volume-type=%s' % self.disk_type]
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['VolumeId']
@@ -60,11 +60,11 @@ class AwsDisk(disk.BaseDisk):
 
   def _Delete(self):
     """Deletes the disk."""
-    delete_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'delete-volume',
-                  '--region=%s' % self.region,
-                  '--volume-id=%s' % self.id]
+    delete_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'delete-volume',
+        '--region=%s' % self.region,
+        '--volume-id=%s' % self.id]
     vm_util.IssueRetryableCommand(delete_cmd)
 
   def Attach(self, vm):
@@ -81,23 +81,23 @@ class AwsDisk(disk.BaseDisk):
       self.device_letter = min(AwsDisk.vm_devices[self.attached_vm_id])
       AwsDisk.vm_devices[self.attached_vm_id].remove(self.device_letter)
 
-    attach_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'attach-volume',
-                  '--region=%s' % self.region,
-                  '--instance-id=%s' % self.attached_vm_id,
-                  '--volume-id=%s' % self.id,
-                  '--device=%s' % self.GetDevicePath()]
+    attach_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'attach-volume',
+        '--region=%s' % self.region,
+        '--instance-id=%s' % self.attached_vm_id,
+        '--volume-id=%s' % self.id,
+        '--device=%s' % self.GetDevicePath()]
     vm_util.IssueRetryableCommand(attach_cmd)
 
   def Detach(self):
     """Detaches the disk from a VM."""
-    detach_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'detach-volume',
-                  '--region=%s' % self.region,
-                  '--instance-id=%s' % self.attached_vm_id,
-                  '--volume-id=%s' % self.id]
+    detach_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'detach-volume',
+        '--region=%s' % self.region,
+        '--instance-id=%s' % self.attached_vm_id,
+        '--volume-id=%s' % self.id]
     vm_util.IssueRetryableCommand(detach_cmd)
 
     with self._lock:
