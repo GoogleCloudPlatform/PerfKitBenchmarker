@@ -23,6 +23,7 @@ import logging
 import re
 import threading
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -113,6 +114,11 @@ def RunNetperf(vm, benchmark_name, servers, result):
 
   match = re.findall(r'(\d+\.\d+)\s+\n', output)
   value = 0
+  expected_num_match = (len(servers) - 1) * FLAGS.num_connections
+  if len(match) != expected_num_match:
+    raise errors.Benchmarks.RunError(
+        'Netserver not reachable. Expecting %s results, got %s.' %
+        (expected_num_match, len(match)))
   for res in match:
     if benchmark_name == 'TCP_RR':
       value += 1.0 / float(res) * 1000.0
