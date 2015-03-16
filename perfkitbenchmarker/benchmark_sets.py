@@ -111,7 +111,7 @@ BENCHMARK_SETS = {
     },
     'mit_set': {
         MESSAGE: 'Massachusetts Institute of Technology benchmark set.',
-        BENCHMARK_LIST: [STANDARD_SET]
+        BENCHMARK_LIST: ['silo']
     }
 }
 
