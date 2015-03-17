@@ -113,6 +113,12 @@ flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'characters in length.')
 flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
                     'Used to tag created resources and performance records.')
+flags.DEFINE_boolean('enable_detailed_timing', False, 'Includes detailed '
+                     'timing metrics in the results. Publishes samples that '
+                     'include the start/stop timestamps and runtimes of '
+                     'various pieces of each benchmark execution, including '
+                     'the time elapsed during calls to the benchmark module '
+                     'Prepare, Run, and Cleanup functions.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
     [log_util.DEBUG, log_util.INFO],
@@ -164,31 +170,32 @@ def ListUnknownBenchmarks():
                 valid_benchmark_sets)
 
 
-def DoPreparePhase(benchmark, info, name, phase_interval, bm_interval):
+def DoPreparePhase(benchmark, info, name, resource_provisioning_interval,
+                   bm_prepare_interval):
   """Performs the Prepare phase of benchmark execution.
 
   Args:
     benchmark: The benchmark module.
     info: The dict returned by the benchmark module's GetInfo function.
     name: A string containing the benchmark name.
-    phase_interval: A TimedInterval that measures the start and stop times of
-      the entire phase.
-    bm_interval: A TimedInterval that measures the start and stop times of the
-      benchmark module's Prepare function.
+    resource_provisioning_interval: A TimedInterval that measures the start and
+      stop times of the BenchmarkSpec preparation.
+    bm_prepare_interval: A TimedInterval that measures the start and stop times
+      of the benchmark module's Prepare function.
 
   Returns:
     The BenchmarkSpec created for the benchmark.
   """
-  with phase_interval.Measure():
-    logging.info('Preparing benchmark %s', name)
+  logging.info('Preparing benchmark %s', name)
+  with resource_provisioning_interval.Measure():
     spec = benchmark_spec.BenchmarkSpec(info)
     spec.Prepare()
-    with bm_interval.Measure():
-      benchmark.Prepare(spec)
+  with bm_prepare_interval.Measure():
+    benchmark.Prepare(spec)
   return spec
 
 
-def DoRunPhase(benchmark, name, spec, collector, phase_interval, bm_interval):
+def DoRunPhase(benchmark, name, spec, collector, bm_run_interval):
   """Performs the Run phase of benchmark execution.
 
   Args:
@@ -196,36 +203,34 @@ def DoRunPhase(benchmark, name, spec, collector, phase_interval, bm_interval):
     name: A string containing the benchmark name.
     spec: The BenchmarkSpec created for the benchmark.
     collector: The SampleCollector object to add samples to.
-    phase_interval: A TimedInterval that measures the start and stop times of
-      the entire phase.
-    bm_interval: A TimedInterval that measures the start and stop times of the
-      benchmark module's Run function.
+    bm_run_interval: A TimedInterval that measures the start and stop times of
+      the benchmark module's Run function.
   """
-  with phase_interval.Measure():
-    logging.info('Running benchmark %s', name)
-    for before_run_hook in BEFORE_RUN_HOOKS:
-      before_run_hook(benchmark=benchmark, benchmark_spec=spec)
-    with bm_interval.Measure():
-      samples = benchmark.Run(spec)
-    collector.AddSamples(samples, name, spec)
+  logging.info('Running benchmark %s', name)
+  for before_run_hook in BEFORE_RUN_HOOKS:
+    before_run_hook(benchmark=benchmark, benchmark_spec=spec)
+  with bm_run_interval.Measure():
+    samples = benchmark.Run(spec)
+  collector.AddSamples(samples, name, spec)
 
 
-def DoCleanupPhase(benchmark, name, spec, phase_interval, bm_interval):
+def DoCleanupPhase(benchmark, name, spec, bm_cleanup_interval,
+                   resource_teardown_interval):
   """Performs the Cleanup phase of benchmark execution.
 
   Args:
     benchmark: The benchmark module.
     name: A string containing the benchmark name.
     spec: The BenchmarkSpec created for the benchmark.
-    phase_interval: A TimedInterval that measures the start and stop times of
-      the entire phase.
-    bm_interval: A TimedInterval that measures the start and stop times of the
-      benchmark module's Cleanup function.
+    bm_cleanup_interval: A TimedInterval that measures the start and stop times
+      of the benchmark module's Cleanup function.
+    resource_teardown_interval: A TimedInterval that measures the start and stop
+      times of the BenchmarkSpec cleanup.
   """
-  with phase_interval.Measure():
-    logging.info('Cleaning up benchmark %s', name)
-    with bm_interval.Measure():
-      benchmark.Cleanup(spec)
+  logging.info('Cleaning up benchmark %s', name)
+  with bm_cleanup_interval.Measure():
+    benchmark.Cleanup(spec)
+  with resource_teardown_interval.Measure():
     spec.Delete()
 
 
@@ -259,16 +264,17 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
         raise
 
     # Initialize timed interval objects.
-    end_to_end_interval = timed_interval.TimedInterval('End to End')
-    prepare_phase_interval = timed_interval.TimedInterval('Prepare Phase')
-    bm_prepare_interval = timed_interval.TimedInterval('Benchmark Prepare')
-    run_phase_interval = timed_interval.TimedInterval('Run Phase')
-    bm_run_interval = timed_interval.TimedInterval('Benchmark Run')
-    cleanup_phase_interval = timed_interval.TimedInterval('Cleanup Phase')
-    bm_cleanup_interval = timed_interval.TimedInterval('Benchmark Cleanup')
-    phase_interval_list = [
-        prepare_phase_interval, bm_prepare_interval, run_phase_interval,
-        bm_run_interval, cleanup_phase_interval, bm_cleanup_interval]
+    TimedInterval = timed_interval.TimedInterval
+    end_to_end_interval = TimedInterval('End to End')
+    resource_provisioning_interval = TimedInterval('Resource Provisioning')
+    bm_prepare_interval = TimedInterval('Benchmark Prepare')
+    bm_run_interval = TimedInterval('Benchmark Run')
+    bm_cleanup_interval = TimedInterval('Benchmark Cleanup')
+    resource_teardown_interval = TimedInterval('Resource Teardown')
+    detailed_timing_interval_list = [
+        end_to_end_interval, resource_provisioning_interval,
+        bm_prepare_interval, bm_run_interval, bm_cleanup_interval,
+        resource_teardown_interval]
 
     spec = None
     try:
@@ -276,27 +282,29 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
         if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
           spec = DoPreparePhase(
               benchmark, benchmark_info, benchmark_name,
-              prepare_phase_interval, bm_prepare_interval)
+              resource_provisioning_interval, bm_prepare_interval)
         else:
           spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_name)
 
         if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
           DoRunPhase(
-              benchmark, benchmark_name, spec, collector,
-              run_phase_interval, bm_run_interval)
+              benchmark, benchmark_name, spec, collector, bm_run_interval)
 
         if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
           DoCleanupPhase(
-              benchmark, benchmark_name, spec,
-              cleanup_phase_interval, bm_cleanup_interval)
+              benchmark, benchmark_name, spec, bm_cleanup_interval,
+              resource_teardown_interval)
 
       # Add samples for any timed interval that was measured.
-      for interval in phase_interval_list:
-        collector.AddSamples(interval.GenerateSamples(), benchmark_name, spec)
-      if FLAGS.run_stage == STAGE_ALL:
-        collector.AddSamples(
-            end_to_end_interval.GenerateSamples(include_runtime=True),
-            benchmark_name, spec)
+      if FLAGS.enable_detailed_timing:
+        for interval in detailed_timing_interval_list:
+          collector.AddSamples(
+              interval.GenerateSamples(include_timestamps=True),
+              benchmark_name, spec)
+      else:
+        if FLAGS.run_stage == STAGE_ALL:
+          collector.AddSamples(
+              end_to_end_interval.GenerateSamples(), benchmark_name, spec)
 
     except Exception:
       # Resource cleanup (below) can take a long time. Log the error to give
