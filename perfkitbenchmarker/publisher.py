@@ -182,25 +182,80 @@ class PrettyPrintStreamPublisher(SamplePublisher):
   Attributes:
     stream: File-like object. Output stream to print samples.
   """
+
   def __init__(self, stream=None):
     self.stream = stream or sys.stdout
 
   def __repr__(self):
     return '<{0} stream={1}>'.format(type(self).__name__, self.stream)
 
+  def _FindConstantMetadataKeys(self, samples):
+    """Finds constant metadata across a list of samples.
+
+    Args:
+      samples: List of dicts, as passed to PublishSamples.
+
+    Returns:
+      The set of metadata keys where the values are constant for all samples in
+      'samples'.
+    """
+    unique_values = {}
+
+    for sample in samples:
+      for k, v in sample['metadata'].iteritems():
+        if len(unique_values.setdefault(k, set())) < 2:
+          unique_values[k].add(v)
+
+    return frozenset(k for k, v in unique_values.iteritems() if len(v) == 1)
+
+  def _FormatMetadata(self, metadata):
+    """Format 'metadata' as space-delimited key="value" pairs."""
+    return ' '.join('{0}="{1}"'.format(k, v)
+                    for k, v in sorted(metadata.iteritems()))
+
   def PublishSamples(self, samples):
+    dashes = '-' * 25
+    self.stream.write('\n' + dashes +
+                      'PerfKitBenchmarker Results Summary' +
+                      dashes + '\n')
+
+    if not samples:
+      return
+
     key = operator.itemgetter('test')
     samples = sorted(samples, key=key)
-    data = [
-        '\n' + '-' * 25 + 'PerfKitBenchmarker Results Summary' + '-' * 25 +
-        '\n']
+    globally_constant_keys = self._FindConstantMetadataKeys(samples)
+
     for benchmark, test_samples in itertools.groupby(samples, key):
-      data.append('%s:\n' % benchmark.upper())
+      test_samples = list(test_samples)
+      locally_constant_keys = (self._FindConstantMetadataKeys(test_samples) -
+                               globally_constant_keys)
+      all_constant_meta = globally_constant_keys.union(locally_constant_keys)
+
+      benchmark_meta = {k: v for k, v in test_samples[0]['metadata'].iteritems()
+                        if k in locally_constant_keys}
+      self.stream.write('{0}:\n'.format(benchmark.upper()))
+
+      if benchmark_meta:
+        self.stream.write('  {0}\n'.format(
+            self._FormatMetadata(benchmark_meta)))
+      else:
+        self.stream.write('\n')
+
       for sample in test_samples:
-        data.append('\t%s %s %s\n' %
-                    (sample['metric'], sample['value'], sample['unit']))
-    data.append('\n')
-    self.stream.write(''.join(data))
+        meta = {k: v for k, v in sample['metadata'].iteritems()
+                if k not in all_constant_meta}
+        self.stream.write('  {0:<30s} {1:>15f} {2:<30s}'.format(
+            sample['metric'], sample['value'], sample['unit']))
+        if meta:
+          self.stream.write(' ({0})'.format(self._FormatMetadata(meta)))
+        self.stream.write('\n')
+
+    global_meta = {k: v for k, v in samples[0]['metadata'].iteritems()
+                   if k in globally_constant_keys}
+    self.stream.write('\n' + dashes + '\n')
+    self.stream.write('Constant metadata: {0}\n'.format(
+        self._FormatMetadata(global_meta)))
 
 
 class LogPublisher(SamplePublisher):

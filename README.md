@@ -227,14 +227,16 @@ Next you will want to create a JSON file describing how to connect to the machin
  {"ip_address": "170.200.60.23",
   "user_name": "voellm",
   "keyfile_path": "/home/voellm/perfkitkeys/my_key_file.pem",
+  "scratch_disk_mountpoints": ["/scratch-disk"],
   "zone": "Siberia"}
 ]
 ```
 
-* The ip_address is the address where you want benchmarks to run.
-* The my_key_file.pem is the same key you pass to the ssh machine using the -i option.
-* keyfile_file is where to find the private ssh key.
-* zone can be anything you want.  It is used when publishing results.
+
+* The `ip_address` is the address where you want benchmarks to run.
+* `keyfile_file` is where to find the private ssh key.
+* `zone` can be anything you want.  It is used when publishing results.
+* `scratch_disk_mountpoints` is used by all benchmarks which use disk (i.e., `fio`, `bonnie++`, many others).
 
 I called my file Siberia.json and used it to run iperf from Siberia to a GCP VM in us-central1-f as follows:
 ```

@@ -1,0 +1,32 @@
+changeset:   3:565c69c33f98
+tag:         tip
+user:        Steven Noonan <steven@uplinklabs.net>
+date:        Sun Mar 06 04:12:12 2011 -0800
+summary:     make maxCopies unbounded for 'system' and 'misc' suites
+
+diff -r b50d02e5c913 -r 565c69c33f98 Run
+--- a/Run	Sun Mar 06 02:03:57 2011 -0800
++++ b/Run	Sun Mar 06 04:12:12 2011 -0800
+@@ -105,10 +105,10 @@
+ 
+ # Configure the categories to which tests can belong.
+ my $testCats = {
+-    'system'    => { 'name' => "System Benchmarks", 'maxCopies' => 16 },
++    'system'    => { 'name' => "System Benchmarks", 'maxCopies' => 0 },
+     '2d'        => { 'name' => "2D Graphics Benchmarks", 'maxCopies' => 1 },
+     '3d'        => { 'name' => "3D Graphics Benchmarks", 'maxCopies' => 1 },
+-    'misc'      => { 'name' => "Non-Index Benchmarks", 'maxCopies' => 16 },
++    'misc'      => { 'name' => "Non-Index Benchmarks", 'maxCopies' => 0 },
+ };
+ 
+ 
+@@ -1328,7 +1328,7 @@
+         # If the benchmark doesn't want to run with this many copies, skip it.
+         my $cat = $params->{'cat'};
+         my $maxCopies = $testCats->{$cat}{'maxCopies'};
+-        next if ($copies > $maxCopies);
++        next if ($maxCopies > 0 && $copies > $maxCopies);
+ 
+         # Run the benchmark.
+         my $bresult = runBenchmark($bench, $params, $verbose, $logFile, $copies);
+

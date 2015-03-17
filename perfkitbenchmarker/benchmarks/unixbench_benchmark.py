@@ -22,6 +22,7 @@ some memory bandwidth, and disk.
 
 import logging
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -34,7 +35,12 @@ BENCHMARK_INFO = {'name': 'unixbench',
                   'scratch_disk': True,
                   'num_machines': 1}
 
+flags.DEFINE_boolean('unixbench_all_cores', default=False,
+                     help='Setting this flag changes the default behavior of '
+                     'Unix bench. It will now scale to the number of CPUs on '
+                     'the machine vs the limit of 16 CPUs today.')
 
+UNIXBENCH_PATCH_FILE = 'unixbench-16core-limitation.patch'
 SYSTEM_SCORE_REGEX = r'\nSystem Benchmarks Index Score\s+([-+]?[0-9]*\.?[0-9]+)'
 RESULT_REGEX = (
     r'\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+) (\w+)\s+\('
@@ -50,6 +56,17 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that the required resources for UnixBench are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+
+  if FLAGS.unixbench_all_cores:
+    data.ResourcePath(UNIXBENCH_PATCH_FILE)
+
+
 def Prepare(benchmark_spec):
   """Install Unixbench on the target vm.
 
@@ -61,6 +78,13 @@ def Prepare(benchmark_spec):
   vm = vms[0]
   logging.info('Unixbench prepare on %s', vm)
   vm.Install('unixbench')
+
+  if FLAGS.unixbench_all_cores:
+    vm.PushDataFile(UNIXBENCH_PATCH_FILE)
+    vm.RemoteCommand('cp %s %s' %
+                     (UNIXBENCH_PATCH_FILE, unixbench.UNIXBENCH_DIR))
+    vm.RemoteCommand('cd %s && patch ./Run %s' %
+                     (unixbench.UNIXBENCH_DIR, UNIXBENCH_PATCH_FILE))
 
 
 def ParseResults(results):
