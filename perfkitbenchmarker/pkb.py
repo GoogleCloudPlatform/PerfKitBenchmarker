@@ -56,7 +56,6 @@ resources
 import getpass
 import logging
 import sys
-import time
 import uuid
 
 from perfkitbenchmarker import benchmarks
@@ -64,8 +63,8 @@ from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
-from perfkitbenchmarker import sample
 from perfkitbenchmarker import static_virtual_machine
+from perfkitbenchmarker import timed_interval
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.publisher import SampleCollector
@@ -165,6 +164,71 @@ def ListUnknownBenchmarks():
                 valid_benchmark_sets)
 
 
+def DoPreparePhase(benchmark, info, name, phase_interval, bm_interval):
+  """Performs the Prepare phase of benchmark execution.
+
+  Args:
+    benchmark: The benchmark module.
+    info: The dict returned by the benchmark module's GetInfo function.
+    name: A string containing the benchmark name.
+    phase_interval: A TimedInterval that measures the start and stop times of
+      the entire phase.
+    bm_interval: A TimedInterval that measures the start and stop times of the
+      benchmark module's Prepare function.
+
+  Returns:
+    The BenchmarkSpec created for the benchmark.
+  """
+  with phase_interval.Measure():
+    logging.info('Preparing benchmark %s', name)
+    spec = benchmark_spec.BenchmarkSpec(info)
+    spec.Prepare()
+    with bm_interval.Measure():
+      benchmark.Prepare(spec)
+  return spec
+
+
+def DoRunPhase(benchmark, name, spec, collector, phase_interval, bm_interval):
+  """Performs the Run phase of benchmark execution.
+
+  Args:
+    benchmark: The benchmark module.
+    name: A string containing the benchmark name.
+    spec: The BenchmarkSpec created for the benchmark.
+    collector: The SampleCollector object to add samples to.
+    phase_interval: A TimedInterval that measures the start and stop times of
+      the entire phase.
+    bm_interval: A TimedInterval that measures the start and stop times of the
+      benchmark module's Run function.
+  """
+  with phase_interval.Measure():
+    logging.info('Running benchmark %s', name)
+    for before_run_hook in BEFORE_RUN_HOOKS:
+      before_run_hook(benchmark=benchmark, benchmark_spec=spec)
+    with bm_interval.Measure():
+      samples = benchmark.Run(spec)
+    collector.AddSamples(samples, name, spec)
+
+
+def DoCleanupPhase(benchmark, name, spec, phase_interval, bm_interval):
+  """Performs the Cleanup phase of benchmark execution.
+
+  Args:
+    benchmark: The benchmark module.
+    name: A string containing the benchmark name.
+    spec: The BenchmarkSpec created for the benchmark.
+    phase_interval: A TimedInterval that measures the start and stop times of
+      the entire phase.
+    bm_interval: A TimedInterval that measures the start and stop times of the
+      benchmark module's Cleanup function.
+  """
+  with phase_interval.Measure():
+    logging.info('Cleaning up benchmark %s', name)
+    with bm_interval.Measure():
+      benchmark.Cleanup(spec)
+    spec.Delete()
+
+
 def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
   """Runs a single benchmark and adds the results to the collector.
 
@@ -176,7 +240,6 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
     total_benchmarks: The total number of benchmarks in the suite.
   """
   benchmark_info = benchmark.GetInfo()
-  benchmark_specification = None
   if not ValidateBenchmarkInfo(benchmark_info):
     return
   benchmark_name = benchmark_info['name']
@@ -195,35 +258,46 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
         logging.exception('Prerequisite check failed for %s', benchmark_name)
         raise
 
-    start_time = time.time()
-    try:
-      if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
-        logging.info('Preparing benchmark %s', benchmark_name)
-        benchmark_specification = benchmark_spec.BenchmarkSpec(benchmark_info)
-        benchmark_specification.Prepare()
-        benchmark.Prepare(benchmark_specification)
-      else:
-        benchmark_specification = benchmark_spec.BenchmarkSpec.GetSpecFromFile(
-            benchmark_name)
-      if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
-        logging.info('Running benchmark %s', benchmark_name)
-        for before_run_hook in BEFORE_RUN_HOOKS:
-          before_run_hook(benchmark=benchmark,
-                          benchmark_spec=benchmark_specification)
-        samples = benchmark.Run(benchmark_specification)
-        collector.AddSamples(samples, benchmark_name, benchmark_specification)
+    # Initialize timed interval objects.
+    end_to_end_interval = timed_interval.TimedInterval('End to End')
+    prepare_phase_interval = timed_interval.TimedInterval('Prepare Phase')
+    bm_prepare_interval = timed_interval.TimedInterval('Benchmark Prepare')
+    run_phase_interval = timed_interval.TimedInterval('Run Phase')
+    bm_run_interval = timed_interval.TimedInterval('Benchmark Run')
+    cleanup_phase_interval = timed_interval.TimedInterval('Cleanup Phase')
+    bm_cleanup_interval = timed_interval.TimedInterval('Benchmark Cleanup')
+    phase_interval_list = [
+        prepare_phase_interval, bm_prepare_interval, run_phase_interval,
+        bm_run_interval, cleanup_phase_interval, bm_cleanup_interval]
 
-      if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
-        logging.info('Cleaning up benchmark %s', benchmark_name)
-        benchmark.Cleanup(benchmark_specification)
-        benchmark_specification.Delete()
-        if FLAGS.run_stage == STAGE_ALL:
-          end_time = time.time()
-          end_to_end_sample = sample.Sample('End to End Runtime',
-                                            end_time - start_time,
-                                            'seconds')
-          collector.AddSamples([end_to_end_sample], benchmark_name,
-                               benchmark_specification)
+    spec = None
+    try:
+      with end_to_end_interval.Measure():
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
+          spec = DoPreparePhase(
+              benchmark, benchmark_info, benchmark_name,
+              prepare_phase_interval, bm_prepare_interval)
+        else:
+          spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_name)
+
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
+          DoRunPhase(
+              benchmark, benchmark_name, spec, collector,
+              run_phase_interval, bm_run_interval)
+
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
+          DoCleanupPhase(
+              benchmark, benchmark_name, spec,
+              cleanup_phase_interval, bm_cleanup_interval)
+
+      # Add samples for any timed interval that was measured.
+      for interval in phase_interval_list:
+        collector.AddSamples(interval.GenerateSamples(), benchmark_name, spec)
+      if FLAGS.run_stage == STAGE_ALL:
+        collector.AddSamples(
+            end_to_end_interval.GenerateSamples(include_runtime=True),
+            benchmark_name, spec)
+
     except Exception:
       # Resource cleanup (below) can take a long time. Log the error to give
       # immediate feedback, then re-throw.
@@ -231,10 +305,10 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       raise
     finally:
       if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
-        if benchmark_specification:
-          benchmark_specification.Delete()
+        if spec:
+          spec.Delete()
       else:
-        benchmark_specification.PickleSpec()
+        spec.PickleSpec()
 
 
 def RunBenchmarks(publish=True):
