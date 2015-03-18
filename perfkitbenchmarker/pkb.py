@@ -64,7 +64,7 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import static_virtual_machine
-from perfkitbenchmarker import timed_interval
+from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.publisher import SampleCollector
@@ -113,12 +113,6 @@ flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'characters in length.')
 flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
                     'Used to tag created resources and performance records.')
-flags.DEFINE_boolean('enable_detailed_timing', False, 'Includes detailed '
-                     'timing metrics in the results. Publishes samples that '
-                     'include the start/stop timestamps and runtimes of '
-                     'various pieces of each benchmark execution, including '
-                     'the time elapsed during calls to the benchmark module '
-                     'Prepare, Run, and Cleanup functions.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
     [log_util.DEBUG, log_util.INFO],
@@ -264,7 +258,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
         raise
 
     # Initialize timed interval objects.
-    TimedInterval = timed_interval.TimedInterval
+    TimedInterval = timing_util.TimedInterval
     end_to_end_interval = TimedInterval('End to End')
     resource_provisioning_interval = TimedInterval('Resource Provisioning')
     bm_prepare_interval = TimedInterval('Benchmark Prepare')
@@ -272,9 +266,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
     bm_cleanup_interval = TimedInterval('Benchmark Cleanup')
     resource_teardown_interval = TimedInterval('Resource Teardown')
     detailed_timing_interval_list = [
-        end_to_end_interval, resource_provisioning_interval,
-        bm_prepare_interval, bm_run_interval, bm_cleanup_interval,
-        resource_teardown_interval]
+        resource_provisioning_interval, bm_prepare_interval, bm_run_interval,
+        bm_cleanup_interval, resource_teardown_interval]
 
     spec = None
     try:
@@ -296,15 +289,19 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
               resource_teardown_interval)
 
       # Add samples for any timed interval that was measured.
-      if FLAGS.enable_detailed_timing:
-        for interval in detailed_timing_interval_list:
-          collector.AddSamples(
-              interval.GenerateSamples(include_timestamps=True),
-              benchmark_name, spec)
-      else:
-        if FLAGS.run_stage == STAGE_ALL:
-          collector.AddSamples(
-              end_to_end_interval.GenerateSamples(), benchmark_name, spec)
+      include_end_to_end = timing_util.TimingMeasurementsFlag.end_to_end_runtime
+      include_runtimes = timing_util.TimingMeasurementsFlag.runtimes
+      include_timestamps = timing_util.TimingMeasurementsFlag.timestamps
+      if FLAGS.run_stage == STAGE_ALL:
+        collector.AddSamples(
+            end_to_end_interval.GenerateSamples(
+                include_runtime=include_end_to_end or include_runtimes,
+                include_timestamps=include_timestamps),
+            benchmark_name, spec)
+      for interval in detailed_timing_interval_list:
+        collector.AddSamples(
+            interval.GenerateSamples(include_runtimes, include_timestamps),
+            benchmark_name, spec)
 
     except Exception:
       # Resource cleanup (below) can take a long time. Log the error to give
@@ -415,6 +412,7 @@ def Main(argv=sys.argv):
                                       % '\n\t'.join(benchmark_sets_list))
   try:
     argv = FLAGS(argv)  # parse flags
+    timing_util.TimingMeasurementsFlag.Initialize(FLAGS.timing_measurements)
   except flags.FlagsError as e:
     logging.error(
         '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
