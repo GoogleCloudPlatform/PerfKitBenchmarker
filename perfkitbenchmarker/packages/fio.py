@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Module containing fio installation, cleanup, parsing functions."""
-
+import re
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -25,7 +25,8 @@ FIO_PATH = FIO_DIR + '/fio'
 SECTION_REGEX = r'\[(\w+)\]\n([\w\d\n=*$/]+)'
 PARAMETER_REGEX = r'(\w+)=([/\w\d$*]+)\n'
 GLOBAL = 'global'
-
+CMD_SECTION_REGEX = r'--name=(\w+)\s+'
+JOB_SECTION_REGEX = r'[\1]\n'
 
 def _Install(vm):
   """Installs the fio package on the VM."""
@@ -98,6 +99,28 @@ def ParseJobFile(job_file):
     parameter_metadata[section_name].update(ExtractFioParameters(section[1]))
 
   return parameter_metadata
+
+
+def FioParametersToJob(fio_parameters):
+  """Translate fio parameters into a job file in raw string.
+
+  Sample fio parameters:
+  --filesize=10g --directory=/scratch0
+  --ioengine=libaio --filename=fio_test_file --invalidate=1
+  --randrepeat=0 --direct=0 --size=3790088k --iodepth=8
+  --name=sequential_write --overwrite=0 --rw=write --end_fsync=1
+
+  Args:
+    fio_parameter: string. Fio parameters in string format.
+
+  Returns:
+    A raw string representing a job file can be read by fio binary.
+  """
+  fio_parameters = fio_parameters.replace(' ', '\n')
+  fio_parameters = re.sub(
+      CMD_SECTION_REGEX, JOB_SECTION_REGEX, fio_parameters)
+  fio_parameters = '[%s]\n%s' % (GLOBAL, fio_parameters)
+  return fio_parameters.replace('--', '')
 
 
 def ParseResults(job_file, fio_json_result):

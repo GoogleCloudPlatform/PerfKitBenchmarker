@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.benchmarks.util.fio."""
+"""Tests for perfkitbenchmarker.packages.fio."""
 
 import json
 import os
@@ -110,6 +110,40 @@ class FioTestCase(unittest.TestCase):
       expected_result = [sample.Sample(*sample_tuple)
                          for sample_tuple in expected_result]
       self.assertEqual(result, expected_result)
+
+  def testFioCommandToJob(self):
+    fio_parameters = (
+        '--filesize=10g --directory=/scratch0 --ioengine=libaio '
+        '--filename=fio_test_file --invalidate=1 --randrepeat=0 '
+        '--direct=0 --size=3790088k --iodepth=8 '
+        '--name=sequential_write --overwrite=0 --rw=write --end_fsync=1 '
+        '--name=random_read --size=379008k --stonewall --rw=randread '
+        '--name=sequential_read --stonewall --rw=read ')
+    expected_result = (
+        '[global]\n'
+        'filesize=10g\n'
+        'directory=/scratch0\n'
+        'ioengine=libaio\n'
+        'filename=fio_test_file\n'
+        'invalidate=1\n'
+        'randrepeat=0\n'
+        'direct=0\n'
+        'size=3790088k\n'
+        'iodepth=8\n'
+        '[sequential_write]\n'
+        'overwrite=0\n'
+        'rw=write\n'
+        'end_fsync=1\n'
+        '[random_read]\n'
+        'size=379008k\n'
+        'stonewall\n'
+        'rw=randread\n'
+        '[sequential_read]\n'
+        'stonewall\n'
+        'rw=read\n')
+    result = fio.FioParametersToJob(fio_parameters)
+    print result
+    self.assertEqual(expected_result, result)
 
 
 if __name__ == '__main__':
