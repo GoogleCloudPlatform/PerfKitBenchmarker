@@ -165,19 +165,27 @@ class SamplePublisher(object):
 class PrettyPrintStreamPublisher(SamplePublisher):
   """Writes samples to an output stream, defaulting to stdout.
 
-  Samples are pretty-printed and summarized. Example output:
+  Samples are pretty-printed and summarized. Example output (truncated):
 
-    -------------------------PerfKitBenchmarker Results Summary----------------
-    NETPERF_SIMPLE:
-            TCP_RR_Transaction_Rate 714.72 transactions_per_second
-            TCP_RR_Transaction_Rate 2950.92 transactions_per_second
-            TCP_CRR_Transaction_Rate 201.6 transactions_per_second
-            TCP_CRR_Transaction_Rate 793.59 transactions_per_second
-            TCP_STREAM_Throughput 283.25 Mbits/sec
-            TCP_STREAM_Throughput 989.06 Mbits/sec
-            UDP_RR_Transaction_Rate 107.9 transactions_per_second
-            UDP_RR_Transaction_Rate 3018.51 transactions_per_second
-            End to End Runtime 471.35810709 seconds
+    -------------------------PerfKitBenchmarker Results Summary--------------
+    COREMARK:
+      num_cpus="4"
+      Coremark Score                    44145.237832
+      End to End Runtime                  289.477677 seconds
+    NETPERF:
+      client_machine_type="n1-standard-4" client_zone="us-central1-a" ....
+      TCP_RR_Transaction_Rate  1354.04 transactions_per_second (ip_type="ext ...
+      TCP_RR_Transaction_Rate  3972.70 transactions_per_second (ip_type="int ...
+      TCP_CRR_Transaction_Rate  449.69 transactions_per_second (ip_type="ext ...
+      TCP_CRR_Transaction_Rate 1271.68 transactions_per_second (ip_type="int ...
+      TCP_STREAM_Throughput    1171.04 Mbits/sec               (ip_type="ext ...
+      TCP_STREAM_Throughput    6253.24 Mbits/sec               (ip_type="int ...
+      UDP_RR_Transaction_Rate  1380.37 transactions_per_second (ip_type="ext ...
+      UDP_RR_Transaction_Rate  4336.37 transactions_per_second (ip_type="int ...
+      End to End Runtime        444.33 seconds
+
+    -------------------------
+    For all tests: cloud="GCP" image="ubuntu-14-04" machine_type="n1-standa ...
 
   Attributes:
     stream: File-like object. Output stream to print samples.
