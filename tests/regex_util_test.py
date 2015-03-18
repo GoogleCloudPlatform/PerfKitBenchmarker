@@ -93,5 +93,23 @@ class ExtractAllMatchesTestCase(unittest.TestCase):
     self.assertRaises(regex_util.NoMatchError, regex_util.ExtractAllMatches,
                       regex, string)
 
+
+class SubstituteTestCase(unittest.TestCase):
+
+  def testSubSuccess(self):
+    pattern = r'<(\w+)>'
+    repl = r'[\1]'
+    text = 'foo <bar> <foo> bar'
+    sub_text = regex_util.Sub(pattern, repl, text)
+    self.assertEqual(sub_text, 'foo [bar] [foo] bar')
+
+  def testNoMatch(self):
+    pattern = r'\[(\w+)\]'
+    repl = r'\1'
+    text = 'foo <bar> <foo> bar'
+    self.assertRaises(regex_util.NoMatchError, regex_util.Sub,
+                      pattern, repl, text)
+
+
 if __name__ == '__main__':
   unittest.main()
