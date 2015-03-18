@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import gflags as flags
 import unittest
 
+from perfkitbenchmarker import flags_validators
 from perfkitbenchmarker import timing_util
 
 
@@ -25,8 +25,8 @@ class TimingMeasurementsFlagTestCase(unittest.TestCase):
     """Passing an empty list is not allowed."""
     e = None
     try:
-      timing_util.TimingMeasurementsFlag.Initialize([])
-    except flags.IllegalFlagValue as e:
+      timing_util.TimingMeasurementsFlag.Validate([])
+    except flags_validators.Error as e:
       pass
     self.assertIsNotNone(e)
     self.assertEqual(str(e), 'option --timing_measurements requires argument')
@@ -35,8 +35,8 @@ class TimingMeasurementsFlagTestCase(unittest.TestCase):
     """Passing an unrecognized value is not allowed."""
     e = None
     try:
-      timing_util.TimingMeasurementsFlag.Initialize(['TEST'])
-    except flags.IllegalFlagValue as e:
+      timing_util.TimingMeasurementsFlag.Validate(['TEST'])
+    except flags_validators.Error as e:
       pass
     self.assertIsNotNone(e)
     self.assertEqual(str(e), 'TEST: Invalid value for --timing_measurements')
@@ -45,8 +45,8 @@ class TimingMeasurementsFlagTestCase(unittest.TestCase):
     """Passing NONE with another value is not allowed."""
     e = None
     try:
-      timing_util.TimingMeasurementsFlag.Initialize(['NONE', 'RUNTIMES'])
-    except flags.IllegalFlagValue as e:
+      timing_util.TimingMeasurementsFlag.Validate(['NONE', 'RUNTIMES'])
+    except flags_validators.Error as e:
       pass
     self.assertIsNotNone(e)
     self.assertEqual(
@@ -56,57 +56,21 @@ class TimingMeasurementsFlagTestCase(unittest.TestCase):
     """Test various valid combinations."""
     tm_flag = timing_util.TimingMeasurementsFlag
     e = None
+    b = True
     try:
-      tm_flag.Initialize(['NONE'])
-      self.assertEqual(tm_flag.none, True)
-      self.assertEqual(tm_flag.end_to_end_runtime, False)
-      self.assertEqual(tm_flag.runtimes, False)
-      self.assertEqual(tm_flag.timestamps, False)
-
-      tm_flag.Initialize(['END_TO_END_RUNTIME'])
-      self.assertEqual(tm_flag.none, False)
-      self.assertEqual(tm_flag.end_to_end_runtime, True)
-      self.assertEqual(tm_flag.runtimes, False)
-      self.assertEqual(tm_flag.timestamps, False)
-
-      tm_flag.Initialize(['RUNTIMES'])
-      self.assertEqual(tm_flag.none, False)
-      self.assertEqual(tm_flag.end_to_end_runtime, False)
-      self.assertEqual(tm_flag.runtimes, True)
-      self.assertEqual(tm_flag.timestamps, False)
-
-      tm_flag.Initialize(['TIMESTAMPS'])
-      self.assertEqual(tm_flag.none, False)
-      self.assertEqual(tm_flag.end_to_end_runtime, False)
-      self.assertEqual(tm_flag.runtimes, False)
-      self.assertEqual(tm_flag.timestamps, True)
-
-      tm_flag.Initialize(['END_TO_END_RUNTIME', 'RUNTIMES'])
-      self.assertEqual(tm_flag.none, False)
-      self.assertEqual(tm_flag.end_to_end_runtime, True)
-      self.assertEqual(tm_flag.runtimes, True)
-      self.assertEqual(tm_flag.timestamps, False)
-
-      tm_flag.Initialize(['END_TO_END_RUNTIME', 'TIMESTAMPS'])
-      self.assertEqual(tm_flag.none, False)
-      self.assertEqual(tm_flag.end_to_end_runtime, True)
-      self.assertEqual(tm_flag.runtimes, False)
-      self.assertEqual(tm_flag.timestamps, True)
-
-      tm_flag.Initialize(['RUNTIMES', 'TIMESTAMPS'])
-      self.assertEqual(tm_flag.none, False)
-      self.assertEqual(tm_flag.end_to_end_runtime, False)
-      self.assertEqual(tm_flag.runtimes, True)
-      self.assertEqual(tm_flag.timestamps, True)
-
-      tm_flag.Initialize(['END_TO_END_RUNTIME', 'RUNTIMES', 'TIMESTAMPS'])
-      self.assertEqual(tm_flag.none, False)
-      self.assertEqual(tm_flag.end_to_end_runtime, True)
-      self.assertEqual(tm_flag.runtimes, True)
-      self.assertEqual(tm_flag.timestamps, True)
-    except flags.IllegalFlagValue as e:
+      b = b and tm_flag.Validate(['NONE'])
+      b = b and tm_flag.Validate(['END_TO_END_RUNTIME'])
+      b = b and tm_flag.Validate(['RUNTIMES'])
+      b = b and tm_flag.Validate(['TIMESTAMPS'])
+      b = b and tm_flag.Validate(['END_TO_END_RUNTIME', 'RUNTIMES'])
+      b = b and tm_flag.Validate(['END_TO_END_RUNTIME', 'TIMESTAMPS'])
+      b = b and tm_flag.Validate(['RUNTIMES', 'TIMESTAMPS'])
+      b = b and tm_flag.Validate(
+          ['END_TO_END_RUNTIME', 'RUNTIMES', 'TIMESTAMPS'])
+    except flags_validators.Error as e:
       pass
     self.assertIsNone(e)
+    self.assertTrue(b)
 
 
 class TimedIntervalTestCase(unittest.TestCase):

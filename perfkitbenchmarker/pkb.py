@@ -289,9 +289,12 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
               resource_teardown_interval)
 
       # Add samples for any timed interval that was measured.
-      include_end_to_end = timing_util.TimingMeasurementsFlag.end_to_end_runtime
-      include_runtimes = timing_util.TimingMeasurementsFlag.runtimes
-      include_timestamps = timing_util.TimingMeasurementsFlag.timestamps
+      include_end_to_end = timing_util.TimingMeasurementsFlag.OptionIncluded(
+          timing_util.TimingMeasurementsFlag.END_TO_END_RUNTIME)
+      include_runtimes = timing_util.TimingMeasurementsFlag.OptionIncluded(
+          timing_util.TimingMeasurementsFlag.RUNTIMES)
+      include_timestamps = timing_util.TimingMeasurementsFlag.OptionIncluded(
+          timing_util.TimingMeasurementsFlag.TIMESTAMPS)
       if FLAGS.run_stage == STAGE_ALL:
         collector.AddSamples(
             end_to_end_interval.GenerateSamples(
@@ -412,7 +415,6 @@ def Main(argv=sys.argv):
                                       % '\n\t'.join(benchmark_sets_list))
   try:
     argv = FLAGS(argv)  # parse flags
-    timing_util.TimingMeasurementsFlag.Initialize(FLAGS.timing_measurements)
   except flags.FlagsError as e:
     logging.error(
         '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)

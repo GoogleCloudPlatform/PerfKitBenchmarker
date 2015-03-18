@@ -17,54 +17,76 @@ from contextlib import contextmanager
 import time
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import flags_validators
 from perfkitbenchmarker import sample
 
 
 class TimingMeasurementsFlag(object):
-  """Global settings decoded from the --timing_measurements flag."""
+  """Functions and values related to the --timing_measurements flag."""
 
-  # Valid options for --timing_measurements.
+  # Name of the flag as a user would type it.
+  FLAG_NAME = 'timing_measurements'
+
+  # Valid options that can be included in the flag's list value.
   NONE = 'NONE'
   END_TO_END_RUNTIME = 'END_TO_END_RUNTIME'
   RUNTIMES = 'RUNTIMES'
   TIMESTAMPS = 'TIMESTAMPS'
-
   ALL = (NONE, END_TO_END_RUNTIME, RUNTIMES, TIMESTAMPS)
 
   @staticmethod
-  def Initialize(options_list):
-    """Verifies correct usage of the flag and initializes global settings.
+  def Validate(options_list):
+    """Verifies correct usage of the flag.
 
-    Previous values of the global settings are replaced with the new settings.
+    The user of the flag must provide at least one option. All provided options
+    must be valid. The NONE option cannot be combined with other options.
 
     Args:
-      options_list: A list of strings parsed from the provided value of the
-        --timing_measurements flag.
+      options_list: A list of strings parsed from the provided value for the
+        flag.
+
+    Returns:
+      True if the list of options provided as the value for the flag meets all
+      the documented requirements.
 
     Raises:
-      flags.IllegalFlagValue: If an illegal value was included in the
-        comma-separated list provided to the --timing-measurements flag.
+      flags_validators.Error: If the list of options provided as the value for
+        the flag does not meet the documented requirements.
     """
-    for option in TimingMeasurementsFlag.ALL:
-      setattr(TimingMeasurementsFlag, option.lower(), False)
     if len(options_list) is 0:
-      raise flags.IllegalFlagValue(
-          'option --timing_measurements requires argument')
+      raise flags_validators.Error(
+          'option --%s requires argument' % TimingMeasurementsFlag.FLAG_NAME)
     for option in options_list:
       if option not in TimingMeasurementsFlag.ALL:
-        raise flags.IllegalFlagValue(
-            '%s: Invalid value for --timing_measurements' % option)
+        raise flags_validators.Error(
+            '%s: Invalid value for --%s' % (
+                option, TimingMeasurementsFlag.FLAG_NAME))
       if option == TimingMeasurementsFlag.NONE and len(options_list) != 1:
-        raise flags.IllegalFlagValue(
-            '%s: Cannot combine with other --timing_measurements options' %
-            option)
-      setattr(TimingMeasurementsFlag, option.lower(), True)
+        raise flags_validators.Error(
+            '%s: Cannot combine with other --%s options' % (
+                option, TimingMeasurementsFlag.FLAG_NAME))
+    return True
+
+  @staticmethod
+  def OptionIncluded(option):
+    """Determines if a specified option was included in the flag list value.
+
+    Args:
+      option: A string containing one of the flag's valid options.
+
+    Returns:
+      A Boolean that is True if the specified option is present in the global
+      flag value, or False if it is not present.
+    """
+    return option in getattr(flags.FLAGS, TimingMeasurementsFlag.FLAG_NAME)
 
 
 flags.DEFINE_list(
-    'timing_measurements', TimingMeasurementsFlag.END_TO_END_RUNTIME,
+    TimingMeasurementsFlag.FLAG_NAME, TimingMeasurementsFlag.END_TO_END_RUNTIME,
     'Comma-separated list of values from <%s> that selects which timing '
     'measurements to enable.' % '|'.join(TimingMeasurementsFlag.ALL))
+flags.RegisterValidator(
+    TimingMeasurementsFlag.FLAG_NAME, TimingMeasurementsFlag.Validate)
 
 
 class TimedInterval(object):
