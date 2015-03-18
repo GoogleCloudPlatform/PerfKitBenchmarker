@@ -62,9 +62,9 @@ class TimingMeasurementsFlag(object):
 
 
 flags.DEFINE_list(
-    'timing_measurements', 'END_TO_END_RUNTIME',
-    'Comma-separated list of values from <NONE|END_TO_END_RUNTIME|RUNTIMES|'
-    'TIMESTAMPS> that selects which timing measurements to enable.')
+    'timing_measurements', TimingMeasurementsFlag.END_TO_END_RUNTIME,
+    'Comma-separated list of values from <%s> that selects which timing '
+    'measurements to enable.' % '|'.join(TimingMeasurementsFlag.ALL))
 
 
 class TimedInterval(object):
