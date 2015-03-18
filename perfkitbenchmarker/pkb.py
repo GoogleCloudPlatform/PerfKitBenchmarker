@@ -289,12 +289,12 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
               resource_teardown_interval)
 
       # Add samples for any timed interval that was measured.
-      include_end_to_end = timing_util.TimingMeasurementsFlag.OptionIncluded(
-          timing_util.TimingMeasurementsFlag.END_TO_END_RUNTIME)
-      include_runtimes = timing_util.TimingMeasurementsFlag.OptionIncluded(
-          timing_util.TimingMeasurementsFlag.RUNTIMES)
-      include_timestamps = timing_util.TimingMeasurementsFlag.OptionIncluded(
-          timing_util.TimingMeasurementsFlag.TIMESTAMPS)
+      include_end_to_end = timing_util.MeasurementsEnabled(
+          timing_util.MEASUREMENTS_END_TO_END_RUNTIME)
+      include_runtimes = timing_util.MeasurementsEnabled(
+          timing_util.MEASUREMENTS_RUNTIMES)
+      include_timestamps = timing_util.MeasurementsEnabled(
+          timing_util.MEASUREMENTS_TIMESTAMPS)
       if FLAGS.run_stage == STAGE_ALL:
         collector.AddSamples(
             end_to_end_interval.GenerateSamples(

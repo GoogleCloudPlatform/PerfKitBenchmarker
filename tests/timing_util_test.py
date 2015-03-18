@@ -18,14 +18,14 @@ from perfkitbenchmarker import flags_validators
 from perfkitbenchmarker import timing_util
 
 
-class TimingMeasurementsFlagTestCase(unittest.TestCase):
-  """Tests exercising TimingMeasurementsFlag."""
+class ValidateMeasurementsFlagTestCase(unittest.TestCase):
+  """Tests exercising ValidateMeasurementsFlag."""
 
   def testEmptyList(self):
     """Passing an empty list is not allowed."""
     e = None
     try:
-      timing_util.TimingMeasurementsFlag.Validate([])
+      timing_util.ValidateMeasurementsFlag([])
     except flags_validators.Error as e:
       pass
     self.assertIsNotNone(e)
@@ -35,7 +35,7 @@ class TimingMeasurementsFlagTestCase(unittest.TestCase):
     """Passing an unrecognized value is not allowed."""
     e = None
     try:
-      timing_util.TimingMeasurementsFlag.Validate(['TEST'])
+      timing_util.ValidateMeasurementsFlag(['TEST'])
     except flags_validators.Error as e:
       pass
     self.assertIsNotNone(e)
@@ -45,7 +45,7 @@ class TimingMeasurementsFlagTestCase(unittest.TestCase):
     """Passing NONE with another value is not allowed."""
     e = None
     try:
-      timing_util.TimingMeasurementsFlag.Validate(['NONE', 'RUNTIMES'])
+      timing_util.ValidateMeasurementsFlag(['NONE', 'RUNTIMES'])
     except flags_validators.Error as e:
       pass
     self.assertIsNotNone(e)
@@ -54,23 +54,22 @@ class TimingMeasurementsFlagTestCase(unittest.TestCase):
 
   def testValid(self):
     """Test various valid combinations."""
-    tm_flag = timing_util.TimingMeasurementsFlag
+    validate = timing_util.ValidateMeasurementsFlag
     e = None
-    b = True
     try:
-      b = b and tm_flag.Validate(['NONE'])
-      b = b and tm_flag.Validate(['END_TO_END_RUNTIME'])
-      b = b and tm_flag.Validate(['RUNTIMES'])
-      b = b and tm_flag.Validate(['TIMESTAMPS'])
-      b = b and tm_flag.Validate(['END_TO_END_RUNTIME', 'RUNTIMES'])
-      b = b and tm_flag.Validate(['END_TO_END_RUNTIME', 'TIMESTAMPS'])
-      b = b and tm_flag.Validate(['RUNTIMES', 'TIMESTAMPS'])
-      b = b and tm_flag.Validate(
-          ['END_TO_END_RUNTIME', 'RUNTIMES', 'TIMESTAMPS'])
+      self.assertEqual(validate(['NONE']), True)
+      self.assertEqual(validate(['END_TO_END_RUNTIME']), True)
+      self.assertEqual(validate(['RUNTIMES']), True)
+      self.assertEqual(validate(['TIMESTAMPS']), True)
+      self.assertEqual(validate(['END_TO_END_RUNTIME', 'RUNTIMES']), True)
+      self.assertEqual(validate(['END_TO_END_RUNTIME', 'TIMESTAMPS']), True)
+      self.assertEqual(validate(['RUNTIMES', 'TIMESTAMPS']), True)
+      self.assertEqual(
+          validate(['END_TO_END_RUNTIME', 'RUNTIMES', 'TIMESTAMPS']),
+          True)
     except flags_validators.Error as e:
       pass
     self.assertIsNone(e)
-    self.assertTrue(b)
 
 
 class TimedIntervalTestCase(unittest.TestCase):

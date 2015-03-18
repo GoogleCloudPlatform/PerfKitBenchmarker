@@ -21,72 +21,70 @@ from perfkitbenchmarker import flags_validators
 from perfkitbenchmarker import sample
 
 
-class TimingMeasurementsFlag(object):
-  """Functions and values related to the --timing_measurements flag."""
+# Name of the measurements configuration flag as a user would type it.
+MEASUREMENTS_FLAG_NAME = 'timing_measurements'
+# Valid options that can be included in the flag's list value.
+MEASUREMENTS_NONE = 'NONE'
+MEASUREMENTS_END_TO_END_RUNTIME = 'END_TO_END_RUNTIME'
+MEASUREMENTS_RUNTIMES = 'RUNTIMES'
+MEASUREMENTS_TIMESTAMPS = 'TIMESTAMPS'
+MEASUREMENTS_ALL = (
+    MEASUREMENTS_NONE, MEASUREMENTS_END_TO_END_RUNTIME, MEASUREMENTS_RUNTIMES,
+    MEASUREMENTS_TIMESTAMPS)
 
-  # Name of the flag as a user would type it.
-  FLAG_NAME = 'timing_measurements'
 
-  # Valid options that can be included in the flag's list value.
-  NONE = 'NONE'
-  END_TO_END_RUNTIME = 'END_TO_END_RUNTIME'
-  RUNTIMES = 'RUNTIMES'
-  TIMESTAMPS = 'TIMESTAMPS'
-  ALL = (NONE, END_TO_END_RUNTIME, RUNTIMES, TIMESTAMPS)
+def ValidateMeasurementsFlag(options_list):
+  """Verifies correct usage of the measurements configuration flag.
 
-  @staticmethod
-  def Validate(options_list):
-    """Verifies correct usage of the flag.
+  The user of the flag must provide at least one option. All provided options
+  must be valid. The NONE option cannot be combined with other options.
 
-    The user of the flag must provide at least one option. All provided options
-    must be valid. The NONE option cannot be combined with other options.
+  Args:
+    options_list: A list of strings parsed from the provided value for the
+      flag.
 
-    Args:
-      options_list: A list of strings parsed from the provided value for the
-        flag.
+  Returns:
+    True if the list of options provided as the value for the flag meets all
+    the documented requirements.
 
-    Returns:
-      True if the list of options provided as the value for the flag meets all
-      the documented requirements.
-
-    Raises:
-      flags_validators.Error: If the list of options provided as the value for
-        the flag does not meet the documented requirements.
-    """
-    if len(options_list) is 0:
+  Raises:
+    flags_validators.Error: If the list of options provided as the value for
+      the flag does not meet the documented requirements.
+  """
+  if len(options_list) is 0:
+    raise flags_validators.Error(
+        'option --%s requires argument' % MEASUREMENTS_FLAG_NAME)
+  for option in options_list:
+    if option not in MEASUREMENTS_ALL:
       raise flags_validators.Error(
-          'option --%s requires argument' % TimingMeasurementsFlag.FLAG_NAME)
-    for option in options_list:
-      if option not in TimingMeasurementsFlag.ALL:
-        raise flags_validators.Error(
-            '%s: Invalid value for --%s' % (
-                option, TimingMeasurementsFlag.FLAG_NAME))
-      if option == TimingMeasurementsFlag.NONE and len(options_list) != 1:
-        raise flags_validators.Error(
-            '%s: Cannot combine with other --%s options' % (
-                option, TimingMeasurementsFlag.FLAG_NAME))
-    return True
+          '%s: Invalid value for --%s' % (option, MEASUREMENTS_FLAG_NAME))
+    if option == MEASUREMENTS_NONE and len(options_list) != 1:
+      raise flags_validators.Error(
+          '%s: Cannot combine with other --%s options' % (
+              option, MEASUREMENTS_FLAG_NAME))
+  return True
 
-  @staticmethod
-  def OptionIncluded(option):
-    """Determines if a specified option was included in the flag list value.
 
-    Args:
-      option: A string containing one of the flag's valid options.
+def MeasurementsEnabled(option):
+  """Determines if a timing measurements option is globally enabled.
 
-    Returns:
-      A Boolean that is True if the specified option is present in the global
-      flag value, or False if it is not present.
-    """
-    return option in getattr(flags.FLAGS, TimingMeasurementsFlag.FLAG_NAME)
+  Args:
+    option: A string containing a valid option for the timing measurements
+      configuration flag.
+
+  Returns:
+    A Boolean that is True if the specified option is present in the global
+    measurements configuration flag value, or False if it is not present.
+  """
+  return option in getattr(flags.FLAGS, MEASUREMENTS_FLAG_NAME)
 
 
 flags.DEFINE_list(
-    TimingMeasurementsFlag.FLAG_NAME, TimingMeasurementsFlag.END_TO_END_RUNTIME,
+    MEASUREMENTS_FLAG_NAME, MEASUREMENTS_END_TO_END_RUNTIME,
     'Comma-separated list of values from <%s> that selects which timing '
-    'measurements to enable.' % '|'.join(TimingMeasurementsFlag.ALL))
+    'measurements to enable.' % '|'.join(MEASUREMENTS_ALL))
 flags.RegisterValidator(
-    TimingMeasurementsFlag.FLAG_NAME, TimingMeasurementsFlag.Validate)
+    MEASUREMENTS_FLAG_NAME, ValidateMeasurementsFlag)
 
 
 class TimedInterval(object):
