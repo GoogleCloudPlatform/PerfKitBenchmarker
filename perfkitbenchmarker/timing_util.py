@@ -13,6 +13,7 @@
 # limitations under the License.
 """Utilities for generating timing samples."""
 
+from collections import OrderedDict
 from contextlib import contextmanager
 import time
 
@@ -21,16 +22,39 @@ from perfkitbenchmarker import flags_validators
 from perfkitbenchmarker import sample
 
 
-# Name of the measurements configuration flag as a user would type it.
 MEASUREMENTS_FLAG_NAME = 'timing_measurements'
 # Valid options that can be included in the flag's list value.
-MEASUREMENTS_NONE = 'NONE'
-MEASUREMENTS_END_TO_END_RUNTIME = 'END_TO_END_RUNTIME'
-MEASUREMENTS_RUNTIMES = 'RUNTIMES'
-MEASUREMENTS_TIMESTAMPS = 'TIMESTAMPS'
-MEASUREMENTS_ALL = (
-    MEASUREMENTS_NONE, MEASUREMENTS_END_TO_END_RUNTIME, MEASUREMENTS_RUNTIMES,
-    MEASUREMENTS_TIMESTAMPS)
+MEASUREMENTS_NONE = 'none'
+MEASUREMENTS_END_TO_END_RUNTIME = 'end_to_end_runtime'
+MEASUREMENTS_RUNTIMES = 'runtimes'
+MEASUREMENTS_TIMESTAMPS = 'timestamps'
+MEASUREMENTS_ALL = OrderedDict([
+    (MEASUREMENTS_NONE, (
+        'No measurements included (same as providing an empty list, and cannot '
+        'be combined with other options).')),
+    (MEASUREMENTS_END_TO_END_RUNTIME, (
+        'Includes an end-to-end runtime measurement.')),
+    (MEASUREMENTS_RUNTIMES, (
+        'Includes runtimes of all measured intervals, including the end-to-end '
+        'runtime, the time taken by the benchmark module Prepare, Run, and '
+        'Cleanup functions, and other important intervals.')),
+    (MEASUREMENTS_TIMESTAMPS, (
+        'Includes start and stop timestamps of all measured intervals.'))])
+
+
+def EndToEndRuntimeMeasurementEnabled():
+  """Returns whether end-to-end runtime measurement is globally enabled."""
+  return MEASUREMENTS_END_TO_END_RUNTIME in flags.FLAGS.timing_measurements
+
+
+def RuntimeMeasurementsEnabled():
+  """Returns whether runtime measurements are globally enabled."""
+  return MEASUREMENTS_RUNTIMES in flags.FLAGS.timing_measurements
+
+
+def TimestampMeasurementsEnabled():
+  """Returns whether timestamps measurements are globally enabled."""
+  return MEASUREMENTS_TIMESTAMPS in flags.FLAGS.timing_measurements
 
 
 def ValidateMeasurementsFlag(options_list):
@@ -51,11 +75,8 @@ def ValidateMeasurementsFlag(options_list):
     flags_validators.Error: If the list of options provided as the value for
       the flag does not meet the documented requirements.
   """
-  if len(options_list) is 0:
-    raise flags_validators.Error(
-        'option --%s requires argument' % MEASUREMENTS_FLAG_NAME)
   for option in options_list:
-    if option not in MEASUREMENTS_ALL:
+    if option not in MEASUREMENTS_ALL.keys():
       raise flags_validators.Error(
           '%s: Invalid value for --%s' % (option, MEASUREMENTS_FLAG_NAME))
     if option == MEASUREMENTS_NONE and len(options_list) != 1:
@@ -65,79 +86,87 @@ def ValidateMeasurementsFlag(options_list):
   return True
 
 
-def MeasurementsEnabled(option):
-  """Determines if a timing measurements option is globally enabled.
-
-  Args:
-    option: A string containing a valid option for the timing measurements
-      configuration flag.
-
-  Returns:
-    A Boolean that is True if the specified option is present in the global
-    measurements configuration flag value, or False if it is not present.
-  """
-  return option in getattr(flags.FLAGS, MEASUREMENTS_FLAG_NAME)
-
-
 flags.DEFINE_list(
     MEASUREMENTS_FLAG_NAME, MEASUREMENTS_END_TO_END_RUNTIME,
     'Comma-separated list of values from <%s> that selects which timing '
-    'measurements to enable.' % '|'.join(MEASUREMENTS_ALL))
+    'measurements to enable. Measurements will be included as samples in the '
+    'benchmark results. %s' % (
+        '|'.join(MEASUREMENTS_ALL.keys()),
+        ' '.join(['%s: %s' % (option, MEASUREMENTS_ALL[option]) for option in
+                  MEASUREMENTS_ALL.keys()])))
 flags.RegisterValidator(
     MEASUREMENTS_FLAG_NAME, ValidateMeasurementsFlag)
 
 
-class TimedInterval(object):
-  """A measured interval that generates timing samples.
+class IntervalTimer(object):
+  """Class that can measure time and generate samples for each measurement.
 
   Attributes:
-    name: A string used to prefix generated samples' names.
-    start_time: A float containing the time in seconds since the epoch, recorded
-      at the beginning of a call to Measure, or None if Measure was not called.
-    stop_time: A float containing the time in seconds since the epoch, recorded
-      at the end of a call to Measure, or None if Measure was not called.
+    intervals: A list of one 3-tuple per measured interval. Each tuple is of the
+      form (name string, start_time float, stop_time float).
   """
 
-  def __init__(self, name):
-    """Create a named interval.
-
-    Args:
-      name: A string used to prefix the generated samples' names.
-    """
-    self.name = name
-    self.start_time = None
-    self.stop_time = None
+  def __init__(self):
+    self.intervals = []
 
   @contextmanager
-  def Measure(self):
-    """Records the start and stop time of the enclosed interval."""
-    self.start_time = time.time()
-    yield
-    self.stop_time = time.time()
-
-  def GenerateSamples(self, include_runtime, include_timestamps):
-    """Generates samples based on the times recorded in Measure.
+  def Measure(self, name):
+    """Records the start and stop times of the enclosed interval.
 
     Args:
-      include_runtime: A Boolean that controls whether an elapsed time sample is
-        included in the generated list.
-      include_timestamps: A Boolean that controls whether samples containing the
+      name: A string that names the interval.
+    """
+    start_time = time.time()
+    yield
+    stop_time = time.time()
+    self.intervals.append((name, start_time, stop_time))
+
+  @staticmethod
+  def _GenerateIntervalSamples(interval, include_runtime, include_timestamps):
+    """Generates Samples for a single interval timed by a call to Measure.
+
+    Args:
+      interval: A (name, start_time, stop_time) tuple from a call to Measure.
+      include_runtime: A Boolean that controls whether an elapsed time Sample
+        is included in the generated list.
+      include_timestamps: A Boolean that controls whether Samples containing the
         start and stop timestamps are added to the generated list.
 
     Returns:
-      A list of Samples. If Measure has not been called, the list is empty.
-      Otherwise, the list contains samples as specified by the args, in the
-      order of runtime, start timestamp, stop timestamp.
+      A list of 0 to 3 Samples as specified by the args. When included, the
+      Samples appear in the order of runtime, start timestamp, stop timestamp.
     """
     samples = []
-    if self.stop_time is not None:
-      if include_runtime:
-        elapsed_time = self.stop_time - self.start_time
-        samples.append(sample.Sample(
-            self.name + ' Runtime', elapsed_time, 'seconds'))
-      if include_timestamps:
-        samples.append(sample.Sample(
-            self.name + ' Start Timestamp', self.start_time, 'seconds'))
-        samples.append(sample.Sample(
-            self.name + ' Stop Timestamp', self.stop_time, 'seconds'))
+    name = interval[0]
+    start_time = interval[1]
+    stop_time = interval[2]
+    if include_runtime:
+      elapsed_time = stop_time - start_time
+      samples.append(sample.Sample(name + ' Runtime', elapsed_time, 'seconds'))
+    if include_timestamps:
+      samples.append(sample.Sample(
+          name + ' Start Timestamp', start_time, 'seconds'))
+      samples.append(sample.Sample(
+          name + ' Stop Timestamp', stop_time, 'seconds'))
     return samples
+
+  def GenerateSamples(self, include_runtime, include_timestamps):
+    """Generates Samples based on the times recorded in all calls to Measure.
+
+    Args:
+      include_runtime: A Boolean that controls whether per-interval elapsed time
+        Samples are included in the generated list.
+      include_timestamps: A Boolean that controls whether per-interval Samples
+        containing the start and stop timestamps are added to the list.
+
+    Returns:
+      A list of Samples. The list contains Samples for each interval that was
+      wrapped by a call to Measure, with per-interval Samples generated as
+      specified by the args in the order of runtime, start timestamp, stop
+      timestamp. All Samples for one interval appear before any Samples from the
+      next interval.
+    """
+    return [
+        sample for interval in self.intervals for sample in
+        self._GenerateIntervalSamples(
+            interval, include_runtime, include_timestamps)]
