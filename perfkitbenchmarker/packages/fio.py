@@ -22,11 +22,13 @@ FIO_DIR = '%s/fio' % vm_util.VM_TMP_DIR
 GIT_REPO = 'git://git.kernel.dk/fio.git'
 GIT_TAG = 'fio-2.1.14'
 FIO_PATH = FIO_DIR + '/fio'
+FIO_CMD_PREFIX = '%s --output-format=json ' % FIO_PATH
 SECTION_REGEX = r'\[(\w+)\]\n([\w\d\n=*$/]+)'
 PARAMETER_REGEX = r'(\w+)=([/\w\d$*]+)\n'
 GLOBAL = 'global'
 CMD_SECTION_REGEX = r'--name=(\w+)\s+'
 JOB_SECTION_REGEX = r'[\1]\n'
+
 
 def _Install(vm):
   """Installs the fio package on the VM."""
