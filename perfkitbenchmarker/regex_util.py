@@ -76,7 +76,7 @@ def ExtractAllMatches(regex, text):
   return match
 
 
-def Sub(pattern, repl, text):
+def Substitute(pattern, repl, text):
   """Substitute all 'pattern' in 'text' with 'repl'.
 
   Args:

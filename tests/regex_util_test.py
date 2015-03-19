@@ -96,18 +96,18 @@ class ExtractAllMatchesTestCase(unittest.TestCase):
 
 class SubstituteTestCase(unittest.TestCase):
 
-  def testSubSuccess(self):
+  def testSubstituteSuccess(self):
     pattern = r'<(\w+)>'
     repl = r'[\1]'
     text = 'foo <bar> <foo> bar'
-    sub_text = regex_util.Sub(pattern, repl, text)
+    sub_text = regex_util.Substitute(pattern, repl, text)
     self.assertEqual(sub_text, 'foo [bar] [foo] bar')
 
   def testNoMatch(self):
     pattern = r'\[(\w+)\]'
     repl = r'\1'
     text = 'foo <bar> <foo> bar'
-    self.assertRaises(regex_util.NoMatchError, regex_util.Sub,
+    self.assertRaises(regex_util.NoMatchError, regex_util.Substitute,
                       pattern, repl, text)
 
 
