@@ -77,11 +77,8 @@ def ExtractAllMatches(regex, text):
 
 
 def Sub(pattern, repl, text):
-  """Substitute all patterns in string with repl pattern.
+  """Substitute all 'pattern' in 'text' with 'repl'.
 
-  Example:
-  >>> re.sub(r'<(\w+)>', r'[\1]', 'foo <bar> <foo> bar')
-  'foo [bar] [foo] bar'
   Args:
     pattern: string. Pattern to be replaced.
     repl: string. Replacement pattern.
@@ -91,9 +88,7 @@ def Sub(pattern, repl, text):
   Raises:
     NoMatchError: when 'pattern' isn't found in string.
   """
-  match = re.search(pattern, text)
-  print match
-  if not match:
+  if not re.search(pattern, text):
     raise NoMatchError('No match for pattern "{0}" in "{1}"'.format(
         pattern, text))
   return re.sub(pattern, repl, text)
