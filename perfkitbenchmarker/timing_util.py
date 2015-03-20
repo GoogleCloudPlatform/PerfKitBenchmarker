@@ -92,13 +92,13 @@ flags.DEFINE_list(
     'measurements to enable. Measurements will be included as samples in the '
     'benchmark results. %s' % (
         '|'.join(MEASUREMENTS_ALL),
-        ' '.join(['%s: %s' % (option, MEASUREMENTS_ALL[option]) for option in
-                  MEASUREMENTS_ALL])))
+        ' '.join(['%s: %s' % (option, description) for option, description in
+                  MEASUREMENTS_ALL.iteritems()])))
 flags.RegisterValidator(
     MEASUREMENTS_FLAG_NAME, ValidateMeasurementsFlag)
 
 
-def GenerateIntervalSamples(interval, include_runtime, include_timestamps):
+def _GenerateIntervalSamples(interval, include_runtime, include_timestamps):
   """Generates Samples for a single interval timed by IntervalTimer.Measure.
 
   Args:
@@ -169,4 +169,4 @@ class IntervalTimer(object):
     """
     return [
         sample for interval in self.intervals for sample in
-        GenerateIntervalSamples(interval, include_runtime, include_timestamps)]
+        _GenerateIntervalSamples(interval, include_runtime, include_timestamps)]
