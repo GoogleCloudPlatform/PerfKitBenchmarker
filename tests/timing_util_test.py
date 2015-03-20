@@ -64,21 +64,21 @@ class IntervalTimerTestCase(unittest.TestCase):
     with timer.Measure('Second Interval'):
       pass
     self.assertEqual(len(timer.intervals), 2)
-    firstInterval = timer.intervals[0]
-    self.assertEqual(len(firstInterval), 3)
-    firstName = firstInterval[0]
-    firstStart = firstInterval[1]
-    firstStop = firstInterval[2]
-    self.assertEqual(firstName, 'First Interval')
-    secondInterval = timer.intervals[1]
-    self.assertEqual(len(secondInterval), 3)
-    secondName = secondInterval[0]
-    secondStart = secondInterval[1]
-    secondStop = secondInterval[2]
-    self.assertEqual(secondName, 'Second Interval')
-    self.assertTrue(firstStart <= firstStop)
-    self.assertTrue(firstStop <= secondStart)
-    self.assertTrue(secondStart <= secondStop)
+    first_interval = timer.intervals[0]
+    self.assertEqual(len(first_interval), 3)
+    first_name = first_interval[0]
+    first_start = first_interval[1]
+    first_stop = first_interval[2]
+    self.assertEqual(first_name, 'First Interval')
+    second_interval = timer.intervals[1]
+    self.assertEqual(len(second_interval), 3)
+    second_name = second_interval[0]
+    second_start = second_interval[1]
+    second_stop = second_interval[2]
+    self.assertEqual(second_name, 'Second Interval')
+    self.assertLessEqual(first_start, first_stop)
+    self.assertLessEqual(first_stop, second_start)
+    self.assertLessEqual(second_start, second_stop)
 
   def testMeasureNested(self):
     """Verify correct interval tuple generation in nested measurements."""
@@ -88,21 +88,21 @@ class IntervalTimerTestCase(unittest.TestCase):
       with timer.Measure('Inner Interval'):
         pass
     self.assertEqual(len(timer.intervals), 2)
-    innerInterval = timer.intervals[0]
-    self.assertEqual(len(innerInterval), 3)
-    innerName = innerInterval[0]
-    innerStart = innerInterval[1]
-    innerStop = innerInterval[2]
-    self.assertEqual(innerName, 'Inner Interval')
-    outerInterval = timer.intervals[1]
-    self.assertEqual(len(outerInterval), 3)
-    outerName = outerInterval[0]
-    outerStart = outerInterval[1]
-    outerStop = outerInterval[2]
-    self.assertEqual(outerName, 'Outer Interval')
-    self.assertTrue(outerStart <= innerStart)
-    self.assertTrue(innerStart <= innerStop)
-    self.assertTrue(innerStop <= outerStop)
+    inner_interval = timer.intervals[0]
+    self.assertEqual(len(inner_interval), 3)
+    inner_name = inner_interval[0]
+    inner_start = inner_interval[1]
+    inner_stop = inner_interval[2]
+    self.assertEqual(inner_name, 'Inner Interval')
+    outer_interval = timer.intervals[1]
+    self.assertEqual(len(outer_interval), 3)
+    outer_name = outer_interval[0]
+    outer_start = outer_interval[1]
+    outer_stop = outer_interval[2]
+    self.assertEqual(outer_name, 'Outer Interval')
+    self.assertLessEqual(outer_start, inner_start)
+    self.assertLessEqual(inner_start, inner_stop)
+    self.assertLessEqual(inner_stop, outer_stop)
 
   def testGenerateSamplesMeasureNotCalled(self):
     """GenerateSamples should return an empty list if Measure was not called."""

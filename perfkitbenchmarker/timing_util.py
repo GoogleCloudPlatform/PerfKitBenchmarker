@@ -76,7 +76,7 @@ def ValidateMeasurementsFlag(options_list):
       the flag does not meet the documented requirements.
   """
   for option in options_list:
-    if option not in MEASUREMENTS_ALL.keys():
+    if option not in MEASUREMENTS_ALL:
       raise flags_validators.Error(
           '%s: Invalid value for --%s' % (option, MEASUREMENTS_FLAG_NAME))
     if option == MEASUREMENTS_NONE and len(options_list) != 1:
@@ -91,11 +91,41 @@ flags.DEFINE_list(
     'Comma-separated list of values from <%s> that selects which timing '
     'measurements to enable. Measurements will be included as samples in the '
     'benchmark results. %s' % (
-        '|'.join(MEASUREMENTS_ALL.keys()),
+        '|'.join(MEASUREMENTS_ALL),
         ' '.join(['%s: %s' % (option, MEASUREMENTS_ALL[option]) for option in
-                  MEASUREMENTS_ALL.keys()])))
+                  MEASUREMENTS_ALL])))
 flags.RegisterValidator(
     MEASUREMENTS_FLAG_NAME, ValidateMeasurementsFlag)
+
+
+def GenerateIntervalSamples(interval, include_runtime, include_timestamps):
+  """Generates Samples for a single interval timed by IntervalTimer.Measure.
+
+  Args:
+    interval: A (name, start_time, stop_time) tuple from a call to
+      IntervalTimer.Measure.
+    include_runtime: A Boolean that controls whether an elapsed time Sample
+      is included in the generated list.
+    include_timestamps: A Boolean that controls whether Samples containing the
+      start and stop timestamps are added to the generated list.
+
+  Returns:
+    A list of 0 to 3 Samples as specified by the args. When included, the
+    Samples appear in the order of runtime, start timestamp, stop timestamp.
+  """
+  samples = []
+  name = interval[0]
+  start_time = interval[1]
+  stop_time = interval[2]
+  if include_runtime:
+    elapsed_time = stop_time - start_time
+    samples.append(sample.Sample(name + ' Runtime', elapsed_time, 'seconds'))
+  if include_timestamps:
+    samples.append(sample.Sample(
+        name + ' Start Timestamp', start_time, 'seconds'))
+    samples.append(sample.Sample(
+        name + ' Stop Timestamp', stop_time, 'seconds'))
+  return samples
 
 
 class IntervalTimer(object):
@@ -121,35 +151,6 @@ class IntervalTimer(object):
     stop_time = time.time()
     self.intervals.append((name, start_time, stop_time))
 
-  @staticmethod
-  def _GenerateIntervalSamples(interval, include_runtime, include_timestamps):
-    """Generates Samples for a single interval timed by a call to Measure.
-
-    Args:
-      interval: A (name, start_time, stop_time) tuple from a call to Measure.
-      include_runtime: A Boolean that controls whether an elapsed time Sample
-        is included in the generated list.
-      include_timestamps: A Boolean that controls whether Samples containing the
-        start and stop timestamps are added to the generated list.
-
-    Returns:
-      A list of 0 to 3 Samples as specified by the args. When included, the
-      Samples appear in the order of runtime, start timestamp, stop timestamp.
-    """
-    samples = []
-    name = interval[0]
-    start_time = interval[1]
-    stop_time = interval[2]
-    if include_runtime:
-      elapsed_time = stop_time - start_time
-      samples.append(sample.Sample(name + ' Runtime', elapsed_time, 'seconds'))
-    if include_timestamps:
-      samples.append(sample.Sample(
-          name + ' Start Timestamp', start_time, 'seconds'))
-      samples.append(sample.Sample(
-          name + ' Stop Timestamp', stop_time, 'seconds'))
-    return samples
-
   def GenerateSamples(self, include_runtime, include_timestamps):
     """Generates Samples based on the times recorded in all calls to Measure.
 
@@ -168,5 +169,4 @@ class IntervalTimer(object):
     """
     return [
         sample for interval in self.intervals for sample in
-        self._GenerateIntervalSamples(
-            interval, include_runtime, include_timestamps)]
+        GenerateIntervalSamples(interval, include_runtime, include_timestamps)]
