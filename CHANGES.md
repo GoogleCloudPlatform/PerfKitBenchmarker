@@ -1,3 +1,15 @@
+# v0.12.0
+
+* Various timestamp and timer related improvements and add per-phase timestamp
+  Samples (GH171)
+* Regex improvement (GH182)
+* Fix a bug in mesh network benchmarks (GH163)
+* Explicitly specify JSON output to AWS command (GH167)
+* Clarify how to provide scratch disk for static VMs (GH166)
+* Improvements in ThreadLogContext (GH157)
+* Specify scratch directory on the command line in fio_benchmark (GH162)
+* Patch to the unix bench for 16 core (GH 135)
+
 # v0.11.1
 
 * Fixed CHANGES.md
