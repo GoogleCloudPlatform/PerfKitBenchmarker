@@ -258,6 +258,7 @@ If a benchmark requires two machines like iperf you can have two both machines i
     "ip_address": "<ip2>",
     "user_name": "connormccoy",
     "keyfile_path": "/home/connormccoy/.ssh/google_compute_engine",
+    "scratch_disk_mountpoints": ["/tmp/google-pkb"],
     "internal_ip": "10.240.234.189"
   }
 ]
