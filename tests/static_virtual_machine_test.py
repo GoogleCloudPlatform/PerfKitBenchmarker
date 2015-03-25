@@ -87,6 +87,17 @@ class StaticVirtualMachineTest(unittest.TestCase):
                              '10.10.10.2', 'rackspace_dallas'),
         vm_pool[1])
 
+  def testReadFromFile_InvalidScratchDisksType(self):
+    s = ('[{'
+         '  "ip_address": "174.12.14.1", '
+         '  "user_name": "perfkitbenchmarker", '
+         '  "keyfile_path": "perfkitbenchmarker.pem", '
+         '  "scratch_disk_mountpoints": "/tmp/google-pkb" '
+         '}]')
+    fp = BytesIO(s)
+    self.assertRaises(ValueError,
+                      StaticVirtualMachine.ReadStaticVirtualMachineFile,
+                      fp)
 
 if __name__ == '__main__':
   unittest.main()

@@ -67,13 +67,13 @@ class AwsFirewall(network.BaseFirewall):
     with self._lock:
       if entry in self.firewall_set:
         return
-      authorize_cmd = [util.AWS_PATH,
-                       'ec2',
-                       'authorize-security-group-ingress',
-                       '--region=%s' % vm.region,
-                       '--group-id=%s' % vm.group_id,
-                       '--port=%s' % port,
-                       '--cidr=0.0.0.0/0']
+      authorize_cmd = util.AWS_PREFIX + [
+          'ec2',
+          'authorize-security-group-ingress',
+          '--region=%s' % vm.region,
+          '--group-id=%s' % vm.group_id,
+          '--port=%s' % port,
+          '--cidr=0.0.0.0/0']
       vm_util.IssueRetryableCommand(
           authorize_cmd + ['--protocol=tcp'])
       vm_util.IssueRetryableCommand(
@@ -95,11 +95,11 @@ class AwsVpc(resource.BaseResource):
 
   def _Create(self):
     """Creates the VPC."""
-    create_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'create-vpc',
-                  '--region=%s' % self.region,
-                  '--cidr-block=10.0.0.0/16']
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-vpc',
+        '--region=%s' % self.region,
+        '--cidr-block=10.0.0.0/16']
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Vpc']['VpcId']
@@ -114,23 +114,23 @@ class AwsVpc(resource.BaseResource):
     enableDnsHostnames attribute to 'true' on the VPC resolves this. See:
     http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/VPC_DHCP_Options.html
     """
-    enable_hostnames_command = [util.AWS_PATH,
-                                'ec2',
-                                'modify-vpc-attribute',
-                                '--region=%s' % self.region,
-                                '--vpc-id', self.id,
-                                '--enable-dns-hostnames',
-                                '{ "Value": true }']
+    enable_hostnames_command = util.AWS_PREFIX + [
+        'ec2',
+        'modify-vpc-attribute',
+        '--region=%s' % self.region,
+        '--vpc-id', self.id,
+        '--enable-dns-hostnames',
+        '{ "Value": true }']
 
     vm_util.IssueRetryableCommand(enable_hostnames_command)
 
   def _Delete(self):
     """Delete's the VPC."""
-    delete_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'delete-vpc',
-                  '--region=%s' % self.region,
-                  '--vpc-id=%s' % self.id]
+    delete_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'delete-vpc',
+        '--region=%s' % self.region,
+        '--vpc-id=%s' % self.id]
     vm_util.IssueRetryableCommand(delete_cmd)
 
 
@@ -146,13 +146,13 @@ class AwsSubnet(resource.BaseResource):
 
   def _Create(self):
     """Creates the subnet."""
-    create_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'create-subnet',
-                  '--region=%s' % self.region,
-                  '--vpc-id=%s' % self.vpc_id,
-                  '--cidr-block=10.0.0.0/24',
-                  '--availability-zone=%s' % self.zone]
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-subnet',
+        '--region=%s' % self.region,
+        '--vpc-id=%s' % self.vpc_id,
+        '--cidr-block=10.0.0.0/24',
+        '--availability-zone=%s' % self.zone]
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Subnet']['SubnetId']
@@ -160,11 +160,11 @@ class AwsSubnet(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the subnet."""
-    delete_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'delete-subnet',
-                  '--region=%s' % self.region,
-                  '--subnet-id=%s' % self.id]
+    delete_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'delete-subnet',
+        '--region=%s' % self.region,
+        '--subnet-id=%s' % self.id]
     vm_util.IssueRetryableCommand(delete_cmd)
 
 
@@ -180,10 +180,10 @@ class AwsInternetGateway(resource.BaseResource):
 
   def _Create(self):
     """Creates the internet gateway."""
-    create_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'create-internet-gateway',
-                  '--region=%s' % self.region]
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-internet-gateway',
+        '--region=%s' % self.region]
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['InternetGateway']['InternetGatewayId']
@@ -191,35 +191,35 @@ class AwsInternetGateway(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the internet gateway."""
-    delete_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'delete-internet-gateway',
-                  '--region=%s' % self.region,
-                  '--internet-gateway-id=%s' % self.id]
+    delete_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'delete-internet-gateway',
+        '--region=%s' % self.region,
+        '--internet-gateway-id=%s' % self.id]
     vm_util.IssueRetryableCommand(delete_cmd)
 
   def Attach(self, vpc_id):
     """Attaches the internetgateway to the VPC."""
     if not self.attached:
       self.vpc_id = vpc_id
-      attach_cmd = [util.AWS_PATH,
-                    'ec2',
-                    'attach-internet-gateway',
-                    '--region=%s' % self.region,
-                    '--internet-gateway-id=%s' % self.id,
-                    '--vpc-id=%s' % self.vpc_id]
+      attach_cmd = util.AWS_PREFIX + [
+          'ec2',
+          'attach-internet-gateway',
+          '--region=%s' % self.region,
+          '--internet-gateway-id=%s' % self.id,
+          '--vpc-id=%s' % self.vpc_id]
       vm_util.IssueRetryableCommand(attach_cmd)
       self.attached = True
 
   def Detach(self):
     """Detaches the internetgateway from the VPC."""
     if self.attached:
-      detach_cmd = [util.AWS_PATH,
-                    'ec2',
-                    'detach-internet-gateway',
-                    '--region=%s' % self.region,
-                    '--internet-gateway-id=%s' % self.id,
-                    '--vpc-id=%s' % self.vpc_id]
+      detach_cmd = util.AWS_PREFIX + [
+          'ec2',
+          'detach-internet-gateway',
+          '--region=%s' % self.region,
+          '--internet-gateway-id=%s' % self.id,
+          '--vpc-id=%s' % self.vpc_id]
       vm_util.IssueRetryableCommand(detach_cmd)
       self.attached = False
 
@@ -249,24 +249,24 @@ class AwsRouteTable(resource.BaseResource):
   @vm_util.Retry()
   def _PostCreate(self):
     """Gets data about the route table."""
-    describe_cmd = [util.AWS_PATH,
-                    'ec2',
-                    'describe-route-tables',
-                    '--region=%s' % self.region,
-                    '--filters=Name=vpc-id,Values=%s' % self.vpc_id]
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-route-tables',
+        '--region=%s' % self.region,
+        '--filters=Name=vpc-id,Values=%s' % self.vpc_id]
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     self.id = response['RouteTables'][0]['RouteTableId']
 
   def CreateRoute(self, internet_gateway_id):
     """Adds a route to the internet gateway."""
-    create_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'create-route',
-                  '--region=%s' % self.region,
-                  '--route-table-id=%s' % self.id,
-                  '--gateway-id=%s' % internet_gateway_id,
-                  '--destination-cidr-block=0.0.0.0/0']
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-route',
+        '--region=%s' % self.region,
+        '--route-table-id=%s' % self.id,
+        '--gateway-id=%s' % internet_gateway_id,
+        '--destination-cidr-block=0.0.0.0/0']
     vm_util.IssueRetryableCommand(create_cmd)
 
 
@@ -291,21 +291,21 @@ class AwsPlacementGroup(resource.BaseResource):
 
   def _Create(self):
     """Creates the Placement Group."""
-    create_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'create-placement-group',
-                  '--region=%s' % self.region,
-                  '--group-name=%s' % self.name,
-                  '--strategy=cluster']
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-placement-group',
+        '--region=%s' % self.region,
+        '--group-name=%s' % self.name,
+        '--strategy=cluster']
     vm_util.IssueRetryableCommand(create_cmd)
 
   def _Delete(self):
     """Deletes the Placement Group."""
-    delete_cmd = [util.AWS_PATH,
-                  'ec2',
-                  'delete-placement-group',
-                  '--region=%s' % self.region,
-                  '--group-name=%s' % self.name]
+    delete_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'delete-placement-group',
+        '--region=%s' % self.region,
+        '--group-name=%s' % self.name]
     vm_util.IssueRetryableCommand(delete_cmd)
 
 
