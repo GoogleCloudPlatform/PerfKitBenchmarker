@@ -92,8 +92,8 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO running on %s', vm)
-  fio_command = '%s --output-format=json %s' % (
-      fio.FIO_PATH, flags.FLAGS.fio_jobfile)
+  fio_command = '%s --output-format=json --directory=%s %s' % (
+      fio.FIO_PATH, vm.GetScratchDir(), flags.FLAGS.fio_jobfile)
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.

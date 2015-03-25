@@ -15,7 +15,6 @@
 [global]
 filesize=10*10*1000*$mb_memory
 filename=fio_test_file
-directory=/scratch0
 ioengine=libaio
 
 [sequential_write]
