@@ -137,6 +137,9 @@ flags.DEFINE_enum(
 flags.DEFINE_boolean('use_local_disk', False, 'For benchmarks that use disks, '
                      'this indicates that they should run against '
                      'the local disk(s) instead of remote storage.')
+flags.DEFINE_integer('scratch_disk_iops', 1500,
+                     'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
+
 
 MAX_RUN_URI_LENGTH = 10
 

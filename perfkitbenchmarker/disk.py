@@ -25,7 +25,7 @@ from perfkitbenchmarker import resource
 class BaseDiskSpec(object):
   """Storing type and size about a disk."""
 
-  def __init__(self, disk_size, disk_type, mount_point):
+  def __init__(self, disk_size, disk_type, mount_point, iops=None):
     """Storing various data about a single disk.
 
     Args:
@@ -33,11 +33,11 @@ class BaseDiskSpec(object):
       disk_type: Disk types in string. See cloud specific disk classes for
           more information on acceptable values.
       mount_point: Directory of mount point in string.
-
     """
     self.disk_size = disk_size
     self.disk_type = disk_type
     self.mount_point = mount_point
+    self.iops = iops
 
 
 class BaseDisk(resource.BaseResource):
@@ -48,6 +48,7 @@ class BaseDisk(resource.BaseResource):
     self.disk_size = disk_spec.disk_size
     self.disk_type = disk_spec.disk_type
     self.mount_point = disk_spec.mount_point
+    self.iops = disk_spec.iops
 
   @abc.abstractmethod
   def Attach(self, vm):
