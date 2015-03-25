@@ -75,7 +75,9 @@ BENCHMARK_SETS = {
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',
-        BENCHMARK_LIST: [STANDARD_SET]
+        BENCHMARK_LIST: ['fio', 'iperf', 'unixbench', 'hpcc',
+                         'cluster_boot', 'redis', 'cassandra_stress',
+                         'object_storage_service', 'sysbench_oltp']
     },
     'mellanox_set': {
         MESSAGE: 'Mellanox benchmark set.',

@@ -1,3 +1,15 @@
+# v0.12.0
+
+* Add per-phase timestamp samples (GH171)
+* Regex improvement (GH182)
+* Fix a bug in mesh network benchmarks (GH163)
+* Fix for running on AWS when user has a non-JSON output format
+  configured(GH167)
+* Clarify how to provide scratch disk for static VMs (GH166)
+* Add benchmark name, run URI to log messages (GH157)
+* Fix fio_benchmark to support static VMs (GH162)
+* Optional patch to the unix bench for 16+ core VMs (GH 135)
+
 # v0.11.1
 
 * Fixed CHANGES.md

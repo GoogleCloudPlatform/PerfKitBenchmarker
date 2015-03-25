@@ -22,3 +22,54 @@ use GitHub pull requests for this purpose.
 ### The small print
 Contributions made by corporations are covered by a different agreement than
 the one above, the Software Grant and Corporate Contributor License Agreement.
+
+### Configuring a local development environment
+This can optionally done within a [`virtualenv`](https://virtualenv.pypa.io/en/latest/).
+
+### Fork the repository
+
+If you plan on contributing, create your own fork of PerfKitBenchmarker to publish your changes.
+GitHub has [a great tutorial](https://help.github.com/articles/fork-a-repo/) (we follow the *Fork & pull* model).
+
+- Clone the repository:
+```
+$ git clone git@github.com:<your-user-name>/PerfKitBenchmarker.git -b dev && cd PerfKitBenchmarker
+```
+- Install Python 2.7.
+- Install [pip](https://pypi.python.org/pypi/pip):
+```
+$ sudo apt-get install -y python-pip
+```
+- Install PerfKitBenchmarker's Python dependencies:
+```
+$ [sudo] pip install -r requirements.txt
+```
+- Install PerfKitBenchmarker's test dependencies:
+```
+$ [sudo] pip install -r test-requirements.txt
+```
+- Install git pre-commit hooks, to enable linting and copyright checks:
+```
+$ hooks/install.sh
+```
+
+### Create a branch
+- Start from the `dev` branch in your forked repository.
+```
+$ git checkout dev
+```
+- Create a branch to contain your changes.
+```
+$ git checkout -b <your-branch-name>
+```
+- Make your modifications to the code in one or more commits [(guidelines for useful git commit messages)](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
+- Push your changes to GitHub
+```
+$ git push origin
+```
+- Create a pull request to integrate your change into the `dev` branch.
+This can be done on github.com, or by installing and using the command line tool [`hub`](https://github.com/github/hub).
+```
+$ hub pull-request -h <your-branch-name> -b dev
+```
+**When making a pull request on GitHub, please set the base branch of the Pull Request to `dev`.**

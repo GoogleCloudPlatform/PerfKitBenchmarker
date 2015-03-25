@@ -29,7 +29,7 @@ In its current release these are the benchmarks that are executed:
   - `cassandra_stress`: Apache v2 (http://cassandra.apache.org/)
   - `cluster_boot`: MIT license.
   - `coremark`: EEMBC (https://www.eembc.org/)
-  - `fio`: GPL v2 (https://github.com/axboe/fio/blob/master/LICENSE)
+  - `fio`: GPL v2 (https://github.com/axboe/fio/blob/master/COPYING)
   - `hadoop_terasort`: Apache v2 (http://hadoop.apache.org/)
   - `hpcc`: Original BSD license (http://icl.cs.utk.edu/hpcc/faq/#263)
   - `iperf`: BSD license(http://iperf.sourceforge.net/)
@@ -164,14 +164,14 @@ As a result, a `.boto` file is created under your home directory.
 `client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials`), which was setup as part of the 'gcloud auth login' step.
 
 
+## Install PerfKit
+
+[Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
+
 ## Install PerfKit dependencies
 ```
 $ sudo pip install -r requirements.txt
 ```
-
-## Install PerfKit
-
-[Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
 
 RUNNING A SINGLE BENCHMARK
 ==========================
@@ -258,6 +258,7 @@ If a benchmark requires two machines like iperf you can have two both machines i
     "ip_address": "<ip2>",
     "user_name": "connormccoy",
     "keyfile_path": "/home/connormccoy/.ssh/google_compute_engine",
+    "scratch_disk_mountpoints": ["/tmp/google-pkb"],
     "internal_ip": "10.240.234.189"
   }
 ]
