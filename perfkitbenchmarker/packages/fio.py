@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """Module containing fio installation, cleanup, parsing functions."""
-import re
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -119,7 +118,7 @@ def FioParametersToJob(fio_parameters):
     A raw string representing a job file can be read by fio binary.
   """
   fio_parameters = fio_parameters.replace(' ', '\n')
-  fio_parameters = re.sub(
+  fio_parameters = regex_util.Substitute(
       CMD_SECTION_REGEX, JOB_SECTION_REGEX, fio_parameters)
   fio_parameters = '[%s]\n%s' % (GLOBAL, fio_parameters)
   return fio_parameters.replace('--', '')
