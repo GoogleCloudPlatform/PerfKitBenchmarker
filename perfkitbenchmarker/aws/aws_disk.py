@@ -53,6 +53,8 @@ class AwsDisk(disk.BaseDisk):
         '--size=%s' % self.disk_size,
         '--availability-zone=%s' % self.zone,
         '--volume-type=%s' % self.disk_type]
+    if self.disk_type == 'io1':
+      create_cmd.append('--iops=%s' % self.iops)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['VolumeId']
