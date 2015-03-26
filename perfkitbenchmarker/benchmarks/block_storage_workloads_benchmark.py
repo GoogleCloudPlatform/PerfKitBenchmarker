@@ -146,7 +146,8 @@ def RunSimulatedLogging(vm):
       '--stonewall '
       '--rw=read ') % (test_size / 10)
   logging.info('FIO Results for simulated %s', LOGGING)
-  res, _ = vm.RemoteCommand(fio.FIO_CMD_PREFIX + cmd, should_log=True)
+  res, _ = vm.RemoteCommand('%s %s' % (fio.FIO_CMD_PREFIX, cmd),
+                            should_log=True)
   results = fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res))
   UpdateWorkloadMetadata(results)
   return results
@@ -194,7 +195,8 @@ def RunSimulatedDatabase(vm):
         '--rwmixwrite=10 '
         '--end_fsync=1 ')
     logging.info('FIO Results for simulated %s, iodepth %s', DATABASE, depth)
-    res, _ = vm.RemoteCommand(fio.FIO_CMD_PREFIX + cmd, should_log=True)
+    res, _ = vm.RemoteCommand('%s %s' % (fio.FIO_CMD_PREFIX, cmd),
+                              should_log=True)
     results.extend(
         fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res)))
   UpdateWorkloadMetadata(results)
@@ -237,7 +239,8 @@ def RunSimulatedStreaming(vm):
         '--stonewall '
         '--rw=read ')
     logging.info('FIO Results for simulated %s', STREAMING)
-    res, _ = vm.RemoteCommand(fio.FIO_CMD_PREFIX + cmd, should_log=True)
+    res, _ = vm.RemoteCommand('%s %s' % (fio.FIO_CMD_PREFIX, cmd),
+                              should_log=True)
     results.extend(
         fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res)))
   UpdateWorkloadMetadata(results)

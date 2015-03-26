@@ -142,7 +142,6 @@ class FioTestCase(unittest.TestCase):
         'stonewall\n'
         'rw=read\n')
     result = fio.FioParametersToJob(fio_parameters)
-    print result
     self.assertEqual(expected_result, result)
 
 
