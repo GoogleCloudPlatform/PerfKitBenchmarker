@@ -1,3 +1,8 @@
+# v0.12.1
+
+* Fix a tagging issue from prior release (v.0.11.0) where a prior commit made
+  directly to master was not properly included.
+
 # v0.12.0
 
 * Add per-phase timestamp samples (GH171)
