@@ -32,8 +32,8 @@ CMD_SECTION_REGEX = r'--name=(\w+)\s+'
 JOB_SECTION_REPL_REGEX = r'[\1]\n'
 CMD_PARAMETER_REGEX = r'--(\w+=[/\w\d]+)\n'
 CMD_PARAMETER_REPL_REGEX = r'\1\n'
-CMD_STONEWALL_PARAMETER = '--stonewall\n'
-JOB_STONEWALL_PARAMETER = 'stonewall\n'
+CMD_STONEWALL_PARAMETER = '--stonewall'
+JOB_STONEWALL_PARAMETER = 'stonewall'
 
 
 def _Install(vm):
@@ -66,20 +66,21 @@ def ParseJobFile(job_file):
     A dictionary of dictionaries of sample metadata, using test name as keys,
         dictionaries of sample metadata as value.
   """
-  job_file = job_file.replace(JOB_STONEWALL_PARAMETER, '')
-  config = ConfigParser.ConfigParser()
+  config = ConfigParser.RawConfigParser(allow_no_value=True)
   config.readfp(io.BytesIO(job_file))
-  sections = config.__dict__['_sections']
   global_metadata = {}
-  if GLOBAL in sections:
-    global_metadata = dict(sections[GLOBAL])
-    del sections[GLOBAL]
-  for section in sections:
+  if GLOBAL in config.sections():
+    global_metadata = dict(config.items(GLOBAL))
+  section_metadata = {}
+  for section in config.sections():
     if section != GLOBAL:
-      sections[section] = dict(sections[section])
-      sections[section].update(global_metadata)
-    del sections[section]['__name__']
-  return dict(sections)
+      metadata = {}
+      metadata.update(dict(config.items(section)))
+      metadata.update(global_metadata)
+      if JOB_STONEWALL_PARAMETER in metadata:
+        del metadata[JOB_STONEWALL_PARAMETER]
+      section_metadata[section] = metadata
+  return section_metadata
 
 
 def FioParametersToJob(fio_parameters):
