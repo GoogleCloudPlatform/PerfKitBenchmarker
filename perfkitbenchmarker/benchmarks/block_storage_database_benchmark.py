@@ -22,7 +22,7 @@ Simulated database benchmark does the following things (PD, PD-SSD, local SSD):
    is a different benchmark).
 2) 4K Random W on a file using queue depths 16 and 64 (each queue depth
    is a different benchmark).
-3) 4K Random 90% R/ 10% W on a file using queue depths 1, 16 and 64 (each
+3) 4K Random 90% R/ 10% W on a file using queue depths 16 and 64 (each
    queue depth is a different benchmark).
 4) The size of the test file is decided by the test VM's total memory and capped
    at 1GB to ensure this test finishes within reasonable time.
