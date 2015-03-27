@@ -71,7 +71,10 @@ BENCHMARK_SETS = {
     'google_set': {
         MESSAGE: ('This benchmark set is maintained by Google Cloud Platform '
                   'Performance Team.'),
-        BENCHMARK_LIST: [STANDARD_SET]
+        BENCHMARK_LIST: [STANDARD_SET,
+                         'block_storage_logging',
+                         'block_storage_database',
+                         'block_storage_streaming']
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',
