@@ -65,8 +65,9 @@ flags.DEFINE_integer('memory_size_mb',
 
 
 def GetInfo():
-  BENCHMARK_INFO['num_machines'] = FLAGS.num_vms
-  return BENCHMARK_INFO
+  info = BENCHMARK_INFO.copy()
+  info['num_machines'] = FLAGS.num_vms
+  return info
 
 
 def CheckPrerequisites():

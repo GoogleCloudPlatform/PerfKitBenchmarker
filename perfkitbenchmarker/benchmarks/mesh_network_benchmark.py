@@ -51,10 +51,11 @@ RESULT_LOCK = threading.Lock()
 
 
 def GetInfo():
-  BENCHMARK_INFO['num_machines'] = FLAGS.num_vms
+  info = BENCHMARK_INFO.copy()
+  info['num_machines'] = FLAGS.num_vms
   if FLAGS.num_vms < 2:  # Needs at least 2 vms to run the benchmark.
-    BENCHMARK_INFO['num_machines'] = 2
-  return BENCHMARK_INFO
+    info['num_machines'] = 2
+  return info
 
 
 def PrepareVM(vm):
