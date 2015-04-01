@@ -36,6 +36,7 @@ FLAGS = flags.FLAGS
 REMOTE_KEY_PATH = '.ssh/id_rsa'
 DEFAULT_USERNAME = 'perfkit'
 SSH_RETRIES = 10
+DEFAULT_SSH_PORT = 22
 STRIPED_DEVICE = '/dev/md0'
 LOCAL_MOUNT_PATH = '/local'
 
@@ -73,6 +74,7 @@ class BaseVirtualMachine(resource.BaseResource):
     network: A BaseNetwork instance.
     project: The provider-specific project associated with the VM (e.g.
       artisanal-lightbulb-883).
+    ssh_port: Port number to use for SSH and SCP commands
     ssh_public_key: Path to SSH public key file.
     ssh_private_key: Path to SSH private key file.
     total_memory_kb: The number of kilobytes of memory on the VM.
@@ -109,6 +111,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.ip_address = None
     self.internal_ip = None
     self.user_name = None
+    self.ssh_port = DEFAULT_SSH_PORT
     self.ssh_public_key = None
     self.ssh_private_key = None
     self.has_private_key = False
@@ -170,7 +173,7 @@ class BaseVirtualMachine(resource.BaseResource):
                'sudo chown -R $USER:$USER {1};').format(device_path, mount_path)
     self.RemoteCommand(mnt_cmd)
 
-  def RenderTemplate(self, template_path, remote_path, context, remote_port=22):
+  def RenderTemplate(self, template_path, remote_path, context):
     """Renders a local Jinja2 template and copies it to the remote host.
 
     The template will be provided variables defined in 'context', as well as a
@@ -180,7 +183,6 @@ class BaseVirtualMachine(resource.BaseResource):
       template_path: string. Local path to jinja2 template.
       remote_path: string. Remote path for rendered file on the remote vm.
       context: dict. Variables to pass to the Jinja2 template during rendering.
-      remote_port: SSH port on the VM.
 
     Raises:
       jinja2.UndefinedError: if template contains variables not present in
@@ -197,23 +199,22 @@ class BaseVirtualMachine(resource.BaseResource):
     with tempfile.NamedTemporaryFile(prefix=prefix) as tf:
       tf.write(template.render(vm=self, **context))
       tf.flush()
-      self.RemoteCopy(tf.name, remote_path, remote_port=remote_port)
+      self.RemoteCopy(tf.name, remote_path)
 
-  def RemoteCopy(self, file_path, remote_path='', copy_to=True, remote_port=22):
+  def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.
 
     Args:
       file_path: Local path to file.
       remote_path: Optional path of where to copy file on remote host.
       copy_to: True to copy to vm, False to copy from vm.
-      remote_port: Ssh port on the VM.
 
     Raises:
       SshConnectionError: If there was a problem copying the file.
     """
     remote_location = '%s@%s:%s' % (
         self.user_name, self.ip_address, remote_path)
-    scp_cmd = ['/usr/bin/scp', '-P', str(remote_port), '-pr']
+    scp_cmd = ['/usr/bin/scp', '-P', str(self.ssh_port), '-pr']
     scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
@@ -229,12 +230,11 @@ class BaseVirtualMachine(resource.BaseResource):
                     (retcode, full_cmd, stdout, stderr))
       raise errors.VmUtil.SshConnectionError(error_text)
 
-  def LongRunningRemoteCommand(self, command, remote_port=22):
+  def LongRunningRemoteCommand(self, command):
     """Runs a long running command on the VM in a robust way.
 
     Args:
       command: A valid bash command.
-      remote_port: Ssh port on the VM.
 
     Returns:
       A tuple of stdout and stderr from running the command.
@@ -244,31 +244,30 @@ class BaseVirtualMachine(resource.BaseResource):
     stderr_file = '/tmp/stderr%s' % uid
     long_running_cmd = ('nohup %s 1> %s 2> %s &' %
                         (command, stdout_file, stderr_file))
-    self.RemoteCommand(long_running_cmd, remote_port)
+    self.RemoteCommand(long_running_cmd)
     get_pid_cmd = 'pgrep %s' % command.split()[0]
-    pid, _ = self.RemoteCommand(get_pid_cmd, remote_port)
+    pid, _ = self.RemoteCommand(get_pid_cmd)
     pid = pid.strip()
     check_process_cmd = ('if ! ps -p %s >/dev/null; then echo "Stopped"; fi' %
                          pid)
     while True:
-      stdout, _ = self.RemoteCommand(check_process_cmd, remote_port)
+      stdout, _ = self.RemoteCommand(check_process_cmd)
       if stdout.strip() == 'Stopped':
         break
       time.sleep(60)
 
-    stdout, _ = self.RemoteCommand('cat %s' % stdout_file, remote_port)
-    stderr, _ = self.RemoteCommand('cat %s' % stderr_file, remote_port)
+    stdout, _ = self.RemoteCommand('cat %s' % stdout_file)
+    stderr, _ = self.RemoteCommand('cat %s' % stderr_file)
 
     return stdout, stderr
 
-  def RemoteCommand(self, command, remote_port=22,
+  def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False):
     """Runs a command on the VM.
 
     Args:
       command: A valid bash command.
-      remote_port: Ssh port on the VM.
       should_log: A boolean indicating whether the command result should be
           logged at the info level. Even if it is false, the results will
           still be logged at the debug level.
@@ -284,7 +283,7 @@ class BaseVirtualMachine(resource.BaseResource):
       SshConnectionError: If there was a problem establishing the connection.
     """
     user_host = '%s@%s' % (self.user_name, self.ip_address)
-    ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(remote_port), user_host]
+    ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(self.ssh_port), user_host]
     ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     try:
       if login_shell:
