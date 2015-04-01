@@ -247,7 +247,7 @@ def Cleanup(benchmark_spec):  # pylint: disable=unused-argument
   """
   vms = benchmark_spec.vms
   for vm_index, vm in enumerate(vms):
-    if vm_index >= NUM_ROOTS and vm_index < (NUM_DRIVERS + NUM_ROOTS):
+    if vm_index >= NUM_DRIVERS and vm_index < (NUM_DRIVERS + NUM_ROOTS):
       vm.RemoteCommand('sudo pkill ParentNode')
     elif vm_index >= (NUM_DRIVERS + NUM_ROOTS):
       vm.RemoteCommand('sudo pkill LeafNode')
