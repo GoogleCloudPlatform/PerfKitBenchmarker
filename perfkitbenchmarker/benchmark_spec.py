@@ -108,7 +108,6 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS], 'Name of the cloud to use.')
 
-SSH_PORT = 22
 
 
 class BenchmarkSpec(object):
@@ -273,7 +272,7 @@ class BenchmarkSpec(object):
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
-    firewall.AllowPort(vm, SSH_PORT)
+    firewall.AllowPort(vm, vm.ssh_port)
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.Startup()
