@@ -245,4 +245,9 @@ def Cleanup(benchmark_spec):  # pylint: disable=unused-argument
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  pass
+  vms = benchmark_spec.vms
+  for vm_index, vm in enumerate(vms):
+    if vm_index >= NUM_ROOTS and vm_index < NUM_DRIVERS + NUM_ROOTS:
+      vm.RemoteCommand('sudo pkill ParentNode')
+    elif vm_index >= (NUM_DRIVERS + NUM_ROOTS):
+      vm.RemoteCommand('sudo pkill LeafNode')
