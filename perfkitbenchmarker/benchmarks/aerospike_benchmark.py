@@ -190,7 +190,9 @@ def Run(benchmark_spec):
       metadata['Disk Type'] = 'Local' if FLAGS.use_local_disk else 'Remote'
     samples.append(sample.Sample('Average Latency', latency, 'ms', metadata))
     if latency < 1.0:
-      max_throughput_for_completion_latency_under_1ms = tps
+      max_throughput_for_completion_latency_under_1ms = max(
+          max_throughput_for_completion_latency_under_1ms,
+          tps)
 
   samples.append(sample.Sample(
                  'max_throughput_for_completion_latency_under_1ms',

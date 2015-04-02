@@ -166,7 +166,9 @@ def Run(benchmark_spec):
       latency += result[1] * result[0] / throughput
 
     if latency < 1.0:
-        max_throughput_for_completion_latency_under_1ms = throughput
+        max_throughput_for_completion_latency_under_1ms = max(
+            max_throughput_for_completion_latency_under_1ms,
+            throughput)
     results.append(sample.Sample('throughput', throughput, 'req/s',
                                  {'latency': latency, 'threads': threads}))
     logging.info('Threads : %d  (%f, %f) < %f', threads, throughput, latency,
