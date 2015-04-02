@@ -174,9 +174,10 @@ def Run(benchmark_spec):
     if threads == 1:
       latency_threshold = latency * 20
 
-  results.append(sample.Sample('max_throughput_for_completion_latency_under_1ms',
-                                max_throughput_for_completion_latency_under_1ms ,
-                                'req/s'))
+  results.append(sample.Sample(
+                 'max_throughput_for_completion_latency_under_1ms',
+                 max_throughput_for_completion_latency_under_1ms,
+                 'req/s'))
 
   return results
 

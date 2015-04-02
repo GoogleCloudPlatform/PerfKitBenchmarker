@@ -191,10 +191,11 @@ def Run(benchmark_spec):
     samples.append(sample.Sample('Average Latency', latency, 'ms', metadata))
     if latency < 1.0:
       max_throughput_for_completion_latency_under_1ms = tps
-      
-  samples.append(sample.Sample('max_throughput_for_completion_latency_under_1ms',
-                                max_throughput_for_completion_latency_under_1ms ,
-                                'req/s'))
+
+  samples.append(sample.Sample(
+                 'max_throughput_for_completion_latency_under_1ms',
+                 max_throughput_for_completion_latency_under_1ms,
+                 'req/s'))
 
   return samples
 
