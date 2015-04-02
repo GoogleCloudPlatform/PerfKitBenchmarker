@@ -28,8 +28,9 @@ as queries per second (QPS) at the current fan-out normalized to QPS at fan-out
 
 Sample command line:
 
-./pkb.py --benchmarks=oldisim --project='YOUR_PROJECT' --num_leaves=4
---fanout=1,2,3,4 --latency_target=40 --latency_metric=avg
+./pkb.py --benchmarks=oldisim --project='YOUR_PROJECT' --oldisim_num_leaves=4
+--oldisim_fanout=1,2,3,4 --oldisim_latency_target=40
+--oldisim_latency_metric=avg
 
 The above command will build a tree with one root node and four leaf nodes. The
 average latency target is 40ms. The root node will vary the fanout from 1 to 4
@@ -48,21 +49,22 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('num_leaves', 4, 'number of leaf nodes',
+flags.DEFINE_integer('oldisim_num_leaves', 4, 'number of leaf nodes',
                      lower_bound=1, upper_bound=64)
-flags.DEFINE_list('fanout', [],
+flags.DEFINE_list('oldisim_fanout', [],
                   'a list of fanouts to be tested. '
                   'a root can connect to a subset of leaf nodes (fanout). '
                   'the value of fanout has to be smaller than num_leaves.')
-flags.DEFINE_enum('latency_metric', 'avg',
+flags.DEFINE_enum('oldisim_latency_metric', 'avg',
                   ['avg', '50p', '90p', '95p', '99p', '99.9p'],
                   'Allowable metrics for end-to-end latency')
-flags.DEFINE_float('latency_target', '30', 'latency target in ms')
+flags.DEFINE_float('oldisim_latency_target', '30', 'latency target in ms')
 
 OLDISIM_GIT = 'https://github.com/GoogleCloudPlatform/oldisim.git'
 NUM_DRIVERS = 1
 NUM_ROOTS = 1
 OLDISIM_DIR = 'oldisim'
+OLDISIM_VERSION = 'v0.1'
 BINARY_BASE = 'release/workloads/search'
 
 
@@ -71,7 +73,8 @@ def GetInfo():
   benchmark_info = {'name': 'oldisim',
                     'description': 'Run oldisim',
                     'scratch_disk': False,
-                    'num_machines': FLAGS.num_leaves + NUM_DRIVERS + NUM_ROOTS}
+                    'num_machines': FLAGS.oldisim_num_leaves + NUM_DRIVERS +
+                    NUM_ROOTS}
   return benchmark_info
 
 
@@ -84,7 +87,8 @@ def InstallAndBuild(vm):
   logging.info('prepare oldisim on %s', vm)
   vm.Install('oldisim_dependencies')
   vm.RemoteCommand('git clone --recursive %s' % OLDISIM_GIT)
-  vm.RemoteCommand('cd %s && scons' % OLDISIM_DIR)
+  vm.RemoteCommand('cd %s && git checkout %s && scons' %
+                   (OLDISIM_DIR, OLDISIM_VERSION))
 
 
 def Prepare(benchmark_spec):
@@ -110,7 +114,7 @@ def Prepare(benchmark_spec):
 
 
 def SetupRoot(root_vm, leaf_vms):
-  """Connect a root node to a list of leave nodes.
+  """Connect a root node to a list of leaf nodes.
 
   Args:
     root_vm: A root vm instance.
@@ -141,15 +145,15 @@ def ParseOutput(oldisim_output):
   for line in oldisim_output.splitlines():
     match = re.search(re_peak, line)
     if match:
-      peak_qps = match.group('qps')
-      peak_lat = match.group('lat')
-      target_qps = peak_qps
-      target_lat = peak_lat
+      peak_qps = float(match.group('qps'))
+      peak_lat = float(match.group('lat'))
+      target_qps = float(peak_qps)
+      target_lat = float(peak_lat)
       continue
     match = re.search(re_target, line)
     if match:
-      target_qps = match.group('qps')
-      target_lat = match.group('lat')
+      target_qps = float(match.group('qps'))
+      target_lat = float(match.group('lat'))
   return peak_qps, peak_lat, target_qps, target_lat
 
 
@@ -163,15 +167,12 @@ def RunLoadTest(benchmark_spec, fanout):
         fans out to a subset of leaf nodes.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A tuple of (peak_qps, peak_lat, target_qps, target_lat).
   """
-  assert fanout <= FLAGS.num_leaves, (
+  assert fanout <= FLAGS.oldisim_num_leaves, (
       'The number of leaf nodes a root node connected to is defined by the '
       'flag fanout. Its current value %s is bigger than the total number of '
-      'leaves %s.' % (fanout, FLAGS.num_leaves))
+      'leaves %s.' % (fanout, FLAGS.oldisim_num_leaves))
 
   vms = benchmark_spec.vms
   driver_vms = []
@@ -198,7 +199,7 @@ def RunLoadTest(benchmark_spec, fanout):
   # Make sure server is up.
   time.sleep(5)
   driver_cmd = '%s -s %s:%s -t 30 -- %s %s --threads=%s --depth=16' % (
-      launch_script, FLAGS.latency_metric, FLAGS.latency_target,
+      launch_script, FLAGS.oldisim_latency_metric, FLAGS.oldisim_latency_target,
       driver_binary, driver_args, driver_vm.num_cpus)
   logging.info('Driver cmdline: %s', driver_cmd)
   stdout, _ = driver_vm.RemoteCommand(driver_cmd, should_log=True)
@@ -220,14 +221,14 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
 
-  fanout_list = set([1, FLAGS.num_leaves])
-  for fanout in map(int, FLAGS.fanout):
-    if fanout > 1 and fanout < FLAGS.num_leaves:
+  fanout_list = set([1, FLAGS.oldisim_num_leaves])
+  for fanout in map(int, FLAGS.oldisim_fanout):
+    if fanout > 1 and fanout < FLAGS.oldisim_num_leaves:
       fanout_list.add(fanout)
 
   metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus}
   for fanout in sorted(fanout_list):
-    qps = float(RunLoadTest(benchmark_spec, fanout)[2])
+    qps = RunLoadTest(benchmark_spec, fanout)[2]
     qps_dict[fanout] = qps
     if fanout == 1:
       base_qps = qps
