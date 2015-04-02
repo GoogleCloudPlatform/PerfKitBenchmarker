@@ -42,11 +42,10 @@ For AWS, where use PD, we should use EBS-GP and EBS Magnetic, for PD-SSD use
 EBS-GP and PIOPS.
 """
 
+import json
 import logging
-import re
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import sample
 from perfkitbenchmarker.packages import fio
 
 LOGGING = 'logging'
@@ -102,68 +101,14 @@ def Prepare(benchmark_spec):
   vm.Install('fio')
 
 
-def ParseFioResult(res):
-  """Parse result from fio commands.
+def UpdateWorkloadMetadata(results):
+  """Update metadata fields in results with workload_mode flag value.
 
   Args:
-    res: Result from fio commands in string format.
-  Returns:
-    A list of tuples represents latency. Each tuple contains unit and
-    latency number.
-    A list of tuples represents bandwidth. Each tuple contains aggrb,
-    unit of aggrb, minb, unit of minb, maxb, unit of maxb, mint, unit of mint,
-    maxt, unit of maxt.
+    results: A list of sample.Sample objects.
   """
-  latency = re.findall(r'\s+lat \((\w+)\)[\s:]+'
-                       r'min%smax%savg%sstdev%s' % (
-                           LATENCY_REGEX, LATENCY_REGEX,
-                           LATENCY_REGEX, LATENCY_REGEX), res)
-  bandwidth = re.findall(
-      r'aggrb=%s, minb=%s, maxb=%s, mint=%s, maxt=%s' % (
-          BANDWIDTH_REGEX, BANDWIDTH_REGEX, BANDWIDTH_REGEX, BANDWIDTH_REGEX,
-          BANDWIDTH_REGEX), res)
-  print latency, bandwidth
-  return latency, bandwidth
-
-
-def CreateSampleFromBandwidthTuple(result, test, iodepth, test_size):
-  """Create a sample from bandwidth result tuple.
-
-  Args:
-    result: A tuple, containing (aggrb, unit of aggrb, minb, unit of minb,
-        maxb, unit of maxb, mint, unit of mint, maxt, unit of maxt).
-    test: Name of test.
-    iodepth: IO depth parameter used by fio command.
-  Returns:
-    A sample.Sample.
-  """
-  return sample.Sample(test, float(result[0]), result[1],
-                       {'minb': result[2] + result[3],
-                        'maxb': result[4] + result[5],
-                        'mint': result[6] + result[7],
-                        'maxt': result[8] + result[9],
-                        'max_jobs': FLAGS.maxjobs,
-                        'iodepth': iodepth,
-                        'test_size': test_size})
-
-
-def CreateSampleFromLatencyTuple(result, test, iodepth, test_size):
-  """Create a sample from latency result tuple.
-
-  Args:
-    result: A tuple, containing (unit, min, max, avg, stdev).
-    test: Name of test.
-    iodepth: IO depth parameter used by fio command.
-  Returns:
-    A sample.Sample.
-  """
-  return sample.Sample(test, float(result[3]), result[0],
-                       {'min': result[1] + result[0],
-                        'max': result[2] + result[0],
-                        'stdev': result[4] + result[0],
-                        'max_jobs': FLAGS.maxjobs,
-                        'iodepth': iodepth,
-                        'test_size': test_size})
+  for result in results:
+    result.metadata.update({'workload_mode': FLAGS.workload_mode})
 
 
 def RunSimulatedLogging(vm):
@@ -175,7 +120,6 @@ def RunSimulatedLogging(vm):
   """
   test_size = vm.total_memory_kb
   cmd = (
-      '%s '
       '--filesize=10g '
       '--directory=%s '
       '--ioengine=libaio '
@@ -184,8 +128,7 @@ def RunSimulatedLogging(vm):
       '--randrepeat=0 '
       '--direct=0 '
       '--size=%dk '
-      '--iodepth=%d ') % (fio.FIO_PATH,
-                          vm.GetScratchDir(),
+      '--iodepth=%d ') % (vm.GetScratchDir(),
                           test_size,
                           DEFAULT_IODEPTH)
   if FLAGS.maxjobs:
@@ -203,22 +146,10 @@ def RunSimulatedLogging(vm):
       '--stonewall '
       '--rw=read ') % (test_size / 10)
   logging.info('FIO Results for simulated %s', LOGGING)
-  res, _ = vm.RemoteCommand(cmd, should_log=True)
-  latency, bandwidth = ParseFioResult(res)
-  results = [
-      CreateSampleFromBandwidthTuple(bandwidth[0],
-                                     'sequential_write:bandwidth',
-                                     DEFAULT_IODEPTH, test_size),
-      CreateSampleFromBandwidthTuple(bandwidth[1], 'random_read:bandwidth',
-                                     DEFAULT_IODEPTH, test_size),
-      CreateSampleFromBandwidthTuple(bandwidth[2], 'sequential_read:bandwidth',
-                                     DEFAULT_IODEPTH, test_size),
-      CreateSampleFromLatencyTuple(latency[0], 'sequential_write:latency',
-                                   DEFAULT_IODEPTH, test_size),
-      CreateSampleFromLatencyTuple(latency[1], 'random_read:latency',
-                                   DEFAULT_IODEPTH, test_size),
-      CreateSampleFromLatencyTuple(latency[2], 'sequential_read:latency',
-                                   DEFAULT_IODEPTH, test_size)]
+  res, _ = vm.RemoteCommand('%s %s' % (fio.FIO_CMD_PREFIX, cmd),
+                            should_log=True)
+  results = fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res))
+  UpdateWorkloadMetadata(results)
   return results
 
 
@@ -235,7 +166,6 @@ def RunSimulatedDatabase(vm):
   results = []
   for depth in iodepth_list:
     cmd = (
-        '%s '
         '--filesize=10g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -246,8 +176,7 @@ def RunSimulatedDatabase(vm):
         '--randrepeat=0 '
         '--iodepth=%s '
         '--size=%dk '
-        '--blocksize=4k ') % (fio.FIO_PATH,
-                              vm.GetScratchDir(),
+        '--blocksize=4k ') % (vm.GetScratchDir(),
                               depth,
                               test_size)
     if FLAGS.maxjobs:
@@ -266,31 +195,11 @@ def RunSimulatedDatabase(vm):
         '--rwmixwrite=10 '
         '--end_fsync=1 ')
     logging.info('FIO Results for simulated %s, iodepth %s', DATABASE, depth)
-    res, _ = vm.RemoteCommand(cmd, should_log=True)
-    latency, bandwidth = ParseFioResult(res)
-    result = [CreateSampleFromBandwidthTuple(bandwidth[0],
-                                             'random_write:bandwidth', depth,
-                                             test_size),
-              CreateSampleFromBandwidthTuple(bandwidth[1],
-                                             'random_read:bandwidth', depth,
-                                             test_size),
-              CreateSampleFromBandwidthTuple(bandwidth[2],
-                                             'mixed_randrw:read:bandwidth',
-                                             depth, test_size),
-              CreateSampleFromBandwidthTuple(bandwidth[3],
-                                             'mixed_randrw:write:bandwidth',
-                                             depth, test_size),
-              CreateSampleFromLatencyTuple(latency[0], 'random_write:latency',
-                                           depth, test_size),
-              CreateSampleFromLatencyTuple(latency[1], 'random_read:latency',
-                                           depth, test_size),
-              CreateSampleFromLatencyTuple(latency[2],
-                                           'mixed_randrw:read:latency', depth,
-                                           test_size),
-              CreateSampleFromLatencyTuple(latency[3],
-                                           'mixed_randrw:write:latency', depth,
-                                           test_size)]
-    results.extend(result)
+    res, _ = vm.RemoteCommand('%s %s' % (fio.FIO_CMD_PREFIX, cmd),
+                              should_log=True)
+    results.extend(
+        fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res)))
+  UpdateWorkloadMetadata(results)
   return results
 
 
@@ -307,7 +216,6 @@ def RunSimulatedStreaming(vm):
   results = []
   for depth in iodepth_list:
     cmd = (
-        '%s '
         '--filesize=10g '
         '--directory=%s '
         '--ioengine=libaio '
@@ -318,8 +226,7 @@ def RunSimulatedStreaming(vm):
         '--iodepth=%s '
         '--blocksize=1m '
         '--size=%dk '
-        '--filename=fio_test_file ') % (fio.FIO_PATH,
-                                        vm.GetScratchDir(),
+        '--filename=fio_test_file ') % (vm.GetScratchDir(),
                                         depth,
                                         test_size)
     if FLAGS.maxjobs:
@@ -332,22 +239,11 @@ def RunSimulatedStreaming(vm):
         '--stonewall '
         '--rw=read ')
     logging.info('FIO Results for simulated %s', STREAMING)
-    res, _ = vm.RemoteCommand(cmd, should_log=True)
-    latency, bandwidth = ParseFioResult(res)
-    result = [
-        CreateSampleFromBandwidthTuple(bandwidth[0],
-                                       'sequential_write:bandwidth', depth,
-                                       test_size),
-        CreateSampleFromBandwidthTuple(bandwidth[1],
-                                       'sequential_read:bandwidth', depth,
-                                       test_size),
-        CreateSampleFromLatencyTuple(latency[0],
-                                     'sequential_write:latency', depth,
-                                     test_size),
-        CreateSampleFromLatencyTuple(latency[1],
-                                     'sequential_read:latency', depth,
-                                     test_size)]
-    results.extend(result)
+    res, _ = vm.RemoteCommand('%s %s' % (fio.FIO_CMD_PREFIX, cmd),
+                              should_log=True)
+    results.extend(
+        fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res)))
+  UpdateWorkloadMetadata(results)
   return results
 
 
@@ -371,10 +267,6 @@ def Run(benchmark_spec):
   logging.info('Simulating %s scenario.', FLAGS.workload_mode)
   vms = benchmark_spec.vms
   vm = vms[0]
-  # Add mode name into benchmark name, so perfkitbenchmarker will publish each
-  # mode as a different benchmark, instead of mixing them together.
-  BENCHMARK_INFO['name'] = '%s:%s' % (BENCHMARK_INFO['name'].split(':')[0],
-                                      FLAGS.workload_mode)
   return RUN_SCENARIO_FUNCTION_DICT[FLAGS.workload_mode][METHOD](vm)
 
 

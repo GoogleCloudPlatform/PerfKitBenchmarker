@@ -145,6 +145,8 @@ def Run(benchmark_spec):
   threads = 0
   results = []
   num_servers = redis_vm.num_cpus * FLAGS.redis_numprocesses
+  max_throughput_for_completion_latency_under_1ms = 0.0
+
   while latency < latency_threshold:
     iteration_results = {}
     threads += max(1, int(threads * .15))
@@ -163,12 +165,19 @@ def Run(benchmark_spec):
     for result in iteration_results.values():
       latency += result[1] * result[0] / throughput
 
+    if latency < 1.0:
+        max_throughput_for_completion_latency_under_1ms = throughput
     results.append(sample.Sample('throughput', throughput, 'req/s',
                                  {'latency': latency, 'threads': threads}))
     logging.info('Threads : %d  (%f, %f) < %f', threads, throughput, latency,
                  latency_threshold)
     if threads == 1:
       latency_threshold = latency * 20
+
+  results.append(sample.Sample(
+                 'max_throughput_for_completion_latency_under_1ms',
+                 max_throughput_for_completion_latency_under_1ms,
+                 'req/s'))
 
   return results
 
