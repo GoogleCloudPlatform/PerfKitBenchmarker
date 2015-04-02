@@ -171,6 +171,7 @@ def Run(benchmark_spec):
                   (CLIENT_DIR, server.internal_ip))
   client.RemoteCommand(load_command, should_log=True)
 
+  max_throughput_for_completion_latency_under_1ms = 0.0
   for threads in range(MIN_THREADS, MAX_THREADS + 1, THREAD_STEP):
     load_command = ('timeout 15 ./%s/benchmarks/target/benchmarks '
                     '-z %s -n test -w RU,%s -o B:1000 -k 1000000 '
@@ -188,6 +189,15 @@ def Run(benchmark_spec):
     if FLAGS.aerospike_storage_type == DISK:
       metadata['Disk Type'] = 'Local' if FLAGS.use_local_disk else 'Remote'
     samples.append(sample.Sample('Average Latency', latency, 'ms', metadata))
+    if latency < 1.0:
+      max_throughput_for_completion_latency_under_1ms = max(
+          max_throughput_for_completion_latency_under_1ms,
+          tps)
+
+  samples.append(sample.Sample(
+                 'max_throughput_for_completion_latency_under_1ms',
+                 max_throughput_for_completion_latency_under_1ms,
+                 'req/s'))
 
   return samples
 
