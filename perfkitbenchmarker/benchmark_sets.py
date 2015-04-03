@@ -71,7 +71,7 @@ BENCHMARK_SETS = {
     'google_set': {
         MESSAGE: ('This benchmark set is maintained by Google Cloud Platform '
                   'Performance Team.'),
-        BENCHMARK_LIST: [STANDARD_SET]
+        BENCHMARK_LIST: [STANDARD_SET, 'oldisim']
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',
@@ -109,7 +109,7 @@ BENCHMARK_SETS = {
     },
     'stanford_set': {
         MESSAGE: 'Stanford University benchmark set.',
-        BENCHMARK_LIST: [STANDARD_SET]
+        BENCHMARK_LIST: [STANDARD_SET, 'oldisim']
     },
     'mit_set': {
         MESSAGE: 'Massachusetts Institute of Technology benchmark set.',
