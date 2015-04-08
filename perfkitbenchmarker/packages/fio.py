@@ -137,11 +137,12 @@ def ParseResults(job_file, fio_json_result):
             'bw_min': job[mode]['bw_min'],
             'bw_max': job[mode]['bw_max'],
             'bw_dev': job[mode]['bw_dev'],
-            'bw_agg': job[mode]['bw_agg']}
+            'bw_agg': job[mode]['bw_agg'],
+            'bw_mean': job[mode]['bw_mean']}
         bw_metadata.update(parameters)
         samples.append(
             sample.Sample('%s:bandwidth' % metric_name,
-                          job[mode]['bw_mean'],
+                          job[mode]['bw'],
                           'KB/s', bw_metadata))
         lat_metadata = {
             'min': job[mode]['lat']['min'],
