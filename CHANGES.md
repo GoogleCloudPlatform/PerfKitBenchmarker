@@ -1,14 +1,14 @@
 # v0.13.0
 
 * Show metadata in StreamPublisher. (GH-178)
-* **Breaking change**: Use parser to extract fio benchmark results, and
+* **Breaking Change**: Use parser to extract fio benchmark results, and
   change metric name from job_name:bandwidth/latency to
   job_name:read/write:bandwidth/latency. (GH-192)
 * Add unit test to check proper handling of scratch disk property. (GH-191)
 * Fix bug where exceptions raised in a runthreaded thread may not have
   been raised after the threads had been joined. (GH-194)
 * Stop mutating globals in GetInfo. (GH-198)
-* Add oldisim benchmark. (GH-200)
+* **New Benchmark**: oldisim. (GH-200)
 * Add oldisim benchmark to google_set and stanford_set.
 * Add max_throughput_for_completion_latency_under_1ms metric to redis and
   aerospike benchmarks. (GH-203)
