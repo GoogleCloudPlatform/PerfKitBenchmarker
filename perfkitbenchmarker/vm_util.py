@@ -238,6 +238,9 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
     try:
       while thread.isAlive():
         thread.join(1000)  # Set timeout so that join is interruptable.
+      # If the thread was already finished when we first checked if it was
+      # alive, we still need to join it so that exceptions can be raised.
+      thread.join()
     except Exception:  # pylint: disable=broad-except
       exceptions.append(traceback.format_exc())
     if thread_params:

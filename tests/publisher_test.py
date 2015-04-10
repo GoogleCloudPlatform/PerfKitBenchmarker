@@ -44,9 +44,12 @@ class PrettyPrintStreamPublisherTestCase(unittest.TestCase):
   def testWritesToStream(self):
     stream = io.BytesIO()
     instance = publisher.PrettyPrintStreamPublisher(stream)
-    samples = [{'test': 'testb', 'metric': '1', 'value': 1.0, 'unit': 'MB'},
-               {'test': 'testb', 'metric': '2', 'value': 14.0, 'unit': 'MB'},
-               {'test': 'testa', 'metric': '3', 'value': 47.0, 'unit': 'us'}]
+    samples = [{'test': 'testb', 'metric': '1', 'value': 1.0, 'unit': 'MB',
+                'metadata': {}},
+               {'test': 'testb', 'metric': '2', 'value': 14.0, 'unit': 'MB',
+                'metadata': {}},
+               {'test': 'testa', 'metric': '3', 'value': 47.0, 'unit': 'us',
+                'metadata': {}}]
     instance.PublishSamples(samples)
 
     value = stream.getvalue()
