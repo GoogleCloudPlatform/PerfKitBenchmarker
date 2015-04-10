@@ -110,7 +110,7 @@ DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli Mbps'
 CLI_TEST_ITERATION_COUNT = 100
 CLI_TEST_FAILURE_TOLERANCE = 0.05
 # TODO: Need to find ways to parallelize Azure's blob operations below.
-# Currently this test takes 4-5 minutes per iteration, doing 100
+# Currently this test takes 10-11 minutes per iteration, doing 100
 # iteration by default is too many. We do only 8 for now.
 CLI_TEST_ITERATION_COUNT_AZURE = 8
 
@@ -169,11 +169,33 @@ def _JsonStringToPercentileResults(results, json_input, metric_name,
         metadata))
 
 
-# TODO: Add api-based benchmarks for Azure here and then consider splitting this
-# into multiple functions, one for each scenario.
-def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
-                              bucket_name, regional_bucket_name=None):
-    """This runs a collection of api-based benchmarks for s3 or GCS.
+def _MakeAzureCommandSuffix(account_name, account_key, for_cli):
+  """ This function returns a suffix for azure command.
+
+  Args:
+    account_name: the name of the azure storage account.
+    account_key: the key to access the account.
+    for_cli: if true, the suffix can be passed to the azure cli tool; if false,
+      the suffix created will be used to call our own test script for api-based
+      tests.
+
+  returns:
+    A string represents a command suffix
+  """
+
+  if for_cli:
+    return (' -a %s -k %s') % (account_name, account_key)
+  else:
+    return (' --azure_account=%s --azure_key=%s') % (account_name, account_key)
+
+
+def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
+                       bucket_name, regional_bucket_name=None,
+                       azure_command_suffix=None):
+    """This function contains all api-based benchmarks. It uses the value of
+       the global flag "object_storage_scenario" to decide which scenario to
+       run inside this function. The caller simply always invokes this function
+       without having to worry about which scenario to select.
 
     Args:
       vm: The vm being used to run the benchmark.
@@ -182,6 +204,7 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       test_script_path: The complete path to the test script on the target VM.
       bucket_name: The name of the bucket caller has created for this test.
       regional_bucket_name: The name of the "regional" bucket, if applicable.
+      azure_command_suffix: A suffix for all Azure related test commands.
 
     Raises:
       ValueError: unexpected test outcome is found from the API test script.
@@ -189,9 +212,6 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     if FLAGS.object_storage_scenario == 'cli':
       # User only wants to run the CLI based tests, do nothing here:
       return
-
-    if storage is not 'S3' and storage is not 'GCS':
-      raise ValueError("Storage must be S3 or GCS to invoke this function")
 
     if (FLAGS.object_storage_scenario == 'all' or
         FLAGS.object_storage_scenario == 'api_data'):
@@ -203,7 +223,10 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       for bucket in buckets:
         one_byte_rw_cmd = ('%s --bucket=%s --storage_provider=%s '
                            '--scenario=OneByteRW') % (
-                           test_script_path, bucket, storage)  # noqa
+                               test_script_path, bucket, storage)
+
+        if azure_command_suffix is not None:
+          one_byte_rw_cmd = ('%s %s') % (one_byte_rw_cmd, azure_command_suffix)
 
         _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
         logging.info('OneByteRW raw result is %s' % raw_result)
@@ -228,7 +251,13 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       # Single stream large object throughput metrics
       single_stream_throughput_cmd = ('%s --bucket=%s --storage_provider=%s '
                                       '--scenario=SingleStreamThroughput') % (
-                                      test_script_path, bucket_name, storage)  # noqa
+                                          test_script_path,
+                                          bucket_name,
+                                          storage)
+      if azure_command_suffix is not None:
+        single_stream_throughput_cmd = ('%s %s') % (
+            single_stream_throughput_cmd, azure_command_suffix)
+
       _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
       logging.info('SingleStreamThroughput raw result is %s' % raw_result)
 
@@ -261,6 +290,11 @@ def S3orGCSApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                                   bucket_name,
                                   storage,
                                   LIST_CONSISTENCY_ITERATIONS)
+
+      if azure_command_suffix is not None:
+        list_consistency_cmd = ('%s %s') % (list_consistency_cmd,
+                                            azure_command_suffix)
+
 
       _, raw_result = vm.RemoteCommand(list_consistency_cmd)
       logging.info('ListConsistency raw result is %s' % raw_result)
@@ -511,8 +545,8 @@ class S3StorageBenchmark(object):
 
     # Now tests the storage provider via APIs
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
-    S3orGCSApiBasedBenchmarks(results, metadata, vm, 'S3', test_script_path,
-                              self.bucket_name)
+    ApiBasedBenchmarks(results, metadata, vm, 'S3', test_script_path,
+                       self.bucket_name)
 
     return results
 
@@ -543,22 +577,35 @@ class AzureBlobStorageBenchmark(object):
     """
     vm.Install('node_js')
     vm.RemoteCommand('sudo npm install azure-cli -g')
+
+    vm.Install('pip')
+    vm.RemoteCommand('sudo pip install azure')
+    vm.RemoteCommand('sudo pip install python-gflags==2.0')
+    vm.Install('gcs_boto_plugin')
+
     vm.PushFile(FLAGS.object_storage_credential_file, AZURE_CREDENTIAL_LOCATION)
     vm.RemoteCommand(
         'azure storage account create -l \'East US\' ''"pkb%s"' %
         (FLAGS.run_uri), ignore_failure=True)
+    vm.azure_account = ('pkb%s' % FLAGS.run_uri)
+
     output, _ = (
         vm.RemoteCommand(
             'azure storage account keys list pkb%s' %
             (FLAGS.run_uri)))
     key = re.findall(r'Primary (.+)', output)
-    vm.azure_command_suffix = (
-        ' -a pkb%s -k %s' % (FLAGS.run_uri, key[0]))
+    vm.azure_key = key[0]
+
     vm.RemoteCommand(
         'azure storage container create pkb%s %s' %
-        (FLAGS.run_uri, vm.azure_command_suffix))
+        (FLAGS.run_uri, _MakeAzureCommandSuffix(vm.azure_account,
+                                                vm.azure_key,
+                                                True)))
+
     vm.RemoteCommand('azure storage blob list pkb%s %s' % (
-        FLAGS.run_uri, vm.azure_command_suffix))
+        FLAGS.run_uri, _MakeAzureCommandSuffix(vm.azure_account,
+                                               vm.azure_key,
+                                               True)))
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with azure CLI tool.
@@ -582,26 +629,40 @@ class AzureBlobStorageBenchmark(object):
 
     # CLI tool based tests.
     scratch_dir = vm.GetScratchDir()
-    clean_up_bucket_cmd = ('for i in {0..99}; do azure storage blob delete '
-                           'pkb%s file-$i.dat %s; done') % (FLAGS.run_uri,
-                           vm.azure_command_suffix)  # noqa
+    test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
+    cleanup_bucket_cmd = ('%s --bucket=pkb%s --storage_provider=AZURE '
+                          ' --scenario=CleanupBucket %s' %
+                          (test_script_path,
+                           FLAGS.run_uri,
+                           _MakeAzureCommandSuffix(vm.azure_account,
+                                                   vm.azure_key,
+                                                   False)))
+
     upload_cmd = ('time for i in {0..99}; do azure storage blob upload '
-                  '%s/run/data/file-$i.dat pkb%s %s; done') % (scratch_dir,
-                  FLAGS.run_uri, vm.azure_command_suffix)  # noqa
+                  '%s/run/data/file-$i.dat pkb%s %s; done' %
+                  (scratch_dir,
+                   FLAGS.run_uri,
+                   _MakeAzureCommandSuffix(vm.azure_account,
+                                           vm.azure_key,
+                                           True)))
+
     cleanup_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
     download_cmd = ('time for i in {0..99}; do azure storage blob download '
-                    'pkb%s file-$i.dat %s/run/temp/file-$i.dat %s; done') % (
-                    FLAGS.run_uri, scratch_dir, vm.azure_command_suffix)  # noqa
+                    'pkb%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
+                        FLAGS.run_uri,
+                        scratch_dir,
+                        _MakeAzureCommandSuffix(vm.azure_account,
+                                                vm.azure_key,
+                                                True)))
 
     _CliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT_AZURE,
-                   clean_up_bucket_cmd, upload_cmd, cleanup_local_temp_cmd,
+                   cleanup_bucket_cmd, upload_cmd, cleanup_local_temp_cmd,
                    download_cmd)
 
-    # TODO: Add API based tests for Azure.
-    if FLAGS.object_storage_scenario != 'cli':
-      # We have not implemented API based tests for Azure yet, print a warning.
-      logging.info('API based tests for Azure has not been implemented yet. '
-                   'The returned result set will likely be empty.')
+    ApiBasedBenchmarks(results, metadata, vm, 'AZURE', test_script_path,
+                       self.bucket_name, regional_bucket_name=None,
+                       azure_command_suffix=_MakeAzureCommandSuffix(
+                           vm.azure_account, vm.azure_key, False))
 
     return results
 
@@ -611,13 +672,21 @@ class AzureBlobStorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    vm.RemoteCommand(
-        'for i in {0..99}; do azure storage blob delete pkb%s '
-        'file-$i.dat %s; done' %
-        (FLAGS.run_uri, vm.azure_command_suffix))
-    vm.RemoteCommand(
-        'azure storage container delete -q pkb%s %s' %
-        (FLAGS.run_uri, vm.azure_command_suffix))
+    test_script_path = '%s/run/%s' % (vm.GetScratchDir(), API_TEST_SCRIPT)
+    remove_content_cmd = ('%s --bucket=pkb%s --storage_provider=AZURE '
+                          ' --scenario=CleanupBucket %s' %
+                          (test_script_path, FLAGS.run_uri,
+                           _MakeAzureCommandSuffix(vm.azure_account,
+                                                   vm.azure_key,
+                                                   False)))
+
+    remove_bucket_cmd = ('azure storage container delete -q pkb%s %s' % (
+                         FLAGS.run_uri,
+                         _MakeAzureCommandSuffix(vm.azure_account,
+                                                 vm.azure_key,
+                                                 True)))
+    DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
+
     vm.RemoteCommand('azure storage account delete -q pkb%s' %
                      FLAGS.run_uri)
 
@@ -703,8 +772,8 @@ class GoogleCloudStorageBenchmark(object):
 
     # API-based benchmarking of GCS
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
-    S3orGCSApiBasedBenchmarks(results, metadata, vm, 'GCS', test_script_path,
-                              self.bucket_name, self.regional_bucket_name)
+    ApiBasedBenchmarks(results, metadata, vm, 'GCS', test_script_path,
+                       self.bucket_name, self.regional_bucket_name)
 
     return results
 
@@ -815,5 +884,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms[0].RemoteCommand('rm -rf %s/run/' % vms[0].GetScratchDir())
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Cleanup(vms[0])
+  vms[0].RemoteCommand('rm -rf %s/run/' % vms[0].GetScratchDir())
