@@ -591,8 +591,8 @@ class AzureBlobStorageBenchmark(object):
 
     output, _ = (
         vm.RemoteCommand(
-            'azure storage account keys list pkb%s' %
-            (FLAGS.run_uri)))
+            'azure storage account keys list %s' %
+            vm.azure_account))
     key = re.findall(r'Primary (.+)', output)
     vm.azure_key = key[0]
 
@@ -601,11 +601,12 @@ class AzureBlobStorageBenchmark(object):
         (FLAGS.run_uri, _MakeAzureCommandSuffix(vm.azure_account,
                                                 vm.azure_key,
                                                 True)))
+    self.bucket_name = 'pkb%s' % FLAGS.run_uri
 
-    vm.RemoteCommand('azure storage blob list pkb%s %s' % (
-        FLAGS.run_uri, _MakeAzureCommandSuffix(vm.azure_account,
-                                               vm.azure_key,
-                                               True)))
+    vm.RemoteCommand('azure storage blob list %s %s' % (
+        self.bucket_name, _MakeAzureCommandSuffix(vm.azure_account,
+                                                  vm.azure_key,
+                                                  True)))
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with azure CLI tool.
@@ -630,26 +631,26 @@ class AzureBlobStorageBenchmark(object):
     # CLI tool based tests.
     scratch_dir = vm.GetScratchDir()
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
-    cleanup_bucket_cmd = ('%s --bucket=pkb%s --storage_provider=AZURE '
+    cleanup_bucket_cmd = ('%s --bucket=%s --storage_provider=AZURE '
                           ' --scenario=CleanupBucket %s' %
                           (test_script_path,
-                           FLAGS.run_uri,
+                           self.bucket_name,
                            _MakeAzureCommandSuffix(vm.azure_account,
                                                    vm.azure_key,
                                                    False)))
 
     upload_cmd = ('time for i in {0..99}; do azure storage blob upload '
-                  '%s/run/data/file-$i.dat pkb%s %s; done' %
+                  '%s/run/data/file-$i.dat %s %s; done' %
                   (scratch_dir,
-                   FLAGS.run_uri,
+                   self.bucket_name,
                    _MakeAzureCommandSuffix(vm.azure_account,
                                            vm.azure_key,
                                            True)))
 
     cleanup_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
     download_cmd = ('time for i in {0..99}; do azure storage blob download '
-                    'pkb%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
-                        FLAGS.run_uri,
+                    '%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
+                        self.bucket_name,
                         scratch_dir,
                         _MakeAzureCommandSuffix(vm.azure_account,
                                                 vm.azure_key,
@@ -673,15 +674,15 @@ class AzureBlobStorageBenchmark(object):
       vm: The vm needs cleanup.
     """
     test_script_path = '%s/run/%s' % (vm.GetScratchDir(), API_TEST_SCRIPT)
-    remove_content_cmd = ('%s --bucket=pkb%s --storage_provider=AZURE '
+    remove_content_cmd = ('%s --bucket=%s --storage_provider=AZURE '
                           ' --scenario=CleanupBucket %s' %
-                          (test_script_path, FLAGS.run_uri,
+                          (test_script_path, self.bucket_name,
                            _MakeAzureCommandSuffix(vm.azure_account,
                                                    vm.azure_key,
                                                    False)))
 
-    remove_bucket_cmd = ('azure storage container delete -q pkb%s %s' % (
-                         FLAGS.run_uri,
+    remove_bucket_cmd = ('azure storage container delete -q %s %s' % (
+                         self.bucket_name,
                          _MakeAzureCommandSuffix(vm.azure_account,
                                                  vm.azure_key,
                                                  True)))
