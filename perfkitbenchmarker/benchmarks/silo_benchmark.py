@@ -1,5 +1,3 @@
-# Copyright 2014 Google Inc. All rights reserved.
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -34,11 +32,15 @@ BENCHMARK_INFO = {'name': 'silo',
                   'scratch_disk': False,
                   'num_machines': 1}
 
-flags.DEFINE_string('silo_benchmark', 'tpcc', 'benchmark to run with silo')
+flags.DEFINE_string('silo_benchmark', 'tpcc',
+                    'benchmark to run with silo. Options include tpcc, ycsb,'
+                    ' queue, bid')
 
-AGG_THPUT_REGEX = r'(agg_throughput):\s+([\d.]+)\s+([a-z/]+)'
-PER_CORE_THPUT_REGEX = r'(avg_per_core_throughput):\s+([\d.]+)\s+([a-z/]+)'
-LAT_REGEX = r'(avg_latency):\s+([\d.]+)\s+([a-z]+)'
+AGG_THPUT_REGEX = \
+    r'(agg_throughput):\s+(\d+\.?\d*e?[+-]?\d*)\s+([a-z/]+)'
+PER_CORE_THPUT_REGEX = \
+    r'(avg_per_core_throughput):\s+(\d+\.?\d*e?[+-]?\d*)\s+([a-z/]+)'
+LAT_REGEX = r'(avg_latency):\s+(\d+\.?\d*e?[+-]?\d*)\s+([a-z]+)'
 
 
 def GetInfo():
@@ -54,7 +56,7 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vm = vms[0]
-  logging.info('Silo prepare on %s', vm)
+  logging.info('Preparing Silo on %s', vm)
   vm.Install('silo')
 
 
