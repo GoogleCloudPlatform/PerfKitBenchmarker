@@ -170,17 +170,17 @@ def _JsonStringToPercentileResults(results, json_input, metric_name,
 
 
 def _MakeAzureCommandSuffix(account_name, account_key, for_cli):
-  """ This function returns a suffix for azure command.
+  """ This function returns a suffix for Azure command.
 
   Args:
-    account_name: the name of the azure storage account.
-    account_key: the key to access the account.
-    for_cli: if true, the suffix can be passed to the azure cli tool; if false,
+    account_name: The name of the Azure storage account.
+    account_key: The key to access the account.
+    for_cli: If true, the suffix can be passed to the Azure cli tool; if false,
       the suffix created will be used to call our own test script for api-based
       tests.
 
   returns:
-    A string represents a command suffix
+    A string represents a command suffix.
   """
 
   if for_cli:
@@ -194,13 +194,13 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                        azure_command_suffix=None):
     """This function contains all api-based benchmarks. It uses the value of
        the global flag "object_storage_scenario" to decide which scenario to
-       run inside this function. The caller simply always invokes this function
+       run inside this function. The caller simply invokes this function
        without having to worry about which scenario to select.
 
     Args:
       vm: The vm being used to run the benchmark.
       results: The results array to append to.
-      storage: The storage provider to run: S3 or GCS
+      storage: The storage provider to run: S3 or GCS or Azure.
       test_script_path: The complete path to the test script on the target VM.
       bucket_name: The name of the bucket caller has created for this test.
       regional_bucket_name: The name of the "regional" bucket, if applicable.
@@ -596,20 +596,19 @@ class AzureBlobStorageBenchmark(object):
     key = re.findall(r'Primary (.+)', output)
     vm.azure_key = key[0]
 
-    vm.RemoteCommand(
-        'azure storage container create pkb%s %s' %
-        (FLAGS.run_uri, _MakeAzureCommandSuffix(vm.azure_account,
-                                                vm.azure_key,
-                                                True)))
+    azure_command_suffix = _MakeAzureCommandSuffix(vm.azure_account,
+                                                   vm.azure_key,
+                                                   True)
+
+    vm.RemoteCommand('azure storage container create pkb%s %s' % (
+        FLAGS.run_uri, azure_command_suffix))
     self.bucket_name = 'pkb%s' % FLAGS.run_uri
 
     vm.RemoteCommand('azure storage blob list %s %s' % (
-        self.bucket_name, _MakeAzureCommandSuffix(vm.azure_account,
-                                                  vm.azure_key,
-                                                  True)))
+        self.bucket_name, azure_command_suffix))
 
   def Run(self, vm, metadata):
-    """Run upload/download on vm with azure CLI tool.
+    """Run upload/download on vm with Azure CLI tool.
 
     Args:
       vm: The vm being used to run the benchmark.

@@ -58,7 +58,7 @@ flags.DEFINE_string('azure_key', None,
 flags.DEFINE_enum(
     'scenario', 'OneByteRW', ['OneByteRW', 'ListConsistency',
                               'SingleStreamThroughput', 'CleanupBucket'],
-    'The various scenarios to test. OneByteRW: read and write of single byte. '
+    'The various scenarios to run. OneByteRW: read and write of single byte. '
     'ListConsistency: List-after-write and list-after-update consistency. '
     'SingleStreamThroughput: Throughput of single stream large object RW. '
     'CleanupBucket: Cleans up everything in a given bucket.')
@@ -126,6 +126,16 @@ class LowAvailabilityError(Exception):
 
 
 def _useBotoApi(storage_schema):
+  """Decides if the caller should use the boto api given a storage schema.
+
+  Args:
+    storage_schema: The schema represents the storage provider.
+
+  Returns:
+    True: Yes, we should use boto API.
+    False: No, do not use boto API for this provider.
+  """
+
   if storage_schema == 'gs' or storage_schema == 's3':
     return True
   else:
@@ -156,6 +166,17 @@ def PercentileCalculator(numbers):
 
 
 def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
+  """List objects under a bucket given a prefix.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    bucket: Name of the bucket.
+    prefix: A prefix to list from.
+    host_to_connect: An optional endpoint string to connect to.
+
+  Returns:
+    A list of object names.
+  """
 
   bucket_list_result = None
   if _useBotoApi(storage_schema):
@@ -208,6 +229,15 @@ def DeleteObjects(storage_schema, bucket, objects_to_delete,
 
 
 def CleanupBucket(storage_schema):
+  """ Cleans-up EVERYTHING under a given bucket as specified by FLAGS.bucket.
+
+  Args:
+    Storage_schema: The address schema identifying a storage. e.g., "gs"
+
+  Returns:
+    None.
+  """
+
   objects_to_cleanup = _ListObjects(storage_schema, FLAGS.bucket, prefix=None)
   while len(objects_to_cleanup) > 0:
     print 'Will delete %d objects.' % len(objects_to_cleanup)
@@ -411,8 +441,8 @@ def AnalyzeListResults(final_result, result_consistent, list_count,
   result_string_consistency = '%s%s' % (list_scenario,
                                         LIST_RESULT_SUFFIX_CONSISTENT)
   result_string_latency = '%s%s' % (list_scenario, LIST_RESULT_SUFFIX_LATENCY)
-  result_string_inconsistency_window = '%s%s' % (list_scenario,
-                               LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW)  # noqa
+  result_string_inconsistency_window = '%s%s' % (
+      list_scenario, LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW)
 
   if result_consistent:
     logging.debug('Listed %d times until results are consistent.', list_count)
