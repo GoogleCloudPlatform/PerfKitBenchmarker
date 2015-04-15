@@ -499,10 +499,7 @@ class S3StorageBenchmark(object):
     Args:
       vm: The vm being used to run the benchmark.
     """
-    vm.Install('pip')
     vm.RemoteCommand('sudo pip install awscli')
-    vm.RemoteCommand('sudo pip install python-gflags==2.0')
-    vm.Install('gcs_boto_plugin')
 
     vm.PushFile(FLAGS.object_storage_credential_file, AWS_CREDENTIAL_LOCATION)
     vm.PushFile(FLAGS.boto_file_location, DEFAULT_BOTO_LOCATION)
@@ -578,11 +575,6 @@ class AzureBlobStorageBenchmark(object):
     """
     vm.Install('node_js')
     vm.RemoteCommand('sudo npm install azure-cli -g')
-
-    vm.Install('pip')
-    vm.RemoteCommand('sudo pip install azure')
-    vm.RemoteCommand('sudo pip install python-gflags==2.0')
-    vm.Install('gcs_boto_plugin')
 
     vm.PushFile(FLAGS.object_storage_credential_file, AZURE_CREDENTIAL_LOCATION)
     vm.RemoteCommand(
@@ -713,10 +705,6 @@ class GoogleCloudStorageBenchmark(object):
                      '--path-update=true '
                      '--bash-completion=true')
 
-    vm.Install('pip')
-    vm.RemoteCommand('sudo pip install python-gflags==2.0')
-    vm.Install('gcs_boto_plugin')
-
     try:
       vm.RemoteCommand('mkdir .config')
     except errors.VmUtil.SshConnectionError:
@@ -830,6 +818,11 @@ def Prepare(benchmark_spec):
       raise errors.Benchmarks.MissingObjectCredentialException(
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)
+
+  vms[0].Install('pip')
+  vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
+  vms[0].RemoteCommand('sudo pip install azure')
+  vms[0].Install('gcs_boto_plugin')
 
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
 
