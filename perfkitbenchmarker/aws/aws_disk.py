@@ -91,8 +91,8 @@ class AwsDisk(disk.BaseDisk):
         '--instance-id=%s' % self.attached_vm_id,
         '--volume-id=%s' % self.id,
         '--device=%s' % self.GetDevicePath()]
-    logging.info('Attaching AWS volume. This may fail if the disk is not '
-                 'ready, but will be retried.')
+    logging.info('Attaching AWS volume %s. This may fail if the disk is not '
+                 'ready, but will be retried.', self.id)
     vm_util.IssueRetryableCommand(attach_cmd)
 
   def Detach(self):
