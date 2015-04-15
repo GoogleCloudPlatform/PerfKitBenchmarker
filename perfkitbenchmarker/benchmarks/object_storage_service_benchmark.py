@@ -192,10 +192,11 @@ def _MakeAzureCommandSuffix(account_name, account_key, for_cli):
 def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                        bucket_name, regional_bucket_name=None,
                        azure_command_suffix=None):
-    """This function contains all api-based benchmarks. It uses the value of
-       the global flag "object_storage_scenario" to decide which scenario to
-       run inside this function. The caller simply invokes this function
-       without having to worry about which scenario to select.
+    """This function contains all api-based benchmarks.
+       It uses the value of the global flag "object_storage_scenario" to
+       decide which scenario to run inside this function. The caller simply
+       invokes this function without having to worry about which scenario to
+       select.
 
     Args:
       vm: The vm being used to run the benchmark.
