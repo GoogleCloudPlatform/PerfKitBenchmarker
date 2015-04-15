@@ -115,7 +115,7 @@ LARGE_OBJECT_COUNT = 100
 LARGE_OBJECT_FAILURE_TOLERANCE = 0.1
 
 # A global variable initialized once for Azure Blob Service
-_azure_blob_service = None
+_AZURE_BLOB_SERVICE = None
 
 
 # When a storage provider fails more than a threshold number of requests, we
@@ -132,8 +132,7 @@ def _useBotoApi(storage_schema):
     storage_schema: The schema represents the storage provider.
 
   Returns:
-    True: Yes, we should use boto API.
-    False: No, do not use boto API for this provider.
+    A boolean indicates whether or not to use boto API.
   """
 
   if storage_schema == 'gs' or storage_schema == 's3':
@@ -186,7 +185,7 @@ def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
 
     bucket_list_result = bucket_uri.list_bucket(prefix=prefix)
   else:
-    bucket_list_result = _azure_blob_service.list_blobs(bucket, prefix=prefix)
+    bucket_list_result = _AZURE_BLOB_SERVICE.list_blobs(bucket, prefix=prefix)
 
   list_result = []
   for k in bucket_list_result:
@@ -219,7 +218,7 @@ def DeleteObjects(storage_schema, bucket, objects_to_delete,
 
         object_uri.delete_key()
       else:
-        _azure_blob_service.delete_blob(bucket, object_name)
+        _AZURE_BLOB_SERVICE.delete_blob(bucket, object_name)
 
       if objects_deleted is not None:
         objects_deleted.append(object_name)
@@ -233,14 +232,11 @@ def CleanupBucket(storage_schema):
 
   Args:
     Storage_schema: The address schema identifying a storage. e.g., "gs"
-
-  Returns:
-    None.
   """
 
   objects_to_cleanup = _ListObjects(storage_schema, FLAGS.bucket, prefix=None)
   while len(objects_to_cleanup) > 0:
-    print 'Will delete %d objects.' % len(objects_to_cleanup)
+    logging.info('Will delete %d objects.', len(objects_to_cleanup))
     DeleteObjects(storage_schema, FLAGS.bucket, objects_to_cleanup)
     objects_to_cleanup = _ListObjects(storage_schema, FLAGS.bucket, prefix=None)
 
@@ -299,7 +295,7 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
 
         object_uri.set_contents_from_string(payload_string)
       else:
-        _azure_blob_service.put_block_blob_from_bytes(bucket, object_name,
+        _AZURE_BLOB_SERVICE.put_block_blob_from_bytes(bucket, object_name,
                                                       bytes(payload_bytes))
 
       latency = time.time() - start_time
@@ -339,7 +335,7 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
         object_uri.connect(host=host_to_connect)
         object_uri.get_contents_as_string()
       else:
-        _azure_blob_service.get_blob_to_bytes(bucket, object_name)
+        _AZURE_BLOB_SERVICE.get_blob_to_bytes(bucket, object_name)
 
       latency = time.time() - start_time
 
@@ -744,8 +740,8 @@ def Main(argv=sys.argv):
     if FLAGS.azure_key is None or FLAGS.azure_account is None:
       raise ValueError('Must specify azure account and key')
     else:
-      global _azure_blob_service
-      _azure_blob_service = BlobService(FLAGS.azure_account, FLAGS.azure_key)
+      global _AZURE_BLOB_SERVICE
+      _AZURE_BLOB_SERVICE = BlobService(FLAGS.azure_account, FLAGS.azure_key)
       # There are DNS lookup issues with the provider Azure when doing
       # "high" number of concurrent requests using multiple threads. The error
       # came from getaddrinfo() called by the azure python library. By reducing
