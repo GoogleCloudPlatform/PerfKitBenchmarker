@@ -22,6 +22,7 @@ information about azure disks.
 """
 
 import json
+import logging
 import threading
 
 from perfkitbenchmarker import disk
@@ -69,6 +70,8 @@ class AzureDisk(disk.BaseDisk):
                   'delete',
                   '--blob-delete',
                   self.name]
+    logging.info('Deleting disk %s. This may fail while the associated VM '
+                 'is deleted, but will be retried.', self.name)
     vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
