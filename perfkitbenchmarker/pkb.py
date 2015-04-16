@@ -164,13 +164,13 @@ def ListUnknownBenchmarks():
                 valid_benchmark_sets)
 
 
-def DoPreparePhase(benchmark, info, name, timer):
+def DoPreparePhase(benchmark, name, spec, timer):
   """Performs the Prepare phase of benchmark execution.
 
   Args:
     benchmark: The benchmark module.
-    info: The dict returned by the benchmark module's GetInfo function.
     name: A string containing the benchmark name.
+    spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of resource
       provisioning and the benchmark module's Prepare function.
 
@@ -179,11 +179,9 @@ def DoPreparePhase(benchmark, info, name, timer):
   """
   logging.info('Preparing benchmark %s', name)
   with timer.Measure('Resource Provisioning'):
-    spec = benchmark_spec.BenchmarkSpec(info)
     spec.Prepare()
   with timer.Measure('Benchmark Prepare'):
     benchmark.Prepare(spec)
-  return spec
 
 
 def DoRunPhase(benchmark, name, spec, collector, timer):
@@ -257,8 +255,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
     try:
       with end_to_end_timer.Measure('End to End'):
         if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
-          spec = DoPreparePhase(
-              benchmark, benchmark_info, benchmark_name, detailed_timer)
+          spec = benchmark_spec.BenchmarkSpec(benchmark_info)
+          DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
           spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_name)
 
