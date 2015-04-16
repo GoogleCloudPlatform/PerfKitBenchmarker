@@ -103,7 +103,7 @@ class AzureAffinityGroup(resource.BaseResource):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = vm_util.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
     try:
       json.loads(stdout)
     except ValueError:
@@ -146,7 +146,7 @@ class AzureStorageAccount(resource.BaseResource):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = vm_util.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
     try:
       json.loads(stdout)
     except ValueError:
@@ -189,7 +189,7 @@ class AzureVirtualNetwork(resource.BaseResource):
                 'show',
                 '--json',
                 self.name]
-    stdout, _, _ = vm_util.IssueCommand(show_cmd)
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
     try:
       json.loads(stdout)
     except ValueError:

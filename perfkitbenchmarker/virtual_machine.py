@@ -151,7 +151,7 @@ class BaseVirtualMachine(resource.BaseResource):
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
     """Waits until VM is has booted."""
-    resp, _ = self.RemoteCommand('hostname', retries=1)
+    resp, _ = self.RemoteCommand('hostname', retries=1, suppress_warning=True)
     if self.bootable_time is None:
       self.bootable_time = time.time()
     if self.hostname is None:
@@ -263,7 +263,8 @@ class BaseVirtualMachine(resource.BaseResource):
 
   def RemoteCommand(self, command, remote_port=22,
                     should_log=False, retries=SSH_RETRIES,
-                    ignore_failure=False, login_shell=False):
+                    ignore_failure=False, login_shell=False,
+                    suppress_warning=False):
     """Runs a command on the VM.
 
     Args:
@@ -276,6 +277,8 @@ class BaseVirtualMachine(resource.BaseResource):
           when it receives a 255 return code.
       ignore_failure: Ignore any failure if set to true.
       login_shell: Run command in a login shell.
+      suppress_warning: Suppress the result logging from IssueCommand when the
+          return code is non-zero.
 
     Returns:
       A tuple of stdout and stderr from running the command.
@@ -295,7 +298,8 @@ class BaseVirtualMachine(resource.BaseResource):
 
       for _ in range(retries):
         stdout, stderr, retcode = vm_util.IssueCommand(
-            ssh_cmd, should_log=should_log)
+            ssh_cmd, force_info_log=should_log,
+            suppress_warning=suppress_warning)
         if retcode != 255:  # Retry on 255 because this indicates an SSH failure
           break
     finally:
