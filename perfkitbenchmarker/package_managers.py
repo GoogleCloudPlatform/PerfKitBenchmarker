@@ -26,6 +26,7 @@ file name minus .py). The framework will take care of all cleanup
 for you.
 """
 
+import logging
 import re
 
 from perfkitbenchmarker import errors
@@ -229,6 +230,8 @@ class AptMixin(BasePackageMixin):
       self.RemoteCommand(
           'sudo sed -i.bk "s/azure.archive.ubuntu.com/archive.ubuntu.com/g" '
           '/etc/apt/sources.list')
+      logging.info('Installing "%s" failed on %s. This may be transient. '
+                   'Updating package list.', packages, self)
       self.AptUpdate()
       raise e
 

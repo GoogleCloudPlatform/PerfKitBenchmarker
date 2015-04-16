@@ -22,6 +22,7 @@ for more information about AWS Virtual Private Clouds.
 """
 
 import json
+import logging
 import threading
 import uuid
 
@@ -160,6 +161,9 @@ class AwsSubnet(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the subnet."""
+    logging.info('Deleting subnet %s. This may fail if all instances in the '
+                 'subnet have not completed termination, but will be retried.',
+                 self.id)
     delete_cmd = util.AWS_PREFIX + [
         'ec2',
         'delete-subnet',

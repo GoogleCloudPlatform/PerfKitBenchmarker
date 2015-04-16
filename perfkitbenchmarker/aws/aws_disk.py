@@ -22,6 +22,7 @@ disks.
 """
 
 import json
+import logging
 import string
 import threading
 
@@ -65,6 +66,8 @@ class AwsDisk(disk.BaseDisk):
         'delete-volume',
         '--region=%s' % self.region,
         '--volume-id=%s' % self.id]
+    logging.info('Deleting AWS volume %s. This may fail if the disk is not '
+                 'yet detached, but will be retried.', self.id)
     vm_util.IssueRetryableCommand(delete_cmd)
 
   def Attach(self, vm):
@@ -88,6 +91,8 @@ class AwsDisk(disk.BaseDisk):
         '--instance-id=%s' % self.attached_vm_id,
         '--volume-id=%s' % self.id,
         '--device=%s' % self.GetDevicePath()]
+    logging.info('Attaching AWS volume %s. This may fail if the disk is not '
+                 'ready, but will be retried.', self.id)
     vm_util.IssueRetryableCommand(attach_cmd)
 
   def Detach(self):
