@@ -258,6 +258,10 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
     try:
       with end_to_end_timer.Measure('End to End'):
         if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
+          # It is important to create the spec outside of DoPreparePhase
+          # because if DoPreparePhase raises an exception, we still need
+          # a reference to the spec in order to delete it in the "finally"
+          # section below.
           spec = benchmark_spec.BenchmarkSpec(benchmark_info)
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
