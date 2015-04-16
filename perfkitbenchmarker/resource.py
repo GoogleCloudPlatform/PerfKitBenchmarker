@@ -22,7 +22,14 @@ reliably.
 import abc
 
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+
+flags.DEFINE_bool('force_delete', False, 'If this is True, all resources will '
+                  'be deleted even if self.created is False or self.deleted '
+                  'is True. This is useful if something went wrong, and you '
+                  'need to clean up.')
+FLAGS = flags.FLAGS
 
 
 class BaseResource(object):
@@ -96,7 +103,7 @@ class BaseResource(object):
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
-    if self.deleted or not self.created:
+    if (self.deleted or not self.created) and not FLAGS.force_delete:
       return
     self._Delete()
     try:

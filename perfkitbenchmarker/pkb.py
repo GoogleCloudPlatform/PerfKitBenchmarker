@@ -180,7 +180,11 @@ def DoPreparePhase(benchmark, info, name, timer):
   logging.info('Preparing benchmark %s', name)
   with timer.Measure('Resource Provisioning'):
     spec = benchmark_spec.BenchmarkSpec(info)
+    # Pickle the spec before anything gets created so we can tear down
+    # in a separate run if something goes wrong.
+    spec.PickleSpec()
     spec.Prepare()
+
   with timer.Measure('Benchmark Prepare'):
     benchmark.Prepare(spec)
   return spec
