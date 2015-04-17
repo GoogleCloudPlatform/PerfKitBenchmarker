@@ -11,12 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utilities related to loggers and logging.
-"""
+"""Utilities related to loggers and logging."""
 
 from contextlib import contextmanager
 import logging
+import sys
 import threading
+
+try:
+  import colorlog
+except ImportError:
+  colorlog = None
+
 
 DEBUG = 'debug'
 INFO = 'info'
@@ -120,8 +126,10 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
   """
   # Build the format strings for the stderr and log file message formatters.
   stderr_format = ('%(asctime)s {} %(threadName)s %(pkb_label)s'
-                   '%(levelname)-8s %(message)s')
-  stderr_format = stderr_format.format(run_uri)
+                   '%(levelname)-8s %(message)s').format(run_uri)
+  stderr_color_format = ('%(log_color)s%(asctime)s {} %(threadName)s '
+                         '%(pkb_label)s%(levelname)-8s%(reset)s '
+                         '%(message)s').format(run_uri)
   file_format = ('%(asctime)s {} %(threadName)s %(pkb_label)s'
                  '%(filename)s:%(lineno)d %(levelname)-8s %(message)s')
   file_format = file_format.format(run_uri)
@@ -140,7 +148,11 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
   # Add handler to output to stderr.
   handler = logging.StreamHandler()
   handler.setLevel(stderr_log_level)
-  handler.setFormatter(logging.Formatter(stderr_format))
+  if colorlog is not None and sys.stderr.isatty():
+    formatter = colorlog.ColoredFormatter(stderr_color_format, reset=True)
+    handler.setFormatter(formatter)
+  else:
+    handler.setFormatter(logging.Formatter(stderr_format))
   logger.addHandler(handler)
 
   # Add handler for output to log file.
