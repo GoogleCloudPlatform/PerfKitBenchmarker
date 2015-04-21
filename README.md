@@ -37,7 +37,7 @@ In its current release these are the benchmarks that are executed:
   - `mongodb`: GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
   - `ycsb` (used by `mongodb`): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
   - `memtier_benchmark`: GPL v2 (https://github.com/RedisLabs/memtier_benchmark)
-  - `sysbench_oltp`: GPL v2 (https://launchpad.net/sysbench)
+  - `sysbench_oltp`: GPL v2 (https://github.com/akopytov/sysbench)
   - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
   - `speccpu2006` - Spec CPU2006 (http://www.spec.org/cpu2006/)
   - `mesh_network`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
