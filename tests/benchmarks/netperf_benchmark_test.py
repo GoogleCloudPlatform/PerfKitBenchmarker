@@ -13,6 +13,8 @@
 # limitations under the License.
 """Tests for netperf_benchmark."""
 
+import json
+import os
 import unittest
 
 import mock
@@ -27,6 +29,13 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
+    # Load data
+    path = os.path.join(os.path.dirname(__file__), '..', 'data',
+                        'netperf_results.json')
+
+    with open(path) as fp:
+      self.expected_stdout = ['\n'.join(i) for i in json.load(fp)]
+
     p = mock.patch(vm_util.__name__ + '.ShouldRunOnExternalIpAddress')
     self.should_run_external = p.start()
     self.addCleanup(p.stop)
@@ -43,14 +52,8 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     self._ConfigureIpTypes()
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
-    vm_spec.vms[0].RemoteCommand.side_effect = [('14.1 \n', ''),
-                                                ('12.4 \n', ''),
-                                                ('146.82 \n', ''),
-                                                ('0.1623\t \n', ''),
-                                                ('10.1 \n', ''),
-                                                ('11.2 \n', ''),
-                                                ('14.82 \n', ''),
-                                                ('2.4\t \n', '')]
+    vm_spec.vms[0].RemoteCommand.side_effect = [
+        (i, '') for i in self.expected_stdout]
 
     result = netperf_benchmark.Run(vm_spec)
 
@@ -58,14 +61,14 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     tps = 'transactions_per_second'
     mbps = 'Mbits/sec'
     self.assertListEqual(
-        [('TCP_RR_Transaction_Rate', 14.1, tps),
-         ('TCP_RR_Transaction_Rate', 12.4, tps),
-         ('TCP_CRR_Transaction_Rate', 146.82, tps),
-         ('TCP_CRR_Transaction_Rate', 0.1623, tps),
-         ('TCP_STREAM_Throughput', 10.1, mbps),
-         ('TCP_STREAM_Throughput', 11.2, mbps),
-         ('UDP_RR_Transaction_Rate', 14.82, tps),
-         ('UDP_RR_Transaction_Rate', 2.4, tps)],
+        [('TCP_RR_Transaction_Rate', 1333.62, tps),
+         ('TCP_RR_Transaction_Rate', 4087.38, tps),
+         ('TCP_CRR_Transaction_Rate', 404.17, tps),
+         ('TCP_CRR_Transaction_Rate', 1251.75, tps),
+         ('TCP_STREAM_Throughput', 1192.43, mbps),
+         ('TCP_STREAM_Throughput', 2804.90, mbps),
+         ('UDP_RR_Transaction_Rate', 1307.56, tps),
+         ('UDP_RR_Transaction_Rate', 4086.70, tps)],
         [i[:3] for i in result])
 
     external_meta = {'ip_type': 'external'}
