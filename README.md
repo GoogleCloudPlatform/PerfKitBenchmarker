@@ -234,6 +234,15 @@ PerfKitBenchmarker uses the file location `~/.config/digitalocean-oauth.curl`
 by default, you can use the `--digitalocean_curl_config` flag to
 override the path.
 
+
+## Rackspace setup
+```
+sudo apt-get install python-pip -y
+sudo pip install -U rackspace-neutronclient
+sudo pip install -U rackspace-novaclient
+sudo pip install -U python-cinderclient
+```
+
 ## Create and Configure a `.boto` file for object storage benchmarks
 
 In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.
