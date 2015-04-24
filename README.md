@@ -27,7 +27,7 @@ In its current release these are the benchmarks that are executed:
 
   - `bonnie++`: GPL v2 (http://www.coker.com.au/bonnie++/readme.html)
   - `cassandra_stress`: Apache v2 (http://cassandra.apache.org/)
-  - `cluster_boot`: MIT license.
+  - `cluster_boot`: MIT License
   - `coremark`: EEMBC (https://www.eembc.org/)
   - `fio`: GPL v2 (https://github.com/axboe/fio/blob/master/COPYING)
   - `hadoop_terasort`: Apache v2 (http://hadoop.apache.org/)
@@ -46,6 +46,7 @@ In its current release these are the benchmarks that are executed:
   - `ping`: No license needed.
   - `aerospike`: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
   - `oldisim`: Apache v2.
+  - `silo` : MIT License
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
 
