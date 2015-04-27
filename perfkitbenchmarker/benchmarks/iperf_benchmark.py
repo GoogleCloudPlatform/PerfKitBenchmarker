@@ -60,6 +60,7 @@ def Prepare(benchmark_spec):
                      IPERF_PORT)
 
 
+@vm_util.Retry(max_retries=IPERF_RETRIES)
 def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   """Run iperf using sending 'vm' to connect to 'ip_address'.
 
