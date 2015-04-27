@@ -19,6 +19,7 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import json
+import logging
 import threading
 
 from perfkitbenchmarker import flags
@@ -179,6 +180,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'describe-instances',
         '--region=%s' % self.region,
         '--instance-ids=%s' % self.id]
+    logging.info('Getting instance %s public IP. This will fail until '
+                 'a public IP is available, but will be retried.', self.id)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     instance = response['Reservations'][0]['Instances'][0]
