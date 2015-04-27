@@ -25,27 +25,28 @@ before you use the PerfKitBenchmarker.
 
 In its current release these are the benchmarks that are executed:
 
+  - `aerospike`: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
   - `bonnie++`: GPL v2 (http://www.coker.com.au/bonnie++/readme.html)
   - `cassandra_stress`: Apache v2 (http://cassandra.apache.org/)
-  - `cluster_boot`: MIT license.
+  - `cluster_boot`: MIT License
   - `coremark`: EEMBC (https://www.eembc.org/)
+  - `copy_throughput`: Apache v2.
   - `fio`: GPL v2 (https://github.com/axboe/fio/blob/master/COPYING)
   - `hadoop_terasort`: Apache v2 (http://hadoop.apache.org/)
   - `hpcc`: Original BSD license (http://icl.cs.utk.edu/hpcc/faq/#263)
   - `iperf`: BSD license(http://iperf.sourceforge.net/)
-  - `netperf`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
-  - `mongodb`: GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
-  - `ycsb` (used by `mongodb`): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
   - `memtier_benchmark`: GPL v2 (https://github.com/RedisLabs/memtier_benchmark)
-  - `sysbench_oltp`: GPL v2 (https://github.com/akopytov/sysbench)
-  - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
-  - `speccpu2006` - Spec CPU2006 (http://www.spec.org/cpu2006/)
   - `mesh_network`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
-  - `copy_throughput`: Apache v2.
+  - `mongodb`: GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
+  - `netperf`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
+  - `oldisim`: Apache v2.
   - `object_storage_service`: Apache v2.
   - `ping`: No license needed.
-  - `aerospike`: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
-  - `oldisim`: Apache v2.
+  - `silo` : MIT License
+  - `speccpu2006` - Spec CPU2006 (http://www.spec.org/cpu2006/)
+  - `sysbench_oltp`: GPL v2 (https://github.com/akopytov/sysbench)
+  - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
+  - `ycsb` (used by `mongodb`): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
 
@@ -260,7 +261,8 @@ If a benchmark requires two machines like iperf you can have two both machines i
     "user_name": "connormccoy",
     "keyfile_path": "/home/connormccoy/.ssh/google_compute_engine",
     "scratch_disk_mountpoints": ["/tmp/google-pkb"],
-    "internal_ip": "10.240.234.189"
+    "internal_ip": "10.240.234.189",
+    "ssh_port": 2222
   }
 ]
 ```

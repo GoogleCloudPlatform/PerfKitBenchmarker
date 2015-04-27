@@ -108,7 +108,6 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS], 'Name of the cloud to use.')
 
-SSH_PORT = 22
 
 
 class BenchmarkSpec(object):
@@ -160,6 +159,7 @@ class BenchmarkSpec(object):
       self.scratch_disk = benchmark_info['scratch_disk']
       self.scratch_disk_size = FLAGS.scratch_disk_size
       self.scratch_disk_type = FLAGS.scratch_disk_type
+      self.scratch_disk_iops = FLAGS.scratch_disk_iops
 
       self.vms = [
           self.CreateVirtualMachine(
@@ -170,7 +170,7 @@ class BenchmarkSpec(object):
         disk_spec = disk.BaseDiskSpec(
             self.scratch_disk_size,
             DISK_TYPE[self.cloud][self.scratch_disk_type],
-            '/scratch%d' % i)
+            '/scratch%d' % i, self.scratch_disk_iops)
         for vm in self.vms:
           vm.disk_specs.append(disk_spec)
 
@@ -273,7 +273,7 @@ class BenchmarkSpec(object):
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
-    firewall.AllowPort(vm, SSH_PORT)
+    firewall.AllowPort(vm, vm.ssh_port)
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.Startup()

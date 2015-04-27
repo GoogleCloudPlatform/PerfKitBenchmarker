@@ -1,3 +1,13 @@
+# v0.14.0
+
+* Added the Silo filesystem benchmark (GH-170)
+* Added Azure Blobs support to the object_storage_service_benchmark (GH-209)
+* Logging now prints in color to make it easier to read (GH-212)
+* Improvement to allow SSH port selection is static machine configs (GH-201)
+* Bug fix for the filesystem workloads when using PIOPS (GH-190)
+* Bug fixes for the side-by-side tool to use the right workload name. (GH-220)
+* Bug fix for a race condition in an exception path that could leave resources behind (GH-214)
+
 # v0.13.0
 
 * Show metadata in StreamPublisher. (GH-178)

@@ -325,15 +325,19 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
   return Wrap
 
 
-def IssueCommand(cmd, should_log=False):
+def IssueCommand(cmd, force_info_log=False, suppress_warning=False):
   """Tries running the provided command once.
 
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
         constructor.
-    should_log: A boolean indicating whether the command result should be
-        logged at the info level. Even if it is false, the results will
-        still be logged at the debug level.
+    force_info_log: A boolean indicating whether the command result should
+        always be logged at the info level. Command results will always be
+        logged at the debug level if they aren't logged at another level.
+    suppress_warning: A boolean indicating whether the results should
+        not be logged at the info level in the event of a non-zero
+        return code. When force_info_log is True, the output is logged
+        regardless of suppress_warning's value.
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
@@ -350,7 +354,7 @@ def IssueCommand(cmd, should_log=False):
 
   debug_text = ('Ran %s. Got return code (%s). STDOUT: %sSTDERR: %s' %
                 (full_cmd, process.returncode, stdout, stderr))
-  if should_log:
+  if force_info_log or (process.returncode and not suppress_warning):
     logging.info(debug_text)
   else:
     logging.debug(debug_text)
@@ -386,10 +390,8 @@ def IssueRetryableCommand(cmd):
   """
   stdout, stderr, retcode = IssueCommand(cmd)
   if retcode:
-    full_cmd = ' '.join(cmd)
-    error_text = ('Command %s returned a non-zero exit code (%d).\n'
-                  'STDOUT: %sSTDERR: %s') % (full_cmd, retcode, stdout, stderr)
-    raise errors.VmUtil.CalledProcessException(error_text)
+    raise errors.VmUtil.CalledProcessException(
+        'Command returned a non-zero exit code.\n')
   return stdout, stderr
 
 

@@ -33,6 +33,7 @@ import time
 import boto
 import gflags as flags
 import gcs_oauth2_boto_plugin  # noqa
+from azure.storage import BlobService
 
 FLAGS = flags.FLAGS
 
@@ -48,19 +49,25 @@ flags.DEFINE_string('bucket', None,
                     'invocation of this test and then clean-up the bucket '
                     'after this test returns.')
 
+flags.DEFINE_string('azure_account', None,
+                    'The name of the storage account for Azure.')
+
+flags.DEFINE_string('azure_key', None,
+                    'The key of the storage account for Azure.')
+
 flags.DEFINE_enum(
     'scenario', 'OneByteRW', ['OneByteRW', 'ListConsistency',
-                              'SingleStreamThroughput'],
-    'The various scenarios to test. OneByteRW: read and write of single byte. '
+                              'SingleStreamThroughput', 'CleanupBucket'],
+    'The various scenarios to run. OneByteRW: read and write of single byte. '
     'ListConsistency: List-after-write and list-after-update consistency. '
-    'SingleStreamThroughput: Throughput of single stream large object RW. (not '
-    'implemented yet)')
+    'SingleStreamThroughput: Throughput of single stream large object RW. '
+    'CleanupBucket: Cleans up everything in a given bucket.')
 
 flags.DEFINE_integer('iterations', 1, 'The number of iterations to run for the '
                      'particular test scenario. Currently only applicable to '
                      'the ListConsistency scenario, ignored in others.')
 
-STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3'}
+STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
 # If more than 5% of our upload or download operations fail for an iteration,
 # there is an availability issue with the service provider or the connection
@@ -107,12 +114,31 @@ LARGE_OBJECT_COUNT = 100
 
 LARGE_OBJECT_FAILURE_TOLERANCE = 0.1
 
+# A global variable initialized once for Azure Blob Service
+_AZURE_BLOB_SERVICE = None
+
 
 # When a storage provider fails more than a threshold number of requests, we
 # stop the benchmarking tests and raise a low availability error back to the
 # caller.
 class LowAvailabilityError(Exception):
     pass
+
+
+def _useBotoApi(storage_schema):
+  """Decides if the caller should use the boto api given a storage schema.
+
+  Args:
+    storage_schema: The schema represents the storage provider.
+
+  Returns:
+    A boolean indicates whether or not to use boto API.
+  """
+
+  if storage_schema == 'gs' or storage_schema == 's3':
+    return True
+  else:
+    return False
 
 
 def PercentileCalculator(numbers):
@@ -139,12 +165,30 @@ def PercentileCalculator(numbers):
 
 
 def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
-  bucket_uri = boto.storage_uri(bucket, storage_schema)
-  if host_to_connect is not None:
-    bucket_uri.connect(host=host_to_connect)
+  """List objects under a bucket given a prefix.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    bucket: Name of the bucket.
+    prefix: A prefix to list from.
+    host_to_connect: An optional endpoint string to connect to.
+
+  Returns:
+    A list of object names.
+  """
+
+  bucket_list_result = None
+  if _useBotoApi(storage_schema):
+    bucket_uri = boto.storage_uri(bucket, storage_schema)
+    if host_to_connect is not None:
+      bucket_uri.connect(host=host_to_connect)
+
+    bucket_list_result = bucket_uri.list_bucket(prefix=prefix)
+  else:
+    bucket_list_result = _AZURE_BLOB_SERVICE.list_blobs(bucket, prefix=prefix)
 
   list_result = []
-  for k in bucket_uri.list_bucket(prefix=prefix):
+  for k in bucket_list_result:
     list_result.append(k.name)
 
   return list_result
@@ -165,18 +209,36 @@ def DeleteObjects(storage_schema, bucket, objects_to_delete,
   """
 
   for object_name in objects_to_delete:
-    object_path = '%s/%s' % (bucket, object_name)
-    object_uri = boto.storage_uri(object_path, storage_schema)
-    if host_to_connect is not None:
-      object_uri.connect(host=host_to_connect)
-
     try:
-      object_uri.delete_key()
+      if _useBotoApi(storage_schema):
+        object_path = '%s/%s' % (bucket, object_name)
+        object_uri = boto.storage_uri(object_path, storage_schema)
+        if host_to_connect is not None:
+          object_uri.connect(host=host_to_connect)
+
+        object_uri.delete_key()
+      else:
+        _AZURE_BLOB_SERVICE.delete_blob(bucket, object_name)
+
       if objects_deleted is not None:
         objects_deleted.append(object_name)
     except:
       logging.exception('Caught exception while deleting object %s.',
-                        object_path)
+                        object_name)
+
+
+def CleanupBucket(storage_schema):
+  """ Cleans-up EVERYTHING under a given bucket as specified by FLAGS.bucket.
+
+  Args:
+    Storage_schema: The address schema identifying a storage. e.g., "gs"
+  """
+
+  objects_to_cleanup = _ListObjects(storage_schema, FLAGS.bucket, prefix=None)
+  while len(objects_to_cleanup) > 0:
+    logging.info('Will delete %d objects.', len(objects_to_cleanup))
+    DeleteObjects(storage_schema, FLAGS.bucket, objects_to_cleanup)
+    objects_to_cleanup = _ListObjects(storage_schema, FLAGS.bucket, prefix=None)
 
 
 def WriteObjects(storage_schema, bucket, object_prefix, count,
@@ -202,20 +264,19 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
     host_to_connect: An optional endpoint string to connect to.
   """
   payload_bytes = bytearray(size)
-  for i in range(size):
+  # Use a while loop to fill up the byte array which is by default 100MB in size
+  # don't use a for...range(100M), range(100M) will create a list of 100mm items
+  # with each item being the default object size of 30 bytes or so, it will lead
+  # to out of memory error.
+  i = 0
+  while i < size:
     payload_bytes[i] = ord(random.choice(string.letters))
+    i += 1
 
   payload_string = payload_bytes.decode('ascii')
 
   for i in range(count):
     object_name = '%s_%d' % (object_prefix, i)
-    object_path = '%s/%s' % (bucket, object_name)
-    object_uri = boto.storage_uri(object_path, storage_schema)
-    # Note below, this does not really connect, it only sets the connection
-    # property, the real http connnection is only established when doing the
-    # actual upload.
-    if host_to_connect is not None:
-      object_uri.connect(host=host_to_connect)
 
     # Ready to go!
     start_time = time.time()
@@ -226,7 +287,17 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
     # the caller to decide if they want to tolerate the failure and accept
     # the results, depending on test scenarios.
     try:
-      object_uri.set_contents_from_string(payload_string)
+      if _useBotoApi(storage_schema):
+        object_path = '%s/%s' % (bucket, object_name)
+        object_uri = boto.storage_uri(object_path, storage_schema)
+        if host_to_connect is not None:
+          object_uri.connect(host=host_to_connect)
+
+        object_uri.set_contents_from_string(payload_string)
+      else:
+        _AZURE_BLOB_SERVICE.put_block_blob_from_bytes(bucket, object_name,
+                                                      bytes(payload_bytes))
+
       latency = time.time() - start_time
 
       if latency_results is not None:
@@ -238,7 +309,7 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
       objects_written.append(object_name)
     except:
       logging.exception('Caught exception while writing object %s.',
-                        object_path)
+                        object_name)
 
 
 def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
@@ -255,15 +326,17 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
     host_to_connect: An optional endpoint string to connect to.
   """
   for object_name in objects_to_read:
-    object_path = '%s/%s' % (FLAGS.bucket, object_name)
-    object_uri = boto.storage_uri(object_path, storage_schema)
-    object_uri.connect(host=host_to_connect)
 
-    # Ready to go!
     start_time = time.time()
-
     try:
-      object_uri.get_contents_as_string()
+      if _useBotoApi(storage_schema):
+        object_path = '%s/%s' % (bucket, object_name)
+        object_uri = boto.storage_uri(object_path, storage_schema)
+        object_uri.connect(host=host_to_connect)
+        object_uri.get_contents_as_string()
+      else:
+        _AZURE_BLOB_SERVICE.get_blob_to_bytes(bucket, object_name)
+
       latency = time.time() - start_time
 
       if latency_results is not None:
@@ -273,7 +346,7 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
           object_size is not None and latency > 0.0):
         bandwidth_results.append(object_size / latency)
     except:
-      logging.exception('Failed to read object %s', object_path)
+      logging.exception('Failed to read object %s', object_name)
 
 
 def DeleteObjectsConcurrently(storage_schema, per_thread_objects_to_delete,
@@ -364,8 +437,8 @@ def AnalyzeListResults(final_result, result_consistent, list_count,
   result_string_consistency = '%s%s' % (list_scenario,
                                         LIST_RESULT_SUFFIX_CONSISTENT)
   result_string_latency = '%s%s' % (list_scenario, LIST_RESULT_SUFFIX_LATENCY)
-  result_string_inconsistency_window = '%s%s' % (list_scenario,
-      LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW)  # noqa
+  result_string_inconsistency_window = '%s%s' % (
+      list_scenario, LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW)
 
   if result_consistent:
     logging.debug('Listed %d times until results are consistent.', list_count)
@@ -664,7 +737,21 @@ def Main(argv=sys.argv):
     host_to_connect = FLAGS.host
 
   if FLAGS.storage_provider == 'AZURE':
-    raise NotImplementedError('Storage type Azure is not implemented yet.')
+    if FLAGS.azure_key is None or FLAGS.azure_account is None:
+      raise ValueError('Must specify azure account and key')
+    else:
+      global _AZURE_BLOB_SERVICE
+      _AZURE_BLOB_SERVICE = BlobService(FLAGS.azure_account, FLAGS.azure_key)
+      # There are DNS lookup issues with the provider Azure when doing
+      # "high" number of concurrent requests using multiple threads. The error
+      # came from getaddrinfo() called by the azure python library. By reducing
+      # the concurrent thread count to 10 or below, the issue can be mitigated.
+      # If we lower the thread count, we need to lower the total object count
+      # too so the time to write these object remains short
+      global LIST_CONSISTENCY_THREAD_COUNT
+      LIST_CONSISTENCY_THREAD_COUNT = 10
+      global LIST_CONSISTENCY_OBJECT_COUNT
+      LIST_CONSISTENCY_OBJECT_COUNT = 1000
 
   storage_schema = STORAGE_TO_SCHEMA_DICT[FLAGS.storage_provider]
 
@@ -717,6 +804,8 @@ def Main(argv=sys.argv):
     return 0
   elif FLAGS.scenario == 'SingleStreamThroughput':
     return SingleStreamThroughputBenchmark(storage_schema, host_to_connect)
+  elif FLAGS.scenario == 'CleanupBucket':
+    return CleanupBucket(storage_schema)
 
 if __name__ == '__main__':
   sys.exit(Main())
