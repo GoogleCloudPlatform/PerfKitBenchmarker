@@ -280,7 +280,7 @@ class BenchmarkSpec(object):
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
     vm_util.BurnCpu(vm)
-    if vm.is_static:
+    if vm.is_static and vm.install_packages:
       vm.SnapshotPackages()
 
   def DeleteVm(self, vm):
@@ -289,7 +289,7 @@ class BenchmarkSpec(object):
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
-    if vm.is_static:
+    if vm.is_static and vm.install_packages:
       vm.PackageCleanup()
     vm.Delete()
     vm.DeleteScratchDisks()
