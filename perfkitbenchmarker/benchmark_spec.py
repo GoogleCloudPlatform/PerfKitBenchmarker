@@ -189,7 +189,8 @@ class BenchmarkSpec(object):
       vm_util.RunThreaded(self.PrepareVm, prepare_args)
 
   def Delete(self):
-    if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
+    if (FLAGS.run_stage not in ['all', 'cleanup'] or
+        (self.deleted and not FLAGS.force_delete)):
       return
     if self.vms:
       vm_util.RunThreaded(self.DeleteVm, self.vms)

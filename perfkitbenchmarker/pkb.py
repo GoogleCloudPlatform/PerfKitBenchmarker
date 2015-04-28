@@ -183,7 +183,6 @@ def DoPreparePhase(benchmark, name, spec, timer):
   logging.info('Preparing benchmark %s', name)
   with timer.Measure('Resource Provisioning'):
     spec.Prepare()
-
   with timer.Measure('Benchmark Prepare'):
     benchmark.Prepare(spec)
 
