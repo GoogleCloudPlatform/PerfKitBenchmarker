@@ -352,7 +352,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False):
   stdout = stdout.decode('ascii', 'ignore')
   stderr = stderr.decode('ascii', 'ignore')
 
-  debug_text = ('Ran %s. Got return code (%s). STDOUT: %sSTDERR: %s' %
+  debug_text = ('Ran %s. Got return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
                 (full_cmd, process.returncode, stdout, stderr))
   if force_info_log or (process.returncode and not suppress_warning):
     logging.info(debug_text)

@@ -22,8 +22,9 @@ Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
 machines.
 """
 
+import csv
+import io
 import logging
-import re
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -37,6 +38,9 @@ BENCHMARKS_INFO = {'name': 'netperf',
                    'Netperf benchmarks',
                    'scratch_disk': False,
                    'num_machines': 2}
+
+MBPS = 'Mbits/sec'
+TRANSACTIONS_PER_SECOND = 'transactions_per_second'
 
 NETPERF_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 COMMAND_PORT = 20000
@@ -83,24 +87,52 @@ def RunNetperf(vm, benchmark_name, server_ip):
   Returns:
     A sample.Sample object with the result.
   """
-  netperf_cmd = ('{netperf_path} -p {command_port} '
+  # Flags:
+  # -o specifies keys to include in CSV output.
+  # -j keeps additional latency numbers
+  netperf_cmd = ('{netperf_path} -p {command_port} -j '
                  '-t {benchmark_name} -H {server_ip} -- '
-                 '-P {data_port}').format(
+                 '-P {data_port} '
+                 '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
+                 'P99_LATENCY').format(
                      netperf_path=netperf.NETPERF_PATH,
-                     benchmark_name=benchmark_name, server_ip=server_ip,
-                     command_port=COMMAND_PORT, data_port=DATA_PORT)
-  logging.info('Netperf Results:')
+                     benchmark_name=benchmark_name,
+                     server_ip=server_ip, command_port=COMMAND_PORT,
+                     data_port=DATA_PORT)
   stdout, _ = vm.RemoteCommand(netperf_cmd, should_log=True)
-  match = re.search(r'(\d+\.\d+)\s+\n', stdout).group(1)
-  value = float(match)
-  # TODO(user): Pull the test to metric name/unit mapping out into a dict.
-  if benchmark_name == 'TCP_STREAM':
-    metric = 'TCP_STREAM_Throughput'
-    unit = 'Mbits/sec'
+
+  fp = io.StringIO(stdout)
+  # "-o" flag above specifies CSV output, but there is one extra header line:
+  banner = next(fp)
+  assert banner.startswith('MIGRATED'), stdout
+  r = csv.DictReader(fp)
+  row = next(r)
+  logging.info('Netperf Results: %s', row)
+  assert 'Throughput' in row, row
+
+  value = float(row['Throughput'])
+  unit = {'Trans/s': TRANSACTIONS_PER_SECOND,
+          '10^6bits/s': MBPS}[row['Throughput Units']]
+  if unit == MBPS:
+    metric = '%s_Throughput' % benchmark_name
   else:
     metric = '%s_Transaction_Rate' % benchmark_name
-    unit = 'transactions_per_second'
-  return sample.Sample(metric, value, unit)
+
+  samples = [sample.Sample(metric, value, unit)]
+
+  # No tail latency for throughput.
+  if unit == MBPS:
+    return samples
+
+  for metric_key, metric_name in [
+      ('50th Percentile Latency Microseconds', 'p50'),
+      ('90th Percentile Latency Microseconds', 'p90'),
+      ('99th Percentile Latency Microseconds', 'p99')]:
+    samples.append(
+        sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
+                      float(row[metric_key]),
+                      'us'))
+  return samples
 
 
 def Run(benchmark_spec):
@@ -116,7 +148,7 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   server_vm = vms[1]
-  logging.info('TCP_RR running on %s', vm)
+  logging.info('netperf running on %s', vm)
   results = []
   metadata = {
       'ip_type': 'external',
@@ -130,17 +162,19 @@ def Run(benchmark_spec):
   for netperf_benchmark in NETPERF_BENCHMARKS:
 
     if vm_util.ShouldRunOnExternalIpAddress():
-      external_ip_result = RunNetperf(vm, netperf_benchmark,
-                                      server_vm.ip_address)
-      external_ip_result.metadata.update(metadata)
-      results.append(external_ip_result)
+      external_ip_results = RunNetperf(vm, netperf_benchmark,
+                                       server_vm.ip_address)
+      for external_ip_result in external_ip_results:
+        external_ip_result.metadata.update(metadata)
+      results.extend(external_ip_results)
 
     if vm_util.ShouldRunOnInternalIpAddress(vm, server_vm):
-      internal_ip_result = RunNetperf(vm, netperf_benchmark,
-                                      server_vm.internal_ip)
-      internal_ip_result.metadata.update(metadata)
-      internal_ip_result.metadata['ip_type'] = 'internal'
-      results.append(internal_ip_result)
+      internal_ip_results = RunNetperf(vm, netperf_benchmark,
+                                       server_vm.internal_ip)
+      for internal_ip_result in internal_ip_results:
+        internal_ip_result.metadata.update(metadata)
+        internal_ip_result.metadata['ip_type'] = 'internal'
+      results.extend(internal_ip_results)
 
   return results
 

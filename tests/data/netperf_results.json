@@ -1,0 +1,42 @@
+[
+  [
+    "MIGRATED TCP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 104.154.50.86 () port 20001 AF_INET : +/-2.500% @ 99% conf.  : first burst 0",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds",
+    "1405.50,Trans/s,2.522,4,783.80,683,735,841"
+  ],
+  [
+    "MIGRATED TCP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 10.240.31.117 () port 20001 AF_INET : +/-2.500% @ 99% conf.  : first burst 0",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds",
+    "3545.77,Trans/s,2.186,3,189.82,274,309,371"
+  ],
+  [
+    "MIGRATED TCP Connect/Request/Response TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 104.154.50.86 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds",
+    "343.35,Trans/s,11.837,20,8147.88,2048,2372,30029"
+  ],
+  [
+    "MIGRATED TCP Connect/Request/Response TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 10.240.31.117 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds",
+    "1078.07,Trans/s,7.512,20,551.07,871,996,2224"
+  ],
+  [
+    "MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 104.154.50.86 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds",
+    "1187.94,10^6bits/s,10.100,20,1084.37,2,6,3374"
+  ],
+  [
+    "MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 10.240.31.117 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds",
+    "1973.37,10^6bits/s,4.995,7,694.10,2,4,20"
+  ],
+  [
+    "MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 104.154.50.86 () port 20001 AF_INET : +/-2.500% @ 99% conf.  : first burst 0",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds",
+    "1359.71,Trans/s,4.911,13,808.44,700,757,891"
+  ],
+  [
+    "MIGRATED UDP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 10.240.31.117 () port 20001 AF_INET : +/-2.500% @ 99% conf.  : first burst 0",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds",
+    "3313.49,Trans/s,7.546,20,214.64,295,330,406"
+  ]
+]
