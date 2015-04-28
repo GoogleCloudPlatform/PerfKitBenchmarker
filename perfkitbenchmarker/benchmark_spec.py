@@ -191,11 +191,24 @@ class BenchmarkSpec(object):
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
       return
+
     if self.vms:
-      vm_util.RunThreaded(self.DeleteVm, self.vms)
-    self.firewall.DisallowAllPorts()
+      try:
+        vm_util.RunThreaded(self.DeleteVm, self.vms)
+      except Exception:
+        logging.exception('Got an exception deleting VMs. '
+                          'Attempting to continue tearing down.')
+    try:
+      self.firewall.DisallowAllPorts()
+    except Exception:
+      logging.exception('Got an exception disabling firewalls. '
+                        'Attempting to continue tearing down.')
     for zone in self.networks:
-      self.networks[zone].Delete()
+      try:
+        self.networks[zone].Delete()
+      except Exception:
+        logging.exception('Got an exception deleting networks. '
+                          'Attempting to continue tearing down.')
     self.deleted = True
 
   def PrepareNetwork(self, network):
