@@ -196,19 +196,19 @@ class BenchmarkSpec(object):
       try:
         vm_util.RunThreaded(self.DeleteVm, self.vms)
       except Exception as e:
-        logging.error('Got an exception: %s\n'
-                      'Attempting to continue tearing down.', e)
+        logging.exception('Got an exception deleting VMs: %s\n'
+                          'Attempting to continue tearing down.', e)
     try:
       self.firewall.DisallowAllPorts()
     except Exception as e:
-      logging.error('Got an exception: %s\n'
-                    'Attempting to continue tearing down.', e)
+      logging.exception('Got an exception disabling firewalls: %s\n'
+                        'Attempting to continue tearing down.', e)
     for zone in self.networks:
       try:
         self.networks[zone].Delete()
       except Exception as e:
-        logging.error('Got an exception: %s\n'
-                      'Attempting to continue tearing down.', e)
+        logging.exception('Got an exception deleting networks: %s\n'
+                          'Attempting to continue tearing down.', e)
     self.deleted = True
 
   def PrepareNetwork(self, network):
