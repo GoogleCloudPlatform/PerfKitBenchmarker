@@ -101,11 +101,26 @@ class AwsVpc(resource.BaseResource):
         'create-vpc',
         '--region=%s' % self.region,
         '--cidr-block=10.0.0.0/16']
-    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Vpc']['VpcId']
     self._EnableDnsHostnames()
     util.AddDefaultTags(self.id, self.region)
+
+  def _Exists(self):
+    """Returns true if the VPC exists."""
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-vpcs',
+        '--region=%s' % self.region,
+        '--filter=Name=vpc-id,Values=%s' % self.id]
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    vpcs = response['Vpcs']
+    if not vpcs:
+      return False
+    else:
+      return True
 
   def _EnableDnsHostnames(self):
     """Sets the enableDnsHostnames attribute of this VPC to True.
@@ -132,7 +147,7 @@ class AwsVpc(resource.BaseResource):
         'delete-vpc',
         '--region=%s' % self.region,
         '--vpc-id=%s' % self.id]
-    vm_util.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
 
 
 class AwsSubnet(resource.BaseResource):
@@ -154,7 +169,7 @@ class AwsSubnet(resource.BaseResource):
         '--vpc-id=%s' % self.vpc_id,
         '--cidr-block=10.0.0.0/24',
         '--availability-zone=%s' % self.zone]
-    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Subnet']['SubnetId']
     util.AddDefaultTags(self.id, self.region)
@@ -169,7 +184,22 @@ class AwsSubnet(resource.BaseResource):
         'delete-subnet',
         '--region=%s' % self.region,
         '--subnet-id=%s' % self.id]
-    vm_util.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
+
+  def _Exists(self):
+    """Returns true if the subnet exists."""
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-subnets',
+        '--region=%s' % self.region,
+        '--filter=Name=subnet-id,Values=%s' % self.id]
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    subnets = response['Subnets']
+    if not subnets:
+      return False
+    else:
+      return True
 
 
 class AwsInternetGateway(resource.BaseResource):
@@ -188,7 +218,7 @@ class AwsInternetGateway(resource.BaseResource):
         'ec2',
         'create-internet-gateway',
         '--region=%s' % self.region]
-    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['InternetGateway']['InternetGatewayId']
     util.AddDefaultTags(self.id, self.region)
@@ -200,7 +230,22 @@ class AwsInternetGateway(resource.BaseResource):
         'delete-internet-gateway',
         '--region=%s' % self.region,
         '--internet-gateway-id=%s' % self.id]
-    vm_util.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
+
+  def _Exists(self):
+    """Returns true if the internet gateway exists."""
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-internet-gateways',
+        '--region=%s' % self.region,
+        '--filter=Name=internet-gateway-id,Values=%s' % self.id]
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    internet_gateways = response['InternetGateways']
+    if not internet_gateways:
+      return False
+    else:
+      return True
 
   def Attach(self, vpc_id):
     """Attaches the internetgateway to the VPC."""
@@ -301,7 +346,7 @@ class AwsPlacementGroup(resource.BaseResource):
         '--region=%s' % self.region,
         '--group-name=%s' % self.name,
         '--strategy=cluster']
-    vm_util.IssueRetryableCommand(create_cmd)
+    vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
     """Deletes the Placement Group."""
@@ -310,7 +355,22 @@ class AwsPlacementGroup(resource.BaseResource):
         'delete-placement-group',
         '--region=%s' % self.region,
         '--group-name=%s' % self.name]
-    vm_util.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
+
+  def _Exists(self):
+    """Returns true if the Placement Group exists."""
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-placement-groups',
+        '--region=%s' % self.region,
+        '--filter=Name=group-name,Values=%s' % self.name]
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    placement_groups = response['PlacementGroups']
+    if not placement_groups:
+      return False
+    else:
+      return True
 
 
 class AwsNetwork(network.BaseNetwork):

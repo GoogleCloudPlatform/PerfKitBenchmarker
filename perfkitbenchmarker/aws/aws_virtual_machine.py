@@ -219,7 +219,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
-    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Instances'][0]['InstanceId']
 
@@ -230,7 +230,25 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'terminate-instances',
         '--region=%s' % self.region,
         '--instance-ids=%s' % self.id]
-    vm_util.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
+
+  def _Exists(self):
+    """Returns true if the VM exists."""
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-instances',
+        '--region=%s' % self.region,
+        '--filter=Name=instance-id,Values=%s' % self.id]
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    reservations = response['Reservations']
+    if not reservations:
+      return False
+    status = reservations[0]['Instances'][0]['State']['Name']
+    if status in ['shutting-down', 'terminated']:
+      return False
+    else:
+      return True
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
