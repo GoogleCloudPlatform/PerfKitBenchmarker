@@ -29,11 +29,8 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-import json
-import re
 import tempfile
 import threading
-import os
 import time
 
 from perfkitbenchmarker import disk
@@ -47,11 +44,12 @@ from perfkitbenchmarker.rackspace import util
 FLAGS = flags.FLAGS
 
 BOOT_DISK_SIZE_GB = 75
-BOOT_DISK_TYPE = 'SATA' # standard
+BOOT_DISK_TYPE = 'SATA'
+
 
 class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
-    instance_counter = 1
+    count = 1
     _lock = threading.Lock()
     has_keypair = False
 
@@ -65,9 +63,10 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
         super(RackspaceVirtualMachine, self).__init__(vm_spec)
         with RackspaceVirtualMachine._lock:
-            self.name = 'perfkit-%s-%s' % (FLAGS.run_uri, RackspaceVirtualMachine.instance_counter)
-            self.device_id = RackspaceVirtualMachine.instance_counter
-            RackspaceVirtualMachine.instance_counter += 1
+            self.name = 'perfkit-%s-%s' % (FLAGS.run_uri,
+                                           RackspaceVirtualMachine.count)
+            self.device_id = RackspaceVirtualMachine.count
+            RackspaceVirtualMachine.count += 1
         self.id = ''
         self.ip_address6 = ''
         self.ip_address = ''
@@ -124,9 +123,12 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
                       '\n',
                       '- useradd -s /bin/bash -U -G sudo %s\n' % u,
                       '- chown -R %s:%s /home/%s/\n' % (u, u, u),
-                      '- chown %s:%s /home/%s/.ssh/authorized_keys\n' % (u, u, u),
+                      '- chown %s:%s /home/%s/.ssh/authorized_keys\n' % (u,
+                                                                         u,
+                                                                         u),
                       '- chmod 600 /home/%s/.ssh/authorized_keys\n' % u,
-                      '- awk \'/(ALL:ALL)/{c++;if(c==2){sub("(ALL:ALL)","NOPASSWD:");c=0}}1\' /etc/sudoers > t\n',
+                      '- awk \'/(ALL:ALL)/{c++;if(c==2){sub("(ALL:ALL)",'
+                      '"NOPASSWD:");c=0}}1\' /etc/sudoers > t\n',
                       '- cp t /etc/sudoers\n',
                       '- sed -i \'s/(NOPASSWD:)/NOPASSWD:/\' /etc/sudoers\n']
             tf.write(''.join(script))
@@ -135,12 +137,13 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
             create_cmd = [FLAGS.nova_path]
             create_cmd.extend(util.GetDefaultRackspaceNovaFlags(self))
             create_cmd.extend(['boot',
-                        '--flavor', self.machine_type,
-                        '--image', self.image,
-                        '--file', '/home/%s/.ssh/authorized_keys=%s' % (u, self.ssh_public_key),
-                        '--key-name', self.key_name,
-                        '--config-drive', 'true',
-                        '--user-data', tf.name])
+                               '--flavor', self.machine_type,
+                               '--image', self.image,
+                               '--file', '/home/%s/.ssh/authorized_keys=%s' % (
+                                   u, self.ssh_public_key),
+                               '--key-name', self.key_name,
+                               '--config-drive', 'true',
+                               '--user-data', tf.name])
             create_cmd.append(self.name)
             vm_util.IssueCommand(create_cmd)
 
@@ -155,7 +158,8 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
             stdout, _, _ = vm_util.IssueCommand(getinstance_cmd)
             attrs = stdout.split('\n')
             for attr in attrs[3:-2]:
-                pv = [v.strip() for v in attr.split('|') if v != '|' and v != '']
+                pv = [v.strip() for v in attr.split('|')
+                      if v != '|' and v != '']
                 if pv[0] == 'accessIPv4':
                     self.ip_address = pv[1]
                 if pv[0] == 'accessIPv6':
@@ -164,8 +168,9 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     self.internal_ip = pv[1]
                 if pv[0] == 'id':
                     self.id = pv[1]
-                if pv[0] == 'status' and pv[1] == 'ACTIVE' and self.ip_address != '':
-                    return
+                if pv[0] == 'status' and pv[1] == 'ACTIVE':
+                    if self.ip_address != '':
+                        return
             if n == 1800:
                 break
             n += 1
@@ -189,7 +194,8 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
         else:
             attrs = stdout.split('\n')
             for attr in attrs[3:-2]:
-                pv = [v.strip() for v in attr.split('|') if v != '|' and v != '']
+                pv = [v.strip() for v in attr.split('|')
+                      if v != '|' and v != '']
                 if pv[0] == 'OS-EXT-STS:task_state' and pv[1] == 'deleting':
                     time.sleep(10)
                     self._Exists()
@@ -233,7 +239,6 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
         """
         return ['/dev/xvd%s' % (chr(i + ord('a')))
                 for i in xrange(4, 4 + self.num_disks)]
-        #return ['/dev/xvdb']
 
     def SetupLocalDrives(self, mount_path=virtual_machine.LOCAL_MOUNT_PATH):
         """Set up any local drives that exist.
@@ -260,10 +265,10 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 
 class DebianBasedRackspaceVirtualMachine(RackspaceVirtualMachine,
-                                   package_managers.AptMixin):
+                                         package_managers.AptMixin):
   pass
 
 
 class RhelBasedRackspaceVirtualMachine(RackspaceVirtualMachine,
-                                 package_managers.YumMixin):
+                                       package_managers.YumMixin):
   pass

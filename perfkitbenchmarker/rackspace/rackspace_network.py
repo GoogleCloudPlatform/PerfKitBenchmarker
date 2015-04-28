@@ -13,8 +13,8 @@
 # limitations under the License.
 """Module containing classes related to Rackspace VM networking.
 
-The SecurityGroup class provides a way of opening VM ports. The Network class allows
-VMs to communicate via internal IPs.
+The SecurityGroup class provides a way of opening VM ports. The Network class
+allows VMs to communicate via internal IPs.
 """
 import json
 import threading
@@ -28,6 +28,7 @@ from perfkitbenchmarker.rackspace import util
 FLAGS = flags.FLAGS
 SSH_PORT = 22
 
+
 class RackspaceSecurityGroup(network.BaseFirewall):
     """An object representing the Rackspace Security Group."""
 
@@ -38,7 +39,8 @@ class RackspaceSecurityGroup(network.BaseFirewall):
         self.sg_counter = 0
 
     def __getstate__(self):
-        """Implements getstate to allow pickling (since locks can't be pickled)."""
+        """Implements getstate to allow pickling (since locks can't be
+         pickled)."""
         d = self.__dict__.copy()
         del d['_lock']
         return d
@@ -59,7 +61,7 @@ class RackspaceSecurityGroup(network.BaseFirewall):
             return
         with self._lock:
             firewall_name = ('perfkit-firewall-%s-%d-%d' %
-                       (FLAGS.run_uri, port, self.sg_counter))
+                             (FLAGS.run_uri, port, self.sg_counter))
             self.sg_counter += 1
             if firewall_name in self.firewall_names:
                 return
@@ -73,24 +75,24 @@ class RackspaceSecurityGroup(network.BaseFirewall):
             for protocol in ['tcp', 'udp']:
                 rule_cmd = []
                 rule_cmd.extend([FLAGS.neutron_path,
-                            'security-group-rule-create',
-                            '--direction', 'ingress',
-                            '--ethertype', 'IPv4',
-                            '--protocol', protocol,
-                            '--port-range-min', str(port),
-                            '--port-range-max', str(port)])
+                                 'security-group-rule-create',
+                                 '--direction', 'ingress',
+                                 '--ethertype', 'IPv4',
+                                 '--protocol', protocol,
+                                 '--port-range-min', str(port),
+                                 '--port-range-max', str(port)])
                 rule_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
                 rule_cmd.append(firewall_name)
                 vm_util.IssueRetryableCommand(rule_cmd)
 
             rule_cmd = []
             rule_cmd.extend([FLAGS.neutron_path,
-                        'security-group-rule-create',
-                        '--direction', 'ingress',
-                        '--ethertype', 'IPv4',
-                        '--protocol', 'tcp',
-                        '--port-range-min', str(SSH_PORT),
-                        '--port-range-max', str(SSH_PORT)])
+                             'security-group-rule-create',
+                             '--direction', 'ingress',
+                             '--ethertype', 'IPv4',
+                             '--protocol', 'tcp',
+                             '--port-range-min', str(SSH_PORT),
+                             '--port-range-max', str(SSH_PORT)])
             rule_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
             rule_cmd.append(firewall_name)
             vm_util.IssueRetryableCommand(rule_cmd)
@@ -98,7 +100,7 @@ class RackspaceSecurityGroup(network.BaseFirewall):
 
             getport_cmd = []
             getport_cmd.extend([FLAGS.neutron_path, 'port-list',
-                           '--format', 'table'])
+                                '--format', 'table'])
             getport_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
             stdout, _ = vm_util.IssueRetryableCommand(getport_cmd)
             attrs = stdout.split('\n')
@@ -121,16 +123,17 @@ class RackspaceSecurityGroup(network.BaseFirewall):
         for firewall in self.firewall_names:
             firewall_cmd = []
             firewall_cmd.extend([FLAGS.neutron_path,
-                          'security-group-show',
-                          '--format', 'value'])
+                                 'security-group-show',
+                                 '--format', 'value'])
             firewall_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
             firewall_cmd.append(firewall)
             stdout, _ = vm_util.IssueRetryableCommand(firewall_cmd)
             rules = [v for v in stdout.split('\n') if v != ''][2:-1]
             for rule in rules:
-                rule_id = str(json.loads(sg_rule)['id'])
+                rule_id = str(json.loads(rule)['id'])
                 rule_cmd = []
-                rule_cmd.extend([FLAGS.neutron_path, 'security-group-rule-delete'])
+                rule_cmd.extend([FLAGS.neutron_path,
+                                 'security-group-rule-delete'])
                 rule_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
                 rule_cmd.append(rule_id)
                 vm_util.IssueRetryableCommand(rule_cmd)
@@ -138,9 +141,9 @@ class RackspaceSecurityGroup(network.BaseFirewall):
             firewall_cmd = [FLAGS.neutron_path]
             firewall_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
             firewall_cmd.extend(['security-group-delete'])
-            firewall_cmd.append(firewall_name)
+            firewall_cmd.append(firewall)
             vm_util.IssueRetryableCommand(firewall_cmd)
-            self.firewall_names.remove(firewall_name)
+            self.firewall_names.remove(firewall)
 
 
 class RackspaceNetwork(network.BaseNetwork):

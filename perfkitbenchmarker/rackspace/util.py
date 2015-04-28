@@ -17,23 +17,24 @@ import os
 from perfkitbenchmarker import flags
 
 flags.DEFINE_string('nova_path',
-                  'nova',
-                  'The path for the rackspace-novaclient tool.')
+                    'nova',
+                    'The path for the rackspace-novaclient tool.')
 
 flags.DEFINE_string('cinder_path',
-                  'cinder',
-                  'The path for the python-cinderclient tool.')
+                    'cinder',
+                    'The path for the python-cinderclient tool.')
 
 flags.DEFINE_string('neutron_path',
-                  'neutron',
-                  'The path for the rackspace-neutronclient tool.')
+                    'neutron',
+                    'The path for the rackspace-neutronclient tool.')
 
 
 flags.DEFINE_list('additional_rackspace_flags',
-                   [],
+                  [],
                   'Additional flags to pass to Rackspace.')
 
 FLAGS = flags.FLAGS
+
 
 def GetDefaultRackspaceNovaFlags(resource):
     """Return common set of flags for using Nova on the Rackspace Cloud.
@@ -64,6 +65,7 @@ def GetDefaultRackspaceCinderFlags(resource):
 
     return options
 
+
 def GetDefaultRackspaceNeutronFlags(resource):
   """Return common set of flags for using Neutron on the Rackspace Cloud.
 
@@ -74,7 +76,6 @@ def GetDefaultRackspaceNeutronFlags(resource):
     A common set of Neutron options.
   """
   options = []
-  #options.extend(['--os-executable', 'neutron'])
   options.extend(['--os-password', os.getenv('RS_API_KEY')])
   options.extend(FLAGS.additional_rackspace_flags)
 

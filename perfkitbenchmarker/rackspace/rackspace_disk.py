@@ -33,6 +33,7 @@ flags.DEFINE_string(
 
 DISK_TYPE = {disk.STANDARD: 'SATA', disk.SSD: 'SSD'}
 
+
 class RackspaceDisk(disk.BaseDisk):
     """Object representing a Rackspace Volume."""
 
@@ -65,7 +66,6 @@ class RackspaceDisk(disk.BaseDisk):
             if pv[0] == 'id':
                 self.id = pv[1]
                 break
-        #return _WaitForCreation()
 
     def _Delete(self):
         """Deletes the volume."""
@@ -73,7 +73,6 @@ class RackspaceDisk(disk.BaseDisk):
         delete_cmd.extend(util.GetDefaultRackspaceCinderFlags(self))
         delete_cmd.append(self.name)
         vm_util.IssueCommand(delete_cmd)
-        #return _WaitForDeletion()
 
     def _Exists(self):
         """Returns true if the volume exists."""
@@ -94,14 +93,16 @@ class RackspaceDisk(disk.BaseDisk):
         """Attaches the volume to a VM.
 
         Args:
-          vm: The RackspaceVirtualMachine instance to which the volume will be attached.
+          vm: The RackspaceVirtualMachine instance to which the volume will be
+              attached.
         """
-        #with RackspaceDisk._lock:
         self.attached_vm_name = vm.name
         attach_cmd = [FLAGS.nova_path]
         attach_cmd.extend(util.GetDefaultRackspaceNovaFlags(self))
         attach_cmd.extend(['volume-attach'])
-        attach_cmd.extend([self.attached_vm_name, self.id, self.GetDevicePath()])
+        attach_cmd.extend([self.attached_vm_name,
+                           self.id,
+                           self.GetDevicePath()])
         vm_util.IssueRetryableCommand(attach_cmd)
 
         getdisk_cmd = [FLAGS.cinder_path, 'show']
@@ -112,7 +113,8 @@ class RackspaceDisk(disk.BaseDisk):
             stdout, _, _ = vm_util.IssueCommand(getdisk_cmd)
             attrs = stdout.split('\n')
             for attr in attrs[3:-2]:
-                pv = [v.strip() for v in attr.split('|') if v != '|' and v != '']
+                pv = [v.strip() for v in attr.split('|')
+                      if v != '|' and v != '']
                 if pv[0] == 'attachments' and vm.id in pv[1]:
                     attached = True
             if attached:
@@ -120,7 +122,8 @@ class RackspaceDisk(disk.BaseDisk):
             time.sleep(10)
 
         if self.num_retried_attach > 5:
-            raise Exception("Failed to attach all scratch disks to vms. Exiting...")
+            raise Exception("Failed to attach all scratch disks to vms. "
+                            "Exiting...")
             sys.exit(0)
         self.num_retried_attach += 1
         self.Attach(vm)
