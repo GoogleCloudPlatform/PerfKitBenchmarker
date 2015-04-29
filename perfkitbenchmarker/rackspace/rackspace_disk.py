@@ -19,7 +19,6 @@ Use 'cinder type-list' to determine valid disk types.
 
 import ast
 import sys
-import threading
 import time
 
 from perfkitbenchmarker import disk
@@ -38,9 +37,6 @@ DISK_TYPE = {disk.STANDARD: 'SATA', disk.SSD: 'SSD'}
 class RackspaceDisk(disk.BaseDisk):
     """Object representing a Rackspace Volume."""
 
-    n = 4
-    _lock = threading.Lock()
-
     def __init__(self, disk_spec, name, image=None):
         super(RackspaceDisk, self).__init__(disk_spec)
         self.attached_vm_name = None
@@ -48,9 +44,6 @@ class RackspaceDisk(disk.BaseDisk):
         self.name = name
         self.id = ''
         self.num_retried_attach = 0
-        with RackspaceDisk._lock:
-            self.disk_num = RackspaceDisk.n
-            RackspaceDisk.n += 1
 
     def _Create(self):
         """Creates the volume."""
@@ -140,10 +133,6 @@ class RackspaceDisk(disk.BaseDisk):
 
     def GetDevicePath(self):
         """Returns the path to the device inside the VM."""
-        # print 'self.disk_num: %d' % self.disk_num
-        # if self.disk_type == 'SSD':
-        #    return '/dev/sd%s' % chr(self.disk_num + ord('a'))
-        # return '/dev/xvd%s' % chr(self.disk_num + ord('a'))
         getdisk_cmd = [FLAGS.cinder_path, 'show']
         getdisk_cmd.extend(util.GetDefaultRackspaceCinderFlags(self))
         getdisk_cmd.append(self.name)
