@@ -95,7 +95,11 @@ BENCHMARK_SETS = {
     },
     'rackspace_set': {
         MESSAGE: 'Rackspace benchmark set.',
-        BENCHMARK_LIST: [STANDARD_SET]
+        BENCHMARK_LIST: ['aerospike', 'cassandra_stress', 'cluster_boot',
+                         'copy_throughput', 'fio', 'hadoop_terasort', 'hpcc',
+                         'iperf', 'mesh_network', 'mongodb', 'netperf', 'ping',
+                         'redis', 'block_storage_workload', 'sysbench_oltp',
+                         'unixbench']
     },
     'red_hat_set': {
         MESSAGE: 'Red Hat benchmark set.',
