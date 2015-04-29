@@ -17,6 +17,7 @@ Volumes can be created, deleted, attached to VMs, and detached from VMs.
 Use 'cinder type-list' to determine valid disk types.
 """
 
+import ast
 import sys
 import threading
 import time
@@ -102,7 +103,7 @@ class RackspaceDisk(disk.BaseDisk):
         attach_cmd.extend(['volume-attach'])
         attach_cmd.extend([self.attached_vm_name,
                            self.id,
-                           self.GetDevicePath()])
+                           ""])
         vm_util.IssueRetryableCommand(attach_cmd)
 
         getdisk_cmd = [FLAGS.cinder_path, 'show']
@@ -139,5 +140,23 @@ class RackspaceDisk(disk.BaseDisk):
 
     def GetDevicePath(self):
         """Returns the path to the device inside the VM."""
-        print 'self.disk_num: %d' % self.disk_num
-        return '/dev/xvd%s' % chr(self.disk_num + ord('a'))
+        # print 'self.disk_num: %d' % self.disk_num
+        # if self.disk_type == 'SSD':
+        #    return '/dev/sd%s' % chr(self.disk_num + ord('a'))
+        # return '/dev/xvd%s' % chr(self.disk_num + ord('a'))
+        getdisk_cmd = [FLAGS.cinder_path, 'show']
+        getdisk_cmd.extend(util.GetDefaultRackspaceCinderFlags(self))
+        getdisk_cmd.append(self.name)
+        stdout, _, _ = vm_util.IssueCommand(getdisk_cmd)
+        if stdout.strip() == '':
+            return False
+        attrs = stdout.split('\n')
+        attachment_info_raw = []
+        for attr in attrs[3:-2]:
+            pv = [v.strip() for v in attr.split('|') if v != '|' and v != '']
+            if pv[0] == 'attachments':
+                attachment_info_raw = pv[1]
+        attachment_info = ast.literal_eval(attachment_info_raw)
+        if 'device' in attachment_info:
+            return str(attachment_info['device'])
+        return ''
