@@ -17,8 +17,78 @@
 import unittest
 
 import mock
+import os
 
 from perfkitbenchmarker import vm_util
+
+
+class IssueCommandsWithEnvironmentVariablesTestCase(unittest.TestCase):
+
+  def testNoEnvArgument(self):
+    with mock.patch.dict('os.environ', {'perfkit': 'benchmarker'}, clear=True):
+      with mock.patch('perfkitbenchmarker.vm_util.subprocess') as subprocess:
+        process_mock = mock.Mock()
+        attributes = {'communicate.return_value': ('output', 'error',),
+                      'returncode': 0}
+        process_mock.configure_mock(**attributes)
+        subprocess.Popen.return_value = process_mock
+
+        vm_util.IssueCommand(['ls', '-la'])
+        subprocess.Popen.assert_called_once_with(['ls', '-la'],
+                                                 env=os.environ.copy(),
+                                                 stdout=subprocess.PIPE,
+                                                 stderr=subprocess.PIPE)
+
+  def testOverwriteEnvArgument(self):
+    with mock.patch.dict('os.environ', {'perfkit': 'old'}, clear=True):
+      with mock.patch('perfkitbenchmarker.vm_util.subprocess') as subprocess:
+        process_mock = mock.Mock()
+        attributes = {'communicate.return_value': ('output', 'error',),
+                      'returncode': 0}
+        process_mock.configure_mock(**attributes)
+        subprocess.Popen.return_value = process_mock
+
+        env = dict({'perfkit': 'old'}, **{'perfkit': 'new'})
+
+        vm_util.IssueCommand(['ls', '-la'], env=env)
+        subprocess.Popen.assert_called_once_with(['ls', '-la'],
+                                                 env={'perfkit': 'new'},
+                                                 stdout=subprocess.PIPE,
+                                                 stderr=subprocess.PIPE)
+
+  def testAppendEnvArgument(self):
+    with mock.patch.dict('os.environ', {'perfkit': 'old'}, clear=True):
+      with mock.patch('perfkitbenchmarker.vm_util.subprocess') as subprocess:
+        process_mock = mock.Mock()
+        attributes = {'communicate.return_value': ('output', 'error',),
+                      'returncode': 0}
+        process_mock.configure_mock(**attributes)
+        subprocess.Popen.return_value = process_mock
+
+        env = dict({'perfkit': 'old'}, **{'newkey': 'newvalue'})
+
+        vm_util.IssueCommand(['ls', '-la'], env=env)
+        subprocess.Popen.assert_called_once_with(['ls', '-la'],
+                                                 env={'perfkit': 'old',
+                                                      'newkey': 'newvalue'},
+                                                 stdout=subprocess.PIPE,
+                                                 stderr=subprocess.PIPE)
+
+  def testUnsetEnvArgument(self):
+    with mock.patch.dict('os.environ', {'perfkit': 'old'}, clear=True):
+      with mock.patch('perfkitbenchmarker.vm_util.subprocess') as subprocess:
+        process_mock = mock.Mock()
+        attributes = {'communicate.return_value': ('output', 'error',),
+                      'returncode': 0}
+        process_mock.configure_mock(**attributes)
+        subprocess.Popen.return_value = process_mock
+
+        env = {}
+
+        vm_util.IssueCommand(['ls', '-la'], env=env)
+        subprocess.Popen.assert_called_once_with(['ls', '-la'], env={},
+                                                 stdout=subprocess.PIPE,
+                                                 stderr=subprocess.PIPE)
 
 
 class ShouldRunOnInternalIpAddressTestCase(unittest.TestCase):
