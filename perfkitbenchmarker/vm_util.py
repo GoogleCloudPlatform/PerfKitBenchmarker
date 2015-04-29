@@ -291,9 +291,6 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
     A function that wraps functions in retry logic. It can be
         used as a decorator.
   """
-  if timeout is None:
-    timeout = FLAGS.default_timeout
-
   if retryable_exceptions is None:
     retryable_exceptions = Exception
 
@@ -301,8 +298,10 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
     """Wraps the supplied function with retry logic."""
     def WrappedFunction(*args, **kwargs):
       """Holds the retry logic."""
-      if timeout >= 0:
-        deadline = time.time() + timeout
+      local_timeout = FLAGS.default_timeout if timeout is None else timeout
+
+      if local_timeout >= 0:
+        deadline = time.time() + local_timeout
       else:
         deadline = float('inf')
 
