@@ -30,17 +30,17 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-BENCHMARKS_INFO = {'name': 'iperf',
-                   'description': 'Run iperf',
-                   'scratch_disk': False,
-                   'num_machines': 2}
+BENCHMARK_INFO = {'name': 'iperf',
+                  'description': 'Run iperf',
+                  'scratch_disk': False,
+                  'num_machines': 2}
 
 IPERF_PORT = 20000
 IPERF_RETRIES = 5
 
 
 def GetInfo():
-  return BENCHMARKS_INFO
+  return BENCHMARK_INFO
 
 
 def Prepare(benchmark_spec):

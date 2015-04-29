@@ -33,11 +33,11 @@ from perfkitbenchmarker.packages import netperf
 
 FLAGS = flags.FLAGS
 
-BENCHMARKS_INFO = {'name': 'netperf',
-                   'description': 'Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM '
-                   'Netperf benchmarks',
-                   'scratch_disk': False,
-                   'num_machines': 2}
+BENCHMARK_INFO = {'name': 'netperf',
+                  'description': 'Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM '
+                  'Netperf benchmarks',
+                  'scratch_disk': False,
+                  'num_machines': 2}
 
 MBPS = 'Mbits/sec'
 TRANSACTIONS_PER_SECOND = 'transactions_per_second'
@@ -48,7 +48,7 @@ DATA_PORT = 20001
 
 
 def GetInfo():
-  return BENCHMARKS_INFO
+  return BENCHMARK_INFO
 
 
 def PrepareNetperf(vm):

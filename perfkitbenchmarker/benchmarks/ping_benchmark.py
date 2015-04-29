@@ -22,7 +22,7 @@ from perfkitbenchmarker import sample
 import re
 
 
-BENCHMARKS_INFO = {
+BENCHMARK_INFO = {
     'name': 'ping',
     'description': 'Benchmarks ping latency over internal IP addresses',
     'scratch_disk': False,
@@ -32,7 +32,7 @@ METRICS = ('Min Latency', 'Average Latency', 'Max Latency', 'Latency Std Dev')
 
 
 def GetInfo():
-  return BENCHMARKS_INFO
+  return BENCHMARK_INFO
 
 
 def Prepare(benchmark_spec):  # pylint: disable=unused-argument
