@@ -14,13 +14,16 @@
 
 """Module containing numactl installation and cleanup functions."""
 
+
 def _Install(vm):
   """Installs the numactl package on the VM."""
   vm.InstallPackages('numactl')
 
+
 def YumInstall(vm):
   """Installs the numactl package on the VM."""
   _Install(vm)
+
 
 def AptInstall(vm):
   """Installs the numactl package on the VM."""

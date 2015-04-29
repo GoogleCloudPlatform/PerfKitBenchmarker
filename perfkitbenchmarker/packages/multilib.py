@@ -14,9 +14,11 @@
 
 """Module containing multilib installation and cleanup functions."""
 
+
 def YumInstall(vm):
   """Installs multilib packages on the VM."""
   vm.InstallPackages('glibc-devel.i686 libstdc++-devel.i686')
+
 
 def AptInstall(vm):
   """Installs multilib packages on the VM."""
