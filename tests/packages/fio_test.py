@@ -95,7 +95,7 @@ class FioTestCase(unittest.TestCase):
             'bw_mean': 130255.2}],
           ['sequential_read:read:latency', 250770.05, 'usec',
            {'max': 528583, 'stddev': 70324.58, 'min': 24361}],
-          ['sequential_read:read:iops', 253, '',{}],
+          ['sequential_read:read:iops', 253, '', {}],
           ['random_write_test:write:bandwidth', 6443, 'KB/s',
            {'bw_max': 7104, 'bw_agg': 6446.55,
             'bw_min': 5896, 'bw_dev': 336.21,
