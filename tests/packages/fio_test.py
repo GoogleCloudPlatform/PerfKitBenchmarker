@@ -88,30 +88,35 @@ class FioTestCase(unittest.TestCase):
             'bw_mean': 63936.8}],
           ['sequential_write:write:latency', 478737.47, 'usec',
            {'max': 869970, 'stddev': 92629.54, 'min': 189438}],
+          ['sequential_write:write:iops', 133, '', {}],
           ['sequential_read:read:bandwidth', 129836, 'KB/s',
            {'bw_max': 162491, 'bw_agg': 130255.2,
             'bw_min': 115250, 'bw_dev': 18551.37,
             'bw_mean': 130255.2}],
           ['sequential_read:read:latency', 250770.05, 'usec',
            {'max': 528583, 'stddev': 70324.58, 'min': 24361}],
+          ['sequential_read:read:iops', 253, '',{}],
           ['random_write_test:write:bandwidth', 6443, 'KB/s',
            {'bw_max': 7104, 'bw_agg': 6446.55,
             'bw_min': 5896, 'bw_dev': 336.21,
             'bw_mean': 6446.55}],
           ['random_write_test:write:latency', 617.69, 'usec',
            {'max': 81866, 'stddev': 898.09, 'min': 447}],
+          ['random_write_test:write:iops', 1610, '', {}],
           ['random_read_test:read:bandwidth', 1269, 'KB/s',
            {'bw_max': 1745, 'bw_agg': 1275.52,
             'bw_min': 330, 'bw_dev': 201.59,
             'bw_mean': 1275.52}],
           ['random_read_test:read:latency', 3146.5, 'usec',
            {'max': 352781, 'stddev': 5114.68, 'min': 6}],
+          ['random_read_test:read:iops', 317, '', {}],
           ['random_read_test_parallel:read:bandwidth', 1292, 'KB/s',
            {'bw_max': 1693, 'bw_agg': 1284.71,
             'bw_min': 795, 'bw_dev': 88.67,
             'bw_mean': 1284.71}],
           ['random_read_test_parallel:read:latency', 198058.86, 'usec',
-           {'max': 400119, 'stddev': 21711.26, 'min': 6}]]
+           {'max': 400119, 'stddev': 21711.26, 'min': 6}],
+          ['random_read_test_parallel:read:iops', 323, '', {}]]
       expected_result = [sample.Sample(*sample_tuple)
                          for sample_tuple in expected_result]
       self.assertEqual(result, expected_result)
@@ -148,6 +153,21 @@ class FioTestCase(unittest.TestCase):
         'rw=read\n')
     result = fio.FioParametersToJob(fio_parameters)
     self.assertEqual(expected_result, result)
+
+  def testDeleteParameterFromJobFile(self):
+    original_job_file = (
+        '[global]\n'
+        'directory=/dev/sdb\n'
+        'filename=foo12_3\n'
+        '...')
+    expected_job_file = (
+        '[global]\n'
+        '...')
+    self.assertEqual(
+        expected_job_file,
+        fio.DeleteParameterFromJobFile(
+            fio.DeleteParameterFromJobFile(original_job_file, 'directory'),
+            'filename'))
 
 
 if __name__ == '__main__':
