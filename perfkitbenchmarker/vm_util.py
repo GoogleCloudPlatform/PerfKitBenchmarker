@@ -343,18 +343,12 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
   """
-
-  if env is not None:
-    cmd_env = env
-  else:
-    cmd_env = os.environ.copy()
-
-  logging.debug('Environment variables: %s' % cmd_env)
+  logging.debug('Environment variables: %s' % env)
 
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
-  process = subprocess.Popen(cmd, env=cmd_env,
+  process = subprocess.Popen(cmd, env=env,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
   stdout, stderr = process.communicate()
@@ -382,18 +376,13 @@ def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
     env: A dict of key/value strings, such as is given to the subprocess.Popen()
         constructor, that contains environment variables to be injected.
   """
-  if env is not None:
-    cmd_env = env
-  else:
-    cmd_env = os.environ.copy()
-
-  logging.debug('Environment variables: %s' % cmd_env)
+  logging.debug('Environment variables: %s' % env)
 
   full_cmd = ' '.join(cmd)
   logging.info('Spawning: %s', full_cmd)
   outfile = open(stdout_path, 'w')
   errfile = open(stderr_path, 'w')
-  subprocess.Popen(cmd, env=cmd_env,
+  subprocess.Popen(cmd, env=env,
                    stdout=outfile, stderr=errfile, close_fds=True)
 
 
