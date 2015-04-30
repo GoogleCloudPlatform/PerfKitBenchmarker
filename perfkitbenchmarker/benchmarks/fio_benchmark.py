@@ -80,7 +80,9 @@ def Prepare(benchmark_spec):
   if FLAGS.against_device:
     logging.info('Fill scratch disk on %s', vm)
     command = (
-        'sudo %s --filename=%s --name=fill-device --rw=write --fill_device=1' %
+        ('sudo %s --filename=%s --ioengine=libaio '
+         '--name=fill-device --blocksize=512k --iodepth=64 '
+         '--rw=write --fill_device=1 --direct=1') %
         (fio.FIO_PATH, vm.scratch_disks[0].GetDevicePath()))
     vm.RemoteCommand(command)
     logging.info('Removing directory and filename in job file.')
@@ -89,7 +91,6 @@ def Prepare(benchmark_spec):
     job_file = fio.DeleteParameterFromJobFile(job_file, 'directory')
     job_file = fio.DeleteParameterFromJobFile(job_file, 'filename')
     tmp_dir = vm_util.GetTempDir()
-    print job_file
     file_path = vm_util.PrependTempDir(FLAGS.fio_jobfile)
     logging.info('Write modified job file to temp directory %s', tmp_dir)
     with open(file_path, 'w') as modified_f:
