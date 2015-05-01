@@ -291,6 +291,10 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       # Resource cleanup (below) can take a long time. Log the error to give
       # immediate feedback, then re-throw.
       logging.exception('Error during benchmark %s', benchmark_name)
+      # If the particular benchmark requests us to always call cleanup, do it
+      # here.
+      if spec.always_call_cleanup:
+        DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
       raise
     finally:
       if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
