@@ -38,14 +38,15 @@ flags.DEFINE_string('redis_setgetratio', '1:0', 'Ratio of reads to write '
 MEMTIER_COMMIT = '1.2.0'
 FIRST_PORT = 6379
 FLAGS = flags.FLAGS
+BENCHMARK_INFO = {'name': 'redis',
+                  'description': 'Run memtier_benchmark against Redis.',
+                  'scratch_disk': False,
+                  'num_machines': None}  # Set in GetInfo below
 
 
 def GetInfo():
-  benchmark_info = {'name': 'redis',
-                    'description': 'Run memtier_benchmark against Redis.',
-                    'scratch_disk': False,
-                    'num_machines': 1 + FLAGS.redis_clients}
-
+  benchmark_info = BENCHMARK_INFO.copy()
+  benchmark_info['num_machines'] = 1 + FLAGS.redis_clients
   return benchmark_info
 
 
