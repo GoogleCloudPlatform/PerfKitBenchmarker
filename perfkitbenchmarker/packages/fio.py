@@ -13,6 +13,8 @@
 # limitations under the License.
 
 """Module containing fio installation, cleanup, parsing functions."""
+import ConfigParser
+import io
 
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -22,9 +24,16 @@ FIO_DIR = '%s/fio' % vm_util.VM_TMP_DIR
 GIT_REPO = 'git://git.kernel.dk/fio.git'
 GIT_TAG = 'fio-2.1.14'
 FIO_PATH = FIO_DIR + '/fio'
+FIO_CMD_PREFIX = '%s --output-format=json' % FIO_PATH
 SECTION_REGEX = r'\[(\w+)\]\n([\w\d\n=*$/]+)'
 PARAMETER_REGEX = r'(\w+)=([/\w\d$*]+)\n'
 GLOBAL = 'global'
+CMD_SECTION_REGEX = r'--name=(\w+)\s+'
+JOB_SECTION_REPL_REGEX = r'[\1]\n'
+CMD_PARAMETER_REGEX = r'--(\w+=[/\w\d]+)\n'
+CMD_PARAMETER_REPL_REGEX = r'\1\n'
+CMD_STONEWALL_PARAMETER = '--stonewall'
+JOB_STONEWALL_PARAMETER = 'stonewall'
 
 
 def _Install(vm):
@@ -47,31 +56,6 @@ def AptInstall(vm):
   _Install(vm)
 
 
-def ExtractFioParameters(fio_parameter):
-  """Extract fio parameters from raw string.
-
-  Sample parameter_string:
-  overwrite=0
-  rw=write
-  blocksize=512k
-  size=10*10*1000*$mb_memory
-  iodepth=64
-  direct=1
-  end_fsync=1
-
-  Args:
-    fio_parameter: string. Parameters in string format.
-  Returns:
-    A dictionary of parameters.
-  """
-  parameters = regex_util.ExtractAllMatches(
-      PARAMETER_REGEX, fio_parameter)
-  param_dict = {}
-  for parameter in parameters:
-    param_dict[parameter[0]] = parameter[1]
-  return param_dict
-
-
 def ParseJobFile(job_file):
   """Parse fio job file as dictionaries of sample metadata.
 
@@ -82,22 +66,52 @@ def ParseJobFile(job_file):
     A dictionary of dictionaries of sample metadata, using test name as keys,
         dictionaries of sample metadata as value.
   """
-  parameter_metadata = {}
+  config = ConfigParser.RawConfigParser(allow_no_value=True)
+  config.readfp(io.BytesIO(job_file))
   global_metadata = {}
-  section_match = regex_util.ExtractAllMatches(SECTION_REGEX, job_file)
-  for section in section_match:
-    if section[0] == GLOBAL:
-      global_metadata = ExtractFioParameters(section[1])
-      break
-  for section in section_match:
-    section_name = section[0]
-    if section_name == GLOBAL:
-      continue
-    parameter_metadata[section_name] = {}
-    parameter_metadata[section_name].update(global_metadata)
-    parameter_metadata[section_name].update(ExtractFioParameters(section[1]))
+  if GLOBAL in config.sections():
+    global_metadata = dict(config.items(GLOBAL))
+  section_metadata = {}
+  for section in config.sections():
+    if section != GLOBAL:
+      metadata = {}
+      metadata.update(dict(config.items(section)))
+      metadata.update(global_metadata)
+      if JOB_STONEWALL_PARAMETER in metadata:
+        del metadata[JOB_STONEWALL_PARAMETER]
+      section_metadata[section] = metadata
+  return section_metadata
 
-  return parameter_metadata
+
+def FioParametersToJob(fio_parameters):
+  """Translate fio parameters into a job config file.
+
+  Sample fio parameters:
+  --filesize=10g --directory=/scratch0
+  --name=sequential_write --overwrite=0 --rw=write
+
+  Output:
+  [global]
+  filesize=10g
+  directory=/scratch0
+  [sequential_write]
+  overwrite=0
+  rw=write
+
+  Args:
+    fio_parameter: string. Fio parameters in string format.
+
+  Returns:
+    A string representing a fio job config file.
+  """
+  fio_parameters = fio_parameters.replace(' ', '\n')
+  fio_parameters = regex_util.Substitute(
+      CMD_SECTION_REGEX, JOB_SECTION_REPL_REGEX, fio_parameters)
+  fio_parameters = '[%s]\n%s' % (GLOBAL, fio_parameters)
+  fio_parameters = regex_util.Substitute(
+      CMD_PARAMETER_REGEX, CMD_PARAMETER_REPL_REGEX, fio_parameters)
+  return fio_parameters.replace(CMD_STONEWALL_PARAMETER,
+                                JOB_STONEWALL_PARAMETER)
 
 
 def ParseResults(job_file, fio_json_result):
@@ -123,11 +137,12 @@ def ParseResults(job_file, fio_json_result):
             'bw_min': job[mode]['bw_min'],
             'bw_max': job[mode]['bw_max'],
             'bw_dev': job[mode]['bw_dev'],
-            'bw_agg': job[mode]['bw_agg']}
+            'bw_agg': job[mode]['bw_agg'],
+            'bw_mean': job[mode]['bw_mean']}
         bw_metadata.update(parameters)
         samples.append(
             sample.Sample('%s:bandwidth' % metric_name,
-                          job[mode]['bw_mean'],
+                          job[mode]['bw'],
                           'KB/s', bw_metadata))
         lat_metadata = {
             'min': job[mode]['lat']['min'],

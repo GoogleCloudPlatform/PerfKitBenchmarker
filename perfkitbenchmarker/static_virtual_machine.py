@@ -42,7 +42,8 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
   is_static = True
 
   def __init__(self, ip_address, user_name, keyfile_path, internal_ip=None,
-               zone=None, local_disks=None, scratch_disk_mountpoints=None):
+               zone=None, local_disks=None, scratch_disk_mountpoints=None,
+               ssh_port=22, install_packages=True):
     """Initialize a static virtual machine.
 
     Args:
@@ -53,6 +54,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       zone: The zone of the VM.
       local_disks: A list of the paths of local disks on the VM.
       scratch_disk_mountpoints: A list of scratch disk mountpoints.
+      ssh_port: The port number to use for SSH and SCP commands.
+      install_packages: If false, no packages will be installed. This is
+          useful if benchmark dependencies have already been installed.
     """
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
         None, None, None, None, None)
@@ -61,9 +65,11 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.internal_ip = internal_ip
     self.zone = zone or ('Static - %s@%s' % (user_name, ip_address))
     self.user_name = user_name
+    self.ssh_port = ssh_port
     self.ssh_private_key = keyfile_path
     self.local_disks = local_disks or []
     self.scratch_disk_mountpoints = scratch_disk_mountpoints or []
+    self.install_packages = install_packages
 
   def _Create(self):
     """StaticVirtualMachines do not implement _Create()."""
@@ -100,7 +106,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
   def ReadStaticVirtualMachineFile(cls, file_obj):
     """Read a file describing the static VMs to use.
 
-    This function will read the static VM infomation from the provided file,
+    This function will read the static VM information from the provided file,
     instantiate VMs corresponding to the info, and add the VMs to the static
     VM pool. The provided file should contain a single array in JSON-format.
     Each element in the array must be an object with required format:
@@ -108,11 +114,13 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       ip_address: string.
       user_name: string.
       keyfile_path: string.
+      ssh_port: integer, optional. Default 22
       internal_ip: string, optional.
       zone: string, optional.
       local_disks: array of strings, optional.
       scratch_disk_mountpoints: array of strings, optional
       os_type: string, optional (see package_managers)
+      install_packages: bool, optional
 
     See the constructor for descriptions.
 
@@ -130,7 +138,8 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     required_keys = frozenset(['ip_address', 'user_name', 'keyfile_path'])
     optional_keys = frozenset(['internal_ip', 'zone', 'local_disks',
-                               'scratch_disk_mountpoints', 'os_type'])
+                               'scratch_disk_mountpoints', 'os_type',
+                               'ssh_port', 'install_packages'])
     allowed_keys = required_keys | optional_keys
 
     def VerifyItemFormat(item):
@@ -161,10 +170,13 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise ValueError(
             'Expected a list of disk mount points, got: {0}'.format(
                 scratch_disk_mountpoints))
+      ssh_port = item.get('ssh_port', 22)
       os_type = item.get('os_type')
+      install_packages = item.get('install_packages', True)
       vm_class = GetStaticVirtualMachineClass(os_type)
       vm = vm_class(ip_address, user_name, keyfile_path, internal_ip, zone,
-                    local_disks, scratch_disk_mountpoints)
+                    local_disks, scratch_disk_mountpoints, ssh_port,
+                    install_packages)
       cls.vm_pool.append(vm)
 
   @classmethod

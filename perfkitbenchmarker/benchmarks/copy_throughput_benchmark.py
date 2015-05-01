@@ -50,12 +50,13 @@ UNIT = 'MB/sec'
 
 def GetInfo():
   """Decide number of vms needed and return infomation for copy benchmark."""
+  info = BENCHMARK_INFO.copy()
   if FLAGS.copy_benchmark_mode != 'scp':
-    BENCHMARK_INFO['num_machines'] = 1
-    BENCHMARK_INFO['scratch_disk'] = 2
+    info['num_machines'] = 1
+    info['scratch_disk'] = 2
   else:
-    BENCHMARK_INFO['num_machines'] = 2
-  return BENCHMARK_INFO
+    info['num_machines'] = 2
+  return info
 
 
 def CheckPrerequisites():

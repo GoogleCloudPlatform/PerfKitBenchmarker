@@ -26,6 +26,7 @@ file name minus .py). The framework will take care of all cleanup
 for you.
 """
 
+import logging
 import re
 
 from perfkitbenchmarker import errors
@@ -42,11 +43,19 @@ EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
 EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
              '7/x86_64/e/epel-release-7-5.noarch.rpm')
 
+FLAGS = flags.FLAGS
+
 flags.DEFINE_enum('os_type', DEBIAN,
                   [DEBIAN, RHEL],
                   'The version of linux that the VM\'s os is based on. '
                   'This will determine the package manager used, among '
                   'other things.')
+flags.DEFINE_bool('install_packages', True,
+                  'Override for determining whether packages should be '
+                  'installed. If this is false, no packages will be installed '
+                  'on any VMs. This option should probably only ever be used '
+                  'if you have already created an image with all relevant '
+                  'packages installed.')
 
 
 class BasePackageMixin(object):
@@ -160,6 +169,9 @@ class YumMixin(BasePackageMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
+    if ((self.is_static and not self.install_packages) or
+        not FLAGS.install_pacakges):
+      return
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
       package.YumInstall(self)
@@ -229,11 +241,16 @@ class AptMixin(BasePackageMixin):
       self.RemoteCommand(
           'sudo sed -i.bk "s/azure.archive.ubuntu.com/archive.ubuntu.com/g" '
           '/etc/apt/sources.list')
+      logging.info('Installing "%s" failed on %s. This may be transient. '
+                   'Updating package list.', packages, self)
       self.AptUpdate()
       raise e
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
+    if ((self.is_static and not self.install_packages) or
+        not FLAGS.install_packages):
+      return
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
       package.AptInstall(self)

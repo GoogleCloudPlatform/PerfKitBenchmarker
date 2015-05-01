@@ -71,7 +71,7 @@ class GceDisk(disk.BaseDisk):
                    'compute', 'disks',
                    'describe', self.name]
     getdisk_cmd.extend(util.GetDefaultGcloudFlags(self))
-    stdout, _, _ = vm_util.IssueCommand(getdisk_cmd)
+    stdout, _, _ = vm_util.IssueCommand(getdisk_cmd, suppress_warning=True)
     try:
       json.loads(stdout)
     except ValueError:

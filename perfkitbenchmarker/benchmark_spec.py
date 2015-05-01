@@ -108,7 +108,6 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS], 'Name of the cloud to use.')
 
-SSH_PORT = 22
 
 
 class BenchmarkSpec(object):
@@ -160,6 +159,7 @@ class BenchmarkSpec(object):
       self.scratch_disk = benchmark_info['scratch_disk']
       self.scratch_disk_size = FLAGS.scratch_disk_size
       self.scratch_disk_type = FLAGS.scratch_disk_type
+      self.scratch_disk_iops = FLAGS.scratch_disk_iops
 
       self.vms = [
           self.CreateVirtualMachine(
@@ -170,7 +170,7 @@ class BenchmarkSpec(object):
         disk_spec = disk.BaseDiskSpec(
             self.scratch_disk_size,
             DISK_TYPE[self.cloud][self.scratch_disk_type],
-            '/scratch%d' % i)
+            '/scratch%d' % i, self.scratch_disk_iops)
         for vm in self.vms:
           vm.disk_specs.append(disk_spec)
 
@@ -191,11 +191,24 @@ class BenchmarkSpec(object):
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
       return
+
     if self.vms:
-      vm_util.RunThreaded(self.DeleteVm, self.vms)
-    self.firewall.DisallowAllPorts()
+      try:
+        vm_util.RunThreaded(self.DeleteVm, self.vms)
+      except Exception:
+        logging.exception('Got an exception deleting VMs. '
+                          'Attempting to continue tearing down.')
+    try:
+      self.firewall.DisallowAllPorts()
+    except Exception:
+      logging.exception('Got an exception disabling firewalls. '
+                        'Attempting to continue tearing down.')
     for zone in self.networks:
-      self.networks[zone].Delete()
+      try:
+        self.networks[zone].Delete()
+      except Exception:
+        logging.exception('Got an exception deleting networks. '
+                          'Attempting to continue tearing down.')
     self.deleted = True
 
   def PrepareNetwork(self, network):
@@ -273,14 +286,14 @@ class BenchmarkSpec(object):
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
-    firewall.AllowPort(vm, SSH_PORT)
+    firewall.AllowPort(vm, vm.ssh_port)
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.Startup()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
     vm_util.BurnCpu(vm)
-    if vm.is_static:
+    if vm.is_static and vm.install_packages:
       vm.SnapshotPackages()
 
   def DeleteVm(self, vm):
@@ -289,7 +302,7 @@ class BenchmarkSpec(object):
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
-    if vm.is_static:
+    if vm.is_static and vm.install_packages:
       vm.PackageCleanup()
     vm.Delete()
     vm.DeleteScratchDisks()

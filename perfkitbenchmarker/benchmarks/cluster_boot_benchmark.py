@@ -28,8 +28,9 @@ BENCHMARK_INFO = {'name': 'cluster_boot',
 
 
 def GetInfo():
-  BENCHMARK_INFO['num_machines'] = FLAGS.num_vms
-  return BENCHMARK_INFO
+  info = BENCHMARK_INFO.copy()
+  info['num_machines'] = FLAGS.num_vms
+  return info
 
 
 def Prepare(unused_benchmark_spec):

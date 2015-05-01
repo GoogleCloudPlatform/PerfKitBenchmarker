@@ -1,3 +1,28 @@
+# v0.14.0
+
+* Added the Silo filesystem benchmark (GH-170)
+* Added Azure Blobs support to the object_storage_service_benchmark (GH-209)
+* Logging now prints in color to make it easier to read (GH-212)
+* Improvement to allow SSH port selection is static machine configs (GH-201)
+* Bug fix for the filesystem workloads when using PIOPS (GH-190)
+* Bug fixes for the side-by-side tool to use the right workload name. (GH-220)
+* Bug fix for a race condition in an exception path that could leave resources behind (GH-214)
+
+# v0.13.0
+
+* Show metadata in StreamPublisher. (GH-178)
+* **Breaking Change**: Use parser to extract fio benchmark results, and
+  change metric name from job_name:bandwidth/latency to
+  job_name:read/write:bandwidth/latency. (GH-192)
+* Add unit test to check proper handling of scratch disk property. (GH-191)
+* Fix bug where exceptions raised in a runthreaded thread may not have
+  been raised after the threads had been joined. (GH-194)
+* Stop mutating globals in GetInfo. (GH-198)
+* **New Benchmark**: oldisim. (GH-200)
+* Add oldisim benchmark to google_set and stanford_set.
+* Add max_throughput_for_completion_latency_under_1ms metric to redis and
+  aerospike benchmarks. (GH-203)
+
 # v0.12.1
 
 * Fix a tagging issue from prior release (v.0.11.0) where a prior commit made

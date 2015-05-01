@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.benchmarks.util.fio."""
+"""Tests for perfkitbenchmarker.packages.fio."""
 
 import json
 import os
@@ -82,34 +82,72 @@ class FioTestCase(unittest.TestCase):
             'random_read_test_parallel': {}}):
       result = fio.ParseResults('', self.result_contents)
       expected_result = [
-          ['sequential_write:write:bandwidth', 63936.8, 'KB/s',
+          ['sequential_write:write:bandwidth', 68118, 'KB/s',
            {'bw_max': 74454, 'bw_agg': 63936.8,
-            'bw_min': 19225, 'bw_dev': 20346.28}],
+            'bw_min': 19225, 'bw_dev': 20346.28,
+            'bw_mean': 63936.8}],
           ['sequential_write:write:latency', 478737.47, 'usec',
            {'max': 869970, 'stddev': 92629.54, 'min': 189438}],
-          ['sequential_read:read:bandwidth', 130255.2, 'KB/s',
+          ['sequential_read:read:bandwidth', 129836, 'KB/s',
            {'bw_max': 162491, 'bw_agg': 130255.2,
-            'bw_min': 115250, 'bw_dev': 18551.37}],
+            'bw_min': 115250, 'bw_dev': 18551.37,
+            'bw_mean': 130255.2}],
           ['sequential_read:read:latency', 250770.05, 'usec',
            {'max': 528583, 'stddev': 70324.58, 'min': 24361}],
-          ['random_write_test:write:bandwidth', 6446.55, 'KB/s',
+          ['random_write_test:write:bandwidth', 6443, 'KB/s',
            {'bw_max': 7104, 'bw_agg': 6446.55,
-            'bw_min': 5896, 'bw_dev': 336.21}],
+            'bw_min': 5896, 'bw_dev': 336.21,
+            'bw_mean': 6446.55}],
           ['random_write_test:write:latency', 617.69, 'usec',
            {'max': 81866, 'stddev': 898.09, 'min': 447}],
-          ['random_read_test:read:bandwidth', 1275.52, 'KB/s',
+          ['random_read_test:read:bandwidth', 1269, 'KB/s',
            {'bw_max': 1745, 'bw_agg': 1275.52,
-            'bw_min': 330, 'bw_dev': 201.59}],
+            'bw_min': 330, 'bw_dev': 201.59,
+            'bw_mean': 1275.52}],
           ['random_read_test:read:latency', 3146.5, 'usec',
            {'max': 352781, 'stddev': 5114.68, 'min': 6}],
-          ['random_read_test_parallel:read:bandwidth', 1284.71, 'KB/s',
+          ['random_read_test_parallel:read:bandwidth', 1292, 'KB/s',
            {'bw_max': 1693, 'bw_agg': 1284.71,
-            'bw_min': 795, 'bw_dev': 88.67}],
+            'bw_min': 795, 'bw_dev': 88.67,
+            'bw_mean': 1284.71}],
           ['random_read_test_parallel:read:latency', 198058.86, 'usec',
            {'max': 400119, 'stddev': 21711.26, 'min': 6}]]
       expected_result = [sample.Sample(*sample_tuple)
                          for sample_tuple in expected_result]
       self.assertEqual(result, expected_result)
+
+  def testFioCommandToJob(self):
+    fio_parameters = (
+        '--filesize=10g --directory=/scratch0 --ioengine=libaio '
+        '--filename=fio_test_file --invalidate=1 --randrepeat=0 '
+        '--direct=0 --size=3790088k --iodepth=8 '
+        '--name=sequential_write --overwrite=0 --rw=write --end_fsync=1 '
+        '--name=random_read --size=379008k --stonewall --rw=randread '
+        '--name=sequential_read --stonewall --rw=read ')
+    expected_result = (
+        '[global]\n'
+        'filesize=10g\n'
+        'directory=/scratch0\n'
+        'ioengine=libaio\n'
+        'filename=fio_test_file\n'
+        'invalidate=1\n'
+        'randrepeat=0\n'
+        'direct=0\n'
+        'size=3790088k\n'
+        'iodepth=8\n'
+        '[sequential_write]\n'
+        'overwrite=0\n'
+        'rw=write\n'
+        'end_fsync=1\n'
+        '[random_read]\n'
+        'size=379008k\n'
+        'stonewall\n'
+        'rw=randread\n'
+        '[sequential_read]\n'
+        'stonewall\n'
+        'rw=read\n')
+    result = fio.FioParametersToJob(fio_parameters)
+    self.assertEqual(expected_result, result)
 
 
 if __name__ == '__main__':
