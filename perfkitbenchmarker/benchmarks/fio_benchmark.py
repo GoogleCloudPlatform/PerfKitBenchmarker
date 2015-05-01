@@ -35,7 +35,16 @@ flags.DEFINE_string('fio_jobfile', 'fio.job', 'job file that fio will use')
 flags.DEFINE_integer('memory_multiple', 10,
                      'size of fio scratch file compared to main memory size.')
 flags.DEFINE_boolean('against_device', False,
-                     'Test direct against scratch disk.')
+                     'Test direct against scratch disk. If set True, will '
+                     'create a modified job file in temp directory, '
+                     'which ignores directory and filename parameter.')
+flags.DEFINE_string('device_fill_size', '100%',
+                    'The amount of device to fill in prepare stage. '
+                    'This flag is only valid when against_device=True. '
+                    'The valid value can either be an integer, which '
+                    'represents the number of bytes to fill or a '
+                    'percentage, which represents the percentage '
+                    'of the device.')
 
 
 BENCHMARK_INFO = {'name': 'fio',
@@ -78,12 +87,13 @@ def Prepare(benchmark_spec):
     #    invalid (or is that rather a 'valid' flag should be added.
     exit(1)
   if FLAGS.against_device:
-    logging.info('Fill scratch disk on %s', vm)
+    device_path = vm.scratch_disks[0].GetDevicePath()
+    logging.info('Fill scratch disk on %s at %s', vm, device_path)
     command = (
         ('sudo %s --filename=%s --ioengine=libaio '
          '--name=fill-device --blocksize=512k --iodepth=64 '
-         '--rw=write --fill_device=1 --direct=1') %
-        (fio.FIO_PATH, vm.scratch_disks[0].GetDevicePath()))
+         '--rw=write --direct=1 --size=%s') %
+        (fio.FIO_PATH, device_path, FLAGS.device_fill_size))
     vm.RemoteCommand(command)
     logging.info('Removing directory and filename in job file.')
     with open(data.ResourcePath(flags.FLAGS.fio_jobfile)) as original_f:
