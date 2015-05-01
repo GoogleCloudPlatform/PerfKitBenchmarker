@@ -578,8 +578,8 @@ class AzureBlobStorageBenchmark(object):
 
     vm.PushFile(FLAGS.object_storage_credential_file, AZURE_CREDENTIAL_LOCATION)
     vm.RemoteCommand(
-        'azure storage account create -l \'East US\' ''"pkb%s"' %
-        (FLAGS.run_uri), ignore_failure=True)
+        'azure storage account create --type ZRS -l \'East US\' ''"pkb%s"' %
+        (FLAGS.run_uri), ignore_failure=False)
     vm.azure_account = ('pkb%s' % FLAGS.run_uri)
 
     output, _ = (
