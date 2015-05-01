@@ -586,7 +586,7 @@ class AzureBlobStorageBenchmark(object):
         vm.RemoteCommand(
             'azure storage account keys list %s' %
             vm.azure_account))
-    key = re.findall(r'Primary (.+)', output)
+    key = re.findall(r'Primary:* (.+)', output)
     vm.azure_key = key[0]
 
     azure_command_suffix = _MakeAzureCommandSuffix(vm.azure_account,
