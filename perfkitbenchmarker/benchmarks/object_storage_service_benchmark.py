@@ -826,6 +826,9 @@ def Prepare(benchmark_spec):
 
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
 
+  # We would like to always cleanup server side states when exception happens.
+  benchmark_spec.always_call_cleanup = True
+
   # Prepare data on vm, create a run directory on scratch drive, and add
   # permission.
   scratch_dir = vms[0].GetScratchDir()

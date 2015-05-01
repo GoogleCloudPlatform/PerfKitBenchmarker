@@ -178,6 +178,7 @@ class BenchmarkSpec(object):
     self.firewall = firewall_class(self.project)
     self.file_name = '%s/%s' % (vm_util.GetTempDir(), benchmark_info['name'])
     self.deleted = False
+    self.always_call_cleanup = False
 
   def Prepare(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
