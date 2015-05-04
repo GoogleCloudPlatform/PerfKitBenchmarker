@@ -41,7 +41,8 @@ FLAGS = flags.FLAGS
 
 BENCHMARK_INFO = {'name': 'mesh_network',
                   'description': 'Measures VM to VM cross section bandwidth in '
-                  'a mesh network.',
+                  'a mesh network. Specify the number of VMs in the network '
+                  'with --num_vms.',
                   'scratch_disk': False,
                   'num_machines': None}  # Set in GetInfo()
 

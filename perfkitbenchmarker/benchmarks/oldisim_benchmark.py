@@ -67,7 +67,8 @@ OLDISIM_DIR = 'oldisim'
 OLDISIM_VERSION = 'v0.1'
 BINARY_BASE = 'release/workloads/search'
 BENCHMARK_INFO = {'name': 'oldisim',
-                  'description': 'Run oldisim',
+                  'description': 'Run oldisim. Specify the number of leaf '
+                  'nodes with --oldisim_num_leaves',
                   'scratch_disk': False,
                   'num_machines': None}  # Set in GetInfo below
 
