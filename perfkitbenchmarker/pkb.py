@@ -383,8 +383,6 @@ def _GenerateBenchmarkDocumentation():
   for benchmark_module in benchmarks.BENCHMARKS:
     benchmark_info = benchmark_module.GetInfo()
     vm_count = benchmark_info['num_machines']
-    if vm_count is None:
-      vm_count = "'--num_vms'"
     scratch_disk_str = ''
     if benchmark_info['scratch_disk']:
       scratch_disk_str = ' with scratch volume'
@@ -409,7 +407,8 @@ def Main(argv=sys.argv):
       (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
       for set_name in benchmark_sets.BENCHMARK_SETS]
   sys.modules['__main__'].__doc__ = __doc__ + (
-      '\nBenchmarks:\n\t%s') % _GenerateBenchmarkDocumentation()
+      '\nBenchmarks (default requirements):\n\t%s' %
+      _GenerateBenchmarkDocumentation())
   sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
                                       % '\n\t'.join(benchmark_sets_list))
   try:

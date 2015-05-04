@@ -39,7 +39,8 @@ MEMTIER_COMMIT = '1.2.0'
 FIRST_PORT = 6379
 FLAGS = flags.FLAGS
 BENCHMARK_INFO = {'name': 'redis',
-                  'description': 'Run memtier_benchmark against Redis.',
+                  'description': 'Run memtier_benchmark against Redis. '
+                  'Specify the number of client VMs with --redis_clients.',
                   'scratch_disk': False,
                   'num_machines': None}  # Set in GetInfo below
 

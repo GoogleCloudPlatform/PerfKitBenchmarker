@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs a cluster boot benchmark."""
+"""Records the time required to boot a cluster of VMs."""
 
 import logging
 
@@ -22,7 +22,8 @@ from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 BENCHMARK_INFO = {'name': 'cluster_boot',
-                  'description': 'Create a cluster, record all times to boot',
+                  'description': 'Create a cluster, record all times to boot. '
+                  'Specify the cluster size with --num_vms.',
                   'scratch_disk': False,
                   'num_machines': None}  # Set in GetInfo()
 
