@@ -39,7 +39,7 @@ import jinja2
 
 
 DEFAULT_FLAGS = ('--cloud=GCP', '--machine_type=n1-standard-4',
-                 '--benchmarks=netperf_simple')
+                 '--benchmarks=netperf')
 # Keys in the sample JSON we expect to vary between runs.
 # These will be removed prior to diffing samples.
 VARYING_KEYS = 'run_uri', 'sample_uri', 'timestamp', 'value'
@@ -329,6 +329,7 @@ def RenderResults(base_result, head_result, template_name=TEMPLATE,
                          sample_diffs=sample_diffs,
                          sample_context_diffs=sample_context_diffs,
                          flag_diffs=flag_diffs,
+                         infinity=float('inf'),
                          **kwargs)
 
 

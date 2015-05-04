@@ -13,6 +13,8 @@
 # limitations under the License.
 """Tests for netperf_benchmark."""
 
+import json
+import os
 import unittest
 
 import mock
@@ -27,6 +29,14 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
+    # Load data
+    path = os.path.join(os.path.dirname(__file__),
+                        '..', 'data',
+                        'netperf_results.json')
+
+    with open(path) as fp:
+      self.expected_stdout = ['\n'.join(i) for i in json.load(fp)]
+
     p = mock.patch(vm_util.__name__ + '.ShouldRunOnExternalIpAddress')
     self.should_run_external = p.start()
     self.addCleanup(p.stop)
@@ -43,34 +53,49 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     self._ConfigureIpTypes()
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
-    vm_spec.vms[0].RemoteCommand.side_effect = [('14.1 \n', ''),
-                                                ('12.4 \n', ''),
-                                                ('146.82 \n', ''),
-                                                ('0.1623\t \n', ''),
-                                                ('10.1 \n', ''),
-                                                ('11.2 \n', ''),
-                                                ('14.82 \n', ''),
-                                                ('2.4\t \n', '')]
+    vm_spec.vms[0].RemoteCommand.side_effect = [
+        (i, '') for i in self.expected_stdout]
 
     result = netperf_benchmark.Run(vm_spec)
 
-    self.assertEqual(8, len(result))
+    self.assertEqual(26, len(result))
     tps = 'transactions_per_second'
     mbps = 'Mbits/sec'
     self.assertListEqual(
-        [('TCP_RR_Transaction_Rate', 14.1, tps),
-         ('TCP_RR_Transaction_Rate', 12.4, tps),
-         ('TCP_CRR_Transaction_Rate', 146.82, tps),
-         ('TCP_CRR_Transaction_Rate', 0.1623, tps),
-         ('TCP_STREAM_Throughput', 10.1, mbps),
-         ('TCP_STREAM_Throughput', 11.2, mbps),
-         ('UDP_RR_Transaction_Rate', 14.82, tps),
-         ('UDP_RR_Transaction_Rate', 2.4, tps)],
+        [('TCP_RR_Transaction_Rate', 1405.5, tps),
+         ('TCP_RR_Latency_p50', 683.0, 'us'),
+         ('TCP_RR_Latency_p90', 735.0, 'us'),
+         ('TCP_RR_Latency_p99', 841.0, 'us'),
+         ('TCP_RR_Transaction_Rate', 3545.77, tps),
+         ('TCP_RR_Latency_p50', 274.0, 'us'),
+         ('TCP_RR_Latency_p90', 309.0, 'us'),
+         ('TCP_RR_Latency_p99', 371.0, 'us'),
+         ('TCP_CRR_Transaction_Rate', 343.35, tps),
+         ('TCP_CRR_Latency_p50', 2048.0, 'us'),
+         ('TCP_CRR_Latency_p90', 2372.0, 'us'),
+         ('TCP_CRR_Latency_p99', 30029.0, 'us'),
+         ('TCP_CRR_Transaction_Rate', 1078.07, tps),
+         ('TCP_CRR_Latency_p50', 871.0, 'us'),
+         ('TCP_CRR_Latency_p90', 996.0, 'us'),
+         ('TCP_CRR_Latency_p99', 2224.0, 'us'),
+         ('TCP_STREAM_Throughput', 1187.94, mbps),
+         ('TCP_STREAM_Throughput', 1973.37, mbps),
+         ('UDP_RR_Transaction_Rate', 1359.71, tps),
+         ('UDP_RR_Latency_p50', 700.0, 'us'),
+         ('UDP_RR_Latency_p90', 757.0, 'us'),
+         ('UDP_RR_Latency_p99', 891.0, 'us'),
+         ('UDP_RR_Transaction_Rate', 3313.49, tps),
+         ('UDP_RR_Latency_p50', 295.0, 'us'),
+         ('UDP_RR_Latency_p90', 330.0, 'us'),
+         ('UDP_RR_Latency_p99', 406.0, 'us')],
         [i[:3] for i in result])
 
     external_meta = {'ip_type': 'external'}
     internal_meta = {'ip_type': 'internal'}
-    expected_meta = [external_meta, internal_meta] * 4
+    expected_meta = (([external_meta] * 4 + [internal_meta] * 4) * 2 +
+                     [external_meta, internal_meta] +
+                     [external_meta] * 4 +
+                     [internal_meta] * 4)
 
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)

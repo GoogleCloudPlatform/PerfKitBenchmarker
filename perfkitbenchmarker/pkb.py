@@ -138,6 +138,9 @@ flags.DEFINE_enum(
 flags.DEFINE_boolean('use_local_disk', False, 'For benchmarks that use disks, '
                      'this indicates that they should run against '
                      'the local disk(s) instead of remote storage.')
+flags.DEFINE_integer('scratch_disk_iops', 1500,
+                     'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
+
 
 MAX_RUN_URI_LENGTH = 10
 
@@ -289,6 +292,10 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       # Resource cleanup (below) can take a long time. Log the error to give
       # immediate feedback, then re-throw.
       logging.exception('Error during benchmark %s', benchmark_name)
+      # If the particular benchmark requests us to always call cleanup, do it
+      # here.
+      if spec.always_call_cleanup:
+        DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
       raise
     finally:
       if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
@@ -379,6 +386,24 @@ def RunBenchmarks(publish=True):
 
 
 
+def _GenerateBenchmarkDocumentation():
+  """Generates benchmark documentation to show in --help."""
+  benchmark_docs = []
+  for benchmark_module in benchmarks.BENCHMARKS:
+    benchmark_info = benchmark_module.GetInfo()
+    vm_count = benchmark_info['num_machines']
+    scratch_disk_str = ''
+    if benchmark_info['scratch_disk']:
+      scratch_disk_str = ' with scratch volume'
+
+    benchmark_docs.append('%s: %s (%s VMs%s)' %
+                          (benchmark_info['name'],
+                           benchmark_info['description'],
+                           vm_count,
+                           scratch_disk_str))
+  return '\n\t'.join(benchmark_docs)
+
+
 def Main(argv=sys.argv):
   logging.basicConfig(level=logging.INFO)
   # TODO: Verify if there is other way of appending additional help
@@ -386,15 +411,13 @@ def Main(argv=sys.argv):
   # Inject more help documentation
   # The following appends descriptions of the benchmarks and descriptions of
   # the benchmark sets to the help text.
-  benchmark_list = ['%s:  %s' % (benchmark_module.GetInfo()['name'],
-                                 benchmark_module.GetInfo()['description'])
-                    for benchmark_module in benchmarks.BENCHMARKS]
   benchmark_sets_list = [
       '%s:  %s' %
       (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
       for set_name in benchmark_sets.BENCHMARK_SETS]
   sys.modules['__main__'].__doc__ = __doc__ + (
-      '\nBenchmarks:\n\t%s') % '\n\t'.join(benchmark_list)
+      '\nBenchmarks (default requirements):\n\t%s' %
+      _GenerateBenchmarkDocumentation())
   sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
                                       % '\n\t'.join(benchmark_sets_list))
   try:

@@ -109,10 +109,10 @@ UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli Mbps'
 DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli Mbps'
 CLI_TEST_ITERATION_COUNT = 100
 CLI_TEST_FAILURE_TOLERANCE = 0.05
-# TODO: Need to find ways to parallelize Azure's blob operations below.
-# Currently this test takes 10-11 minutes per iteration, doing 100
-# iteration by default is too many. We do only 8 for now.
-CLI_TEST_ITERATION_COUNT_AZURE = 8
+# Azure does not parallelize operations in its CLI tools. We have to
+# do the uploads or downloads of 100 test files sequentially, it takes
+# a very long time for each iteration, so we are doing only 3 iterations.
+CLI_TEST_ITERATION_COUNT_AZURE = 3
 
 SINGLE_STREAM_THROUGHPUT = 'single stream %s throughput Mbps'
 
@@ -578,15 +578,15 @@ class AzureBlobStorageBenchmark(object):
 
     vm.PushFile(FLAGS.object_storage_credential_file, AZURE_CREDENTIAL_LOCATION)
     vm.RemoteCommand(
-        'azure storage account create -l \'East US\' ''"pkb%s"' %
-        (FLAGS.run_uri), ignore_failure=True)
+        'azure storage account create --type ZRS -l \'East US\' ''"pkb%s"' %
+        (FLAGS.run_uri), ignore_failure=False)
     vm.azure_account = ('pkb%s' % FLAGS.run_uri)
 
     output, _ = (
         vm.RemoteCommand(
             'azure storage account keys list %s' %
             vm.azure_account))
-    key = re.findall(r'Primary (.+)', output)
+    key = re.findall(r'Primary:* (.+)', output)
     vm.azure_key = key[0]
 
     azure_command_suffix = _MakeAzureCommandSuffix(vm.azure_account,
@@ -825,6 +825,9 @@ def Prepare(benchmark_spec):
   vms[0].Install('gcs_boto_plugin')
 
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
+
+  # We would like to always cleanup server side states when exception happens.
+  benchmark_spec.always_call_cleanup = True
 
   # Prepare data on vm, create a run directory on scratch drive, and add
   # permission.

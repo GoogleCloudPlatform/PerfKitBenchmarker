@@ -23,6 +23,7 @@ import logging
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import fio
 
 
@@ -33,6 +34,17 @@ flags.DEFINE_string('fio_benchmark_filename', 'fio_benchmark_file',
 flags.DEFINE_string('fio_jobfile', 'fio.job', 'job file that fio will use')
 flags.DEFINE_integer('memory_multiple', 10,
                      'size of fio scratch file compared to main memory size.')
+flags.DEFINE_boolean('against_device', False,
+                     'Test direct against scratch disk. If set True, will '
+                     'create a modified job file in temp directory, '
+                     'which ignores directory and filename parameter.')
+flags.DEFINE_string('device_fill_size', '100%',
+                    'The amount of device to fill in prepare stage. '
+                    'This flag is only valid when against_device=True. '
+                    'The valid value can either be an integer, which '
+                    'represents the number of bytes to fill or a '
+                    'percentage, which represents the percentage '
+                    'of the device.')
 
 
 BENCHMARK_INFO = {'name': 'fio',
@@ -61,7 +73,7 @@ def Prepare(benchmark_spec):
   logging.info('FIO prepare on %s', vm)
   vm.Install('fio')
   file_path = data.ResourcePath(flags.FLAGS.fio_jobfile)
-  vm.PushFile(file_path)
+
   disk_size_kb = vm.GetDeviceSizeFromPath(vm.GetScratchDir())
   amount_memory_kb = vm.total_memory_kb
   if disk_size_kb < amount_memory_kb * flags.FLAGS.memory_multiple:
@@ -74,6 +86,26 @@ def Prepare(benchmark_spec):
     #    invalid. Once the benchmark results are returned from Run() an
     #    invalid (or is that rather a 'valid' flag should be added.
     exit(1)
+  if FLAGS.against_device:
+    device_path = vm.scratch_disks[0].GetDevicePath()
+    logging.info('Fill scratch disk on %s at %s', vm, device_path)
+    command = (
+        ('sudo %s --filename=%s --ioengine=libaio '
+         '--name=fill-device --blocksize=512k --iodepth=64 '
+         '--rw=write --direct=1 --size=%s') %
+        (fio.FIO_PATH, device_path, FLAGS.device_fill_size))
+    vm.RemoteCommand(command)
+    logging.info('Removing directory and filename in job file.')
+    with open(data.ResourcePath(flags.FLAGS.fio_jobfile)) as original_f:
+      job_file = original_f.read()
+    job_file = fio.DeleteParameterFromJobFile(job_file, 'directory')
+    job_file = fio.DeleteParameterFromJobFile(job_file, 'filename')
+    tmp_dir = vm_util.GetTempDir()
+    file_path = vm_util.PrependTempDir(FLAGS.fio_jobfile)
+    logging.info('Write modified job file to temp directory %s', tmp_dir)
+    with open(file_path, 'w') as modified_f:
+      modified_f.write(job_file)
+  vm.PushFile(file_path)
 
 
 def Run(benchmark_spec):
@@ -92,14 +124,21 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('FIO running on %s', vm)
-  fio_command = '%s --output-format=json --directory=%s %s' % (
-      fio.FIO_PATH, vm.GetScratchDir(), flags.FLAGS.fio_jobfile)
+  if FLAGS.against_device:
+    file_path = vm_util.PrependTempDir(FLAGS.fio_jobfile)
+    fio_command = '--filename=%s %s' % (vm.scratch_disks[0].GetDevicePath(),
+                                        FLAGS.fio_jobfile)
+  else:
+    file_path = data.ResourcePath(FLAGS.fio_jobfile)
+    fio_command = '--directory=%s %s' % (
+        vm.GetScratchDir(), FLAGS.fio_jobfile)
+  fio_command = 'sudo %s --output-format=json %s' % (fio.FIO_PATH, fio_command)
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
   stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
-  with open(data.ResourcePath(flags.FLAGS.fio_jobfile)) as f:
+  with open(file_path) as f:
     job_file = f.read()
   return fio.ParseResults(job_file, json.loads(stdout))
 
