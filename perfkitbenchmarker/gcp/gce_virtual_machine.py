@@ -207,7 +207,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not kwargs:
       return
     cmd = [FLAGS.gcloud_path, 'compute', 'instances', 'add-metadata',
-           '--zone', self.zone, self.name, '--metadata']
+           self.name, '--metadata']
     for key, value in kwargs.iteritems():
       cmd.append('{0}={1}'.format(key, value))
     cmd.extend(util.GetDefaultGcloudFlags(self))
