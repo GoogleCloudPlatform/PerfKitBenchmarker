@@ -377,6 +377,26 @@ def RunBenchmarks(publish=True):
         'To run again with this setup, please use --run_uri=%s', FLAGS.run_uri)
 
 
+def _GenerateBenchmarkDocumentation():
+  """Generates benchmark documentation to show in --help."""
+  benchmark_docs = []
+  for benchmark_module in benchmarks.BENCHMARKS:
+    benchmark_info = benchmark_module.GetInfo()
+    vm_count = benchmark_info['num_machines']
+    if vm_count is None:
+      vm_count = "'--num_vms'"
+    scratch_disk_str = ''
+    if benchmark_info['scratch_disk']:
+      scratch_disk_str = ' with scratch volume'
+
+    benchmark_docs.append('%s: %s (%s VMs%s)' %
+                          (benchmark_info['name'],
+                           benchmark_info['description'],
+                           vm_count,
+                           scratch_disk_str))
+  return '\n\t'.join(benchmark_docs)
+
+
 def Main(argv=sys.argv):
   logging.basicConfig(level=logging.INFO)
   # TODO: Verify if there is other way of appending additional help
@@ -384,15 +404,12 @@ def Main(argv=sys.argv):
   # Inject more help documentation
   # The following appends descriptions of the benchmarks and descriptions of
   # the benchmark sets to the help text.
-  benchmark_list = ['%s:  %s' % (benchmark_module.GetInfo()['name'],
-                                 benchmark_module.GetInfo()['description'])
-                    for benchmark_module in benchmarks.BENCHMARKS]
   benchmark_sets_list = [
       '%s:  %s' %
       (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
       for set_name in benchmark_sets.BENCHMARK_SETS]
   sys.modules['__main__'].__doc__ = __doc__ + (
-      '\nBenchmarks:\n\t%s') % '\n\t'.join(benchmark_list)
+      '\nBenchmarks:\n\t%s') % _GenerateBenchmarkDocumentation()
   sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
                                       % '\n\t'.join(benchmark_sets_list))
   try:
