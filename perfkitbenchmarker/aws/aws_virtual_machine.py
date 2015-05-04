@@ -85,6 +85,10 @@ NUM_LOCAL_VOLUMES = {
     'r3.8xlarge': 2,
 }
 DRIVE_START_LETTER = 'b'
+INSTANCE_EXISTS_STATUSES = frozenset(
+    ['pending', 'running', 'stopping', 'stopped'])
+INSTANCE_DELETED_STATUSES = frozenset(['shutting-down', 'terminated'])
+INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 
 
 def GetBlockDeviceMap(machine_type):
@@ -242,13 +246,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     reservations = response['Reservations']
+    assert len(reservations) < 2, 'Too many reservations.'
     if not reservations:
       return False
-    status = reservations[0]['Instances'][0]['State']['Name']
-    if status in ['shutting-down', 'terminated']:
-      return False
-    else:
-      return True
+    instances = reservations[0]['Instances']
+    assert len(instances) == 1, 'Wrong number of instances.'
+    status = instances[0]['State']['Name']
+    assert status in INSTANCE_KNOWN_STATUSES
+    return status in INSTANCE_EXISTS_STATUSES
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.

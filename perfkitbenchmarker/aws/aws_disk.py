@@ -30,6 +30,10 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import util
 
+VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
+VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
+VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
+
 
 class AwsDisk(disk.BaseDisk):
   """Object representing an Aws Disk."""
@@ -82,13 +86,12 @@ class AwsDisk(disk.BaseDisk):
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     volumes = response['Volumes']
+    assert len(volumes) < 2, 'Too many volumes.'
     if not volumes:
       return False
     status = volumes[0]['State']
-    if status in ['creating', 'available', 'in-use']:
-      return True
-    else:
-      return False
+    assert status in VOLUME_KNOWN_STATUSES
+    return status in VOLUME_EXISTS_STATUSES
 
   def Attach(self, vm):
     """Attaches the disk to a VM.

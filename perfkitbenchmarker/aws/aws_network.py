@@ -117,10 +117,8 @@ class AwsVpc(resource.BaseResource):
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     vpcs = response['Vpcs']
-    if not vpcs:
-      return False
-    else:
-      return True
+    assert len(vpcs) < 2, 'Too many VPCs.'
+    return len(vpcs) > 0
 
   def _EnableDnsHostnames(self):
     """Sets the enableDnsHostnames attribute of this VPC to True.
@@ -196,10 +194,8 @@ class AwsSubnet(resource.BaseResource):
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     subnets = response['Subnets']
-    if not subnets:
-      return False
-    else:
-      return True
+    assert len(subnets) < 2, 'Too many subnets.'
+    return len(subnets) > 0
 
 
 class AwsInternetGateway(resource.BaseResource):
@@ -242,10 +238,8 @@ class AwsInternetGateway(resource.BaseResource):
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     internet_gateways = response['InternetGateways']
-    if not internet_gateways:
-      return False
-    else:
-      return True
+    assert len(internet_gateways) < 2, 'Too many internet gateways.'
+    return len(internet_gateways) > 0
 
   def Attach(self, vpc_id):
     """Attaches the internetgateway to the VPC."""
@@ -367,10 +361,8 @@ class AwsPlacementGroup(resource.BaseResource):
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     placement_groups = response['PlacementGroups']
-    if not placement_groups:
-      return False
-    else:
-      return True
+    assert len(placement_groups) < 2, 'Too many placement groups.'
+    return len(placement_groups) > 0
 
 
 class AwsNetwork(network.BaseNetwork):
