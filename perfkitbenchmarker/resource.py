@@ -33,7 +33,6 @@ class BaseResource(object):
   def __init__(self):
     super(BaseResource, self).__init__()
     self.created = False
-    self.deleted = False
 
   @abc.abstractmethod
   def _Create(self):
@@ -96,8 +95,6 @@ class BaseResource(object):
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
-    if self.deleted or not self.created:
-      return
     self._Delete()
     try:
       if self._Exists():
@@ -105,7 +102,6 @@ class BaseResource(object):
             'Deletion of %s failed.' % type(self).__name__)
     except NotImplementedError:
       pass
-    self.deleted = True
 
   def Create(self):
     """Creates a resource and its dependencies."""

@@ -264,6 +264,9 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
           # a reference to the spec in order to delete it in the "finally"
           # section below.
           spec = benchmark_spec.BenchmarkSpec(benchmark_info)
+          # Pickle the spec before we try to create anything so we can always
+          # clean everything up on a second run if something goes wrong.
+          spec.PickkleSpec()
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
           spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_name)
