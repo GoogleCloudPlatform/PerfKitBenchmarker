@@ -1,0 +1,18 @@
+<configuration>
+  <property>
+    <name>hbase.rootdir</name>
+    <value>hdfs://{{ master_ip }}/hbase</value>
+  </property>
+  <property>
+    <name>hbase.zookeeper.property.dataDir</name>
+    <value>{{ scratch_dir }}/zookeeper</value>
+  </property>
+  <property>
+    <name>hbase.cluster.distributed</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>hbase.zookeeper.quorum</name>
+    <value>{{ zk_quorum_ips | join(',') }}</value>
+  </property>
+</configuration>

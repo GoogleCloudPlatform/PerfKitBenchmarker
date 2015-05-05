@@ -20,6 +20,7 @@ import functools
 import logging
 import os
 import re
+import time
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
@@ -142,6 +143,9 @@ def ConfigureAndStart(master, workers, start_yarn=True):
   master.RenderTemplate(data.ResourcePath(START_HADOOP_SCRIPT),
                         script_path, context=context)
   master.RemoteCommand('bash {0}'.format(script_path), should_log=True)
+
+  logging.info('Sleeping 10s for Hadoop nodes to join.')
+  time.sleep(10)
 
   logging.info('Checking HDFS status.')
   hdfs_online_count = _GetHDFSOnlineNodeCount(master)
