@@ -213,9 +213,9 @@ class AptMixin(BasePackageMixin):
 
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
-    # We don't want to fail if updating fails. The '-m' option
-    # lets us continue even when we can't locate an archive.
-    self.RemoteCommand('sudo apt-get update -m', ignore_failure=True)
+    # We don't want to fail if updating fails. The '--ignore-missing'
+    # option lets us continue even when we can't locate an archive.
+    self.RemoteCommand('sudo apt-get update --ignore-missing')
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
