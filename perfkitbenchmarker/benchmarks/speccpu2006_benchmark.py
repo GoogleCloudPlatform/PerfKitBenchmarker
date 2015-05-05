@@ -35,6 +35,26 @@ FLAGS = flags.FLAGS
 flags.DEFINE_enum('benchmark_subset', 'int', ['int', 'fp', 'all'],
                   'specify a subset of benchmarks to run: int, fp, all')
 
+flags.DEFINE_string('runspec_config', 'linux64-x64-gcc47.cfg',
+                    'name of the cpu2006 configuration to use (runspec --config'
+                    ' argument)')
+
+flags.DEFINE_integer('runspec_iterations', 3,
+                     'number of benchmark iterations to execute - default 3 '
+                     '(runspec --iterations argument)')
+
+flags.DEFINE_string('runspec_define', '',
+                    'optional comma separated list of preprocessor macros: '
+                    'SYMBOL[=VALUE] - e.g. numa,smt,sse=SSE4.2 (runspec '
+                    '--define arguments)')
+
+flags.DEFINE_boolean('runspec_enable_32bit', default=False,
+                     help='setting this flag will result in installation of '
+                     'multilib packages to enable use of 32-bit cpu2006 '
+                     'binaries (useful when running on memory constrained '
+                     'instance types where 64-bit execution may be problematic '
+                     ' - i.e. < 1.5-2GB/core)')
+
 BENCHMARK_INFO = {'name': 'speccpu2006',
                   'description': 'Run Spec CPU2006',
                   'scratch_disk': True,
@@ -70,6 +90,9 @@ def Prepare(benchmark_spec):
   vm.Install('wget')
   vm.Install('build_tools')
   vm.Install('fortran')
+  if (FLAGS.runspec_enable_32bit):
+    vm.Install('multilib')
+  vm.Install('numactl')
   try:
     local_tar_file_path = data.ResourcePath(SPECCPU2006_TAR)
   except data.ResourceNotFound as e:
@@ -219,10 +242,15 @@ def Run(benchmark_spec):
   vm = vms[0]
   logging.info('SpecCPU2006 running on %s', vm)
   num_cpus = vm.num_cpus
+  iterations = ' --iterations=' + repr(FLAGS.runspec_iterations) if \
+               FLAGS.runspec_iterations != 3 else ''
+  defines = ' --define ' + ' --define '.join(FLAGS.runspec_define.split(','))\
+            if FLAGS.runspec_define != '' else ''
   vm.RemoteCommand('cd %s; . ./shrc; ./bin/relocate; . ./shrc; rm -rf result; '
-                   'runspec --config=linux64-x64-gcc47.cfg --tune=base '
-                   '--size=ref --noreportable -rate %s %s '
-                   % (vm.spec_dir, num_cpus, FLAGS.benchmark_subset))
+                   'runspec --config=%s --tune=base '
+                   '--size=ref --noreportable --rate %s%s%s %s'
+                   % (vm.spec_dir, FLAGS.runspec_config, num_cpus, iterations,
+                      defines, FLAGS.benchmark_subset))
   logging.info('SpecCPU2006 Results:')
   return ParseOutput(vm)
 
