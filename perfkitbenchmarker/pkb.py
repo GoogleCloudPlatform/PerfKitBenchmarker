@@ -218,8 +218,10 @@ def DoCleanupPhase(benchmark, name, spec, timer):
       benchmark module's Cleanup function and resource teardown.
   """
   logging.info('Cleaning up benchmark %s', name)
-  with timer.Measure('Benchmark Cleanup'):
-    benchmark.Cleanup(spec)
+
+  if spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]):
+    with timer.Measure('Benchmark Cleanup'):
+      benchmark.Cleanup(spec)
   with timer.Measure('Resource Teardown'):
     spec.Delete()
 
