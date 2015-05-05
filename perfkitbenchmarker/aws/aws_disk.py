@@ -30,6 +30,10 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import util
 
+VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
+VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
+VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
+
 
 class AwsDisk(disk.BaseDisk):
   """Object representing an Aws Disk."""
@@ -56,7 +60,7 @@ class AwsDisk(disk.BaseDisk):
         '--volume-type=%s' % self.disk_type]
     if self.disk_type == 'io1':
       create_cmd.append('--iops=%s' % self.iops)
-    stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['VolumeId']
     util.AddDefaultTags(self.id, self.region)
@@ -70,7 +74,24 @@ class AwsDisk(disk.BaseDisk):
         '--volume-id=%s' % self.id]
     logging.info('Deleting AWS volume %s. This may fail if the disk is not '
                  'yet detached, but will be retried.', self.id)
-    vm_util.IssueRetryableCommand(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
+
+  def _Exists(self):
+    """Returns true if the disk exists."""
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-volumes',
+        '--region=%s' % self.region,
+        '--filter=Name=volume-id,Values=%s' % self.id]
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    volumes = response['Volumes']
+    assert len(volumes) < 2, 'Too many volumes.'
+    if not volumes:
+      return False
+    status = volumes[0]['State']
+    assert status in VOLUME_KNOWN_STATUSES, status
+    return status in VOLUME_EXISTS_STATUSES
 
   def Attach(self, vm):
     """Attaches the disk to a VM.
