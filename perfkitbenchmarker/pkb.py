@@ -73,6 +73,7 @@ STAGE_ALL = 'all'
 STAGE_PREPARE = 'prepare'
 STAGE_RUN = 'run'
 STAGE_CLEANUP = 'cleanup'
+LOG_FILE_NAME = 'pkb.log'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 # List of functions taking a benchmark_spec. Will be called before benchmark.Run
 # with two parameters: the benchmark and benchmark_spec.
@@ -332,7 +333,7 @@ def RunBenchmarks(publish=True):
   vm_util.GenTempDir()
   log_util.ConfigureLogging(
       stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
-      log_path=vm_util.PrependTempDir('pkb.log'),
+      log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
       run_uri=FLAGS.run_uri)
 
   unknown_benchmarks = ListUnknownBenchmarks()
@@ -376,9 +377,13 @@ def RunBenchmarks(publish=True):
     if collector.samples:
       collector.PublishSamples()
 
+    logging.info('Complete logs can be found at: %s',
+                 vm_util.PrependTempDir(LOG_FILE_NAME))
+
   if FLAGS.run_stage not in [STAGE_ALL, STAGE_CLEANUP]:
     logging.info(
         'To run again with this setup, please use --run_uri=%s', FLAGS.run_uri)
+
 
 
 def _GenerateBenchmarkDocumentation():
