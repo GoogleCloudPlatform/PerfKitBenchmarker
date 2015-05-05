@@ -17,54 +17,8 @@
 import unittest
 
 import mock
-import os
 
 from perfkitbenchmarker import vm_util
-
-
-if os.name is 'posix':
-  class IssueCommandsWithEnvironmentVariablesTestCase(unittest.TestCase):
-
-    def testNoEnvArgument(self):
-      with mock.patch.dict('perfkitbenchmarker.vm_util.os.environ',
-                           {'perfkit': 'benchmarker'}, clear=True):
-
-        (stdout, stderr, retcode) = vm_util.IssueCommand(['/usr/bin/env'])
-
-        self.assertTrue('perfkit=benchmarker' in stdout)
-        self.assertEqual(0, retcode)
-
-    def testOverwriteEnvArgument(self):
-      with mock.patch.dict('perfkitbenchmarker.vm_util.os.environ',
-                           {'perfkit': 'old'}, clear=True):
-
-        env = {'perfkit': 'new'}
-        (stdout, stderr, retcode) = vm_util.IssueCommand(['/usr/bin/env'],
-                                                         env=env)
-        self.assertTrue('perfkit=new' in stdout)
-        self.assertTrue('perfkit=old' not in stdout)
-        self.assertEqual(0, retcode)
-
-    def testAppendEnvArgument(self):
-      with mock.patch.dict('perfkitbenchmarker.vm_util.os.environ',
-                           {'perfkit': 'old'}, clear=True):
-
-        env = {'perfkit': 'old', 'newkey': 'newvalue'}
-        (stdout, stderr, retcode) = vm_util.IssueCommand(['/usr/bin/env'],
-                                                         env=env)
-        self.assertTrue('perfkit=old' in stdout)
-        self.assertTrue('newkey=newvalue' in stdout)
-        self.assertEqual(0, retcode)
-
-    def testUnsetEnvArgument(self):
-      with mock.patch.dict('perfkitbenchmarker.vm_util.os.environ',
-                           {'perfkit': 'old'}, clear=True):
-        env = {}
-        (stdout, stderr, retcode) = vm_util.IssueCommand(['/usr/bin/env'],
-                                                         env=env)
-
-        self.assertTrue('perfkit=old' not in stdout)
-        self.assertEqual(0, retcode)
 
 
 class ShouldRunOnInternalIpAddressTestCase(unittest.TestCase):
