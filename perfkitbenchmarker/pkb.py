@@ -182,8 +182,17 @@ def DoPreparePhase(benchmark, name, spec, timer):
     The BenchmarkSpec created for the benchmark.
   """
   logging.info('Preparing benchmark %s', name)
-  with timer.Measure('Resource Provisioning'):
-    spec.Prepare()
+  # Pickle the spec before we try to create anything so we can clean
+  # everything up on a second run if something goes wrong.
+  spec.PickleSpec()
+  try:
+    with timer.Measure('Resource Provisioning'):
+      spec.Prepare()
+  finally:
+    # Also pickle the spec after the resources are created so that
+    # we have a record of things like AWS ids. Otherwise we won't
+    # be able to clean them up on a subsequent run.
+    spec.PickleSpec()
   with timer.Measure('Benchmark Prepare'):
     benchmark.Prepare(spec)
 
@@ -264,9 +273,6 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
           # a reference to the spec in order to delete it in the "finally"
           # section below.
           spec = benchmark_spec.BenchmarkSpec(benchmark_info)
-          # Pickle the spec before we try to create anything so we can always
-          # clean everything up on a second run if something goes wrong.
-          spec.PickkleSpec()
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
           spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_name)

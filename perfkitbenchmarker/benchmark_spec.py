@@ -177,6 +177,7 @@ class BenchmarkSpec(object):
     firewall_class = CLASSES[self.cloud][FIREWALL]
     self.firewall = firewall_class(self.project)
     self.file_name = '%s/%s' % (vm_util.GetTempDir(), benchmark_info['name'])
+    self.deleted = False
     self.always_call_cleanup = False
 
   def Prepare(self):
@@ -189,7 +190,7 @@ class BenchmarkSpec(object):
       vm_util.RunThreaded(self.PrepareVm, prepare_args)
 
   def Delete(self):
-    if FLAGS.run_stage not in ['all', 'cleanup']:
+    if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
       return
 
     if self.vms:
@@ -209,6 +210,7 @@ class BenchmarkSpec(object):
       except Exception:
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
+    self.deleted = True
 
   def PrepareNetwork(self, network):
     """Initialize the network."""
@@ -328,4 +330,5 @@ class BenchmarkSpec(object):
     except Exception as e:  # pylint: disable=broad-except
       logging.error('Unable to unpickle spec file for benchmark %s.', name)
       raise e
+    spec.deleted = False
     return spec
