@@ -252,7 +252,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     instances = reservations[0]['Instances']
     assert len(instances) == 1, 'Wrong number of instances.'
     status = instances[0]['State']['Name']
-    assert status in INSTANCE_KNOWN_STATUSES
+    assert status in INSTANCE_KNOWN_STATUSES, status
     return status in INSTANCE_EXISTS_STATUSES
 
   def CreateScratchDisk(self, disk_spec):

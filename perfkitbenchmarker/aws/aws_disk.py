@@ -90,7 +90,7 @@ class AwsDisk(disk.BaseDisk):
     if not volumes:
       return False
     status = volumes[0]['State']
-    assert status in VOLUME_KNOWN_STATUSES
+    assert status in VOLUME_KNOWN_STATUSES, status
     return status in VOLUME_EXISTS_STATUSES
 
   def Attach(self, vm):
