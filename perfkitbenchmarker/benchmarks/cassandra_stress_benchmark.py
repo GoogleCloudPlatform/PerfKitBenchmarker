@@ -131,7 +131,8 @@ def Prepare(benchmark_spec):
     vm_dict[LOADER_NODE] = [vm_dict['default'][-1]]
     vm_dict[DATA_NODE] = vm_dict['default'][:3]
     disk_spec = disk.BaseDiskSpec(
-        500, bs.DISK_TYPE[benchmark_spec.cloud][bs.STANDARD],
+        FLAGS.scratch_disk_size,
+        bs.DISK_TYPE[benchmark_spec.cloud][FLAGS.scratch_disk_type],
         '/cassandra_data')
     for vm in vm_dict[DATA_NODE]:
       vm.CreateScratchDisk(disk_spec)
