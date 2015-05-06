@@ -161,12 +161,19 @@ def StopHDFS(master):
   master.RemoteCommand(os.path.join(HADOOP_SBIN, 'stop-dfs.sh'))
 
 
+def StopHistoryServer(master):
+  """Stop the MapReduce JobHistory daemon."""
+  master.RemoteCommand('{0} stop historyserver'.format(
+      os.path.join(HADOOP_SBIN, 'mr-jobhistory-daemon.sh')))
+
+
 def StopAll(master):
   """Stop HDFS and YARN.
 
   Args:
     master: VM. HDFS NameNode/YARN ResourceManager.
   """
+  StopHistoryServer(master)
   StopYARN(master)
   StopHDFS(master)
 
