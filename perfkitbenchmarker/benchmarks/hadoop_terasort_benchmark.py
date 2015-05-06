@@ -39,8 +39,7 @@ BENCHMARK_INFO = {'name': 'hadoop_terasort',
                   'description': 'Runs Terasort. Control the number of VMs '
                   'with --num_vms.',
                   'scratch_disk': True,
-                  'num_machines': None}
-DEFAULT_VM_COUNT = 9
+                  'num_machines': 9}
 
 NUM_BYTES_PER_ROW = 100
 NUM_MB_PER_ROW = NUM_BYTES_PER_ROW / (1024.0 ** 2)
@@ -48,9 +47,7 @@ NUM_MB_PER_ROW = NUM_BYTES_PER_ROW / (1024.0 ** 2)
 
 def GetInfo():
   info = BENCHMARK_INFO.copy()
-  if FLAGS.num_vms == 1:  # Unchanged from default
-    info['num_machines'] = 9
-  else:
+  if FLAGS.num_vms != 1:  # Changed from default
     info['num_machines'] = FLAGS.num_vms
   return info
 
