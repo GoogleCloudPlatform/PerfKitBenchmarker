@@ -47,7 +47,7 @@ NUM_MB_PER_ROW = NUM_BYTES_PER_ROW / (1024.0 ** 2)
 
 def GetInfo():
   info = BENCHMARK_INFO.copy()
-  if FLAGS.num_vms != 1:  # Changed from default
+  if FLAGS['num_vms'].present:
     info['num_machines'] = FLAGS.num_vms
   return info
 
