@@ -31,6 +31,7 @@ from perfkitbenchmarker import vm_util
 AZURE_PATH = 'azure'
 
 DRIVE_START_LETTER = 'c'
+DISK_TYPE = {disk.STANDARD: None}  # Azure doesn't have a disk type option yet.
 
 
 class AzureDisk(disk.BaseDisk):
@@ -47,6 +48,7 @@ class AzureDisk(disk.BaseDisk):
 
   def _Create(self):
     """Creates the disk."""
+    assert self.disk_type in DISK_TYPE, self.disk_type
     with self._lock:
       create_cmd = [AZURE_PATH,
                     'vm',

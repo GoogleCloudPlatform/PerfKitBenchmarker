@@ -33,6 +33,7 @@ from perfkitbenchmarker.aws import util
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
 VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
+DISK_TYPE = {disk.STANDARD: 'standard', disk.SSD: 'gp2', disk.IOPS: 'io1'}
 
 
 class AwsDisk(disk.BaseDisk):
@@ -57,7 +58,7 @@ class AwsDisk(disk.BaseDisk):
         '--region=%s' % self.region,
         '--size=%s' % self.disk_size,
         '--availability-zone=%s' % self.zone,
-        '--volume-type=%s' % self.disk_type]
+        '--volume-type=%s' % DISK_TYPE[self.disk_type]]
     if self.disk_type == 'io1':
       create_cmd.append('--iops=%s' % self.iops)
     stdout, _, _ = vm_util.IssueCommand(create_cmd)

@@ -86,28 +86,10 @@ CLASSES = {
         FIREWALL: aws_network.AwsFirewall
     }
 }
-STANDARD = 'standard'
-SSD = 'ssd'
-IOPS = 'iops'  # Provisioned IOPS (ssd) in AWS
-DISK_TYPE = {
-    GCP: {
-        STANDARD: 'pd-standard',
-        SSD: 'pd-ssd',
-    },
-    AWS: {
-        STANDARD: 'standard',
-        SSD: 'gp2',
-        IOPS: 'io1',
-    },
-    AZURE: {
-        STANDARD: None,  # Azure doesn't have a disk type option yet.
-    }
-}
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS], 'Name of the cloud to use.')
-
 
 
 class BenchmarkSpec(object):
@@ -168,8 +150,7 @@ class BenchmarkSpec(object):
       self.vm_dict['default'] = self.vms
       for i in range(benchmark_info['scratch_disk']):
         disk_spec = disk.BaseDiskSpec(
-            self.scratch_disk_size,
-            DISK_TYPE[self.cloud][self.scratch_disk_type],
+            self.scratch_disk_size, self.scratch_disk_type,
             '/scratch%d' % i, self.scratch_disk_iops)
         for vm in self.vms:
           vm.disk_specs.append(disk_spec)
@@ -273,7 +254,7 @@ class BenchmarkSpec(object):
         disk_size, disk_type, mnt_point = node_section[option].split(':')
         disk_size = int(disk_size)
         disk_spec = disk.BaseDiskSpec(
-            disk_size, DISK_TYPE[self.cloud][disk_type], mnt_point)
+            disk_size, disk_type, mnt_point)
         for vm in vms:
           vm.disk_specs.append(disk_spec)
 

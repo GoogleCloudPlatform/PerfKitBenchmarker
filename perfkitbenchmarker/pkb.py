@@ -61,6 +61,7 @@ import uuid
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import static_virtual_machine
@@ -132,8 +133,8 @@ flags.DEFINE_string('static_vm_file', None,
                     'static_virtual_machine.py for a description of this file.')
 flags.DEFINE_boolean('version', False, 'Display the version and exit.')
 flags.DEFINE_enum(
-    'scratch_disk_type', benchmark_spec.STANDARD,
-    [benchmark_spec.STANDARD, benchmark_spec.SSD, benchmark_spec.IOPS],
+    'scratch_disk_type', disk.STANDARD,
+    [disk.STANDARD, disk.SSD, disk.IOPS, disk.LOCAL],
     'Type for all scratch disks. The default is standard')
 flags.DEFINE_boolean('use_local_disk', False, 'For benchmarks that use disks, '
                      'this indicates that they should run against '

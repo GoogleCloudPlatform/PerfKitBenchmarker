@@ -48,7 +48,7 @@ FLAGS = flags.FLAGS
 
 SET_INTERRUPTS_SH = 'set-interrupts.sh'
 BOOT_DISK_SIZE_GB = 10
-BOOT_DISK_TYPE = 'pd-standard'
+BOOT_DISK_TYPE = disk.STANDARD
 DRIVE_START_LETTER = 'b'
 NVME = 'nvme'
 SCSI = 'SCSI'

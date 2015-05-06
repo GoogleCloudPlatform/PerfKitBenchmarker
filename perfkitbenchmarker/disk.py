@@ -21,6 +21,11 @@ import abc
 
 from perfkitbenchmarker import resource
 
+STANDARD = 'standard'
+SSD = 'ssd'
+IOPS = 'iops'  # Provisioned IOPS (ssd) in AWS
+LOCAL = 'local'
+
 
 class BaseDiskSpec(object):
   """Storing type and size about a disk."""
