@@ -11,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing Hadoop installation and cleanup functions."""
+"""Module containing Hadoop installation and cleanup functions.
+
+For documentation of commands to run at startup and shutdown, see:
+http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/ClusterSetup.html#Hadoop_Startup
+"""
 import functools
 import logging
 import os
