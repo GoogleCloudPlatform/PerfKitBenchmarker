@@ -91,11 +91,12 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   master = vms[0]
 
-  hadoop_cmd = ('{0} jar {1}/share/hadoop/mapreduce/'
-                'hadoop-mapreduce-examples-{2}.jar').format(
-                    os.path.join(hadoop.HADOOP_BIN, 'yarn'),
-                    hadoop.HADOOP_DIR,
-                    hadoop.HADOOP_VERSION)
+  mapreduce_example_jar = os.path.join(
+      hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
+      'hadoop-mapreduce-examples-{0}.jar'.format(hadoop.HADOOP_VERSION))
+  hadoop_cmd = '{0} jar {1}'.format(
+      os.path.join(hadoop.HADOOP_BIN, 'yarn'),
+      mapreduce_example_jar)
   master.RemoteCommand('{0} teragen {1} /teragen'.format(
       hadoop_cmd, FLAGS.terasort_num_rows))
   num_cpus = sum(vm.num_cpus for vm in vms[1:])

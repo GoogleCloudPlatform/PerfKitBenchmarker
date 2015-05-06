@@ -70,15 +70,16 @@ def AptInstall(vm):
   _Install(vm)
 
 
+# TODO: revisit memory fraction.
 def _RenderConfig(vm, master_ip, worker_ips, memory_fraction=0.9):
-  yarn_memory = int((vm.total_memory_kb / 1024) * memory_fraction)
+  yarn_memory_mb = int((vm.total_memory_kb / 1024) * memory_fraction)
   context = {
       'master_ip': master_ip,
       'worker_ips': worker_ips,
       'scratch_dir': os.path.join(vm.GetScratchDir(), 'hadoop'),
       'vcpus': vm.num_cpus,
       'hadoop_private_key': HADOOP_PRIVATE_KEY,
-      'yarn_memory': yarn_memory
+      'yarn_memory_mb': yarn_memory_mb
   }
 
   for file_name in DATA_FILES:

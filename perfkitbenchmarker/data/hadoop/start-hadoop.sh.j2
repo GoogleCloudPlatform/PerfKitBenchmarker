@@ -30,12 +30,7 @@ set -x
 
 readonly HADOOP_DIR="{{ hadoop_dir }}"
 
-if [[ -z "$HADOOP_DIR" ]]; then
-  >&2 echo "Missing hadoop dir"
-  exit 1
-fi
-
-pushd $HADOOP_DIR
+cd $HADOOP_DIR
 
 # Format the namenode
 /usr/bin/yes | bin/hdfs namenode -format || true  # This returns non-zero; not sure why
