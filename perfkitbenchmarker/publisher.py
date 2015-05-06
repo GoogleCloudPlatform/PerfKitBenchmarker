@@ -320,7 +320,7 @@ class NewlineDelimitedJSONPublisher(SamplePublisher):
   The resulting output file is compatible with 'bq load' using
   format NEWLINE_DELIMITED_JSON.
 
-  If collapse_labels is Ture, metadata is converted to a flat string with key
+  If 'collapse_labels' is True, metadata is converted to a flat string with key
   'labels' via GetLabelsFromDict.
 
   Attributes:
