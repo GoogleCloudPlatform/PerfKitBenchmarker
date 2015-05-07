@@ -136,9 +136,6 @@ flags.DEFINE_enum(
     'scratch_disk_type', disk.STANDARD,
     [disk.STANDARD, disk.SSD, disk.IOPS, disk.LOCAL],
     'Type for all scratch disks. The default is standard')
-flags.DEFINE_boolean('use_local_disk', False, 'For benchmarks that use disks, '
-                     'this indicates that they should run against '
-                     'the local disk(s) instead of remote storage.')
 flags.DEFINE_integer('scratch_disk_iops', 1500,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
 
