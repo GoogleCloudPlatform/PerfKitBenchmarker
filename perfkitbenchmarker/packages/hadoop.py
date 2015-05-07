@@ -109,12 +109,14 @@ def _GetYARNOnlineNodeCount(master):
   return len(re.findall(r'RUNNING', stdout))
 
 
-def ConfigureAndStart(master, workers):
+def ConfigureAndStart(master, workers, start_yarn=True):
   """Configure hadoop on a cluster.
 
   Args:
     master: VM. Master VM - will be the HDFS NameNode, YARN ResourceManager.
     workers: List of VMs. Each VM will run an HDFS DataNode, YARN node.
+    start_yarn: bool. Start YARN and JobHistory server? Set to False if HDFS is
+        the only service required. Default: True.
   """
   vms = [master] + workers
   fn = functools.partial(_RenderConfig, master_ip=master.internal_ip,
@@ -132,7 +134,8 @@ def ConfigureAndStart(master, workers):
   vm_util.RunThreaded(AddKey, vms)
 
   context = {'hadoop_dir': HADOOP_DIR,
-             'vm_ips': [vm.internal_ip for vm in vms]}
+             'vm_ips': [vm.internal_ip for vm in vms],
+             'start_yarn': start_yarn}
 
   # HDFS setup and formatting, YARN startup
   script_path = os.path.join(HADOOP_DIR, 'start-hadoop.sh')
@@ -140,6 +143,7 @@ def ConfigureAndStart(master, workers):
                         script_path, context=context)
   master.RemoteCommand('bash {0}'.format(script_path), should_log=True)
 
+  logging.info('Checking HDFS status.')
   hdfs_online_count = _GetHDFSOnlineNodeCount(master)
   if hdfs_online_count != len(workers):
     raise ValueError('Not all nodes running HDFS: {0} < {1}'.format(
@@ -147,12 +151,14 @@ def ConfigureAndStart(master, workers):
   else:
     logging.info('HDFS running on all %d workers', len(workers))
 
-  yarn_online_count = _GetYARNOnlineNodeCount(master)
-  if yarn_online_count != len(workers):
-    raise ValueError('Not all nodes running YARN: {0} < {1}'.format(
-        yarn_online_count, len(workers)))
-  else:
-    logging.info('YARN running on all %d workers', len(workers))
+  if start_yarn:
+    logging.info('Checking YARN status.')
+    yarn_online_count = _GetYARNOnlineNodeCount(master)
+    if yarn_online_count != len(workers):
+      raise ValueError('Not all nodes running YARN: {0} < {1}'.format(
+          yarn_online_count, len(workers)))
+    else:
+      logging.info('YARN running on all %d workers', len(workers))
 
 
 def StopYARN(master):
