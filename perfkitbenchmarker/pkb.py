@@ -134,7 +134,7 @@ flags.DEFINE_string('static_vm_file', None,
 flags.DEFINE_boolean('version', False, 'Display the version and exit.')
 flags.DEFINE_enum(
     'scratch_disk_type', disk.STANDARD,
-    [disk.STANDARD, disk.SSD, disk.IOPS, disk.LOCAL],
+    [disk.STANDARD, disk.SSD, disk.PIOPS, disk.LOCAL],
     'Type for all scratch disks. The default is standard')
 flags.DEFINE_integer('scratch_disk_iops', 1500,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
