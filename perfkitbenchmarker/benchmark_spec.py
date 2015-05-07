@@ -272,6 +272,8 @@ class BenchmarkSpec(object):
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.Startup()
+    if FLAGS.scratch_disk_type == disk.LOCAL:
+      vm.SetupLocalDrives()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
     vm_util.BurnCpu(vm)

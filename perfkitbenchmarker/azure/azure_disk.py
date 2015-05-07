@@ -125,4 +125,7 @@ class AzureDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    return '/dev/sd%s' % chr(ord(DRIVE_START_LETTER) + self.lun)
+    if self.disk_type == disk.LOCAL:
+      return '/dev/sdb'
+    else:
+      return '/dev/sd%s' % chr(ord(DRIVE_START_LETTER) + self.lun)
