@@ -85,6 +85,8 @@ class BaseVirtualMachine(resource.BaseResource):
     disk_specs: list of BaseDiskSpec objects. Specifications for disks attached
       to the VM.
     scratch_disks: list of BaseDisk objects. Scratch disks attached to the VM.
+    max_local_drives: The number of local drives on the VM that can be used as
+      scratch disks or that can be striped together.
   """
 
   is_static = False
