@@ -294,7 +294,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       logging.exception('Error during benchmark %s', benchmark_name)
       # If the particular benchmark requests us to always call cleanup, do it
       # here.
-      if spec.always_call_cleanup:
+      if spec and spec.always_call_cleanup:
         DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
       raise
     finally:
@@ -302,7 +302,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
         if spec:
           spec.Delete()
       else:
-        spec.PickleSpec()
+        if spec:
+          spec.PickleSpec()
 
 
 def RunBenchmarks(publish=True):
@@ -320,9 +321,17 @@ def RunBenchmarks(publish=True):
 
   if FLAGS.run_uri is None:
     if FLAGS.run_stage not in [STAGE_ALL, STAGE_PREPARE]:
-      logging.error(
-          'Cannot run "%s" with unspecified run_uri.', FLAGS.run_stage)
-      return 1
+      # Attempt to get the last modified run directory.
+      run_uri = vm_util.GetLastRunUri()
+      if run_uri:
+        FLAGS.run_uri = run_uri
+        logging.warning(
+            'No run_uri specified. Attempting to run "%s" with --run_uri=%s.',
+            FLAGS.run_stage, FLAGS.run_uri)
+      else:
+        logging.error(
+            'No run_uri specified. Could not run "%s".', FLAGS.run_stage)
+        return 1
     else:
       FLAGS.run_uri = str(uuid.uuid4())[-8:]
   elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:

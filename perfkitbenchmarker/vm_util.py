@@ -27,6 +27,7 @@ import traceback
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
+from perfkitbenchmarker import regex_util
 
 FLAGS = flags.FLAGS
 
@@ -467,3 +468,13 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
                                  IpAddressSubset.INTERNAL) or
           (FLAGS.ip_addresses == IpAddressSubset.REACHABLE and
            sending_vm.IsReachable(receiving_vm)))
+
+
+def GetLastRunUri():
+  """Returns the last run_uri used (or None if it can't be determined)."""
+  stdout, _, _ = IssueCommand(
+      ['bash', '-c', 'ls -1t %s | head -1' % TEMP_DIR])
+  try:
+    return regex_util.ExtractGroup('run_(.*)', stdout)
+  except regex_util.NoMatchError:
+    return None
