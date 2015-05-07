@@ -33,6 +33,11 @@ from perfkitbenchmarker.aws import util
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
 VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
+DISK_TYPE = {
+    disk.STANDARD: 'standard',
+    disk.REMOTE_SSD: 'gp2',
+    disk.PIOPS: 'io1'
+}
 
 
 class AwsDisk(disk.BaseDisk):
@@ -57,7 +62,7 @@ class AwsDisk(disk.BaseDisk):
         '--region=%s' % self.region,
         '--size=%s' % self.disk_size,
         '--availability-zone=%s' % self.zone,
-        '--volume-type=%s' % self.disk_type]
+        '--volume-type=%s' % DISK_TYPE[self.disk_type]]
     if self.disk_type == 'io1':
       create_cmd.append('--iops=%s' % self.iops)
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
@@ -136,4 +141,7 @@ class AwsDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    return '/dev/xvdb%s' % self.device_letter
+    if self.disk_type == disk.LOCAL:
+      return '/dev/xvd%s' % self.device_letter
+    else:
+      return '/dev/xvdb%s' % self.device_letter

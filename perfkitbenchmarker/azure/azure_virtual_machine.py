@@ -28,6 +28,7 @@ operate on the VM: boot, shutdown, etc.
 import json
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import package_managers
 from perfkitbenchmarker import resource
@@ -99,6 +100,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                                 self.network.affinity_group.name)
     disk_spec = disk.BaseDiskSpec(None, None, None)
     self.os_disk = azure_disk.AzureDisk(disk_spec, self.name)
+    self.max_local_drives = 1
+    self.local_drive_counter = 0
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -171,7 +174,12 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     data_disk = azure_disk.AzureDisk(disk_spec, self.name)
     self.scratch_disks.append(data_disk)
 
-    data_disk.Create()
+    if data_disk.disk_type == disk.LOCAL:
+      if self.local_drive_counter >= self.max_local_drives:
+        raise errors.Error('Not enough local drives.')
+      self.local_drive_counter += 1
+    else:
+      data_disk.Create()
 
     device_path = data_disk.GetDevicePath()
     self.FormatDisk(device_path)
@@ -184,24 +192,11 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       A list of strings, where each string is the absolute path to the local
           drives on the VM (e.g. '/dev/sdb').
     """
-    return ['/dev/sdb1']  # TODO(user) once the CLI supports D types, this
-    # needs to be modified to support them
+    return ['/dev/sdb']
 
-  def SetupLocalDrives(self, mount_path=virtual_machine.LOCAL_MOUNT_PATH):
-    """Set up any local drives that exist.
-
-    Performs Azure specific setup (remounts drive), then sets up as usual.
-
-    Args:
-      mount_path: The path where the local drives should be mounted. If this
-          is None, then the device won't be formatted or mounted.
-
-    Returns:
-      A boolean indicating whether the setup occured.
-    """
+  def SetupLocalDrives(self):
+    """Performs Azure specific setup (unmounts drive)."""
     self.RemoteCommand('sudo umount /mnt')
-    return super(AzureVirtualMachine, self).SetupLocalDrives(
-        mount_path=mount_path)
 
 
 class DebianBasedAzureVirtualMachine(AzureVirtualMachine,

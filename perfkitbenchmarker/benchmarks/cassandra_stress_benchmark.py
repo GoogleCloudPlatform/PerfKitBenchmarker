@@ -24,7 +24,6 @@ import re
 import time
 
 
-from perfkitbenchmarker import benchmark_spec as bs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -132,7 +131,7 @@ def Prepare(benchmark_spec):
     vm_dict[DATA_NODE] = vm_dict['default'][:3]
     disk_spec = disk.BaseDiskSpec(
         FLAGS.scratch_disk_size,
-        bs.DISK_TYPE[benchmark_spec.cloud][FLAGS.scratch_disk_type],
+        FLAGS.scratch_disk_type,
         '/cassandra_data')
     for vm in vm_dict[DATA_NODE]:
       vm.CreateScratchDisk(disk_spec)

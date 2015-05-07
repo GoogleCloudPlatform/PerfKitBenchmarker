@@ -85,6 +85,8 @@ class BaseVirtualMachine(resource.BaseResource):
     disk_specs: list of BaseDiskSpec objects. Specifications for disks attached
       to the VM.
     scratch_disks: list of BaseDisk objects. Scratch disks attached to the VM.
+    max_local_drives: The number of local drives on the VM that can be used as
+      scratch disks or that can be striped together.
   """
 
   is_static = False
@@ -122,6 +124,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.disk_specs = []
     self.scratch_disks = []
     self.hostname = None
+    self.max_local_drives = 0
 
     # Cached values
     self._reachable = {}
@@ -495,35 +498,9 @@ class BaseVirtualMachine(resource.BaseResource):
     """Returns a list of local drives on the VM."""
     return []
 
-  def SetupLocalDrives(self, mount_path=LOCAL_MOUNT_PATH):
-    """Set up any local drives that exist.
-
-    Gets all local drives, stripes them together (if possible), formats,
-    and mounts them at 'mount_path'. If there are no local drives to set up,
-    this method will return False. If this method does set up local drives,
-    then it will return True.
-
-    Args:
-      mount_path: The path where the local drives should be mounted. If this
-          is None, then the device won't be formatted or mounted.
-
-    Returns:
-      A boolean indicating whether the setup occured.
-    """
-    devices = self.GetLocalDrives()
-    if not devices:
-      return False
-
-    if len(devices) > 1:
-      device_path = STRIPED_DEVICE
-      self.StripeDrives(devices, device_path)
-    else:
-      device_path = devices[0]
-
-    if mount_path:
-      self.FormatDisk(device_path)
-      self.MountDisk(device_path, mount_path)
-    return True
+  def SetupLocalDrives(self):
+    """Perform cloud specific setup on any local drives that exist."""
+    pass
 
   def AddMetadata(self, **kwargs):
     """Add key/value metadata to the instance.
