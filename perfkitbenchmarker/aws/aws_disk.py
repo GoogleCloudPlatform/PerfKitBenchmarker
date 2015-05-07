@@ -33,7 +33,11 @@ from perfkitbenchmarker.aws import util
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
 VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
-DISK_TYPE = {disk.STANDARD: 'standard', disk.SSD: 'gp2', disk.PIOPS: 'io1'}
+DISK_TYPE = {
+    disk.STANDARD: 'standard',
+    disk.REMOTE_SSD: 'gp2',
+    disk.PIOPS: 'io1'
+}
 
 
 class AwsDisk(disk.BaseDisk):

@@ -22,7 +22,7 @@ import abc
 from perfkitbenchmarker import resource
 
 STANDARD = 'standard'
-SSD = 'ssd'
+REMOTE_SSD = 'remote_ssd'
 PIOPS = 'piops'  # Provisioned IOPS (ssd) in AWS
 LOCAL = 'local'
 

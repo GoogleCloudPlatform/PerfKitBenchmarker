@@ -30,7 +30,7 @@ flags.DEFINE_string(
     ' be resolved. See: '
     'https://cloud.google.com/sdk/gcloud/reference/compute/disks/create')
 
-DISK_TYPE = {disk.STANDARD: 'pd-standard', disk.SSD: 'pd-ssd'}
+DISK_TYPE = {disk.STANDARD: 'pd-standard', disk.REMOTE_SSD: 'pd-ssd'}
 
 
 class GceDisk(disk.BaseDisk):
