@@ -171,19 +171,17 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
-    data_disk = azure_disk.AzureDisk(disk_spec, self.name)
-    self.scratch_disks.append(data_disk)
-
-    if data_disk.disk_type == disk.LOCAL:
-      if self.local_drive_counter >= self.max_local_drives:
+    if disk_spec.disk_type == disk.LOCAL:
+      self.local_drive_counter += disk_spec.num_striped_disks
+      if self.local_drive_counter > self.max_local_drives:
         raise errors.Error('Not enough local drives.')
-      self.local_drive_counter += 1
-    else:
-      data_disk.Create()
 
-    device_path = data_disk.GetDevicePath()
-    self.FormatDisk(device_path)
-    self.MountDisk(device_path, disk_spec.mount_point)
+    # Instantiate the disk(s) that we want to create.
+    disks = [azure_disk.AzureDisk(disk_spec, self.name)
+             for _ in range(disk_spec.num_striped_disks)]
+
+    self._CreateScratchDiskFromDisks(disk_spec, disks)
+
 
   def GetLocalDrives(self):
     """Returns a list of local drives on the VM.

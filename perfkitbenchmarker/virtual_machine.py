@@ -27,6 +27,7 @@ import uuid
 import jinja2
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
@@ -148,6 +149,42 @@ class BaseVirtualMachine(resource.BaseResource):
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
     pass
+
+  def _CreateScratchDiskFromDisks(self, disk_spec, disks):
+    """Helper method to prepare data disks.
+
+    Given a list of BaseDisk objects representing a single data disk,
+    this will do most of the work creating, attaching, striping,
+    formating, and mounting them. This is intended to be called from
+    within a cloud specific VM's CreateScratchDisk method.
+
+    Args:
+      disk_spec: The BaseDiskSpec object corresponding to the disk.
+      disks: A list of the disk(s) to be created, attached, striped,
+          formatted, and mounted. If there is more than one disk in
+          the list, then they will be striped together.
+    """
+    if len(disks) > 1:
+      # If the disk_spec called for a striped disk, create one.
+      device_path = '/dev/md%d' % len(self.scratch_disks)
+      data_disk = disk.StripedDisk(disk_spec, disks, device_path)
+    else:
+      data_disk = disks[0]
+
+    self.scratch_disks.append(data_disk)
+
+    if data_disk.disk_type != disk.LOCAL:
+      data_disk.Create()
+      data_disk.Attach(self)
+
+    if isinstance(data_disk, disk.StripedDisk):
+      device_paths = [d.GetDevicePath() for d in data_disk.disks]
+      self.StripeDrives(device_paths, data_disk.GetDevicePath())
+
+    if disk_spec.mount_point:
+      self.FormatDisk(data_disk.GetDevicePath())
+      self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point)
+
 
   def DeleteScratchDisks(self):
     """Delete a VM's scratch disks."""

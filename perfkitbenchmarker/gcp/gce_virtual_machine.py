@@ -160,21 +160,23 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
-    name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
-    scratch_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
-    self.scratch_disks.append(scratch_disk)
-
-    if scratch_disk.disk_type == disk.LOCAL:
-      if self.local_drive_counter >= self.max_local_drives:
+    # Get the names for the disk(s) we are going to create.
+    if disk_spec.disk_type == disk.LOCAL:
+      new_count = self.local_drive_counter + disk_spec.num_striped_disks
+      if new_count > self.max_local_drives:
         raise errors.Error('Not enough local drives.')
-      scratch_disk.name = 'local-ssd-%d' % self.local_drive_counter
-      self.local_drive_counter += 1
+      disk_names = ['local-ssd-%d' % i
+                    for i in range(self.local_drive_counter, new_count)]
+      self.local_drive_counter = new_count
     else:
-      scratch_disk.Create()
-      scratch_disk.Attach(self)
+      disk_names = ['%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
+                    for i in range(disk_spec.num_striped_disks)]
 
-    self.FormatDisk(scratch_disk.GetDevicePath())
-    self.MountDisk(scratch_disk.GetDevicePath(), disk_spec.mount_point)
+    # Instantiate the disk(s).
+    disks = [gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
+             for name in disk_names]
+
+    self._CreateScratchDiskFromDisks(disk_spec, disks)
 
   def GetName(self):
     """Get a GCE VM's unique name."""

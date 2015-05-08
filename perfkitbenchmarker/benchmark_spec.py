@@ -148,11 +148,18 @@ class BenchmarkSpec(object):
               self.zones[min(index, len(self.zones) - 1)])
           for index in range(self.num_vms)]
       self.vm_dict['default'] = self.vms
-      for i in range(benchmark_info['scratch_disk']):
-        disk_spec = disk.BaseDiskSpec(
-            self.scratch_disk_size, self.scratch_disk_type,
-            '/scratch%d' % i, self.scratch_disk_iops)
-        for vm in self.vms:
+      for vm in self.vms:
+        if (FLAGS.scratch_disk_type == disk.LOCAL and
+            not FLAGS['num_striped_drives'].present):
+          num_striped_drives = (vm.max_local_drives /
+                                benchmark_info['scratch_disk'])
+        else:
+          num_striped_drives = FLAGS.num_striped_drives
+        for i in range(benchmark_info['scratch_disk']):
+          disk_spec = disk.BaseDiskSpec(
+              self.scratch_disk_size, self.scratch_disk_type,
+              '/scratch%d' % i, self.scratch_disk_iops,
+              num_striped_drives)
           vm.disk_specs.append(disk_spec)
 
     firewall_class = CLASSES[self.cloud][FIREWALL]

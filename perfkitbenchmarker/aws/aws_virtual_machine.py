@@ -266,22 +266,22 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
-    volume = aws_disk.AwsDisk(disk_spec, self.zone)
-    self.scratch_disks.append(volume)
-
-    if volume.disk_type == disk.LOCAL:
-      if self.local_drive_counter >= self.max_local_drives:
+    # Instantiate the disk(s) that we want to create.
+    if disk_spec.disk_type == disk.LOCAL:
+      disks = []
+      for _ in range(disk_spec.num_striped_disks):
+        local_disk = aws_disk.AwsDisk(disk_spec, self.zone)
+        local_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
+                                       self.local_drive_counter)
+        self.local_drive_counter += 1
+        disks.append(local_disk)
+      if self.local_drive_counter > self.max_local_drives:
         raise errors.Error('Not enough local drives.')
-      volume.device_letter = chr(ord(DRIVE_START_LETTER) +
-                                 self.local_drive_counter)
-      self.local_drive_counter += 1
     else:
-      volume.Create()
-      util.AddDefaultTags(volume.id, self.region)
-      volume.Attach(self)
+      disks = [aws_disk.AwsDisk(disk_spec, self.zone)
+               for _ in range(disk_spec.num_striped_disks)]
 
-    self.FormatDisk(volume.GetDevicePath())
-    self.MountDisk(volume.GetDevicePath(), disk_spec.mount_point)
+    self._CreateScratchDiskFromDisks(disk_spec, disks)
 
   def GetLocalDrives(self):
     """Returns a list of local drives on the VM.
