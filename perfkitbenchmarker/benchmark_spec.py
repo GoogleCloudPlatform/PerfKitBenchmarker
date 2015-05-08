@@ -150,6 +150,7 @@ class BenchmarkSpec(object):
       self.vm_dict['default'] = self.vms
       for vm in self.vms:
         if (FLAGS.scratch_disk_type == disk.LOCAL and
+            benchmark_info['scratch_disk'] and
             not FLAGS['num_striped_drives'].present):
           num_striped_drives = (vm.max_local_drives /
                                 benchmark_info['scratch_disk'])
