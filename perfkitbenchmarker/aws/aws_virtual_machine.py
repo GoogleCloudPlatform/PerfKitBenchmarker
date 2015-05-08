@@ -22,6 +22,8 @@ import json
 import logging
 import threading
 
+from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import package_managers
 from perfkitbenchmarker import virtual_machine
@@ -143,6 +145,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.region = self.zone[:-1]
     self.image = self.image or GetImage(self.machine_type, self.region)
     self.user_name = FLAGS.aws_user_name
+    if self.machine_type in NUM_LOCAL_VOLUMES:
+      self.max_local_drives = NUM_LOCAL_VOLUMES[self.machine_type]
+    self.local_drive_counter = 0
 
   def ImportKeyfile(self):
     """Imports the public keyfile to AWS."""
@@ -261,15 +266,22 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
-    disk = aws_disk.AwsDisk(disk_spec, self.zone)
-    self.scratch_disks.append(disk)
+    volume = aws_disk.AwsDisk(disk_spec, self.zone)
+    self.scratch_disks.append(volume)
 
-    disk.Create()
-    util.AddDefaultTags(disk.id, self.region)
-    disk.Attach(self)
+    if volume.disk_type == disk.LOCAL:
+      if self.local_drive_counter >= self.max_local_drives:
+        raise errors.Error('Not enough local drives.')
+      volume.device_letter = chr(ord(DRIVE_START_LETTER) +
+                                 self.local_drive_counter)
+      self.local_drive_counter += 1
+    else:
+      volume.Create()
+      util.AddDefaultTags(volume.id, self.region)
+      volume.Attach(self)
 
-    self.FormatDisk(disk.GetDevicePath())
-    self.MountDisk(disk.GetDevicePath(), disk_spec.mount_point)
+    self.FormatDisk(volume.GetDevicePath())
+    self.MountDisk(volume.GetDevicePath(), disk_spec.mount_point)
 
   def GetLocalDrives(self):
     """Returns a list of local drives on the VM.
@@ -281,22 +293,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     return ['/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
             for i in xrange(NUM_LOCAL_VOLUMES[self.machine_type])]
 
-  def SetupLocalDrives(self, mount_path=virtual_machine.LOCAL_MOUNT_PATH):
-    """Set up any local drives that exist.
-
-    Performs AWS specific setup (unmounts drives) then sets up drives as usual.
-
-    Args:
-      mount_path: The path where the local drives should be mounted. If this
-          is None, then the device won't be formatted or mounted.
-
-    Returns:
-      A boolean indicating whether the setup occured.
-    """
-    if NUM_LOCAL_VOLUMES[self.machine_type]:
-      self.RemoteCommand('sudo umount /mnt')
-    return super(AwsVirtualMachine, self).SetupLocalDrives(
-        mount_path=mount_path)
+  def SetupLocalDrives(self):
+    """Performs AWS specific setup of local drives."""
+    # Some images may automount one local drive, but we don't
+    # want to fail if this wasn't the case.
+    self.RemoteCommand('sudo umount /mnt', ignore_failure=True)
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
