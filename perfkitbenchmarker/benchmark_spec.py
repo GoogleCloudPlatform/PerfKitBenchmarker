@@ -149,6 +149,8 @@ class BenchmarkSpec(object):
           for index in range(self.num_vms)]
       self.vm_dict['default'] = self.vms
       for vm in self.vms:
+        # If we are using local disks and num_striped_drives has not been
+        # set, then we want to set it to stripe all local drives together.
         if (FLAGS.scratch_disk_type == disk.LOCAL and
             benchmark_info['scratch_disk'] and
             not FLAGS['num_striped_drives'].present):
