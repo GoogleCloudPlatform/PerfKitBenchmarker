@@ -55,7 +55,8 @@ BLOCK_SIZE = 192
 STREAM_METRICS = ['Copy', 'Scale', 'Add', 'Triad']
 
 BENCHMARK_INFO = {'name': 'hpcc',
-                  'description': 'Runs HPCC.',
+                  'description': 'Runs HPCC. Specify the number of VMs with '
+                  '--num_vms',
                   'scratch_disk': False}
 
 flags.DEFINE_integer('memory_size_mb',

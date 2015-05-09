@@ -30,6 +30,8 @@ flags.DEFINE_string(
     ' be resolved. See: '
     'https://cloud.google.com/sdk/gcloud/reference/compute/disks/create')
 
+DISK_TYPE = {disk.STANDARD: 'pd-standard', disk.REMOTE_SSD: 'pd-ssd'}
+
 
 class GceDisk(disk.BaseDisk):
   """Object representing an GCE Disk."""
@@ -49,7 +51,7 @@ class GceDisk(disk.BaseDisk):
                   'disks',
                   'create', self.name,
                   '--size', str(self.disk_size),
-                  '--type', self.disk_type]
+                  '--type', DISK_TYPE[self.disk_type]]
     create_cmd.extend(util.GetDefaultGcloudFlags(self))
     if self.image:
       create_cmd.extend(['--image', self.image])

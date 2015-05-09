@@ -35,7 +35,7 @@ FLAGS = flags.FLAGS
 BENCHMARK_INFO = {'name': 'copy_throughput',
                   'description': 'Get cp and scp performance between vms.',
                   'scratch_disk': True,
-                  'num_machines': 0}
+                  'num_machines': None}
 
 CIPHER = 'aes128-cbc'
 

@@ -24,23 +24,26 @@ import logging
 import re
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
+flags.DEFINE_integer('sending_thread_count', 1,
+                     'Number of connections to make to the'
+                     ' server for sending traffic.')
+
 FLAGS = flags.FLAGS
 
-BENCHMARKS_INFO = {'name': 'iperf',
-                   'description': 'Run iperf',
-                   'scratch_disk': False,
-                   'num_machines': 2}
+BENCHMARK_INFO = {'name': 'iperf',
+                  'description': 'Run iperf',
+                  'scratch_disk': False,
+                  'num_machines': 2}
 
 IPERF_PORT = 20000
 IPERF_RETRIES = 5
 
 
 def GetInfo():
-  return BENCHMARKS_INFO
+  return BENCHMARK_INFO
 
 
 def Prepare(benchmark_spec):
@@ -71,15 +74,35 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
     ip_type: The IP type of 'ip_address' (e.g. 'internal', 'external')
   Returns:
     A Sample.
-  Raises:
-    regex_util.NoMatchError: When iperf results are not found in stdout.
   """
-  iperf_cmd = ('iperf --client %s --port %s --format m --time 60' %
-               (receiving_ip_address, IPERF_PORT))
+  iperf_cmd = ('iperf --client %s --port %s --format m --time 60 -P %s' %
+               (receiving_ip_address, IPERF_PORT, FLAGS.sending_thread_count))
   stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True)
 
-  iperf_pattern = re.compile(r'(\d+\.\d+|\d+) Mbits/sec')
-  value = regex_util.ExtractFloat(iperf_pattern, stdout)
+  # Example output from iperf that needs to be parsed
+  # STDOUT: ------------------------------------------------------------
+  # Client connecting to 10.237.229.201, TCP port 5001
+  # TCP window size: 0.04 MByte (default)
+  # ------------------------------------------------------------
+  # [  6] local 10.76.234.115 port 53527 connected with 10.237.229.201 port 5001
+  # [  3] local 10.76.234.115 port 53524 connected with 10.237.229.201 port 5001
+  # [  4] local 10.76.234.115 port 53525 connected with 10.237.229.201 port 5001
+  # [  5] local 10.76.234.115 port 53526 connected with 10.237.229.201 port 5001
+  # [ ID] Interval       Transfer     Bandwidth
+  # [  4]  0.0-60.0 sec  3730 MBytes   521 Mbits/sec
+  # [  5]  0.0-60.0 sec  3499 MBytes   489 Mbits/sec
+  # [  6]  0.0-60.0 sec  3044 MBytes   425 Mbits/sec
+  # [  3]  0.0-60.0 sec  3738 MBytes   522 Mbits/sec
+  # [SUM]  0.0-60.0 sec  14010 MBytes  1957 Mbits/sec
+
+  thread_values = re.findall('\[.*\d\].*\d.Mbits/sec', stdout)
+  if len(thread_values) != FLAGS.sending_thread_count:
+        raise ValueError('Only %s out of %s iperf threads repoted a'
+                         ' throughput value.' % (len(thread_values),
+                                                 FLAGS.sending_thread_count))
+  total_throughput = 0.0
+  for value in thread_values:
+      total_throughput += float(value.split(' ')[-2])
 
   metadata = {
       # TODO(voellm): The server and client terminology is being
@@ -93,10 +116,11 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
       'receiving_machine_type': receiving_vm.machine_type,
       'receiving_zone': receiving_vm.zone,
       'sending_machine_type': sending_vm.machine_type,
+      'sending_thread_count': FLAGS.sending_thread_count,
       'sending_zone': sending_vm.zone,
       'ip_type': ip_type
   }
-  return sample.Sample('Throughput', float(value), 'Mbits/sec', metadata)
+  return sample.Sample('Throughput', total_throughput, 'Mbits/sec', metadata)
 
 
 def Run(benchmark_spec):

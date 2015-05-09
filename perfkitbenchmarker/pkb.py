@@ -61,6 +61,7 @@ import uuid
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import static_virtual_machine
@@ -73,6 +74,7 @@ STAGE_ALL = 'all'
 STAGE_PREPARE = 'prepare'
 STAGE_RUN = 'run'
 STAGE_CLEANUP = 'cleanup'
+LOG_FILE_NAME = 'pkb.log'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 # List of functions taking a benchmark_spec. Will be called before benchmark.Run
 # with two parameters: the benchmark and benchmark_spec.
@@ -131,12 +133,9 @@ flags.DEFINE_string('static_vm_file', None,
                     'static_virtual_machine.py for a description of this file.')
 flags.DEFINE_boolean('version', False, 'Display the version and exit.')
 flags.DEFINE_enum(
-    'scratch_disk_type', benchmark_spec.STANDARD,
-    [benchmark_spec.STANDARD, benchmark_spec.SSD, benchmark_spec.IOPS],
+    'scratch_disk_type', disk.STANDARD,
+    [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
     'Type for all scratch disks. The default is standard')
-flags.DEFINE_boolean('use_local_disk', False, 'For benchmarks that use disks, '
-                     'this indicates that they should run against '
-                     'the local disk(s) instead of remote storage.')
 flags.DEFINE_integer('scratch_disk_iops', 1500,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
 
@@ -291,6 +290,10 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       # Resource cleanup (below) can take a long time. Log the error to give
       # immediate feedback, then re-throw.
       logging.exception('Error during benchmark %s', benchmark_name)
+      # If the particular benchmark requests us to always call cleanup, do it
+      # here.
+      if spec.always_call_cleanup:
+        DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
       raise
     finally:
       if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
@@ -328,7 +331,7 @@ def RunBenchmarks(publish=True):
   vm_util.GenTempDir()
   log_util.ConfigureLogging(
       stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
-      log_path=vm_util.PrependTempDir('pkb.log'),
+      log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
       run_uri=FLAGS.run_uri)
 
   unknown_benchmarks = ListUnknownBenchmarks()
@@ -372,9 +375,31 @@ def RunBenchmarks(publish=True):
     if collector.samples:
       collector.PublishSamples()
 
+    logging.info('Complete logs can be found at: %s',
+                 vm_util.PrependTempDir(LOG_FILE_NAME))
+
   if FLAGS.run_stage not in [STAGE_ALL, STAGE_CLEANUP]:
     logging.info(
         'To run again with this setup, please use --run_uri=%s', FLAGS.run_uri)
+
+
+
+def _GenerateBenchmarkDocumentation():
+  """Generates benchmark documentation to show in --help."""
+  benchmark_docs = []
+  for benchmark_module in benchmarks.BENCHMARKS:
+    benchmark_info = benchmark_module.GetInfo()
+    vm_count = benchmark_info['num_machines']
+    scratch_disk_str = ''
+    if benchmark_info['scratch_disk']:
+      scratch_disk_str = ' with scratch volume'
+
+    benchmark_docs.append('%s: %s (%s VMs%s)' %
+                          (benchmark_info['name'],
+                           benchmark_info['description'],
+                           vm_count,
+                           scratch_disk_str))
+  return '\n\t'.join(benchmark_docs)
 
 
 def Main(argv=sys.argv):
@@ -384,15 +409,13 @@ def Main(argv=sys.argv):
   # Inject more help documentation
   # The following appends descriptions of the benchmarks and descriptions of
   # the benchmark sets to the help text.
-  benchmark_list = ['%s:  %s' % (benchmark_module.GetInfo()['name'],
-                                 benchmark_module.GetInfo()['description'])
-                    for benchmark_module in benchmarks.BENCHMARKS]
   benchmark_sets_list = [
       '%s:  %s' %
       (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
       for set_name in benchmark_sets.BENCHMARK_SETS]
   sys.modules['__main__'].__doc__ = __doc__ + (
-      '\nBenchmarks:\n\t%s') % '\n\t'.join(benchmark_list)
+      '\nBenchmarks (default requirements):\n\t%s' %
+      _GenerateBenchmarkDocumentation())
   sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
                                       % '\n\t'.join(benchmark_sets_list))
   try:

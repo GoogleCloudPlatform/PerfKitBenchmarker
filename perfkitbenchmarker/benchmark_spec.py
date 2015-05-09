@@ -86,28 +86,10 @@ CLASSES = {
         FIREWALL: aws_network.AwsFirewall
     }
 }
-STANDARD = 'standard'
-SSD = 'ssd'
-IOPS = 'iops'  # Provisioned IOPS (ssd) in AWS
-DISK_TYPE = {
-    GCP: {
-        STANDARD: 'pd-standard',
-        SSD: 'pd-ssd',
-    },
-    AWS: {
-        STANDARD: 'standard',
-        SSD: 'gp2',
-        IOPS: 'io1',
-    },
-    AZURE: {
-        STANDARD: None,  # Azure doesn't have a disk type option yet.
-    }
-}
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS], 'Name of the cloud to use.')
-
 
 
 class BenchmarkSpec(object):
@@ -168,8 +150,7 @@ class BenchmarkSpec(object):
       self.vm_dict['default'] = self.vms
       for i in range(benchmark_info['scratch_disk']):
         disk_spec = disk.BaseDiskSpec(
-            self.scratch_disk_size,
-            DISK_TYPE[self.cloud][self.scratch_disk_type],
+            self.scratch_disk_size, self.scratch_disk_type,
             '/scratch%d' % i, self.scratch_disk_iops)
         for vm in self.vms:
           vm.disk_specs.append(disk_spec)
@@ -178,6 +159,7 @@ class BenchmarkSpec(object):
     self.firewall = firewall_class(self.project)
     self.file_name = '%s/%s' % (vm_util.GetTempDir(), benchmark_info['name'])
     self.deleted = False
+    self.always_call_cleanup = False
 
   def Prepare(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
@@ -191,11 +173,24 @@ class BenchmarkSpec(object):
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
       return
+
     if self.vms:
-      vm_util.RunThreaded(self.DeleteVm, self.vms)
-    self.firewall.DisallowAllPorts()
+      try:
+        vm_util.RunThreaded(self.DeleteVm, self.vms)
+      except Exception:
+        logging.exception('Got an exception deleting VMs. '
+                          'Attempting to continue tearing down.')
+    try:
+      self.firewall.DisallowAllPorts()
+    except Exception:
+      logging.exception('Got an exception disabling firewalls. '
+                        'Attempting to continue tearing down.')
     for zone in self.networks:
-      self.networks[zone].Delete()
+      try:
+        self.networks[zone].Delete()
+      except Exception:
+        logging.exception('Got an exception deleting networks. '
+                          'Attempting to continue tearing down.')
     self.deleted = True
 
   def PrepareNetwork(self, network):
@@ -259,7 +254,7 @@ class BenchmarkSpec(object):
         disk_size, disk_type, mnt_point = node_section[option].split(':')
         disk_size = int(disk_size)
         disk_spec = disk.BaseDiskSpec(
-            disk_size, DISK_TYPE[self.cloud][disk_type], mnt_point)
+            disk_size, disk_type, mnt_point)
         for vm in vms:
           vm.disk_specs.append(disk_spec)
 
@@ -277,10 +272,12 @@ class BenchmarkSpec(object):
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.Startup()
+    if FLAGS.scratch_disk_type == disk.LOCAL:
+      vm.SetupLocalDrives()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
     vm_util.BurnCpu(vm)
-    if vm.is_static:
+    if vm.is_static and vm.install_packages:
       vm.SnapshotPackages()
 
   def DeleteVm(self, vm):
@@ -289,7 +286,7 @@ class BenchmarkSpec(object):
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
-    if vm.is_static:
+    if vm.is_static and vm.install_packages:
       vm.PackageCleanup()
     vm.Delete()
     vm.DeleteScratchDisks()

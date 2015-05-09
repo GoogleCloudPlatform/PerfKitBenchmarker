@@ -291,9 +291,6 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
     A function that wraps functions in retry logic. It can be
         used as a decorator.
   """
-  if timeout is None:
-    timeout = FLAGS.default_timeout
-
   if retryable_exceptions is None:
     retryable_exceptions = Exception
 
@@ -301,8 +298,10 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
     """Wraps the supplied function with retry logic."""
     def WrappedFunction(*args, **kwargs):
       """Holds the retry logic."""
-      if timeout >= 0:
-        deadline = time.time() + timeout
+      local_timeout = FLAGS.default_timeout if timeout is None else timeout
+
+      if local_timeout >= 0:
+        deadline = time.time() + local_timeout
       else:
         deadline = float('inf')
 
@@ -325,7 +324,7 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
   return Wrap
 
 
-def IssueCommand(cmd, force_info_log=False, suppress_warning=False):
+def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
   """Tries running the provided command once.
 
   Args:
@@ -338,13 +337,18 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False):
         not be logged at the info level in the event of a non-zero
         return code. When force_info_log is True, the output is logged
         regardless of suppress_warning's value.
+    env: A dict of key/value strings, such as is given to the subprocess.Popen()
+        constructor, that contains environment variables to be injected.
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
   """
+  logging.debug('Environment variables: %s' % env)
+
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
-  process = subprocess.Popen(cmd,
+
+  process = subprocess.Popen(cmd, env=env,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
   stdout, stderr = process.communicate()
@@ -352,7 +356,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False):
   stdout = stdout.decode('ascii', 'ignore')
   stderr = stderr.decode('ascii', 'ignore')
 
-  debug_text = ('Ran %s. Got return code (%s). STDOUT: %sSTDERR: %s' %
+  debug_text = ('Ran %s. Got return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
                 (full_cmd, process.returncode, stdout, stderr))
   if force_info_log or (process.returncode and not suppress_warning):
     logging.info(debug_text)
@@ -362,23 +366,28 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False):
   return stdout, stderr, process.returncode
 
 
-def IssueBackgroundCommand(cmd, stdout_path, stderr_path):
+def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
   """Run the provided command once in the background.
 
   Args:
     cmd: Command to be run, as expected by subprocess.Popen.
     stdout_path: Redirect stdout here. Overwritten.
     stderr_path: Redirect stderr here. Overwritten.
+    env: A dict of key/value strings, such as is given to the subprocess.Popen()
+        constructor, that contains environment variables to be injected.
   """
+  logging.debug('Environment variables: %s' % env)
+
   full_cmd = ' '.join(cmd)
   logging.info('Spawning: %s', full_cmd)
   outfile = open(stdout_path, 'w')
   errfile = open(stderr_path, 'w')
-  subprocess.Popen(cmd, stdout=outfile, stderr=errfile, close_fds=True)
+  subprocess.Popen(cmd, env=env,
+                   stdout=outfile, stderr=errfile, close_fds=True)
 
 
 @Retry()
-def IssueRetryableCommand(cmd):
+def IssueRetryableCommand(cmd, env=None):
   """Tries running the provided command until it succeeds or times out.
 
   Args:
@@ -388,7 +397,7 @@ def IssueRetryableCommand(cmd):
   Returns:
     A tuple of stdout and stderr from running the provided command.
   """
-  stdout, stderr, retcode = IssueCommand(cmd)
+  stdout, stderr, retcode = IssueCommand(cmd, env=env)
   if retcode:
     raise errors.VmUtil.CalledProcessException(
         'Command returned a non-zero exit code.\n')
