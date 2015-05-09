@@ -81,13 +81,13 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
 
   # Example output from iperf that needs to be parsed
   # STDOUT: ------------------------------------------------------------
-  # Client connecting to 10.237.229.201, TCP port 20000
+  # Client connecting to 10.237.229.201, TCP port 5001
   # TCP window size: 0.04 MByte (default)
   # ------------------------------------------------------------
-  # [  6] local 10.76.234.115 port 53527 connected with 10.237.229.201 port 20000
-  # [  3] local 10.76.234.115 port 53524 connected with 10.237.229.201 port 20000
-  # [  4] local 10.76.234.115 port 53525 connected with 10.237.229.201 port 20000
-  # [  5] local 10.76.234.115 port 53526 connected with 10.237.229.201 port 20000
+  # [  6] local 10.76.234.115 port 53527 connected with 10.237.229.201 port 5001
+  # [  3] local 10.76.234.115 port 53524 connected with 10.237.229.201 port 5001
+  # [  4] local 10.76.234.115 port 53525 connected with 10.237.229.201 port 5001
+  # [  5] local 10.76.234.115 port 53526 connected with 10.237.229.201 port 5001
   # [ ID] Interval       Transfer     Bandwidth
   # [  4]  0.0-60.0 sec  3730 MBytes   521 Mbits/sec
   # [  5]  0.0-60.0 sec  3499 MBytes   489 Mbits/sec
