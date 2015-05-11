@@ -333,7 +333,7 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
         object_path = '%s/%s' % (bucket, object_name)
         object_uri = boto.storage_uri(object_path, storage_schema)
         object_uri.connect(host=host_to_connect)
-        object_uri.get_contents_as_string()
+        object_uri.new_key().get_contents_as_string()
       else:
         _AZURE_BLOB_SERVICE.get_blob_to_bytes(bucket, object_name)
 
@@ -766,7 +766,7 @@ def Main(argv=sys.argv):
       list_inconsistency_window[scenario] = []
       inconsistent_list_count[scenario] = 0.0
 
-    logging.info('Running list consistency tests for %d iterations...' %
+    logging.info('Running list consistency tests for %d iterations...',
                  FLAGS.iterations)
     for _ in range(FLAGS.iterations):
       result = ListConsistencyBenchmark(storage_schema, host_to_connect)
