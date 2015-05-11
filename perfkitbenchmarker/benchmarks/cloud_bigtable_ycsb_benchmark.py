@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs YCSB against Cloud Bigtable"""
+"""Runs YCSB against Cloud Bigtable.
+
+Cloud Bigtable (https://cloud.google.com/bigtable/) is a managed NoSQL database
+with an HBase-compatible API.
+
+Compared to hbase_ycsb, this benchmark:
+  * Modifies hbase-site.xml to work with Cloud Bigtable.
+  * Adds the Bigtable client JAR.
+  * Adds alpn-boot-7.0.0.v20140317.jar to the bootclasspath, required to
+    operate.
+"""
 
 import os
 
@@ -34,6 +44,16 @@ flags.DEFINE_string('google_bigtable_zone_name', 'us-central1-b',
                     'Bigtable zone.')
 flags.DEFINE_string('google_bigtable_cluster_name', None,
                     'Bigtable cluster name.')
+flags.DEFINE_string(
+    'google_bigtable_alpn_jar_url',
+    'http://central.maven.org/maven2/org/mortbay/jetty/alpn/'
+    'alpn-boot/7.0.0.v20140317/alpn-boot-7.0.0.v20140317.jar',
+    'URL for the ALPN boot JAR, required for HTTP2')
+flags.DEFINE_string(
+    'google_bigtable_hbase_jar_url',
+    'https://storage.googleapis.com/cloud-bigtable/jars/'
+    'bigtable-hbase/bigtable-hbase-0.1.5.jar',
+    'URL for the Bigtable-HBase client JAR.')
 
 
 BENCHMARK_INFO = {'name': 'cloud_bigtable_ycsb',
@@ -44,12 +64,6 @@ BENCHMARK_INFO = {'name': 'cloud_bigtable_ycsb',
 
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
-BIGTABLE_HBASE_JAR_URL = ('https://storage.googleapis.com/cloud-bigtable/jars/'
-                          'bigtable-hbase/bigtable-hbase-0.1.5.jar')
-ALPN_JAR_URL = ('http://central.maven.org/maven2/org/mortbay/jetty/alpn/'
-                'alpn-boot/7.0.0.v20140317/alpn-boot-7.0.0.v20140317.jar')
-ALPN_LOCAL_PATH = os.path.join(vm_util.VM_TMP_DIR,
-                               os.path.basename(ALPN_JAR_URL))
 YCSB_HBASE_LIB = os.path.join(ycsb.YCSB_DIR, 'hbase-binding', 'lib')
 YCSB_HBASE_CONF = os.path.join(ycsb.YCSB_DIR, 'hbase-binding', 'conf')
 
@@ -90,6 +104,13 @@ def CheckPrerequisites():
     raise ValueError('Missing --project')
 
 
+def _GetALPNLocalPath():
+  bn = os.path.basename(FLAGS.google_bigtable_alpn_jar_url)
+  if not bn.endswith('.jar'):
+    bn = 'alpn.jar'
+  return os.path.join(vm_util.VM_TMP_DIR, bn)
+
+
 def _GetTableName():
   return 'ycsb{0}'.format(FLAGS.run_uri)
 
@@ -100,16 +121,18 @@ def _Install(vm):
   vm.Install('ycsb')
 
   hbase_lib = os.path.join(hbase.HBASE_DIR, 'lib')
-  for url in [BIGTABLE_HBASE_JAR_URL]:
+  for url in [FLAGS.google_bigtable_hbase_jar_url]:
     jar_name = os.path.basename(url)
     jar_path = os.path.join(YCSB_HBASE_LIB, jar_name)
     vm.RemoteCommand('curl -Lo {0} {1}'.format(jar_path, url))
     vm.RemoteCommand('cp {0} {1}'.format(jar_path, hbase_lib))
 
-  vm.RemoteCommand('curl -Lo {0} {1}'.format(ALPN_LOCAL_PATH, ALPN_JAR_URL))
+  vm.RemoteCommand('curl -Lo {0} {1}'.format(
+      _GetALPNLocalPath(),
+      FLAGS.google_bigtable_alpn_jar_url))
   vm.RemoteCommand(('echo "export JAVA_HOME=/usr\n'
                     'export HBASE_OPTS=-Xbootclasspath/p:{0}"'
-                    ' >> {1}/hbase-env.sh').format(ALPN_LOCAL_PATH,
+                    ' >> {1}/hbase-env.sh').format(_GetALPNLocalPath(),
                                                    hbase.HBASE_CONF_DIR))
 
   context = {
@@ -133,7 +156,7 @@ def _Install(vm):
   ycsb_memory = min(vm.total_memory_kb // 1024, 4096)
   cmd = ("""sed -i.bak -e '/^ycsb_command =/a """
          """  "-Xmx{0}m", "-Xbootclasspath/p:{1}",' {2}""").format(
-             ycsb_memory, ALPN_LOCAL_PATH, ycsb.YCSB_EXE)
+             ycsb_memory, _GetALPNLocalPath(), ycsb.YCSB_EXE)
   vm.RemoteCommand(cmd)
   # ... and fail if Java exits non-zero
   cmd = "sed -i -e 's/^subprocess.call/subprocess.check_call/' {0} ".format(
