@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,10 @@ import os
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.packages import ycsb
+
+# See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
+flags.DEFINE_string('mongodb_writeconcern', 'safe',
+                    'MongoDB write concern.')
 
 FLAGS = flags.FLAGS
 
@@ -92,7 +96,7 @@ def Run(benchmark_spec):
   executor = ycsb.YCSBExecutor('mongodb')
   kwargs = {
       'mongodb.url': 'mongodb://%s:27017' % vms[0].internal_ip,
-      'mongodb.writeConcern': 'normal'}
+      'mongodb.writeConcern': FLAGS.mongodb_writeconcern}
   samples = list(executor.LoadAndRun([vm], load_kwargs=kwargs,
                                      run_kwargs=kwargs))
   return samples
