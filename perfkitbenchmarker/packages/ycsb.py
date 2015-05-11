@@ -32,7 +32,7 @@ HBase 1.0:
   >>> samples = executor.LoadAndRun(loader_vms)
 
 By default, this runs YCSB workloads A and B against the database, 32 threads
-per client VM, with an initial database size twice the total cluster memory.
+per client VM, with an initial database size of 1GB (1k records).
 Each workload runs for at most 30 minutes.
 """
 import bisect
