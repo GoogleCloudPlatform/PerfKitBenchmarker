@@ -251,13 +251,19 @@
               {%- endif -%}
               {%- endfor -%} {# sample in pair #}
               {%- if base_sample and head_sample -%}
+                {% if base_sample.value %}
                 {% set pct_diff = ((head_sample.value - base_sample.value) / base_sample.value * 100) -%}
+                {% set relative_diff = '{0:.3f}'.format(head_sample.value / base_sample.value) %}
+                {% else -%}
+                {% set pct_diff = infinity -%}
+                {% set relative_diff = "&infin;" %}
+                {% endif -%}
                 <td>{{ head_sample.value - base_sample.value }}</td>
                 <td class="{{ class_for_percent_diff(pct_diff) }}">
                   {%- if class_for_percent_diff(pct_diff) %}
                   <span class="glyphicon glyphicon-arrow-{% if head_sample.value > base_sample.value %}up{% else %}down{% endif %}"></span>
                   {% endif %}
-                  {{ "{0:.3f}".format(head_sample.value / base_sample.value) }}x
+                  {{ relative_diff }}x
                 </td>
               {% else %}
               {% for i in range(2) %}<td></td>{% endfor %}

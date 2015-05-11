@@ -66,15 +66,18 @@ NUM_ROOTS = 1
 OLDISIM_DIR = 'oldisim'
 OLDISIM_VERSION = 'v0.1'
 BINARY_BASE = 'release/workloads/search'
+BENCHMARK_INFO = {'name': 'oldisim',
+                  'description': 'Run oldisim. Specify the number of leaf '
+                  'nodes with --oldisim_num_leaves',
+                  'scratch_disk': False,
+                  'num_machines': None}  # Set in GetInfo below
 
 
 def GetInfo():
   """Decide number of vms needed to run oldisim."""
-  benchmark_info = {'name': 'oldisim',
-                    'description': 'Run oldisim',
-                    'scratch_disk': False,
-                    'num_machines': FLAGS.oldisim_num_leaves + NUM_DRIVERS +
-                    NUM_ROOTS}
+  benchmark_info = BENCHMARK_INFO.copy()
+  benchmark_info['num_machines'] = (FLAGS.oldisim_num_leaves
+                                    + NUM_DRIVERS + NUM_ROOTS)
   return benchmark_info
 
 

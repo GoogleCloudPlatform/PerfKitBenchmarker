@@ -43,11 +43,19 @@ EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
 EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
              '7/x86_64/e/epel-release-7-5.noarch.rpm')
 
+FLAGS = flags.FLAGS
+
 flags.DEFINE_enum('os_type', DEBIAN,
                   [DEBIAN, RHEL],
                   'The version of linux that the VM\'s os is based on. '
                   'This will determine the package manager used, among '
                   'other things.')
+flags.DEFINE_bool('install_packages', True,
+                  'Override for determining whether packages should be '
+                  'installed. If this is false, no packages will be installed '
+                  'on any VMs. This option should probably only ever be used '
+                  'if you have already created an image with all relevant '
+                  'packages installed.')
 
 
 class BasePackageMixin(object):
@@ -161,6 +169,9 @@ class YumMixin(BasePackageMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
+    if ((self.is_static and not self.install_packages) or
+        not FLAGS.install_pacakges):
+      return
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
       package.YumInstall(self)
@@ -202,7 +213,9 @@ class AptMixin(BasePackageMixin):
 
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
-    self.RemoteCommand('sudo apt-get update')
+    # We don't want to fail if updating fails. The '--ignore-missing'
+    # option lets us continue even when we can't locate an archive.
+    self.RemoteCommand('sudo apt-get update --ignore-missing')
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
@@ -237,6 +250,9 @@ class AptMixin(BasePackageMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
+    if ((self.is_static and not self.install_packages) or
+        not FLAGS.install_packages):
+      return
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
       package.AptInstall(self)

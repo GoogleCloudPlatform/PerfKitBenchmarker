@@ -145,12 +145,31 @@ def ParseResults(job_file, fio_json_result):
                           job[mode]['bw'],
                           'KB/s', bw_metadata))
         lat_metadata = {
-            'min': job[mode]['lat']['min'],
-            'max': job[mode]['lat']['max'],
-            'stddev': job[mode]['lat']['stddev']}
+            'min': job[mode]['clat']['min'],
+            'max': job[mode]['clat']['max'],
+            'stddev': job[mode]['clat']['stddev']}
         lat_metadata.update(parameters)
         samples.append(
             sample.Sample('%s:latency' % metric_name,
-                          job[mode]['lat']['mean'],
+                          job[mode]['clat']['mean'],
                           'usec', lat_metadata))
+        samples.append(
+            sample.Sample('%s:iops' % metric_name,
+                          job[mode]['iops'], '', parameters))
   return samples
+
+
+def DeleteParameterFromJobFile(job_file, parameter):
+  """Delete all occurance of parameter from job_file.
+
+  Args:
+    job_file: The contents of the fio job file.
+    parameter: The parameter to be deleted in job file.
+
+  Returns:
+    A string representing a fio job file after removing parameter.
+  """
+  try:
+    return regex_util.Substitute(r'%s=[\w\d_/]+\n' % parameter, '', job_file)
+  except regex_util.NoMatchError:
+    return job_file

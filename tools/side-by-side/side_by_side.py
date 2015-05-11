@@ -329,6 +329,7 @@ def RenderResults(base_result, head_result, template_name=TEMPLATE,
                          sample_diffs=sample_diffs,
                          sample_context_diffs=sample_context_diffs,
                          flag_diffs=flag_diffs,
+                         infinity=float('inf'),
                          **kwargs)
 
 

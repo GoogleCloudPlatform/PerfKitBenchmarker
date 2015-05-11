@@ -43,7 +43,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def __init__(self, ip_address, user_name, keyfile_path, internal_ip=None,
                zone=None, local_disks=None, scratch_disk_mountpoints=None,
-               ssh_port=22):
+               ssh_port=22, install_packages=True):
     """Initialize a static virtual machine.
 
     Args:
@@ -55,6 +55,8 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       local_disks: A list of the paths of local disks on the VM.
       scratch_disk_mountpoints: A list of scratch disk mountpoints.
       ssh_port: The port number to use for SSH and SCP commands.
+      install_packages: If false, no packages will be installed. This is
+          useful if benchmark dependencies have already been installed.
     """
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
         None, None, None, None, None)
@@ -67,6 +69,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.ssh_private_key = keyfile_path
     self.local_disks = local_disks or []
     self.scratch_disk_mountpoints = scratch_disk_mountpoints or []
+    self.install_packages = install_packages
 
   def _Create(self):
     """StaticVirtualMachines do not implement _Create()."""
@@ -117,6 +120,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       local_disks: array of strings, optional.
       scratch_disk_mountpoints: array of strings, optional
       os_type: string, optional (see package_managers)
+      install_packages: bool, optional
 
     See the constructor for descriptions.
 
@@ -135,7 +139,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     required_keys = frozenset(['ip_address', 'user_name', 'keyfile_path'])
     optional_keys = frozenset(['internal_ip', 'zone', 'local_disks',
                                'scratch_disk_mountpoints', 'os_type',
-                               'ssh_port'])
+                               'ssh_port', 'install_packages'])
     allowed_keys = required_keys | optional_keys
 
     def VerifyItemFormat(item):
@@ -168,9 +172,11 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
                 scratch_disk_mountpoints))
       ssh_port = item.get('ssh_port', 22)
       os_type = item.get('os_type')
+      install_packages = item.get('install_packages', True)
       vm_class = GetStaticVirtualMachineClass(os_type)
       vm = vm_class(ip_address, user_name, keyfile_path, internal_ip, zone,
-                    local_disks, scratch_disk_mountpoints, ssh_port)
+                    local_disks, scratch_disk_mountpoints, ssh_port,
+                    install_packages)
       cls.vm_pool.append(vm)
 
   @classmethod

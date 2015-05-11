@@ -1,0 +1,86 @@
+{
+    "Reservations": [
+        {
+            "Groups": [],
+            "OwnerId": "835761027970",
+            "Instances": [
+                {
+                    "ProductCodes": [],
+                    "VpcId": "vpc-91755bf4",
+                    "StateTransitionReason": null,
+                    "LaunchTime": "2015-05-04T23:46:22.000Z",
+                    "KeyName": "perfkit-key-20aec52a",
+                    "Hypervisor": "xen",
+                    "InstanceType": "m3.medium",
+                    "SourceDestCheck": true,
+                    "Monitoring": {
+                        "State": "disabled"
+                    },
+                    "ClientToken": null,
+                    "State": {
+                        "Name": "pending",
+                        "Code": 0
+                    },
+                    "RootDeviceType": "ebs",
+                    "ImageId": "ami-acff23c4",
+                    "Architecture": "x86_64",
+                    "AmiLaunchIndex": 0,
+                    "Placement": {
+                        "AvailabilityZone": "us-east-1a",
+                        "GroupName": null,
+                        "Tenancy": "default"
+                    },
+                    "RootDeviceName": "/dev/sda1",
+                    "VirtualizationType": "hvm",
+                    "PrivateDnsName": "ip-10-0-0-133.ec2.internal",
+                    "SecurityGroups": [
+                        {
+                            "GroupName": "default",
+                            "GroupId": "sg-6a4b150e"
+                        }
+                    ],
+                    "EbsOptimized": false,
+                    "NetworkInterfaces": [
+                        {
+                            "OwnerId": "835761027970",
+                            "NetworkInterfaceId": "eni-1114294a",
+                            "Groups": [
+                                {
+                                    "GroupName": "default",
+                                    "GroupId": "sg-6a4b150e"
+                                }
+                            ],
+                            "SourceDestCheck": true,
+                            "Description": null,
+                            "PrivateIpAddress": "10.0.0.133",
+                            "Attachment": {
+                                "DeleteOnTermination": true,
+                                "AttachmentId": "eni-attach-1081e669",
+                                "DeviceIndex": 0,
+                                "Status": "attaching",
+                                "AttachTime": "2015-05-04T23:46:22.000Z"
+                            },
+                            "PrivateIpAddresses": [
+                                {
+                                    "PrivateIpAddress": "10.0.0.133",
+                                    "Primary": true,
+                                    "PrivateDnsName": "ip-10-0-0-133.ec2.internal"
+                                }
+                            ],
+                            "VpcId": "vpc-91755bf4",
+                            "PrivateDnsName": "ip-10-0-0-133.ec2.internal",
+                            "Status": "in-use",
+                            "SubnetId": "subnet-7325b92a"
+                        }
+                    ],
+                    "PublicDnsName": null,
+                    "PrivateIpAddress": "10.0.0.133",
+                    "BlockDeviceMappings": [],
+                    "InstanceId": "i-8ed83d71",
+                    "SubnetId": "subnet-7325b92a"
+                }
+            ],
+            "ReservationId": "r-41a3efad"
+        }
+    ]
+}
