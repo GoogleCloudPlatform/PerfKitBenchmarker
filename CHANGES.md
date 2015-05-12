@@ -1,3 +1,23 @@
+# v0.15.0
+
+* Add ability to inject environment variables to IssueCommand. (GH-231)
+* More SPEC CPU 2006 execution flexibility. (GH-230)
+* Enable different disk types for cassandra_stress test. (GH-252)
+* Add the option to skip installing packages. (GH-223)
+* Expose VM count and scratch disk requirements in help. (GH-240, GH-241)
+* Add iops and against device flag. (GH-236)
+* Netperf: Parse CSV output; add p50, p90, p99. (GH-222)
+* Logging fixes and enhancements. (GH-68)
+* Fixes some apt-get update flakiness. (GH-250)
+* Updates AWS to use _Exists for resources. (GH-228)
+* Fixes small bug wth GCP metadata. (GH-242)
+* Call benchmark specific cleanup() when there is exception. (GH-239)
+* Fix the command that creates a storage account for Azure. (GH-238)
+* Defines BENCHMARK_INFO for all benchmarks. (GH-232)
+* Fixes issue with retry. (GH-233)
+* Make resource deletion continue even when exceptions are thrown. (GH-224)
+* Fix a DivideByZeroError in side-by-side. (GH-226)
+
 # v0.14.0
 
 * Added the Silo filesystem benchmark (GH-170)
