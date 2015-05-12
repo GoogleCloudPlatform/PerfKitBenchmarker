@@ -14,4 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:/jre/bin/java::")
+export JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:/bin/java::")
+export HADOOP_SSH_OPTS="-o IdentitiesOnly=yes \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  -o IdentityFile={{ hadoop_private_key }} \
+  -o BatchMode=Yes"
