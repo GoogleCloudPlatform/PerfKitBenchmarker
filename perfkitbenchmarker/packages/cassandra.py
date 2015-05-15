@@ -47,8 +47,9 @@ NODETOOL = os.path.join(CASSANDRA_DIR, 'bin', 'nodetool')
 
 # Number of times to attempt to start the cluster.
 CLUSTER_START_TRIES = 10
+CLUSTER_START_SLEEP = 120
 # Time, in seconds, to sleep between node starts.
-SLEEP_BETWEEN_NODE_START = 30
+NODE_START_SLEEP = 30
 
 
 def CheckPrerequisites():
@@ -159,19 +160,41 @@ def _StartCassandraIfNotRunning(vm):
     Start(vm)
 
 
+def GetNumberOfNodesUp(vm):
+  """Gets the number of VMs which are up in a Cassandra cluster.
+
+  Args:
+    vm: VirtualMachine. The VM to use to check the cluster status.
+  """
+  vms_up = vm.RemoteCommand(
+      '{0} status | grep -c "^UN"'.format(NODETOOL))[0].strip()
+  return int(vms_up)
+
+
 def StartCluster(seed_vm, vms):
+  """Starts a Cassandra cluster.
+
+  Starts a Cassandra cluster, first starting 'seed_vm', then remaining VMs in
+  'vms'.
+
+  Args:
+    seed_vm: VirtualMachine. Machine which will function as the sole seed. It
+      will be started before all other VMs.
+    vms: list of VirtualMachines. VMs *other than* seed_vm which should be
+      started.
+  """
   vm_count = len(vms) + 1
 
   # Cassandra setup
   logging.info('Starting seed VM %s', seed_vm)
   Start(seed_vm)
-  logging.info('Waiting for seed to start')
-  time.sleep(20)
+  logging.info('Waiting %ds for seed to start', NODE_START_SLEEP)
+  time.sleep(NODE_START_SLEEP)
   for i in xrange(5):
     if not IsRunning(seed_vm):
-      logging.warn('Seed %s: Cassandra not running yet (try %d). Waiting %d.',
-                   seed_vm, i, SLEEP_BETWEEN_NODE_START)
-      time.sleep(SLEEP_BETWEEN_NODE_START)
+      logging.warn('Seed %s: Cassandra not running yet (try %d). Waiting %ds.',
+                   seed_vm, i, NODE_START_SLEEP)
+      time.sleep(NODE_START_SLEEP)
     else:
       break
   else:
@@ -183,22 +206,21 @@ def StartCluster(seed_vm, vms):
     # Starting Cassandra nodes fails when multiple nodes attempt to join the
     # cluster concurrently.
     for i, vm in enumerate(vms):
-      time.sleep(SLEEP_BETWEEN_NODE_START)
+      time.sleep(NODE_START_SLEEP)
       logging.info('Starting non-seed VM %d/%d.', i + 1, len(vms))
       Start(vm)
-    logging.info('Waiting 2m for nodes to join')
-    time.sleep(120)
+    logging.info('Waiting %ds for nodes to join', CLUSTER_START_SLEEP)
+    time.sleep(CLUSTER_START_SLEEP)
 
   for i in xrange(CLUSTER_START_TRIES):
-    vms_up = seed_vm.RemoteCommand(
-        '{0} status | grep -c "^UN"'.format(NODETOOL))[0].strip()
-    if int(vms_up) == vm_count:
+    vms_up = GetNumberOfNodesUp(seed_vm)
+    if vms_up == vm_count:
       logging.info('All %d nodes up!', vm_count)
       break
 
-    logging.warn('Try %d: only %s of %s up. Sleeping 30s', i, vms_up,
-                 vm_count)
+    logging.warn('Try %d: only %s of %s up. Sleeping %ds', i, vms_up,
+                 vm_count, NODE_START_SLEEP)
     vm_util.RunThreaded(_StartCassandraIfNotRunning, vms)
-    time.sleep(SLEEP_BETWEEN_NODE_START)
+    time.sleep(NODE_START_SLEEP)
   else:
     raise IOError('Failed to start Cassandra cluster.')
