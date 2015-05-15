@@ -67,10 +67,13 @@ _DEFAULT_PERCENTILES = 50, 75, 90, 95, 99, 99.9
 flags.DEFINE_boolean('ycsb_histogram', True, 'Include individual '
                      'histogram results from YCSB (will increase sample '
                      'count).')
+flags.DEFINE_boolean('ycsb_load_samples', True, 'Include samples '
+                     'from pre-populating database.')
 flags.DEFINE_boolean('ycsb_include_individual_results', False,
                      'Include results from each client VM, rather than just '
                      'combined results.')
-flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.')
+flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.',
+                     lower_bound=1)
 flags.DEFINE_list('ycsb_workload_files', [],
                   'Path to YCSB workload file to use during *run* '
                   'stage only. Comma-separated list')
@@ -219,15 +222,11 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
       # Drop ">" from ">1000"
       if name.startswith('>'):
         name = name[1:]
+      val = float(val) if '.' in val else int(val)
       if name.isdigit():
-        val = float(val) if '.' in val else int(val)
         if val:
           op_result[data_type].append((int(name), val))
       else:
-        if '.' in val:
-          val = float(val)
-        else:
-          val = int(val)
         if '(us)' in name:
           name = name.replace('(us)', '(ms)')
           val /= 1000.0
@@ -304,7 +303,19 @@ def _PercentilesFromHistogram(ycsb_histogram, percentiles=_DEFAULT_PERCENTILES):
 
 
 def _CombineResults(result_list, combine_histograms=True):
-  """Combine results from multiple YCSB clients."""
+  """Combine results from multiple YCSB clients.
+
+  Reduces a list of YCSB results (the output of ParseResults)
+  into a single result. Histogram bin counts, operation counts, and throughput
+  are summed; RunTime is replaced by the maximum runtime of any result.
+
+  Args:
+    result_list: List of ParseResults outputs.
+    combine_histograms: If true, histogram bins are summed across results. If
+      not, no histogram will be returned. Defaults to True.
+  Returns:
+    A dictionary, as returned by ParseResults.
+  """
   result = copy.deepcopy(result_list[0])
 
   # Binary operators to aggregate reported statistics.
@@ -366,6 +377,11 @@ def _CombineResults(result_list, combine_histograms=True):
 def _ParseWorkload(contents):
   """Parse a YCSB workload file.
 
+  YCSB workloads are Java .properties format.
+  http://en.wikipedia.org/wiki/.properties
+  This function does not support all .properties syntax, in particular escaped
+  newlines.
+
   Args:
     contents: str. Contents of the file.
 
@@ -373,8 +389,14 @@ def _ParseWorkload(contents):
     dict mapping from property key to property value for each property found in
     'contents'.
   """
-  matches = re.findall(r'^([^#]+?)\s*=\s*(.*)$', contents, re.MULTILINE)
-  return {k.strip(): v.strip() for k, v in matches}
+  fp = io.BytesIO(contents)
+  result = {}
+  for line in fp:
+    if (line.strip() and not line.lstrip().startswith('#') and
+        not line.lstrip().startswith('!')):
+      k, v = re.split(r'\s*[:=]\s*', line, maxsplit=1)
+      result[k] = v
+  return result
 
 
 def _CreateSamples(ycsb_result, include_histogram=True, **kwargs):
@@ -461,7 +483,7 @@ class YCSBExecutor(object):
     parameters = self.parameters.copy()
     parameters.update(kwargs)
 
-    # these are passed as flags rather than properties, so they
+    # These are passed as flags rather than properties, so they
     # are handled differently.
     for flag in self.FLAG_ATTRIBUTES:
       value = parameters.pop(flag, None)
@@ -477,7 +499,7 @@ class YCSBExecutor(object):
     return ' '.join(command)
 
   def _Load(self, vm, **kwargs):
-    """Execute ycsb load on 'vm'."""
+    """Execute 'ycsb load' on 'vm'."""
     kwargs.setdefault('threads', FLAGS.ycsb_preload_threads)
     kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
     for pv in FLAGS.ycsb_load_parameters:
@@ -570,22 +592,22 @@ class YCSBExecutor(object):
                  (1 if i < (target % len(vms)) else 0)
                  for i in xrange(len(vms))]
     else:
-      targets = [target for vm in vms]
+      targets = [target for _ in vms]
 
-    result = []
+    results = []
 
     def _Run(loader_index):
       vm = vms[loader_index]
       kwargs['target'] = targets[loader_index]
-      result.append(self._Run(vm, **kwargs))
+      results.append(self._Run(vm, **kwargs))
       logging.info('VM %d (%s) finished', loader_index, vm)
     vm_util.RunThreaded(_Run, range(len(vms)))
 
-    if len(result) != len(vms):
+    if len(results) != len(vms):
       raise IOError('Missing results: only {0}/{1} reported\n{2}'.format(
-          len(result), len(vms), result))
+          len(results), len(vms), results))
 
-    return list(result)
+    return results
 
   def RunStaircaseLoads(self, vms, workloads, **kwargs):
     """Run each workload in 'workloads' in succession.
@@ -672,4 +694,7 @@ class YCSBExecutor(object):
                                            **(load_kwargs or {})))
     run_samples = list(self.RunStaircaseLoads(vms, workloads,
                                               **(run_kwargs or {})))
-    return load_samples + run_samples
+    if FLAGS.ycsb_load_samples:
+      return load_samples + run_samples
+    else:
+      return run_samples

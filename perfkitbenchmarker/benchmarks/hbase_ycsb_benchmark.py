@@ -91,13 +91,17 @@ def CheckPrerequisites():
   ycsb.CheckPrerequisites()
 
 
-def _InstallYCSB(vm):
-  """Install YCSB on 'vm'."""
-  vm.Install('ycsb')
-
-
 def _CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
                      n_splits=TABLE_SPLIT_COUNT):
+  """Create a table for use with YCSB.
+
+  Args:
+    vm: Virtual machine from which to create the table.
+    table_name: Name for the table.
+    family: Column family name.
+    n_splits: Initial number of regions for the table. Default follows
+      HBASE-4163.
+  """
   # See: https://issues.apache.org/jira/browse/HBASE-4163
   template_path = data.ResourcePath(CREATE_TABLE_SCRIPT)
   remote = os.path.join(hbase.HBASE_DIR,
@@ -113,6 +117,20 @@ def _CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
 
 
 def _GetVMsByRole(vms):
+  """Partition "vms" by role in the benchmark.
+
+  * The first VM is the master.
+  * The first FLAGS.hbase_zookeeper_nodes form the Zookeeper quorum.
+  * The last FLAGS.ycsb_client_vms are loader nodes.
+  * The nodes which are neither the master nor loaders are HBase region servers.
+
+  Args:
+    vms: A list of virtual machines.
+
+  Returns:
+    A dictionary with keys 'vms', 'hbase_vms', 'master', 'zk_quorum', 'workers',
+    and 'loaders'.
+  """
   hbase_vms = vms[:-FLAGS.ycsb_client_vms]
   return {'vms': vms,
           'hbase_vms': hbase_vms,
@@ -133,27 +151,30 @@ def Prepare(benchmark_spec):
   by_role = _GetVMsByRole(benchmark_spec.vms)
 
   loaders = by_role['loaders']
-  assert loaders, vms
+  assert loaders, 'No loader VMs: {0}'.format(by_role)
 
   # HBase cluster
   hbase_vms = by_role['hbase_vms']
-  assert hbase_vms, vms
+  assert hbase_vms, 'No HBase VMs: {0}'.format(by_role)
   master = by_role['master']
   zk_quorum = by_role['zk_quorum']
-  assert zk_quorum
+  assert zk_quorum, 'No zookeeper quorum: {0}'.format(by_role)
   workers = by_role['workers']
-  assert workers
+  assert workers, 'No workers: {0}'.format(by_role)
+
+  vms = benchmark_spec.vms
 
   def InstallHBase(vm):
     vm.Install('hbase')
-  vms = benchmark_spec.vms
   vm_util.RunThreaded(InstallHBase, vms)
   hadoop.ConfigureAndStart(master, workers, start_yarn=False)
   hbase.ConfigureAndStart(master, workers, zk_quorum)
 
   _CreateYCSBTable(master)
 
-  vm_util.RunThreaded(_InstallYCSB, loaders)
+  def InstallYCSB(vm):
+    vm.Install('ycsb')
+  vm_util.RunThreaded(InstallYCSB, loaders)
 
   # Populate hbase-site.xml on the loaders.
   master.PullFile(
@@ -176,13 +197,14 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
-  loaders = _GetVMsByRole(vms)['loaders']
+  by_role = _GetVMsByRole(vms)
+  loaders = by_role['loaders']
   logging.info('Loaders: %s', loaders)
 
   executor = ycsb.YCSBExecutor('hbase-10')
 
-  metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
-              'num_vms': FLAGS.num_vms,
+  metadata = {'ycsb_client_vms': len(loaders),
+              'hbase_cluster_size': len(by_role['hbase_vms']),
               'hbase_zookeeper_nodes': FLAGS.hbase_zookeeper_nodes,
               'scratch_disk_type': FLAGS.scratch_disk_type,
               'scratch_disk_size': FLAGS.scratch_disk_size}
