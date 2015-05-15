@@ -194,8 +194,8 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       else:
         return None
 
-  def GetLocalDrives(self):
-    """Returns a list of local drives on the VM."""
+  def GetLocalDisks(self):
+    """Returns a list of local disks on the VM."""
     return self.local_disks
 
 

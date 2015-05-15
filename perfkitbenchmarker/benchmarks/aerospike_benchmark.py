@@ -104,7 +104,7 @@ def _PrepareServer(server):
 
   if FLAGS.aerospike_storage_type == DISK:
     if FLAGS.scratch_disk_type == disk.LOCAL:
-      devices = server.GetLocalDrives()
+      devices = server.GetLocalDisks()
     else:
       devices = [scratch_disk.GetDevicePath()
                  for scratch_disk in server.scratch_disks]

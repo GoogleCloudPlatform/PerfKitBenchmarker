@@ -100,8 +100,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                                 self.network.affinity_group.name)
     disk_spec = disk.BaseDiskSpec(None, None, None)
     self.os_disk = azure_disk.AzureDisk(disk_spec, self.name)
-    self.max_local_drives = 1
-    self.local_drive_counter = 0
+    self.max_local_disks = 1
+    self.local_disk_counter = 0
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -172,9 +172,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
     if disk_spec.disk_type == disk.LOCAL:
-      self.local_drive_counter += disk_spec.num_striped_disks
-      if self.local_drive_counter > self.max_local_drives:
-        raise errors.Error('Not enough local drives.')
+      self.local_disk_counter += disk_spec.num_striped_disks
+      if self.local_disk_counter > self.max_local_disks:
+        raise errors.Error('Not enough local disks.')
 
     # Instantiate the disk(s) that we want to create.
     disks = [azure_disk.AzureDisk(disk_spec, self.name)
@@ -183,17 +183,17 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
 
-  def GetLocalDrives(self):
-    """Returns a list of local drives on the VM.
+  def GetLocalDisks(self):
+    """Returns a list of local disks on the VM.
 
     Returns:
       A list of strings, where each string is the absolute path to the local
-          drives on the VM (e.g. '/dev/sdb').
+          disks on the VM (e.g. '/dev/sdb').
     """
     return ['/dev/sdb']
 
-  def SetupLocalDrives(self):
-    """Performs Azure specific setup (unmounts drive)."""
+  def SetupLocalDisk(self):
+    """Performs Azure specific setup (unmounts disk)."""
     self.RemoteCommand('sudo umount /mnt')
 
 

@@ -138,11 +138,11 @@ flags.DEFINE_enum(
     'Type for all scratch disks. The default is standard')
 flags.DEFINE_integer('scratch_disk_iops', 1500,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
-flags.DEFINE_integer('num_striped_drives', 1,
-                     'The number of drives to stripe together. This defaults '
-                     'to 1 (except with local drives), which means no '
-                     'striping. When using local drives, they default to '
-                     'striping all drives together.',
+flags.DEFINE_integer('num_striped_disks', 1,
+                     'The number of disks to stripe together. This defaults '
+                     'to 1 (except with local disks), which means no '
+                     'striping. When using local disks, they default to '
+                     'striping all disks together.',
                      lower_bound=1)
 
 MAX_RUN_URI_LENGTH = 10

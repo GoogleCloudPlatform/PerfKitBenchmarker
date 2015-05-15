@@ -101,7 +101,7 @@ def GetBlockDeviceMap(machine_type):
 
   Returns:
     The json representation of the block device map for a machine compatible
-    with the AWS CLI, or if the machine type has no local drives, it will
+    with the AWS CLI, or if the machine type has no local disks, it will
     return None.
   """
   if machine_type in NUM_LOCAL_VOLUMES:
@@ -146,8 +146,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image = self.image or GetImage(self.machine_type, self.region)
     self.user_name = FLAGS.aws_user_name
     if self.machine_type in NUM_LOCAL_VOLUMES:
-      self.max_local_drives = NUM_LOCAL_VOLUMES[self.machine_type]
-    self.local_drive_counter = 0
+      self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
+    self.local_disk_counter = 0
 
   def ImportKeyfile(self):
     """Imports the public keyfile to AWS."""
@@ -272,30 +272,30 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       for _ in range(disk_spec.num_striped_disks):
         local_disk = aws_disk.AwsDisk(disk_spec, self.zone)
         local_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
-                                       self.local_drive_counter)
-        self.local_drive_counter += 1
+                                       self.local_disk_counter)
+        self.local_disk_counter += 1
         disks.append(local_disk)
-      if self.local_drive_counter > self.max_local_drives:
-        raise errors.Error('Not enough local drives.')
+      if self.local_disk_counter > self.max_local_disks:
+        raise errors.Error('Not enough local disks.')
     else:
       disks = [aws_disk.AwsDisk(disk_spec, self.zone)
                for _ in range(disk_spec.num_striped_disks)]
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
-  def GetLocalDrives(self):
-    """Returns a list of local drives on the VM.
+  def GetLocalDisks(self):
+    """Returns a list of local disks on the VM.
 
     Returns:
       A list of strings, where each string is the absolute path to the local
-          drives on the VM (e.g. '/dev/sdb').
+          disks on the VM (e.g. '/dev/sdb').
     """
     return ['/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
             for i in xrange(NUM_LOCAL_VOLUMES[self.machine_type])]
 
-  def SetupLocalDrives(self):
-    """Performs AWS specific setup of local drives."""
-    # Some images may automount one local drive, but we don't
+  def SetupLocalDisks(self):
+    """Performs AWS specific setup of local disks."""
+    # Some images may automount one local disk, but we don't
     # want to fail if this wasn't the case.
     self.RemoteCommand('sudo umount /mnt', ignore_failure=True)
 

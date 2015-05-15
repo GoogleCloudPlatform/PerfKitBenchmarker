@@ -46,12 +46,15 @@ class BaseDiskSpec(object):
     self.disk_type = disk_type
     self.mount_point = mount_point
     self.iops = iops
-    assert num_striped_disks >= 1
+    assert num_striped_disks >= 1, ('Disk objects must correspond to at least '
+                                    '1 real disk.')
     self.num_striped_disks = num_striped_disks
 
 
 class BaseDisk(resource.BaseResource):
   """Object representing a Base Disk."""
+
+  is_striped = False
 
   def __init__(self, disk_spec):
     super(BaseDisk, self).__init__()
@@ -82,6 +85,8 @@ class BaseDisk(resource.BaseResource):
 
 class StripedDisk(BaseDisk):
   """Object representing several disks striped together."""
+
+  is_striped = True
 
   def __init__(self, disk_spec, disks, device_path):
     """Initializes a StripedDisk object.
