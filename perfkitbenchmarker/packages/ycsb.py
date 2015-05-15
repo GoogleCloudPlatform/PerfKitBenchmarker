@@ -88,8 +88,8 @@ flags.DEFINE_list('ycsb_threads_per_client', ['32'], 'Number of threads per '
                   'number of clients.')
 flags.DEFINE_integer('ycsb_preload_threads', 1, 'Number of threads per '
                      'loader during the initial data population stage.')
-flags.DEFINE_float('ycsb_record_count', 1000000, 'Pre-load with a total '
-                   'dataset of records total.')
+flags.DEFINE_integer('ycsb_record_count', 1000000, 'Pre-load with a total '
+                     'dataset of records total.')
 flags.DEFINE_integer('ycsb_operation_count', 1000000, 'Number of operations '
                      '*per client VM*.')
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
