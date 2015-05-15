@@ -179,6 +179,7 @@ class BenchmarkSpec(object):
     if self.vms:
       prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
       vm_util.RunThreaded(self.PrepareVm, prepare_args)
+      vm_util.GenerateSSHConfig(self.vms)
 
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
