@@ -123,7 +123,7 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
-  """Uninstall packages required for hadoop and remove benchmark files.
+  """Uninstall packages required for Hadoop and remove benchmark files.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is

@@ -38,8 +38,10 @@ cd $HADOOP_DIR
 # Start HDFS
 sbin/start-dfs.sh 2>&1
 
+{% if start_yarn -%}
 # Start YARN
 sbin/start-yarn.sh 2>&1
 
 # Start Job History server
 sbin/mr-jobhistory-daemon.sh start historyserver
+{%- endif %}
