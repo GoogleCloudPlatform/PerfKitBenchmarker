@@ -27,6 +27,7 @@ import uuid
 import jinja2
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
@@ -85,7 +86,7 @@ class BaseVirtualMachine(resource.BaseResource):
     disk_specs: list of BaseDiskSpec objects. Specifications for disks attached
       to the VM.
     scratch_disks: list of BaseDisk objects. Scratch disks attached to the VM.
-    max_local_drives: The number of local drives on the VM that can be used as
+    max_local_disks: The number of local disks on the VM that can be used as
       scratch disks or that can be striped together.
   """
 
@@ -130,7 +131,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.disk_specs = []
     self.scratch_disks = []
     self.hostname = None
-    self.max_local_drives = 0
+    self.max_local_disks = 0
 
     # Cached values
     self._reachable = {}
@@ -154,6 +155,44 @@ class BaseVirtualMachine(resource.BaseResource):
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
     pass
+
+  def _CreateScratchDiskFromDisks(self, disk_spec, disks):
+    """Helper method to prepare data disks.
+
+    Given a list of BaseDisk objects, this will do most of the work creating,
+    attaching, striping, formatting, and mounting them. If multiple BaseDisk
+    objects are passed to this method, it will stripe them, combining them
+    into one 'logical' data disk (it will be treated as a single disk from a
+    benchmarks perspective). This is intended to be called from within a cloud
+    specific VM's CreateScratchDisk method.
+
+    Args:
+      disk_spec: The BaseDiskSpec object corresponding to the disk.
+      disks: A list of the disk(s) to be created, attached, striped,
+          formatted, and mounted. If there is more than one disk in
+          the list, then they will be striped together.
+    """
+    if len(disks) > 1:
+      # If the disk_spec called for a striped disk, create one.
+      device_path = '/dev/md%d' % len(self.scratch_disks)
+      data_disk = disk.StripedDisk(disk_spec, disks, device_path)
+    else:
+      data_disk = disks[0]
+
+    self.scratch_disks.append(data_disk)
+
+    if data_disk.disk_type != disk.LOCAL:
+      data_disk.Create()
+      data_disk.Attach(self)
+
+    if data_disk.is_striped:
+      device_paths = [d.GetDevicePath() for d in data_disk.disks]
+      self.StripeDisks(device_paths, data_disk.GetDevicePath())
+
+    if disk_spec.mount_point:
+      self.FormatDisk(data_disk.GetDevicePath())
+      self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point)
+
 
   def DeleteScratchDisks(self):
     """Delete a VM's scratch disks."""
@@ -488,8 +527,8 @@ class BaseVirtualMachine(resource.BaseResource):
         self._reachable[target_vm] = True
     return self._reachable[target_vm]
 
-  def StripeDrives(self, devices, striped_device):
-    """Raids drives together using mdadm.
+  def StripeDisks(self, devices, striped_device):
+    """Raids disks together using mdadm.
 
     Args:
       devices: A list of device paths that should be striped together.
@@ -500,12 +539,12 @@ class BaseVirtualMachine(resource.BaseResource):
                   '%s %s' % (striped_device, len(devices), ' '.join(devices)))
     self.RemoteCommand(stripe_cmd)
 
-  def GetLocalDrives(self):
-    """Returns a list of local drives on the VM."""
+  def GetLocalDisks(self):
+    """Returns a list of local disks on the VM."""
     return []
 
-  def SetupLocalDrives(self):
-    """Perform cloud specific setup on any local drives that exist."""
+  def SetupLocalDisks(self):
+    """Perform cloud specific setup on any local disks that exist."""
     pass
 
   def AddMetadata(self, **kwargs):

@@ -148,11 +148,21 @@ class BenchmarkSpec(object):
               self.zones[min(index, len(self.zones) - 1)])
           for index in range(self.num_vms)]
       self.vm_dict['default'] = self.vms
-      for i in range(benchmark_info['scratch_disk']):
-        disk_spec = disk.BaseDiskSpec(
-            self.scratch_disk_size, self.scratch_disk_type,
-            '/scratch%d' % i, self.scratch_disk_iops)
-        for vm in self.vms:
+      for vm in self.vms:
+        # If we are using local disks and num_striped_disks has not been
+        # set, then we want to set it to stripe all local disks together.
+        if (FLAGS.scratch_disk_type == disk.LOCAL and
+            benchmark_info['scratch_disk'] and
+            not FLAGS['num_striped_disks'].present):
+          num_striped_disks = (vm.max_local_disks /
+                               benchmark_info['scratch_disk'])
+        else:
+          num_striped_disks = FLAGS.num_striped_disks
+        for i in range(benchmark_info['scratch_disk']):
+          disk_spec = disk.BaseDiskSpec(
+              self.scratch_disk_size, self.scratch_disk_type,
+              '/scratch%d' % i, self.scratch_disk_iops,
+              num_striped_disks)
           vm.disk_specs.append(disk_spec)
 
     firewall_class = CLASSES[self.cloud][FIREWALL]
@@ -273,7 +283,7 @@ class BenchmarkSpec(object):
     vm.WaitForBootCompletion()
     vm.Startup()
     if FLAGS.scratch_disk_type == disk.LOCAL:
-      vm.SetupLocalDrives()
+      vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
     vm_util.BurnCpu(vm)
