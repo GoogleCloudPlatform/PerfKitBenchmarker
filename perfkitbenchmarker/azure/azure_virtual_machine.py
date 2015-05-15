@@ -85,8 +85,6 @@ class AzureService(resource.BaseResource):
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
 
-  instance_counter = 0
-
   def __init__(self, vm_spec):
     """Initialize a Azure virtual machine.
 
@@ -94,8 +92,6 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(AzureVirtualMachine, self).__init__(vm_spec)
-    self.name = 'perfkit-%s-%s' % (FLAGS.run_uri, self.instance_counter)
-    AzureVirtualMachine.instance_counter += 1
     self.service = AzureService(self.name,
                                 self.network.affinity_group.name)
     disk_spec = disk.BaseDiskSpec(None, None, None)
