@@ -170,7 +170,7 @@ class YumMixin(BasePackageMixin):
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
     if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_pacakges):
+        not FLAGS.install_packages):
       return
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
