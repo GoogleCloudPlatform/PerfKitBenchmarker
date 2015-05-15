@@ -192,7 +192,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     return ['/dev/sdb']
 
-  def SetupLocalDisk(self):
+  def SetupLocalDisks(self):
     """Performs Azure specific setup (unmounts disk)."""
     self.RemoteCommand('sudo umount /mnt')
 
