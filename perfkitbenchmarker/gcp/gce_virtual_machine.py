@@ -58,8 +58,6 @@ SCSI = 'SCSI'
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
-  instance_counter = 0
-
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
 
@@ -67,8 +65,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
-    self.name = 'perfkit-%s-%s' % (FLAGS.run_uri, self.instance_counter)
-    GceVirtualMachine.instance_counter += 1
     disk_spec = disk.BaseDiskSpec(BOOT_DISK_SIZE_GB, BOOT_DISK_TYPE, None)
     self.boot_disk = gce_disk.GceDisk(
         disk_spec, self.name, self.zone, self.project, self.image)

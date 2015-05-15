@@ -96,6 +96,9 @@ class BaseVirtualMachine(resource.BaseResource):
   # Serializing calls to ssh with the -t option fixes the problem.
   pseudo_tty_lock = threading.Lock()
 
+  _instance_counter_lock = threading.Lock()
+  _instance_counter = 0
+
   def __init__(self, vm_spec):
     """Initialize BaseVirtualMachine class.
 
@@ -103,6 +106,9 @@ class BaseVirtualMachine(resource.BaseResource):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(BaseVirtualMachine, self).__init__()
+    with self._instance_counter_lock:
+      self.name = 'perfkit-%s-%d' % (FLAGS.run_uri, self._instance_counter)
+      BaseVirtualMachine._instance_counter += 1
     self.create_time = None
     self.bootable_time = None
     self.project = vm_spec.project
