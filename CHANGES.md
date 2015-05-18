@@ -1,3 +1,11 @@
+# v0.16.0 (draft)
+
+* **Breaking Change** Added a new scratch disk type: "local" (ephemeral
+  storage bundled with the instance). As a result, the type "ssd" was
+  changed to "remote_ssd". (GH-253)
+* Support for striping multiple scratch disks together has been added. (GH-259)
+* You can now omit "--run_uri" under certain circumstances. (GH-255)
+
 # v0.15.0
 
 * Add ability to inject environment variables to IssueCommand. (GH-231)
