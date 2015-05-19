@@ -24,6 +24,9 @@ import threading
 import time
 import traceback
 
+import jinja2
+
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
@@ -478,3 +481,23 @@ def GetLastRunUri():
     return regex_util.ExtractGroup('run_(.*)', stdout)
   except regex_util.NoMatchError:
     return None
+
+
+def GenerateSSHConfig(vms):
+  """Generates an SSH config file to simplify connecting to "vms".
+
+  Writes a file to GetTempDir()/ssh_config with SSH configuration for each VM in
+  'vms'.  Users can then SSH with 'ssh -F <ssh_config_path> <vm_name>'.
+
+  Args:
+    vms: List of virtual machines.
+  """
+  target_file = os.path.join(GetTempDir(), 'ssh_config')
+  template_path = data.ResourcePath('ssh_config.j2')
+  environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+  with open(template_path) as fp:
+    template = environment.from_string(fp.read())
+  with open(target_file, 'w') as ofp:
+    ofp.write(template.render({'vms': vms}))
+  logging.info('ssh to VMs in this benchmark by name with: '
+               'ssh -F {0} <vm name>'.format(target_file))
