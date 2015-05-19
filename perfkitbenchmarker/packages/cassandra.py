@@ -124,7 +124,7 @@ def Start(vm):
 
 
 def Stop(vm):
-  """Stops Cassandra on VM."""
+  """Stops Cassandra on 'vm'."""
   vm.RemoteCommand('kill $(cat {0})'.format(CASSANDRA_PID),
                    ignore_failure=True)
 
@@ -149,7 +149,11 @@ def IsRunning(vm):
 
 
 def CleanNode(vm):
-  """Remove Cassandra data from 'vm'."""
+  """Remove Cassandra data from 'vm'.
+
+  Args:
+    vm: VirtualMachine. VM to clean.
+  """
   data_path = os.path.join(vm.GetScratchDir(), 'cassandra')
   vm.RemoteCommand('rm -rf {0}'.format(data_path))
 
