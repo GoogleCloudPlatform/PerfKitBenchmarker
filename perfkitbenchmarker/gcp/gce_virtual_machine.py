@@ -98,6 +98,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     '--machine-type', self.machine_type,
                     '--tags=perfkitbenchmarker',
                     '--maintenance-policy', 'TERMINATE',
+                    '--no-restart-on-failure',
                     '--metadata-from-file',
                     'sshKeys=%s' % tf.name,
                     '--metadata',
