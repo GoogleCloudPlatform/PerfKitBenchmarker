@@ -95,7 +95,8 @@ def Configure(vm, seed_vms):
   context = {'ip_address': vm.internal_ip,
              'data_path': os.path.join(vm.GetScratchDir(), 'cassandra'),
              'seeds': ','.join(vm.internal_ip for vm in seed_vms),
-             'num_cpus': vm.num_cpus}
+             'num_cpus': vm.num_cpus,
+             'cluster_name': 'Test cluster'}
 
   for config_file in [CASSANDRA_ENV_TEMPLATE, CASSANDRA_YAML_TEMPLATE]:
     local_path = data.ResourcePath(config_file)
