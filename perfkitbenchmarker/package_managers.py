@@ -217,9 +217,7 @@ class AptMixin(BasePackageMixin):
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
     try:
-      # We don't want to fail if updating fails. The '--ignore-missing'
-      # option lets us continue even when we can't locate an archive.
-      self.RemoteCommand('sudo apt-get update --ignore-missing')
+      self.RemoteCommand('sudo apt-get update')
     except errors.VmUtil.SshConnectionError as e:
       # If there is a problem, remove the lists in order to get rid of
       # "Hash Sum mismatch" errors (the files will be restored when
