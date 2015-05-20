@@ -14,10 +14,6 @@
 
 """Installs/Configures Cassandra.
 
-Most settings are kept at default values, except where:
-  * The Cassandra documentation recommends a different value for Linux.
-  * The Cassandra documentation recommends a value based on machine core count.
-  * The configuration value is specific to the VM (e.g., data directory, seed).
 See 'perfkitbenchmarker/data/cassandra/' for configuration files used.
 
 Cassandra homepage: http://cassandra.apache.org
@@ -64,6 +60,7 @@ def CheckPrerequisites():
 
 
 def _Install(vm):
+  """Installs Cassandra from a tarball."""
   vm.Install('openjdk7')
   vm.RemoteCommand('mkdir {0} && curl -L {1} | '
                    'tar -C {0} -xzf - --strip-components=1'.format(
@@ -160,6 +157,7 @@ def CleanNode(vm):
 
 
 def _StartCassandraIfNotRunning(vm):
+  """Starts Cassandra on 'vm' if not currently running."""
   if not IsRunning(vm):
     logging.info('Retrying starting cassandra on %s', vm)
     Start(vm)
