@@ -61,6 +61,7 @@ import uuid
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import static_virtual_machine
@@ -132,15 +133,18 @@ flags.DEFINE_string('static_vm_file', None,
                     'static_virtual_machine.py for a description of this file.')
 flags.DEFINE_boolean('version', False, 'Display the version and exit.')
 flags.DEFINE_enum(
-    'scratch_disk_type', benchmark_spec.STANDARD,
-    [benchmark_spec.STANDARD, benchmark_spec.SSD, benchmark_spec.IOPS],
+    'scratch_disk_type', disk.STANDARD,
+    [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
     'Type for all scratch disks. The default is standard')
-flags.DEFINE_boolean('use_local_disk', False, 'For benchmarks that use disks, '
-                     'this indicates that they should run against '
-                     'the local disk(s) instead of remote storage.')
 flags.DEFINE_integer('scratch_disk_iops', 1500,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
-
+flags.DEFINE_integer('num_striped_disks', 1,
+                     'The number of disks to stripe together to form one '
+                     '"logical" scratch disk. This defaults to 1 '
+                     '(except with local disks), which means no striping. '
+                     'When using local disks, they default to striping '
+                     'all disks together.',
+                     lower_bound=1)
 
 MAX_RUN_URI_LENGTH = 10
 
@@ -227,8 +231,10 @@ def DoCleanupPhase(benchmark, name, spec, timer):
       benchmark module's Cleanup function and resource teardown.
   """
   logging.info('Cleaning up benchmark %s', name)
-  with timer.Measure('Benchmark Cleanup'):
-    benchmark.Cleanup(spec)
+
+  if spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]):
+    with timer.Measure('Benchmark Cleanup'):
+      benchmark.Cleanup(spec)
   with timer.Measure('Resource Teardown'):
     spec.Delete()
 
@@ -303,7 +309,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       logging.exception('Error during benchmark %s', benchmark_name)
       # If the particular benchmark requests us to always call cleanup, do it
       # here.
-      if spec.always_call_cleanup:
+      if spec and spec.always_call_cleanup:
         DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
       raise
     finally:
@@ -311,7 +317,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
         if spec:
           spec.Delete()
       else:
-        spec.PickleSpec()
+        if spec:
+          spec.PickleSpec()
 
 
 def RunBenchmarks(publish=True):
@@ -329,9 +336,17 @@ def RunBenchmarks(publish=True):
 
   if FLAGS.run_uri is None:
     if FLAGS.run_stage not in [STAGE_ALL, STAGE_PREPARE]:
-      logging.error(
-          'Cannot run "%s" with unspecified run_uri.', FLAGS.run_stage)
-      return 1
+      # Attempt to get the last modified run directory.
+      run_uri = vm_util.GetLastRunUri()
+      if run_uri:
+        FLAGS.run_uri = run_uri
+        logging.warning(
+            'No run_uri specified. Attempting to run "%s" with --run_uri=%s.',
+            FLAGS.run_stage, FLAGS.run_uri)
+      else:
+        logging.error(
+            'No run_uri specified. Could not run "%s".', FLAGS.run_stage)
+        return 1
     else:
       FLAGS.run_uri = str(uuid.uuid4())[-8:]
   elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:

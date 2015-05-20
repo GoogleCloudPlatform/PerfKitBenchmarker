@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,4 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:/jre/bin/java::")
+"""Module containing numactl installation and cleanup functions."""
+
+
+def _Install(vm):
+  """Installs the numactl package on the VM."""
+  vm.InstallPackages('numactl')
+
+
+def YumInstall(vm):
+  """Installs the numactl package on the VM."""
+  _Install(vm)
+
+
+def AptInstall(vm):
+  """Installs the numactl package on the VM."""
+  _Install(vm)

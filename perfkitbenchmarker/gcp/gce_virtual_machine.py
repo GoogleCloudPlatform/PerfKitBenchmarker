@@ -29,6 +29,7 @@ import re
 import tempfile
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import package_managers
 from perfkitbenchmarker import virtual_machine
@@ -48,16 +49,13 @@ FLAGS = flags.FLAGS
 
 SET_INTERRUPTS_SH = 'set-interrupts.sh'
 BOOT_DISK_SIZE_GB = 10
-BOOT_DISK_TYPE = 'pd-standard'
-DRIVE_START_LETTER = 'b'
+BOOT_DISK_TYPE = disk.STANDARD
 NVME = 'nvme'
 SCSI = 'SCSI'
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
-
-  instance_counter = 0
 
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
@@ -66,12 +64,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
-    self.name = 'perfkit-%s-%s' % (FLAGS.run_uri, self.instance_counter)
-    GceVirtualMachine.instance_counter += 1
     disk_spec = disk.BaseDiskSpec(BOOT_DISK_SIZE_GB, BOOT_DISK_TYPE, None)
     self.boot_disk = gce_disk.GceDisk(
         disk_spec, self.name, self.zone, self.project, self.image)
-    self.num_ssds = FLAGS.gce_num_local_ssds
+    self.max_local_disks = FLAGS.gce_num_local_ssds
+    self.local_disk_counter = 0
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -101,12 +98,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     '--machine-type', self.machine_type,
                     '--tags=perfkitbenchmarker',
                     '--maintenance-policy', 'TERMINATE',
+                    '--no-restart-on-failure',
                     '--metadata-from-file',
                     'sshKeys=%s' % tf.name,
                     '--metadata',
                     'owner=%s' % FLAGS.owner]
       ssd_interface_option = NVME if NVME in self.image else SCSI
-      for _ in range(self.num_ssds):
+      for _ in range(self.max_local_disks):
         create_cmd.append('--local-ssd')
         create_cmd.append('interface=%s' % ssd_interface_option)
       if FLAGS.gcloud_scopes:
@@ -158,49 +156,42 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
-    name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
-    scratch_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
-    self.scratch_disks.append(scratch_disk)
+    # Get the names for the disk(s) we are going to create.
+    if disk_spec.disk_type == disk.LOCAL:
+      new_count = self.local_disk_counter + disk_spec.num_striped_disks
+      if new_count > self.max_local_disks:
+        raise errors.Error('Not enough local disks.')
+      disk_names = ['local-ssd-%d' % i
+                    for i in range(self.local_disk_counter, new_count)]
+      self.local_disk_counter = new_count
+    else:
+      disk_names = ['%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
+                    for i in range(disk_spec.num_striped_disks)]
 
-    scratch_disk.Create()
-    scratch_disk.Attach(self)
+    # Instantiate the disk(s).
+    disks = [gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
+             for name in disk_names]
 
-    self.FormatDisk(scratch_disk.GetDevicePath())
-    self.MountDisk(scratch_disk.GetDevicePath(), disk_spec.mount_point)
+    self._CreateScratchDiskFromDisks(disk_spec, disks)
 
   def GetName(self):
     """Get a GCE VM's unique name."""
     return self.name
 
-  def GetLocalDrives(self):
-    """Returns a list of local drives on the VM.
+  def GetLocalDisks(self):
+    """Returns a list of local disks on the VM.
 
     Returns:
       A list of strings, where each string is the absolute path to the local
-          drives on the VM (e.g. '/dev/sdb').
+          disks on the VM (e.g. '/dev/sdb').
     """
     return ['/dev/disk/by-id/google-local-ssd-%d' % i
-            for i in range(self.num_ssds)]
+            for i in range(self.max_local_disks)]
 
-  def SetupLocalDrives(self, mount_path=virtual_machine.LOCAL_MOUNT_PATH):
-    """Set up any local drives that exist.
-
-    Sets up drives as usual, then performs GCE specific setup
-    (runs set-interrupts.sh).
-
-    Args:
-      mount_path: The path where the local drives should be mounted. If this
-          is None, then the device won't be formatted or mounted.
-
-    Returns:
-      A boolean indicating whether the setup occured.
-    """
-    ret = super(GceVirtualMachine, self).SetupLocalDrives(mount_path=mount_path)
-    if ret:
-      self.PushDataFile(SET_INTERRUPTS_SH)
-      self.RemoteCommand(
-          'chmod +rx set-interrupts.sh; sudo ./set-interrupts.sh')
-    return ret
+  def SetupLocalDisks(self):
+    """Performs GCE specific local SSD setup (runs set-interrupts.sh)."""
+    self.PushDataFile(SET_INTERRUPTS_SH)
+    self.RemoteCommand('chmod +rx set-interrupts.sh; sudo ./set-interrupts.sh')
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM via 'gcloud compute instances add-metadata'."""

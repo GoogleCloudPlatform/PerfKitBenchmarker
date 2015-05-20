@@ -14,10 +14,12 @@
         <name>yarn.nodemanager.aux-services</name>
         <value>mapreduce_shuffle</value>
     </property>
+    {%- if yarn_memory_mb-%}
     <property>
         <name>yarn.nodemanager.resource.memory-mb</name>
-        <value>{{ node_memory }}</value>
+        <value>{{ yarn_memory_mb }}</value>
     </property>
+    {%- endif %}
     <property>
         <name>yarn.nodemanager.resource.cpu-vcores</name>
         <value>{{ vcpus }}</value>

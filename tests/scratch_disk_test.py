@@ -71,7 +71,8 @@ class ScratchDiskTestMixin(object):
 
     # We need the disk class mocks to return new mocks each time they are
     # called. Otherwise all "disks" instantiated will be the same object.
-    self._GetDiskClass().side_effect = lambda *args, **kwargs: mock.MagicMock()
+    self._GetDiskClass().side_effect = (
+        lambda *args, **kwargs: mock.MagicMock(is_striped=False))
 
   def testScratchDisks(self):
     """Test for creating and deleting scratch disks.

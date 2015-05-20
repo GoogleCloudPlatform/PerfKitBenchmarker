@@ -170,7 +170,7 @@ class YumMixin(BasePackageMixin):
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
     if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_pacakges):
+        not FLAGS.install_packages):
       return
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
@@ -213,7 +213,9 @@ class AptMixin(BasePackageMixin):
 
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
-    self.RemoteCommand('sudo apt-get update')
+    # We don't want to fail if updating fails. The '--ignore-missing'
+    # option lets us continue even when we can't locate an archive.
+    self.RemoteCommand('sudo apt-get update --ignore-missing')
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""

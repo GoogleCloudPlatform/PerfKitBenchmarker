@@ -86,28 +86,10 @@ CLASSES = {
         FIREWALL: aws_network.AwsFirewall
     }
 }
-STANDARD = 'standard'
-SSD = 'ssd'
-IOPS = 'iops'  # Provisioned IOPS (ssd) in AWS
-DISK_TYPE = {
-    GCP: {
-        STANDARD: 'pd-standard',
-        SSD: 'pd-ssd',
-    },
-    AWS: {
-        STANDARD: 'standard',
-        SSD: 'gp2',
-        IOPS: 'io1',
-    },
-    AZURE: {
-        STANDARD: None,  # Azure doesn't have a disk type option yet.
-    }
-}
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS], 'Name of the cloud to use.')
-
 
 
 class BenchmarkSpec(object):
@@ -166,12 +148,21 @@ class BenchmarkSpec(object):
               self.zones[min(index, len(self.zones) - 1)])
           for index in range(self.num_vms)]
       self.vm_dict['default'] = self.vms
-      for i in range(benchmark_info['scratch_disk']):
-        disk_spec = disk.BaseDiskSpec(
-            self.scratch_disk_size,
-            DISK_TYPE[self.cloud][self.scratch_disk_type],
-            '/scratch%d' % i, self.scratch_disk_iops)
-        for vm in self.vms:
+      for vm in self.vms:
+        # If we are using local disks and num_striped_disks has not been
+        # set, then we want to set it to stripe all local disks together.
+        if (FLAGS.scratch_disk_type == disk.LOCAL and
+            benchmark_info['scratch_disk'] and
+            not FLAGS['num_striped_disks'].present):
+          num_striped_disks = (vm.max_local_disks /
+                               benchmark_info['scratch_disk'])
+        else:
+          num_striped_disks = FLAGS.num_striped_disks
+        for i in range(benchmark_info['scratch_disk']):
+          disk_spec = disk.BaseDiskSpec(
+              self.scratch_disk_size, self.scratch_disk_type,
+              '/scratch%d' % i, self.scratch_disk_iops,
+              num_striped_disks)
           vm.disk_specs.append(disk_spec)
 
     firewall_class = CLASSES[self.cloud][FIREWALL]
@@ -188,6 +179,7 @@ class BenchmarkSpec(object):
     if self.vms:
       prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
       vm_util.RunThreaded(self.PrepareVm, prepare_args)
+      vm_util.GenerateSSHConfig(self.vms)
 
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
@@ -273,7 +265,7 @@ class BenchmarkSpec(object):
         disk_size, disk_type, mnt_point = node_section[option].split(':')
         disk_size = int(disk_size)
         disk_spec = disk.BaseDiskSpec(
-            disk_size, DISK_TYPE[self.cloud][disk_type], mnt_point)
+            disk_size, disk_type, mnt_point)
         for vm in vms:
           vm.disk_specs.append(disk_spec)
 
@@ -291,6 +283,8 @@ class BenchmarkSpec(object):
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.Startup()
+    if FLAGS.scratch_disk_type == disk.LOCAL:
+      vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
     vm_util.BurnCpu(vm)

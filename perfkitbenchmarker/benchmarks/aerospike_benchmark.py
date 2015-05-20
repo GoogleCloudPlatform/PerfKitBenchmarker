@@ -27,6 +27,7 @@ import re
 import time
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -56,11 +57,13 @@ THREAD_STEP = 8
 
 
 def GetInfo():
-  if FLAGS.aerospike_storage_type == DISK and not FLAGS.use_local_disk:
-    BENCHMARK_INFO['scratch_disk'] = True
+  info = BENCHMARK_INFO.copy()
+  if (FLAGS.aerospike_storage_type == DISK and
+      FLAGS.scratch_disk_type != disk.LOCAL):
+    info['scratch_disk'] = True
   else:
-    BENCHMARK_INFO['scratch_disk'] = False
-  return BENCHMARK_INFO
+    info['scratch_disk'] = False
+  return info
 
 
 def CheckPrerequisites():
@@ -100,17 +103,18 @@ def _PrepareServer(server):
   server.Install('aerospike_server')
 
   if FLAGS.aerospike_storage_type == DISK:
-    if FLAGS.use_local_disk:
-      devices = server.GetLocalDrives()
+    if FLAGS.scratch_disk_type == disk.LOCAL:
+      devices = server.GetLocalDisks()
     else:
-      devices = [disk.GetDevicePath() for disk in server.scratch_disks]
+      devices = [scratch_disk.GetDevicePath()
+                 for scratch_disk in server.scratch_disks]
 
     server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
                           aerospike_server.AEROSPIKE_CONF_PATH,
                           {'devices': devices})
 
-  for disk in server.scratch_disks:
-    server.RemoteCommand('sudo umount %s' % disk.mount_point)
+  for scratch_disk in server.scratch_disks:
+    server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
 
   server.RemoteCommand('cd %s && make init' % aerospike_server.AEROSPIKE_DIR)
   server.RemoteCommand('cd %s; nohup sudo make start &> /dev/null &' %

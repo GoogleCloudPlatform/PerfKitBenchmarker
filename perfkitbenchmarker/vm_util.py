@@ -24,9 +24,13 @@ import threading
 import time
 import traceback
 
+import jinja2
+
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
+from perfkitbenchmarker import regex_util
 
 FLAGS = flags.FLAGS
 
@@ -324,7 +328,7 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
   return Wrap
 
 
-def IssueCommand(cmd, force_info_log=False, suppress_warning=False):
+def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
   """Tries running the provided command once.
 
   Args:
@@ -337,13 +341,18 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False):
         not be logged at the info level in the event of a non-zero
         return code. When force_info_log is True, the output is logged
         regardless of suppress_warning's value.
+    env: A dict of key/value strings, such as is given to the subprocess.Popen()
+        constructor, that contains environment variables to be injected.
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
   """
+  logging.debug('Environment variables: %s' % env)
+
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
-  process = subprocess.Popen(cmd,
+
+  process = subprocess.Popen(cmd, env=env,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
   stdout, stderr = process.communicate()
@@ -361,23 +370,28 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False):
   return stdout, stderr, process.returncode
 
 
-def IssueBackgroundCommand(cmd, stdout_path, stderr_path):
+def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
   """Run the provided command once in the background.
 
   Args:
     cmd: Command to be run, as expected by subprocess.Popen.
     stdout_path: Redirect stdout here. Overwritten.
     stderr_path: Redirect stderr here. Overwritten.
+    env: A dict of key/value strings, such as is given to the subprocess.Popen()
+        constructor, that contains environment variables to be injected.
   """
+  logging.debug('Environment variables: %s' % env)
+
   full_cmd = ' '.join(cmd)
   logging.info('Spawning: %s', full_cmd)
   outfile = open(stdout_path, 'w')
   errfile = open(stderr_path, 'w')
-  subprocess.Popen(cmd, stdout=outfile, stderr=errfile, close_fds=True)
+  subprocess.Popen(cmd, env=env,
+                   stdout=outfile, stderr=errfile, close_fds=True)
 
 
 @Retry()
-def IssueRetryableCommand(cmd):
+def IssueRetryableCommand(cmd, env=None):
   """Tries running the provided command until it succeeds or times out.
 
   Args:
@@ -387,7 +401,7 @@ def IssueRetryableCommand(cmd):
   Returns:
     A tuple of stdout and stderr from running the provided command.
   """
-  stdout, stderr, retcode = IssueCommand(cmd)
+  stdout, stderr, retcode = IssueCommand(cmd, env=env)
   if retcode:
     raise errors.VmUtil.CalledProcessException(
         'Command returned a non-zero exit code.\n')
@@ -457,3 +471,33 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
                                  IpAddressSubset.INTERNAL) or
           (FLAGS.ip_addresses == IpAddressSubset.REACHABLE and
            sending_vm.IsReachable(receiving_vm)))
+
+
+def GetLastRunUri():
+  """Returns the last run_uri used (or None if it can't be determined)."""
+  stdout, _, _ = IssueCommand(
+      ['bash', '-c', 'ls -1t %s | head -1' % TEMP_DIR])
+  try:
+    return regex_util.ExtractGroup('run_(.*)', stdout)
+  except regex_util.NoMatchError:
+    return None
+
+
+def GenerateSSHConfig(vms):
+  """Generates an SSH config file to simplify connecting to "vms".
+
+  Writes a file to GetTempDir()/ssh_config with SSH configuration for each VM in
+  'vms'.  Users can then SSH with 'ssh -F <ssh_config_path> <vm_name>'.
+
+  Args:
+    vms: List of virtual machines.
+  """
+  target_file = os.path.join(GetTempDir(), 'ssh_config')
+  template_path = data.ResourcePath('ssh_config.j2')
+  environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+  with open(template_path) as fp:
+    template = environment.from_string(fp.read())
+  with open(target_file, 'w') as ofp:
+    ofp.write(template.render({'vms': vms}))
+  logging.info('ssh to VMs in this benchmark by name with: '
+               'ssh -F {0} <vm name>'.format(target_file))
