@@ -261,12 +261,17 @@ class BaseVirtualMachine(resource.BaseResource):
     Raises:
       SshConnectionError: If there was a problem copying the file.
     """
+    if os.name == vm_util.WINDOWS:
+      if ':' in file_path:
+        # Scp doesn't like colons in paths.
+        file_path = file_path.split(':', 1)[1]
+      if not remote_path:
+        remote_path = os.path.basename(file_path)
+
     remote_location = '%s@%s:%s' % (
         self.user_name, self.ip_address, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
     scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
-    if os.name == vm_util.WINDOWS and ':' in file_path:
-      file_path = file_path.split(':', 1)[1]
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
     else:
