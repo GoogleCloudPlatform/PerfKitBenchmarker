@@ -93,7 +93,7 @@ class GceFirewall(network.BaseFirewall):
       project: The GCP project name under which firewall is created.
     """
     self._lock = threading.Lock()
-    self.firewall_rules = []
+    self.firewall_rules = set()
     self.project = project
 
   def __getstate__(self):
@@ -122,7 +122,7 @@ class GceFirewall(network.BaseFirewall):
       firewall_rule = GceFirewallRule(firewall_name, self.project, port)
       if firewall_rule in self.firewall_rules:
         return
-      self.firewall_rules.append(firewall_rule)
+      self.firewall_rules.add(firewall_rule)
       firewall_rule.Create()
 
   def DisallowAllPorts(self):
