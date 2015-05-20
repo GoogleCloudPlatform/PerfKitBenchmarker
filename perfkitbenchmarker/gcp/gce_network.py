@@ -44,7 +44,9 @@ class GceFirewallRule(resource.BaseResource):
 
   def __eq__(self, other):
     """Defines equality to make comparison easy."""
-    return self.__dict__ == other.__dict__
+    return (self.name == other.name and
+            self.port == other.port and
+            self.project == other.project)
 
   def _Create(self):
     """Creates the Firewall Rule."""
