@@ -94,7 +94,9 @@ $ sudo apt-get install python-pip -y
 Instructions: https://windows.github.com/
 
 Make sure that openssl/ssh/scp/ssh-keygen are on your path (you will need to update the PATH environment variable).
-The path to these commands should be "C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin".
+The path to these commands should be
+
+"C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin".
 
 ## Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using linux you can run the command below.
