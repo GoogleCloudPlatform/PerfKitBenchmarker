@@ -19,7 +19,6 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import os.path
-import tempfile
 import threading
 import time
 import uuid
@@ -244,9 +243,10 @@ class BaseVirtualMachine(resource.BaseResource):
     template = environment.from_string(template_contents)
     prefix = 'pkb-' + os.path.basename(template_path)
 
-    with tempfile.NamedTemporaryFile(prefix=prefix) as tf:
+    with vm_util.NamedTempFile(prefix=prefix) as tf:
       tf.write(template.render(vm=self, **context))
       tf.flush()
+      tf.close()
       self.RemoteCopy(tf.name, remote_path)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
@@ -262,7 +262,7 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     remote_location = '%s@%s:%s' % (
         self.user_name, self.ip_address, remote_path)
-    scp_cmd = ['/usr/bin/scp', '-P', str(self.ssh_port), '-pr']
+    scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
     scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
@@ -334,7 +334,7 @@ class BaseVirtualMachine(resource.BaseResource):
       SshConnectionError: If there was a problem establishing the connection.
     """
     user_host = '%s@%s' % (self.user_name, self.ip_address)
-    ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(self.ssh_port), user_host]
+    ssh_cmd = ['ssh', '-A', '-p', str(self.ssh_port), user_host]
     ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     try:
       if login_shell:

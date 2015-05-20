@@ -26,7 +26,6 @@ operate on the VM: boot, shutdown, etc.
 
 import json
 import re
-import tempfile
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -83,10 +82,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(GceVirtualMachine, self)._Create()
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
-    with tempfile.NamedTemporaryFile(dir=vm_util.GetTempDir(),
-                                     prefix='key-metadata') as tf:
+    with vm_util.NamedTempFile(dir=vm_util.GetTempDir(),
+                               prefix='key-metadata') as tf:
       tf.write('%s:%s\n' % (self.user_name, public_key))
       tf.flush()
+      tf.close()
       create_cmd = [FLAGS.gcloud_path,
                     'compute',
                     'instances',
