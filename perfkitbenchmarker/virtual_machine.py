@@ -18,6 +18,7 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+import os
 import os.path
 import threading
 import time
@@ -264,6 +265,8 @@ class BaseVirtualMachine(resource.BaseResource):
         self.user_name, self.ip_address, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
     scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
+    if os.name == vm_util.WINDOWS and ':' in file_path:
+      file_path = file_path.split(':', 1)[1]
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
     else:

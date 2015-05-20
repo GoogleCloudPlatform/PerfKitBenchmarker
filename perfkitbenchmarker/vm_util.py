@@ -500,7 +500,7 @@ def GetLastRunUri():
     cmd = ['bash', '-c', 'ls -1t %s | head -1' % TEMP_DIR]
   stdout, _, _ = IssueCommand(cmd)
   try:
-    return regex_util.ExtractGroup('run_(.*)', stdout)
+    return regex_util.ExtractGroup('run_([^\s]*)', stdout)
   except regex_util.NoMatchError:
     return None
 
