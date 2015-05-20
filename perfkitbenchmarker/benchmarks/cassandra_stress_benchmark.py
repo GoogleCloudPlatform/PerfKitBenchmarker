@@ -267,9 +267,7 @@ def CollectResults(benchmark_spec):
               'num_data_nodes': len(vm_dict[DATA_NODE]),
               'num_loader_nodes': len(vm_dict[LOADER_NODE]),
               'num_cassandra_stress_threads':
-              FLAGS.num_cassandra_stress_threads,
-              'scratch_disk_type': FLAGS.scratch_disk_type,
-              'scratch_disk_size': FLAGS.scratch_disk_size}
+              FLAGS.num_cassandra_stress_threads}
   results = [
       sample.Sample('Interval_op_rate', math.fsum(interval_op_rate_list),
                     'operations per second', metadata),
