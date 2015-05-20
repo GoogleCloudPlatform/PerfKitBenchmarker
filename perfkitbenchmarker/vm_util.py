@@ -508,7 +508,7 @@ def NamedTempFile(prefix='tmp', suffix='', dir=None):
 
   The existing tempfile.NamedTemporaryFile has the annoying property on
   Windows that it cannot be opened a second time while it is already open.
-  This makes it impossible to use with a "with" statement in a cross platform
+  This makes it impossible to use it with a "with" statement in a cross platform
   compatible way. This serves a similar role, but allows the file to be closed
   within a "with" statement without causing the file to be unlinked until the
   context exits.
