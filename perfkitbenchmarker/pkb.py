@@ -313,12 +313,11 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
         DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
       raise
     finally:
-      if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
-        if spec:
+      if spec:
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
           spec.Delete()
-      else:
-        if spec:
-          spec.PickleSpec()
+        # Pickle spec to save final resource state.
+        spec.PickleSpec()
 
 
 def RunBenchmarks(publish=True):
