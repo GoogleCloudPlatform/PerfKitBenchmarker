@@ -23,6 +23,7 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -222,3 +223,62 @@ class SampleCollectorTestCase(unittest.TestCase):
     samples = [tuple(self.sample)]
     self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
     self._VerifyResult()
+
+
+class DefaultMetadataProviderTestCase(unittest.TestCase):
+
+  def setUp(self):
+    p = mock.patch(publisher.__name__ + '.FLAGS')
+    self.mock_flags = p.start()
+    self.mock_flags.configure_mock(metadata=[])
+    self.addCleanup(p.stop)
+
+    p = mock.patch(publisher.__name__ + '.version',
+                   VERSION='v1')
+    p.start()
+    self.addCleanup(p.stop)
+
+    self.mock_spec = mock.MagicMock(cloud='GCP',
+                                    zones=['us-central1-a'],
+                                    machine_type='n1-standard-1',
+                                    image='ubuntu-14-04')
+
+    self.default_meta = {'perfkitbenchmarker_version': 'v1',
+                         'cloud': self.mock_spec.cloud,
+                         'zones': 'us-central1-a',
+                         'machine_type': self.mock_spec.machine_type,
+                         'image': self.mock_spec.image}
+
+  def _RunTest(self, spec, expected, input_metadata=None):
+    input_metadata = input_metadata or {}
+    instance = publisher.DefaultMetadataProvider()
+    result = instance.AddMetadata(input_metadata, self.mock_spec)
+    self.assertIsNot(input_metadata, result,
+                     msg='Input metadata was not copied.')
+    self.assertDictEqual(expected, result)
+
+  def testAddMetadata_ScratchDiskUndefined(self):
+    del self.mock_spec.scratch_disk
+    self._RunTest(self.mock_spec, self.default_meta)
+
+  def testAddMetadata_NoScratchDisk(self):
+    self.mock_spec.scratch_disk = False
+    self._RunTest(self.mock_spec, self.default_meta)
+
+  def testAddMetadata_WithScratchDisk(self):
+    self.mock_spec.configure_mock(scratch_disk=True,
+                                  scratch_disk_size=20,
+                                  scratch_disk_type='remote_ssd')
+    expected = self.default_meta.copy()
+    expected.update(scratch_disk_size=20, scratch_disk_type='remote_ssd')
+    self._RunTest(self.mock_spec, expected)
+
+  def testAddMetadata_PIOPS(self):
+    self.mock_spec.configure_mock(scratch_disk=True,
+                                  scratch_disk_size=20,
+                                  scratch_disk_type=disk.PIOPS,
+                                  scratch_disk_iops=1000)
+    expected = self.default_meta.copy()
+    expected.update(scratch_disk_size=20, scratch_disk_type=disk.PIOPS,
+                    scratch_disk_iops=1000)
+    self._RunTest(self.mock_spec, expected)
