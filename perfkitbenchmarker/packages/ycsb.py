@@ -46,6 +46,7 @@ import re
 import logging
 import operator
 import os
+import posixpath
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
@@ -57,9 +58,9 @@ FLAGS = flags.FLAGS
 
 YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/archive/'
                 '5ab241210adbb2d10fd89e755c433dd99cddb5ba.tar.gz')
-YCSB_BUILD_DIR = os.path.join(vm_util.VM_TMP_DIR, 'ycsb-build')
-YCSB_DIR = os.path.join(vm_util.VM_TMP_DIR, 'ycsb')
-YCSB_EXE = os.path.join(YCSB_DIR, 'bin', 'ycsb')
+YCSB_BUILD_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb-build')
+YCSB_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb')
+YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 
 _DEFAULT_PERCENTILES = 50, 75, 90, 95, 99, 99.9
 
@@ -522,8 +523,8 @@ class YCSBExecutor(object):
     """
     results = []
 
-    remote_path = os.path.join(vm_util.VM_TMP_DIR,
-                               os.path.basename(workload_file))
+    remote_path = posixpath.join(vm_util.VM_TMP_DIR,
+                                 os.path.basename(workload_file))
 
     with open(workload_file) as fp:
       workload_meta = _ParseWorkload(fp.read())
@@ -630,8 +631,8 @@ class YCSBExecutor(object):
       if FLAGS.ycsb_timelimit:
         parameters['timelimit'] = FLAGS.ycsb_timelimit
       parameters.update(kwargs)
-      remote_path = os.path.join(vm_util.VM_TMP_DIR,
-                                 os.path.basename(workload_file))
+      remote_path = posixpath.join(vm_util.VM_TMP_DIR,
+                                   os.path.basename(workload_file))
 
       with open(workload_file) as fp:
         workload_meta = _ParseWorkload(fp.read())

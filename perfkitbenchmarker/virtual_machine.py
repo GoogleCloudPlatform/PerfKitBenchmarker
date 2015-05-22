@@ -341,6 +341,9 @@ class BaseVirtualMachine(resource.BaseResource):
     Raises:
       SshConnectionError: If there was a problem establishing the connection.
     """
+    if os.name == vm_util.WINDOWS:
+      command = command.replace('\n', '\\n')
+
     user_host = '%s@%s' % (self.user_name, self.ip_address)
     ssh_cmd = ['ssh', '-A', '-p', str(self.ssh_port), user_host]
     ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))

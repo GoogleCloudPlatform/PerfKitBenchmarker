@@ -38,7 +38,7 @@ and measure the scaling efficiency.
 """
 
 import logging
-import os
+import posixpath
 import re
 import time
 
@@ -110,7 +110,7 @@ def Prepare(benchmark_spec):
     vm_util.RunThreaded(InstallAndBuild, vms)
 
   # Launch job on the leaf nodes.
-  leaf_server_bin = os.path.join(OLDISIM_DIR, BINARY_BASE, 'LeafNode')
+  leaf_server_bin = posixpath.join(OLDISIM_DIR, BINARY_BASE, 'LeafNode')
   for vm in leaf_vms:
     leaf_cmd = '%s --threads=%s' % (leaf_server_bin, vm.num_cpus)
     vm.RemoteCommand('%s &> /dev/null &' % leaf_cmd)
@@ -125,7 +125,7 @@ def SetupRoot(root_vm, leaf_vms):
   """
   fanout_args = ' '.join(['--leaf=%s' % i.internal_ip
                           for i in leaf_vms])
-  root_server_bin = os.path.join(OLDISIM_DIR, BINARY_BASE, 'ParentNode')
+  root_server_bin = posixpath.join(OLDISIM_DIR, BINARY_BASE, 'ParentNode')
   root_cmd = '%s --threads=%s %s' % (root_server_bin, root_vm.num_cpus,
                                      fanout_args)
   logging.info('Root cmdline: %s', root_cmd)
@@ -195,8 +195,8 @@ def RunLoadTest(benchmark_spec, fanout):
     SetupRoot(root_vm, leaf_vms)
 
   driver_vm = driver_vms[0]
-  driver_binary = os.path.join(OLDISIM_DIR, BINARY_BASE, 'DriverNode')
-  launch_script = os.path.join(OLDISIM_DIR, 'workloads/search/search_qps.sh')
+  driver_binary = posixpath.join(OLDISIM_DIR, BINARY_BASE, 'DriverNode')
+  launch_script = posixpath.join(OLDISIM_DIR, 'workloads/search/search_qps.sh')
   driver_args = ' '.join(['--server=%s' % i.internal_ip
                           for i in root_vms])
   # Make sure server is up.

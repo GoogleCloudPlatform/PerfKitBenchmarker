@@ -19,6 +19,7 @@ http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/ClusterS
 import functools
 import logging
 import os
+import posixpath
 import re
 import time
 
@@ -39,11 +40,11 @@ DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
               'hadoop/hadoop-env.sh.j2', 'hadoop/slaves.j2']
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
-HADOOP_DIR = os.path.join(vm_util.VM_TMP_DIR, 'hadoop')
-HADOOP_BIN = os.path.join(HADOOP_DIR, 'bin')
-HADOOP_SBIN = os.path.join(HADOOP_DIR, 'sbin')
-HADOOP_CONF_DIR = os.path.join(HADOOP_DIR, 'etc', 'hadoop')
-HADOOP_PRIVATE_KEY = os.path.join(HADOOP_CONF_DIR, 'hadoop_keyfile')
+HADOOP_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'hadoop')
+HADOOP_BIN = posixpath.join(HADOOP_DIR, 'bin')
+HADOOP_SBIN = posixpath.join(HADOOP_DIR, 'sbin')
+HADOOP_CONF_DIR = posixpath.join(HADOOP_DIR, 'etc', 'hadoop')
+HADOOP_PRIVATE_KEY = posixpath.join(HADOOP_CONF_DIR, 'hadoop_keyfile')
 
 
 def CheckPrerequisites():
@@ -81,7 +82,7 @@ def _RenderConfig(vm, master_ip, worker_ips, memory_fraction=0.9):
   context = {
       'master_ip': master_ip,
       'worker_ips': worker_ips,
-      'scratch_dir': os.path.join(vm.GetScratchDir(), 'hadoop'),
+      'scratch_dir': posixpath.join(vm.GetScratchDir(), 'hadoop'),
       'vcpus': vm.num_cpus,
       'hadoop_private_key': HADOOP_PRIVATE_KEY,
       'yarn_memory_mb': yarn_memory_mb
@@ -89,8 +90,8 @@ def _RenderConfig(vm, master_ip, worker_ips, memory_fraction=0.9):
 
   for file_name in DATA_FILES:
     file_path = data.ResourcePath(file_name)
-    remote_path = os.path.join(HADOOP_CONF_DIR,
-                               os.path.basename(file_name))
+    remote_path = posixpath.join(HADOOP_CONF_DIR,
+                                 os.path.basename(file_name))
     if file_name.endswith('.j2'):
       vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
     else:
@@ -98,14 +99,14 @@ def _RenderConfig(vm, master_ip, worker_ips, memory_fraction=0.9):
 
 
 def _GetHDFSOnlineNodeCount(master):
-  cmd = '{0} dfsadmin -report'.format(os.path.join(HADOOP_BIN, 'hdfs'))
+  cmd = '{0} dfsadmin -report'.format(posixpath.join(HADOOP_BIN, 'hdfs'))
   stdout = master.RemoteCommand(cmd)[0]
   avail_str = regex_util.ExtractGroup(r'Live datanodes\s+\((\d+)\):', stdout)
   return int(avail_str)
 
 
 def _GetYARNOnlineNodeCount(master):
-  cmd = '{0} node -list -all'.format(os.path.join(HADOOP_BIN, 'yarn'))
+  cmd = '{0} node -list -all'.format(posixpath.join(HADOOP_BIN, 'yarn'))
   stdout = master.RemoteCommand(cmd)[0]
   return len(re.findall(r'RUNNING', stdout))
 
@@ -139,7 +140,7 @@ def ConfigureAndStart(master, workers, start_yarn=True):
              'start_yarn': start_yarn}
 
   # HDFS setup and formatting, YARN startup
-  script_path = os.path.join(HADOOP_DIR, 'start-hadoop.sh')
+  script_path = posixpath.join(HADOOP_DIR, 'start-hadoop.sh')
   master.RenderTemplate(data.ResourcePath(START_HADOOP_SCRIPT),
                         script_path, context=context)
   master.RemoteCommand('bash {0}'.format(script_path), should_log=True)
@@ -167,18 +168,18 @@ def ConfigureAndStart(master, workers, start_yarn=True):
 
 def StopYARN(master):
   """Stop YARN on all nodes."""
-  master.RemoteCommand(os.path.join(HADOOP_SBIN, 'stop-yarn.sh'))
+  master.RemoteCommand(posixpath.join(HADOOP_SBIN, 'stop-yarn.sh'))
 
 
 def StopHDFS(master):
   """Stop HDFS on all nodes."""
-  master.RemoteCommand(os.path.join(HADOOP_SBIN, 'stop-dfs.sh'))
+  master.RemoteCommand(posixpath.join(HADOOP_SBIN, 'stop-dfs.sh'))
 
 
 def StopHistoryServer(master):
   """Stop the MapReduce JobHistory daemon."""
   master.RemoteCommand('{0} stop historyserver'.format(
-      os.path.join(HADOOP_SBIN, 'mr-jobhistory-daemon.sh')))
+      posixpath.join(HADOOP_SBIN, 'mr-jobhistory-daemon.sh')))
 
 
 def StopAll(master):
@@ -195,4 +196,4 @@ def StopAll(master):
 def CleanDatanode(vm):
   """Delete Hadoop data from 'vm'."""
   vm.RemoteCommand('rm -rf {0}'.format(
-      os.path.join(vm.GetScratchDir(), 'hadoop')))
+      posixpath.join(vm.GetScratchDir(), 'hadoop')))

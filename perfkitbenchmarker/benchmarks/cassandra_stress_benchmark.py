@@ -19,7 +19,7 @@ Cassandra homepage: http://cassandra.apache.org
 
 import logging
 import math
-import os.path
+import posixpath
 import re
 import time
 
@@ -170,7 +170,7 @@ def ConfigureCassandraEnvScript(vm):
   file_path = data.ResourcePath(CASSANDRA_ENV_TEMPLATE)
 
   vm.RenderTemplate(file_path,
-                    os.path.join(CASSANDRA_DIR, 'conf', 'cassandra-env.sh'),
+                    posixpath.join(CASSANDRA_DIR, 'conf', 'cassandra-env.sh'),
                     context=context)
 
 
@@ -189,7 +189,7 @@ def GenerateCassandraYaml(vm, seed_vm):
 
   file_path = data.ResourcePath(CASSANDRA_YAML_TEMPLATE)
   vm.RenderTemplate(file_path,
-                    os.path.join(CASSANDRA_DIR, 'conf', CASSANDRA_YAML),
+                    posixpath.join(CASSANDRA_DIR, 'conf', CASSANDRA_YAML),
                     context=context)
 
 

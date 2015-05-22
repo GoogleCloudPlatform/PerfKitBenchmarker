@@ -18,7 +18,7 @@ cp and dd between two attached disks on same vm.
 scp copy across different vms using external networks.
 """
 import logging
-import os.path
+import posixpath
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
@@ -191,7 +191,7 @@ def RunScpSingleDirection(sending_vm, receiving_vm):
 
   def RunForIpAddress(ip_address, ip_type):
     """Run SCP benchmark against a destination IP address."""
-    target_dir = os.path.join(receiving_vm.GetScratchDir(0), ip_type)
+    target_dir = posixpath.join(receiving_vm.GetScratchDir(0), ip_type)
     cmd = cmd_template % (ip_address, target_dir)
     receiving_vm.RemoteCommand('mkdir %s' % target_dir)
     meta = metadata.copy()
