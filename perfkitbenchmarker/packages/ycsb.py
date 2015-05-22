@@ -134,7 +134,8 @@ def _Install(vm):
                     '-DskipTests -Dcheckstyle.skip=true').format(
                         YCSB_BUILD_DIR, maven.MVN_DIR))
 
-  tar = os.path.join(YCSB_BUILD_DIR, 'distribution', 'target', 'ycsb-*.tar.gz')
+  tar = posixpath.join(
+      YCSB_BUILD_DIR, 'distribution', 'target', 'ycsb-*.tar.gz')
   vm.RemoteCommand(('mkdir -p {0} && tar --strip-components 1 -C {0} '
                     '-xf {1}').format(YCSB_DIR, tar))
 
