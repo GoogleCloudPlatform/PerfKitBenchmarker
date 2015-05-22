@@ -27,8 +27,8 @@ from perfkitbenchmarker.packages import hadoop
 
 FLAGS = flags.FLAGS
 
-HBASE_VERSION = '1.0.1'
-HBASE_URL = ('http://apache.mirrors.tds.net/hbase/hbase-{0}/'
+HBASE_VERSION = '1.0.1.1'
+HBASE_URL = ('http://apache.mirrors.tds.net/hbase/{0}/'
              'hbase-{0}-bin.tar.gz').format(HBASE_VERSION)
 
 DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
