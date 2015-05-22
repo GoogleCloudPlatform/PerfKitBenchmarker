@@ -400,15 +400,14 @@ def RunBenchmarks(publish=True):
         'To run again with this setup, please use --run_uri=%s', FLAGS.run_uri)
 
 
-
 def _GenerateBenchmarkDocumentation():
   """Generates benchmark documentation to show in --help."""
   benchmark_docs = []
   for benchmark_module in benchmarks.BENCHMARKS:
-    benchmark_info = benchmark_module.GetInfo()
-    vm_count = benchmark_info['num_machines']
+    benchmark_info = benchmark_module.BENCHMARK_INFO
+    vm_count = benchmark_info.get('num_machines') or 'variable'
     scratch_disk_str = ''
-    if benchmark_info['scratch_disk']:
+    if benchmark_info.get('scratch_disk'):
       scratch_disk_str = ' with scratch volume'
 
     benchmark_docs.append('%s: %s (%s VMs%s)' %

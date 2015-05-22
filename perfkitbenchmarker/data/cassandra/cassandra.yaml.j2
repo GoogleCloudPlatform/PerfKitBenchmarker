@@ -27,7 +27,7 @@ seed_provider:
       parameters:
           - seeds: "{{ seeds }}"
 concurrent_reads: 32
-concurrent_writes: {{ concurrent_writes }}
+concurrent_writes: {{ num_cpus * 8 }}
 commitlog_total_space_in_mb: 4096
 memtable_flush_writers: 4
 memtable_flush_queue_size: 4
@@ -35,11 +35,11 @@ trickle_fsync: true
 trickle_fsync_interval_in_kb: 10240
 storage_port: 7000
 ssl_storage_port: 7001
-listen_address: {{ eth0_address }}
+listen_address: {{ ip_address }}
 start_native_transport: true
 native_transport_port: 9042
 start_rpc: true
-rpc_address: {{ eth0_address }}
+rpc_address: {{ ip_address }}
 rpc_port: 9160
 rpc_keepalive: true
 rpc_server_type: sync
