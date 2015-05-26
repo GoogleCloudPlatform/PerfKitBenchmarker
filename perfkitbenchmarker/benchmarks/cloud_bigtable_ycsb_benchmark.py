@@ -171,6 +171,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
+  benchmark_spec.always_call_cleanup = True
   vms = benchmark_spec.vms
 
   vm_util.RunThreaded(_Install, vms)
