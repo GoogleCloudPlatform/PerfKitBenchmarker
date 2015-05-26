@@ -20,7 +20,6 @@ same project. See https://developers.google.com/compute/docs/networking for
 more information about GCE VM networking.
 """
 
-import json
 import threading
 
 from perfkitbenchmarker import flags
@@ -77,10 +76,8 @@ class GceFirewallRule(resource.BaseResource):
                     'describe',
                     self.name]
     describe_cmd.extend(util.GetDefaultGcloudFlags(self))
-    stdout, _, _ = vm_util.IssueCommand(describe_cmd, suppress_warning=True)
-    try:
-      json.loads(stdout)
-    except ValueError:
+    _, _, retcode = vm_util.IssueCommand(describe_cmd, suppress_warning=True)
+    if retcode:
       return False
     return True
 

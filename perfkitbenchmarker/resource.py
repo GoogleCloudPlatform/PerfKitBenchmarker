@@ -41,7 +41,12 @@ class BaseResource(object):
 
   @abc.abstractmethod
   def _Delete(self):
-    """Deletes the underlying resource."""
+    """Deletes the underlying resource.
+
+    Implementations of this method should be idempotent since it may
+    be called multiple times, even if the resource has already been
+    deleted.
+    """
     raise NotImplementedError()
 
   def _Exists(self):
