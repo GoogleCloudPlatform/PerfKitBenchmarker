@@ -72,7 +72,8 @@ You also need the software dependencies, which are mostly command line tools and
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
 
 If you are running on Windows, you will need to install Github Windows
-since it includes tools like openssl and an ssh client.
+since it includes tools like openssl and an ssh client. Alternatively you can
+install Cygwin since it should include the same tools.
 
 ## Install python 2 (and pip)
 If you are running on Windows, get the latest version of python 2 [here](https://www.python.org/downloads/windows/).
