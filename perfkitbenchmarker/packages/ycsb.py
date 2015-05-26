@@ -504,7 +504,6 @@ class YCSBExecutor(object):
     """Execute 'ycsb load' on 'vm'."""
     kwargs.setdefault('threads', FLAGS.ycsb_preload_threads)
     kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
-    kwargs.setdefault('operationcount', FLAGS.ycsb_record_count)
     for pv in FLAGS.ycsb_load_parameters:
       param, value = pv.split('=', 1)
       kwargs[param] = value
@@ -527,6 +526,8 @@ class YCSBExecutor(object):
 
     remote_path = posixpath.join(vm_util.VM_TMP_DIR,
                                  os.path.basename(workload_file))
+    kwargs.setdefault('threads', FLAGS.ycsb_preload_threads)
+    kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
 
     with open(workload_file) as fp:
       workload_meta = _ParseWorkload(fp.read())
