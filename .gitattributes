@@ -1,0 +1,2 @@
+# Don't let git add carriage returns on Windows.
+* text eol=lf
