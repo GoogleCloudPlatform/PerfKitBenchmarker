@@ -76,6 +76,7 @@ STAGE_RUN = 'run'
 STAGE_CLEANUP = 'cleanup'
 LOG_FILE_NAME = 'pkb.log'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
+REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
 # List of functions taking a benchmark_spec. Will be called before benchmark.Run
 # with two parameters: the benchmark and benchmark_spec.
 BEFORE_RUN_HOOKS = []
@@ -324,6 +325,11 @@ def RunBenchmarks(publish=True):
   if FLAGS.version:
     print version.VERSION
     return
+
+  for executable in REQUIRED_EXECUTABLES:
+    if not vm_util.ExecutableOnPath(executable):
+      logging.error('Could not find required executable "%s".' % executable)
+      return 1
 
   if FLAGS.run_uri is None:
     if FLAGS.run_stage not in [STAGE_ALL, STAGE_PREPARE]:

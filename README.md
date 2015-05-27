@@ -71,12 +71,12 @@ Before you can run the PerfKit Benchmaker on Cloud providers you need accounts a
 You also need the software dependencies, which are mostly command line tools and credentials to access your
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
 
-If you are running on Windows, you will need to install Github Windows
+If you are running on Windows, you will need to install GitHub Windows
 since it includes tools like openssl and an ssh client. Alternatively you can
 install Cygwin since it should include the same tools.
 
-## Install python 2 (and pip)
-If you are running on Windows, get the latest version of python 2 [here](https://www.python.org/downloads/windows/).
+## Install Python 2.7 (and pip)
+If you are running on Windows, get the latest version of Python 2.7 [here](https://www.python.org/downloads/windows/).
 This should have pip bundled with it. Make sure your PATH environment variable is set so that you can use both
 `python` and `pip` on the commandline (you can have the installer do it for you if you select the correct option).
 
@@ -90,14 +90,14 @@ On Debian/Ubuntu you can run the command below (or the equivalent command on dif
 $ sudo apt-get install python-pip -y
 ```
 
-## (*Windows Only*) Install Github Windows
+## (*Windows Only*) Install GitHub Windows
 
 Instructions: https://windows.github.com/
 
 Make sure that openssl/ssh/scp/ssh-keygen are on your path (you will need to update the PATH environment variable).
 The path to these commands should be
 
-"C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin".
+`C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin`
 
 ## Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using linux you can run the command below.

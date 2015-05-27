@@ -107,7 +107,7 @@ class BigQueryPublisherTestCase(unittest.TestCase):
   def setUp(self):
     p = mock.patch(publisher.__name__ + '.vm_util', spec=publisher.vm_util)
     self.mock_vm_util = p.start()
-    publisher.vm_util.NamedTempFile = vm_util.NamedTempFile
+    publisher.vm_util.NamedTemporaryFile = vm_util.NamedTemporaryFile
     self.mock_vm_util.GetTempDir.return_value = tempfile.gettempdir()
     self.addCleanup(p.stop)
 
@@ -156,7 +156,7 @@ class CloudStoragePublisherTestCase(unittest.TestCase):
   def setUp(self):
     p = mock.patch(publisher.__name__ + '.vm_util', spec=publisher.vm_util)
     self.mock_vm_util = p.start()
-    publisher.vm_util.NamedTempFile = vm_util.NamedTempFile
+    publisher.vm_util.NamedTemporaryFile = vm_util.NamedTemporaryFile
     self.mock_vm_util.GetTempDir.return_value = tempfile.gettempdir()
     self.addCleanup(p.stop)
 

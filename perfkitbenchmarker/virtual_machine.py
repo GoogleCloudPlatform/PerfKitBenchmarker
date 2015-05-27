@@ -244,7 +244,7 @@ class BaseVirtualMachine(resource.BaseResource):
     template = environment.from_string(template_contents)
     prefix = 'pkb-' + os.path.basename(template_path)
 
-    with vm_util.NamedTempFile(prefix=prefix) as tf:
+    with vm_util.NamedTemporaryFile(prefix=prefix) as tf:
       tf.write(template.render(vm=self, **context))
       tf.flush()
       tf.close()
@@ -261,7 +261,7 @@ class BaseVirtualMachine(resource.BaseResource):
     Raises:
       SshConnectionError: If there was a problem copying the file.
     """
-    if os.name == vm_util.WINDOWS:
+    if vm_util.RunningOnWindows():
       if ':' in file_path:
         # scp doesn't like colons in paths.
         file_path = file_path.split(':', 1)[1]
@@ -341,7 +341,9 @@ class BaseVirtualMachine(resource.BaseResource):
     Raises:
       SshConnectionError: If there was a problem establishing the connection.
     """
-    if os.name == vm_util.WINDOWS:
+    if vm_util.RunningOnWindows():
+      # Multi-line commands passed to ssh won't work on Windows unless the
+      # newlines are escaped.
       command = command.replace('\n', '\\n')
 
     user_host = '%s@%s' % (self.user_name, self.ip_address)

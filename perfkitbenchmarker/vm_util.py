@@ -90,16 +90,8 @@ def PrependTempDir(file_name):
 
 def GenTempDir():
   """Creates the tmp dir for the current run if it does not already exist."""
-  if os.name == WINDOWS:
-    create_cmd = ['powershell', 'mkdir', GetTempDir()]
-  else:
-    create_cmd = ['mkdir', '-p', GetTempDir()]
-  shell_value = True if os.name == WINDOWS else False
-  create_process = subprocess.Popen(create_cmd,
-                                    shell=shell_value,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
-  create_process.wait()
+  if not os.path.exists(GetTempDir()):
+    os.makedirs(GetTempDir())
 
 
 def SSHKeyGen():
@@ -116,7 +108,7 @@ def SSHKeyGen():
                   '-q',
                   '-f',
                   PrependTempDir(PRIVATE_KEYFILE)]
-    shell_value = True if os.name == WINDOWS else False
+    shell_value = RunningOnWindows()
     create_process = subprocess.Popen(create_cmd,
                                       shell=shell_value,
                                       stdout=subprocess.PIPE,
@@ -132,7 +124,7 @@ def SSHKeyGen():
                   PrependTempDir(CERT_FILE),
                   '-key',
                   PrependTempDir(PRIVATE_KEYFILE)]
-    shell_value = True if os.name == WINDOWS else False
+    shell_value = RunningOnWindows()
     create_process = subprocess.Popen(create_cmd,
                                       shell=shell_value,
                                       stdout=subprocess.PIPE,
@@ -368,7 +360,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
-  shell_value = True if os.name == WINDOWS else False
+  shell_value = RunningOnWindows()
   process = subprocess.Popen(cmd, env=env, shell=shell_value,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
@@ -403,7 +395,7 @@ def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
   logging.info('Spawning: %s', full_cmd)
   outfile = open(stdout_path, 'w')
   errfile = open(stderr_path, 'w')
-  shell_value = True if os.name == WINDOWS else False
+  shell_value = RunningOnWindows()
   subprocess.Popen(cmd, env=env, shell=shell_value,
                    stdout=outfile, stderr=errfile, close_fds=True)
 
@@ -493,7 +485,7 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
 
 def GetLastRunUri():
   """Returns the last run_uri used (or None if it can't be determined)."""
-  if os.name == WINDOWS:
+  if RunningOnWindows():
     cmd = ['powershell', '-Command',
            'gci %s | sort LastWriteTime | select -last 1' % TEMP_DIR]
   else:
@@ -506,7 +498,7 @@ def GetLastRunUri():
 
 
 @contextlib.contextmanager
-def NamedTempFile(prefix='tmp', suffix='', dir=None):
+def NamedTemporaryFile(prefix='tmp', suffix='', dir=None):
   """Behaves like tempfile.NamedTemporaryFile.
 
   The existing tempfile.NamedTemporaryFile has the annoying property on
@@ -521,6 +513,8 @@ def NamedTempFile(prefix='tmp', suffix='', dir=None):
   try:
     yield f
   finally:
+    if not f.closed:
+      f.close()
     os.unlink(f.name)
 
 
@@ -542,3 +536,19 @@ def GenerateSSHConfig(vms):
     ofp.write(template.render({'vms': vms}))
   logging.info('ssh to VMs in this benchmark by name with: '
                'ssh -F {0} <vm name>'.format(target_file))
+
+
+def RunningOnWindows():
+  """Returns True if PKB is running on Windows."""
+  return os.name == WINDOWS
+
+
+def ExecutableOnPath(executable_name):
+  """Return True if the given executable can be found on the path."""
+  cmd = ['where'] if RunningOnWindows() else ['which']
+  cmd.append(executable_name)
+
+  _, _, retcode = IssueCommand(cmd)
+  if retcode:
+    return False
+  return True

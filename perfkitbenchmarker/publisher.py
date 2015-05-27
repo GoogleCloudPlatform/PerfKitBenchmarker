@@ -384,9 +384,9 @@ class BigQueryPublisher(SamplePublisher):
       logging.warn('No samples: not publishing to BigQuery')
       return
 
-    with vm_util.NamedTempFile(prefix='perfkit-bq-pub',
-                               dir=vm_util.GetTempDir(),
-                               suffix='.json') as tf:
+    with vm_util.NamedTemporaryFile(prefix='perfkit-bq-pub',
+                                    dir=vm_util.GetTempDir(),
+                                    suffix='.json') as tf:
       json_publisher = NewlineDelimitedJSONPublisher(tf.name,
                                                      collapse_labels=True)
       json_publisher.PublishSamples(samples)
@@ -438,9 +438,9 @@ class CloudStoragePublisher(SamplePublisher):
       return object_name[:GCS_OBJECT_NAME_LENGTH]
 
   def PublishSamples(self, samples):
-    with vm_util.NamedTempFile(prefix='perfkit-gcs-pub',
-                               dir=vm_util.GetTempDir(),
-                               suffix='.json') as tf:
+    with vm_util.NamedTemporaryFile(prefix='perfkit-gcs-pub',
+                                    dir=vm_util.GetTempDir(),
+                                    suffix='.json') as tf:
       json_publisher = NewlineDelimitedJSONPublisher(tf.name)
       json_publisher.PublishSamples(samples)
       tf.close()

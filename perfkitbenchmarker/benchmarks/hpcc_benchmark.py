@@ -86,13 +86,12 @@ def CreateMachineFile(vms):
   Args:
     vms: The list of vms which will be in the cluster.
   """
-  with vm_util.NamedTempFile() as machine_file:
+  with vm_util.NamedTemporaryFile() as machine_file:
     master_vm = vms[0]
     machine_file.write('localhost slots=%d\n' % master_vm.num_cpus)
     for vm in vms[1:]:
       machine_file.write('%s slots=%d\n' % (vm.internal_ip,
                                             vm.num_cpus))
-    machine_file.flush()
     machine_file.close()
     master_vm.PushFile(machine_file.name, MACHINEFILE)
 
