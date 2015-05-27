@@ -246,7 +246,6 @@ class BaseVirtualMachine(resource.BaseResource):
 
     with vm_util.NamedTemporaryFile(prefix=prefix) as tf:
       tf.write(template.render(vm=self, **context))
-      tf.flush()
       tf.close()
       self.RemoteCopy(tf.name, remote_path)
 
