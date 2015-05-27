@@ -71,6 +71,34 @@ Before you can run the PerfKit Benchmaker on Cloud providers you need accounts a
 You also need the software dependencies, which are mostly command line tools and credentials to access your
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
 
+If you are running on Windows, you will need to install GitHub Windows
+since it includes tools like openssl and an ssh client. Alternatively you can
+install Cygwin since it should include the same tools.
+
+## Install Python 2.7 (and pip)
+If you are running on Windows, get the latest version of Python 2.7 [here](https://www.python.org/downloads/windows/).
+This should have pip bundled with it. Make sure your PATH environment variable is set so that you can use both
+`python` and `pip` on the commandline (you can have the installer do it for you if you select the correct option).
+
+Most Linux distributions already have python 2 installed. If python is not installed, you can likely install it
+using your distribution's package manager.
+
+If you just need to install pip, go [here](http://pip.readthedocs.org/en/latest/installing.html).
+On Windows follow the instructions on the page above.
+On Debian/Ubuntu you can run the command below (or the equivalent command on different distributions):
+```
+$ sudo apt-get install python-pip -y
+```
+
+## (*Windows Only*) Install GitHub Windows
+
+Instructions: https://windows.github.com/
+
+Make sure that openssl/ssh/scp/ssh-keygen are on your path (you will need to update the PATH environment variable).
+The path to these commands should be
+
+`C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin`
+
 ## Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using linux you can run the command below.
 
@@ -78,8 +106,10 @@ When prompted pick the local folder, then Python project, then the defaults for 
 ```
 $ curl https://sdk.cloud.google.com | bash
 ```
-
 Restart your shell window (or logout/ssh again if running on a VM)
+
+On Windows, visit the same page and follow the Windows installation instructions on the page.
+
 Set your credentials up: https://developers.google.com/cloud/sdk/gcloud/#gcloud.auth. Run the command below.
 It will print a web page URL. Navigate there, authorize the gcloud instance you just installed to use the services
 it lists, copy the access token and give it to the shell prompt.
@@ -91,12 +121,9 @@ You will need a project ID before you can run. Please navigate to https://consol
 create one.
 
 ## Install AWS CLI and setup authentication
-Install [pip](http://pip.readthedocs.org/en/latest/installing.html).
-```
-$ sudo apt-get install python-pip -y
-```
+Make sure you have installed pip (see the section above).
 
-Follow instructions at http://aws.amazon.com/cli/ or run the following command
+Follow instructions at http://aws.amazon.com/cli/ or run the following command (omit the 'sudo' on Windows)
 ```
 $ sudo pip install awscli
 ```
@@ -112,6 +139,11 @@ $ aws configure
 ```
 
 ## Windows Azure CLI and credentials
+You first need to install node.js (and npm).
+
+On Windows, go [here](https://nodejs.org/download/), and follow the setup instructions.
+
+On Debian based Linux systems, you can run the following:
 ```
 $ sudo apt-get install build-essential -y
 $ wget http://nodejs.org/dist/v0.10.26/node-v0.10.26.tar.gz
@@ -122,6 +154,10 @@ $ make
 $ sudo make install
 $ chmod +x /usr/bin/node
 $ cd ..
+```
+Next, run the following (omit the 'sudo' on Windows):
+
+```
 $ sudo npm install azure-cli -g
 $ azure account download
 ```

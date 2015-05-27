@@ -19,6 +19,7 @@ https://hbase.apache.org/
 
 import functools
 import os
+import posixpath
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
@@ -34,9 +35,9 @@ HBASE_URL = ('http://apache.mirrors.tds.net/hbase/{0}/'
 DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
               'hbase/hbase-env.sh.j2']
 
-HBASE_DIR = os.path.join(vm_util.VM_TMP_DIR, 'hbase')
-HBASE_BIN = os.path.join(HBASE_DIR, 'bin')
-HBASE_CONF_DIR = os.path.join(HBASE_DIR, 'conf')
+HBASE_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'hbase')
+HBASE_BIN = posixpath.join(HBASE_DIR, 'bin')
+HBASE_CONF_DIR = posixpath.join(HBASE_DIR, 'conf')
 
 
 def CheckPrerequisites():
@@ -82,8 +83,8 @@ def _RenderConfig(vm, master_ip, zk_ips, regionserver_ips):
 
   for file_name in DATA_FILES:
     file_path = data.ResourcePath(file_name)
-    remote_path = os.path.join(HBASE_CONF_DIR,
-                               os.path.basename(file_name))
+    remote_path = posixpath.join(HBASE_CONF_DIR,
+                                 os.path.basename(file_name))
     if file_name.endswith('.j2'):
       vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
     else:
@@ -103,7 +104,7 @@ def ConfigureAndStart(master, regionservers, zk_nodes):
     vm.RemoteCommand(('mkdir {0}/lib/native && '
                       'ln -s {1} {0}/lib/native/Linux-amd64-64').format(
                           HBASE_DIR,
-                          os.path.join(hadoop.HADOOP_DIR, 'lib', 'native')))
+                          posixpath.join(hadoop.HADOOP_DIR, 'lib', 'native')))
   vm_util.RunThreaded(LinkNativeLibraries, vms)
   fn = functools.partial(_RenderConfig, master_ip=master.internal_ip,
                          zk_ips=[vm.internal_ip for vm in zk_nodes],
@@ -112,9 +113,9 @@ def ConfigureAndStart(master, regionservers, zk_nodes):
   vm_util.RunThreaded(fn, vms)
 
   master.RemoteCommand('{0} dfs -mkdir /hbase'.format(
-      os.path.join(hadoop.HADOOP_BIN, 'hdfs')))
+      posixpath.join(hadoop.HADOOP_BIN, 'hdfs')))
 
-  master.RemoteCommand(os.path.join(HBASE_BIN, 'start-hbase.sh'))
+  master.RemoteCommand(posixpath.join(HBASE_BIN, 'start-hbase.sh'))
 
 
 def Stop(master):
@@ -123,4 +124,4 @@ def Stop(master):
   Args:
     master: VM. Master VM.
   """
-  master.RemoteCommand(os.path.join(HBASE_BIN, 'stop-hbase.sh'))
+  master.RemoteCommand(posixpath.join(HBASE_BIN, 'stop-hbase.sh'))

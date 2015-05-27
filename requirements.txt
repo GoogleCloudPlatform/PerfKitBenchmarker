@@ -14,4 +14,4 @@
 python-gflags==2.0
 jinja2>=2.7
 setuptools
-colorlog==2.6.0
+colorlog[windows]==2.6.0

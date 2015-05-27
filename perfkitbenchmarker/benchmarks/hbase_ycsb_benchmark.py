@@ -42,6 +42,7 @@ HDFS web UI on  50070.
 
 import logging
 import os
+import posixpath
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
@@ -104,8 +105,8 @@ def _CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
   """
   # See: https://issues.apache.org/jira/browse/HBASE-4163
   template_path = data.ResourcePath(CREATE_TABLE_SCRIPT)
-  remote = os.path.join(hbase.HBASE_DIR,
-                        os.path.basename(os.path.splitext(template_path)[0]))
+  remote = posixpath.join(hbase.HBASE_DIR,
+                          os.path.basename(os.path.splitext(template_path)[0]))
   vm.RenderTemplate(template_path, remote,
                     context={'table_name': table_name,
                              'family': family,
@@ -179,11 +180,11 @@ def Prepare(benchmark_spec):
   # Populate hbase-site.xml on the loaders.
   master.PullFile(
       vm_util.GetTempDir(),
-      os.path.join(hbase.HBASE_CONF_DIR, HBASE_SITE))
+      posixpath.join(hbase.HBASE_CONF_DIR, HBASE_SITE))
   for loader_vm in loaders:
     loader_vm.PushFile(
         os.path.join(vm_util.GetTempDir(), HBASE_SITE),
-        os.path.join(ycsb.YCSB_DIR, 'hbase-binding', 'conf', HBASE_SITE))
+        posixpath.join(ycsb.YCSB_DIR, 'hbase-binding', 'conf', HBASE_SITE))
 
 
 def Run(benchmark_spec):

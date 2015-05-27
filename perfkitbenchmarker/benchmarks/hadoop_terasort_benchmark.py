@@ -22,7 +22,7 @@ investigate other settings and verfiy that we are seeing good performance.
 """
 
 import logging
-import os.path
+import posixpath
 import time
 
 from perfkitbenchmarker import flags
@@ -91,11 +91,11 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   master = vms[0]
 
-  mapreduce_example_jar = os.path.join(
+  mapreduce_example_jar = posixpath.join(
       hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
       'hadoop-mapreduce-examples-{0}.jar'.format(hadoop.HADOOP_VERSION))
   hadoop_cmd = '{0} jar {1}'.format(
-      os.path.join(hadoop.HADOOP_BIN, 'yarn'),
+      posixpath.join(hadoop.HADOOP_BIN, 'yarn'),
       mapreduce_example_jar)
   master.RemoteCommand('{0} teragen {1} /teragen'.format(
       hadoop_cmd, FLAGS.terasort_num_rows))
@@ -110,7 +110,7 @@ def Run(benchmark_spec):
   # Clean up
   master.RemoteCommand(
       '{0} dfs -rm -r -f /teragen /teravalidate /terasort'.format(
-          os.path.join(hadoop.HADOOP_BIN, 'hdfs')))
+          posixpath.join(hadoop.HADOOP_BIN, 'hdfs')))
 
   metadata = {'num_rows': FLAGS.terasort_num_rows,
               'data_size_in_bytes': FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW,

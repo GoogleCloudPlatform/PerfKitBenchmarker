@@ -22,6 +22,7 @@ import random
 import re
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import traceback
@@ -39,7 +40,7 @@ FLAGS = flags.FLAGS
 PRIVATE_KEYFILE = 'perfkitbenchmarker_keyfile'
 PUBLIC_KEYFILE = 'perfkitbenchmarker_keyfile.pub'
 CERT_FILE = 'perfkitbenchmarker.pem'
-TEMP_DIR = '/tmp/perfkitbenchmarker'
+TEMP_DIR = os.path.join(tempfile.gettempdir(), 'perfkitbenchmarker')
 
 # The temporary directory on VMs. We cannot reuse GetTempDir()
 # because run_uri will not be available at time of module load and we need
@@ -52,6 +53,7 @@ TIMEOUT = 1200
 FUZZ = .5
 MAX_RETRIES = -1
 
+WINDOWS = 'nt'
 
 flags.DEFINE_integer('default_timeout', TIMEOUT, 'The default timeout for '
                      'retryable commands in seconds.')
@@ -96,9 +98,8 @@ def PrependTempDir(file_name):
 
 def GenTempDir():
   """Creates the tmp dir for the current run if it does not already exist."""
-  create_cmd = ['mkdir', '-p', GetTempDir()]
-  create_process = subprocess.Popen(create_cmd)
-  create_process.wait()
+  if not os.path.exists(GetTempDir()):
+    os.makedirs(GetTempDir())
 
 
 def SSHKeyGen():
@@ -107,7 +108,7 @@ def SSHKeyGen():
     GenTempDir()
 
   if not os.path.isfile(GetPrivateKeyPath()):
-    create_cmd = ['/usr/bin/ssh-keygen',
+    create_cmd = ['ssh-keygen',
                   '-t',
                   'rsa',
                   '-N',
@@ -115,11 +116,15 @@ def SSHKeyGen():
                   '-q',
                   '-f',
                   PrependTempDir(PRIVATE_KEYFILE)]
-    create_process = subprocess.Popen(create_cmd)
-    create_process.wait()
+    shell_value = RunningOnWindows()
+    create_process = subprocess.Popen(create_cmd,
+                                      shell=shell_value,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+    create_process.communicate()
 
   if not os.path.isfile(GetCertPath()):
-    create_cmd = ['/usr/bin/openssl',
+    create_cmd = ['openssl',
                   'req',
                   '-x509',
                   '-new',
@@ -127,7 +132,9 @@ def SSHKeyGen():
                   PrependTempDir(CERT_FILE),
                   '-key',
                   PrependTempDir(PRIVATE_KEYFILE)]
+    shell_value = RunningOnWindows()
     create_process = subprocess.Popen(create_cmd,
+                                      shell=shell_value,
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       stdin=subprocess.PIPE)
@@ -361,7 +368,8 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
-  process = subprocess.Popen(cmd, env=env,
+  shell_value = RunningOnWindows()
+  process = subprocess.Popen(cmd, env=env, shell=shell_value,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
   stdout, stderr = process.communicate()
@@ -395,7 +403,8 @@ def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
   logging.info('Spawning: %s', full_cmd)
   outfile = open(stdout_path, 'w')
   errfile = open(stderr_path, 'w')
-  subprocess.Popen(cmd, env=env,
+  shell_value = RunningOnWindows()
+  subprocess.Popen(cmd, env=env, shell=shell_value,
                    stdout=outfile, stderr=errfile, close_fds=True)
 
 
@@ -484,12 +493,37 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
 
 def GetLastRunUri():
   """Returns the last run_uri used (or None if it can't be determined)."""
-  stdout, _, _ = IssueCommand(
-      ['bash', '-c', 'ls -1t %s | head -1' % TEMP_DIR])
+  if RunningOnWindows():
+    cmd = ['powershell', '-Command',
+           'gci %s | sort LastWriteTime | select -last 1' % TEMP_DIR]
+  else:
+    cmd = ['bash', '-c', 'ls -1t %s | head -1' % TEMP_DIR]
+  stdout, _, _ = IssueCommand(cmd)
   try:
-    return regex_util.ExtractGroup('run_(.*)', stdout)
+    return regex_util.ExtractGroup('run_([^\s]*)', stdout)
   except regex_util.NoMatchError:
     return None
+
+
+@contextlib.contextmanager
+def NamedTemporaryFile(prefix='tmp', suffix='', dir=None):
+  """Behaves like tempfile.NamedTemporaryFile.
+
+  The existing tempfile.NamedTemporaryFile has the annoying property on
+  Windows that it cannot be opened a second time while it is already open.
+  This makes it impossible to use it with a "with" statement in a cross platform
+  compatible way. This serves a similar role, but allows the file to be closed
+  within a "with" statement without causing the file to be unlinked until the
+  context exits.
+  """
+  f = tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix,
+                                  dir=dir, delete=False)
+  try:
+    yield f
+  finally:
+    if not f.closed:
+      f.close()
+    os.unlink(f.name)
 
 
 def GenerateSSHConfig(vms):
@@ -510,6 +544,28 @@ def GenerateSSHConfig(vms):
     ofp.write(template.render({'vms': vms}))
   logging.info('ssh to VMs in this benchmark by name with: '
                'ssh -F {0} <vm name>'.format(target_file))
+
+
+def RunningOnWindows():
+  """Returns True if PKB is running on Windows."""
+  return os.name == WINDOWS
+
+
+def ExecutableOnPath(executable_name):
+  """Return True if the given executable can be found on the path."""
+  cmd = ['where'] if RunningOnWindows() else ['which']
+  cmd.append(executable_name)
+
+  shell_value = RunningOnWindows()
+  process = subprocess.Popen(cmd,
+                             shell=shell_value,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+  process.communicate()
+
+  if process.returncode:
+    return False
+  return True
 
 
 @contextlib.contextmanager
