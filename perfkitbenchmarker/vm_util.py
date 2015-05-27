@@ -548,7 +548,13 @@ def ExecutableOnPath(executable_name):
   cmd = ['where'] if RunningOnWindows() else ['which']
   cmd.append(executable_name)
 
-  _, _, retcode = IssueCommand(cmd)
-  if retcode:
+  shell_value = RunningOnWindows()
+  process = subprocess.Popen(cmd,
+                             shell=shell_value,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+  process.wait()
+
+  if process.returncode:
     return False
   return True
