@@ -25,6 +25,7 @@ Compared to hbase_ycsb, this benchmark:
 """
 
 import os
+import posixpath
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
@@ -64,8 +65,8 @@ BENCHMARK_INFO = {'name': 'cloud_bigtable_ycsb',
 
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
-YCSB_HBASE_LIB = os.path.join(ycsb.YCSB_DIR, 'hbase-binding', 'lib')
-YCSB_HBASE_CONF = os.path.join(ycsb.YCSB_DIR, 'hbase-binding', 'conf')
+YCSB_HBASE_LIB = posixpath.join(ycsb.YCSB_DIR, 'hbase-binding', 'lib')
+YCSB_HBASE_CONF = posixpath.join(ycsb.YCSB_DIR, 'hbase-binding', 'conf')
 
 REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/bigtable.admin',
@@ -108,7 +109,7 @@ def _GetALPNLocalPath():
   bn = os.path.basename(FLAGS.google_bigtable_alpn_jar_url)
   if not bn.endswith('.jar'):
     bn = 'alpn.jar'
-  return os.path.join(vm_util.VM_TMP_DIR, bn)
+  return posixpath.join(vm_util.VM_TMP_DIR, bn)
 
 
 def _GetTableName():
@@ -120,10 +121,10 @@ def _Install(vm):
   vm.Install('hbase')
   vm.Install('ycsb')
 
-  hbase_lib = os.path.join(hbase.HBASE_DIR, 'lib')
+  hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
   for url in [FLAGS.google_bigtable_hbase_jar_url]:
     jar_name = os.path.basename(url)
-    jar_path = os.path.join(YCSB_HBASE_LIB, jar_name)
+    jar_path = posixpath.join(YCSB_HBASE_LIB, jar_name)
     vm.RemoteCommand('curl -Lo {0} {1}'.format(jar_path, url))
     vm.RemoteCommand('cp {0} {1}'.format(jar_path, hbase_lib))
 
@@ -146,7 +147,7 @@ def _Install(vm):
   for file_name in HBASE_CONF_FILES:
     file_path = data.ResourcePath(file_name)
     for conf_dir in [hbase.HBASE_CONF_DIR, YCSB_HBASE_CONF]:
-      remote_path = os.path.join(conf_dir, os.path.basename(file_name))
+      remote_path = posixpath.join(conf_dir, os.path.basename(file_name))
       if file_name.endswith('.j2'):
         vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
       else:
