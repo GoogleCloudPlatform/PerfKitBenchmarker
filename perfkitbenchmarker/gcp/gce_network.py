@@ -19,15 +19,67 @@ others in the
 same project. See https://developers.google.com/compute/docs/networking for
 more information about GCE VM networking.
 """
+
 import threading
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import util
 
 
 FLAGS = flags.FLAGS
+
+
+class GceFirewallRule(resource.BaseResource):
+  """An object representing a GCE Firewall Rule."""
+
+  def __init__(self, name, project, port):
+    super(GceFirewallRule, self).__init__()
+    self.name = name
+    self.project = project
+    self.port = port
+
+  def __eq__(self, other):
+    """Defines equality to make comparison easy."""
+    return (self.name == other.name and
+            self.port == other.port and
+            self.project == other.project)
+
+  def _Create(self):
+    """Creates the Firewall Rule."""
+    create_cmd = [FLAGS.gcloud_path,
+                  'compute',
+                  'firewall-rules',
+                  'create',
+                  self.name,
+                  '--allow', 'tcp:%d' % self.port, 'udp:%d' % self.port]
+    create_cmd.extend(util.GetDefaultGcloudFlags(self))
+    vm_util.IssueCommand(create_cmd)
+
+  def _Delete(self):
+    """Deletes the Firewall Rule."""
+    delete_cmd = [FLAGS.gcloud_path,
+                  'compute',
+                  'firewall-rules',
+                  'delete',
+                  self.name]
+    delete_cmd.extend(util.GetDefaultGcloudFlags(self))
+    vm_util.IssueCommand(delete_cmd)
+
+  def _Exists(self):
+    """Returns True if the Firewall Rule exists."""
+    describe_cmd = [FLAGS.gcloud_path,
+                    'compute',
+                    'firewall-rules',
+                    'describe',
+                    self.name]
+    describe_cmd.extend(util.GetDefaultGcloudFlags(self))
+    _, _, retcode = vm_util.IssueCommand(describe_cmd, suppress_warning=True)
+    if retcode:
+      return False
+    return True
 
 
 class GceFirewall(network.BaseFirewall):
@@ -40,7 +92,7 @@ class GceFirewall(network.BaseFirewall):
       project: The GCP project name under which firewall is created.
     """
     self._lock = threading.Lock()
-    self.firewall_names = []
+    self.firewall_rules = []
     self.project = project
 
   def __getstate__(self):
@@ -66,29 +118,16 @@ class GceFirewall(network.BaseFirewall):
     with self._lock:
       firewall_name = ('perfkit-firewall-%s-%d' %
                        (FLAGS.run_uri, port))
-      if firewall_name in self.firewall_names:
+      firewall_rule = GceFirewallRule(firewall_name, self.project, port)
+      if firewall_rule in self.firewall_rules:
         return
-      firewall_cmd = [FLAGS.gcloud_path,
-                      'compute',
-                      'firewall-rules',
-                      'create',
-                      firewall_name,
-                      '--allow', 'tcp:%d' % port, 'udp:%d' % port]
-      firewall_cmd.extend(util.GetDefaultGcloudFlags(self))
-
-      vm_util.IssueRetryableCommand(firewall_cmd)
-      self.firewall_names.append(firewall_name)
+      self.firewall_rules.append(firewall_rule)
+      firewall_rule.Create()
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
-    for firewall in self.firewall_names:
-      firewall_cmd = [FLAGS.gcloud_path,
-                      'compute',
-                      'firewall-rules',
-                      'delete',
-                      firewall]
-      firewall_cmd.extend(util.GetDefaultGcloudFlags(self))
-      vm_util.IssueRetryableCommand(firewall_cmd)
+    for firewall_rule in self.firewall_rules:
+      firewall_rule.Delete()
 
 
 class GceNetwork(network.BaseNetwork):

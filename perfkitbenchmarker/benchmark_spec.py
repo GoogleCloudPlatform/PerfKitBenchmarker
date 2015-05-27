@@ -324,4 +324,7 @@ class BenchmarkSpec(object):
     except Exception as e:  # pylint: disable=broad-except
       logging.error('Unable to unpickle spec file for benchmark %s.', name)
       raise e
+    # Always let the spec be deleted after being unpickled so that
+    # it's possible to run cleanup even if cleanup has already run.
+    spec.deleted = False
     return spec

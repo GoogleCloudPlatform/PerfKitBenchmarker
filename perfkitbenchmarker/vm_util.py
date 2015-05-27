@@ -17,6 +17,7 @@
 import contextlib
 import logging
 import os
+import posixpath
 import random
 import re
 import socket
@@ -59,6 +60,13 @@ flags.DEFINE_integer('default_timeout', TIMEOUT, 'The default timeout for '
 flags.DEFINE_integer('burn_cpu_seconds', 0,
                      'Amount of time in seconds to burn cpu on vm.')
 flags.DEFINE_integer('burn_cpu_threads', 1, 'Number of threads to burn cpu.')
+flags.DEFINE_boolean('dstat', False,
+                     'Run dstat (http://dag.wiee.rs/home-made/dstat/) '
+                     'on each VM to collect system performance metrics during '
+                     'each benchmark run.')
+flags.DEFINE_integer('dstat_interval', None,
+                     'dstat sample collection frequency, in seconds. Only '
+                     'applicable when --dstat is specified.')
 
 
 class IpAddressSubset(object):
@@ -558,3 +566,68 @@ def ExecutableOnPath(executable_name):
   if process.returncode:
     return False
   return True
+
+
+@contextlib.contextmanager
+def RunDStatIfConfigured(vms, suffix='-dstat'):
+  """Installs and runs dstat on 'vms' if FLAGS.dstat is set.
+
+  On exiting the context manager, the results are copied to the run temp dir.
+
+  Args:
+    vms: List of virtual machines.
+    suffix: str. Suffix to add to each dstat result file.
+
+  Yields:
+    None
+  """
+  if not FLAGS.dstat:
+    yield
+    return
+
+  lock = threading.Lock()
+  pids = {}
+  file_names = {}
+
+  def StartDStat(vm):
+    vm.Install('dstat')
+
+    num_cpus = vm.num_cpus
+
+    # List block devices so that I/O to each block device can be recorded.
+    block_devices, _ = vm.RemoteCommand(
+        'lsblk --nodeps --output NAME --noheadings')
+    block_devices = block_devices.splitlines()
+    dstat_file = posixpath.join(
+        VM_TMP_DIR, '{0}{1}.csv'.format(vm.name, suffix))
+    cmd = ('dstat --epoch -C total,0-{max_cpu} '
+           '-D total,{block_devices} '
+           '-clrdngyi -pms --fs --ipc --tcp '
+           '--udp --raw --socket --unix --vm --rpc '
+           '--noheaders --output {output} {dstat_interval} > /dev/null 2>&1 & '
+           'echo $!').format(
+               max_cpu=num_cpus - 1,
+               block_devices=','.join(block_devices),
+               output=dstat_file,
+               dstat_interval=FLAGS.dstat_interval or '')
+    stdout, _ = vm.RemoteCommand(cmd)
+    with lock:
+      pids[vm.name] = stdout.strip()
+      file_names[vm.name] = dstat_file
+
+  def StopDStat(vm):
+    if vm.name not in pids:
+      logging.warn('No dstat PID for %s', vm.name)
+      return
+    cmd = 'kill {0} || true'.format(pids[vm.name])
+    vm.RemoteCommand(cmd)
+    try:
+      vm.PullFile(GetTempDir(), file_names[vm.name])
+    except:
+      logging.exception('Failed fetching dstat result.')
+
+  RunThreaded(StartDStat, vms)
+  try:
+    yield
+  finally:
+    RunThreaded(StopDStat, vms)
