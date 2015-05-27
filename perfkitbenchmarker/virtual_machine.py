@@ -263,10 +263,10 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     if os.name == vm_util.WINDOWS:
       if ':' in file_path:
-        # Scp doesn't like colons in paths.
+        # scp doesn't like colons in paths.
         file_path = file_path.split(':', 1)[1]
-      if not remote_path:
-        remote_path = os.path.basename(file_path)
+      # Replace the last instance of '\' with '/' to make scp happy.
+      file_path = '/'.join(file_path.rsplit('\\', 1))
 
     remote_location = '%s@%s:%s' % (
         self.user_name, self.ip_address, remote_path)
