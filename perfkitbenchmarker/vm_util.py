@@ -121,7 +121,7 @@ def SSHKeyGen():
                                       shell=shell_value,
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
-    create_process.wait()
+    create_process.communicate()
 
   if not os.path.isfile(GetCertPath()):
     create_cmd = ['openssl',
@@ -561,7 +561,7 @@ def ExecutableOnPath(executable_name):
                              shell=shell_value,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
-  process.wait()
+  process.communicate()
 
   if process.returncode:
     return False
