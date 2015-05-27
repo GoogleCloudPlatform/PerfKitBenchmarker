@@ -215,8 +215,10 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
   logging.info('Running benchmark %s', name)
   for before_run_hook in BEFORE_RUN_HOOKS:
     before_run_hook(benchmark=benchmark, benchmark_spec=spec)
-  with timer.Measure('Benchmark Run'):
-    samples = benchmark.Run(spec)
+
+  with vm_util.RunDStatIfConfigured(spec.vms, suffix='-{0}-dstat'.format(name)):
+    with timer.Measure('Benchmark Run'):
+      samples = benchmark.Run(spec)
   collector.AddSamples(samples, name, spec)
 
 
