@@ -43,6 +43,8 @@ EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
 EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
              '7/x86_64/e/epel-release-7-5.noarch.rpm')
 
+UPDATE_RETRIES = 5
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('os_type', DEBIAN,
@@ -170,7 +172,7 @@ class YumMixin(BasePackageMixin):
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
     if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_pacakges):
+        not FLAGS.install_packages):
       return
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
@@ -211,11 +213,17 @@ class AptMixin(BasePackageMixin):
     self.AptUpdate()
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
+  @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
-    # We don't want to fail if updating fails. The '--ignore-missing'
-    # option lets us continue even when we can't locate an archive.
-    self.RemoteCommand('sudo apt-get update --ignore-missing')
+    try:
+      self.RemoteCommand('sudo apt-get update')
+    except errors.VmUtil.SshConnectionError as e:
+      # If there is a problem, remove the lists in order to get rid of
+      # "Hash Sum mismatch" errors (the files will be restored when
+      # apt-get update is run again).
+      self.RemoteCommand('sudo rm -r /var/lib/apt/lists/*')
+      raise e
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""

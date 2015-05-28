@@ -1,3 +1,20 @@
+# v0.16.0
+
+* **Breaking Change** Added a new scratch disk type: "local" (ephemeral
+  storage bundled with the instance). As a result, the type "ssd" was
+  changed to "remote_ssd". (GH-253)
+* You can now omit "--run_uri" under certain circumstances. (GH-255)
+* Support for striping multiple scratch disks together has been added. (GH-259)
+* Add hbase_ycsb benchmark. (GH-263)
+* Use the boto API differently when downloading a one byte object to avoid
+  the unnecessary HEAD request (and issue GET request only). (GH-264)
+* Move VM name to BaseVirtualMachine. (GH-265)
+* Write an SSH config file to the run temp directory. (GH-266)
+* Fix a typo in package_managers.py. (GH-267)
+* Add a Cassandra package. (GH-268)
+* GCE: do not restart on host failure. (GH-273)
+* Fix Hash Sum mismatch errors. (GH-275)
+
 # v0.15.0
 
 * Add ability to inject environment variables to IssueCommand. (GH-231)
