@@ -258,7 +258,9 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
         """Adds metadata to the Rackspace VM"""
         if not kwargs:
             return
-        cmd = [FLAGS.nova_path, 'meta', 'set']
+        cmd = [FLAGS.nova_path]
+        cmd.extend(util.GetDefaultRackspaceNovaFlags(self))
+        cmd.extend(['meta', self.name, 'set'])
         for key, value in kwargs.iteritems():
             cmd.append('{0}={1}'.format(key, value))
         vm_util.IssueCommand(cmd)
