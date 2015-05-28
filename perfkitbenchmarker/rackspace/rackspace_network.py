@@ -26,6 +26,14 @@ from perfkitbenchmarker.rackspace import util
 
 
 FLAGS = flags.FLAGS
+flags.DEFINE_boolean(
+    'use_security_group', False,
+    'A boolean indicating if whether or not to create a security group for the'
+    ' new instance. Applies default security group rules'
+    ' (e.g. allow ingress TCP, and UDP traffic through port 22). If no security'
+    ' group is used, all incoming and outgoing traffic through TCP, UDP and'
+    ' ICMP is allowed, this is the default.')
+
 SSH_PORT = 22
 
 
@@ -57,7 +65,7 @@ class RackspaceSecurityGroup(network.BaseFirewall):
           vm: The BaseVirtualMachine object to open the port for.
           port: The local port to open.
         """
-        if vm.is_static or port == SSH_PORT:
+        if vm.is_static or not FLAGS.use_security_group or port == SSH_PORT:
             return
         with self._lock:
             firewall_name = ('perfkit-firewall-%s-%d-%d' %
