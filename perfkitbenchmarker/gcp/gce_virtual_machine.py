@@ -91,9 +91,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     'instances',
                     'create', self.name,
                     '--disk',
-                    'name=%s' % self.boot_disk.name,
-                    'boot=yes',
-                    'mode=rw',
+                    'name=%s,boot=yes,mode=rw' % self.boot_disk.name,
                     '--machine-type', self.machine_type,
                     '--tags=perfkitbenchmarker',
                     '--maintenance-policy', 'TERMINATE',
@@ -108,7 +106,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         create_cmd.append('interface=%s' % ssd_interface_option)
       if FLAGS.gcloud_scopes:
         create_cmd.extend(['--scopes'] +
-                          re.split(r'[,; ]', FLAGS.gcloud_scopes))
+                          ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes)))
       create_cmd.extend(util.GetDefaultGcloudFlags(self))
       vm_util.IssueCommand(create_cmd)
 
