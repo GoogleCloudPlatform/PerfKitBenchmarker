@@ -99,6 +99,7 @@ def CheckPrerequisites():
     if scope not in FLAGS.gcloud_scopes:
       raise ValueError('Scope {0} required.'.format(scope))
 
+  # TODO: extract from gcloud config if available.
   if not FLAGS.google_bigtable_cluster_name:
     raise ValueError('Missing --google_bigtable_cluster_name')
   if not FLAGS.google_bigtable_zone_name:
