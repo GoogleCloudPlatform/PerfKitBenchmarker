@@ -24,8 +24,10 @@ Compared to hbase_ycsb, this benchmark:
     operate.
 """
 
+import json
 import os
 import posixpath
+import subprocess
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
@@ -101,8 +103,6 @@ def CheckPrerequisites():
     raise ValueError('Missing --google_bigtable_cluster_name')
   if not FLAGS.google_bigtable_zone_name:
     raise ValueError('Missing --google_bigtable_zone_name')
-  if not FLAGS.project:
-    raise ValueError('Missing --project')
 
 
 def _GetALPNLocalPath():
@@ -114,6 +114,20 @@ def _GetALPNLocalPath():
 
 def _GetTableName():
   return 'ycsb{0}'.format(FLAGS.run_uri)
+
+
+def _GetDefaultProject():
+  cmd = [FLAGS.gcloud_path, 'config', 'list', '--format', 'json']
+  stdout, stderr, return_code = vm_util.IssueCommand(cmd)
+  if return_code:
+    raise subprocess.CalledProcessError(return_code, cmd, stdout)
+
+  config = json.loads(stdout)
+
+  try:
+    return config['core']['project']
+  except KeyError:
+    raise KeyError('No default project found in {0}'.format(config))
 
 
 def _Install(vm):
@@ -139,7 +153,7 @@ def _Install(vm):
   context = {
       'google_bigtable_endpoint': FLAGS.google_bigtable_endpoint,
       'google_bigtable_admin_endpoint': FLAGS.google_bigtable_admin_endpoint,
-      'project': FLAGS.project,
+      'project': FLAGS.project or _GetDefaultProject(),
       'cluster': FLAGS.google_bigtable_cluster_name,
       'zone': FLAGS.google_bigtable_zone_name,
   }
