@@ -364,7 +364,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     env: A dict of key/value strings, such as is given to the subprocess.Popen()
         constructor, that contains environment variables to be injected.
     timeout: Timeout for the command in seconds. If the command has not finished
-        before the timeout is reached, it will be killed. Set timeout to -1 to
+        before the timeout is reached, it will be killed. Set timeout to None to
         let the command run indefinitely.
 
   Returns:
@@ -381,9 +381,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
                              stderr=subprocess.PIPE)
 
   timer = threading.Timer(timeout, lambda p: p.kill(), (process,))
-
-  if timeout != -1:
-    timer.start()
+  timer.start()
 
   stdout, stderr = process.communicate()
 
