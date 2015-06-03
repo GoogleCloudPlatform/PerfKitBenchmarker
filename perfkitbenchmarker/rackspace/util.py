@@ -14,15 +14,18 @@
 """Utilities for working with Rackspace Cloud Platform resources."""
 
 import os
+import re
+
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+
+flags.DEFINE_boolean('boot_from_cbs_volume', 'False',
+                     'When flag is included the instance will use a remote disk'
+                     'as its boot disk, if machine_type supports it.')
 
 flags.DEFINE_string('nova_path',
                     'nova',
                     'The path for the rackspace-novaclient tool.')
-
-flags.DEFINE_string('cinder_path',
-                    'cinder',
-                    'The path for the python-cinderclient tool.')
 
 flags.DEFINE_string('neutron_path',
                     'neutron',
@@ -35,48 +38,89 @@ flags.DEFINE_list('additional_rackspace_flags',
 
 FLAGS = flags.FLAGS
 
-
-def GetDefaultRackspaceNovaFlags(resource):
-    """Return common set of flags for using Nova on the Rackspace Cloud.
-
-    Args:
-    resource: A Rackspace resource of type BaseResource.
-
-    Returns:
-    A common set of Nova options.
-    """
-    options = ['--os-password', os.getenv('RS_API_KEY')]
-    options.extend(FLAGS.additional_rackspace_flags)
-
-    return options
+PROPERTY_VALUE_ROW_REGEX = r'\|\s+(:?\S+\s\S+|\S+)\s+\|\s+(.*?)\s+\|'
+PROP_VAL_PATTERN = re.compile(PROPERTY_VALUE_ROW_REGEX)
 
 
-def GetDefaultRackspaceCinderFlags(resource):
-    """Return common set of flags for using Cinder on the Rackspace Cloud.
-
-    Args:
-    resource: A Rackspace resource of type BaseResource.
-
-    Returns:
-    A common set of Cinder options.
-    """
-    options = []
-    options.extend(FLAGS.additional_rackspace_flags)
-
-    return options
-
-
-def GetDefaultRackspaceNeutronFlags(resource):
-  """Return common set of flags for using Neutron on the Rackspace Cloud.
-
-  Args:
-    resource: A Rackspace resource of type BaseResource.
+def ParseNovaTable(output):
+  """Returns a dict with key/values returned from a Nova CLI formatted table.
 
   Returns:
-    A common set of Neutron options.
+  dict with key/values of the resource requested.
   """
-  options = []
-  options.extend(['--os-password', os.getenv('RS_API_KEY')])
-  options.extend(FLAGS.additional_rackspace_flags)
+  stdout_lines = output.split('\n')
+  groups = (PROP_VAL_PATTERN.match(line) for line in stdout_lines)
+  tuples = (g.groups() for g in groups if g)
+  filtered_tuples = ((key, val) for (key, val) in tuples
+                     if key and key not in ('', 'Property',))
+  return dict(filtered_tuples)
 
-  return options
+
+def GetDefaultRackspaceCommonEnv(zone='IAD'):
+  """Return common set of environment variables for using any OpenStack client
+  against the Rackspace Public Cloud.
+
+  Args:
+  zone: string specifying Rackspace region to use.
+
+  Returns:
+  dict of environment variables
+  """
+  env = {
+      'OS_AUTH_URL': os.getenv('OS_AUTH_URL',
+                               'https://identity.api.rackspacecloud.com/v2.0/'),
+      'OS_AUTH_SYSTEM': os.getenv('OS_AUTH_SYSTEM', 'rackspace'),
+      'OS_SERVICE_NAME': os.getenv('OS_SERVICE_NAME', 'cloudServersOpenStack'),
+      'OS_REGION_NAME': zone,
+      'OS_USERNAME': os.getenv('OS_USERNAME'),
+      'OS_PASSWORD': os.getenv('OS_PASSWORD'),
+      'OS_TENANT_NAME': os.getenv('OS_TENANT_NAME'),
+      'OS_NO_CACHE': os.getenv('OS_NO_CACHE', '1'),
+  }
+
+  environment_vars_missing = []
+  for key, val in env.items():
+    if val is None:
+      environment_vars_missing.append(key)
+
+  if len(environment_vars_missing) != 0:
+    msg = ('The following required environment variables were not found:\n',
+           '\n'.join(environment_vars_missing),
+           '\n\nPlease make sure to source them into your environment, and try',
+           ' again.',)
+    raise errors.Error(''.join(msg))
+
+  return env
+
+
+def GetDefaultRackspaceNovaEnv(zone):
+  """Return common set of environment variables for using the Nova client
+  against the Rackspace Public Cloud.
+
+  Args:
+  zone: string specifying Rackspace region to use.
+
+  Returns:
+  dict of environment variables for Nova
+  """
+  env = GetDefaultRackspaceCommonEnv(zone)
+  env.update({
+      'NOVA_RAX_AUTH': os.getenv('NOVA_RAX_AUTH', '1'),
+  })
+
+  return env
+
+
+def GetDefaultRackspaceNeutronEnv(zone):
+  """Return common set of environment variables for using the Neutron client
+  against the Rackspace Public Cloud.
+
+  Args:
+  zone: string specifying Rackspace region to use.
+
+  Returns:
+  dict of environment variables for Neutron
+  """
+  env = GetDefaultRackspaceCommonEnv(zone)
+
+  return env

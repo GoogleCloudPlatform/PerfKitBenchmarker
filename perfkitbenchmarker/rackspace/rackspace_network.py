@@ -17,6 +17,7 @@ The SecurityGroup class provides a way of opening VM ports. The Network class
 allows VMs to communicate via internal IPs.
 """
 import json
+import os
 import threading
 
 from perfkitbenchmarker import flags
@@ -73,11 +74,16 @@ class RackspaceSecurityGroup(network.BaseFirewall):
             self.sg_counter += 1
             if firewall_name in self.firewall_names:
                 return
+
+            firewall_env = dict(os.environ.copy(),
+                                **util.GetDefaultRackspaceNeutronEnv(self))
+
             firewall_cmd = [FLAGS.neutron_path]
-            firewall_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
             firewall_cmd.extend(['security-group-create'])
             firewall_cmd.append(firewall_name)
-            vm_util.IssueRetryableCommand(firewall_cmd)
+
+            vm_util.IssueRetryableCommand(firewall_cmd, env=firewall_env)
+
             self.firewall_names.add(firewall_name)
 
             for protocol in ['tcp', 'udp']:
@@ -89,9 +95,9 @@ class RackspaceSecurityGroup(network.BaseFirewall):
                                  '--protocol', protocol,
                                  '--port-range-min', str(port),
                                  '--port-range-max', str(port)])
-                rule_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
                 rule_cmd.append(firewall_name)
-                vm_util.IssueRetryableCommand(rule_cmd)
+
+                vm_util.IssueRetryableCommand(rule_cmd, env=firewall_env)
 
             rule_cmd = []
             rule_cmd.extend([FLAGS.neutron_path,
@@ -101,16 +107,16 @@ class RackspaceSecurityGroup(network.BaseFirewall):
                              '--protocol', 'tcp',
                              '--port-range-min', str(SSH_PORT),
                              '--port-range-max', str(SSH_PORT)])
-            rule_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
             rule_cmd.append(firewall_name)
-            vm_util.IssueRetryableCommand(rule_cmd)
 
+            vm_util.IssueRetryableCommand(rule_cmd, env=firewall_env)
 
             getport_cmd = []
             getport_cmd.extend([FLAGS.neutron_path, 'port-list',
                                 '--format', 'table'])
-            getport_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
-            stdout, _ = vm_util.IssueRetryableCommand(getport_cmd)
+
+            stdout, _ = vm_util.IssueRetryableCommand(getport_cmd,
+                                                      env=firewall_env)
             attrs = stdout.split('\n')
             for attr in attrs:
                 if vm.ip_address in attr or vm.ip_address6 in attr:
@@ -118,39 +124,48 @@ class RackspaceSecurityGroup(network.BaseFirewall):
                     if port_id != '':
                         break
 
+            if not port_id:
+              raise ValueError('Could not find port_id from response.')
+
             updateport_cmd = []
             updateport_cmd.extend([FLAGS.neutron_path, 'port-update'])
             for firewall in self.firewall_names:
                 updateport_cmd.extend(['--security-group', firewall])
-            updateport_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
             updateport_cmd.append(port_id)
-            vm_util.IssueRetryableCommand(updateport_cmd)
+
+            vm_util.IssueRetryableCommand(updateport_cmd, env=firewall_env)
 
     def DisallowAllPorts(self):
         """Closes all ports on the firewall."""
+        firewall_env = dict(os.environ.copy(),
+                            **util.GetDefaultRackspaceNeutronEnv(self))
+
         for firewall in self.firewall_names:
             firewall_cmd = []
             firewall_cmd.extend([FLAGS.neutron_path,
                                  'security-group-show',
                                  '--format', 'value'])
-            firewall_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
             firewall_cmd.append(firewall)
-            stdout, _ = vm_util.IssueRetryableCommand(firewall_cmd)
+
+            stdout, _ = vm_util.IssueRetryableCommand(firewall_cmd,
+                                                      env=firewall_env)
+
             rules = [v for v in stdout.split('\n') if v != ''][2:-1]
             for rule in rules:
                 rule_id = str(json.loads(rule)['id'])
                 rule_cmd = []
                 rule_cmd.extend([FLAGS.neutron_path,
                                  'security-group-rule-delete'])
-                rule_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
                 rule_cmd.append(rule_id)
-                vm_util.IssueRetryableCommand(rule_cmd)
+
+                vm_util.IssueRetryableCommand(rule_cmd, env=firewall_env)
 
             firewall_cmd = [FLAGS.neutron_path]
-            firewall_cmd.extend(util.GetDefaultRackspaceNeutronFlags(self))
             firewall_cmd.extend(['security-group-delete'])
             firewall_cmd.append(firewall)
-            vm_util.IssueRetryableCommand(firewall_cmd)
+
+            vm_util.IssueRetryableCommand(firewall_cmd, env=firewall_env)
+
             self.firewall_names.remove(firewall)
 
 
