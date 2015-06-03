@@ -230,7 +230,8 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
   def setUp(self):
     p = mock.patch(publisher.__name__ + '.FLAGS')
     self.mock_flags = p.start()
-    self.mock_flags.configure_mock(metadata=[])
+    self.mock_flags.configure_mock(metadata=[],
+                                   num_striped_disks=1)
     self.addCleanup(p.stop)
 
     p = mock.patch(publisher.__name__ + '.version',
@@ -247,7 +248,8 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                          'cloud': self.mock_spec.cloud,
                          'zones': 'us-central1-a',
                          'machine_type': self.mock_spec.machine_type,
-                         'image': self.mock_spec.image}
+                         'image': self.mock_spec.image,
+                         'num_striped_disks': 1}
 
   def _RunTest(self, spec, expected, input_metadata=None):
     input_metadata = input_metadata or {}
@@ -259,11 +261,15 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
 
   def testAddMetadata_ScratchDiskUndefined(self):
     del self.mock_spec.scratch_disk
-    self._RunTest(self.mock_spec, self.default_meta)
+    meta = self.default_meta.copy()
+    meta.pop('num_striped_disks')
+    self._RunTest(self.mock_spec, meta)
 
   def testAddMetadata_NoScratchDisk(self):
     self.mock_spec.scratch_disk = False
-    self._RunTest(self.mock_spec, self.default_meta)
+    meta = self.default_meta.copy()
+    meta.pop('num_striped_disks')
+    self._RunTest(self.mock_spec, meta)
 
   def testAddMetadata_WithScratchDisk(self):
     self.mock_spec.configure_mock(scratch_disk=True,

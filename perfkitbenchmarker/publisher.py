@@ -138,7 +138,8 @@ class DefaultMetadataProvider(MetadataProvider):
     # Scratch disk is not defined when a benchmark config is provided.
     if getattr(benchmark_spec, 'scratch_disk', None):
       metadata.update(scratch_disk_type=benchmark_spec.scratch_disk_type,
-                      scratch_disk_size=benchmark_spec.scratch_disk_size)
+                      scratch_disk_size=benchmark_spec.scratch_disk_size,
+                      num_striped_disks=FLAGS.num_striped_disks)
       if benchmark_spec.scratch_disk_type == disk.PIOPS:
         metadata['scratch_disk_iops'] = benchmark_spec.scratch_disk_iops
 
