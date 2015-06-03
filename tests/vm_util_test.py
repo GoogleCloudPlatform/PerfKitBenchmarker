@@ -77,6 +77,10 @@ class IssueCommandTestCase(unittest.TestCase):
     _, _, retcode = vm_util.IssueCommand(['sleep', '2s'], timeout=1)
     self.assertEqual(retcode, -9)
 
+  def testNoTimeout(self):
+    _, _, retcode = vm_util.IssueCommand(['sleep', '2s'], timeout=None)
+    self.assertEqual(retcode, 0)
+
 
 if __name__ == '__main__':
   unittest.main()
