@@ -632,7 +632,7 @@ class YCSBExecutor(object):
       parameters = {'operationcount': FLAGS.ycsb_operation_count,
                     'recordcount': FLAGS.ycsb_record_count}
       if FLAGS.ycsb_timelimit:
-        parameters['timelimit'] = FLAGS.ycsb_timelimit
+        parameters['maxexecutiontime'] = FLAGS.ycsb_timelimit
       parameters.update(kwargs)
       remote_path = posixpath.join(vm_util.VM_TMP_DIR,
                                    os.path.basename(workload_file))
