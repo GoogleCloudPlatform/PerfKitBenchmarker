@@ -276,7 +276,7 @@ class BaseVirtualMachine(resource.BaseResource):
     else:
       scp_cmd.extend([remote_location, file_path])
 
-    stdout, stderr, retcode = vm_util.IssueCommand(scp_cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(scp_cmd, timeout=-1)
 
     if retcode:
       full_cmd = ' '.join(scp_cmd)
@@ -358,7 +358,8 @@ class BaseVirtualMachine(resource.BaseResource):
       for _ in range(retries):
         stdout, stderr, retcode = vm_util.IssueCommand(
             ssh_cmd, force_info_log=should_log,
-            suppress_warning=suppress_warning)
+            suppress_warning=suppress_warning,
+            timeout=-1)
         if retcode != 255:  # Retry on 255 because this indicates an SSH failure
           break
     finally:
