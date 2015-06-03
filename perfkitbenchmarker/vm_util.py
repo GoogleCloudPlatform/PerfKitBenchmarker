@@ -380,11 +380,12 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
 
-  def _KillProcess(process):
-    logging.warning('IssueCommand timed out. Killing Process.')
+  def _KillProcess():
+    logging.error('IssueCommand timed out after %d seconds. '
+                  'Killing command "%s".', timeout, full_cmd)
     process.kill()
 
-  timer = threading.Timer(timeout, _KillProcess, (process,))
+  timer = threading.Timer(timeout, _KillProcess)
   timer.start()
 
   stdout, stderr = process.communicate()
