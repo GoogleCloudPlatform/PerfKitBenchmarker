@@ -365,7 +365,10 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
         constructor, that contains environment variables to be injected.
     timeout: Timeout for the command in seconds. If the command has not finished
         before the timeout is reached, it will be killed. Set timeout to None to
-        let the command run indefinitely.
+        let the command run indefinitely. If the subprocess is killed, the
+        return code will indicate an error, and stdout and stderr will
+        contain what had already been written to them before the process was
+        killed.
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.

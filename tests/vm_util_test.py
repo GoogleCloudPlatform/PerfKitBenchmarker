@@ -67,5 +67,16 @@ class ShouldRunOnInternalIpAddressTestCase(unittest.TestCase):
         False, vm_util.IpAddressSubset.REACHABLE, False)
 
 
+class IssueCommandTestCase(unittest.TestCase):
+
+  def testTimeoutNotReached(self):
+    _, _, retcode = vm_util.IssueCommand(['sleep', '2s'])
+    self.assertEqual(retcode, 0)
+
+  def testTimeoutReached(self):
+    _, _, retcode = vm_util.IssueCommand(['sleep', '2s'], timeout=1)
+    self.assertEqual(retcode, -9)
+
+
 if __name__ == '__main__':
   unittest.main()
