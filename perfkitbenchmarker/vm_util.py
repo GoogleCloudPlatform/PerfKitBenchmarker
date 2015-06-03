@@ -376,20 +376,18 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   logging.info('Running: %s', full_cmd)
 
   shell_value = RunningOnWindows()
-
   process = subprocess.Popen(cmd, env=env, shell=shell_value,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
 
-  timer = None
+  timer = threading.Timer(timeout, lambda p: p.kill(), (process,))
+
   if timeout != -1:
-    timer = threading.Timer(timeout, lambda p: p.kill(), (process,))
     timer.start()
 
   stdout, stderr = process.communicate()
 
-  if timer:
-    timer.cancel()
+  timer.cancel()
 
   stdout = stdout.decode('ascii', 'ignore')
   stderr = stderr.decode('ascii', 'ignore')
