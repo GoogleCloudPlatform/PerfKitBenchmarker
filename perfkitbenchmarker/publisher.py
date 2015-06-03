@@ -24,6 +24,7 @@ import sys
 import time
 import uuid
 
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
@@ -133,13 +134,23 @@ class DefaultMetadataProvider(MetadataProvider):
     metadata['zones'] = ','.join(benchmark_spec.zones)
     metadata['machine_type'] = benchmark_spec.machine_type
     metadata['image'] = benchmark_spec.image
+
+    # Scratch disk is not defined when a benchmark config is provided.
+    if getattr(benchmark_spec, 'scratch_disk', None):
+      metadata.update(scratch_disk_type=benchmark_spec.scratch_disk_type,
+                      scratch_disk_size=benchmark_spec.scratch_disk_size,
+                      num_striped_disks=FLAGS.num_striped_disks)
+      if benchmark_spec.scratch_disk_type == disk.PIOPS:
+        metadata['scratch_disk_iops'] = benchmark_spec.scratch_disk_iops
+
+    # User specified metadata
     for pair in FLAGS.metadata:
       try:
         key, value = pair.split(':')
         metadata[key] = value
       except ValueError:
-          logging.error('Bad metadata flag format. Skipping "%s".', pair)
-          continue
+        logging.error('Bad metadata flag format. Skipping "%s".', pair)
+        continue
 
     return metadata
 
