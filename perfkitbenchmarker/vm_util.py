@@ -391,9 +391,10 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   timer = threading.Timer(timeout, _KillProcess)
   timer.start()
 
-  stdout, stderr = process.communicate()
-
-  timer.cancel()
+  try:
+    stdout, stderr = process.communicate()
+  finally:
+    timer.cancel()
 
   stdout = stdout.decode('ascii', 'ignore')
   stderr = stderr.decode('ascii', 'ignore')
