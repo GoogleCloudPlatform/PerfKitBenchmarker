@@ -42,8 +42,9 @@ In its current release these are the benchmarks that are executed:
   - `oldisim`: Apache v2.
   - `object_storage_service`: Apache v2.
   - `ping`: No license needed.
-  - `silo` : MIT License
-  - `speccpu2006` - Spec CPU2006 (http://www.spec.org/cpu2006/)
+  - `silo`: MIT License
+  - `scimark2`: public domain (http://math.nist.gov/scimark2/credits.html)
+  - `speccpu2006`: Spec CPU2006 (http://www.spec.org/cpu2006/)
   - `sysbench_oltp`: GPL v2 (https://github.com/akopytov/sysbench)
   - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
   - `ycsb` (used by `mongodb`): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
