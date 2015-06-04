@@ -23,6 +23,7 @@ import functools
 import logging
 import math
 import os
+import posixpath
 import re
 import time
 
@@ -66,8 +67,8 @@ CONSISTENCY_LEVEL = 'quorum'
 REPLICATION_FACTOR = 3
 RETRIES = 1000
 
-CASSANDRA_STRESS = os.path.join(cassandra.CASSANDRA_DIR, 'tools', 'bin',
-                                'cassandra-stress')
+CASSANDRA_STRESS = posixpath.join(cassandra.CASSANDRA_DIR, 'tools', 'bin',
+                                  'cassandra-stress')
 
 
 def GetInfo():
@@ -117,8 +118,8 @@ def Prepare(benchmark_spec):
 
 
 def _ResultFilePath(vm):
-  return os.path.join(vm_util.VM_TMP_DIR,
-                      vm.hostname + '.stress_results.txt')
+  return posixpath.join(vm_util.VM_TMP_DIR,
+                        vm.hostname + '.stress_results.txt')
 
 
 def RunTestOnLoader(vm, data_node_ips):
@@ -187,8 +188,8 @@ def WaitForLoaderToFinish(vm):
       vm.PullFile(vm_util.GetTempDir(), result_path)
       raise errors.Benchmarks.RunError(
           'cassandra-stress tool failed, check %s for details.'
-          % os.path.join(vm_util.GetTempDir(),
-                         os.path.basename(result_path)))
+          % posixpath.join(vm_util.GetTempDir(),
+                           os.path.basename(result_path)))
     time.sleep(SLEEP_BETWEEN_CHECK_IN_SECONDS)
 
 

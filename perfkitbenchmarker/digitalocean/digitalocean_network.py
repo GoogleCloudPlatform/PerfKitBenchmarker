@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-python-gflags==2.0
-jinja2>=2.7
-setuptools
-colorlog[windows]==2.6.0
+"""Module containing classes related to DigitalOcean VM networking."""
+
+import threading
+
+from perfkitbenchmarker import network
+
+
+class DigitaloceanFirewall(network.BaseFirewall):
+  """A dummy firewall for DigitalOcean, this does nothing."""
+  pass
+
+class DigitaloceanNetwork(network.BaseNetwork):
+  """Object representing a DigitalOcean Network."""
+
+  def Create(self):
+    """Creates the actual network."""
+    pass
+
+  def Delete(self):
+    """Deletes the actual network."""
+    pass
