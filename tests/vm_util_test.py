@@ -14,6 +14,7 @@
 
 """Tests for perfkitbenchmarker.vm_util."""
 
+import subprocess
 import unittest
 
 import mock
@@ -80,6 +81,12 @@ class IssueCommandTestCase(unittest.TestCase):
   def testNoTimeout(self):
     _, _, retcode = vm_util.IssueCommand(['sleep', '2s'], timeout=None)
     self.assertEqual(retcode, 0)
+
+  def testNoTimeout_ExceptionRaised(self):
+    with mock.patch('subprocess.Popen', spec=subprocess.Popen) as mock_popen:
+      mock_popen.return_value.communicate.side_effect = KeyboardInterrupt()
+      with self.assertRaises(KeyboardInterrupt):
+        vm_util.IssueCommand(['sleep', '2s'], timeout=None)
 
 
 if __name__ == '__main__':
