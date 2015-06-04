@@ -47,6 +47,9 @@ TEMP_DIR = os.path.join(tempfile.gettempdir(), 'perfkitbenchmarker')
 # to use this directory as a base for other module level constants.
 VM_TMP_DIR = '/tmp/pkb'
 
+# Default timeout for issuing a command.
+DEFAULT_TIMEOUT = 300
+
 # Defaults for retrying commands.
 POLL_INTERVAL = 30
 TIMEOUT = 1200
@@ -344,7 +347,8 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
   return Wrap
 
 
-def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
+def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
+                 env=None, timeout=DEFAULT_TIMEOUT):
   """Tries running the provided command once.
 
   Args:
@@ -359,6 +363,12 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
         regardless of suppress_warning's value.
     env: A dict of key/value strings, such as is given to the subprocess.Popen()
         constructor, that contains environment variables to be injected.
+    timeout: Timeout for the command in seconds. If the command has not finished
+        before the timeout is reached, it will be killed. Set timeout to None to
+        let the command run indefinitely. If the subprocess is killed, the
+        return code will indicate an error, and stdout and stderr will
+        contain what had already been written to them before the process was
+        killed.
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
@@ -372,7 +382,18 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
   process = subprocess.Popen(cmd, env=env, shell=shell_value,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
+
+  def _KillProcess():
+    logging.error('IssueCommand timed out after %d seconds. '
+                  'Killing command "%s".', timeout, full_cmd)
+    process.kill()
+
+  timer = threading.Timer(timeout, _KillProcess)
+  timer.start()
+
   stdout, stderr = process.communicate()
+
+  timer.cancel()
 
   stdout = stdout.decode('ascii', 'ignore')
   stderr = stderr.decode('ascii', 'ignore')
