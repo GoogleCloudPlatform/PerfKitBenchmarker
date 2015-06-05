@@ -22,9 +22,14 @@ Compared to hbase_ycsb, this benchmark:
   * Adds the Bigtable client JAR.
   * Adds alpn-boot-7.0.0.v20140317.jar to the bootclasspath, required to
     operate.
+
+This benchmark requires a Cloud Bigtable cluster to be provisioned before
+running.
+The benchmark will fail if the specified cluster is not found.
 """
 
 import json
+import logging
 import os
 import posixpath
 import subprocess
@@ -60,8 +65,9 @@ flags.DEFINE_string(
 
 
 BENCHMARK_INFO = {'name': 'cloud_bigtable_ycsb',
-                  'description': 'Run YCSB against Cloud Bigtable. '
-                  'configure the number of client VMs via --num_vms.',
+                  'description': 'Run YCSB against an existing Cloud Bigtable '
+                  'cluster. Configure the number of client VMs via '
+                  '--num_vms.',
                   'scratch_disk': False,
                   'num_machines': None}
 
@@ -104,6 +110,10 @@ def CheckPrerequisites():
     raise ValueError('Missing --google_bigtable_cluster_name')
   if not FLAGS.google_bigtable_zone_name:
     raise ValueError('Missing --google_bigtable_zone_name')
+  cluster = _GetClusterDescription(FLAGS.project or _GetDefaultProject(),
+                                   FLAGS.google_bigtable_zone_name,
+                                   FLAGS.google_bigtable_cluster_name)
+  logging.info('Found cluster: %s', cluster)
 
 
 def _GetALPNLocalPath():
@@ -111,6 +121,37 @@ def _GetALPNLocalPath():
   if not bn.endswith('.jar'):
     bn = 'alpn.jar'
   return posixpath.join(vm_util.VM_TMP_DIR, bn)
+
+
+def _GetClusterDescription(project, zone, cluster_name):
+  """Gets the description for a Cloud Bigtable cluster.
+
+  Args:
+    project: str. Name of the project in which the cluster was created.
+    zone: str. Zone of the project in which the cluster was created.
+    cluster_name: str. Cluster ID of the desired Bigtable cluster.
+
+  Returns:
+    A dictionary containing a cluster description.
+
+  Raises:
+    KeyError: when the cluster was not found.
+  """
+  cmd = [FLAGS.gcloud_path, 'alpha', 'bigtable', 'clusters', 'list', '--format',
+         'json']
+  stdout, stderr, returncode = vm_util.IssueCommand(cmd)
+  if returncode:
+    raise IOError('Command "{0}" failed:\nSTDOUT:\n{1}\nSTDERR:\n{2}'.format(
+        ' '.join(cmd), stdout, stderr))
+  result = json.loads(stdout)
+  clusters = {cluster['name']: cluster for cluster in result['clusters']}
+  expected_cluster_name = 'projects/{0}/zones/{1}/clusters/{2}'.format(
+      project, zone, cluster_name)
+  try:
+    return clusters[expected_cluster_name]
+  except KeyError:
+    raise KeyError('Cluster {0} not found in {1}'.format(
+        expected_cluster_name, list(clusters)))
 
 
 def _GetTableName():
@@ -213,8 +254,12 @@ def Run(benchmark_spec):
   table_name = _GetTableName()
 
   executor = ycsb.YCSBExecutor('hbase-10', table=table_name)
+  cluster_info = _GetClusterDescription(FLAGS.project or _GetDefaultProject(),
+                                        FLAGS.google_bigtable_zone_name,
+                                        FLAGS.google_bigtable_cluster_name)
 
-  metadata = {'ycsb_client_vms': len(vms)}
+  metadata = {'ycsb_client_vms': len(vms),
+              'bigtable_nodes': cluster_info.get('serveNodes')}
 
   kwargs = {'columnfamily': COLUMN_FAMILY}
   # By default YCSB uses a BufferedMutator for Puts / Deletes.
