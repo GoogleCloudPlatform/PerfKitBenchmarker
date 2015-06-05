@@ -526,6 +526,8 @@ class YCSBExecutor(object):
 
     remote_path = posixpath.join(vm_util.VM_TMP_DIR,
                                  os.path.basename(workload_file))
+    kwargs.setdefault('threads', FLAGS.ycsb_preload_threads)
+    kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
 
     with open(workload_file) as fp:
       workload_meta = _ParseWorkload(fp.read())
@@ -630,7 +632,7 @@ class YCSBExecutor(object):
       parameters = {'operationcount': FLAGS.ycsb_operation_count,
                     'recordcount': FLAGS.ycsb_record_count}
       if FLAGS.ycsb_timelimit:
-        parameters['timelimit'] = FLAGS.ycsb_timelimit
+        parameters['maxexecutiontime'] = FLAGS.ycsb_timelimit
       parameters.update(kwargs)
       remote_path = posixpath.join(vm_util.VM_TMP_DIR,
                                    os.path.basename(workload_file))

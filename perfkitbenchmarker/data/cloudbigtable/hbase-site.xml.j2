@@ -1,0 +1,26 @@
+<configuration>
+  <property>
+    <name>google.bigtable.endpoint.host</name>
+    <value>{{ google_bigtable_endpoint }}</value>
+  </property>
+  <property>
+    <name>google.bigtable.admin.endpoint.host</name>
+    <value>{{ google_bigtable_admin_endpoint }}</value>
+  </property>
+  <property>
+    <name>hbase.client.connection.impl</name>
+    <value>org.apache.hadoop.hbase.client.BigtableConnection</value>
+  </property>
+  <property>
+    <name>google.bigtable.project.id</name>
+    <value>{{ project }}</value>
+  </property>
+  <property>
+    <name>google.bigtable.cluster.name</name>
+    <value>{{ cluster }}</value>
+  </property>
+  <property>
+    <name>google.bigtable.zone.name</name>
+    <value>{{ zone }}</value>
+  </property>
+</configuration>
