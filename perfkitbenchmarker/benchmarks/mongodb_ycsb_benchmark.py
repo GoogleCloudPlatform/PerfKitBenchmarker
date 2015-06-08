@@ -75,17 +75,14 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
-  """Run run YCSB with workloada against MongoDB.
+  """Run YCSB with against MongoDB.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   vm = vms[1]
