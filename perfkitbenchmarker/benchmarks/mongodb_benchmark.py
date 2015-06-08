@@ -19,6 +19,9 @@ database.
 
 MongoDB homepage: http://www.mongodb.org/
 YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
+
+DEPRECATED: This performs a very short test against a VM without a scratch disk.
+Please use mongodb_ycsb_benchmark in place of this benchmark.
 """
 
 import logging
@@ -32,12 +35,16 @@ YCSB_CMD = ('cd %s; ./bin/ycsb %s mongodb -s -P workloads/workloada '
             '-p mongodb.writeConcern=normal')
 
 BENCHMARK_INFO = {'name': 'mongodb',
-                  'description': 'Run YCSB against MongoDB.',
+                  'description': 'Run YCSB against MongoDB. DEPRECATED.',
                   'scratch_disk': False,
                   'num_machines': 2}
 
 RESULT_REGEX = r'\[(\w+)\], (\w+)\(([\w/]+)\), ([-+]?[0-9]*\.?[0-9]+)'
 OPERATIONS_REGEX = r'\[(\w+)\], Operations, ([-+]?[0-9]*\.?[0-9]+)'
+
+DEPRECATION_MESSAGE = """DEPRECATED: This performs a very short test against a
+VM without a scratch disk. Please use 'mongodb_ycsb' in place of this
+benchmark. 'mongodb' will be removed in a future release."""
 
 
 def GetInfo():
@@ -51,6 +58,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
+  logging.warn(DEPRECATION_MESSAGE)
   vms = benchmark_spec.vms
   assert len(vms) == BENCHMARK_INFO['num_machines']
   vm = vms[0]

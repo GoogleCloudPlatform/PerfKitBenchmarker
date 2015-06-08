@@ -37,7 +37,8 @@ In its current release these are the benchmarks that are executed:
   - `iperf`: BSD license(http://iperf.sourceforge.net/)
   - `memtier_benchmark`: GPL v2 (https://github.com/RedisLabs/memtier_benchmark)
   - `mesh_network`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
-  - `mongodb`: GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
+  - `mongodb`: **Deprecated**. GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
+  - `mongodb_ycsb`: GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
   - `netperf`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
   - `oldisim`: Apache v2.
   - `object_storage_service`: Apache v2.
