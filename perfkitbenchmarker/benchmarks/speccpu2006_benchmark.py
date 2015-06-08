@@ -22,7 +22,7 @@ SpecCPU2006 homepage: http://www.spec.org/cpu2006/
 """
 
 import logging
-import os
+import posixpath
 import re
 
 from perfkitbenchmarker import data
@@ -99,8 +99,8 @@ def Prepare(benchmark_spec):
     logging.error('Please provide %s under perfkitbenchmarker/data directory '
                   'before running SpecCPU2006 benchmark.', SPECCPU2006_TAR)
     raise errors.Benchmarks.PrepareException(str(e))
-  vm.tar_file_path = os.path.join(vm.GetScratchDir(), SPECCPU2006_TAR)
-  vm.spec_dir = os.path.join(vm.GetScratchDir(), SPECCPU2006_DIR)
+  vm.tar_file_path = posixpath.join(vm.GetScratchDir(), SPECCPU2006_TAR)
+  vm.spec_dir = posixpath.join(vm.GetScratchDir(), SPECCPU2006_DIR)
   vm.RemoteCommand('chmod 777 %s' % vm.GetScratchDir())
   vm.PushFile(local_tar_file_path, vm.GetScratchDir())
   vm.RemoteCommand('cd %s && tar xvfz %s' % (vm.GetScratchDir(),

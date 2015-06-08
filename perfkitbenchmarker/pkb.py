@@ -76,6 +76,7 @@ STAGE_RUN = 'run'
 STAGE_CLEANUP = 'cleanup'
 LOG_FILE_NAME = 'pkb.log'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
+REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
 # List of functions taking a benchmark_spec. Will be called before benchmark.Run
 # with two parameters: the benchmark and benchmark_spec.
 BEFORE_RUN_HOOKS = []
@@ -138,7 +139,13 @@ flags.DEFINE_enum(
     'Type for all scratch disks. The default is standard')
 flags.DEFINE_integer('scratch_disk_iops', 1500,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
-
+flags.DEFINE_integer('num_striped_disks', 1,
+                     'The number of disks to stripe together to form one '
+                     '"logical" scratch disk. This defaults to 1 '
+                     '(except with local disks), which means no striping. '
+                     'When using local disks, they default to striping '
+                     'all disks together.',
+                     lower_bound=1)
 
 MAX_RUN_URI_LENGTH = 10
 
@@ -180,8 +187,17 @@ def DoPreparePhase(benchmark, name, spec, timer):
     The BenchmarkSpec created for the benchmark.
   """
   logging.info('Preparing benchmark %s', name)
-  with timer.Measure('Resource Provisioning'):
-    spec.Prepare()
+  # Pickle the spec before we try to create anything so we can clean
+  # everything up on a second run if something goes wrong.
+  spec.PickleSpec()
+  try:
+    with timer.Measure('Resource Provisioning'):
+      spec.Prepare()
+  finally:
+    # Also pickle the spec after the resources are created so that
+    # we have a record of things like AWS ids. Otherwise we won't
+    # be able to clean them up on a subsequent run.
+    spec.PickleSpec()
   with timer.Measure('Benchmark Prepare'):
     benchmark.Prepare(spec)
 
@@ -200,8 +216,10 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
   logging.info('Running benchmark %s', name)
   for before_run_hook in BEFORE_RUN_HOOKS:
     before_run_hook(benchmark=benchmark, benchmark_spec=spec)
-  with timer.Measure('Benchmark Run'):
-    samples = benchmark.Run(spec)
+
+  with vm_util.RunDStatIfConfigured(spec.vms, suffix='-{0}-dstat'.format(name)):
+    with timer.Measure('Benchmark Run'):
+      samples = benchmark.Run(spec)
   collector.AddSamples(samples, name, spec)
 
 
@@ -216,8 +234,10 @@ def DoCleanupPhase(benchmark, name, spec, timer):
       benchmark module's Cleanup function and resource teardown.
   """
   logging.info('Cleaning up benchmark %s', name)
-  with timer.Measure('Benchmark Cleanup'):
-    benchmark.Cleanup(spec)
+
+  if spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]):
+    with timer.Measure('Benchmark Cleanup'):
+      benchmark.Cleanup(spec)
   with timer.Measure('Resource Teardown'):
     spec.Delete()
 
@@ -292,15 +312,23 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       logging.exception('Error during benchmark %s', benchmark_name)
       # If the particular benchmark requests us to always call cleanup, do it
       # here.
-      if spec.always_call_cleanup:
+      if spec and spec.always_call_cleanup:
         DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
       raise
     finally:
-      if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
-        if spec:
+      if spec:
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
           spec.Delete()
-      else:
+        # Pickle spec to save final resource state.
         spec.PickleSpec()
+
+
+def _LogCommandLineFlags():
+  result = []
+  for flag in FLAGS.FlagDict().values():
+    if flag.present:
+      result.append(flag.Serialize())
+  logging.info('Flag values:\n%s', '\n'.join(result))
 
 
 def RunBenchmarks(publish=True):
@@ -316,11 +344,24 @@ def RunBenchmarks(publish=True):
     print version.VERSION
     return
 
+  for executable in REQUIRED_EXECUTABLES:
+    if not vm_util.ExecutableOnPath(executable):
+      logging.error('Could not find required executable "%s".' % executable)
+      return 1
+
   if FLAGS.run_uri is None:
     if FLAGS.run_stage not in [STAGE_ALL, STAGE_PREPARE]:
-      logging.error(
-          'Cannot run "%s" with unspecified run_uri.', FLAGS.run_stage)
-      return 1
+      # Attempt to get the last modified run directory.
+      run_uri = vm_util.GetLastRunUri()
+      if run_uri:
+        FLAGS.run_uri = run_uri
+        logging.warning(
+            'No run_uri specified. Attempting to run "%s" with --run_uri=%s.',
+            FLAGS.run_stage, FLAGS.run_uri)
+      else:
+        logging.error(
+            'No run_uri specified. Could not run "%s".', FLAGS.run_stage)
+        return 1
     else:
       FLAGS.run_uri = str(uuid.uuid4())[-8:]
   elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
@@ -333,6 +374,7 @@ def RunBenchmarks(publish=True):
       stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
       log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
       run_uri=FLAGS.run_uri)
+  _LogCommandLineFlags()
 
   unknown_benchmarks = ListUnknownBenchmarks()
   if unknown_benchmarks:
@@ -383,15 +425,14 @@ def RunBenchmarks(publish=True):
         'To run again with this setup, please use --run_uri=%s', FLAGS.run_uri)
 
 
-
 def _GenerateBenchmarkDocumentation():
   """Generates benchmark documentation to show in --help."""
   benchmark_docs = []
   for benchmark_module in benchmarks.BENCHMARKS:
-    benchmark_info = benchmark_module.GetInfo()
-    vm_count = benchmark_info['num_machines']
+    benchmark_info = benchmark_module.BENCHMARK_INFO
+    vm_count = benchmark_info.get('num_machines') or 'variable'
     scratch_disk_str = ''
-    if benchmark_info['scratch_disk']:
+    if benchmark_info.get('scratch_disk'):
       scratch_disk_str = ' with scratch volume'
 
     benchmark_docs.append('%s: %s (%s VMs%s)' %

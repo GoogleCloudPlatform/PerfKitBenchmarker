@@ -73,3 +73,12 @@ This can be done on github.com, or by installing and using the command line tool
 $ hub pull-request -h <your-branch-name> -b dev
 ```
 **When making a pull request on GitHub, please set the base branch of the Pull Request to `dev`.**
+
+### Developer documentation
+We have added a lot of comments into the code to make it easy to;
+* Add new benchmarks (eg: --benchmarks=<new benchmark>)
+* Add new package/os type support (eg: --os_type=<new os type>)
+* Add new providers (eg: --cloud=<new provider>)
+* etc...
+
+Even with lots of comments we make to support more detailed documention.  You will find the documatation we have on the [Wiki pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki).  Missing documentation you want?  Start a page and/or open an [issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) to get it added.

@@ -1,0 +1,47 @@
+#!/bin/bash
+# Copyright 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
+# *Run on the HDFS namenode/YARN ResourceManager.*
+#
+# Formats the namenode, starts HDFS.
+#
+# Prior to running:
+# * Passwordless SSH must be enabled from the namenode to all
+#   data nodes.
+# * Data nodes must be listed in HADOOP_CONF_DIR/slaves.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+set -x
+
+readonly HADOOP_DIR="{{ hadoop_dir }}"
+
+cd $HADOOP_DIR
+
+# Format the namenode
+/usr/bin/yes | bin/hdfs namenode -format || true  # This returns non-zero; not sure why
+
+# Start HDFS
+sbin/start-dfs.sh 2>&1
+
+{% if start_yarn -%}
+# Start YARN
+sbin/start-yarn.sh 2>&1
+
+# Start Job History server
+sbin/mr-jobhistory-daemon.sh start historyserver
+{%- endif %}

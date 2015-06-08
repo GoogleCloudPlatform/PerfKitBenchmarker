@@ -21,6 +21,7 @@ import mock
 
 from perfkitbenchmarker import pkb  # NOQA
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.aws import aws_disk
 from perfkitbenchmarker.aws import aws_virtual_machine
@@ -71,7 +72,8 @@ class ScratchDiskTestMixin(object):
 
     # We need the disk class mocks to return new mocks each time they are
     # called. Otherwise all "disks" instantiated will be the same object.
-    self._GetDiskClass().side_effect = lambda *args, **kwargs: mock.MagicMock()
+    self._GetDiskClass().side_effect = (
+        lambda *args, **kwargs: mock.MagicMock(is_striped=False))
 
   def testScratchDisks(self):
     """Test for creating and deleting scratch disks.
@@ -98,6 +100,14 @@ class ScratchDiskTestMixin(object):
     vm.CreateScratchDisk(disk_spec)
 
     assert len(vm.scratch_disks) == 2, 'Disk not added to scratch disks.'
+
+    # Check that these execute without exceptions. The return value
+    # is a MagicMock, not a string, so we can't compare to expected results.
+    vm.GetScratchDir()
+    vm.GetScratchDir(0)
+    vm.GetScratchDir(1)
+    with self.assertRaises(errors.Error):
+      vm.GetScratchDir(2)
 
     scratch_disk = vm.scratch_disks[1]
 

@@ -1,3 +1,40 @@
+# v0.16.0
+
+* **Breaking Change** Added a new scratch disk type: "local" (ephemeral
+  storage bundled with the instance). As a result, the type "ssd" was
+  changed to "remote_ssd". (GH-253)
+* You can now omit "--run_uri" under certain circumstances. (GH-255)
+* Support for striping multiple scratch disks together has been added. (GH-259)
+* Add hbase_ycsb benchmark. (GH-263)
+* Use the boto API differently when downloading a one byte object to avoid
+  the unnecessary HEAD request (and issue GET request only). (GH-264)
+* Move VM name to BaseVirtualMachine. (GH-265)
+* Write an SSH config file to the run temp directory. (GH-266)
+* Fix a typo in package_managers.py. (GH-267)
+* Add a Cassandra package. (GH-268)
+* GCE: do not restart on host failure. (GH-273)
+* Fix Hash Sum mismatch errors. (GH-275)
+
+# v0.15.0
+
+* Add ability to inject environment variables to IssueCommand. (GH-231)
+* More SPEC CPU 2006 execution flexibility. (GH-230)
+* Enable different disk types for cassandra_stress test. (GH-252)
+* Add the option to skip installing packages. (GH-223)
+* Expose VM count and scratch disk requirements in help. (GH-240, GH-241)
+* Add iops and against device flag. (GH-236)
+* Netperf: Parse CSV output; add p50, p90, p99. (GH-222)
+* Logging fixes and enhancements. (GH-68)
+* Fixes some apt-get update flakiness. (GH-250)
+* Updates AWS to use _Exists for resources. (GH-228)
+* Fixes small bug wth GCP metadata. (GH-242)
+* Call benchmark specific cleanup() when there is exception. (GH-239)
+* Fix the command that creates a storage account for Azure. (GH-238)
+* Defines BENCHMARK_INFO for all benchmarks. (GH-232)
+* Fixes issue with retry. (GH-233)
+* Make resource deletion continue even when exceptions are thrown. (GH-224)
+* Fix a DivideByZeroError in side-by-side. (GH-226)
+
 # v0.14.0
 
 * Added the Silo filesystem benchmark (GH-170)
