@@ -69,6 +69,7 @@ Before you can run the PerfKit Benchmaker on Cloud providers you need accounts a
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
 * Get an AWS account to run tests on AWS. Their site is http://aws.amazon.com/
 * Get an Azure account to run tests on Azure. Their site is http://azure.microsoft.com/
+* Get a DigitalOcean account to run tests on DigitalOcean. Their site is https://www.digitalocean.com/
 
 You also need the software dependencies, which are mostly command line tools and credentials to access your
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
@@ -175,6 +176,40 @@ Test that azure is installed correctly
 ```
 $ azure vm list
 ```
+
+## DigitalOcean configuration and credentials
+
+PerfKitBenchmarker uses the *curl* tool to interact with
+DigitalOcean's REST API. This API uses oauth for authentication.
+Please set this up as follows:
+
+Log in to your DigitalOcean account and create a Personal Access Token
+for use by PerfKitBenchmarker with read/write access in Settings /
+API: https://cloud.digitalocean.com/settings/applications
+
+Save a copy of the authentication token it shows, this is a
+64-character hex string.
+
+Create a curl configuration file containing the needed authorization
+header. The double quotes are required. Example:
+
+```
+$ cat > ~/.config/digitalocean-oauth.curl
+header = "Authorization: Bearer 9876543210fedc...ba98765432"
+^D
+```
+
+Confirm that the authentication works:
+
+```
+$ curl --config ~/.config/digitalocean-oauth.curl https://api.digitalocean.com/v2/sizes
+{"sizes":[{"slug":"512mb","memory":512,"vcpus":1,...
+```
+
+PerfKitBenchmarker uses the file location `~/.config/digitalocean-oauth.curl`
+by default, you can use the `--digitalocean_curl_config` flag to
+override the path.
+
 ## Create and Configure a `.boto` file for object storage benchmarks
 
 In order to run object storage benchmark tests, you need to have a properly configured ~/.boto file.
@@ -215,7 +250,8 @@ $ sudo pip install -r requirements.txt
 
 RUNNING A SINGLE BENCHMARK
 ==========================
-PerfKitBenchmarks can run benchmarks both on Cloud Providers (GCP, AWS, Azure) as well as any "machine" you can SSH into.
+PerfKitBenchmarks can run benchmarks both on Cloud Providers (GCP,
+AWS, Azure, DigitalOcean) as well as any "machine" you can SSH into.
 
 ## Example run on GCP
 ```
@@ -233,6 +269,11 @@ $ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro
 $ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
 ```
 
+## Example run on DigitalOcean
+```
+$ ./pkb.py --cloud=DigitalOcean --machine_type=16gb --benchmarks=iperf
+```
+
 HOW TO RUN ALL STANDARD BENCHMARKS
 ==================
 Run without the --benchmarks parameter and every benchmark in the standard set will run serially which can take a couple of hours (alternatively run with --benchmarks="standard_set").  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
@@ -246,13 +287,28 @@ To run all benchmarks in a named set, specify the set name in the benchmarks par
 
 USEFUL GLOBAL FLAGS
 ==================
-```
-The following are some common flags used when configuring PerfKitBenchmaker.
---help           : see all flags
---cloud          : Check where the bechmarks are run.  Choices are GCP, AWS, or AZURE
---zone           : This flag always you to override the default zone.  It is thats the same value that the Cloud CLI's take such as --zone=us-central1-a is use for GCP, --zone=us-east-1a is used for AWS, and --zone='East US' is used by AZURE.
---benchmarks     : A comman separted list of benchmarks to run such as --benchmarks=iperf,ping . To see the full list just run ./pkd.py --help
-```
+
+The following are some common flags used when configuring
+PerfKitBenchmaker.
+
+Flag | Notes
+-----|------
+`--help`       | see all flags
+`--cloud`      | Check where the bechmarks are run.  Choices are `GCP`, `AWS`, `Azure`, or `DigitalOcean`
+`--zone`       | This flag allows you to override the default zone. See below.
+`--benchmarks` | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --help`
+
+The zone (region) as specified with the --zone flag uses the same
+value that the Cloud CLIs take:
+
+Cloud | Default | Notes
+-------|---------|-------
+GCP | us-central1-a | |
+AWS | us-east-1a | |
+Azure | East US | |
+DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
+
+
 ADVANCED: HOW TO RUN BENCHMARKS WITHOUT CLOUD PROVISIONING (eg: local workstation)
 ==================
 It is possible to run PerfKitBenchmarker without running the Cloud provioning steps.  This is useful if you want to run on a local machine, or have a benchmark like iperf run from an external point to a Cloud VM.
