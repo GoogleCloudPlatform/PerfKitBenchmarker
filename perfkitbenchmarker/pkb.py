@@ -323,6 +323,14 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
         spec.PickleSpec()
 
 
+def _LogCommandLineFlags():
+  result = []
+  for flag in FLAGS.FlagDict().values():
+    if flag.present:
+      result.append(flag.Serialize())
+  logging.info('Flag values:\n%s', '\n'.join(result))
+
+
 def RunBenchmarks(publish=True):
   """Runs all benchmarks in PerfKitBenchmarker.
 
@@ -366,6 +374,7 @@ def RunBenchmarks(publish=True):
       stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
       log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
       run_uri=FLAGS.run_uri)
+  _LogCommandLineFlags()
 
   unknown_benchmarks = ListUnknownBenchmarks()
   if unknown_benchmarks:
