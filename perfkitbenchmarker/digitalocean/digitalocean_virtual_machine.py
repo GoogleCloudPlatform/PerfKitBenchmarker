@@ -105,9 +105,9 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not self._GetActionResult(response['links']['actions'][0]['id']):
       raise errors.Resource.RetryableCreationError('Creation failed, see log.')
 
-  def _GetActionResult(
-      self, action_id, wait_seconds=DEFAULT_ACTION_WAIT_SECONDS,
-      max_tries=DEFAULT_ACTION_MAX_TRIES):
+  def _GetActionResult(self, action_id,
+                       wait_seconds=DEFAULT_ACTION_WAIT_SECONDS,
+                       max_tries=DEFAULT_ACTION_MAX_TRIES):
     """Wait until a VM action completes."""
     for _ in xrange(max_tries):
       time.sleep(wait_seconds)
