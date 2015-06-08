@@ -397,7 +397,7 @@ def _ParseWorkload(contents):
     if (line.strip() and not line.lstrip().startswith('#') and
         not line.lstrip().startswith('!')):
       k, v = re.split(r'\s*[:=]\s*', line, maxsplit=1)
-      result[k] = v
+      result[k] = v.strip()
   return result
 
 
