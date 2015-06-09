@@ -27,6 +27,7 @@ In its current release these are the benchmarks that are executed:
 
   - `aerospike`: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
   - `bonnie++`: GPL v2 (http://www.coker.com.au/bonnie++/readme.html)
+  - `cassandra_ycsb`: Apache v2 (http://cassandra.apache.org/)
   - `cassandra_stress`: Apache v2 (http://cassandra.apache.org/)
   - `cluster_boot`: MIT License
   - `coremark`: EEMBC (https://www.eembc.org/)
@@ -48,7 +49,7 @@ In its current release these are the benchmarks that are executed:
   - `speccpu2006`: Spec CPU2006 (http://www.spec.org/cpu2006/)
   - `sysbench_oltp`: GPL v2 (https://github.com/akopytov/sysbench)
   - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
-  - `ycsb` (used by `mongodb`): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
+  - `ycsb` (used by `mongodb`, `hbase_ycsb`, and others): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
 
