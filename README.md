@@ -102,7 +102,7 @@ The path to these commands should be
 `C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin`
 
 ## Install `gcloud` and setup authentication
-Instructions: https://developers.google.com/cloud/sdk/. If you're using linux you can run the command below.
+Instructions: https://developers.google.com/cloud/sdk/. If you're using OS X or Linux you can run the command below.
 
 When prompted pick the local folder, then Python project, then the defaults for all the rest
 ```
@@ -141,23 +141,11 @@ $ aws configure
 ```
 
 ## Windows Azure CLI and credentials
-You first need to install node.js (and npm).
+You first need to install node.js and NPM.
 
-On Windows, go [here](https://nodejs.org/download/), and follow the setup instructions.
+Go [here](https://nodejs.org/download/), and follow the setup instructions.
 
-On Debian based Linux systems, you can run the following:
-```
-$ sudo apt-get install build-essential -y
-$ wget http://nodejs.org/dist/v0.10.26/node-v0.10.26.tar.gz
-$ tar xzvf node-v0.10.26.tar.gz
-$ cd node-v0.10.26
-$ ./configure --prefix=/usr
-$ make
-$ sudo make install
-$ chmod +x /usr/bin/node
-$ cd ..
-```
-Next, run the following (omit the 'sudo' on Windows):
+Next, run the following (omit the `sudo` on Windows):
 
 ```
 $ sudo npm install azure-cli -g
@@ -165,8 +153,8 @@ $ azure account download
 ```
 
 Read the output of the previous command. It will contain a webpage URL. Open that in a browser. It will download
-a file (.publishsettings) file. Copy to the folder you're running PerfKit Benchmarker. In my case the file was called
-"Free Trial-7-18-2014-credentials.publishsettings"
+a file (`.publishsettings`) file. Copy to the folder you're running PerfKit Benchmarker. In my case the file was called
+`Free Trial-7-18-2014-credentials.publishsettings`
 ```
 $ azure account import [path to .publishsettings file]
 ```
@@ -211,7 +199,7 @@ override the path.
 
 ## Create and Configure a `.boto` file for object storage benchmarks
 
-In order to run object storage benchmark tests, you need to have a properly configured ~/.boto file.
+In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.
 
 Here is how:
 
@@ -242,8 +230,9 @@ As a result, a `.boto` file is created under your home directory.
 
 [Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
 
-## Install PerfKit dependencies
+## Install PerfKit Benchmakrer dependencies
 ```
+$ cd /path/to/PerfKitBenchmarker
 $ sudo pip install -r requirements.txt
 ```
 
