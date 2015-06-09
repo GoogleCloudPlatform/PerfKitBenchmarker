@@ -101,7 +101,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
 
   thread_values = re.findall('\[SUM].*\s+(\d+\.?\d*).Mbits/sec', stdout)
   if (thread_values is None) or (len(thread_values) == 0):
-    # If there is no sum you have try and figure our an estimate
+    # If there is no sum you have try and figure out an estimate
     # which happens when threads start at different times.  The code
     # below will tend to overestimate a bit.
     thread_values = re.findall('\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec', stdout)
