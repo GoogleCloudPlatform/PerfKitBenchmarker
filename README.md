@@ -63,8 +63,8 @@ Benchmarker users must manually download the CoreMark tarball from their website
 PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
 the `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
 
-HOW TO GET SET UP
-=================
+Installing Prerequisites
+========================
 Before you can run the PerfKit Benchmaker on Cloud providers you need accounts and access:
 
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
@@ -76,29 +76,27 @@ You also need the software dependencies, which are mostly command line tools and
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
 
 If you are running on Windows, you will need to install GitHub Windows
-since it includes tools like openssl and an ssh client. Alternatively you can
+since it includes tools like `openssl` and an `ssh` client. Alternatively you can
 install Cygwin since it should include the same tools.
 
-## Install Python 2.7 (and pip)
-If you are running on Windows, get the latest version of Python 2.7 [here](https://www.python.org/downloads/windows/).
-This should have pip bundled with it. Make sure your PATH environment variable is set so that you can use both
-`python` and `pip` on the commandline (you can have the installer do it for you if you select the correct option).
+## Install Python 2.7 and `pip`
+If you are running on Windows, get the latest version of Python 2.7
+[here](https://www.python.org/downloads/windows/). This should have pip bundled
+with it. Make sure your `PATH` environment variable is set so that you can use
+both `python` and `pip` on the command line (you can have the installer do it
+for you if you select the correct option).
 
-Most Linux distributions already have python 2 installed. If python is not installed, you can likely install it
-using your distribution's package manager.
+Most Linux distributions and recent Mac OS X version already have Python 2.7
+installed.
+If Python is not installed, you can likely install it using your distribution's package manager, or see the [Python Download page](https://www.python.org/downloads/).
 
-If you just need to install pip, go [here](http://pip.readthedocs.org/en/latest/installing.html).
-On Windows follow the instructions on the page above.
-On Debian/Ubuntu you can run the command below (or the equivalent command on different distributions):
-```
-$ sudo apt-get install python-pip -y
-```
+If you need to install `pip`, see [these instructions](http://pip.readthedocs.org/en/latest/installing.html).
 
 ## (*Windows Only*) Install GitHub Windows
 
 Instructions: https://windows.github.com/
 
-Make sure that openssl/ssh/scp/ssh-keygen are on your path (you will need to update the PATH environment variable).
+Make sure that `openssl`/`ssh`/`scp`/`ssh-keygen` are on your path (you will need to update the `PATH` environment variable).
 The path to these commands should be
 
 `C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin`
