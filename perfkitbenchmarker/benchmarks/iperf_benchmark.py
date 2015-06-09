@@ -99,15 +99,15 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
   # [  3]  0.0-60.0 sec  3738 MBytes   522 Mbits/sec
   # [SUM]  0.0-60.0 sec  14010 MBytes  1957 Mbits/sec
 
-  thread_values = re.findall('\[SUM].*\s+(\d+\.?\d*).Mbits/sec', stdout)
-  if (thread_values is None) or (len(thread_values) == 0):
+  thread_values = re.findall(r'\[SUM].*\s+(\d+\.?\d*).Mbits/sec', stdout)
+  if not thread_values:
     # If there is no sum you have try and figure out an estimate
     # which happens when threads start at different times.  The code
     # below will tend to overestimate a bit.
     thread_values = re.findall('\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec', stdout)
 
     if len(thread_values) != FLAGS.iperf_sending_thread_count:
-      raise ValueError('Only %s out of %s iperf threads repoted a'
+      raise ValueError('Only %s out of %s iperf threads reported a'
                        ' throughput value.' %
                        (len(thread_values), FLAGS.iperf_sending_thread_count))
 
