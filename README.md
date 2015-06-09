@@ -63,8 +63,8 @@ Benchmarker users must manually download the CoreMark tarball from their website
 PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
 the `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
 
-HOW TO GET SET UP
-=================
+Installing Prerequisites
+========================
 Before you can run the PerfKit Benchmaker on Cloud providers you need accounts and access:
 
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
@@ -76,35 +76,33 @@ You also need the software dependencies, which are mostly command line tools and
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
 
 If you are running on Windows, you will need to install GitHub Windows
-since it includes tools like openssl and an ssh client. Alternatively you can
+since it includes tools like `openssl` and an `ssh` client. Alternatively you can
 install Cygwin since it should include the same tools.
 
-## Install Python 2.7 (and pip)
-If you are running on Windows, get the latest version of Python 2.7 [here](https://www.python.org/downloads/windows/).
-This should have pip bundled with it. Make sure your PATH environment variable is set so that you can use both
-`python` and `pip` on the commandline (you can have the installer do it for you if you select the correct option).
+## Install Python 2.7 and `pip`
+If you are running on Windows, get the latest version of Python 2.7
+[here](https://www.python.org/downloads/windows/). This should have pip bundled
+with it. Make sure your `PATH` environment variable is set so that you can use
+both `python` and `pip` on the command line (you can have the installer do it
+for you if you select the correct option).
 
-Most Linux distributions already have python 2 installed. If python is not installed, you can likely install it
-using your distribution's package manager.
+Most Linux distributions and recent Mac OS X version already have Python 2.7
+installed.
+If Python is not installed, you can likely install it using your distribution's package manager, or see the [Python Download page](https://www.python.org/downloads/).
 
-If you just need to install pip, go [here](http://pip.readthedocs.org/en/latest/installing.html).
-On Windows follow the instructions on the page above.
-On Debian/Ubuntu you can run the command below (or the equivalent command on different distributions):
-```
-$ sudo apt-get install python-pip -y
-```
+If you need to install `pip`, see [these instructions](http://pip.readthedocs.org/en/latest/installing.html).
 
 ## (*Windows Only*) Install GitHub Windows
 
 Instructions: https://windows.github.com/
 
-Make sure that openssl/ssh/scp/ssh-keygen are on your path (you will need to update the PATH environment variable).
+Make sure that `openssl`/`ssh`/`scp`/`ssh-keygen` are on your path (you will need to update the `PATH` environment variable).
 The path to these commands should be
 
 `C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin`
 
 ## Install `gcloud` and setup authentication
-Instructions: https://developers.google.com/cloud/sdk/. If you're using linux you can run the command below.
+Instructions: https://developers.google.com/cloud/sdk/. If you're using OS X or Linux you can run the command below.
 
 When prompted pick the local folder, then Python project, then the defaults for all the rest
 ```
@@ -143,23 +141,11 @@ $ aws configure
 ```
 
 ## Windows Azure CLI and credentials
-You first need to install node.js (and npm).
+You first need to install node.js and NPM.
 
-On Windows, go [here](https://nodejs.org/download/), and follow the setup instructions.
+Go [here](https://nodejs.org/download/), and follow the setup instructions.
 
-On Debian based Linux systems, you can run the following:
-```
-$ sudo apt-get install build-essential -y
-$ wget http://nodejs.org/dist/v0.10.26/node-v0.10.26.tar.gz
-$ tar xzvf node-v0.10.26.tar.gz
-$ cd node-v0.10.26
-$ ./configure --prefix=/usr
-$ make
-$ sudo make install
-$ chmod +x /usr/bin/node
-$ cd ..
-```
-Next, run the following (omit the 'sudo' on Windows):
+Next, run the following (omit the `sudo` on Windows):
 
 ```
 $ sudo npm install azure-cli -g
@@ -167,8 +153,8 @@ $ azure account download
 ```
 
 Read the output of the previous command. It will contain a webpage URL. Open that in a browser. It will download
-a file (.publishsettings) file. Copy to the folder you're running PerfKit Benchmarker. In my case the file was called
-"Free Trial-7-18-2014-credentials.publishsettings"
+a file (`.publishsettings`) file. Copy to the folder you're running PerfKit Benchmarker. In my case the file was called
+`Free Trial-7-18-2014-credentials.publishsettings`
 ```
 $ azure account import [path to .publishsettings file]
 ```
@@ -213,7 +199,7 @@ override the path.
 
 ## Create and Configure a `.boto` file for object storage benchmarks
 
-In order to run object storage benchmark tests, you need to have a properly configured ~/.boto file.
+In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.
 
 Here is how:
 
@@ -244,8 +230,9 @@ As a result, a `.boto` file is created under your home directory.
 
 [Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
 
-## Install PerfKit dependencies
+## Install PerfKit Benchmakrer dependencies
 ```
+$ cd /path/to/PerfKitBenchmarker
 $ sudo pip install -r requirements.txt
 ```
 
