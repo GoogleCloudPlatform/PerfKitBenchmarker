@@ -167,7 +167,13 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--config-drive', 'true',
           '--user-data', tf.name,
           self.name])
-      vm_util.IssueCommand(create_cmd, env=env)
+      stdout, _, _ = vm_util.IssueCommand(create_cmd, env=env)
+      instance = util.ParseNovaTable(stdout)
+      if 'id' in instance:
+        self.id = instance['id']
+      else:
+        raise errors.Resource.RetryableCreationError(
+            'There was a problem trying to create instance %s' % self.name)
 
     if not self._WaitForInstanceUntilActive():
       raise errors.Resource.RetryableCreationError(
@@ -177,7 +183,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Wait until instance achieves non-transient state."""
     env = os.environ.copy()
     env.update(util.GetDefaultRackspaceNovaEnv(self.zone))
-    getinstance_cmd = [FLAGS.nova_path, 'show', self.name]
+    getinstance_cmd = [FLAGS.nova_path, 'show', self.id]
 
     for _ in xrange(360):
       time.sleep(5)
@@ -219,7 +225,6 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     stdout, _, _ = vm_util.IssueCommand(getinstance_cmd, env=env)
     instance = util.ParseNovaTable(stdout)
     if 'status' in instance and instance['status'] == 'ACTIVE':
-      self.id = instance['id']
       self.ip_address = instance['accessIPv4']
       self.ip_address6 = instance['accessIPv6']
       self.internal_ip = instance['private network']
@@ -237,7 +242,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Returns true if the VM exists."""
     env = os.environ.copy()
     env.update(util.GetDefaultRackspaceNovaEnv(self.zone))
-    getinstance_cmd = [FLAGS.nova_path, 'show', self.name]
+    getinstance_cmd = [FLAGS.nova_path, 'show', self.id]
     stdout, stderr, _ = vm_util.IssueCommand(getinstance_cmd, env=env)
     if stdout.strip() == '':
         return False
@@ -417,7 +422,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
         return
     env = os.environ.copy()
     env.update(util.GetDefaultRackspaceNovaEnv(self.zone))
-    cmd = [FLAGS.nova_path, 'meta', self.name, 'set']
+    cmd = [FLAGS.nova_path, 'meta', self.id, 'set']
     for key, value in kwargs.iteritems():
         cmd.append('{0}={1}'.format(key, value))
     vm_util.IssueCommand(cmd, env=env)
