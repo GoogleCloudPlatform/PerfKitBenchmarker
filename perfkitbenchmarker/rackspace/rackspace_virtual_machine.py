@@ -197,10 +197,11 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
         % (self.user_name, self.ssh_public_key),
         '--key-name', self.key_name]
 
-    if self.remote_disk_support:
-      if (util.FLAGS.boot_from_cbs_volume or
-          self.flavor_class in (rax.COMPUTE1_CLASS, rax.MEMORY1_CLASS)):
+    boot_from_cbs = (
+        self.flavor_class in (rax.COMPUTE1_CLASS, rax.MEMORY1_CLASS,) or
+        util.FLAGS.boot_from_cbs_volume)
 
+    if self.remote_disk_support and boot_from_cbs:
         blk_params = BLOCK_DEVICE_TEMPLATE.strip('\n').format(
             self.image, str(rax.REMOTE_BOOT_DISK_SIZE_GB))
         create_cmd.extend(['--block-device', blk_params])
