@@ -58,7 +58,7 @@ users:
     shell: /bin/bash
 
 runcmd:
- - chown -R {0}:{0} /home/{0}/.ssh/
+ - chown -R {0}:{0} /home/{0}
 
 '''
 
