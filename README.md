@@ -254,8 +254,21 @@ export OS_PASSWORD=<your_rackspace_API_key>
 export OS_TENANT_NAME=<your_rackspace_account_number>
 ```
 
+For a Rackspace UK Public Cloud account, an extra environment variable has to
+be set, please remember that only the LON region is available under
+a Rackspace UK Public Cloud account.
+```bash
+export OS_AUTH_URL=https://lon.identity.api.rackspacecloud.com/v2.0/
+
+export OS_USERNAME=<your_rackspace_uk_username>
+export OS_PASSWORD=<your_rackspace_uk_API_key>
+export OS_TENANT_NAME=<your_rackspace_uk_account_number>
+```
 *Tip*: Put these variables in a file, and simple source them to your shell with
 `source <filename>` 
+
+**Note:** Not all flavors are supported on every region. Always check first
+if the flavor is supported in the region.
 
 ## Create and Configure a `.boto` file for object storage benchmarks
 
