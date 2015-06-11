@@ -99,7 +99,7 @@ BENCHMARK_SETS = {
                          'copy_throughput', 'fio', 'hpcc', 'iperf',
                          'mesh_network', 'mongodb_ycsb', 'netperf', 'ping',
                          'redis', 'block_storage_workload', 'sysbench_oltp',
-                         'unixbench', 'oldisim']
+                         'unixbench', 'oldisim', 'silo']
     },
     'red_hat_set': {
         MESSAGE: 'Red Hat benchmark set.',
