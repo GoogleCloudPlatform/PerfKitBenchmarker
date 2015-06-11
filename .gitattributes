@@ -1,0 +1,5 @@
+# Set the default end of line character.
+* text eol=lf
+
+# Don't let git change end of line characters in the data directory.
+perfkitbenchmarker/data/* -text

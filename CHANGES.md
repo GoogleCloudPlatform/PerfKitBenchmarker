@@ -1,3 +1,19 @@
+# v0.17.0
+
+* Add initial support for DigitalOcean as a cloud provider (GH-291).
+* Add SciMark2 Benchmark (GH-271, thanks @zlim!).
+* New NoSQL benchmarks: `cloud_bigtable_ycsb` (GH-283), `mongodb_ycsb`
+  (GH-279), `cassandra_ycsb` (GH-278).
+* Allow PerfKitBenchmarker to run on a Windows controller (GH-274).
+* Add a `--dstat` flag, to collect performance metrics during benchmark runs
+  (GH-282).
+* Add support for parallel iperf clients to the iperf benchmark (GH-262).
+* Add scratch disk information to sample metadata (GH-277).
+* Add a 5 minute timeout to local commands (GH-289, GH-293).
+* Do not use FLAG values in generating benchmark documentation (GH-280).
+* Bump HBase to v1.0.1.1 (GH-281).
+* Fix an issue preventing resources from being cleaned up (GH-276).
+
 # v0.16.0
 
 * **Breaking Change** Added a new scratch disk type: "local" (ephemeral

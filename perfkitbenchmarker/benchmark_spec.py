@@ -28,12 +28,15 @@ from perfkitbenchmarker.azure import azure_network
 from perfkitbenchmarker.azure import azure_virtual_machine
 from perfkitbenchmarker.deployment.config import config_reader
 import perfkitbenchmarker.deployment.shared.ini_constants as ini_constants
+from perfkitbenchmarker.digitalocean import digitalocean_network
+from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine
 
 GCP = 'GCP'
 AZURE = 'Azure'
 AWS = 'AWS'
+DIGITALOCEAN = 'DigitalOcean'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 IMAGE = 'image'
@@ -58,6 +61,11 @@ DEFAULTS = {
         IMAGE: None,
         MACHINE_TYPE: 'm3.medium',
         ZONE: 'us-east-1a'
+    },
+    DIGITALOCEAN: {
+        IMAGE: 'ubuntu-14-04-x64',
+        MACHINE_TYPE: '2gb',
+        ZONE: 'sfo1'
     }
 }
 CLASSES = {
@@ -84,12 +92,23 @@ CLASSES = {
         },
         NETWORK: aws_network.AwsNetwork,
         FIREWALL: aws_network.AwsFirewall
-    }
+    },
+    DIGITALOCEAN: {
+        VIRTUAL_MACHINE: {
+            DEBIAN:
+            digitalocean_virtual_machine.DebianBasedDigitalOceanVirtualMachine,
+            RHEL:
+            digitalocean_virtual_machine.RhelBasedDigitalOceanVirtualMachine,
+        },
+        NETWORK: digitalocean_network.DigitalOceanNetwork,
+        FIREWALL: digitalocean_network.DigitalOceanFirewall
+    },
 }
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS], 'Name of the cloud to use.')
+flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
+                  'Name of the cloud to use.')
 
 
 class BenchmarkSpec(object):
@@ -324,4 +343,7 @@ class BenchmarkSpec(object):
     except Exception as e:  # pylint: disable=broad-except
       logging.error('Unable to unpickle spec file for benchmark %s.', name)
       raise e
+    # Always let the spec be deleted after being unpickled so that
+    # it's possible to run cleanup even if cleanup has already run.
+    spec.deleted = False
     return spec

@@ -18,8 +18,8 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+import os
 import os.path
-import tempfile
 import threading
 import time
 import uuid
@@ -244,9 +244,9 @@ class BaseVirtualMachine(resource.BaseResource):
     template = environment.from_string(template_contents)
     prefix = 'pkb-' + os.path.basename(template_path)
 
-    with tempfile.NamedTemporaryFile(prefix=prefix) as tf:
+    with vm_util.NamedTemporaryFile(prefix=prefix) as tf:
       tf.write(template.render(vm=self, **context))
-      tf.flush()
+      tf.close()
       self.RemoteCopy(tf.name, remote_path)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
@@ -260,16 +260,23 @@ class BaseVirtualMachine(resource.BaseResource):
     Raises:
       SshConnectionError: If there was a problem copying the file.
     """
+    if vm_util.RunningOnWindows():
+      if ':' in file_path:
+        # scp doesn't like colons in paths.
+        file_path = file_path.split(':', 1)[1]
+      # Replace the last instance of '\' with '/' to make scp happy.
+      file_path = '/'.join(file_path.rsplit('\\', 1))
+
     remote_location = '%s@%s:%s' % (
         self.user_name, self.ip_address, remote_path)
-    scp_cmd = ['/usr/bin/scp', '-P', str(self.ssh_port), '-pr']
+    scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
     scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
     else:
       scp_cmd.extend([remote_location, file_path])
 
-    stdout, stderr, retcode = vm_util.IssueCommand(scp_cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(scp_cmd, timeout=None)
 
     if retcode:
       full_cmd = ' '.join(scp_cmd)
@@ -333,8 +340,13 @@ class BaseVirtualMachine(resource.BaseResource):
     Raises:
       SshConnectionError: If there was a problem establishing the connection.
     """
+    if vm_util.RunningOnWindows():
+      # Multi-line commands passed to ssh won't work on Windows unless the
+      # newlines are escaped.
+      command = command.replace('\n', '\\n')
+
     user_host = '%s@%s' % (self.user_name, self.ip_address)
-    ssh_cmd = ['/usr/bin/ssh', '-A', '-p', str(self.ssh_port), user_host]
+    ssh_cmd = ['ssh', '-A', '-p', str(self.ssh_port), user_host]
     ssh_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
     try:
       if login_shell:
@@ -346,7 +358,8 @@ class BaseVirtualMachine(resource.BaseResource):
       for _ in range(retries):
         stdout, stderr, retcode = vm_util.IssueCommand(
             ssh_cmd, force_info_log=should_log,
-            suppress_warning=suppress_warning)
+            suppress_warning=suppress_warning,
+            timeout=None)
         if retcode != 255:  # Retry on 255 because this indicates an SSH failure
           break
     finally:
@@ -482,6 +495,10 @@ class BaseVirtualMachine(resource.BaseResource):
       The mounted disk directory.
 
     """
+    if disk_num >= len(self.scratch_disks):
+      raise errors.Error(
+          'GetScratchDir(disk_num=%s) is invalid, max disk_num is %s' % (
+              disk_num, len(self.scratch_disks)))
     return self.scratch_disks[disk_num].mount_point
 
   @property

@@ -14,12 +14,15 @@
 
 """Set of utility functions for working with virtual machines."""
 
+import contextlib
 import logging
 import os
+import posixpath
 import random
 import re
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import traceback
@@ -37,12 +40,15 @@ FLAGS = flags.FLAGS
 PRIVATE_KEYFILE = 'perfkitbenchmarker_keyfile'
 PUBLIC_KEYFILE = 'perfkitbenchmarker_keyfile.pub'
 CERT_FILE = 'perfkitbenchmarker.pem'
-TEMP_DIR = '/tmp/perfkitbenchmarker'
+TEMP_DIR = os.path.join(tempfile.gettempdir(), 'perfkitbenchmarker')
 
 # The temporary directory on VMs. We cannot reuse GetTempDir()
 # because run_uri will not be available at time of module load and we need
 # to use this directory as a base for other module level constants.
 VM_TMP_DIR = '/tmp/pkb'
+
+# Default timeout for issuing a command.
+DEFAULT_TIMEOUT = 300
 
 # Defaults for retrying commands.
 POLL_INTERVAL = 30
@@ -50,12 +56,20 @@ TIMEOUT = 1200
 FUZZ = .5
 MAX_RETRIES = -1
 
+WINDOWS = 'nt'
 
 flags.DEFINE_integer('default_timeout', TIMEOUT, 'The default timeout for '
                      'retryable commands in seconds.')
 flags.DEFINE_integer('burn_cpu_seconds', 0,
                      'Amount of time in seconds to burn cpu on vm.')
 flags.DEFINE_integer('burn_cpu_threads', 1, 'Number of threads to burn cpu.')
+flags.DEFINE_boolean('dstat', False,
+                     'Run dstat (http://dag.wiee.rs/home-made/dstat/) '
+                     'on each VM to collect system performance metrics during '
+                     'each benchmark run.')
+flags.DEFINE_integer('dstat_interval', None,
+                     'dstat sample collection frequency, in seconds. Only '
+                     'applicable when --dstat is specified.')
 
 
 class IpAddressSubset(object):
@@ -87,9 +101,8 @@ def PrependTempDir(file_name):
 
 def GenTempDir():
   """Creates the tmp dir for the current run if it does not already exist."""
-  create_cmd = ['mkdir', '-p', GetTempDir()]
-  create_process = subprocess.Popen(create_cmd)
-  create_process.wait()
+  if not os.path.exists(GetTempDir()):
+    os.makedirs(GetTempDir())
 
 
 def SSHKeyGen():
@@ -98,7 +111,7 @@ def SSHKeyGen():
     GenTempDir()
 
   if not os.path.isfile(GetPrivateKeyPath()):
-    create_cmd = ['/usr/bin/ssh-keygen',
+    create_cmd = ['ssh-keygen',
                   '-t',
                   'rsa',
                   '-N',
@@ -106,11 +119,15 @@ def SSHKeyGen():
                   '-q',
                   '-f',
                   PrependTempDir(PRIVATE_KEYFILE)]
-    create_process = subprocess.Popen(create_cmd)
-    create_process.wait()
+    shell_value = RunningOnWindows()
+    create_process = subprocess.Popen(create_cmd,
+                                      shell=shell_value,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+    create_process.communicate()
 
   if not os.path.isfile(GetCertPath()):
-    create_cmd = ['/usr/bin/openssl',
+    create_cmd = ['openssl',
                   'req',
                   '-x509',
                   '-new',
@@ -118,7 +135,9 @@ def SSHKeyGen():
                   PrependTempDir(CERT_FILE),
                   '-key',
                   PrependTempDir(PRIVATE_KEYFILE)]
+    shell_value = RunningOnWindows()
     create_process = subprocess.Popen(create_cmd,
+                                      shell=shell_value,
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       stdin=subprocess.PIPE)
@@ -328,7 +347,8 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
   return Wrap
 
 
-def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
+def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
+                 env=None, timeout=DEFAULT_TIMEOUT):
   """Tries running the provided command once.
 
   Args:
@@ -343,6 +363,12 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
         regardless of suppress_warning's value.
     env: A dict of key/value strings, such as is given to the subprocess.Popen()
         constructor, that contains environment variables to be injected.
+    timeout: Timeout for the command in seconds. If the command has not finished
+        before the timeout is reached, it will be killed. Set timeout to None to
+        let the command run indefinitely. If the subprocess is killed, the
+        return code will indicate an error, and stdout and stderr will
+        contain what had already been written to them before the process was
+        killed.
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
@@ -352,10 +378,23 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False, env=None):
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
-  process = subprocess.Popen(cmd, env=env,
+  shell_value = RunningOnWindows()
+  process = subprocess.Popen(cmd, env=env, shell=shell_value,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
-  stdout, stderr = process.communicate()
+
+  def _KillProcess():
+    logging.error('IssueCommand timed out after %d seconds. '
+                  'Killing command "%s".', timeout, full_cmd)
+    process.kill()
+
+  timer = threading.Timer(timeout, _KillProcess)
+  timer.start()
+
+  try:
+    stdout, stderr = process.communicate()
+  finally:
+    timer.cancel()
 
   stdout = stdout.decode('ascii', 'ignore')
   stderr = stderr.decode('ascii', 'ignore')
@@ -386,7 +425,8 @@ def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
   logging.info('Spawning: %s', full_cmd)
   outfile = open(stdout_path, 'w')
   errfile = open(stderr_path, 'w')
-  subprocess.Popen(cmd, env=env,
+  shell_value = RunningOnWindows()
+  subprocess.Popen(cmd, env=env, shell=shell_value,
                    stdout=outfile, stderr=errfile, close_fds=True)
 
 
@@ -475,12 +515,37 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
 
 def GetLastRunUri():
   """Returns the last run_uri used (or None if it can't be determined)."""
-  stdout, _, _ = IssueCommand(
-      ['bash', '-c', 'ls -1t %s | head -1' % TEMP_DIR])
+  if RunningOnWindows():
+    cmd = ['powershell', '-Command',
+           'gci %s | sort LastWriteTime | select -last 1' % TEMP_DIR]
+  else:
+    cmd = ['bash', '-c', 'ls -1t %s | head -1' % TEMP_DIR]
+  stdout, _, _ = IssueCommand(cmd)
   try:
-    return regex_util.ExtractGroup('run_(.*)', stdout)
+    return regex_util.ExtractGroup('run_([^\s]*)', stdout)
   except regex_util.NoMatchError:
     return None
+
+
+@contextlib.contextmanager
+def NamedTemporaryFile(prefix='tmp', suffix='', dir=None):
+  """Behaves like tempfile.NamedTemporaryFile.
+
+  The existing tempfile.NamedTemporaryFile has the annoying property on
+  Windows that it cannot be opened a second time while it is already open.
+  This makes it impossible to use it with a "with" statement in a cross platform
+  compatible way. This serves a similar role, but allows the file to be closed
+  within a "with" statement without causing the file to be unlinked until the
+  context exits.
+  """
+  f = tempfile.NamedTemporaryFile(prefix=prefix, suffix=suffix,
+                                  dir=dir, delete=False)
+  try:
+    yield f
+  finally:
+    if not f.closed:
+      f.close()
+    os.unlink(f.name)
 
 
 def GenerateSSHConfig(vms):
@@ -501,3 +566,90 @@ def GenerateSSHConfig(vms):
     ofp.write(template.render({'vms': vms}))
   logging.info('ssh to VMs in this benchmark by name with: '
                'ssh -F {0} <vm name>'.format(target_file))
+
+
+def RunningOnWindows():
+  """Returns True if PKB is running on Windows."""
+  return os.name == WINDOWS
+
+
+def ExecutableOnPath(executable_name):
+  """Return True if the given executable can be found on the path."""
+  cmd = ['where'] if RunningOnWindows() else ['which']
+  cmd.append(executable_name)
+
+  shell_value = RunningOnWindows()
+  process = subprocess.Popen(cmd,
+                             shell=shell_value,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+  process.communicate()
+
+  if process.returncode:
+    return False
+  return True
+
+
+@contextlib.contextmanager
+def RunDStatIfConfigured(vms, suffix='-dstat'):
+  """Installs and runs dstat on 'vms' if FLAGS.dstat is set.
+
+  On exiting the context manager, the results are copied to the run temp dir.
+
+  Args:
+    vms: List of virtual machines.
+    suffix: str. Suffix to add to each dstat result file.
+
+  Yields:
+    None
+  """
+  if not FLAGS.dstat:
+    yield
+    return
+
+  lock = threading.Lock()
+  pids = {}
+  file_names = {}
+
+  def StartDStat(vm):
+    vm.Install('dstat')
+
+    num_cpus = vm.num_cpus
+
+    # List block devices so that I/O to each block device can be recorded.
+    block_devices, _ = vm.RemoteCommand(
+        'lsblk --nodeps --output NAME --noheadings')
+    block_devices = block_devices.splitlines()
+    dstat_file = posixpath.join(
+        VM_TMP_DIR, '{0}{1}.csv'.format(vm.name, suffix))
+    cmd = ('dstat --epoch -C total,0-{max_cpu} '
+           '-D total,{block_devices} '
+           '-clrdngyi -pms --fs --ipc --tcp '
+           '--udp --raw --socket --unix --vm --rpc '
+           '--noheaders --output {output} {dstat_interval} > /dev/null 2>&1 & '
+           'echo $!').format(
+               max_cpu=num_cpus - 1,
+               block_devices=','.join(block_devices),
+               output=dstat_file,
+               dstat_interval=FLAGS.dstat_interval or '')
+    stdout, _ = vm.RemoteCommand(cmd)
+    with lock:
+      pids[vm.name] = stdout.strip()
+      file_names[vm.name] = dstat_file
+
+  def StopDStat(vm):
+    if vm.name not in pids:
+      logging.warn('No dstat PID for %s', vm.name)
+      return
+    cmd = 'kill {0} || true'.format(pids[vm.name])
+    vm.RemoteCommand(cmd)
+    try:
+      vm.PullFile(GetTempDir(), file_names[vm.name])
+    except:
+      logging.exception('Failed fetching dstat result.')
+
+  RunThreaded(StartDStat, vms)
+  try:
+    yield
+  finally:
+    RunThreaded(StopDStat, vms)

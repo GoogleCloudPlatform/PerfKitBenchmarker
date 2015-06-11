@@ -21,6 +21,7 @@ Cassandra homepage: http://cassandra.apache.org
 
 import logging
 import os
+import posixpath
 import time
 
 from perfkitbenchmarker import data
@@ -34,11 +35,11 @@ CASSANDRA_TAR_URL = ('http://archive.apache.org/dist/cassandra/2.0.0/'
                      'apache-cassandra-2.0.0-bin.tar.gz')
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
 CASSANDRA_ENV_TEMPLATE = 'cassandra/cassandra-env.sh.j2'
-CASSANDRA_DIR = os.path.join(vm_util.VM_TMP_DIR, 'apache-cassandra')
-CASSANDRA_PID = os.path.join(CASSANDRA_DIR, 'cassandra.pid')
-CASSANDRA_OUT = os.path.join(CASSANDRA_DIR, 'cassandra.out')
-CASSANDRA_ERR = os.path.join(CASSANDRA_DIR, 'cassandra.err')
-NODETOOL = os.path.join(CASSANDRA_DIR, 'bin', 'nodetool')
+CASSANDRA_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'apache-cassandra')
+CASSANDRA_PID = posixpath.join(CASSANDRA_DIR, 'cassandra.pid')
+CASSANDRA_OUT = posixpath.join(CASSANDRA_DIR, 'cassandra.out')
+CASSANDRA_ERR = posixpath.join(CASSANDRA_DIR, 'cassandra.err')
+NODETOOL = posixpath.join(CASSANDRA_DIR, 'bin', 'nodetool')
 
 
 # Number of times to attempt to start the cluster.
@@ -68,7 +69,7 @@ def _Install(vm):
 
   # Add JNA
   vm.RemoteCommand('cd {0} && curl -LJO {1}'.format(
-      os.path.join(CASSANDRA_DIR, 'lib'),
+      posixpath.join(CASSANDRA_DIR, 'lib'),
       JNA_JAR_URL))
 
 
@@ -90,14 +91,14 @@ def Configure(vm, seed_vms):
     seed_vms: List of VirtualMachine. The seed virtual machine(s).
   """
   context = {'ip_address': vm.internal_ip,
-             'data_path': os.path.join(vm.GetScratchDir(), 'cassandra'),
+             'data_path': posixpath.join(vm.GetScratchDir(), 'cassandra'),
              'seeds': ','.join(vm.internal_ip for vm in seed_vms),
              'num_cpus': vm.num_cpus,
              'cluster_name': 'Test cluster'}
 
   for config_file in [CASSANDRA_ENV_TEMPLATE, CASSANDRA_YAML_TEMPLATE]:
     local_path = data.ResourcePath(config_file)
-    remote_path = os.path.join(
+    remote_path = posixpath.join(
         CASSANDRA_DIR, 'conf',
         os.path.splitext(os.path.basename(config_file))[0])
     vm.RenderTemplate(local_path, remote_path, context=context)
@@ -107,7 +108,7 @@ def Configure(vm, seed_vms):
       'sed -i -e "s,log4j.appender.R.File=.*,'
       'log4j.appender.R.File={0}/logs/system.log," {1}'.format(
           CASSANDRA_DIR,
-          os.path.join(CASSANDRA_DIR, 'conf', 'log4j-server.properties')))
+          posixpath.join(CASSANDRA_DIR, 'conf', 'log4j-server.properties')))
 
 
 def Start(vm):
@@ -152,7 +153,7 @@ def CleanNode(vm):
   Args:
     vm: VirtualMachine. VM to clean.
   """
-  data_path = os.path.join(vm.GetScratchDir(), 'cassandra')
+  data_path = posixpath.join(vm.GetScratchDir(), 'cassandra')
   vm.RemoteCommand('rm -rf {0}'.format(data_path))
 
 

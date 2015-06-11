@@ -21,10 +21,10 @@ import json
 import logging
 import operator
 import sys
-import tempfile
 import time
 import uuid
 
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
@@ -134,13 +134,23 @@ class DefaultMetadataProvider(MetadataProvider):
     metadata['zones'] = ','.join(benchmark_spec.zones)
     metadata['machine_type'] = benchmark_spec.machine_type
     metadata['image'] = benchmark_spec.image
+
+    # Scratch disk is not defined when a benchmark config is provided.
+    if getattr(benchmark_spec, 'scratch_disk', None):
+      metadata.update(scratch_disk_type=benchmark_spec.scratch_disk_type,
+                      scratch_disk_size=benchmark_spec.scratch_disk_size,
+                      num_striped_disks=FLAGS.num_striped_disks)
+      if benchmark_spec.scratch_disk_type == disk.PIOPS:
+        metadata['scratch_disk_iops'] = benchmark_spec.scratch_disk_iops
+
+    # User specified metadata
     for pair in FLAGS.metadata:
       try:
         key, value = pair.split(':')
         metadata[key] = value
       except ValueError:
-          logging.error('Bad metadata flag format. Skipping "%s".', pair)
-          continue
+        logging.error('Bad metadata flag format. Skipping "%s".', pair)
+        continue
 
     return metadata
 
@@ -385,12 +395,13 @@ class BigQueryPublisher(SamplePublisher):
       logging.warn('No samples: not publishing to BigQuery')
       return
 
-    with tempfile.NamedTemporaryFile(prefix='perfkit-bq-pub',
-                                     dir=vm_util.GetTempDir(),
-                                     suffix='.json') as tf:
+    with vm_util.NamedTemporaryFile(prefix='perfkit-bq-pub',
+                                    dir=vm_util.GetTempDir(),
+                                    suffix='.json') as tf:
       json_publisher = NewlineDelimitedJSONPublisher(tf.name,
                                                      collapse_labels=True)
       json_publisher.PublishSamples(samples)
+      tf.close()
       logging.info('Publishing %d samples to %s', len(samples),
                    self.bigquery_table)
       load_cmd = [self.bq_path]
@@ -438,11 +449,12 @@ class CloudStoragePublisher(SamplePublisher):
       return object_name[:GCS_OBJECT_NAME_LENGTH]
 
   def PublishSamples(self, samples):
-    with tempfile.NamedTemporaryFile(prefix='perfkit-gcs-pub',
-                                     dir=vm_util.GetTempDir(),
-                                     suffix='.json') as tf:
+    with vm_util.NamedTemporaryFile(prefix='perfkit-gcs-pub',
+                                    dir=vm_util.GetTempDir(),
+                                    suffix='.json') as tf:
       json_publisher = NewlineDelimitedJSONPublisher(tf.name)
       json_publisher.PublishSamples(samples)
+      tf.close()
       object_name = self._GenerateObjectName()
       storage_uri = 'gs://{0}/{1}'.format(self.bucket, object_name)
       logging.info('Publishing %d samples to %s', len(samples), storage_uri)

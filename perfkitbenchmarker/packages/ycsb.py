@@ -46,6 +46,7 @@ import re
 import logging
 import operator
 import os
+import posixpath
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
@@ -57,9 +58,9 @@ FLAGS = flags.FLAGS
 
 YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/archive/'
                 '5ab241210adbb2d10fd89e755c433dd99cddb5ba.tar.gz')
-YCSB_BUILD_DIR = os.path.join(vm_util.VM_TMP_DIR, 'ycsb-build')
-YCSB_DIR = os.path.join(vm_util.VM_TMP_DIR, 'ycsb')
-YCSB_EXE = os.path.join(YCSB_DIR, 'bin', 'ycsb')
+YCSB_BUILD_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb-build')
+YCSB_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb')
+YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 
 _DEFAULT_PERCENTILES = 50, 75, 90, 95, 99, 99.9
 
@@ -133,7 +134,8 @@ def _Install(vm):
                     '-DskipTests -Dcheckstyle.skip=true').format(
                         YCSB_BUILD_DIR, maven.MVN_DIR))
 
-  tar = os.path.join(YCSB_BUILD_DIR, 'distribution', 'target', 'ycsb-*.tar.gz')
+  tar = posixpath.join(
+      YCSB_BUILD_DIR, 'distribution', 'target', 'ycsb-*.tar.gz')
   vm.RemoteCommand(('mkdir -p {0} && tar --strip-components 1 -C {0} '
                     '-xf {1}').format(YCSB_DIR, tar))
 
@@ -395,7 +397,7 @@ def _ParseWorkload(contents):
     if (line.strip() and not line.lstrip().startswith('#') and
         not line.lstrip().startswith('!')):
       k, v = re.split(r'\s*[:=]\s*', line, maxsplit=1)
-      result[k] = v
+      result[k] = v.strip()
   return result
 
 
@@ -522,8 +524,10 @@ class YCSBExecutor(object):
     """
     results = []
 
-    remote_path = os.path.join(vm_util.VM_TMP_DIR,
-                               os.path.basename(workload_file))
+    remote_path = posixpath.join(vm_util.VM_TMP_DIR,
+                                 os.path.basename(workload_file))
+    kwargs.setdefault('threads', FLAGS.ycsb_preload_threads)
+    kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
 
     with open(workload_file) as fp:
       workload_meta = _ParseWorkload(fp.read())
@@ -628,10 +632,10 @@ class YCSBExecutor(object):
       parameters = {'operationcount': FLAGS.ycsb_operation_count,
                     'recordcount': FLAGS.ycsb_record_count}
       if FLAGS.ycsb_timelimit:
-        parameters['timelimit'] = FLAGS.ycsb_timelimit
+        parameters['maxexecutiontime'] = FLAGS.ycsb_timelimit
       parameters.update(kwargs)
-      remote_path = os.path.join(vm_util.VM_TMP_DIR,
-                                 os.path.basename(workload_file))
+      remote_path = posixpath.join(vm_util.VM_TMP_DIR,
+                                   os.path.basename(workload_file))
 
       with open(workload_file) as fp:
         workload_meta = _ParseWorkload(fp.read())
