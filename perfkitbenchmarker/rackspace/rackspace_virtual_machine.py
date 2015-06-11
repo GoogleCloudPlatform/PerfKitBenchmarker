@@ -57,9 +57,6 @@ users:
     groups: sudo
     shell: /bin/bash
 
-runcmd:
- - chown -R {0}:{0} /home/{0}
-
 '''
 
 BLOCK_DEVICE_TEMPLATE = '''
@@ -198,9 +195,6 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_cmd = [
         FLAGS.nova_path, 'boot',
         '--flavor', self.machine_type,
-        '--file',
-        '/home/%s/.ssh/authorized_keys=%s'
-        % (self.user_name, self.ssh_public_key),
         '--key-name', self.key_name]
 
     boot_from_cbs = (
