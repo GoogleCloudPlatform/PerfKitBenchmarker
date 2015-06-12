@@ -88,7 +88,8 @@ class AwsDisk(disk.BaseDisk):
         'describe-volumes',
         '--region=%s' % self.region,
         '--filter=Name=volume-id,Values=%s' % self.id]
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd,
+                                              retry_on_stderr=True)
     response = json.loads(stdout)
     volumes = response['Volumes']
     assert len(volumes) < 2, 'Too many volumes.'
@@ -121,7 +122,7 @@ class AwsDisk(disk.BaseDisk):
         '--device=%s' % self.GetDevicePath()]
     logging.info('Attaching AWS volume %s. This may fail if the disk is not '
                  'ready, but will be retried.', self.id)
-    vm_util.IssueRetryableCommand(attach_cmd)
+    vm_util.IssueRetryableCommand(attach_cmd, retry_on_stderr=True)
 
   def Detach(self):
     """Detaches the disk from a VM."""
@@ -131,7 +132,7 @@ class AwsDisk(disk.BaseDisk):
         '--region=%s' % self.region,
         '--instance-id=%s' % self.attached_vm_id,
         '--volume-id=%s' % self.id]
-    vm_util.IssueRetryableCommand(detach_cmd)
+    vm_util.IssueRetryableCommand(detach_cmd, retry_on_stderr=True)
 
     with self._lock:
       assert self.attached_vm_id in AwsDisk.vm_devices

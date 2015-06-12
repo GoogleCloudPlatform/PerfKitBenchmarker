@@ -24,7 +24,7 @@ FLAGS = flags.FLAGS
 BENCHMARK_INFO = {'name': 'cluster_boot',
                   'description': 'Create a cluster, record all times to boot. '
                   'Specify the cluster size with --num_vms.',
-                  'scratch_disk': False,
+                  'scratch_disk': True,
                   'num_machines': None}  # Set in GetInfo()
 
 

@@ -18,6 +18,7 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+import base64
 import json
 import logging
 import threading
@@ -25,9 +26,10 @@ import threading
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.aws import aws_disk
 from perfkitbenchmarker.aws import util
 
@@ -71,6 +73,8 @@ AMIS = {
         SA_EAST_1: 'ami-6770d87a',
     }
 }
+HVM_US_EAST_1_WINDOWS_AMI = 'ami-cc93a8a4'
+WINDOWS = 'windows'
 PLACEMENT_GROUP_PREFIXES = frozenset(
     ['c3', 'c4', 'cc2', 'cg1', 'g2', 'cr1', 'r3', 'hi1', 'i2'])
 NUM_LOCAL_VOLUMES = {
@@ -116,10 +120,18 @@ def GetBlockDeviceMap(machine_type):
 def GetImage(machine_type, region):
   """Gets an ami compatible with the machine type and zone."""
   prefix = machine_type.split('.')[0]
-  if prefix in NON_HVM_PREFIXES:
-    return AMIS[PV][region]
+  if FLAGS.os_type != WINDOWS:
+    if prefix in NON_HVM_PREFIXES:
+      return AMIS[PV][region]
+    else:
+      return AMIS[HVM][region]
   else:
-    return AMIS[HVM][region]
+    if prefix in NON_HVM_PREFIXES or region != US_EAST_1:
+      raise errors.Error(
+          'We do not have a default AMI for Windows VMs of the specified '
+          'machine type in the specified region. Please specify an AMI '
+          'via the --image flag.')
+    return HVM_US_EAST_1_WINDOWS_AMI
 
 
 def IsPlacementGroupCompatible(machine_type):
@@ -147,7 +159,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.user_name = FLAGS.aws_user_name
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
-    self.local_disk_counter = 0
+    self.user_data = None
 
   def ImportKeyfile(self):
     """Imports the public keyfile to AWS."""
@@ -162,7 +174,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'import-key-pair',
           '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
           '--public-key-material=%s' % keyfile]
-      vm_util.IssueRetryableCommand(import_cmd)
+      vm_util.IssueRetryableCommand(import_cmd, retry_on_stderr=True)
       self.imported_keyfile_set.add(self.region)
       if self.region in self.deleted_keyfile_set:
         self.deleted_keyfile_set.remove(self.region)
@@ -176,7 +188,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'ec2', '--region=%s' % self.region,
           'delete-key-pair',
           '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
-      vm_util.IssueRetryableCommand(delete_cmd)
+      vm_util.IssueRetryableCommand(delete_cmd, retry_on_stderr=True)
       self.deleted_keyfile_set.add(self.region)
       if self.region in self.imported_keyfile_set:
         self.imported_keyfile_set.remove(self.region)
@@ -191,7 +203,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--instance-ids=%s' % self.id]
     logging.info('Getting instance %s public IP. This will fail until '
                  'a public IP is available, but will be retried.', self.id)
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd,
+                                              retry_on_stderr=True)
     response = json.loads(stdout)
     instance = response['Reservations'][0]['Instances'][0]
     self.ip_address = instance['PublicIpAddress']
@@ -209,8 +222,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a VM instance."""
-    super(AwsVirtualMachine, self)._Create()
-
     placement = 'AvailabilityZone=%s' % self.zone
     if IsPlacementGroupCompatible(self.machine_type):
       placement += ',GroupName=%s' % self.network.placement_group.name
@@ -228,6 +239,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
+    if self.user_data:
+      create_cmd.append('--user-data=%s' % self.user_data)
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Instances'][0]['InstanceId']
@@ -248,7 +261,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'describe-instances',
         '--region=%s' % self.region,
         '--filter=Name=instance-id,Values=%s' % self.id]
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd,
+                                              retry_on_stderr=True)
     response = json.loads(stdout)
     reservations = response['Reservations']
     assert len(reservations) < 2, 'Too many reservations.'
@@ -267,19 +281,24 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
     # Instantiate the disk(s) that we want to create.
-    if disk_spec.disk_type == disk.LOCAL:
-      disks = []
-      for _ in range(disk_spec.num_striped_disks):
-        local_disk = aws_disk.AwsDisk(disk_spec, self.zone)
-        local_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
-                                       self.local_disk_counter)
+    disks = []
+    for _ in range(disk_spec.num_striped_disks):
+      data_disk = aws_disk.AwsDisk(disk_spec, self.zone)
+      if disk_spec.disk_type == disk.LOCAL:
+        data_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
+                                      self.local_disk_counter)
+        # Local disk numbers start at 1 (0 is the system disk).
+        data_disk.disk_number = self.local_disk_counter + 1
         self.local_disk_counter += 1
-        disks.append(local_disk)
-      if self.local_disk_counter > self.max_local_disks:
-        raise errors.Error('Not enough local disks.')
-    else:
-      disks = [aws_disk.AwsDisk(disk_spec, self.zone)
-               for _ in range(disk_spec.num_striped_disks)]
+        if self.local_disk_counter > self.max_local_disks:
+          raise errors.Error('Not enough local disks.')
+      else:
+        # Remote disk numbers start at 1 + max_local disks (0 is the system disk
+        # and local disks occupy 1-max_local_disks).
+        data_disk.disk_number = (self.remote_disk_counter +
+                                 1 + self.max_local_disks)
+        self.remote_disk_counter += 1
+      disks.append(data_disk)
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
@@ -293,22 +312,58 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     return ['/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
             for i in xrange(NUM_LOCAL_VOLUMES[self.machine_type])]
 
-  def SetupLocalDisks(self):
-    """Performs AWS specific setup of local disks."""
-    # Some images may automount one local disk, but we don't
-    # want to fail if this wasn't the case.
-    self.RemoteCommand('sudo umount /mnt', ignore_failure=True)
-
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
 
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
-                                   package_managers.AptMixin):
+                                   linux_virtual_machine.DebianMixin):
   pass
 
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
-                                 package_managers.YumMixin):
+                                 linux_virtual_machine.RhelMixin):
   pass
+
+
+class WindowsAwsVirtualMachine(AwsVirtualMachine,
+                               windows_virtual_machine.WindowsMixin):
+
+  def __init__(self, vm_spec):
+    super(WindowsAwsVirtualMachine, self).__init__(vm_spec)
+    self.user_name = 'Administrator'
+    self.user_data = ('<powershell>%s</powershell>' %
+                      windows_virtual_machine.STARTUP_SCRIPT)
+
+  @vm_util.Retry()
+  def _GetDecodedPasswordData(self):
+    get_password_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'get-password-data',
+        '--region=%s' % self.region,
+        '--instance-id=%s' % self.id]
+    stdout, _ = vm_util.IssueRetryableCommand(get_password_cmd,
+                                              retry_on_stderr=True)
+    response = json.loads(stdout)
+    password_data = response['PasswordData']
+    if not password_data:
+      raise ValueError('No PasswordData in response.')
+    return base64.b64decode(password_data)
+
+
+  def _PostCreate(self):
+    super(WindowsAwsVirtualMachine, self)._PostCreate()
+    decoded_password_data = self._GetDecodedPasswordData()
+    with vm_util.NamedTemporaryFile() as tf:
+      tf.write(decoded_password_data)
+      tf.close()
+      decrypt_cmd = ['openssl',
+                     'rsautl',
+                     '-decrypt',
+                     '-in',
+                     tf.name,
+                     '-inkey',
+                     vm_util.GetPrivateKeyPath()]
+      password, _ = vm_util.IssueRetryableCommand(decrypt_cmd)
+      self.password = password

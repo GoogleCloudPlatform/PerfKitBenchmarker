@@ -21,6 +21,7 @@ import posixpath
 import random
 import re
 import socket
+import string
 import subprocess
 import tempfile
 import threading
@@ -57,6 +58,7 @@ FUZZ = .5
 MAX_RETRIES = -1
 
 WINDOWS = 'nt'
+PASSWORD_LENGTH = 15
 
 flags.DEFINE_integer('default_timeout', TIMEOUT, 'The default timeout for '
                      'retryable commands in seconds.')
@@ -433,12 +435,15 @@ def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
 
 
 @Retry()
-def IssueRetryableCommand(cmd, env=None):
+def IssueRetryableCommand(cmd, env=None, retry_on_stderr=False):
   """Tries running the provided command until it succeeds or times out.
 
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
         constructor.
+    env: An alternate environment to pass to the Popen command.
+    retry_on_stderr: If True, getting any output on stderr will be treated
+        like a non-zero return code (i.e. the command will be retried).
 
   Returns:
     A tuple of stdout and stderr from running the provided command.
@@ -447,6 +452,10 @@ def IssueRetryableCommand(cmd, env=None):
   if retcode:
     raise errors.VmUtil.CalledProcessException(
         'Command returned a non-zero exit code.\n')
+  if retry_on_stderr and stderr:
+    raise errors.VmUtil.CalledProcessException(
+        'The "retry_on_stderr" option was set and the command '
+        'had output on stderr:\n%s' % stderr)
   return stdout, stderr
 
 
@@ -463,26 +472,6 @@ def ParseTimeCommandResult(command_result):
   time_in_seconds = 60 * float(time_data[0][0]) + float(time_data[0][1])
   return time_in_seconds
 
-
-def BurnCpu(vm, burn_cpu_threads=None, burn_cpu_seconds=None):
-  """Burns vm cpu for some amount of time and dirty cache.
-
-  Args:
-    vm: The target vm.
-    burn_cpu_threads: Number of threads to burn cpu.
-    burn_cpu_seconds: Amount of time in seconds to burn cpu.
-  """
-  burn_cpu_threads = burn_cpu_threads or FLAGS.burn_cpu_threads
-  burn_cpu_seconds = burn_cpu_seconds or FLAGS.burn_cpu_seconds
-  if burn_cpu_seconds:
-    vm.Install('sysbench')
-    end_time = time.time() + burn_cpu_seconds
-    vm.RemoteCommand(
-        'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
-        'run 1> /dev/null 2> /dev/null &' % burn_cpu_threads)
-    if time.time() < end_time:
-      time.sleep(end_time - time.time())
-    vm.RemoteCommand('pkill -9 sysbench')
 
 
 def ShouldRunOnExternalIpAddress():
@@ -655,3 +644,18 @@ def RunDStatIfConfigured(vms, suffix='-dstat'):
     yield
   finally:
     RunThreaded(StopDStat, vms)
+
+
+def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):
+  """Generates a password that meets Windows complexity requirements."""
+  special_chars = '~!$%*_-+=\\[]:.?/'
+  password = [
+      random.choice(string.ascii_letters + string.digits + special_chars)
+      for _ in range(password_length - 4)]
+  # Ensure that the password contains at least one of each 4 required
+  # character types.
+  password.append(random.choice(string.ascii_lowercase))
+  password.append(random.choice(string.ascii_uppercase))
+  password.append(random.choice(string.digits))
+  password.append(random.choice(special_chars))
+  return ''.join(password)
