@@ -91,6 +91,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self.id = ''
     self.ip_address6 = ''
+    self.mounted_disks = set()
     self.key_name = 'perfkit-%s' % FLAGS.run_uri
     self.max_local_disks = 0
     self.flavor = self._GetFlavorDetails()
@@ -363,7 +364,8 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     extra_blk_devices = []
     for dev in blk_devices:
       if (dev['type'] != 'part' and dev['name'] != boot_device['name'] and
-          'config' not in dev['label']):
+          'config' not in dev['label'] and
+          dev['name'] not in self.mounted_disks):
         extra_blk_devices.append(dev)
 
     if len(extra_blk_devices) == 0:
@@ -382,12 +384,13 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       local_device = extra_blk_devices[i]
       local_disk = rackspace_disk.RackspaceEphemeralDisk(
           disk_spec, local_device['name'])
+      self.mounted_disks.add(local_device['name'])
       disks.append(local_disk)
     return disks
 
   def GetScratchDir(self, disk_num=0):
     if self.scratch_disks[disk_num].mount_point == '':
-      return '/scratch0'
+      return '/scratch%s' % disk_num
 
     return super(RackspaceVirtualMachine, self).GetScratchDir(disk_num)
 
