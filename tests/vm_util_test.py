@@ -75,8 +75,8 @@ class ShouldRunOnInternalIpAddressTestCase(unittest.TestCase):
 def HaveSleepSubprocess():
   """Checks if the current process has a sleep subprocess."""
 
-  for child in psutil.Process(os.getpid()).get_children(recursive=True):
-    if 'sleep' in child.cmdline:
+  for child in psutil.Process(os.getpid()).children(recursive=True):
+    if 'sleep' in child.cmdline():
       return True
   return False
 
