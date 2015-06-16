@@ -54,6 +54,8 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import maven
 
+from xml.etree.ElementTree import Element, SubElement, tostring
+
 FLAGS = flags.FLAGS
 
 YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/archive/'
@@ -113,6 +115,18 @@ flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination. Set to 0 for '
                      'unlimited time.')
 
+def create_proxy_element(proxy_type, proxy, parent):
+    proxy = re.sub(r'^https?:\/\/', '', proxy)
+    host_addr, port_number = proxy.split(":")
+    http_proxy = SubElement(parent, "proxy")
+    active = SubElement(http_proxy, "active")
+    active.text = "true"
+    protocol = SubElement(http_proxy, "protocol")
+    protocol.text = proxy_type
+    host = SubElement(http_proxy, "host")
+    host.text =  host_addr
+    port = SubElement(http_proxy, "port")
+    port.text = port_number
 
 def _GetThreadsPerLoaderList():
   """Returns the list of client counts per VM to use in staircase load."""
@@ -146,6 +160,26 @@ def _Install(vm):
   vm.RemoteCommand(('mkdir -p {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         YCSB_BUILD_DIR, YCSB_TAR_URL))
+
+  settings_file = ".m2/settings.xml"
+  proxy_enable = False
+
+  root = Element('settings')
+  proxies = SubElement(root, "proxies")
+
+  if FLAGS.http_proxy:
+      proxy_enable = True
+      create_proxy_element("http", FLAGS.http_proxy, proxies)
+
+  if FLAGS.https_proxy:
+      proxy_enable = True
+      create_proxy_element("https", FLAGS.https_proxy, proxies)
+
+  if proxy_enable:
+      vm.RemoteCommand("mkdir -p $HOME/.m2")
+      vm.RemoteCommand("touch $HOME/%s" % settings_file)
+      vm.RemoteCommand("echo -e '%s' | sudo tee %s" % (tostring(root), settings_file))
+
   vm.RemoteCommand(('cd {0} && {1}/bin/mvn clean package '
                     '-DskipTests -Dcheckstyle.skip=true').format(
                         YCSB_BUILD_DIR, maven.MVN_DIR))
