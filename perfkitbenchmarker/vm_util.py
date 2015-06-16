@@ -15,6 +15,7 @@
 """Set of utility functions for working with virtual machines."""
 
 import contextlib
+import functools
 import logging
 import os
 import posixpath
@@ -31,6 +32,7 @@ import jinja2
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import regex_util
@@ -592,28 +594,26 @@ def ExecutableOnPath(executable_name):
   return True
 
 
-@contextlib.contextmanager
-def RunDStatIfConfigured(vms, suffix='-dstat'):
-  """Installs and runs dstat on 'vms' if FLAGS.dstat is set.
+class _DStatCollector(object):
+  """dstat collector.
 
-  On exiting the context manager, the results are copied to the run temp dir.
-
-  Args:
-    vms: List of virtual machines.
-    suffix: str. Suffix to add to each dstat result file.
-
-  Yields:
-    None
+  Installs and runs dstat on a collection of VMs.
   """
-  if not FLAGS.dstat:
-    yield
-    return
 
-  lock = threading.Lock()
-  pids = {}
-  file_names = {}
+  def __init__(self, interval=None):
+    """Runs dstat on 'vms'.
 
-  def StartDStat(vm):
+    Start dstat collection via `Start`. Stop via `Stop`.
+
+    Args:
+      interval: Optional int. Interval in seconds in which to collect samples.
+    """
+    self.interval = interval
+    self._lock = threading.Lock()
+    self._pids = {}
+    self._file_names = {}
+
+  def _StartOnVm(self, vm, suffix='-dstat'):
     vm.Install('dstat')
 
     num_cpus = vm.num_cpus
@@ -633,25 +633,47 @@ def RunDStatIfConfigured(vms, suffix='-dstat'):
                max_cpu=num_cpus - 1,
                block_devices=','.join(block_devices),
                output=dstat_file,
-               dstat_interval=FLAGS.dstat_interval or '')
+               dstat_interval=self.interval or '')
     stdout, _ = vm.RemoteCommand(cmd)
-    with lock:
-      pids[vm.name] = stdout.strip()
-      file_names[vm.name] = dstat_file
+    with self._lock:
+      self._pids[vm.name] = stdout.strip()
+      self._file_names[vm.name] = dstat_file
 
-  def StopDStat(vm):
-    if vm.name not in pids:
+  def _StopOnVm(self, vm):
+    """Stop dstat on 'vm', copy the results to the run temporary directory."""
+    if vm.name not in self._pids:
       logging.warn('No dstat PID for %s', vm.name)
       return
-    cmd = 'kill {0} || true'.format(pids[vm.name])
+    else:
+      with self._lock:
+        pid = self._pids.pop(vm.name)
+        file_name = self._file_names.pop(vm.name)
+    cmd = 'kill {0} || true'.format(pid)
     vm.RemoteCommand(cmd)
     try:
-      vm.PullFile(GetTempDir(), file_names[vm.name])
+      vm.PullFile(GetTempDir(), file_name)
     except:
-      logging.exception('Failed fetching dstat result.')
+      logging.exception('Failed fetching dstat result from %s.', vm.name)
 
-  RunThreaded(StartDStat, vms)
-  try:
-    yield
-  finally:
-    RunThreaded(StopDStat, vms)
+  def Start(self, sender, benchmark_spec):
+    """Install and start dstat on all VMs in 'benchmark_spec'."""
+    suffix = '-{0}-dstat'.format(benchmark_spec.benchmark_name)
+    start_on_vm = functools.partial(self._StartOnVm, suffix=suffix)
+    RunThreaded(start_on_vm, benchmark_spec.vms)
+
+  def Stop(self, sender, benchmark_spec):
+    """Stop dstat on all VMs in 'benchmark_spec', fetch results."""
+    RunThreaded(self._StopOnVm, benchmark_spec.vms)
+
+
+@events.initialization_complete.connect
+def _RegisterDStatCollector(sender, parsed_flags):
+  """Registers the dstat collector if FLAGS.dstat is set."""
+  if not parsed_flags.dstat:
+    return
+
+  logging.debug('Registering dstat collector with interval %s.',
+                parsed_flags.dstat_interval)
+  collector = _DStatCollector(interval=parsed_flags.dstat_interval)
+  events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
+  events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
