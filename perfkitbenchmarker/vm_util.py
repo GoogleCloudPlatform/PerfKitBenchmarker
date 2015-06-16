@@ -73,6 +73,11 @@ flags.DEFINE_boolean('dstat', False,
 flags.DEFINE_integer('dstat_interval', None,
                      'dstat sample collection frequency, in seconds. Only '
                      'applicable when --dstat is specified.')
+flags.DEFINE_string('dstat_output', None,
+                    'Output directory for dstat output. '
+                    'Only applicable when --dstat is specified. '
+                    'Default: run temporary directory.')
+
 
 
 class IpAddressSubset(object):
@@ -601,7 +606,7 @@ class _DStatCollector(object):
   Installs and runs dstat on a collection of VMs.
   """
 
-  def __init__(self, interval=None):
+  def __init__(self, interval=None, output_directory=None):
     """Runs dstat on 'vms'.
 
     Start dstat collection via `Start`. Stop via `Stop`.
@@ -610,9 +615,14 @@ class _DStatCollector(object):
       interval: Optional int. Interval in seconds in which to collect samples.
     """
     self.interval = interval
+    self.output_directory = output_directory or GetTempDir()
     self._lock = threading.Lock()
     self._pids = {}
     self._file_names = {}
+
+    if not os.path.isdir(self.output_directory):
+      raise IOError('dstat output directory does not exist: {0}'.format(
+          self.output_directory))
 
   def _StartOnVm(self, vm, suffix='-dstat'):
     vm.Install('dstat')
@@ -652,7 +662,7 @@ class _DStatCollector(object):
     cmd = 'kill {0} || true'.format(pid)
     vm.RemoteCommand(cmd)
     try:
-      vm.PullFile(GetTempDir(), file_name)
+      vm.PullFile(self.output_directory, file_name)
     except:
       logging.exception('Failed fetching dstat result from %s.', vm.name)
 
@@ -674,8 +684,16 @@ def _RegisterDStatCollector(sender, parsed_flags):
   if not parsed_flags.dstat:
     return
 
-  logging.debug('Registering dstat collector with interval %s.',
-                parsed_flags.dstat_interval)
-  collector = _DStatCollector(interval=parsed_flags.dstat_interval)
+  output_directory = (parsed_flags.dstat_output
+                      if parsed_flags['dstat_output'].present
+                      else GetTempDir())
+
+  logging.debug('Registering dstat collector with interval %s, output to %s.',
+                parsed_flags.dstat_interval, output_directory)
+
+  if not os.path.isdir(output_directory):
+    os.makedirs(output_directory)
+  collector = _DStatCollector(interval=parsed_flags.dstat_interval,
+                              output_directory=output_directory)
   events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
   events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
