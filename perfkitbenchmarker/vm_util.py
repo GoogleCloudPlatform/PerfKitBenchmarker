@@ -27,6 +27,7 @@ import tempfile
 import threading
 import time
 import traceback
+import uuid
 
 import jinja2
 
@@ -657,7 +658,8 @@ class _DStatCollector(object):
 
   def Start(self, sender, benchmark_spec):
     """Install and start dstat on all VMs in 'benchmark_spec'."""
-    suffix = '-{0}-dstat'.format(benchmark_spec.benchmark_name)
+    suffix = '-{0}-{1}-dstat'.format(benchmark_spec.benchmark_name,
+                                     str(uuid.uuid4())[:8])
     start_on_vm = functools.partial(self._StartOnVm, suffix=suffix)
     RunThreaded(start_on_vm, benchmark_spec.vms)
 
