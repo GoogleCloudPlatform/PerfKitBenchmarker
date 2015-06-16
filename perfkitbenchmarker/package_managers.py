@@ -146,6 +146,8 @@ class YumMixin(BasePackageMixin):
 
   def Startup(self):
     """Eliminates the need to have a tty to run sudo commands."""
+    if FLAGS.http_proxy or FLAGS.https_proxy:
+        self.SetupProxy()
     self.RemoteCommand('echo \'Defaults:%s !requiretty\' | '
                        'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                        login_shell=True)
@@ -230,6 +232,24 @@ class YumMixin(BasePackageMixin):
     """
     package = packages.PACKAGES[package_name]
     return package.YumGetServiceName(self)
+
+  def SetupProxy(self):
+    """
+        This function setup proxy if your cloud is currently installed behind proxy server
+    """
+    super(YumMixin, self).SetupProxy()
+    yum_proxy_file = "/etc/yum.conf"
+
+    commands = []
+
+    add_proxy_conf = "sudo touch %s" % yum_proxy_file
+    commands.append(add_proxy_conf)
+
+    if FLAGS.http_proxy:
+        add_http_proxy = "echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (FLAGS.http_proxy, yum_proxy_file)
+        commands.append(add_http_proxy)
+
+    self.RemoteCommand(";".join(commands))
 
 
 class AptMixin(BasePackageMixin):
