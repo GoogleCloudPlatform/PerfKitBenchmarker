@@ -247,6 +247,8 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
   elif (not isinstance(thread_params[0][0], tuple) or
         not isinstance(thread_params[0][1], dict)):
     raise ValueError('If Param is a tuple, the tuple must be (tuple, dict)')
+  else:
+    thread_params = thread_params[:]
 
   threads = []
   exceptions = []
