@@ -15,7 +15,6 @@
 """Set of utility functions for working with virtual machines."""
 
 import contextlib
-import copy
 import logging
 import os
 import posixpath
@@ -248,10 +247,11 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
   elif (not isinstance(thread_params[0][0], tuple) or
         not isinstance(thread_params[0][1], dict)):
     raise ValueError('If Param is a tuple, the tuple must be (tuple, dict)')
+  else:
+    thread_params = thread_params[:]
 
   threads = []
   exceptions = []
-  thread_params = copy.copy(thread_params)
   while thread_params and len(threads) < max_concurrent_threads:
     args, kwargs = thread_params.pop()
     thread = ThreadWithExceptions(target=target, args=args, kwargs=kwargs)
