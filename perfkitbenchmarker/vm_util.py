@@ -15,6 +15,7 @@
 """Set of utility functions for working with virtual machines."""
 
 import contextlib
+import copy
 import logging
 import os
 import posixpath
@@ -250,6 +251,7 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
 
   threads = []
   exceptions = []
+  thread_params = copy.copy(thread_params)
   while thread_params and len(threads) < max_concurrent_threads:
     args, kwargs = thread_params.pop()
     thread = ThreadWithExceptions(target=target, args=args, kwargs=kwargs)
