@@ -45,3 +45,11 @@ successful.
 
 Sender: the phase. Currently only RUN_PHASE.
 Payload: benchmark_spec.""")
+
+sample_created = _events.signal('sample-created', doc="""
+Called with sample object and benchmark spec.
+
+Signal sent immediately after a sample is created by a publisher.
+
+Sender: None
+Payload: benchmark_spec (BenchmarkSpec), sample (dict).""")
