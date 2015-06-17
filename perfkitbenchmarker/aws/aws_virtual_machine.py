@@ -162,7 +162,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'import-key-pair',
           '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
           '--public-key-material=%s' % keyfile]
-      vm_util.IssueRetryableCommand(import_cmd)
+      util.IssueRetryableCommand(import_cmd)
       self.imported_keyfile_set.add(self.region)
       if self.region in self.deleted_keyfile_set:
         self.deleted_keyfile_set.remove(self.region)
@@ -176,7 +176,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'ec2', '--region=%s' % self.region,
           'delete-key-pair',
           '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
-      vm_util.IssueRetryableCommand(delete_cmd)
+      util.IssueRetryableCommand(delete_cmd)
       self.deleted_keyfile_set.add(self.region)
       if self.region in self.imported_keyfile_set:
         self.imported_keyfile_set.remove(self.region)
@@ -191,7 +191,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--instance-ids=%s' % self.id]
     logging.info('Getting instance %s public IP. This will fail until '
                  'a public IP is available, but will be retried.', self.id)
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     instance = response['Reservations'][0]['Instances'][0]
     self.ip_address = instance['PublicIpAddress']
@@ -248,7 +248,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'describe-instances',
         '--region=%s' % self.region,
         '--filter=Name=instance-id,Values=%s' % self.id]
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     reservations = response['Reservations']
     assert len(reservations) < 2, 'Too many reservations.'

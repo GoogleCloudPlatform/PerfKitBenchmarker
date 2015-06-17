@@ -439,6 +439,7 @@ def IssueRetryableCommand(cmd, env=None):
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
         constructor.
+    env: An alternate environment to pass to the Popen command.
 
   Returns:
     A tuple of stdout and stderr from running the provided command.
