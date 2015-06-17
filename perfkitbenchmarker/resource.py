@@ -20,6 +20,7 @@ reliably.
 """
 
 import abc
+import time
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -33,6 +34,13 @@ class BaseResource(object):
   def __init__(self):
     super(BaseResource, self).__init__()
     self.created = False
+
+    # Creation and deletion time information
+    # that we may make use of later.
+    self.create_start_time = None
+    self.delete_start_time = None
+    self.create_end_time = None
+    self.delete_end_time = None
 
   @abc.abstractmethod
   def _Create(self):
@@ -88,6 +96,8 @@ class BaseResource(object):
     """Reliably creates the underlying resource."""
     if self.created:
       return
+    if not self.create_start_time:
+      self.create_start_time = time.time()
     self._Create()
     try:
       if not self._Exists():
@@ -96,10 +106,14 @@ class BaseResource(object):
     except NotImplementedError:
       pass
     self.created = True
+    if not self.create_end_time:
+      self.create_end_time = time.time()
 
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
+    if not self.delete_start_time:
+      self.delete_start_time = time.time()
     self._Delete()
     try:
       if self._Exists():
@@ -107,6 +121,8 @@ class BaseResource(object):
             'Deletion of %s failed.' % type(self).__name__)
     except NotImplementedError:
       pass
+    if not self.delete_end_time:
+      self.delete_end_time = time.time()
 
   def Create(self):
     """Creates a resource and its dependencies."""
@@ -115,6 +131,6 @@ class BaseResource(object):
     self._PostCreate()
 
   def Delete(self):
-    """Deletes a resource and its dependencie."""
+    """Deletes a resource and its dependencies."""
     self._DeleteResource()
     self._DeleteDependencies()

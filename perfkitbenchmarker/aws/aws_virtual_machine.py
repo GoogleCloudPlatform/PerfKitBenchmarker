@@ -209,8 +209,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a VM instance."""
-    super(AwsVirtualMachine, self)._Create()
-
     placement = 'AvailabilityZone=%s' % self.zone
     if IsPlacementGroupCompatible(self.machine_type):
       placement += ',GroupName=%s' % self.network.placement_group.name
