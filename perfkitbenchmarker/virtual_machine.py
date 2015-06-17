@@ -514,10 +514,10 @@ class BaseVirtualMachine(resource.BaseResource):
     """Gets the time it took to boot this VM.
 
     Returns:
-      Boot time (in seconds), or None if the boot is incomplete.
+      Boot time (in seconds).
     """
-    if not self.bootable_time or not self.create_start_time:
-      return None
+    assert self.bootable_time, 'VM must have booted to get boot time.'
+    assert self.create_start_time, 'VM must be created to get boot time.'
     assert self.bootable_time >= self.create_start_time
     return self.bootable_time - self.create_start_time
 
