@@ -109,7 +109,6 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.service.Delete()
 
   def _Create(self):
-    super(AzureVirtualMachine, self)._Create()
     create_cmd = [AZURE_PATH,
                   'vm',
                   'create',

@@ -79,7 +79,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a GCE VM instance."""
-    super(GceVirtualMachine, self)._Create()
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
     with vm_util.NamedTemporaryFile(dir=vm_util.GetTempDir(),

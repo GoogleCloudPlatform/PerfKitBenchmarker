@@ -73,7 +73,6 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a DigitalOcean VM instance (droplet)."""
-    super(DigitalOceanVirtualMachine, self)._Create()
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
 

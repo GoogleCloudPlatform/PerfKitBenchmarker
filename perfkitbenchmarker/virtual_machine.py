@@ -110,7 +110,6 @@ class BaseVirtualMachine(resource.BaseResource):
     with self._instance_counter_lock:
       self.name = 'perfkit-%s-%d' % (FLAGS.run_uri, self._instance_counter)
       BaseVirtualMachine._instance_counter += 1
-    self.create_time = None
     self.bootable_time = None
     self.project = vm_spec.project
     self.zone = vm_spec.zone
@@ -137,9 +136,6 @@ class BaseVirtualMachine(resource.BaseResource):
     self._reachable = {}
     self._total_memory_kb = None
     self._num_cpus = None
-
-  def _Create(self):
-    self.create_time = time.time()
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -520,10 +516,10 @@ class BaseVirtualMachine(resource.BaseResource):
     Returns:
       Boot time (in seconds), or None if the boot is incomplete.
     """
-    if not self.bootable_time or not self.create_time:
+    if not self.bootable_time or not self.create_start_time:
       return None
-    assert self.bootable_time >= self.create_time
-    return self.bootable_time - self.create_time
+    assert self.bootable_time >= self.create_start_time
+    return self.bootable_time - self.create_start_time
 
   def IsReachable(self, target_vm):
     """Indicates whether the target VM can be reached from it's internal ip.
