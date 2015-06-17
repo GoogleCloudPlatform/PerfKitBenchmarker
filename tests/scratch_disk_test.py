@@ -22,6 +22,7 @@ import mock
 from perfkitbenchmarker import pkb  # NOQA
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.aws import aws_disk
 from perfkitbenchmarker.aws import aws_virtual_machine
@@ -54,7 +55,7 @@ class ScratchDiskTestMixin(object):
   def setUp(self):
     self.patches = []
 
-    vm_prefix = virtual_machine.__name__ + '.BaseVirtualMachine'
+    vm_prefix = linux_virtual_machine.__name__ + '.BaseLinuxMixin'
     self.patches.append(
         mock.patch(vm_prefix + '.FormatDisk'))
     self.patches.append(
@@ -131,7 +132,7 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     network = azure_network.AzureNetwork(None)
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
         None, None, None, None, network)
-    return azure_virtual_machine.AzureVirtualMachine(vm_spec)
+    return azure_virtual_machine.DebianBasedAzureVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return azure_disk.AzureDisk
@@ -145,7 +146,7 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _CreateVm(self):
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
         None, None, None, None, None)
-    return gce_virtual_machine.GceVirtualMachine(vm_spec)
+    return gce_virtual_machine.DebianBasedGceVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return gce_disk.GceDisk
@@ -160,7 +161,7 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _CreateVm(self):
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
         None, 'zone', None, 'image', None)
-    return aws_virtual_machine.AwsVirtualMachine(vm_spec)
+    return aws_virtual_machine.DebianBasedAwsVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return aws_disk.AwsDisk

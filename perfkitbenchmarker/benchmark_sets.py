@@ -15,7 +15,9 @@
 """Benchmark set specific functions and definitions."""
 
 from perfkitbenchmarker import benchmarks
+from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import windows_benchmarks
 
 FLAGS = flags.FLAGS
 
@@ -147,12 +149,10 @@ def GetBenchmarksFromFlags():
                 benchmark_name][BENCHMARK_LIST])
         break
 
-  # Create a dictionary of valid benchmark names and modules
-  # TODO(voellm): I really think the benchmarks package init should
-  # build the dictionary
-  valid_benchmarks = {}
-  for benchmark_module in benchmarks.BENCHMARKS:
-    valid_benchmarks[benchmark_module.GetInfo()['name']] = benchmark_module
+  if FLAGS.os_type == benchmark_spec.WINDOWS:
+    valid_benchmarks = windows_benchmarks.VALID_BENCHMARKS
+  else:
+    valid_benchmarks = benchmarks.VALID_BENCHMARKS
 
   # create a list of modules to return
   benchmark_module_list = []

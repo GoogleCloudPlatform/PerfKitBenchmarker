@@ -68,6 +68,7 @@ from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.publisher import SampleCollector
 
 STAGE_ALL = 'all'
@@ -164,13 +165,13 @@ def ValidateBenchmarkInfo(benchmark_info):
 
 def ListUnknownBenchmarks():
   """Identify invalid benchmark names specified in the command line flags."""
-  valid_benchmark_names = frozenset(benchmark.GetInfo()['name']
-                                    for benchmark in benchmarks.BENCHMARKS)
+  valid_windows_benchmark_names = frozenset(windows_benchmarks.VALID_BENCHMARKS)
+  valid_benchmark_names = frozenset(benchmarks.VALID_BENCHMARKS)
   valid_benchmark_sets = frozenset(benchmark_sets.BENCHMARK_SETS)
   specified_benchmark_names = frozenset(FLAGS.benchmarks)
 
-  return sorted((specified_benchmark_names - valid_benchmark_names) -
-                valid_benchmark_sets)
+  return sorted(((specified_benchmark_names - valid_benchmark_names) -
+                valid_benchmark_sets) - valid_windows_benchmark_names)
 
 
 def DoPreparePhase(benchmark, name, spec, timer):
@@ -380,6 +381,11 @@ def RunBenchmarks(publish=True):
   if unknown_benchmarks:
     logging.error('Unknown benchmark(s) provided: %s',
                   ', '.join(unknown_benchmarks))
+    return 1
+
+  if FLAGS.os_type == benchmark_spec.WINDOWS and not vm_util.RunningOnWindows():
+    logging.error('In order to run benchmarks on Windows VMs, you must be '
+                  'running on Windows.')
     return 1
 
   vm_util.SSHKeyGen()

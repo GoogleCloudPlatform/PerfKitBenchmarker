@@ -21,7 +21,7 @@ import time
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.digitalocean import digitalocean_disk
@@ -73,7 +73,6 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a DigitalOcean VM instance (droplet)."""
-    super(DigitalOceanVirtualMachine, self)._Create()
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
 
@@ -206,10 +205,10 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 
 class DebianBasedDigitalOceanVirtualMachine(DigitalOceanVirtualMachine,
-                                            package_managers.AptMixin):
+                                            linux_virtual_machine.DebianMixin):
   pass
 
 
 class RhelBasedDigitalOceanVirtualMachine(DigitalOceanVirtualMachine,
-                                          package_managers.YumMixin):
+                                          linux_virtual_machine.RhelMixin):
   pass

@@ -707,7 +707,7 @@ class GoogleCloudStorageBenchmark(object):
 
     try:
       vm.RemoteCommand('mkdir .config')
-    except errors.VmUtil.SshConnectionError:
+    except errors.VirtualMachine.RemoteCommandError:
       # If ran on existing machines, .config folder may already exists.
       pass
     vm.PushFile(FLAGS.object_storage_credential_file, '.config/')
