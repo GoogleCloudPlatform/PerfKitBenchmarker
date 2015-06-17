@@ -75,10 +75,10 @@ class AwsFirewall(network.BaseFirewall):
           '--group-id=%s' % vm.group_id,
           '--port=%s' % port,
           '--cidr=0.0.0.0/0']
-      vm_util.IssueRetryableCommand(
-          authorize_cmd + ['--protocol=tcp'], retry_on_stderr=True)
-      vm_util.IssueRetryableCommand(
-          authorize_cmd + ['--protocol=udp'], retry_on_stderr=True)
+      util.IssueRetryableCommand(
+          authorize_cmd + ['--protocol=tcp'])
+      util.IssueRetryableCommand(
+          authorize_cmd + ['--protocol=udp'])
       self.firewall_set.add(entry)
 
   def DisallowAllPorts(self):
@@ -114,8 +114,7 @@ class AwsVpc(resource.BaseResource):
         'describe-vpcs',
         '--region=%s' % self.region,
         '--filter=Name=vpc-id,Values=%s' % self.id]
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd,
-                                              retry_on_stderr=True)
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     vpcs = response['Vpcs']
     assert len(vpcs) < 2, 'Too many VPCs.'
@@ -137,8 +136,7 @@ class AwsVpc(resource.BaseResource):
         '--enable-dns-hostnames',
         '{ "Value": true }']
 
-    vm_util.IssueRetryableCommand(enable_hostnames_command,
-                                  retry_on_stderr=True)
+    util.IssueRetryableCommand(enable_hostnames_command)
 
   def _Delete(self):
     """Delete's the VPC."""
@@ -193,8 +191,7 @@ class AwsSubnet(resource.BaseResource):
         'describe-subnets',
         '--region=%s' % self.region,
         '--filter=Name=subnet-id,Values=%s' % self.id]
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd,
-                                              retry_on_stderr=True)
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     subnets = response['Subnets']
     assert len(subnets) < 2, 'Too many subnets.'
@@ -238,8 +235,7 @@ class AwsInternetGateway(resource.BaseResource):
         'describe-internet-gateways',
         '--region=%s' % self.region,
         '--filter=Name=internet-gateway-id,Values=%s' % self.id]
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd,
-                                              retry_on_stderr=True)
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     internet_gateways = response['InternetGateways']
     assert len(internet_gateways) < 2, 'Too many internet gateways.'
@@ -255,7 +251,7 @@ class AwsInternetGateway(resource.BaseResource):
           '--region=%s' % self.region,
           '--internet-gateway-id=%s' % self.id,
           '--vpc-id=%s' % self.vpc_id]
-      vm_util.IssueRetryableCommand(attach_cmd, retry_on_stderr=True)
+      util.IssueRetryableCommand(attach_cmd)
       self.attached = True
 
   def Detach(self):
@@ -267,7 +263,7 @@ class AwsInternetGateway(resource.BaseResource):
           '--region=%s' % self.region,
           '--internet-gateway-id=%s' % self.id,
           '--vpc-id=%s' % self.vpc_id]
-      vm_util.IssueRetryableCommand(detach_cmd, retry_on_stderr=True)
+      util.IssueRetryableCommand(detach_cmd)
       self.attached = False
 
 
@@ -301,8 +297,7 @@ class AwsRouteTable(resource.BaseResource):
         'describe-route-tables',
         '--region=%s' % self.region,
         '--filters=Name=vpc-id,Values=%s' % self.vpc_id]
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd,
-                                              retry_on_stderr=True)
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     self.id = response['RouteTables'][0]['RouteTableId']
 
@@ -315,8 +310,7 @@ class AwsRouteTable(resource.BaseResource):
         '--route-table-id=%s' % self.id,
         '--gateway-id=%s' % internet_gateway_id,
         '--destination-cidr-block=0.0.0.0/0']
-    vm_util.IssueRetryableCommand(create_cmd,
-                                  retry_on_stderr=True)
+    util.IssueRetryableCommand(create_cmd)
 
 
 class AwsPlacementGroup(resource.BaseResource):
@@ -364,8 +358,7 @@ class AwsPlacementGroup(resource.BaseResource):
         'describe-placement-groups',
         '--region=%s' % self.region,
         '--filter=Name=group-name,Values=%s' % self.name]
-    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd,
-                                              retry_on_stderr=True)
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     placement_groups = response['PlacementGroups']
     assert len(placement_groups) < 2, 'Too many placement groups.'

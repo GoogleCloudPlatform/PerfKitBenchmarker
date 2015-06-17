@@ -14,6 +14,7 @@
 
 """Utilities for working with Amazon Web Services resources."""
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
@@ -41,7 +42,7 @@ def AddTags(resource_id, region, **kwargs):
       '--tags']
   for key, value in kwargs.iteritems():
     tag_cmd.append('Key={0},Value={1}'.format(key, value))
-  vm_util.IssueRetryableCommand(tag_cmd, retry_on_stderr=True)
+  IssueRetryableCommand(tag_cmd)
 
 
 def AddDefaultTags(resource_id, region):
@@ -57,3 +58,29 @@ def AddDefaultTags(resource_id, region):
   """
   tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
   AddTags(resource_id, region, **tags)
+
+
+@vm_util.Retry()
+def IssueRetryableCommand(cmd, env=None):
+  """Tries running the provided command until it succeeds or times out.
+
+  On Windows, the AWS CLI doesn't correctly set the return code when it
+  has an error (at least on version 1.7.28). By retrying the command if
+  we get output on stderr, we can work around this issue.
+
+  Args:
+    cmd: A list of strings such as is given to the subprocess.Popen()
+        constructor.
+    env: An alternate environment to pass to the Popen command.
+
+  Returns:
+    A tuple of stdout and stderr from running the provided command.
+  """
+  stdout, stderr, retcode = vm_util.IssueCommand(cmd, env=env)
+  if retcode:
+    raise errors.VmUtil.CalledProcessException(
+        'Command returned a non-zero exit code.\n')
+  if stderr:
+    raise errors.VmUtil.CalledProcessException(
+        'The command had output on stderr:\n%s' % stderr)
+  return stdout, stderr

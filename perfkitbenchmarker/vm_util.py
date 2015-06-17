@@ -433,15 +433,13 @@ def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
 
 
 @Retry()
-def IssueRetryableCommand(cmd, env=None, retry_on_stderr=False):
+def IssueRetryableCommand(cmd, env=None):
   """Tries running the provided command until it succeeds or times out.
 
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
         constructor.
     env: An alternate environment to pass to the Popen command.
-    retry_on_stderr: If True, getting any output on stderr will be treated
-        like a non-zero return code (i.e. the command will be retried).
 
   Returns:
     A tuple of stdout and stderr from running the provided command.
@@ -450,10 +448,6 @@ def IssueRetryableCommand(cmd, env=None, retry_on_stderr=False):
   if retcode:
     raise errors.VmUtil.CalledProcessException(
         'Command returned a non-zero exit code.\n')
-  if retry_on_stderr and stderr:
-    raise errors.VmUtil.CalledProcessException(
-        'The "retry_on_stderr" option was set and the command '
-        'had output on stderr:\n%s' % stderr)
   return stdout, stderr
 
 

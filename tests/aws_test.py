@@ -22,16 +22,16 @@ import mock
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import aws_disk
 from perfkitbenchmarker.aws import aws_network
 from perfkitbenchmarker.aws import aws_virtual_machine
+from perfkitbenchmarker.aws import util
 
 
 class AwsVolumeExistsTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.p = mock.patch('perfkitbenchmarker.vm_util.IssueRetryableCommand')
+    self.p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
     self.p.start()
     self.disk = aws_disk.AwsDisk(disk.BaseDiskSpec(None, None, None), 'zone-a')
     self.disk.id = 'vol-foo'
@@ -44,7 +44,7 @@ class AwsVolumeExistsTestCase(unittest.TestCase):
                 '"CreateTime": "2015-05-04T23:47:31.726Z","VolumeId":'
                 '"vol-5859691f","AvailabilityZone":"us-east-1a","VolumeType":'
                 '"standard","State":"creating"}]}')
-    vm_util.IssueRetryableCommand.side_effect = [(response, None)]
+    util.IssueRetryableCommand.side_effect = [(response, None)]
     self.assertTrue(self.disk._Exists())
 
   def testVolumeDeleted(self):
@@ -52,14 +52,14 @@ class AwsVolumeExistsTestCase(unittest.TestCase):
                 '"AvailabilityZone": "us-east-1a","CreateTime":'
                 '"2015-05-04T23:53:42.952Z","Attachments":[],"State":'
                 '"deleting","SnapshotId":null,"VolumeType": "standard"}]}')
-    vm_util.IssueRetryableCommand.side_effect = [(response, None)]
+    util.IssueRetryableCommand.side_effect = [(response, None)]
     self.assertFalse(self.disk._Exists())
 
 
 class AwsVpcExistsTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.p = mock.patch('perfkitbenchmarker.vm_util.IssueRetryableCommand')
+    self.p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
     self.p.start()
     self.vpc = aws_network.AwsVpc('region')
     self.vpc.id = 'vpc-foo'
@@ -69,7 +69,7 @@ class AwsVpcExistsTestCase(unittest.TestCase):
 
   def testVpcDeleted(self):
     response = '{"Vpcs": [] }'
-    vm_util.IssueRetryableCommand.side_effect = [(response, None)]
+    util.IssueRetryableCommand.side_effect = [(response, None)]
     self.assertFalse(self.vpc._Exists())
 
   def testVpcPresent(self):
@@ -77,7 +77,7 @@ class AwsVpcExistsTestCase(unittest.TestCase):
                 '"10.0.0.0/16","IsDefault":false,"DhcpOptionsId":'
                 '"dopt-59b12f38","State":"available","VpcId":"vpc-2289a647"'
                 '}]}')
-    vm_util.IssueRetryableCommand.side_effect = [(response, None)]
+    util.IssueRetryableCommand.side_effect = [(response, None)]
     self.assertTrue(self.vpc._Exists())
 
 
@@ -85,7 +85,7 @@ class AwsVpcExistsTestCase(unittest.TestCase):
 class AwsVirtualMachineExistsTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.p = mock.patch('perfkitbenchmarker.vm_util.IssueRetryableCommand')
+    self.p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
     self.p.start()
     self.vm = aws_virtual_machine.AwsVirtualMachine(
         virtual_machine.BaseVirtualMachineSpec(
@@ -100,14 +100,14 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
     self.p.stop()
 
   def testInstancePresent(self):
-    vm_util.IssueRetryableCommand.side_effect = [(self.response, None)]
+    util.IssueRetryableCommand.side_effect = [(self.response, None)]
     self.assertTrue(self.vm._Exists())
 
   def testInstanceDeleted(self):
     response = json.loads(self.response)
     state = response['Reservations'][0]['Instances'][0]['State']
     state['Name'] = 'shutting-down'
-    vm_util.IssueRetryableCommand.side_effect = [(json.dumps(response), None)]
+    util.IssueRetryableCommand.side_effect = [(json.dumps(response), None)]
     self.assertFalse(self.vm._Exists())
 
 if __name__ == '__main__':
