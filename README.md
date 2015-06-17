@@ -142,6 +142,7 @@ $ aws configure
 
 ## Windows Azure CLI and credentials
 You first need to install node.js and NPM.
+This version of Perfkit Benchmarker is compatible with azure version 0.9.3.
 
 Go [here](https://nodejs.org/download/), and follow the setup instructions.
 
