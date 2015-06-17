@@ -159,7 +159,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.os_disk.name = response['OSDisk']['name']
     self.os_disk.created = True
     self.internal_ip = response['IPAddress']
-    self.ip_address = response['Network']['Endpoints'][0]['virtualIPAddress']
+    self.ip_address = response['VirtualIPAddresses'][0]['address']
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
