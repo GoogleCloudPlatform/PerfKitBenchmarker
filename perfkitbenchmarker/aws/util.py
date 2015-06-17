@@ -41,7 +41,7 @@ def AddTags(resource_id, region, **kwargs):
       '--tags']
   for key, value in kwargs.iteritems():
     tag_cmd.append('Key={0},Value={1}'.format(key, value))
-  vm_util.IssueRetryableCommand(tag_cmd)
+  vm_util.IssueRetryableCommand(tag_cmd, retry_on_stderr=True)
 
 
 def AddDefaultTags(resource_id, region):
