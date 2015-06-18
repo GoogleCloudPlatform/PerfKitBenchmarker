@@ -318,8 +318,6 @@ def _CombineResults(result_list, combine_histograms=True):
   Returns:
     A dictionary, as returned by ParseResults.
   """
-  result = copy.deepcopy(result_list[0])
-
   # Binary operators to aggregate reported statistics.
   # 'None' will be dropped.
   operators = {
@@ -336,6 +334,13 @@ def _CombineResults(result_list, combine_histograms=True):
       'MinLatency(ms)': min,
       'MaxLatency(ms)': max}
 
+  def DropUnaggregated(result):
+    """Remove statistics which 'operators' specify should not be combined."""
+    drop_keys = {k for k, v in operators.iteritems() if v is None}
+    for group in result['groups'].itervalues():
+      for k in drop_keys:
+        group['statistics'].pop(k, None)
+
   def CombineHistograms(hist1, hist2):
     h1 = dict(hist1)
     h2 = dict(hist2)
@@ -345,18 +350,25 @@ def _CombineResults(result_list, combine_histograms=True):
       result.append((k, h1.get(k, 0) + h2.get(k, 0)))
     return result
 
+  result = copy.deepcopy(result_list[0])
+  DropUnaggregated(result)
+
   for indiv in result_list[1:]:
     for group_name, group in indiv['groups'].iteritems():
+      if group_name not in result['groups']:
+        logging.warn('"%s" in new dict, but not in old.', group_name)
+        result['groups'][group_name] = copy.deepcopy(group)
+        continue
       for k, v in group['statistics'].iteritems():
-        if k not in result['groups'][group_name]['statistics']:
-          logging.warn('"%s" in new dict, but not in old.', k)
-          result['groups'][group_name]['statistics'][k] = copy.deepcopy(v)
-          continue
-        elif k not in operators:
+        if k not in operators:
           logging.warn('No operator for "%s". Skipping aggregation.', k)
           continue
         elif operators[k] is None:
           result['groups'][group_name]['statistics'].pop(k, None)
+          continue
+        elif k not in result['groups'][group_name]['statistics']:
+          logging.warn('"%s" in new dict, but not in old.', k)
+          result['groups'][group_name]['statistics'][k] = copy.deepcopy(v)
           continue
         result['groups'][group_name]['statistics'][k] = (
             operators[k](result['groups'][group_name]['statistics'][k], v))
