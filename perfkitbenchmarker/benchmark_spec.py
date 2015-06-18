@@ -18,6 +18,7 @@ import logging
 import pickle
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
@@ -175,6 +176,13 @@ class BenchmarkSpec(object):
             not FLAGS['num_striped_disks'].present):
           num_striped_disks = (vm.max_local_disks /
                                benchmark_info['scratch_disk'])
+          if num_striped_disks == 0:
+            raise errors.Error(
+                'Not enough local disks to run benchmark "%s". It requires at '
+                'least %d local disk(s). The specified machine type has %d '
+                'local disk(s).' % (benchmark_info['name'],
+                                    int(benchmark_info['scratch_disk']),
+                                    vm.max_local_disks))
         else:
           num_striped_disks = FLAGS.num_striped_disks
         for i in range(benchmark_info['scratch_disk']):
