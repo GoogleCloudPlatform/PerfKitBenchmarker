@@ -32,9 +32,6 @@ LOG_LEVELS = {
 }
 
 
-thread_local = threading.local()
-
-
 class ThreadLogContext(object):
   """Per-thread context for log message prefix labels."""
   def __init__(self, thread_log_context=None):
@@ -77,6 +74,13 @@ class ThreadLogContext(object):
     yield
     self._label_list.pop()
     self._RecalculateLabel()
+
+
+class _ThreadData(threading.local):
+  def __init__(self):
+    self.pkb_thread_log_context = ThreadLogContext()
+
+thread_local = _ThreadData()
 
 
 def SetThreadLogContext(thread_log_context):

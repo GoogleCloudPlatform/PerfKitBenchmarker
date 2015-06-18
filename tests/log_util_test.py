@@ -14,6 +14,7 @@
 
 import logging
 import inspect
+import threading
 import unittest
 
 from perfkitbenchmarker import log_util
@@ -115,6 +116,23 @@ class LogUtilTestCase(unittest.TestCase):
           msg="Log message.", args=None, exc_info=None)
       log_util.PkbLogFilter().filter(log_record)
       self.assertEqual(log_record.pkb_label, 'LABEL-A ')
+
+  def testPkbLogFilterNoContext(self):
+    """Verify that PkbLogFilter works if no context was set."""
+    self.completed = False
+    def childLog():
+      logger_name = 'log_util_test.LogUtilTestCase.testPkbLogFilterNoContext'
+      self.log_record = logging.LogRecord(
+          name=logger_name, level=logging.INFO, pathname=__file__,
+          lineno=inspect.getframeinfo(inspect.currentframe()).lineno + 1,
+          msg="Log message.", args=None, exc_info=None)
+      log_util.PkbLogFilter().filter(self.log_record)
+      self.completed = True
+    child = threading.Thread(target=childLog)
+    child.start()
+    child.join()
+    self.assertTrue(self.completed)
+    self.assertEqual(self.log_record.pkb_label, '')
 
 
 if __name__ == '__main__':
