@@ -64,6 +64,22 @@ YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 
 _DEFAULT_PERCENTILES = 50, 75, 90, 95, 99, 99.9
 
+# Binary operators to aggregate reported statistics.
+# Statistics with operator 'None' will be dropped.
+AGGREGATE_OPERATORS = {
+    'Operations': operator.add,
+    'RunTime(ms)': max,
+    'Return=0': operator.add,
+    'Return=-1': operator.add,
+    'Return=-2': operator.add,
+    'Return=-3': operator.add,
+    'AverageLatency(ms)': None,  # Requires both average and # of ops.
+    'Throughput(ops/sec)': operator.add,
+    '95thPercentileLatency(ms)': None,  # Calculated across clients.
+    '99thPercentileLatency(ms)': None,  # Calculated across clients.
+    'MinLatency(ms)': min,
+    'MaxLatency(ms)': max}
+
 
 flags.DEFINE_boolean('ycsb_histogram', True, 'Include individual '
                      'histogram results from YCSB (will increase sample '
@@ -318,25 +334,9 @@ def _CombineResults(result_list, combine_histograms=True):
   Returns:
     A dictionary, as returned by ParseResults.
   """
-  # Binary operators to aggregate reported statistics.
-  # 'None' will be dropped.
-  operators = {
-      'Operations': operator.add,
-      'RunTime(ms)': max,
-      'Return=0': operator.add,
-      'Return=-1': operator.add,
-      'Return=-2': operator.add,
-      'Return=-3': operator.add,
-      'AverageLatency(ms)': None,
-      'Throughput(ops/sec)': operator.add,
-      '95thPercentileLatency(ms)': None,
-      '99thPercentileLatency(ms)': None,
-      'MinLatency(ms)': min,
-      'MaxLatency(ms)': max}
-
   def DropUnaggregated(result):
     """Remove statistics which 'operators' specify should not be combined."""
-    drop_keys = {k for k, v in operators.iteritems() if v is None}
+    drop_keys = {k for k, v in AGGREGATE_OPERATORS.iteritems() if v is None}
     for group in result['groups'].itervalues():
       for k in drop_keys:
         group['statistics'].pop(k, None)
@@ -359,19 +359,27 @@ def _CombineResults(result_list, combine_histograms=True):
         logging.warn('"%s" in new dict, but not in old.', group_name)
         result['groups'][group_name] = copy.deepcopy(group)
         continue
+
+      # Combine reported statistics.
+      # If no combining operator is defined, the statistic is skipped.
+      # Otherwise, the aggregated value is either:
+      # * The value in 'indiv', if the statistic is not present in 'result' or
+      # * AGGREGATE_OPERATORS[statistic](result_value, indiv_value)
       for k, v in group['statistics'].iteritems():
-        if k not in operators:
+        if k not in AGGREGATE_OPERATORS:
           logging.warn('No operator for "%s". Skipping aggregation.', k)
           continue
-        elif operators[k] is None:
+        elif AGGREGATE_OPERATORS[k] is None:  # Drop
           result['groups'][group_name]['statistics'].pop(k, None)
           continue
         elif k not in result['groups'][group_name]['statistics']:
           logging.warn('"%s" in new dict, but not in old.', k)
           result['groups'][group_name]['statistics'][k] = copy.deepcopy(v)
           continue
+
+        op = AGGREGATE_OPERATORS[k]
         result['groups'][group_name]['statistics'][k] = (
-            operators[k](result['groups'][group_name]['statistics'][k], v))
+            op(result['groups'][group_name]['statistics'][k], v))
 
       if combine_histograms:
         result['groups'][group_name]['histogram'] = CombineHistograms(
