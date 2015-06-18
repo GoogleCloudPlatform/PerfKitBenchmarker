@@ -109,11 +109,13 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
                   'Name of the cloud to use.')
-flags.DEFINE_enum('os_type', DEBIAN,
-                  [DEBIAN, RHEL],
-                  'The VM\'s OS type. For Linux variants, this includes OSs '
-                  'which are based on the OS (i.e. Ubuntu\'s os_type is '
-                  'Debian). This will determine the OS Mixin class used.')
+flags.DEFINE_enum(
+    'os_type', DEBIAN, [DEBIAN, RHEL],
+    'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
+    'built on Debian and uses the same package manager. Likewise, CentOS\'s '
+    'os_type is "rhel". In general if two OS\'s use the same package manager, '
+    'and are otherwise very similar, the same os_type should work on both of '
+    'them.')
 
 
 class BenchmarkSpec(object):
@@ -303,11 +305,11 @@ class BenchmarkSpec(object):
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
-    if vm.ssh_port:
-      firewall.AllowPort(vm, vm.ssh_port)
+    for port in vm.remote_access_ports:
+      firewall.AllowPort(vm, port)
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
-    vm.Startup()
+    vm.OnStartup()
     if FLAGS.scratch_disk_type == disk.LOCAL:
       vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:

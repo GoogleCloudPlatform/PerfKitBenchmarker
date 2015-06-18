@@ -72,11 +72,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   # If multiple ssh calls are made in parallel using -t it will mess
   # the stty settings up and the terminal will become very hard to use.
   # Serializing calls to ssh with the -t option fixes the problem.
-  pseudo_tty_lock = threading.Lock()
+  _pseudo_tty_lock = threading.Lock()
 
   def __init__(self):
     super(BaseLinuxMixin, self).__init__()
     self.ssh_port = DEFAULT_SSH_PORT
+    self.remote_access_ports = [self.ssh_port]
     self.has_private_key = False
 
     self._remote_command_script_upload_lock = threading.Lock()
@@ -152,8 +153,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--delete']
     return self.RemoteCommand(' '.join(wait_command), should_log=False)
 
-
-  def Startup(self):
+  def OnStartup(self):
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
     self.BurnCpu()
@@ -319,7 +319,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     try:
       if login_shell:
         ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
-        self.pseudo_tty_lock.acquire()
+        self._pseudo_tty_lock.acquire()
       else:
         ssh_cmd.append(command)
 
@@ -332,7 +332,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           break
     finally:
       if login_shell:
-        self.pseudo_tty_lock.release()
+        self._pseudo_tty_lock.release()
 
     if retcode:
       full_cmd = ' '.join(ssh_cmd)
@@ -515,9 +515,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
-  def Startup(self):
+  def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    super(RhelMixin, self).Startup()
+    super(RhelMixin, self).OnStartup()
     self.RemoteCommand('echo \'Defaults:%s !requiretty\' | '
                        'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                        login_shell=True)
@@ -607,9 +607,9 @@ class RhelMixin(BaseLinuxMixin):
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  def Startup(self):
+  def OnStartup(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""
-    super(DebianMixin, self).Startup()
+    super(DebianMixin, self).OnStartup()
     self.AptUpdate()
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 

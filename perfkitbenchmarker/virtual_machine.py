@@ -96,7 +96,7 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     super(BaseVirtualMachine, self).__init__()
     with self._instance_counter_lock:
-      self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self._instance_counter)
+      self.name = 'perfkit-%s-%d' % (FLAGS.run_uri, self._instance_counter)
       BaseVirtualMachine._instance_counter += 1
     self.project = vm_spec.project
     self.zone = vm_spec.zone
@@ -189,8 +189,8 @@ class BaseOsMixin(object):
     self.bootable_time = None
     self.hostname = None
 
-    # Ports that may be opened by benchmark_spec
-    self.ssh_port = None
+    # Ports that will be opened by benchmark_spec to permit access to the VM.
+    self.remote_access_ports = []
 
     # Cached values
     self._reachable = {}
@@ -240,12 +240,12 @@ class BaseOsMixin(object):
   def WaitForBootCompletion(self):
     """Waits until VM is has booted.
 
-    Implmentations of this method should set the 'bootable_time' attribute
+    Implementations of this method should set the 'bootable_time' attribute
     and the 'hostname' attribute.
     """
     raise NotImplementedError()
 
-  def Startup(self):
+  def OnStartup(self):
     """Performs any necessary setup on the VM specific to the OS.
 
     This will be called once after the VM has booted.
