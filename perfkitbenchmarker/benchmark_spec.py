@@ -109,6 +109,11 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
                   'Name of the cloud to use.')
+flags.DEFINE_enum('os_type', DEBIAN,
+                  [DEBIAN, RHEL],
+                  'The VM\'s OS type. For Linux variants, this includes OSs '
+                  'which are based on the OS (i.e. Ubuntu\'s os_type is '
+                  'Debian). This will determine the OS Mixin class used.')
 
 
 class BenchmarkSpec(object):
@@ -298,7 +303,8 @@ class BenchmarkSpec(object):
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
-    firewall.AllowPort(vm, vm.ssh_port)
+    if vm.ssh_port:
+      firewall.AllowPort(vm, vm.ssh_port)
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.Startup()
@@ -306,9 +312,6 @@ class BenchmarkSpec(object):
       vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
-    vm_util.BurnCpu(vm)
-    if vm.is_static and vm.install_packages:
-      vm.SnapshotPackages()
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.

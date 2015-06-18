@@ -146,6 +146,12 @@ flags.DEFINE_integer('num_striped_disks', 1,
                      'When using local disks, they default to striping '
                      'all disks together.',
                      lower_bound=1)
+flags.DEFINE_bool('install_packages', True,
+                  'Override for determining whether packages should be '
+                  'installed. If this is false, no packages will be installed '
+                  'on any VMs. This option should probably only ever be used '
+                  'if you have already created an image with all relevant '
+                  'packages installed.')
 
 MAX_RUN_URI_LENGTH = 10
 

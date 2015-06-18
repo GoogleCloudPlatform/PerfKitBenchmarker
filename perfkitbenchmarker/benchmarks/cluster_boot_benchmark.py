@@ -41,8 +41,10 @@ def Prepare(unused_benchmark_spec):
 def _GetTimeToBoot(vm, vm_index, result_list):
   metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus,
               'machine_instance': vm_index}
-  value = vm.TimeToBoot()
-  assert value is not None
+  assert vm.bootable_time
+  assert vm.create_start_time
+  assert vm.bootable_time >= vm.create_start_time
+  value = vm.bootable_time - vm.create_start_time
   result_list.append(sample.Sample('Boot Time', value, 'seconds', metadata))
 
 

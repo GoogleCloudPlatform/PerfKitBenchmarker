@@ -465,26 +465,6 @@ def ParseTimeCommandResult(command_result):
   return time_in_seconds
 
 
-def BurnCpu(vm, burn_cpu_threads=None, burn_cpu_seconds=None):
-  """Burns vm cpu for some amount of time and dirty cache.
-
-  Args:
-    vm: The target vm.
-    burn_cpu_threads: Number of threads to burn cpu.
-    burn_cpu_seconds: Amount of time in seconds to burn cpu.
-  """
-  burn_cpu_threads = burn_cpu_threads or FLAGS.burn_cpu_threads
-  burn_cpu_seconds = burn_cpu_seconds or FLAGS.burn_cpu_seconds
-  if burn_cpu_seconds:
-    vm.Install('sysbench')
-    end_time = time.time() + burn_cpu_seconds
-    vm.RemoteCommand(
-        'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
-        'run 1> /dev/null 2> /dev/null &' % burn_cpu_threads)
-    if time.time() < end_time:
-      time.sleep(end_time - time.time())
-    vm.RemoteCommand('pkill -9 sysbench')
-
 
 def ShouldRunOnExternalIpAddress():
   """Returns whether a test should be run on an instance's external IP."""

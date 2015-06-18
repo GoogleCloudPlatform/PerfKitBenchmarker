@@ -29,7 +29,7 @@ import json
 import logging
 import threading
 
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 
 
@@ -213,10 +213,10 @@ def GetStaticVirtualMachineClass(os_type):
 
 
 class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
-                                      package_managers.AptMixin):
+                                      linux_virtual_machine.DebianMixin):
   pass
 
 
 class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
-                                    package_managers.YumMixin):
+                                    linux_virtual_machine.RhelMixin):
   pass

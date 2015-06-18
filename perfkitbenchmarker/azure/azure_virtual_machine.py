@@ -30,7 +30,7 @@ import json
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -187,16 +187,12 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     return ['/dev/sdb']
 
-  def SetupLocalDisks(self):
-    """Performs Azure specific setup (unmounts disk)."""
-    self.RemoteCommand('sudo umount /mnt')
-
 
 class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
-                                     package_managers.AptMixin):
+                                     linux_virtual_machine.DebianMixin):
   pass
 
 
 class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
-                                   package_managers.YumMixin):
+                                   linux_virtual_machine.RhelMixin):
   pass
