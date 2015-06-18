@@ -120,6 +120,7 @@ class LogUtilTestCase(unittest.TestCase):
   def testPkbLogFilterNoContext(self):
     """Verify that PkbLogFilter works if no context was set."""
     self.completed = False
+
     def childLog():
       logger_name = 'log_util_test.LogUtilTestCase.testPkbLogFilterNoContext'
       self.log_record = logging.LogRecord(
