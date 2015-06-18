@@ -36,8 +36,8 @@ from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.openstack import os_network as openstack_network
 from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
-from perfkitbenchmarker.rackspace import rackspace_network
-from perfkitbenchmarker.rackspace import rackspace_virtual_machine
+from perfkitbenchmarker.rackspace import rackspace_network as rax_net
+from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
 
 GCP = 'GCP'
 AZURE = 'Azure'
@@ -100,11 +100,11 @@ CLASSES = {
     },
     RACKSPACE: {
         VIRTUAL_MACHINE: {
-            DEBIAN: rackspace_virtual_machine.DebianBasedRackspaceVirtualMachine,
-            RHEL: rackspace_virtual_machine.RhelBasedRackspaceVirtualMachine
+            DEBIAN: rax_vm.DebianBasedRackspaceVirtualMachine,
+            RHEL: rax_vm.RhelBasedRackspaceVirtualMachine
         },
-        NETWORK: rackspace_network.RackspaceNetwork,
-        FIREWALL: rackspace_network.RackspaceSecurityGroup
+        NETWORK: rax_net.RackspaceNetwork,
+        FIREWALL: rax_net.RackspaceSecurityGroup
     }
 }
 
