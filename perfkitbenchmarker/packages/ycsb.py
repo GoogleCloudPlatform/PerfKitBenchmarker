@@ -115,18 +115,19 @@ flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination. Set to 0 for '
                      'unlimited time.')
 
-def create_proxy_element(proxy_type, proxy, parent):
+def CreateProxyElement(proxy_type, proxy):
     proxy = re.sub(r'^https?:\/\/', '', proxy)
     host_addr, port_number = proxy.split(":")
-    http_proxy = SubElement(parent, "proxy")
-    active = SubElement(http_proxy, "active")
+    proxy_element = Element("proxy")
+    active = SubElement(proxy_element, "active")
     active.text = "true"
-    protocol = SubElement(http_proxy, "protocol")
+    protocol = SubElement(proxy_element, "protocol")
     protocol.text = proxy_type
-    host = SubElement(http_proxy, "host")
+    host = SubElement(proxy_element, "host")
     host.text =  host_addr
-    port = SubElement(http_proxy, "port")
+    port = SubElement(proxy_element, "port")
     port.text = port_number
+    return proxy_element
 
 def _GetThreadsPerLoaderList():
   """Returns the list of client counts per VM to use in staircase load."""
@@ -161,21 +162,19 @@ def _Install(vm):
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         YCSB_BUILD_DIR, YCSB_TAR_URL))
 
-  settings_file = ".m2/settings.xml"
-  proxy_enable = False
-
-  root = Element('settings')
-  proxies = SubElement(root, "proxies")
+  proxy_nodes = []
 
   if FLAGS.http_proxy:
-      proxy_enable = True
-      create_proxy_element("http", FLAGS.http_proxy, proxies)
+      proxy_nodes.append(CreateProxyElement('http', FLAGS.http_proxy))
 
   if FLAGS.https_proxy:
-      proxy_enable = True
-      create_proxy_element("https", FLAGS.https_proxy, proxies)
+      proxy_nodes.append(CreateProxyElement('https', FLAGS.http_proxy))
 
-  if proxy_enable:
+  if proxy_nodes:
+      settings_file = ".m2/settings.xml"
+      root = Element('settings')
+      proxies = SubElement(root, 'proxies')
+      proxies.extend(proxy_nodes)
       vm.RemoteCommand("mkdir -p $HOME/.m2")
       vm.RemoteCommand("touch $HOME/%s" % settings_file)
       vm.RemoteCommand("echo -e '%s' | sudo tee %s" % (tostring(root), settings_file))

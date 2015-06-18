@@ -34,6 +34,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import packages
 from perfkitbenchmarker import vm_util
 
+FLAGS = flags.FLAGS
 
 RHEL = 'rhel'
 DEBIAN = 'debian'
@@ -114,7 +115,6 @@ class BasePackageMixin(object):
     need to implement it if this is not the case.
     """
     pass
-
   def SetupProxy(self):
     """
         This function setup proxy if your cloud is currently installed behind proxy server
@@ -123,20 +123,17 @@ class BasePackageMixin(object):
 
     commands = []
 
-    add_proxy_conf = "sudo touch %s" % env_file
-    commands.append(add_proxy_conf)
-
     if FLAGS.http_proxy:
-        add_http_proxy = "echo -e 'http_proxy=%s' | sudo tee -a %s" % (FLAGS.http_proxy, env_file)
+        add_http_proxy = "echo 'http_proxy=%s' | sudo tee -a %s" % (FLAGS.http_proxy, env_file)
         commands.append(add_http_proxy)
 
 
     if FLAGS.https_proxy:
-        add_https_proxy = "echo -e 'https_proxy=%s' | sudo tee -a %s" % (FLAGS.https_proxy, env_file)
+        add_https_proxy = "echo 'https_proxy=%s' | sudo tee -a %s" % (FLAGS.https_proxy, env_file)
         commands.append(add_https_proxy)
 
     if FLAGS.ftp_proxy:
-        add_ftp_proxy = "echo -e 'ftp_proxy=%s' | sudo tee -a %s" % (FLAGS.ftp_proxy, env_file)
+        add_ftp_proxy = "echo 'ftp_proxy=%s' | sudo tee -a %s" % (FLAGS.ftp_proxy, env_file)
         commands.append(add_ftp_proxy)
 
     self.RemoteCommand(";".join(commands))
@@ -146,7 +143,7 @@ class YumMixin(BasePackageMixin):
 
   def Startup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    if FLAGS.http_proxy or FLAGS.https_proxy:
+    if FLAGS.http_proxy or FLAGS.https_proxy or FLAGS.ftp_proxy:
         self.SetupProxy()
     self.RemoteCommand('echo \'Defaults:%s !requiretty\' | '
                        'sudo tee /etc/sudoers.d/pkb' % self.user_name,
@@ -242,9 +239,6 @@ class YumMixin(BasePackageMixin):
 
     commands = []
 
-    add_proxy_conf = "sudo touch %s" % yum_proxy_file
-    commands.append(add_proxy_conf)
-
     if FLAGS.http_proxy:
         add_http_proxy = "echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (FLAGS.http_proxy, yum_proxy_file)
         commands.append(add_http_proxy)
@@ -256,7 +250,7 @@ class AptMixin(BasePackageMixin):
 
   def Startup(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""
-    if FLAGS.http_proxy or FLAGS.https_proxy:
+    if FLAGS.http_proxy or FLAGS.https_proxy or FLAGS.ftp_proxy:
         self.SetupProxy()
     self.AptUpdate()
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
@@ -306,9 +300,6 @@ class AptMixin(BasePackageMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_packages):
-      return
     if package_name not in self._installed_packages:
       package = packages.PACKAGES[package_name]
       package.AptInstall(self)
@@ -348,9 +339,6 @@ class AptMixin(BasePackageMixin):
     apt_proxy_file = "/etc/apt/apt.conf"
 
     commands = []
-
-    add_proxy_conf = "sudo touch %s" % apt_proxy_file
-    commands.append(add_proxy_conf)
 
     if FLAGS.http_proxy:
         add_http_proxy = "echo -e 'Acquire::http::proxy \"%s\";' | sudo tee -a %s" % (FLAGS.http_proxy, apt_proxy_file)
