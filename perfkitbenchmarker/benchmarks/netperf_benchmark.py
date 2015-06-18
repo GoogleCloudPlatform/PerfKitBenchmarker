@@ -37,7 +37,7 @@ flags.DEFINE_integer('netperf_max_iter', None,
                      'a single iteration will be run.',
                      lower_bound=1, upper_bound=30)
 
-flags.DEFINE_integer('netperf_test_length', 10,
+flags.DEFINE_integer('netperf_test_length', 60,
                      'netperf test length, in seconds',
                      lower_bound=1)
 
