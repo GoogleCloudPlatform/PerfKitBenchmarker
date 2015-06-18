@@ -174,7 +174,7 @@ class BenchmarkSpec(object):
         if (FLAGS.scratch_disk_type == disk.LOCAL and
             benchmark_info['scratch_disk'] and
             not FLAGS['num_striped_disks'].present):
-          num_striped_disks = (vm.max_local_disks /
+          num_striped_disks = (vm.max_local_disks //
                                benchmark_info['scratch_disk'])
           if num_striped_disks == 0:
             raise errors.Error(
