@@ -178,6 +178,12 @@ class BaseOsMixin(object):
   This class holds VM methods and attributes relating to the VM's guest OS.
   For methods and attributes that relate to the VM as a cloud resource,
   see BaseVirtualMachine and its subclasses.
+
+  Attributes:
+    bootable_time: The time when the VM finished booting.
+    hostname: The VM's hostname.
+    remote_access_ports: A list of ports which must be opened on the firewall
+        in order to access the VM.
   """
 
   __metaclass__ = abc.ABCMeta
