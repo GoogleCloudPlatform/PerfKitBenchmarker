@@ -97,15 +97,17 @@ def Run(benchmark_spec):
   hadoop_cmd = '{0} jar {1}'.format(
       posixpath.join(hadoop.HADOOP_BIN, 'yarn'),
       mapreduce_example_jar)
-  master.RemoteCommand('{0} teragen {1} /teragen'.format(
+  master.RobustRemoteCommand('{0} teragen {1} /teragen'.format(
       hadoop_cmd, FLAGS.terasort_num_rows))
   num_cpus = sum(vm.num_cpus for vm in vms[1:])
   start_time = time.time()
-  stdout, _ = master.RemoteCommand(hadoop_cmd + ' terasort /teragen /terasort')
+  stdout, _ = master.RobustRemoteCommand(
+      hadoop_cmd + ' terasort /teragen /terasort')
   logging.info('Terasort output: %s', stdout)
   time_elapsed = time.time() - start_time
   data_processed_in_mbytes = FLAGS.terasort_num_rows * NUM_MB_PER_ROW
-  master.RemoteCommand(hadoop_cmd + ' teravalidate /terasort /teravalidate')
+  master.RobustRemoteCommand(
+      hadoop_cmd + ' teravalidate /terasort /teravalidate')
 
   # Clean up
   master.RemoteCommand(

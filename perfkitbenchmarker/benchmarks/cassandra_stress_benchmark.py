@@ -129,7 +129,7 @@ def RunTestOnLoader(vm, data_node_ips):
     vm: The target vm.
     data_node_ips: List of IP addresses for all data nodes.
   """
-  vm.RemoteCommand(
+  vm.RobustRemoteCommand(
       '%s '
       '--file "%s" --nodes %s '
       '--replication-factor %s --consistency-level %s '
