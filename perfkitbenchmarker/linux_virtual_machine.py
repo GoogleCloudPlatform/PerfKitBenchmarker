@@ -253,37 +253,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     (retcode, full_cmd, stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-  def LongRunningRemoteCommand(self, command):
-    """Runs a long running command on the VM in a robust way.
-
-    Args:
-      command: A valid bash command.
-
-    Returns:
-      A tuple of stdout and stderr from running the command.
-    """
-    uid = uuid.uuid4()
-    stdout_file = '/tmp/stdout%s' % uid
-    stderr_file = '/tmp/stderr%s' % uid
-    long_running_cmd = ('nohup %s 1> %s 2> %s &' %
-                        (command, stdout_file, stderr_file))
-    self.RemoteCommand(long_running_cmd)
-    get_pid_cmd = 'pgrep %s' % command.split()[0]
-    pid, _ = self.RemoteCommand(get_pid_cmd)
-    pid = pid.strip()
-    check_process_cmd = ('if ! ps -p %s >/dev/null; then echo "Stopped"; fi' %
-                         pid)
-    while True:
-      stdout, _ = self.RemoteCommand(check_process_cmd)
-      if stdout.strip() == 'Stopped':
-        break
-      time.sleep(60)
-
-    stdout, _ = self.RemoteCommand('cat %s' % stdout_file)
-    stderr, _ = self.RemoteCommand('cat %s' % stderr_file)
-
-    return stdout, stderr
-
   def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False,
