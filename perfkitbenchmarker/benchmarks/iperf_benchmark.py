@@ -28,10 +28,12 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_integer('iperf_sending_thread_count', 1,
-                     'Number of connections to make to the'
-                     ' server for sending traffic.')
+                     'Number of connections to make to the '
+                     'server for sending traffic.',
+                     lower_bound=1)
 flags.DEFINE_integer('iperf_runtime_in_seconds', 60,
-                     'Number of seconds to run iperf.')
+                     'Number of seconds to run iperf.',
+                     lower_bound=1)
 
 FLAGS = flags.FLAGS
 
