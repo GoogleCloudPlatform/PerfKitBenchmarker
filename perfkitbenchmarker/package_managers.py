@@ -237,13 +237,9 @@ class YumMixin(BasePackageMixin):
     super(YumMixin, self).SetupProxy()
     yum_proxy_file = "/etc/yum.conf"
 
-    commands = []
-
     if FLAGS.http_proxy:
         add_http_proxy = "echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (FLAGS.http_proxy, yum_proxy_file)
-        commands.append(add_http_proxy)
-
-    self.RemoteCommand(";".join(commands))
+        self.RemoteCommand(add_http_proxy)
 
 
 class AptMixin(BasePackageMixin):
