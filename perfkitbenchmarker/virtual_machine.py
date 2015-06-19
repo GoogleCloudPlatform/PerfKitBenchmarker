@@ -20,6 +20,7 @@ operate on the VM: boot, shutdown, etc.
 
 import os
 import os.path
+import pipes
 import threading
 import time
 import uuid
@@ -40,6 +41,17 @@ SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
 STRIPED_DEVICE = '/dev/md0'
 LOCAL_MOUNT_PATH = '/local'
+
+# This pair of scripts used for executing long-running commands, which will be
+# resilient in the face of SSH connection errors.
+# EXECUTE_COMMAND runs a command, streaming stdout / stderr to a file, then
+# writing the return code to a file. An exclusive lock is acquired on the return
+# code file, so that other processes may wait for completion.
+EXECUTE_COMMAND = 'execute_command.py'
+# WAIT_FOR_COMMAND waits on the file lock created by EXECUTE_COMMAND,
+# then copies the stdout and stderr, exiting with the status of the command run
+# by EXECUTE_COMMAND.
+WAIT_FOR_COMMAND = 'wait_for_command.py'
 
 
 class BaseVirtualMachineSpec(object):
@@ -137,12 +149,29 @@ class BaseVirtualMachine(resource.BaseResource):
     self._total_memory_kb = None
     self._num_cpus = None
 
+    self._remote_command_script_upload_lock = threading.Lock()
+    self._has_remote_command_script = False
+
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
         self.ip_address, self.internal_ip)
 
   def __str__(self):
     return self.ip_address
+
+  def __getstate__(self):
+    """Get state for pickling."""
+    d = self.__dict__.copy()
+    # Locks cannot be pickled, so we just drop it and create a new one in
+    # __setstate__.
+    del d['_remote_command_script_upload_lock']
+    return d
+
+  def __setstate__(self, state):
+    """Restores state after unpickling."""
+    self.__dict__ = state
+    # Locks cannot be pickled, so we create a new one after deserialization.
+    self._remote_command_script_upload_lock = threading.Lock()
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
@@ -281,8 +310,30 @@ class BaseVirtualMachine(resource.BaseResource):
                     (retcode, full_cmd, stdout, stderr))
       raise errors.VmUtil.SshConnectionError(error_text)
 
-  def LongRunningRemoteCommand(self, command):
-    """Runs a long running command on the VM in a robust way.
+  def _PushRobustCommandScripts(self):
+    """Pushes the scripts required by RobustRemoteCommand to this VM.
+
+    If the scripts have already been placed on the VM, this is a noop.
+    """
+    with self._remote_command_script_upload_lock:
+      if not self._has_remote_command_script:
+        for f in (EXECUTE_COMMAND, WAIT_FOR_COMMAND):
+          self.PushDataFile(f, os.path.join(vm_util.VM_TMP_DIR,
+                                            os.path.basename(f)))
+        self._has_remote_command_script = True
+
+  def RobustRemoteCommand(self, command):
+    """Runs a command on the VM in a more robust way than RemoteCommand.
+
+    Executes a command via a pair of scripts on the VM:
+
+    * EXECUTE_COMMAND, which runs 'command' in a nohupped background process.
+    * WAIT_FOR_COMMAND, which waits on a file lock held by EXECUTE_COMMAND until
+      'command' completes, then returns with the stdout, stderr, and exit status
+      of 'command'.
+
+    Temporary SSH failures (where ssh returns a 255) while waiting for the
+    command to complete will be tolerated and safely retried.
 
     Args:
       command: A valid bash command.
@@ -290,27 +341,36 @@ class BaseVirtualMachine(resource.BaseResource):
     Returns:
       A tuple of stdout and stderr from running the command.
     """
+    self._PushRobustCommandScripts()
+
+    execute_path = os.path.join(vm_util.VM_TMP_DIR,
+                                os.path.basename(EXECUTE_COMMAND))
+    wait_path = os.path.join(vm_util.VM_TMP_DIR,
+                             os.path.basename(WAIT_FOR_COMMAND))
+
     uid = uuid.uuid4()
-    stdout_file = '/tmp/stdout%s' % uid
-    stderr_file = '/tmp/stderr%s' % uid
-    long_running_cmd = ('nohup %s 1> %s 2> %s &' %
-                        (command, stdout_file, stderr_file))
-    self.RemoteCommand(long_running_cmd)
-    get_pid_cmd = 'pgrep %s' % command.split()[0]
-    pid, _ = self.RemoteCommand(get_pid_cmd)
-    pid = pid.strip()
-    check_process_cmd = ('if ! ps -p %s >/dev/null; then echo "Stopped"; fi' %
-                         pid)
-    while True:
-      stdout, _ = self.RemoteCommand(check_process_cmd)
-      if stdout.strip() == 'Stopped':
-        break
-      time.sleep(60)
+    file_base = os.path.join(vm_util.VM_TMP_DIR, 'cmd%s' % uid)
+    stdout_file = file_base + '.stdout'
+    stderr_file = file_base + '.stderr'
+    status_file = file_base + '.status'
 
-    stdout, _ = self.RemoteCommand('cat %s' % stdout_file)
-    stderr, _ = self.RemoteCommand('cat %s' % stderr_file)
+    if not isinstance(command, basestring):
+      command = ' '.join(command)
 
-    return stdout, stderr
+    start_command = ['nohup', 'python', execute_path,
+                     '--stdout', stdout_file,
+                     '--stderr', stderr_file,
+                     '--status', status_file,
+                     '--command', pipes.quote(command)]
+
+    start_command = '%s 1> /dev/null 2> /dev/null &' % ' '.join(start_command)
+    self.RemoteCommand(start_command)
+
+    wait_command = ['python', wait_path, '--stdout', stdout_file,
+                    '--stderr', stderr_file,
+                    '--status', status_file,
+                    '--delete']
+    return self.RemoteCommand(' '.join(wait_command), should_log=False)
 
   def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
@@ -420,16 +480,18 @@ class BaseVirtualMachine(resource.BaseResource):
     self.PushFile(vm_util.GetPrivateKeyPath(),
                   REMOTE_KEY_PATH)
 
-  def PushDataFile(self, data_file):
+  def PushDataFile(self, data_file, remote_path=''):
     """Upload a file in perfkitbenchmarker.data directory to the VM.
 
     Args:
       data_file: The filename of the file to upload.
+      remote_path: The destination for 'data_file' on the VM. If not specified,
+        the file will be placed in the user's home directory.
     Raises:
       perfkitbenchmarker.data.ResourceNotFound: if 'data_file' does not exist.
     """
     file_path = data.ResourcePath(data_file)
-    self.PushFile(file_path)
+    self.PushFile(file_path, remote_path)
 
   def CheckJavaVersion(self):
     """Check the version of java on remote machine.

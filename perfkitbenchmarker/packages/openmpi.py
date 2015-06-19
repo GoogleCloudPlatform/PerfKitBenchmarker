@@ -31,8 +31,9 @@ def _Install(vm):
   make_jobs = vm.num_cpus
   config_cmd = ('./configure --enable-static --disable-shared --disable-dlopen '
                 '--prefix=/usr')
-  vm.RemoteCommand('cd %s && %s && make -j %s && sudo make install' %
-                   (MPI_DIR, config_cmd, make_jobs))
+  vm.RobustRemoteCommand(
+      'cd %s && %s && make -j %s && sudo make install' %
+      (MPI_DIR, config_cmd, make_jobs))
 
 
 def YumInstall(vm):

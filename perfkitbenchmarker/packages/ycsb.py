@@ -528,7 +528,7 @@ class YCSBExecutor(object):
       param, value = pv.split('=', 1)
       kwargs[param] = value
     command = self._BuildCommand('load', **kwargs)
-    stdout, _ = vm.RemoteCommand(command)
+    stdout, _ = vm.RobustRemoteCommand(command)
     return ParseResults(str(stdout))
 
   def _LoadThreaded(self, vms, workload_file, **kwargs):
@@ -604,7 +604,7 @@ class YCSBExecutor(object):
       param, value = pv.split('=', 1)
       kwargs[param] = value
     command = self._BuildCommand('run', **kwargs)
-    stdout, _ = vm.RemoteCommand(command)
+    stdout, _ = vm.RobustRemoteCommand(command)
     return ParseResults(str(stdout))
 
   def _RunThreaded(self, vms, **kwargs):
