@@ -35,7 +35,7 @@ flags.DEFINE_integer('netperf_max_iter', None,
                      'Maximum number of iterations to run during '
                      'confidence interval estimation. If unset, '
                      'a single iteration will be run.',
-                     lower_bound=1, upper_bound=30)
+                     lower_bound=3, upper_bound=30)
 
 flags.DEFINE_integer('netperf_test_length', 60,
                      'netperf test length, in seconds',
