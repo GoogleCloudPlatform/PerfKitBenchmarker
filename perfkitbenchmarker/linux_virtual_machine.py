@@ -419,7 +419,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         'cat /proc/cpuinfo | grep processor | wc -l')
     return int(stdout)
 
-  def _TotalMemoryKb(self):
+  def _GetTotalMemoryKb(self):
     """Returns the amount of physical memory on the VM in Kilobytes.
 
     This method does not cache results (unlike "total_memory_kb").

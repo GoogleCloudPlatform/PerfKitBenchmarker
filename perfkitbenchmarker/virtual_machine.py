@@ -386,7 +386,7 @@ class BaseOsMixin(object):
     return self._total_memory_kb
 
   @abc.abstractmethod
-  def _TotalMemoryKb(self):
+  def _GetTotalMemoryKb(self):
     """Returns the amount of physical memory on the VM in Kilobytes.
 
     This method does not cache results (unlike "total_memory_kb").
