@@ -19,6 +19,6 @@ export HBASE_SSH_OPTS="-o IdentitiesOnly=yes \
   -o StrictHostKeyChecking=no \
   -o UserKnownHostsFile=/dev/null \
   -o IdentityFile={{ hadoop_private_key }} \
-  -o BatchMode=Yes"
+  -o BatchMode=yes"
 export HBASE_OPTS="-XX:+UseConcMarkSweepGC"
 export HBASE_HEAPSIZE={{ hbase_memory_mb }}
