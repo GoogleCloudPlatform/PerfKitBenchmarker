@@ -137,8 +137,8 @@ def _GetClusterDescription(project, zone, cluster_name):
   Raises:
     KeyError: when the cluster was not found.
   """
-  cmd = [FLAGS.gcloud_path, 'alpha', 'bigtable', 'clusters', 'list', '--format',
-         'json']
+  cmd = [FLAGS.gcloud_path, 'alpha', 'bigtable', 'clusters', 'list', '--quiet',
+         '--format', 'json']
   stdout, stderr, returncode = vm_util.IssueCommand(cmd)
   if returncode:
     raise IOError('Command "{0}" failed:\nSTDOUT:\n{1}\nSTDERR:\n{2}'.format(
