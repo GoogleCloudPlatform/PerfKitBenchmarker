@@ -25,7 +25,7 @@ import threading
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import aws_disk
@@ -147,7 +147,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.user_name = FLAGS.aws_user_name
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
-    self.local_disk_counter = 0
 
   def ImportKeyfile(self):
     """Imports the public keyfile to AWS."""
@@ -291,22 +290,16 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     return ['/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
             for i in xrange(NUM_LOCAL_VOLUMES[self.machine_type])]
 
-  def SetupLocalDisks(self):
-    """Performs AWS specific setup of local disks."""
-    # Some images may automount one local disk, but we don't
-    # want to fail if this wasn't the case.
-    self.RemoteCommand('sudo umount /mnt', ignore_failure=True)
-
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
 
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
-                                   package_managers.AptMixin):
+                                   linux_virtual_machine.DebianMixin):
   pass
 
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
-                                 package_managers.YumMixin):
+                                 linux_virtual_machine.RhelMixin):
   pass

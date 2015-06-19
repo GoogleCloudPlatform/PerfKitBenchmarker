@@ -30,7 +30,7 @@ import re
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import gce_disk
@@ -172,10 +172,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
-  def GetName(self):
-    """Get a GCE VM's unique name."""
-    return self.name
-
   def GetLocalDisks(self):
     """Returns a list of local disks on the VM.
 
@@ -185,11 +181,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     return ['/dev/disk/by-id/google-local-ssd-%d' % i
             for i in range(self.max_local_disks)]
-
-  def SetupLocalDisks(self):
-    """Performs GCE specific local SSD setup (runs set-interrupts.sh)."""
-    self.PushDataFile(SET_INTERRUPTS_SH)
-    self.RemoteCommand('chmod +rx set-interrupts.sh; sudo ./set-interrupts.sh')
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM via 'gcloud compute instances add-metadata'."""
@@ -204,10 +195,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 
 class DebianBasedGceVirtualMachine(GceVirtualMachine,
-                                   package_managers.AptMixin):
+                                   linux_virtual_machine.DebianMixin):
   pass
 
 
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
-                                 package_managers.YumMixin):
+                                 linux_virtual_machine.RhelMixin):
   pass

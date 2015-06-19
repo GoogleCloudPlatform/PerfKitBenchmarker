@@ -138,7 +138,7 @@ def IsRunning(vm):
   try:
     vm.RemoteCommand('kill -0 {0}'.format(cassandra_pid))
     return True
-  except errors.VmUtil.SshConnectionError:
+  except errors.VirtualMachine.RemoteCommandError:
     logging.warn('%s: Cassandra is not running. '
                  'Startup STDOUT:\n%s\n\nSTDERR:\n%s',
                  vm,

@@ -31,7 +31,7 @@ def YumInstall(vm):
     vm.InstallEpelRepo()
     _Install(vm)
   # RHEL 7 does not have an iperf package in the standard/EPEL repositories
-  except errors.VmUtil.SshConnectionError:
+  except errors.VirtualMachine.RemoteCommandError:
     vm.RemoteCommand('sudo rpm -ivh %s' % IPERF_RPM)
 
 
