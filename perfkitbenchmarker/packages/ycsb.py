@@ -143,6 +143,7 @@ def _Install(vm):
   """Installs the YCSB package on the VM."""
   vm.Install('maven')
   vm.Install('openjdk7')
+  vm.Install('curl')
   vm.RemoteCommand(('mkdir -p {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         YCSB_BUILD_DIR, YCSB_TAR_URL))

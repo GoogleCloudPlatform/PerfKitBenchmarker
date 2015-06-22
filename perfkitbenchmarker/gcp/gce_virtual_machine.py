@@ -193,6 +193,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.extend(util.GetDefaultGcloudFlags(self))
     vm_util.IssueCommand(cmd)
 
+class ContainerizedDebianBasedGceVirtualMachine(GceVirtualMachine,
+                               linux_virtual_machine.ContainerizedDebianMixin):
+  pass
 
 class DebianBasedGceVirtualMachine(GceVirtualMachine,
                                    linux_virtual_machine.DebianMixin):

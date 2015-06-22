@@ -99,10 +99,11 @@ def Prepare(benchmark_spec):
                  '1 loader node, 3 data nodes')
     vm_dict[LOADER_NODE] = [vm_dict['default'][-1]]
     vm_dict[DATA_NODE] = vm_dict['default'][:3]
+    mount_point = os.path.join(vm_util.GetTempDir(), 'cassandra_data')
     disk_spec = disk.BaseDiskSpec(
         FLAGS.scratch_disk_size,
         FLAGS.scratch_disk_type,
-        '/cassandra_data')
+        mount_point)
     for vm in vm_dict[DATA_NODE]:
       vm.CreateScratchDisk(disk_spec)
 

@@ -16,6 +16,7 @@
 
 import logging
 import pickle
+import os
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
@@ -39,6 +40,7 @@ AWS = 'AWS'
 DIGITALOCEAN = 'DigitalOcean'
 DEBIAN = 'debian'
 RHEL = 'rhel'
+UBUNTU_CONTAINER = 'ubuntu_container'
 IMAGE = 'image'
 MACHINE_TYPE = 'machine_type'
 ZONE = 'zone'
@@ -72,7 +74,8 @@ CLASSES = {
     GCP: {
         VIRTUAL_MACHINE: {
             DEBIAN: gce_virtual_machine.DebianBasedGceVirtualMachine,
-            RHEL: gce_virtual_machine.RhelBasedGceVirtualMachine
+            RHEL: gce_virtual_machine.RhelBasedGceVirtualMachine,
+            UBUNTU_CONTAINER: gce_virtual_machine.ContainerizedDebianBasedGceVirtualMachine
         },
         NETWORK: gce_network.GceNetwork,
         FIREWALL: gce_network.GceFirewall
@@ -110,13 +113,14 @@ FLAGS = flags.FLAGS
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
-    'os_type', DEBIAN, [DEBIAN, RHEL],
+    'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER],
     'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
     'built on Debian and uses the same package manager. Likewise, CentOS\'s '
     'os_type is "rhel". In general if two OS\'s use the same package manager, '
     'and are otherwise very similar, the same os_type should work on both of '
     'them.')
-
+flags.DEFINE_string('scratch_dir', '/',
+                    'Directory in the VM where scratch disks will be mounted.')
 
 class BenchmarkSpec(object):
   """Contains the various data required to make a benchmark run."""
@@ -185,9 +189,10 @@ class BenchmarkSpec(object):
         else:
           num_striped_disks = FLAGS.num_striped_disks
         for i in range(benchmark_info['scratch_disk']):
+          mount_point = os.path.join(FLAGS.scratch_dir, 'scratch%d' % i)
           disk_spec = disk.BaseDiskSpec(
               self.scratch_disk_size, self.scratch_disk_type,
-              '/scratch%d' % i, self.scratch_disk_iops,
+              mount_point, self.scratch_disk_iops,
               num_striped_disks)
           vm.disk_specs.append(disk_spec)
 
