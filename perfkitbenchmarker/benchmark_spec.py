@@ -15,6 +15,7 @@
 """Container for all data required for a benchmark to run."""
 
 import logging
+import os
 import pickle
 
 from perfkitbenchmarker import disk
@@ -42,6 +43,7 @@ DIGITALOCEAN = 'DigitalOcean'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
+UBUNTU_CONTAINER = 'ubuntu_container'
 IMAGE = 'image'
 WINDOWS_IMAGE = 'windows_image'
 MACHINE_TYPE = 'machine_type'
@@ -54,6 +56,7 @@ CLASSES = {
         VIRTUAL_MACHINE: {
             DEBIAN: gce_virtual_machine.DebianBasedGceVirtualMachine,
             RHEL: gce_virtual_machine.RhelBasedGceVirtualMachine,
+            UBUNTU_CONTAINER: gce_virtual_machine.ContainerizedGceVirtualMachine,
             WINDOWS: gce_virtual_machine.WindowsGceVirtualMachine
         },
         FIREWALL: gce_network.GceFirewall
@@ -88,12 +91,14 @@ FLAGS = flags.FLAGS
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
-    'os_type', DEBIAN, [DEBIAN, RHEL, WINDOWS],
+    'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
     'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
     'built on Debian and uses the same package manager. Likewise, CentOS\'s '
     'os_type is "rhel". In general if two OS\'s use the same package manager, '
     'and are otherwise very similar, the same os_type should work on both of '
     'them.')
+flags.DEFINE_string('scratch_dir', '/',
+                    'Directory in the VM where scratch disks will be mounted.')
 
 
 class BenchmarkSpec(object):
@@ -160,9 +165,10 @@ class BenchmarkSpec(object):
         else:
           num_striped_disks = FLAGS.num_striped_disks
         for i in range(benchmark_info['scratch_disk']):
+          mount_point = os.path.join(FLAGS.scratch_dir, 'scratch%d' % i)
           disk_spec = disk.BaseDiskSpec(
               self.scratch_disk_size, self.scratch_disk_type,
-              '/scratch%d' % i, self.scratch_disk_iops,
+              mount_point, self.scratch_disk_iops,
               num_striped_disks)
           vm.disk_specs.append(disk_spec)
 
@@ -288,11 +294,14 @@ class BenchmarkSpec(object):
       firewall.AllowPort(vm, port)
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
-    vm.OnStartup()
     if FLAGS.scratch_disk_type == disk.LOCAL:
       vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
+
+    # This must come after Scratch Disk creation to support the
+    # Containerized VM case
+    vm.OnStartup()
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.

@@ -52,6 +52,7 @@ UPDATE_RETRIES = 5
 SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '.ssh/id_rsa'
+UBUNTU_DOCKER_IMAGE = 'ubuntu:latest'
 
 FLAGS = flags.FLAGS
 
@@ -183,7 +184,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
     """Waits until VM is has booted."""
-    resp, _ = self.RemoteCommand('hostname', retries=1, suppress_warning=True)
+    resp, _ = self.RemoteHostCommand('hostname', retries=1,
+                                     suppress_warning=True)
     if self.bootable_time is None:
       self.bootable_time = time.time()
     if self.hostname is None:
@@ -231,15 +233,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Formats a disk attached to the VM."""
     fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0 -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
-    self.RemoteCommand(fmt_cmd)
+    self.RemoteHostCommand(fmt_cmd)
 
   def MountDisk(self, device_path, mount_path):
     """Mounts a formatted disk in the VM."""
     mnt_cmd = ('sudo mkdir -p {1};sudo mount {0} {1};'
                'sudo chown -R $USER:$USER {1};').format(device_path, mount_path)
-    self.RemoteCommand(mnt_cmd)
+    self.RemoteHostCommand(mnt_cmd)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
+    self.RemoteHostCopy(file_path, remote_path, copy_to)
+
+  def RemoteHostCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.
 
     Args:
@@ -279,7 +284,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False,
                     suppress_warning=False):
+    return self.RemoteHostCommand(command, should_log, retries,
+                                  ignore_failure, login_shell,
+                                  suppress_warning)
+
+  def RemoteHostCommand(self, command,
+                        should_log=False, retries=SSH_RETRIES,
+                        ignore_failure=False, login_shell=False,
+                        suppress_warning=False):
     """Runs a command on the VM.
+
+    This is guaranteed to run on the host VM, whereas RemoteCommand might run
+    within i.e. a container in the host VM.
 
     Args:
       command: A valid bash command.
@@ -336,6 +352,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     return stdout, stderr
 
   def MoveFile(self, target, source_path, remote_path=''):
+    self.MoveHostFile(target, source_path, remote_path)
+
+  def MoveHostFile(self, target, source_path, remote_path=''):
     """Copies a file from one VM to a target VM.
 
     Args:
@@ -345,7 +364,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           is the home directory.
     """
     if not self.has_private_key:
-      self.PushFile(target.ssh_private_key, REMOTE_KEY_PATH)
+      self.RemoteHostCopy(target.ssh_private_key, REMOTE_KEY_PATH)
       self.has_private_key = True
 
     # TODO(user): For security we may want to include
@@ -355,13 +374,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     #     OpenMPI to operate correctly.
     remote_location = '%s@%s:%s' % (
         target.user_name, target.ip_address, remote_path)
-    self.RemoteCommand('scp -o StrictHostKeyChecking=no -i %s %s %s' %
-                       (REMOTE_KEY_PATH, source_path, remote_location))
+    self.RemoteHostCommand('scp -o StrictHostKeyChecking=no -i %s %s %s' %
+                           (REMOTE_KEY_PATH, source_path, remote_location))
 
   def AuthenticateVm(self):
     """Authenticate a remote machine to access all peers."""
-    self.PushFile(vm_util.GetPrivateKeyPath(),
-                  REMOTE_KEY_PATH)
+    self.RemoteHostCopy(vm_util.GetPrivateKeyPath(),
+                        REMOTE_KEY_PATH)
 
   def CheckJavaVersion(self):
     """Check the version of java on remote machine.
@@ -431,7 +450,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Performs Linux specific setup of local disks."""
     # Some images may automount one local disk, but we don't
     # want to fail if this wasn't the case.
-    self.RemoteCommand('sudo umount /mnt', ignore_failure=True)
+    self.RemoteHostCommand('sudo umount /mnt', ignore_failure=True)
 
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to prepare data disks.
@@ -480,7 +499,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.Install('mdadm')
     stripe_cmd = ('yes | sudo mdadm --create %s --level=stripe --raid-devices='
                   '%s %s' % (striped_device, len(devices), ' '.join(devices)))
-    self.RemoteCommand(stripe_cmd)
+    self.RemoteHostCommand(stripe_cmd)
 
   def BurnCpu(self, burn_cpu_threads=None, burn_cpu_seconds=None):
     """Burns vm cpu for some amount of time and dirty cache.
@@ -708,3 +727,132 @@ class DebianMixin(BaseLinuxMixin):
 
     if commands:
       self.RemoteCommand(";".join(commands))
+
+
+class ContainerizedDebianMixin(DebianMixin):
+  """Class representing a Virtual Machine that runs Remote
+  Commands within a Docker Container running Ubuntu"""
+
+  def OnStartup(self):
+    """Initializes docker before proceeding with Startup."""
+    self.RemoteHostCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    self.Install('docker')
+    self.InitDocker()
+    super(ContainerizedDebianMixin, self).OnStartup()
+
+  def InitDocker(self):
+    """Initializes the docker container daemon."""
+    init_docker_cmd = 'sudo docker run -d --net=host '
+    for sd in self.scratch_disks:
+      init_docker_cmd += '-v %s:%s ' % (sd.mount_point, sd.mount_point)
+    init_docker_cmd += '%s sleep infinity ' % UBUNTU_DOCKER_IMAGE
+
+    resp, _ = self.RemoteHostCommand(init_docker_cmd)
+    self.docker_id = resp[:-1]
+    return self.docker_id
+
+  def RemoteCommand(self, command,
+                    should_log=False, retries=SSH_RETRIES,
+                    ignore_failure=False, login_shell=False,
+                    suppress_warning=False):
+    """Runs a command inside the container.
+
+    Args:
+      command: A valid bash command.
+      should_log: A boolean indicating whether the command result should be
+          logged at the info level. Even if it is false, the results will
+          still be logged at the debug level.
+      retries: The maximum number of times RemoteCommand should retry SSHing
+          when it receives a 255 return code.
+      ignore_failure: Ignore any failure if set to true.
+      login_shell: Run command in a login shell.
+      suppress_warning: Suppress the result logging from IssueCommand when the
+          return code is non-zero.
+
+    Returns:
+      A tuple of stdout and stderr from running the command.
+    """
+    # Escapes bash sequences
+    command = command.replace('\'', '\'\\\'\'')
+
+    logging.info("Docker running: %s" % command)
+    command = "sudo docker exec %s bash -c '%s'" % (self.docker_id, command)
+    return self.RemoteHostCommand(command, should_log, retries,
+                                  ignore_failure, login_shell, suppress_warning)
+
+  def ContainerCopy(self, host_path, container_path='', copy_to=True):
+    """Copies a file from host to container and vice versa.
+
+    Does not preserve permissions. If copying from container, host_path
+    must be a directory.
+
+    Args:
+      host_path: Path to file in the host.
+      container_path: Optional path of where to copy file on container..
+      copy_to: True to copy to container, False to copy from container.
+
+    Raises:
+      RemoteExceptionError: If the source container_path is blank.
+    """
+    if copy_to:
+      file_name = os.path.basename(host_path)
+
+      # Default container directory is /
+      if container_path == '':
+        container_path = '/%s' % file_name
+
+      # Need to ensure container_path is not a directory
+      if container_path[-1] == '/':
+        container_path = os.path.join(container_path, file_name)
+
+      command = ("cat %s | sudo docker exec -i %s bash -c 'cat > %s'" %
+                 (host_path, self.docker_id, container_path))
+      self.RemoteHostCommand(command)
+    else:
+      if container_path == '':
+        raise errors.VirtualMachine.RemoteExceptionError('Cannot copy '
+                                                         'from blank target')
+      command = "sudo docker cp %s:%s %s" % (self.docker_id,
+                                             container_path, host_path)
+      self.RemoteHostCommand(command)
+
+  def RemoteCopy(self, file_path, remote_path='', copy_to=True):
+    """Copies a file to or from the container in the remote VM.
+
+    Args:
+      file_path: Local path to file.
+      remote_path: Optional path of where to copy file inside the container.
+      copy_to: True to copy to VM, False to copy from VM.
+    """
+    if copy_to:
+      file_name = os.path.basename(file_path)
+      middle_dir = vm_util.VM_TMP_DIR
+      middle_path = os.path.join(middle_dir, file_name)
+      self.RemoteHostCopy(file_path, middle_path, copy_to)
+      self.ContainerCopy(middle_path, remote_path, copy_to)
+    else:
+      file_name = os.path.basename(remote_path)
+      middle_dir = vm_util.VM_TMP_DIR
+      middle_path = os.path.join(middle_dir, file_name)
+      self.ContainerCopy(middle_dir, remote_path, copy_to)
+      self.RemoteHostCopy(file_path, middle_path, copy_to)
+
+  def MoveFile(self, target, source_path, remote_path=''):
+    """Copies a file from one Container in a source VM to
+    a Container in a target VM.
+
+    Args:
+      target: The target ContainerizedVirtualMachine object.
+      source_path: The location of the file on the REMOTE machine.
+      remote_path: The destination of the file on the TARGET machine, default
+          is the root directory.
+    """
+    file_name = os.path.basename(source_path)
+    remote_host_dir = vm_util.VM_TMP_DIR
+    self.ContainerCopy(remote_host_dir, source_path, copy_to=False)
+    source_host_path = os.path.join(remote_host_dir, file_name)
+
+    target_host_dir = vm_util.VM_TMP_DIR
+    self.MoveHostFile(target, source_host_path, target_host_dir)
+    target_host_path = os.path.join(target_host_dir, file_name)
+    target.ContainerCopy(target_host_path, remote_path)
