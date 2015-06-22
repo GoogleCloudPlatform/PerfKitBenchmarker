@@ -26,7 +26,7 @@ pushd $GIT_DIR > /dev/null
 >&2 echo "-------------------"
 
 find tests -name '*.pyc' | xargs --no-run-if-empty rm -f
-nosetests
+tox
 
 >&2 echo
 >&2 echo "Running linter."
