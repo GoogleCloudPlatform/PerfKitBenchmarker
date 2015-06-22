@@ -16,6 +16,9 @@
 
 All events are passed keyword arguments, and possibly a sender. See event
 definitions below.
+
+Event handlers are run synchronously in an unspecified order; any exceptions
+raised will be propagated.
 """
 
 from blinker import Namespace
