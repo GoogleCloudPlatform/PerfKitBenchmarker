@@ -25,6 +25,7 @@ import time
 import uuid
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
@@ -551,6 +552,8 @@ class SampleCollector(object):
       sample['timestamp'] = time.time()
       sample['run_uri'] = self.run_uri
       sample['sample_uri'] = str(uuid.uuid4())
+      events.sample_created.send(benchmark_spec=benchmark_spec,
+                                 sample=sample)
       self.samples.append(sample)
 
   def PublishSamples(self):
