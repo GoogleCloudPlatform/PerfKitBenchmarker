@@ -63,6 +63,7 @@ def CheckPrerequisites():
 def _Install(vm):
   """Installs Cassandra from a tarball."""
   vm.Install('openjdk7')
+  vm.Install('curl')
   vm.RemoteCommand('mkdir {0} && curl -L {1} | '
                    'tar -C {0} -xzf - --strip-components=1'.format(
                        CASSANDRA_DIR, CASSANDRA_TAR_URL))

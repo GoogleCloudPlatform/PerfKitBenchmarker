@@ -59,6 +59,7 @@ def CheckPrerequisites():
 
 def _Install(vm):
   vm.Install('openjdk7')
+  vm.Install('curl')
   vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         HADOOP_DIR, HADOOP_URL))
