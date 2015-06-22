@@ -11,7 +11,7 @@ PerfKitExplorer.
 ## Setup dashboards
 From this directory:
 
-  sed -i  's/{{ project_id }}/PERFKIT_EXPLORER_PROJECT/g' *.json
-  sed -i  's/{{ dataset_name }}/DATASET_NAME/g' *.json
-  sed -i  's/{{ table_name }}/TABLE_NAME/g' *.json
+    sed -i  's/{{ project_id }}/PERFKIT_EXPLORER_PROJECT/g' *.json
+    sed -i  's/{{ dataset_name }}/DATASET_NAME/g' *.json
+    sed -i  's/{{ table_name }}/TABLE_NAME/g' *.json
 
