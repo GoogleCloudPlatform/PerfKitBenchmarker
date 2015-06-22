@@ -122,6 +122,18 @@ $ gcloud auth login
 You will need a project ID before you can run. Please navigate to https://console.developers.google.com and
 create one.
 
+
+## OpenStack nova client
+Install [pip](http://pip.readthedocs.org/en/latest/installing.html).
+```
+$ sudo apt-get install python-pip -y
+```
+
+And install python-novaclient by following command:
+```
+sudo pip install python-novaclient
+```
+
 ## Install AWS CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
@@ -263,6 +275,12 @@ $ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
 $ ./pkb.py --cloud=DigitalOcean --machine_type=16gb --benchmarks=iperf
 ```
 
+## Example run on OpenStack
+```
+$ ./pkb.py --cloud=OpenStack --benchmarks=iperf --os_auth_url=http://localhost:5000/v2.0/
+```
+
+
 HOW TO RUN ALL STANDARD BENCHMARKS
 ==================
 Run without the --benchmarks parameter and every benchmark in the standard set will run serially which can take a couple of hours (alternatively run with --benchmarks="standard_set").  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
@@ -283,7 +301,7 @@ PerfKitBenchmaker.
 Flag | Notes
 -----|------
 `--help`       | see all flags
-`--cloud`      | Check where the bechmarks are run.  Choices are `GCP`, `AWS`, `Azure`, or `DigitalOcean`
+`--cloud`      | Check where the bechmarks are run.  Choices are `GCP`, `AWS`, `Azure`, `DigitalOcean`, or `OpenStack`
 `--zone`       | This flag allows you to override the default zone. See below.
 `--benchmarks` | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --help`
 
