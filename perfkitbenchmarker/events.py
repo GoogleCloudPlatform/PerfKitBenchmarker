@@ -53,6 +53,7 @@ sample_created = _events.signal('sample-created', doc="""
 Called with sample object and benchmark spec.
 
 Signal sent immediately after a sample is created by a publisher.
+The sample's metadata is mutable, and may be updated by the subscriber.
 
 Sender: None
 Payload: benchmark_spec (BenchmarkSpec), sample (dict).""")
