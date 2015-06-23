@@ -2,9 +2,9 @@
 
 This folder contains a list of pre-built dashboards for every benchmark in PerfKitBenchmarker and a summary dashboard for all benchmarks. The dashboards can be used by PerfKitExplorer.
 
-See:
-
-`https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/README.md` for setting up PerfKitExplorer and load data into Google BigQuery.
+See PerfKitBenchmarker [README.md]
+(https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/README.md)
+for setting up PerfKitExplorer and load data into Google BigQuery.
 
 ## Setup dashboards
 * Once the PerfKitExplorer is deployed, config the the dashboards with your BIGQUERY_PROJECT_ID, BIGQUERY_DATASET and BIGQUERY_TABLE used by PerfKitExplorer by running the following command in this directory:
