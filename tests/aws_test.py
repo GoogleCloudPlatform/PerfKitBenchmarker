@@ -31,13 +31,11 @@ from perfkitbenchmarker.aws import util
 class AwsVolumeExistsTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
-    self.p.start()
+    p = mock.patch(util.__name__ + '.IssueRetryableCommand')
+    p.start()
+    self.addCleanup(p.stop)
     self.disk = aws_disk.AwsDisk(disk.BaseDiskSpec(None, None, None), 'zone-a')
     self.disk.id = 'vol-foo'
-
-  def tearDown(self):
-    self.p.stop()
 
   def testVolumePresent(self):
     response = ('{"Volumes":[{"Size":500,"Attachments":[],"SnapshotId":null,'
@@ -59,13 +57,11 @@ class AwsVolumeExistsTestCase(unittest.TestCase):
 class AwsVpcExistsTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
-    self.p.start()
+    p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
+    p.start()
+    self.addCleanup(p.stop)
     self.vpc = aws_network.AwsVpc('region')
     self.vpc.id = 'vpc-foo'
-
-  def tearDown(self):
-    self.p.stop()
 
   def testVpcDeleted(self):
     response = '{"Vpcs": [] }'
@@ -81,12 +77,18 @@ class AwsVpcExistsTestCase(unittest.TestCase):
     self.assertTrue(self.vpc._Exists())
 
 
-
 class AwsVirtualMachineExistsTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
-    self.p.start()
+    for module in ('perfkitbenchmarker.virtual_machine',
+                   'perfkitbenchmarker.vm_util'):
+      p = mock.patch('{0}.FLAGS'.format(module))
+      mock_flags = p.start()
+      mock_flags.run_uri = 'aaaaaa'
+      self.addCleanup(p.stop)
+    p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
+    p.start()
+    self.addCleanup(p.stop)
     self.vm = aws_virtual_machine.AwsVirtualMachine(
         virtual_machine.BaseVirtualMachineSpec(
             None, 'us-east-1a', 'c3.large', None, None))
@@ -95,9 +97,6 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
                         'data', 'aws-describe-instance.json')
     with open(path) as f:
       self.response = f.read()
-
-  def tearDown(self):
-    self.p.stop()
 
   def testInstancePresent(self):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]

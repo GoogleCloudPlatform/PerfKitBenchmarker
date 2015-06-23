@@ -74,11 +74,11 @@ if [[ "${#files_with_lint_errors[@]}" -ne 0 ]]; then
   ) >> $1
 fi
 
-if [[ -z $(command -v nosetests) ]]; then
-  >&2 echo "Missing nose. Install it via 'pip' to enable unit testing."
+if [[ -z $(command -v tox) ]]; then
+  >&2 echo "Missing tox. Install it via 'pip' to enable unit testing."
   exit 1
 else
-  UNITTEST_RESULT=$(nosetests -v || echo "FAILED")
+  UNITTEST_RESULT=$(tox -e py27 || echo "FAILED")
   if [[ "$UNITTEST_RESULT" == *"FAILED"* ]]; then
     (
       echo

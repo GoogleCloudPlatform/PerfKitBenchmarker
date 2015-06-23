@@ -46,7 +46,7 @@ $ [sudo] pip install -r requirements.txt
 ```
 - Install PerfKitBenchmarker's test dependencies:
 ```
-$ [sudo] pip install -r test-requirements.txt
+$ [sudo] pip install tox
 ```
 - Install git pre-commit hooks, to enable linting and copyright checks:
 ```
