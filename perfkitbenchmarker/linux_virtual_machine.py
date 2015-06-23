@@ -41,6 +41,7 @@ from perfkitbenchmarker import packages
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
+FLAGS = flags.FLAGS
 
 EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
              '6/x86_64/epel-release-6-8.noarch.rpm')
@@ -153,7 +154,28 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--delete']
     return self.RemoteCommand(' '.join(wait_command), should_log=False)
 
+  def SetupProxy(self):
+    """Sets up proxy configuration variables for the cloud environment."""
+    env_file = "/etc/environment"
+    commands = []
+
+    if FLAGS.http_proxy:
+      commands.append("echo 'http_proxy=%s' | sudo tee -a %s" % (
+          FLAGS.http_proxy, env_file))
+
+    if FLAGS.https_proxy:
+      commands.append("echo 'https_proxy=%s' | sudo tee -a %s" % (
+          FLAGS.https_proxy, env_file))
+
+    if FLAGS.ftp_proxy:
+      commands.append("echo 'ftp_proxy=%s' | sudo tee -a %s" % (
+          FLAGS.ftp_proxy, env_file))
+
+    if commands:
+      self.RemoteCommand(";".join(commands))
+
   def OnStartup(self):
+    self.SetupProxy()
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
     self.BurnCpu()
@@ -572,6 +594,15 @@ class RhelMixin(BaseLinuxMixin):
     package = packages.PACKAGES[package_name]
     return package.YumGetServiceName(self)
 
+  def SetupProxy(self):
+    """Sets up proxy configuration variables for the cloud environment."""
+    super(RhelMixin, self).SetupProxy()
+    yum_proxy_file = "/etc/yum.conf"
+
+    if FLAGS.http_proxy:
+      self.RemoteCommand("echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (
+          FLAGS.http_proxy, yum_proxy_file))
+
 
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
@@ -660,3 +691,20 @@ class DebianMixin(BaseLinuxMixin):
     """
     package = packages.PACKAGES[package_name]
     return package.AptGetServiceName(self)
+
+  def SetupProxy(self):
+    """Sets up proxy configuration variables for the cloud environment."""
+    super(DebianMixin, self).SetupProxy()
+    apt_proxy_file = "/etc/apt/apt.conf"
+    commands = []
+
+    if FLAGS.http_proxy:
+      commands.append("echo -e 'Acquire::http::proxy \"%s\";' |"
+                      'sudo tee -a %s' % (FLAGS.http_proxy, apt_proxy_file))
+
+    if FLAGS.https_proxy:
+      commands.append("echo -e 'Acquire::https::proxy \"%s\";' |"
+                      'sudo tee -a %s' % (FLAGS.https_proxy, apt_proxy_file))
+
+    if commands:
+      self.RemoteCommand(";".join(commands))
