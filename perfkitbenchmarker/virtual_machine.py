@@ -101,12 +101,14 @@ class BaseVirtualMachine(resource.BaseResource):
     self.ip_address = None
     self.internal_ip = None
     self.user_name = DEFAULT_USERNAME
+    self.password = None
     self.ssh_public_key = vm_util.GetPublicKeyPath()
     self.ssh_private_key = vm_util.GetPrivateKeyPath()
     self.disk_specs = []
     self.scratch_disks = []
     self.max_local_disks = 0
     self.local_disk_counter = 0
+    self.remote_disk_counter = 0
 
   @classmethod
   def SetVmSpecDefaults(cls, vm_spec):
