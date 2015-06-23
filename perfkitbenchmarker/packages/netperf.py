@@ -28,7 +28,8 @@ def _Install(vm):
   """Installs the netperf package on the VM."""
   vm.Install('build_tools')
   vm.Install('curl')
-  vm.RemoteCommand('curl %s -o %s/%s' % (NETPERF_URL, vm_util.VM_TMP_DIR, NETPERF_TAR))
+  vm.RemoteCommand('curl %s -o %s/%s' % (
+      NETPERF_URL, vm_util.VM_TMP_DIR, NETPERF_TAR))
   vm.RemoteCommand('cd %s && tar xvzf %s' % (vm_util.VM_TMP_DIR, NETPERF_TAR))
   vm.RemoteCommand('cd %s && ./configure && make' % NETPERF_DIR)
 

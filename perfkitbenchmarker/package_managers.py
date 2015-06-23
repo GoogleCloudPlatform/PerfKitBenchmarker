@@ -115,26 +115,25 @@ class BasePackageMixin(object):
     need to implement it if this is not the case.
     """
     pass
-  def SetupProxy(self):
-    """
-        This function setup proxy if your cloud is currently installed behind proxy server
-    """
-    env_file = "/etc/environment"
 
+  def SetupProxy(self):
+    """Sets up proxy configuration variables for the cloud environment."""
+
+    env_file = "/etc/environment"
     commands = []
 
     if FLAGS.http_proxy:
-        add_http_proxy = "echo 'http_proxy=%s' | sudo tee -a %s" % (FLAGS.http_proxy, env_file)
-        commands.append(add_http_proxy)
+        commands.append("echo 'http_proxy=%s' | sudo tee -a %s" % (
+            FLAGS.http_proxy, env_file))
 
 
     if FLAGS.https_proxy:
-        add_https_proxy = "echo 'https_proxy=%s' | sudo tee -a %s" % (FLAGS.https_proxy, env_file)
-        commands.append(add_https_proxy)
+        commands.append("echo 'https_proxy=%s' | sudo tee -a %s" % (
+            FLAGS.https_proxy, env_file))
 
     if FLAGS.ftp_proxy:
-        add_ftp_proxy = "echo 'ftp_proxy=%s' | sudo tee -a %s" % (FLAGS.ftp_proxy, env_file)
-        commands.append(add_ftp_proxy)
+        commands.append("echo 'ftp_proxy=%s' | sudo tee -a %s" % (
+            FLAGS.ftp_proxy, env_file))
 
     self.RemoteCommand(";".join(commands))
 
@@ -231,15 +230,13 @@ class YumMixin(BasePackageMixin):
     return package.YumGetServiceName(self)
 
   def SetupProxy(self):
-    """
-        This function setup proxy if your cloud is currently installed behind proxy server
-    """
+    """Sets up proxy configuration variables for the cloud environment."""
     super(YumMixin, self).SetupProxy()
     yum_proxy_file = "/etc/yum.conf"
 
     if FLAGS.http_proxy:
-        add_http_proxy = "echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (FLAGS.http_proxy, yum_proxy_file)
-        self.RemoteCommand(add_http_proxy)
+        self.RemoteCommand("echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (
+            FLAGS.http_proxy, yum_proxy_file))
 
 
 class AptMixin(BasePackageMixin):
@@ -328,20 +325,18 @@ class AptMixin(BasePackageMixin):
     return package.AptGetServiceName(self)
 
   def SetupProxy(self):
-    """
-        This function setup proxy if your cloud is currently installed behind proxy server
-    """
+    """Sets up proxy configuration variables for the cloud environment."""
     super(AptMixin, self).SetupProxy()
     apt_proxy_file = "/etc/apt/apt.conf"
 
     commands = []
 
     if FLAGS.http_proxy:
-        add_http_proxy = "echo -e 'Acquire::http::proxy \"%s\";' | sudo tee -a %s" % (FLAGS.http_proxy, apt_proxy_file)
-        commands.append(add_http_proxy)
+        commands.append("echo -e 'Acquire::http::proxy \"%s\";' |"
+                        'sudo tee -a %s' % (FLAGS.http_proxy, apt_proxy_file))
 
     if FLAGS.https_proxy:
-        add_https_proxy = "echo -e 'Acquire::https::proxy \"%s\";' | sudo tee -a %s" % (FLAGS.https_proxy, apt_proxy_file)
-        commands.append(add_https_proxy)
+        commands.append("echo -e 'Acquire::https::proxy \"%s\";' |"
+                        'sudo tee -a %s' % (FLAGS.https_proxy, apt_proxy_file))
 
     self.RemoteCommand(";".join(commands))

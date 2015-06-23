@@ -53,8 +53,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import maven
-
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree import ElementTree
 
 FLAGS = flags.FLAGS
 
@@ -115,19 +114,21 @@ flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination. Set to 0 for '
                      'unlimited time.')
 
+
 def CreateProxyElement(proxy_type, proxy):
     proxy = re.sub(r'^https?:\/\/', '', proxy)
     host_addr, port_number = proxy.split(":")
-    proxy_element = Element("proxy")
-    active = SubElement(proxy_element, "active")
+    proxy_element = ElementTree.Element("proxy")
+    active = ElementTree.SubElement(proxy_element, "active")
     active.text = "true"
-    protocol = SubElement(proxy_element, "protocol")
+    protocol = ElementTree.SubElement(proxy_element, "protocol")
     protocol.text = proxy_type
-    host = SubElement(proxy_element, "host")
-    host.text =  host_addr
-    port = SubElement(proxy_element, "port")
+    host = ElementTree.SubElement(proxy_element, "host")
+    host.text = host_addr
+    port = ElementTree.SubElement(proxy_element, "port")
     port.text = port_number
     return proxy_element
+
 
 def _GetThreadsPerLoaderList():
   """Returns the list of client counts per VM to use in staircase load."""
@@ -172,12 +173,13 @@ def _Install(vm):
 
   if proxy_nodes:
       settings_file = ".m2/settings.xml"
-      root = Element('settings')
-      proxies = SubElement(root, 'proxies')
+      root = ElementTree.Element('settings')
+      proxies = ElementTree.SubElement(root, 'proxies')
       proxies.extend(proxy_nodes)
       vm.RemoteCommand("mkdir -p $HOME/.m2")
       vm.RemoteCommand("touch $HOME/%s" % settings_file)
-      vm.RemoteCommand("echo -e '%s' | sudo tee %s" % (tostring(root), settings_file))
+      vm.RemoteCommand("echo -e '%s' | sudo tee %s" % (
+          ElementTree.tostring(root), settings_file))
 
   vm.RemoteCommand(('cd {0} && {1}/bin/mvn clean package '
                     '-DskipTests -Dcheckstyle.skip=true').format(
