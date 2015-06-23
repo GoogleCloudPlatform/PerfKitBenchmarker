@@ -21,7 +21,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 FIO_DIR = '%s/fio' % vm_util.VM_TMP_DIR
-GIT_REPO = 'git://git.kernel.dk/fio.git'
+GIT_REPO = 'http://git.kernel.dk/fio.git'
 GIT_TAG = 'fio-2.1.14'
 FIO_PATH = FIO_DIR + '/fio'
 FIO_CMD_PREFIX = '%s --output-format=json' % FIO_PATH

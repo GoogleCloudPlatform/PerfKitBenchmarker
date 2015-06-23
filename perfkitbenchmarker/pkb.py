@@ -151,6 +151,17 @@ flags.DEFINE_bool('install_packages', True,
                   'if you have already created an image with all relevant '
                   'packages installed.')
 
+# Support for using a proxy in the cloud environment.
+flags.DEFINE_string('http_proxy', '',
+                    'Specify a proxy for HTTP in the form '
+                    '[user:passwd@]proxy.server:port.')
+flags.DEFINE_string('https_proxy', '',
+                    'Specify a proxy for HTTPS in the form '
+                    '[user:passwd@]proxy.server:port.')
+flags.DEFINE_string('ftp_proxy', '',
+                    'Specify a proxy for FTP in the form '
+                    '[user:passwd@]proxy.server:port.')
+
 MAX_RUN_URI_LENGTH = 10
 
 

@@ -53,6 +53,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import maven
+from xml.etree import ElementTree
 
 FLAGS = flags.FLAGS
 
@@ -114,6 +115,21 @@ flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'unlimited time.')
 
 
+def CreateProxyElement(proxy_type, proxy):
+    proxy = re.sub(r'^https?:\/\/', '', proxy)
+    host_addr, port_number = proxy.split(":")
+    proxy_element = ElementTree.Element("proxy")
+    active = ElementTree.SubElement(proxy_element, "active")
+    active.text = "true"
+    protocol = ElementTree.SubElement(proxy_element, "protocol")
+    protocol.text = proxy_type
+    host = ElementTree.SubElement(proxy_element, "host")
+    host.text = host_addr
+    port = ElementTree.SubElement(proxy_element, "port")
+    port.text = port_number
+    return proxy_element
+
+
 def _GetThreadsPerLoaderList():
   """Returns the list of client counts per VM to use in staircase load."""
   return [int(thread_count) for thread_count in FLAGS.ycsb_threads_per_client]
@@ -146,6 +162,25 @@ def _Install(vm):
   vm.RemoteCommand(('mkdir -p {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         YCSB_BUILD_DIR, YCSB_TAR_URL))
+
+  proxy_nodes = []
+
+  if FLAGS.http_proxy:
+      proxy_nodes.append(CreateProxyElement('http', FLAGS.http_proxy))
+
+  if FLAGS.https_proxy:
+      proxy_nodes.append(CreateProxyElement('https', FLAGS.http_proxy))
+
+  if proxy_nodes:
+      settings_file = ".m2/settings.xml"
+      root = ElementTree.Element('settings')
+      proxies = ElementTree.SubElement(root, 'proxies')
+      proxies.extend(proxy_nodes)
+      vm.RemoteCommand("mkdir -p $HOME/.m2")
+      vm.RemoteCommand("touch $HOME/%s" % settings_file)
+      vm.RemoteCommand("echo -e '%s' | sudo tee %s" % (
+          ElementTree.tostring(root), settings_file))
+
   vm.RemoteCommand(('cd {0} && {1}/bin/mvn clean package '
                     '-DskipTests -Dcheckstyle.skip=true').format(
                         YCSB_BUILD_DIR, maven.MVN_DIR))

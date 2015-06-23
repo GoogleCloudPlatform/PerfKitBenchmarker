@@ -297,6 +297,21 @@ AWS | us-east-1a | |
 Azure | East US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
 
+## Proxy configuration for VM guests.
+
+If the VM guests do not have direct Internet access in the cloud
+environment, you can configure proxy settings through `pkb.py` flags.
+
+To do that simple setup three flags (All urls are in notation ): The
+flag values use the same `<protocol>://<server>:<port>` syntax as the
+corresponding environment variables, for example
+`--http_proxy=http://proxy.example.com:8080` .
+
+Flag | Notes
+-----|------
+`--http_proxy`       | Needed for package manager on Guest OS and for some Perfkit packages
+`--https_proxy`      | Needed for package manager or Ubuntu guest and for from github downloaded packages
+`--ftp_proxy`       | Needed for some Perfkit packages
 
 ADVANCED: HOW TO RUN BENCHMARKS WITHOUT CLOUD PROVISIONING (eg: local workstation)
 ==================
