@@ -39,7 +39,7 @@ import time
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.rackspace import rackspace_disk
@@ -148,7 +148,6 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a Rackspace instance."""
-    super(RackspaceVirtualMachine, self)._Create()
     with tempfile.NamedTemporaryFile(dir=vm_util.GetTempDir(),
                                      prefix='user-data') as tf:
       with open(self.ssh_public_key) as f:
@@ -426,10 +425,10 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 
 class DebianBasedRackspaceVirtualMachine(RackspaceVirtualMachine,
-                                         package_managers.AptMixin):
+                                         linux_virtual_machine.DebianMixin):
   pass
 
 
 class RhelBasedRackspaceVirtualMachine(RackspaceVirtualMachine,
-                                       package_managers.YumMixin):
+                                       linux_virtual_machine.RhelMixin):
   pass
