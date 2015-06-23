@@ -1,0 +1,3693 @@
+{
+  "children": [
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "K/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "put_block",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'put_block' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'put_block' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "358397018",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "put_block - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "925016420",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "%s",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "put_block_cpu",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'put_block_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'put_block_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "806647824",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "put_block_cpu - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "143218350",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "K/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "rewrite",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'rewrite' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'rewrite' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "291630688",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "rewrite - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "267567457",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "%s",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "rewrite_cpu",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'rewrite_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'rewrite_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "766244406",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "rewrite_cpu - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "744976590",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "K/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "get_block",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'get_block' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'get_block' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "628946016",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "get_block - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "766300396",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "%s",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "get_block_cpu",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'get_block_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'get_block_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "552061503",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "get_block_cpu - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "831162018",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "K/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seeks",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seeks' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seeks' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "565309771",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seeks - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "962576379",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "%s",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seeks_cpu",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seeks_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seeks_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "486115894",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seeks_cpu - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "284222834",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "K/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seq_create",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_create' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_create' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "112655520",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seq_create - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "748731530",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "%s",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seq_create_cpu",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_create_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_create_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "887279093",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seq_create_cpu - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "109446368",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "K/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seq_del",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_del' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_del' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "368667805",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seq_del - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "473492143",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "%s",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seq_del_cpu",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_del_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_del_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "670531702",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seq_del_cpu - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "676333508",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "K/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "ran_create",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_create' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_create' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "103544189",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "ran_create - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "791836423",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "%s",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "ran_create_cpu",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_create_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_create_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "568094172",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "ran_create_cpu - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "301449421",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "K/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "ran_del",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_del' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_del' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "969329215",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "ran_del - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "266736347",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "%s",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "ran_del_cpu",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_del_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_del_cpu' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "251454425",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "ran_del_cpu - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "692465060",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ms",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "put_block_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'put_block_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'put_block_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "330450641",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "put_block_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "850446438",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ms",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "rewrite_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'rewrite_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'rewrite_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "713481879",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "rewrite_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "187970453",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "us",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "get_block_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'get_block_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'get_block_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "332625170",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "get_block_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "723177655",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "us",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seeks_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seeks_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seeks_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "616546308",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seeks_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "184066181",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "us",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seq_create_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_create_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_create_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "946476216",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seq_create_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "211671423",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "us",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seq_stat_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_stat_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_stat_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "563997952",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seq_stat_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "123401559",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "us",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "seq_del_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_del_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'seq_del_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "634343204",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "seq_del_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "153484246",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "us",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "ran_create_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_create_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_create_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "435716534",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "ran_create_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "839485211",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "us",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "ran_stat_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_stat_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_stat_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "103662460",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "ran_stat_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "281007985",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "us",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "ran_del_latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_del_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'ran_del_latency' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "799015758",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "ran_del_latency - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "553297603",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "seconds",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "End to End Runtime",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "bonnie++"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'End to End Runtime' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'bonnie++' AND\n\tmetric = 'End to End Runtime' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "841691401",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "perfkit-widget-no-overflow"
+            },
+            "title": "End to End Runtime - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "499619204",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    }
+  ],
+  "dataset_name": "{{ dataset_name }}",
+  "id": "6039190156345344",
+  "owner": "",
+  "params": [
+    {
+      "$$hashKey": "0EC",
+      "name": "EXPRESSION",
+      "value": "NTH(50, QUANTILES(value))"
+    }
+  ],
+  "project_id": "{{ project_id }}",
+  "table_name": "{{ table_name }}",
+  "table_partition": "",
+  "title": "bonnie++",
+  "type": "dashboard",
+  "version": "8",
+  "writers": []
+}
