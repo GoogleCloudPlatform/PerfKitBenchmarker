@@ -383,12 +383,16 @@ HOW TO VISUALIZE PerfKitBenchmarker RESULTS
 The dashboards directory contains a list of pre-built dashboards for every benchmark in PerfKitBenchmarker and a summary dashboard for all benchmarks. The dashboards can be used by PerfKitExplorer.
 
 To use pre-built dashboards
-* See [PerfKitExplorer README.md] (`https://github.com/GoogleCloudPlatform/PerfKitExplorer/blob/master/README.md`) for how to setup PerfKitExplorer and how to setup Google BigQuery dataset and table. 
-* Upload PerfKitBenchmarker results (/tmp/perfkitbenchmarker/run_*/perfkitbenchmarker_results.json) into BigQuery by running the following command (if you upload to a new BigQuery Table, a [schema] (`https://github.com/GoogleCloudPlatform/PerfKitExplorer/blob/master/data/samples_mart/results_table_schema.json`) file is needed):
+* See PerfKitExplorer [README.md]
+(https://github.com/GoogleCloudPlatform/PerfKitExplorer/blob/master/README.md)
+for how to setup PerfKitExplorer and how to setup Google BigQuery dataset and table. 
+* Upload PerfKitBenchmarker results (/tmp/perfkitbenchmarker/run_*/perfkitbenchmarker_results.json) into BigQuery by running the following command (if you upload to a new BigQuery Table, a [schema]
+(https://github.com/GoogleCloudPlatform/PerfKitExplorer/blob/master/data/samples_mart/results_table_schema.json)
+file is needed):
 
     bq load --source_format=NEWLINE_DELIMITED_JSON BIGQUERY_PROJECT_ID:BIGQUERY_DATASET.BIGQUERY_TABLE RESULTS_FILE (BIGQUERY_SCHEMA)
 
-* See [dashboards README.md] (`https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/dashboards/README.md`) for how to setup and upload dashboards.
+* See [dashboards/README.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/dashboards/README.md) for how to setup and upload dashboards.
 
 
 PLANNED IMPROVEMENTS
