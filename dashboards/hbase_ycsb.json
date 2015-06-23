@@ -1,0 +1,1819 @@
+{
+  "children": [
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ops/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "overall Throughput",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'overall Throughput' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'overall Throughput' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "999452993",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "overall Throughput, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "587033986",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "update Operations",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'update Operations' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'update Operations' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "884219466",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "update Operations, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "115443446",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "update Return=0",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'update Return=0' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'update Return=0' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "589931678",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "update Return=0, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "453191896",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ms",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "update MaxLatency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'update %%MINMAX%%Latency' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'update MaxLatency' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "203105116",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "update %%MINMAX%%Latency, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "2033005353",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ms",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "update p50 latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'update p%%YCSB_PERCENTILE%% latency' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'update p50 latency' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "336541794",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "update p%%YCSB_PERCENTILE%% latency, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "1791503897",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "read Operations",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'read Operations' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'read Operations' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "281011581",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "read Operations, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "1472197599",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "read Return=0",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'read Return=0' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'read Return=0' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "630588431",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "read Return=0, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "359480479",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ms",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "read MaxLatency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'read %%MINMAX%%Latency' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'read MaxLatency' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "778801019",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "read %%MINMAX%%Latency, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "653615415",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ms",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "read p50 latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'read p%%YCSB_PERCENTILE%% latency' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'read p50 latency' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "905348358",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "read p%%YCSB_PERCENTILE%% latency, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "528174255",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "cleanup Operations",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'cleanup Operations' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'cleanup Operations' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "811390728",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "cleanup Operations, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "266918996",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ms",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "cleanup MaxLatency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'cleanup %%MINMAX%%Latency' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'cleanup MaxLatency' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "584591888",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "cleanup %%MINMAX%%Latency, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "760537777",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ms",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "cleanup p50 latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'cleanup p%%YCSB_PERCENTILE%% latency' AND\n    REGEXP_MATCH(labels, r'\\|stage:%%STAGE%%\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:%%WORKLOAD_NAME%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:%%CLIENT_THREAD%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:%%CLIENT_COUNT%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'cleanup p50 latency' AND\n    REGEXP_MATCH(labels, r'\\|stage:run\\|')  AND\n    REGEXP_MATCH(labels, r'\\|workload_name:workloada\\|') AND\n    REGEXP_MATCH(labels, r'\\|threads_per_client_vm:32\\|') AND\n    REGEXP_MATCH(labels, r'\\|ycsb_client_vms:1\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "885437812",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "cleanup p%%YCSB_PERCENTILE%% latency, %%STAGE%%, %%WORKLOAD_NAME%%, client_thread:%%CLIENT_THREAD%%, client_count: %%CLIENT_COUNT%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "625304201",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "seconds",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "End to End Runtime",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hbase_ycsb"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'End to End Runtime' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hbase_ycsb' AND\n\tmetric = 'End to End Runtime' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "564690235",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "End to End Runtime - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 250
+      },
+      "id": "310636311",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    }
+  ],
+  "dataset_name": "{{ dataset_name }}",
+  "id": "6602140109766656",
+  "owner": "",
+  "params": [
+    {
+      "$$hashKey": "0EC",
+      "name": "EXPRESSION",
+      "value": "NTH(50, QUANTILES(value))"
+    },
+    {
+      "$$hashKey": "object:196",
+      "name": "MINMAX",
+      "value": "Min"
+    },
+    {
+      "$$hashKey": "object:198",
+      "name": "YCSB_PERCENTILE",
+      "value": "50"
+    },
+    {
+      "$$hashKey": "object:200",
+      "name": "STAGE",
+      "value": "run"
+    },
+    {
+      "$$hashKey": "object:202",
+      "name": "WORKLOAD_NAME",
+      "value": "workloada"
+    },
+    {
+      "$$hashKey": "object:204",
+      "name": "CLIENT_THREAD",
+      "value": "32"
+    },
+    {
+      "$$hashKey": "object:206",
+      "name": "CLIENT_COUNT",
+      "value": "1"
+    }
+  ],
+  "project_id": "{{ project_id }}",
+  "table_name": "{{ table_name }}",
+  "table_partition": "",
+  "title": "hbase_ycsb",
+  "type": "dashboard",
+  "version": "8",
+  "writers": []
+}
