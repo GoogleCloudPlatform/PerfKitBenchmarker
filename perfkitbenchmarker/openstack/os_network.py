@@ -20,9 +20,10 @@ class OpenStackFirewall(network.BaseFirewall):
         super(OpenStackFirewall, self).__init__(project)
         self.project = project
         self.__nclient = utils.NovaClient(FLAGS.os_auth_url,
+                                          FLAGS.os_tenant,
                                           FLAGS.os_username,
-                                          FLAGS.os_passwd,
-                                          FLAGS.os_tenant)
+                                          FLAGS.os_passwd
+                                          )
 
         if not (self.__nclient.security_groups.findall(name='perfkit_sc_group')):
             self.sec_group = self.__nclient.security_groups.create(

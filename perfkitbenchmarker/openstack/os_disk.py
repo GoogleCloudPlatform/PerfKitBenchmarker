@@ -17,9 +17,10 @@ class OpenStackDisk(disk.BaseDisk):
     def __init__(self, disk_spec, name, zone, project, image=None):
         super(OpenStackDisk, self).__init__(disk_spec)
         self.__nclient = utils.NovaClient(FLAGS.os_auth_url,
+                                          FLAGS.os_tenant,
                                           FLAGS.os_username,
-                                          FLAGS.os_passwd,
-                                          FLAGS.os_tenant)
+                                          FLAGS.os_passwd
+                                          )
         self.attached_vm_name = None
         self.attached_vm_id = -1
         self.image = image

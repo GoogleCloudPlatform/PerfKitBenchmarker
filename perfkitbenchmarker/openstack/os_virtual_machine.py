@@ -44,9 +44,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_counter, self.special_id)
         OpenStackVirtualMachine.instance_counter += 1
         self.client = os_utils.NovaClient(FLAGS.os_auth_url,
+                                          FLAGS.os_tenant,
                                           FLAGS.os_username,
-                                          FLAGS.os_passwd,
-                                          FLAGS.os_tenant)
+                                          FLAGS.os_passwd
+                                          )
         self.id = -1
         self.pk = -1
         self.user_name = 'ubuntu'
