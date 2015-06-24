@@ -54,7 +54,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.wait_time = 15
 
     def _Create(self):
-        super(OpenStackVirtualMachine, self)._Create()
         image = self.client.images.findall(name=self.image)[0]
         flavor = self.client.flavors.findall(name=self.machine_type)[0]
 
