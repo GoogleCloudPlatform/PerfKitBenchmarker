@@ -63,6 +63,7 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
+  fw = benchmark_spec.firewall
   redis_vm = vms[0]
   # Install latest redis on the 1st machine.
   redis_vm.Install('redis_server')
@@ -70,9 +71,11 @@ def Prepare(benchmark_spec):
   sed_cmd = (r"sed -i -e '/save 900/d' -e '/save 300/d' -e '/save 60/d' -e 's/#"
              "   save \"\"/save \"\"/g' %s/redis.conf")
   redis_vm.RemoteCommand(sed_cmd % redis_server.REDIS_DIR)
+  fw.AllowPort(vms[0], FIRST_PORT)
 
   for i in range(redis_vm.num_cpus * FLAGS.redis_numprocesses):
     port = FIRST_PORT + i
+
     redis_vm.RemoteCommand(
         'cp %s/redis.conf %s/redis-%d.conf' %
         (redis_server.REDIS_DIR, redis_server.REDIS_DIR, port))
