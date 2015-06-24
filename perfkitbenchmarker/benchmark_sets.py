@@ -22,6 +22,7 @@ FLAGS = flags.FLAGS
 MESSAGE = 'message'
 BENCHMARK_LIST = 'benchmark_list'
 STANDARD_SET = 'standard_set'
+ALL_SET = 'all_set'
 
 BENCHMARK_SETS = {
     STANDARD_SET: {
@@ -33,6 +34,10 @@ BENCHMARK_SETS = {
             'hadoop_terasort', 'hpcc', 'iperf', 'mesh_network', 'mongodb',
             'netperf', 'ping', 'redis', 'speccpu2006',
             'block_storage_workload', 'sysbench_oltp', 'unixbench']
+    },
+    ALL_SET: {
+        MESSAGE: ('This set contains all implemented benchmarks.'),
+        BENCHMARK_LIST: []  # Special cased below.
     },
     'arm_set': {
         MESSAGE: 'ARM benchmark set.',
@@ -125,9 +130,18 @@ def GetBenchmarksFromFlags():
   If multiple sets or mixes of sets and benchmarks are specified, this will
   return the union of all sets and individual benchmarks.
   """
+  # Create a dictionary of valid benchmark names and modules
+  # TODO(voellm): I really think the benchmarks package init should
+  # build the dictionary
+  valid_benchmarks = {}
+  for benchmark_module in benchmarks.BENCHMARKS:
+    valid_benchmarks[benchmark_module.GetInfo()['name']] = benchmark_module
+
   benchmark_names = set()
   for benchmark in FLAGS.benchmarks:
-    if benchmark in BENCHMARK_SETS:
+    if benchmark == ALL_SET:
+      benchmark_names.update(valid_benchmarks)
+    elif benchmark in BENCHMARK_SETS:
       benchmark_names |= set(BENCHMARK_SETS[benchmark][BENCHMARK_LIST])
     else:
       benchmark_names.add(benchmark)
@@ -146,13 +160,6 @@ def GetBenchmarksFromFlags():
             benchmark_names |= set(BENCHMARK_SETS[
                 benchmark_name][BENCHMARK_LIST])
         break
-
-  # Create a dictionary of valid benchmark names and modules
-  # TODO(voellm): I really think the benchmarks package init should
-  # build the dictionary
-  valid_benchmarks = {}
-  for benchmark_module in benchmarks.BENCHMARKS:
-    valid_benchmarks[benchmark_module.GetInfo()['name']] = benchmark_module
 
   # create a list of modules to return
   benchmark_module_list = []

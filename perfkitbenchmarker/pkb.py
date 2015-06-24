@@ -466,10 +466,10 @@ def Main(argv=sys.argv):
   # Inject more help documentation
   # The following appends descriptions of the benchmarks and descriptions of
   # the benchmark sets to the help text.
-  benchmark_sets_list = [
+  benchmark_sets_list = sorted([
       '%s:  %s' %
       (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
-      for set_name in benchmark_sets.BENCHMARK_SETS]
+      for set_name in benchmark_sets.BENCHMARK_SETS])
   sys.modules['__main__'].__doc__ = __doc__ + (
       '\nBenchmarks (default requirements):\n\t%s' %
       _GenerateBenchmarkDocumentation())
