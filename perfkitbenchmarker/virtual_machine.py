@@ -261,9 +261,17 @@ class BaseOsMixin(object):
   def OnStartup(self):
     """Performs any necessary setup on the VM specific to the OS.
 
-    This will be called once after the VM has booted.
+    This will be called once immediately after the VM has booted.
     """
     pass
+
+  def PrepareVMEnvironment(self):
+    """Performs any necessary setup on the VM specific to the OS.
+
+    This will be called once after setting up scratch disks.
+    """
+    pass
+
 
   @abc.abstractmethod
   def Install(self, package_name):

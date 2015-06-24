@@ -53,6 +53,8 @@ SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '.ssh/id_rsa'
 UBUNTU_DOCKER_IMAGE = 'ubuntu:latest'
+CONTAINER_MOUNT_DIR = '/mnt'
+CONTAINER_WORK_DIR = '/root'
 
 FLAGS = flags.FLAGS
 
@@ -175,7 +177,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if commands:
       self.RemoteCommand(";".join(commands))
 
-  def OnStartup(self):
+  def PrepareVMEnvironment(self):
     self.SetupProxy()
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
@@ -527,10 +529,12 @@ class RhelMixin(BaseLinuxMixin):
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    super(RhelMixin, self).OnStartup()
     self.RemoteCommand('echo \'Defaults:%s !requiretty\' | '
                        'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                        login_shell=True)
+
+  def PrepareVMEnvironment(self):
+    super(RhelMixin, self).PrepareVMEnvironment()
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
   def InstallEpelRepo(self):
@@ -626,9 +630,9 @@ class RhelMixin(BaseLinuxMixin):
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  def OnStartup(self):
+  def PrepareVMEnvironment(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""
-    super(DebianMixin, self).OnStartup()
+    super(DebianMixin, self).PrepareVMEnvironment()
     self.AptUpdate()
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
@@ -730,22 +734,33 @@ class DebianMixin(BaseLinuxMixin):
 
 
 class ContainerizedDebianMixin(DebianMixin):
-  """Class representing a Virtual Machine that runs Remote
-  Commands within a Docker Container running Ubuntu"""
+  """Class representing a Containerized Virtual Machine.
 
-  def OnStartup(self):
-    """Initializes docker before proceeding with Startup."""
+  A Containerized Virtual Machine is a VM that runs remote commands
+  within a Docker Container running Ubuntu.
+  Any call to RemoteCommand() will be run within the container
+  whereas any call to RemoteHostCommand() will be run in the VM itself.
+  """
+
+  def PrepareVMEnvironment(self):
+    """Initializes docker before proceeding with preparation."""
     self.RemoteHostCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
     self.Install('docker')
     self.InitDocker()
-    super(ContainerizedDebianMixin, self).OnStartup()
+    super(ContainerizedDebianMixin, self).PrepareVMEnvironment()
 
   def InitDocker(self):
     """Initializes the docker container daemon."""
-    init_docker_cmd = 'sudo docker run -d --net=host '
+    init_docker_cmd = ['sudo docker run -d '
+                       '--net=host '
+                       '--workdir=%s '
+                       '-v %s:%s ' % (CONTAINER_WORK_DIR,
+                                      vm_util.VM_TMP_DIR,
+                                      CONTAINER_MOUNT_DIR)]
     for sd in self.scratch_disks:
-      init_docker_cmd += '-v %s:%s ' % (sd.mount_point, sd.mount_point)
-    init_docker_cmd += '%s sleep infinity ' % UBUNTU_DOCKER_IMAGE
+      init_docker_cmd.append('-v %s:%s ' % (sd.mount_point, sd.mount_point))
+    init_docker_cmd.append('%s sleep infinity ' % UBUNTU_DOCKER_IMAGE)
+    init_docker_cmd = ''.join(init_docker_cmd)
 
     resp, _ = self.RemoteHostCommand(init_docker_cmd)
     self.docker_id = resp[:-1]
@@ -773,48 +788,39 @@ class ContainerizedDebianMixin(DebianMixin):
       A tuple of stdout and stderr from running the command.
     """
     # Escapes bash sequences
-    command = command.replace('\'', '\'\\\'\'')
+    command = command.replace("\'", "\'\\\'\'")
 
-    logging.info("Docker running: %s" % command)
+    logging.info('Docker running: %s' % command)
     command = "sudo docker exec %s bash -c '%s'" % (self.docker_id, command)
     return self.RemoteHostCommand(command, should_log, retries,
                                   ignore_failure, login_shell, suppress_warning)
 
-  def ContainerCopy(self, host_path, container_path='', copy_to=True):
-    """Copies a file from host to container and vice versa.
-
-    Does not preserve permissions. If copying from container, host_path
-    must be a directory.
+  def ContainerCopy(self, file_name, container_path='', copy_to=True):
+    """Copies a file to and from container_path to the host's vm_util.VM_TMP_DIR.
 
     Args:
-      host_path: Path to file in the host.
-      container_path: Optional path of where to copy file on container..
+      file_name: Name of the file in the host's vm_util.VM_TMP_DIR.
+      container_path: Optional path of where to copy file on container.
       copy_to: True to copy to container, False to copy from container.
-
     Raises:
       RemoteExceptionError: If the source container_path is blank.
     """
     if copy_to:
-      file_name = os.path.basename(host_path)
-
-      # Default container directory is /
       if container_path == '':
-        container_path = '/%s' % file_name
+        container_path = CONTAINER_WORK_DIR
 
-      # Need to ensure container_path is not a directory
-      if container_path[-1] == '/':
-        container_path = os.path.join(container_path, file_name)
-
-      command = ("cat %s | sudo docker exec -i %s bash -c 'cat > %s'" %
-                 (host_path, self.docker_id, container_path))
-      self.RemoteHostCommand(command)
+      # Everything in vm_util.VM_TMP_DIR is directly accessible
+      # both in the host and in the container
+      source_path = os.path.join(CONTAINER_MOUNT_DIR, file_name)
+      command = 'cp %s %s' % (source_path, container_path)
+      self.RemoteCommand(command)
     else:
       if container_path == '':
         raise errors.VirtualMachine.RemoteExceptionError('Cannot copy '
                                                          'from blank target')
-      command = "sudo docker cp %s:%s %s" % (self.docker_id,
-                                             container_path, host_path)
-      self.RemoteHostCommand(command)
+      destination_path = os.path.join(CONTAINER_MOUNT_DIR, file_name)
+      command = 'cp %s %s' % (container_path, destination_path)
+      self.RemoteCommand(command)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the container in the remote VM.
@@ -826,20 +832,20 @@ class ContainerizedDebianMixin(DebianMixin):
     """
     if copy_to:
       file_name = os.path.basename(file_path)
-      middle_dir = vm_util.VM_TMP_DIR
-      middle_path = os.path.join(middle_dir, file_name)
-      self.RemoteHostCopy(file_path, middle_path, copy_to)
-      self.ContainerCopy(middle_path, remote_path, copy_to)
+      tmp_path = os.path.join(vm_util.VM_TMP_DIR, file_name)
+      self.RemoteHostCopy(file_path, tmp_path, copy_to)
+      self.ContainerCopy(file_name, remote_path, copy_to)
     else:
       file_name = os.path.basename(remote_path)
-      middle_dir = vm_util.VM_TMP_DIR
-      middle_path = os.path.join(middle_dir, file_name)
-      self.ContainerCopy(middle_dir, remote_path, copy_to)
-      self.RemoteHostCopy(file_path, middle_path, copy_to)
+      tmp_path = os.path.join(vm_util.VM_TMP_DIR, file_name)
+      self.ContainerCopy(file_name, remote_path, copy_to)
+      self.RemoteHostCopy(file_path, tmp_path, copy_to)
 
   def MoveFile(self, target, source_path, remote_path=''):
-    """Copies a file from one Container in a source VM to
-    a Container in a target VM.
+    """Copies a file from one VM to a target VM.
+
+    Copies a file from a container in the source VM to a container
+    in the target VM.
 
     Args:
       target: The target ContainerizedVirtualMachine object.
@@ -848,11 +854,14 @@ class ContainerizedDebianMixin(DebianMixin):
           is the root directory.
     """
     file_name = os.path.basename(source_path)
-    remote_host_dir = vm_util.VM_TMP_DIR
-    self.ContainerCopy(remote_host_dir, source_path, copy_to=False)
-    source_host_path = os.path.join(remote_host_dir, file_name)
 
+    # Copies the file to vm_util.VM_TMP_DIR in source
+    self.ContainerCopy(file_name, source_path, copy_to=False)
+
+    # Moves the file to vm_util.VM_TMP_DIR in target
+    source_host_path = os.path.join(vm_util.VM_TMP_DIR, file_name)
     target_host_dir = vm_util.VM_TMP_DIR
     self.MoveHostFile(target, source_host_path, target_host_dir)
-    target_host_path = os.path.join(target_host_dir, file_name)
-    target.ContainerCopy(target_host_path, remote_path)
+
+    # Copies the file to its final destination in the container
+    target.ContainerCopy(file_name, remote_path)

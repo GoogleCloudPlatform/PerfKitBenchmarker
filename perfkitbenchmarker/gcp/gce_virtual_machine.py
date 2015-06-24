@@ -225,7 +225,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
                                      linux_vm.ContainerizedDebianMixin):
-  pass
+  DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
 class DebianBasedGceVirtualMachine(GceVirtualMachine,
