@@ -54,8 +54,6 @@ CREATE_TABLE_SCRIPT = 'cassandra/create-ycsb-table.cql.j2'
 def GetInfo():
   info = BENCHMARK_INFO.copy()
   num_vms = max(FLAGS.num_vms, 3)
-  if FLAGS['num_vms'].present and FLAGS.num_vms < 3:
-    raise ValueError('cassandra_ycsb requires at least 3 Cassandra VMs.')
   info['num_machines'] = num_vms + FLAGS.ycsb_client_vms
   return info
 
@@ -66,6 +64,8 @@ def CheckPrerequisites():
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
+  if FLAGS['num_vms'].present and FLAGS.num_vms < 3:
+    raise ValueError('cassandra_ycsb requires at least 3 Cassandra VMs.')
   cassandra.CheckPrerequisites()
   ycsb.CheckPrerequisites()
   data.ResourcePath(CREATE_TABLE_SCRIPT)
