@@ -59,7 +59,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
           useful if benchmark dependencies have already been installed.
     """
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
-        None, None, None, None, None)
+        None, None, None, None)
     super(StaticVirtualMachine, self).__init__(vm_spec)
     self.ip_address = ip_address
     self.internal_ip = internal_ip

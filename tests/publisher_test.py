@@ -239,8 +239,9 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     p.start()
     self.addCleanup(p.stop)
 
+    mock_vm = mock.MagicMock(zone='us-central1-a')
     self.mock_spec = mock.MagicMock(cloud='GCP',
-                                    zones=['us-central1-a'],
+                                    vms=[mock_vm],
                                     machine_type='n1-standard-1',
                                     image='ubuntu-14-04')
 

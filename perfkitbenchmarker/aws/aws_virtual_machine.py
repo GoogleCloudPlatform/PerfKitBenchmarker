@@ -29,6 +29,7 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import aws_disk
+from perfkitbenchmarker.aws import aws_network
 from perfkitbenchmarker.aws import util
 
 FLAGS = flags.FLAGS
@@ -49,7 +50,7 @@ AP_NORTHEAST_1 = 'ap-northeast-1'
 AP_SOUTHEAST_1 = 'ap-southeast-1'
 AP_SOUTHEAST_2 = 'ap-southeast-2'
 SA_EAST_1 = 'sa-east-1'
-AMIS = {
+UBUNTU_AMIS = {
     HVM: {
         US_EAST_1: 'ami-acff23c4',
         US_WEST_1: 'ami-05717d40',
@@ -113,15 +114,6 @@ def GetBlockDeviceMap(machine_type):
     return None
 
 
-def GetImage(machine_type, region):
-  """Gets an ami compatible with the machine type and zone."""
-  prefix = machine_type.split('.')[0]
-  if prefix in NON_HVM_PREFIXES:
-    return AMIS[PV][region]
-  else:
-    return AMIS[HVM][region]
-
-
 def IsPlacementGroupCompatible(machine_type):
   """Returns True if VMs of 'machine_type' can be put in a placement group."""
   prefix = machine_type.split('.')[0]
@@ -130,6 +122,9 @@ def IsPlacementGroupCompatible(machine_type):
 
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
+
+  DEFAULT_ZONE = 'us-east-1a'
+  DEFAULT_MACHINE_TYPE = 'm3.medium'
 
   _lock = threading.Lock()
   imported_keyfile_set = set()
@@ -143,10 +138,29 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     super(AwsVirtualMachine, self).__init__(vm_spec)
     self.region = self.zone[:-1]
-    self.image = self.image or GetImage(self.machine_type, self.region)
     self.user_name = FLAGS.aws_user_name
+    self.network = aws_network.AwsNetwork.GetNetwork(self.zone)
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
+
+  @classmethod
+  def SetVmSpecDefaults(cls, vm_spec):
+    """Updates the VM spec with cloud specific defaults."""
+    if vm_spec.machine_type is None:
+      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
+    if vm_spec.zone is None:
+      vm_spec.zone = cls.DEFAULT_ZONE
+    if vm_spec.image is None:
+      region = vm_spec.zone[:-1]
+      vm_spec.image = cls._GetDefaultImage(vm_spec.machine_type, region)
+
+  @staticmethod
+  def _GetDefaultImage(machine_type, region):
+    """Returns the default image given the machine type and region.
+
+    If no default is configured, this will return None.
+    """
+    return None
 
   def ImportKeyfile(self):
     """Imports the public keyfile to AWS."""
@@ -297,7 +311,18 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
-  pass
+
+  @staticmethod
+  def _GetDefaultImage(machine_type, region):
+    """Returns the default image given the machine type and region.
+
+    If no default is configured, this will return None.
+    """
+    prefix = machine_type.split('.')[0]
+    if prefix in NON_HVM_PREFIXES:
+      return UBUNTU_AMIS[PV][region]
+    else:
+      return UBUNTU_AMIS[HVM][region]
 
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,

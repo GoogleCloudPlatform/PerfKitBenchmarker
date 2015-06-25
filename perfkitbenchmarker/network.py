@@ -20,6 +20,8 @@ others in the
 same project.
 """
 
+import threading
+
 from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
@@ -53,13 +55,31 @@ class BaseFirewall(object):
 class BaseNetwork(object):
   """Object representing a Base Network."""
 
+  # Dictionary holding all BaseNetwork objects.
+  networks = {}
+
+  # Lock used to serialize the instantiation of new BaseNetwork objects.
+  _class_lock = threading.Lock()
+
   def __init__(self, zone=None):
     self.zone = zone
-    self.created = False
+
+  @classmethod
+  def GetNetwork(cls, zone):
+    """Returns the network corresponding to the given zone."""
+    with cls._class_lock:
+      # This probably will never happen, but we want to ensure that
+      # networks from different clouds never share the same entry, so
+      # in addition to using the zone, we also use the class as part
+      # of the key.
+      key = (cls, zone)
+      if key not in cls.networks:
+        cls.networks[key] = cls(zone)
+      return cls.networks[key]
 
   def Create(self):
     """Creates the actual network."""
-    self.created = True
+    pass
 
   def Delete(self):
     """Deletes the actual network."""
