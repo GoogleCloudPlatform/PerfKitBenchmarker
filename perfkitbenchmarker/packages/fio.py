@@ -153,8 +153,7 @@ def ParseResults(job_file, fio_json_result):
             '50th': job[mode]['clat']['percentile']['50.000000'],
             '95th': job[mode]['clat']['percentile']['95.000000'],
             '99th': job[mode]['clat']['percentile']['99.000000'],
-            '99.99th': job[mode]['clat']['percentile']['99.990000']
-            }
+            '99.99th': job[mode]['clat']['percentile']['99.990000']}
         lat_metadata.update(parameters)
         samples.append(
             sample.Sample('%s:latency' % metric_name,
