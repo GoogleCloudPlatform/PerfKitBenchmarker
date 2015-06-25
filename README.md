@@ -124,10 +124,7 @@ create one.
 
 
 ## OpenStack nova client
-Install [pip](http://pip.readthedocs.org/en/latest/installing.html).
-```
-$ sudo apt-get install python-pip -y
-```
+Make sure you have installed pip (see the section above).
 
 And install python-novaclient by following command:
 ```
@@ -314,6 +311,7 @@ GCP | us-central1-a | |
 AWS | us-east-1a | |
 Azure | East US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
+OpenStack | nova | |
 
 ## Proxy configuration for VM guests.
 
