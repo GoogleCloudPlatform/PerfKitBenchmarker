@@ -44,6 +44,8 @@ flags.DEFINE_integer('gce_num_local_ssds', 0,
                      '(see https://cloud.google.com/compute/docs/local-ssd).')
 flags.DEFINE_string('gcloud_scopes', None, 'If set, space-separated list of '
                     'scopes to apply to every created machine')
+flags.DEFINE_boolean('gce_migrate_on_maintenance', False, 'If true, allow VM '
+                     'migration on GCE host maintenance.')
 
 FLAGS = flags.FLAGS
 
@@ -116,12 +118,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     'mode=rw',
                     '--machine-type', self.machine_type,
                     '--tags=perfkitbenchmarker',
-                    '--maintenance-policy', 'TERMINATE',
-                    '--no-restart-on-failure',
+                    '--no-restart-on-failure'
                     '--metadata-from-file',
                     'sshKeys=%s' % tf.name,
                     '--metadata',
                     'owner=%s' % FLAGS.owner]
+      if not FLAGS.gce_migrate_on_maintenance:
+        create_cmd.extend(['--maintenance-policy', 'TERMINATE'])
+
       ssd_interface_option = NVME if NVME in self.image else SCSI
       for _ in range(self.max_local_disks):
         create_cmd.append('--local-ssd')
