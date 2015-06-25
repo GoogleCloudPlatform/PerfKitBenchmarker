@@ -37,12 +37,14 @@ class OpenStackDisk(disk.BaseDisk):
                                                    availability_zone=self.zone,
                                                    imageRef=self.image,
                                                    )
-        time.sleep(1)
+
         is_unavailable = True
         while is_unavailable:
-            status = self.__nclient.volumes.get(self._disk.id).status
-            is_unavailable = not (status == "available")
-        self._disk = self.__nclient.volumes.get(self._disk.id)
+            time.sleep(1)
+            volume = self.__nclient.volumes.get(self._disk.id)
+            if volume:
+                is_unavailable = not (volume.status == "available")
+        self._disk = volume
 
     @retry_authorization(max_retries=4)
     def _Delete(self):
