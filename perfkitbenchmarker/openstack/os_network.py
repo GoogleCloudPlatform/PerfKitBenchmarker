@@ -12,6 +12,7 @@ flags.DEFINE_string('openstack_public_network', None,
 flags.DEFINE_string('openstack_private_network', 'private',
                     'Name of OpenStack private network')
 
+MAX_PORT = 65535
 
 class OpenStackFirewall(network.BaseFirewall):
     """
@@ -36,17 +37,18 @@ class OpenStackFirewall(network.BaseFirewall):
         else:
             self.sec_group = self.__nclient.security_groups.findall(name='perfkit_sc_group')[0]
 
-        self.AllowPort(None, -1, 'icmp')
-        self.AllowPort(None, 22)
-        self.AllowPort(None, 80)
-        self.AllowPort(None, 3000)
+        self.AllowPort(None, -1, protocol='icmp')
+        self.AllowPort(None, 1, MAX_PORT)
 
-    def AllowPort(self, vm, port, protocol='tcp'):
+    def AllowPort(self, vm, from_port, to_port=None, protocol='tcp'):
+        if to_port is None:
+            to_port = from_port
+
         try:
             self.__nclient.security_group_rules.create(self.sec_group.id,
                                                        ip_protocol=protocol,
-                                                       from_port=port,
-                                                       to_port=port)
+                                                       from_port=from_port,
+                                                       to_port=to_port)
         except Exception:
             pass
 
