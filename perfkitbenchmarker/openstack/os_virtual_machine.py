@@ -27,6 +27,12 @@ flags.DEFINE_string('os_tenant', 'admin',
 flags.DEFINE_boolean('os_config_drive', False,
                      'Add possibilities to get metadata from external drive')
 
+flags.DEFINE_boolean('openstack_boot_from_volume', False,
+                     'Boot from volume instead of an image')
+
+flags.DEFINE_integer('openstack_volume_size', 20,
+                     'Size of the volume (GB)')
+
 
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
@@ -59,14 +65,25 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
         network = self.client.networks.find(label=FLAGS.os_private_network)
         nics = [{'net-id': network.id}]
+        image_id = image.id
+        boot_from_vol = []
+        if FLAGS.openstack_boot_from_volume:
+            image_id = None
+            boot_from_vol = [{'boot_index': 0,
+                              'uuid': image.id,
+                              'volume_size': FLAGS.openstack_volume_size,
+                              'source_type': 'image',
+                              'destination_type': 'volume',
+                              'delete_on_termination': True}]
 
         vm = self.client.servers.create(name=self.name,
-                                        image=image.id,
+                                        image=image_id,
                                         flavor=flavor.id,
                                         key_name=self.key_name,
                                         security_groups=['perfkit_sc_group'],
                                         nics=nics,
                                         availability_zone='nova',
+                                        block_device_mapping_v2=boot_from_vol,
                                         config_drive=FLAGS.os_config_drive)
         self.id = vm.id
 
