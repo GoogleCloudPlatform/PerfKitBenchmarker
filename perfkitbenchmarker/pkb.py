@@ -69,6 +69,7 @@ from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.publisher import SampleCollector
 
 STAGE_ALL = 'all'
@@ -175,17 +176,6 @@ def ValidateBenchmarkInfo(benchmark_info):
       # TODO(user): Raise error with info about the validation failure
       return False
   return True
-
-
-def ListUnknownBenchmarks():
-  """Identify invalid benchmark names specified in the command line flags."""
-  valid_benchmark_names = frozenset(benchmark.GetInfo()['name']
-                                    for benchmark in benchmarks.BENCHMARKS)
-  valid_benchmark_sets = frozenset(benchmark_sets.BENCHMARK_SETS)
-  specified_benchmark_names = frozenset(FLAGS.benchmarks)
-
-  return sorted((specified_benchmark_names - valid_benchmark_names) -
-                valid_benchmark_sets)
 
 
 def DoPreparePhase(benchmark, name, spec, timer):
@@ -391,10 +381,9 @@ def RunBenchmarks(publish=True):
       run_uri=FLAGS.run_uri)
   _LogCommandLineFlags()
 
-  unknown_benchmarks = ListUnknownBenchmarks()
-  if unknown_benchmarks:
-    logging.error('Unknown benchmark(s) provided: %s',
-                  ', '.join(unknown_benchmarks))
+  if FLAGS.os_type == benchmark_spec.WINDOWS and not vm_util.RunningOnWindows():
+    logging.error('In order to run benchmarks on Windows VMs, you must be '
+                  'running on Windows.')
     return 1
 
   vm_util.SSHKeyGen()
@@ -444,15 +433,19 @@ def RunBenchmarks(publish=True):
 def _GenerateBenchmarkDocumentation():
   """Generates benchmark documentation to show in --help."""
   benchmark_docs = []
-  for benchmark_module in benchmarks.BENCHMARKS:
+  for benchmark_module in (benchmarks.BENCHMARKS +
+                           windows_benchmarks.BENCHMARKS):
     benchmark_info = benchmark_module.BENCHMARK_INFO
     vm_count = benchmark_info.get('num_machines') or 'variable'
     scratch_disk_str = ''
     if benchmark_info.get('scratch_disk'):
       scratch_disk_str = ' with scratch volume'
 
+    name = benchmark_info['name']
+    if benchmark_module in windows_benchmarks.BENCHMARKS:
+      name += ' (Windows)'
     benchmark_docs.append('%s: %s (%s VMs%s)' %
-                          (benchmark_info['name'],
+                          (name,
                            benchmark_info['description'],
                            vm_count,
                            scratch_disk_str))

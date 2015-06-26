@@ -33,6 +33,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import util
@@ -47,12 +48,11 @@ flags.DEFINE_string('gcloud_scopes', None, 'If set, space-separated list of '
 
 FLAGS = flags.FLAGS
 
-BOOT_DISK_SIZE_GB = 10
-BOOT_DISK_TYPE = disk.STANDARD
 NVME = 'nvme'
 SCSI = 'SCSI'
 UBUNTU_IMAGE = 'ubuntu-14-04'
 RHEL_IMAGE = 'rhel-7'
+WINDOWS_IMAGE = 'windows-2012-r2'
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -78,6 +78,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.boot_disk = gce_disk.GceDisk(
         disk_spec, self.name, self.zone, self.project, self.image)
     self.max_local_disks = FLAGS.gce_num_local_ssds
+    self.boot_metadata = {}
 
 
   @classmethod
@@ -122,6 +123,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     'sshKeys=%s' % tf.name,
                     '--metadata',
                     'owner=%s' % FLAGS.owner]
+      for key, value in self.boot_metadata.iteritems():
+        create_cmd.append('%s=%s' % (key, value))
       ssd_interface_option = NVME if NVME in self.image else SCSI
       for _ in range(self.max_local_disks):
         create_cmd.append('--local-ssd')
@@ -175,21 +178,26 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
-    # Get the names for the disk(s) we are going to create.
-    if disk_spec.disk_type == disk.LOCAL:
-      new_count = self.local_disk_counter + disk_spec.num_striped_disks
-      if new_count > self.max_local_disks:
-        raise errors.Error('Not enough local disks.')
-      disk_names = ['local-ssd-%d' % i
-                    for i in range(self.local_disk_counter, new_count)]
-      self.local_disk_counter = new_count
-    else:
-      disk_names = ['%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
-                    for i in range(disk_spec.num_striped_disks)]
+    disks = []
 
-    # Instantiate the disk(s).
-    disks = [gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
-             for name in disk_names]
+    for i in xrange(disk_spec.num_striped_disks):
+      if disk_spec.disk_type == disk.LOCAL:
+        name = 'local-ssd-%d' % self.local_disk_counter
+        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
+        # Local disk numbers start at 1 (0 is the system disk).
+        data_disk.disk_number = self.local_disk_counter + 1
+        self.local_disk_counter += 1
+        if self.local_disk_counter > self.max_local_disks:
+          raise errors.Error('Not enough local disks.')
+      else:
+        name = '%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
+        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
+        # Remote disk numbers start at 1+max_local_disks (0 is the system disk
+        # and local disks occupy 1-max_local_disks).
+        data_disk.disk_number = (self.remote_disk_counter +
+                                 1 + self.max_local_disks)
+        self.remote_disk_counter += 1
+      disks.append(data_disk)
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
@@ -223,3 +231,29 @@ class DebianBasedGceVirtualMachine(GceVirtualMachine,
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  linux_virtual_machine.RhelMixin):
   DEFAULT_IMAGE = RHEL_IMAGE
+
+
+class WindowsGceVirtualMachine(GceVirtualMachine,
+                               windows_virtual_machine.WindowsMixin):
+
+  DEFAULT_IMAGE = WINDOWS_IMAGE
+  BOOT_DISK_SIZE_GB = 50
+  BOOT_DISK_TYPE = disk.REMOTE_SSD
+
+  def __init__(self, vm_spec):
+    super(WindowsGceVirtualMachine, self).__init__(vm_spec)
+    self.boot_metadata[
+        'windows-startup-script-ps1'] = windows_virtual_machine.STARTUP_SCRIPT
+
+  def _PostCreate(self):
+    super(WindowsGceVirtualMachine, self)._PostCreate()
+    reset_password_cmd = [FLAGS.gcloud_path,
+                          'compute',
+                          'reset-windows-password',
+                          '--user',
+                          self.user_name,
+                          self.name]
+    reset_password_cmd.extend(util.GetDefaultGcloudFlags(self))
+    stdout, _ = vm_util.IssueRetryableCommand(reset_password_cmd)
+    response = json.loads(stdout)
+    self.password = response['password']

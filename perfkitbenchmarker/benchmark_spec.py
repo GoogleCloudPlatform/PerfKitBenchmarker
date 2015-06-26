@@ -18,6 +18,7 @@ import logging
 import pickle
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import static_virtual_machine
@@ -40,7 +41,9 @@ AWS = 'AWS'
 DIGITALOCEAN = 'DigitalOcean'
 DEBIAN = 'debian'
 RHEL = 'rhel'
+WINDOWS = 'windows'
 IMAGE = 'image'
+WINDOWS_IMAGE = 'windows_image'
 MACHINE_TYPE = 'machine_type'
 ZONE = 'zone'
 VIRTUAL_MACHINE = 'virtual_machine'
@@ -50,7 +53,8 @@ CLASSES = {
     GCP: {
         VIRTUAL_MACHINE: {
             DEBIAN: gce_virtual_machine.DebianBasedGceVirtualMachine,
-            RHEL: gce_virtual_machine.RhelBasedGceVirtualMachine
+            RHEL: gce_virtual_machine.RhelBasedGceVirtualMachine,
+            WINDOWS: gce_virtual_machine.WindowsGceVirtualMachine
         },
         FIREWALL: gce_network.GceFirewall
     },
@@ -84,7 +88,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
-    'os_type', DEBIAN, [DEBIAN, RHEL],
+    'os_type', DEBIAN, [DEBIAN, RHEL, WINDOWS],
     'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
     'built on Debian and uses the same package manager. Likewise, CentOS\'s '
     'os_type is "rhel". In general if two OS\'s use the same package manager, '
@@ -176,7 +180,8 @@ class BenchmarkSpec(object):
     if self.vms:
       prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
       vm_util.RunThreaded(self.PrepareVm, prepare_args)
-      vm_util.GenerateSSHConfig(self.vms)
+      if FLAGS.os_type != WINDOWS:
+        vm_util.GenerateSSHConfig(self.vms)
 
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
@@ -218,7 +223,12 @@ class BenchmarkSpec(object):
     if vm:
       return vm
 
-    vm_class = CLASSES[self.cloud][VIRTUAL_MACHINE][FLAGS.os_type]
+    vm_classes = CLASSES[self.cloud][VIRTUAL_MACHINE]
+    if FLAGS.os_type not in vm_classes:
+      raise errors.Error(
+          'VMs of type %s" are not currently supported on cloud "%s".' %
+          (FLAGS.os_type, self.cloud))
+    vm_class = vm_classes[FLAGS.os_type]
 
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
         self.project, zone, self.machine_type, self.image)
