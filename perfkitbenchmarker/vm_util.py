@@ -22,6 +22,7 @@ import posixpath
 import random
 import re
 import socket
+import string
 import subprocess
 import tempfile
 import threading
@@ -60,6 +61,7 @@ FUZZ = .5
 MAX_RETRIES = -1
 
 WINDOWS = 'nt'
+PASSWORD_LENGTH = 15
 
 flags.DEFINE_integer('default_timeout', TIMEOUT, 'The default timeout for '
                      'retryable commands in seconds.')
@@ -678,3 +680,18 @@ def _RegisterDStatCollector(sender, parsed_flags):
                               output_directory=output_directory)
   events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
   events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
+
+
+def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):
+  """Generates a password that meets Windows complexity requirements."""
+  special_chars = '~!$%*_-+=\\[]:.?/'
+  password = [
+      random.choice(string.ascii_letters + string.digits + special_chars)
+      for _ in range(password_length - 4)]
+  # Ensure that the password contains at least one of each 4 required
+  # character types.
+  password.append(random.choice(string.ascii_lowercase))
+  password.append(random.choice(string.ascii_uppercase))
+  password.append(random.choice(string.digits))
+  password.append(random.choice(special_chars))
+  return ''.join(password)
