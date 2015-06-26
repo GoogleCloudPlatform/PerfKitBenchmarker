@@ -132,7 +132,8 @@ class DefaultMetadataProvider(MetadataProvider):
     metadata = metadata.copy()
     metadata['perfkitbenchmarker_version'] = version.VERSION
     metadata['cloud'] = benchmark_spec.cloud
-    metadata['zones'] = ','.join(benchmark_spec.zones)
+    # Get the unique zone names from the VMs.
+    metadata['zones'] = ','.join(set([vm.zone for vm in benchmark_spec.vms]))
     metadata['machine_type'] = benchmark_spec.machine_type
     metadata['image'] = benchmark_spec.image
 

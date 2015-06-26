@@ -81,7 +81,8 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
 
   def setUp(self):
     for module in ('perfkitbenchmarker.virtual_machine',
-                   'perfkitbenchmarker.vm_util'):
+                   'perfkitbenchmarker.vm_util',
+                   'perfkitbenchmarker.aws.aws_network'):
       p = mock.patch('{0}.FLAGS'.format(module))
       mock_flags = p.start()
       mock_flags.run_uri = 'aaaaaa'
@@ -91,7 +92,7 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
     self.vm = aws_virtual_machine.AwsVirtualMachine(
         virtual_machine.BaseVirtualMachineSpec(
-            None, 'us-east-1a', 'c3.large', None, None))
+            None, 'us-east-1a', 'c3.large', None))
     self.vm.id = 'i-foo'
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'aws-describe-instance.json')

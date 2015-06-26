@@ -29,6 +29,7 @@ from perfkitbenchmarker.digitalocean import util
 
 FLAGS = flags.FLAGS
 
+UBUNTU_IMAGE = 'ubuntu-14-04-x64'
 CLOUD_CONFIG_TEMPLATE = '''#cloud-config
 users:
   - name: {0}
@@ -60,6 +61,11 @@ def GetErrorMessage(stdout):
 class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a DigitalOcean Virtual Machine (Droplet)."""
 
+  DEFAULT_ZONE = 'sfo1'
+  DEFAULT_MACHINE_TYPE = '2gb'
+  # Subclasses should override the default image.
+  DEFAULT_IMAGE = None
+
   def __init__(self, vm_spec):
     """Initialize a DigitalOcean virtual machine.
 
@@ -70,6 +76,16 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.droplet_id = None
     self.max_local_disks = 1
     self.local_disk_counter = 0
+
+  @classmethod
+  def SetVmSpecDefaults(cls, vm_spec):
+    """Updates the VM spec with cloud specific defaults."""
+    if vm_spec.machine_type is None:
+      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
+    if vm_spec.zone is None:
+      vm_spec.zone = cls.DEFAULT_ZONE
+    if vm_spec.image is None:
+      vm_spec.image = cls.DEFAULT_IMAGE
 
   def _Create(self):
     """Create a DigitalOcean VM instance (droplet)."""
@@ -206,7 +222,7 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedDigitalOceanVirtualMachine(DigitalOceanVirtualMachine,
                                             linux_virtual_machine.DebianMixin):
-  pass
+  DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
 class RhelBasedDigitalOceanVirtualMachine(DigitalOceanVirtualMachine,

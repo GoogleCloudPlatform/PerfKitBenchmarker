@@ -44,16 +44,13 @@ class BaseVirtualMachineSpec(object):
     zone: The region / zone the in which to launch the VM.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     image: The disk image to boot from.
-    network: A BaseNetwork instance. The VM will be launched within this
-      network.
   """
 
-  def __init__(self, project, zone, machine_type, image, network):
+  def __init__(self, project, zone, machine_type, image):
     self.project = project
     self.zone = zone
     self.machine_type = machine_type
     self.image = image
-    self.network = network
 
 
 class BaseVirtualMachine(resource.BaseResource):
@@ -68,7 +65,6 @@ class BaseVirtualMachine(resource.BaseResource):
     internal_ip: Internal IP address.
     ip: Public (external) IP address.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
-    network: A BaseNetwork instance.
     project: The provider-specific project associated with the VM (e.g.
       artisanal-lightbulb-883).
     ssh_public_key: Path to SSH public key file.
@@ -103,7 +99,6 @@ class BaseVirtualMachine(resource.BaseResource):
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.image = vm_spec.image
-    self.network = vm_spec.network
     self.ip_address = None
     self.internal_ip = None
     self.user_name = DEFAULT_USERNAME
@@ -113,6 +108,16 @@ class BaseVirtualMachine(resource.BaseResource):
     self.scratch_disks = []
     self.max_local_disks = 0
     self.local_disk_counter = 0
+
+  @classmethod
+  def SetVmSpecDefaults(cls, vm_spec):
+    """Updates the VM spec with cloud specific defaults.
+
+    If any of the VM spec attributes haven't been set by the time this is
+    called, this should set them. This method should not override any
+    attributes which have been set.
+    """
+    pass
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(

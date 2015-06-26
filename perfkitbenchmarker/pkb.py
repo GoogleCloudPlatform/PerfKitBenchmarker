@@ -91,7 +91,7 @@ flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
 flags.DEFINE_list(
-    'zones', None,
+    'zones', [None],
     'A list of zones within which to run PerfKitBenchmarker.'
     ' This is specific to the cloud provider you are running on. '
     'If multiple zones are given, PerfKitBenchmarker will create 1 VM in '

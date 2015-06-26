@@ -19,6 +19,7 @@ import pickle
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import network
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -82,7 +83,6 @@ CLASSES = {
             DEBIAN: gce_virtual_machine.DebianBasedGceVirtualMachine,
             RHEL: gce_virtual_machine.RhelBasedGceVirtualMachine
         },
-        NETWORK: gce_network.GceNetwork,
         FIREWALL: gce_network.GceFirewall
     },
     AZURE: {
@@ -90,7 +90,6 @@ CLASSES = {
             DEBIAN: azure_virtual_machine.DebianBasedAzureVirtualMachine,
             RHEL: azure_virtual_machine.RhelBasedAzureVirtualMachine
         },
-        NETWORK: azure_network.AzureNetwork,
         FIREWALL: azure_network.AzureFirewall
     },
     AWS: {
@@ -98,7 +97,6 @@ CLASSES = {
             DEBIAN: aws_virtual_machine.DebianBasedAwsVirtualMachine,
             RHEL: aws_virtual_machine.RhelBasedAwsVirtualMachine
         },
-        NETWORK: aws_network.AwsNetwork,
         FIREWALL: aws_network.AwsFirewall
     },
     DIGITALOCEAN: {
@@ -108,7 +106,6 @@ CLASSES = {
             RHEL:
             digitalocean_virtual_machine.RhelBasedDigitalOceanVirtualMachine,
         },
-        NETWORK: digitalocean_network.DigitalOceanNetwork,
         FIREWALL: digitalocean_network.DigitalOceanFirewall
     },
     OPENSTACK: {
@@ -146,7 +143,6 @@ class BenchmarkSpec(object):
           FLAGS.benchmark_config_pair[benchmark_info['name']])
     self.vms = []
     self.vm_dict = {'default': []}
-    self.networks = {}
     self.benchmark_name = benchmark_info['name']
     if hasattr(self, 'config'):
       config_dict = {}
@@ -171,11 +167,9 @@ class BenchmarkSpec(object):
     else:
       self.cloud = FLAGS.cloud
       self.project = FLAGS.project
-      defaults = DEFAULTS[self.cloud]
-      self.zones = FLAGS.zones or [defaults[ZONE]]
-      self.image = FLAGS.image or defaults[IMAGE]
-      self.machine_type = FLAGS.machine_type or defaults[
-          MACHINE_TYPE]
+      self.zones = FLAGS.zones
+      self.image = FLAGS.image
+      self.machine_type = FLAGS.machine_type
       if benchmark_info['num_machines'] is None:
         self.num_vms = FLAGS.num_vms
       else:
@@ -215,9 +209,9 @@ class BenchmarkSpec(object):
 
   def Prepare(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
-    if self.networks:
-      prepare_args = [self.networks[zone] for zone in self.networks]
-      vm_util.RunThreaded(self.PrepareNetwork, prepare_args)
+    prepare_args = network.BaseNetwork.networks.values()
+    vm_util.RunThreaded(self.PrepareNetwork, prepare_args)
+
     if self.vms:
       prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
       vm_util.RunThreaded(self.PrepareVm, prepare_args)
@@ -238,9 +232,9 @@ class BenchmarkSpec(object):
     except Exception:
       logging.exception('Got an exception disabling firewalls. '
                         'Attempting to continue tearing down.')
-    for zone in self.networks:
+    for net in network.BaseNetwork.networks.itervalues():
       try:
-        self.networks[zone].Delete()
+        net.Delete()
       except Exception:
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
@@ -250,12 +244,12 @@ class BenchmarkSpec(object):
     """Initialize the network."""
     network.Create()
 
-  def CreateVirtualMachine(self, opt_zone=None):
+  def CreateVirtualMachine(self, zone):
     """Create a vm in zone.
 
     Args:
-      opt_zone: The zone in which the vm will be created. If not provided,
-        FLAGS.zone or the revelant zone from DEFAULT will be used.
+      zone: The zone in which the vm will be created. If zone is None,
+        the VM class's DEFAULT_ZONE will be used instead.
     Returns:
       A vm object.
     """
@@ -264,14 +258,12 @@ class BenchmarkSpec(object):
       return vm
 
     vm_class = CLASSES[self.cloud][VIRTUAL_MACHINE][FLAGS.os_type]
-    zone = opt_zone or self.zones[0]
-    if zone not in self.networks:
-      network_class = CLASSES[self.cloud][NETWORK]
-      self.networks[zone] = network_class(zone)
-    self.vm_spec = virtual_machine.BaseVirtualMachineSpec(
-        self.project, zone, self.machine_type, self.image,
-        self.networks[zone])
-    return vm_class(self.vm_spec)
+
+    vm_spec = virtual_machine.BaseVirtualMachineSpec(
+        self.project, zone, self.machine_type, self.image)
+    vm_class.SetVmSpecDefaults(vm_spec)
+
+    return vm_class(vm_spec)
 
   def CreateVirtualMachineFromNodeSection(self, node_section, node_name):
     """Create a VirtualMachine object from NodeSection.

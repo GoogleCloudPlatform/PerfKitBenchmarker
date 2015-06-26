@@ -34,6 +34,7 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import gce_disk
+from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import util
 
 
@@ -46,15 +47,23 @@ flags.DEFINE_string('gcloud_scopes', None, 'If set, space-separated list of '
 
 FLAGS = flags.FLAGS
 
-SET_INTERRUPTS_SH = 'set-interrupts.sh'
 BOOT_DISK_SIZE_GB = 10
 BOOT_DISK_TYPE = disk.STANDARD
 NVME = 'nvme'
 SCSI = 'SCSI'
+UBUNTU_IMAGE = 'ubuntu-14-04'
+RHEL_IMAGE = 'rhel-7'
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
+
+  DEFAULT_ZONE = 'us-central1-a'
+  DEFAULT_MACHINE_TYPE = 'n1-standard-1'
+  # Subclasses should override the default image.
+  DEFAULT_IMAGE = None
+  BOOT_DISK_SIZE_GB = 10
+  BOOT_DISK_TYPE = disk.STANDARD
 
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
@@ -63,11 +72,23 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
-    disk_spec = disk.BaseDiskSpec(BOOT_DISK_SIZE_GB, BOOT_DISK_TYPE, None)
+    disk_spec = disk.BaseDiskSpec(
+        self.BOOT_DISK_SIZE_GB, self.BOOT_DISK_TYPE, None)
+    self.network = gce_network.GceNetwork.GetNetwork(None)
     self.boot_disk = gce_disk.GceDisk(
         disk_spec, self.name, self.zone, self.project, self.image)
     self.max_local_disks = FLAGS.gce_num_local_ssds
-    self.local_disk_counter = 0
+
+
+  @classmethod
+  def SetVmSpecDefaults(cls, vm_spec):
+    """Updates the VM spec with cloud specific defaults."""
+    if vm_spec.machine_type is None:
+      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
+    if vm_spec.zone is None:
+      vm_spec.zone = cls.DEFAULT_ZONE
+    if vm_spec.image is None:
+      vm_spec.image = cls.DEFAULT_IMAGE
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -196,9 +217,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedGceVirtualMachine(GceVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
-  pass
+  DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  linux_virtual_machine.RhelMixin):
-  pass
+  DEFAULT_IMAGE = RHEL_IMAGE
