@@ -61,8 +61,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         image = self.client.images.findall(name=self.image)[0]
         flavor = self.client.flavors.findall(name=self.machine_type)[0]
 
-        network = self.client.networks.find(label=
-                                            FLAGS.openstack_private_network)
+        network = self.client.networks.find(label=FLAGS.
+                                            openstack_private_network)
         nics = [{'net-id': network.id}]
         image_id = image.id
         boot_from_vol = []
@@ -83,8 +83,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                                         nics=nics,
                                         availability_zone='nova',
                                         block_device_mapping_v2=boot_from_vol,
-                                        config_drive=
-                                        FLAGS.openstack_config_drive)
+                                        config_drive=FLAGS.
+                                        openstack_config_drive)
         self.id = vm.id
 
     @vm_util.Retry(max_retries=4, poll_interval=2)
