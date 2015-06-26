@@ -33,6 +33,10 @@ FLAGS = flags.FLAGS
 AZURE_PATH = 'azure'
 MAX_NAME_LENGTH = 24
 SSH_PORT = 22
+# The default type of storage account to create. LRS
+# stands for 'Locally Redundant Storage' and is the
+# type that we used before there were type options.
+DEFAULT_STORAGE_TYPE = 'LRS'
 
 
 class AzureFirewall(network.BaseFirewall):
@@ -114,9 +118,10 @@ class AzureAffinityGroup(resource.BaseResource):
 class AzureStorageAccount(resource.BaseResource):
   """Object representing an Azure Storage Account."""
 
-  def __init__(self, name):
+  def __init__(self, name, storage_type):
     super(AzureStorageAccount, self).__init__()
     self.name = name
+    self.storage_type = storage_type
 
   def _Create(self):
     """Creates the storage account."""
@@ -125,6 +130,7 @@ class AzureStorageAccount(resource.BaseResource):
                   'account',
                   'create',
                   '--affinity-group=%s' % self.name,
+                  '--type=%s' % self.storage_type,
                   self.name]
     vm_util.IssueCommand(create_cmd)
 
@@ -205,7 +211,7 @@ class AzureNetwork(network.BaseNetwork):
     name = ('perfkit%s%s' %
             (FLAGS.run_uri, str(uuid.uuid4())[-12:])).lower()[:MAX_NAME_LENGTH]
     self.affinity_group = AzureAffinityGroup(name, zone)
-    self.storage_account = AzureStorageAccount(name)
+    self.storage_account = AzureStorageAccount(name, DEFAULT_STORAGE_TYPE)
     self.vnet = AzureVirtualNetwork(name)
 
   @vm_util.Retry()

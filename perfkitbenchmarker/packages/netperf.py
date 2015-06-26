@@ -27,8 +27,9 @@ NETPERF_PATH = NETPERF_DIR + '/src/netperf'
 def _Install(vm):
   """Installs the netperf package on the VM."""
   vm.Install('build_tools')
-  vm.Install('wget')
-  vm.RemoteCommand('wget %s -P %s' % (NETPERF_URL, vm_util.VM_TMP_DIR))
+  vm.Install('curl')
+  vm.RemoteCommand('curl %s -o %s/%s' % (
+      NETPERF_URL, vm_util.VM_TMP_DIR, NETPERF_TAR))
   vm.RemoteCommand('cd %s && tar xvzf %s' % (vm_util.VM_TMP_DIR, NETPERF_TAR))
   vm.RemoteCommand('cd %s && ./configure && make' % NETPERF_DIR)
 

@@ -62,6 +62,7 @@ from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import static_virtual_machine
@@ -77,9 +78,6 @@ STAGE_CLEANUP = 'cleanup'
 LOG_FILE_NAME = 'pkb.log'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
-# List of functions taking a benchmark_spec. Will be called before benchmark.Run
-# with two parameters: the benchmark and benchmark_spec.
-BEFORE_RUN_HOOKS = []
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
@@ -93,7 +91,7 @@ flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
 flags.DEFINE_list(
-    'zones', None,
+    'zones', [None],
     'A list of zones within which to run PerfKitBenchmarker.'
     ' This is specific to the cloud provider you are running on. '
     'If multiple zones are given, PerfKitBenchmarker will create 1 VM in '
@@ -146,6 +144,23 @@ flags.DEFINE_integer('num_striped_disks', 1,
                      'When using local disks, they default to striping '
                      'all disks together.',
                      lower_bound=1)
+flags.DEFINE_bool('install_packages', True,
+                  'Override for determining whether packages should be '
+                  'installed. If this is false, no packages will be installed '
+                  'on any VMs. This option should probably only ever be used '
+                  'if you have already created an image with all relevant '
+                  'packages installed.')
+
+# Support for using a proxy in the cloud environment.
+flags.DEFINE_string('http_proxy', '',
+                    'Specify a proxy for HTTP in the form '
+                    '[user:passwd@]proxy.server:port.')
+flags.DEFINE_string('https_proxy', '',
+                    'Specify a proxy for HTTPS in the form '
+                    '[user:passwd@]proxy.server:port.')
+flags.DEFINE_string('ftp_proxy', '',
+                    'Specify a proxy for FTP in the form '
+                    '[user:passwd@]proxy.server:port.')
 
 MAX_RUN_URI_LENGTH = 10
 
@@ -214,12 +229,12 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
       benchmark module's Run function.
   """
   logging.info('Running benchmark %s', name)
-  for before_run_hook in BEFORE_RUN_HOOKS:
-    before_run_hook(benchmark=benchmark, benchmark_spec=spec)
-
-  with vm_util.RunDStatIfConfigured(spec.vms, suffix='-{0}-dstat'.format(name)):
+  events.before_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+  try:
     with timer.Measure('Benchmark Run'):
       samples = benchmark.Run(spec)
+  finally:
+    events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
   collector.AddSamples(samples, name, spec)
 
 
@@ -384,6 +399,7 @@ def RunBenchmarks(publish=True):
 
   vm_util.SSHKeyGen()
   collector = SampleCollector()
+  events.initialization_complete.send(parsed_flags=FLAGS)
 
   if FLAGS.static_vm_file:
     with open(FLAGS.static_vm_file) as fp:

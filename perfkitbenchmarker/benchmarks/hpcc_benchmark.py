@@ -213,7 +213,7 @@ def Run(benchmark_spec):
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '
              '"ssh -o StrictHostKeyChecking=no" ./hpcc' %
              (num_processes, MACHINEFILE))
-  master_vm.LongRunningRemoteCommand(mpi_cmd)
+  master_vm.RobustRemoteCommand(mpi_cmd)
   logging.info('HPCC Results:')
   stdout, _ = master_vm.RemoteCommand('cat hpccoutf.txt', should_log=True)
 

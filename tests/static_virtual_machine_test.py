@@ -41,7 +41,6 @@ class StaticVirtualMachineTest(unittest.TestCase):
     self.assertEqual(vm1.user_name, vm2.user_name)
     self.assertEqual(vm1.zone, vm2.zone)
     self.assertEqual(vm1.ssh_private_key, vm2.ssh_private_key)
-    self.assertEqual(vm1.has_private_key, vm2.has_private_key)
 
   def testReadFromFile_WrongFormat(self):
     fp = BytesIO('{}')

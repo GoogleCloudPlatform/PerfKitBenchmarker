@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.packages.ycsb"""
 
+import copy
 import os
 import unittest
 
@@ -140,7 +141,7 @@ class WeightedQuantileTestCase(unittest.TestCase):
     self.assertEqual(4, ycsb._WeightedQuantile(x, weights, 0.995))
 
 
-class _ParseWorkloadTestCase(unittest.TestCase):
+class ParseWorkloadTestCase(unittest.TestCase):
 
   def testParsesEmptyString(self):
     self.assertDictEqual({}, ycsb._ParseWorkload(''))
@@ -176,3 +177,65 @@ class _ParseWorkloadTestCase(unittest.TestCase):
     }
 
     self.assertDictEqual(expected, actual)
+
+
+class CombineResultsTestCase(unittest.TestCase):
+
+  def testGroupMissing(self):
+    r1 = {
+        'client': '',
+        'command_line': '',
+        'groups': {
+            'read': {
+                'group': 'read',
+                'statistics': {'Operations': 100,
+                               'Return=0': 100},
+                'histogram': []
+            }
+        }
+    }
+    r2 = {
+        'client': '',
+        'command_line': '',
+        'groups': {
+            'read': {
+                'group': 'read',
+                'statistics': {'Operations': 96, 'Return=0': 94,
+                               'Return=-1': 2},
+                'histogram': []
+            },
+            'update': {
+                'group': 'update',
+                'statistics': {'Operations': 100,
+                               'AverageLatency(ms)': 25},
+                'histogram': []
+            }
+        }
+    }
+    combined = ycsb._CombineResults([r1, r2])
+    self.assertItemsEqual(['read', 'update'], combined['groups'])
+    self.assertItemsEqual(['Operations', 'Return=0', 'Return=-1'],
+                          combined['groups']['read']['statistics'])
+    read_stats = combined['groups']['read']['statistics']
+    self.assertEqual({'Operations': 196, 'Return=0': 194, 'Return=-1': 2},
+                     read_stats)
+
+  def testDropUnaggregatedFromSingleResult(self):
+    r = {
+        'client': '',
+        'command_line': '',
+        'groups': {
+            'read': {
+                'group': 'read',
+                'statistics': {'AverageLatency(ms)': 21},
+                'histogram': []
+            }
+        }
+    }
+
+    r_copy = copy.deepcopy(r)
+    self.assertEqual(r, r_copy)
+    combined = ycsb._CombineResults([r])
+    self.assertEqual(r, r_copy)
+    r['groups']['read']['statistics'] = {}
+    self.assertEqual(r, combined)

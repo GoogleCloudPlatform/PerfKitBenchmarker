@@ -19,6 +19,7 @@ import pickle
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import network
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -45,36 +46,12 @@ ZONE = 'zone'
 VIRTUAL_MACHINE = 'virtual_machine'
 NETWORK = 'network'
 FIREWALL = 'firewall'
-DEFAULTS = {
-    GCP: {
-        IMAGE: 'ubuntu-14-04',
-        MACHINE_TYPE: 'n1-standard-1',
-        ZONE: 'us-central1-a',
-    },
-    AZURE: {
-        IMAGE: ('b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-'
-                '14_04_1-LTS-amd64-server-20150123-en-us-30GB'),
-        MACHINE_TYPE: 'Small',
-        ZONE: 'East US',
-    },
-    AWS: {
-        IMAGE: None,
-        MACHINE_TYPE: 'm3.medium',
-        ZONE: 'us-east-1a'
-    },
-    DIGITALOCEAN: {
-        IMAGE: 'ubuntu-14-04-x64',
-        MACHINE_TYPE: '2gb',
-        ZONE: 'sfo1'
-    }
-}
 CLASSES = {
     GCP: {
         VIRTUAL_MACHINE: {
             DEBIAN: gce_virtual_machine.DebianBasedGceVirtualMachine,
             RHEL: gce_virtual_machine.RhelBasedGceVirtualMachine
         },
-        NETWORK: gce_network.GceNetwork,
         FIREWALL: gce_network.GceFirewall
     },
     AZURE: {
@@ -82,7 +59,6 @@ CLASSES = {
             DEBIAN: azure_virtual_machine.DebianBasedAzureVirtualMachine,
             RHEL: azure_virtual_machine.RhelBasedAzureVirtualMachine
         },
-        NETWORK: azure_network.AzureNetwork,
         FIREWALL: azure_network.AzureFirewall
     },
     AWS: {
@@ -90,7 +66,6 @@ CLASSES = {
             DEBIAN: aws_virtual_machine.DebianBasedAwsVirtualMachine,
             RHEL: aws_virtual_machine.RhelBasedAwsVirtualMachine
         },
-        NETWORK: aws_network.AwsNetwork,
         FIREWALL: aws_network.AwsFirewall
     },
     DIGITALOCEAN: {
@@ -100,7 +75,6 @@ CLASSES = {
             RHEL:
             digitalocean_virtual_machine.RhelBasedDigitalOceanVirtualMachine,
         },
-        NETWORK: digitalocean_network.DigitalOceanNetwork,
         FIREWALL: digitalocean_network.DigitalOceanFirewall
     },
 }
@@ -109,6 +83,13 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
                   'Name of the cloud to use.')
+flags.DEFINE_enum(
+    'os_type', DEBIAN, [DEBIAN, RHEL],
+    'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
+    'built on Debian and uses the same package manager. Likewise, CentOS\'s '
+    'os_type is "rhel". In general if two OS\'s use the same package manager, '
+    'and are otherwise very similar, the same os_type should work on both of '
+    'them.')
 
 
 class BenchmarkSpec(object):
@@ -123,7 +104,6 @@ class BenchmarkSpec(object):
           FLAGS.benchmark_config_pair[benchmark_info['name']])
     self.vms = []
     self.vm_dict = {'default': []}
-    self.networks = {}
     self.benchmark_name = benchmark_info['name']
     if hasattr(self, 'config'):
       config_dict = {}
@@ -148,11 +128,9 @@ class BenchmarkSpec(object):
     else:
       self.cloud = FLAGS.cloud
       self.project = FLAGS.project
-      defaults = DEFAULTS[self.cloud]
-      self.zones = FLAGS.zones or [defaults[ZONE]]
-      self.image = FLAGS.image or defaults[IMAGE]
-      self.machine_type = FLAGS.machine_type or defaults[
-          MACHINE_TYPE]
+      self.zones = FLAGS.zones
+      self.image = FLAGS.image
+      self.machine_type = FLAGS.machine_type
       if benchmark_info['num_machines'] is None:
         self.num_vms = FLAGS.num_vms
       else:
@@ -192,9 +170,9 @@ class BenchmarkSpec(object):
 
   def Prepare(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
-    if self.networks:
-      prepare_args = [self.networks[zone] for zone in self.networks]
-      vm_util.RunThreaded(self.PrepareNetwork, prepare_args)
+    prepare_args = network.BaseNetwork.networks.values()
+    vm_util.RunThreaded(self.PrepareNetwork, prepare_args)
+
     if self.vms:
       prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
       vm_util.RunThreaded(self.PrepareVm, prepare_args)
@@ -215,9 +193,9 @@ class BenchmarkSpec(object):
     except Exception:
       logging.exception('Got an exception disabling firewalls. '
                         'Attempting to continue tearing down.')
-    for zone in self.networks:
+    for net in network.BaseNetwork.networks.itervalues():
       try:
-        self.networks[zone].Delete()
+        net.Delete()
       except Exception:
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
@@ -227,12 +205,12 @@ class BenchmarkSpec(object):
     """Initialize the network."""
     network.Create()
 
-  def CreateVirtualMachine(self, opt_zone=None):
+  def CreateVirtualMachine(self, zone):
     """Create a vm in zone.
 
     Args:
-      opt_zone: The zone in which the vm will be created. If not provided,
-        FLAGS.zone or the revelant zone from DEFAULT will be used.
+      zone: The zone in which the vm will be created. If zone is None,
+        the VM class's DEFAULT_ZONE will be used instead.
     Returns:
       A vm object.
     """
@@ -241,14 +219,12 @@ class BenchmarkSpec(object):
       return vm
 
     vm_class = CLASSES[self.cloud][VIRTUAL_MACHINE][FLAGS.os_type]
-    zone = opt_zone or self.zones[0]
-    if zone not in self.networks:
-      network_class = CLASSES[self.cloud][NETWORK]
-      self.networks[zone] = network_class(zone)
-    self.vm_spec = virtual_machine.BaseVirtualMachineSpec(
-        self.project, zone, self.machine_type, self.image,
-        self.networks[zone])
-    return vm_class(self.vm_spec)
+
+    vm_spec = virtual_machine.BaseVirtualMachineSpec(
+        self.project, zone, self.machine_type, self.image)
+    vm_class.SetVmSpecDefaults(vm_spec)
+
+    return vm_class(vm_spec)
 
   def CreateVirtualMachineFromNodeSection(self, node_section, node_name):
     """Create a VirtualMachine object from NodeSection.
@@ -298,17 +274,15 @@ class BenchmarkSpec(object):
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
-    firewall.AllowPort(vm, vm.ssh_port)
+    for port in vm.remote_access_ports:
+      firewall.AllowPort(vm, port)
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
-    vm.Startup()
+    vm.OnStartup()
     if FLAGS.scratch_disk_type == disk.LOCAL:
       vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
-    vm_util.BurnCpu(vm)
-    if vm.is_static and vm.install_packages:
-      vm.SnapshotPackages()
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.

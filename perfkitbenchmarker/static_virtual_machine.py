@@ -29,7 +29,7 @@ import json
 import logging
 import threading
 
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 
 
@@ -59,7 +59,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
           useful if benchmark dependencies have already been installed.
     """
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
-        None, None, None, None, None)
+        None, None, None, None)
     super(StaticVirtualMachine, self).__init__(vm_spec)
     self.ip_address = ip_address
     self.internal_ip = internal_ip
@@ -213,10 +213,10 @@ def GetStaticVirtualMachineClass(os_type):
 
 
 class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
-                                      package_managers.AptMixin):
+                                      linux_virtual_machine.DebianMixin):
   pass
 
 
 class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
-                                    package_managers.YumMixin):
+                                    linux_virtual_machine.RhelMixin):
   pass

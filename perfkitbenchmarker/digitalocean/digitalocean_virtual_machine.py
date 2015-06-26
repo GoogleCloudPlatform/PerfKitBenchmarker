@@ -21,7 +21,7 @@ import time
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.digitalocean import digitalocean_disk
@@ -29,6 +29,7 @@ from perfkitbenchmarker.digitalocean import util
 
 FLAGS = flags.FLAGS
 
+UBUNTU_IMAGE = 'ubuntu-14-04-x64'
 CLOUD_CONFIG_TEMPLATE = '''#cloud-config
 users:
   - name: {0}
@@ -60,6 +61,11 @@ def GetErrorMessage(stdout):
 class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a DigitalOcean Virtual Machine (Droplet)."""
 
+  DEFAULT_ZONE = 'sfo1'
+  DEFAULT_MACHINE_TYPE = '2gb'
+  # Subclasses should override the default image.
+  DEFAULT_IMAGE = None
+
   def __init__(self, vm_spec):
     """Initialize a DigitalOcean virtual machine.
 
@@ -71,9 +77,18 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = 1
     self.local_disk_counter = 0
 
+  @classmethod
+  def SetVmSpecDefaults(cls, vm_spec):
+    """Updates the VM spec with cloud specific defaults."""
+    if vm_spec.machine_type is None:
+      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
+    if vm_spec.zone is None:
+      vm_spec.zone = cls.DEFAULT_ZONE
+    if vm_spec.image is None:
+      vm_spec.image = cls.DEFAULT_IMAGE
+
   def _Create(self):
     """Create a DigitalOcean VM instance (droplet)."""
-    super(DigitalOceanVirtualMachine, self)._Create()
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
 
@@ -206,10 +221,10 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 
 class DebianBasedDigitalOceanVirtualMachine(DigitalOceanVirtualMachine,
-                                            package_managers.AptMixin):
-  pass
+                                            linux_virtual_machine.DebianMixin):
+  DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
 class RhelBasedDigitalOceanVirtualMachine(DigitalOceanVirtualMachine,
-                                          package_managers.YumMixin):
+                                          linux_virtual_machine.RhelMixin):
   pass

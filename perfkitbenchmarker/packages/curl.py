@@ -11,7 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Files to run *on the guest VM*.
 
-Nothing in this package should be imported.
-"""
+
+"""Module containing curl installation and cleanup functions."""
+
+
+def _Install(vm):
+  """Installs the curl package on the VM."""
+  vm.InstallPackages('curl')
+
+
+def YumInstall(vm):
+  """Installs the curl package on the VM."""
+  _Install(vm)
+
+
+def AptInstall(vm):
+  """Installs the curl package on the VM."""
+  _Install(vm)
