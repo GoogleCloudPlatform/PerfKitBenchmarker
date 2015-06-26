@@ -33,11 +33,14 @@ from perfkitbenchmarker.digitalocean import digitalocean_network
 from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine
+from perfkitbenchmarker.openstack import os_network
+from perfkitbenchmarker.openstack import os_virtual_machine
 
 GCP = 'GCP'
 AZURE = 'Azure'
 AWS = 'AWS'
 DIGITALOCEAN = 'DigitalOcean'
+OPENSTACK = 'OpenStack'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 IMAGE = 'image'
@@ -46,6 +49,34 @@ ZONE = 'zone'
 VIRTUAL_MACHINE = 'virtual_machine'
 NETWORK = 'network'
 FIREWALL = 'firewall'
+DEFAULTS = {
+    GCP: {
+        IMAGE: 'ubuntu-14-04',
+        MACHINE_TYPE: 'n1-standard-1',
+        ZONE: 'us-central1-a',
+    },
+    AZURE: {
+        IMAGE: ('b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-'
+                '14_04_1-LTS-amd64-server-20150123-en-us-30GB'),
+        MACHINE_TYPE: 'Small',
+        ZONE: 'East US',
+    },
+    AWS: {
+        IMAGE: None,
+        MACHINE_TYPE: 'm3.medium',
+        ZONE: 'us-east-1a'
+    },
+    DIGITALOCEAN: {
+        IMAGE: 'ubuntu-14-04-x64',
+        MACHINE_TYPE: '2gb',
+        ZONE: 'sfo1'
+    },
+    OPENSTACK: {
+        IMAGE: 'ubuntu-14.04',
+        MACHINE_TYPE: 'm1.small',
+        ZONE: 'nova'
+    }
+}
 CLASSES = {
     GCP: {
         VIRTUAL_MACHINE: {
@@ -77,11 +108,19 @@ CLASSES = {
         },
         FIREWALL: digitalocean_network.DigitalOceanFirewall
     },
+    OPENSTACK: {
+        VIRTUAL_MACHINE: {
+            DEBIAN: os_virtual_machine.DebianBasedOpenStackVirtualMachine,
+            RHEL: os_virtual_machine.OpenStackVirtualMachine
+        },
+        NETWORK: os_network.OpenStackNetwork,
+        FIREWALL: os_network.OpenStackFirewall
+    }
 }
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
+flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN, OPENSTACK],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL],
