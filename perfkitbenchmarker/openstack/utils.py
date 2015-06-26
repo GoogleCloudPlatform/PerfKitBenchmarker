@@ -2,7 +2,7 @@ import functools
 
 import keystoneclient.v2_0.client as ksclient
 from novaclient import client as noclient
-from novaclient.exceptions import Unauthorized, NotFound, BadRequest
+from novaclient.exceptions import Unauthorized
 
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.vm_util import POLL_INTERVAL
@@ -82,7 +82,8 @@ class NovaClient(object):
                                         )
 
     def reconnect(self):
-        self.__auth = KeystoneAuth(self.url, self.tenant, self.user, self.password)
+        self.__auth = KeystoneAuth(self.url, self.tenant, self.user,
+                                   self.password)
         self.__client = noclient.Client('1.1',
                                         auth_url=self.url,
                                         username=self.user,

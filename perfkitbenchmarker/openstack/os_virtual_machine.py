@@ -61,7 +61,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         image = self.client.images.findall(name=self.image)[0]
         flavor = self.client.flavors.findall(name=self.machine_type)[0]
 
-        network = self.client.networks.find(label=FLAGS.openstack_private_network)
+        network = self.client.networks.find(label=
+                                            FLAGS.openstack_private_network)
         nics = [{'net-id': network.id}]
         image_id = image.id
         boot_from_vol = []
@@ -82,7 +83,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                                         nics=nics,
                                         availability_zone='nova',
                                         block_device_mapping_v2=boot_from_vol,
-                                        config_drive=FLAGS.openstack_config_drive)
+                                        config_drive=
+                                        FLAGS.openstack_config_drive)
         self.id = vm.id
 
     @vm_util.Retry(max_retries=4, poll_interval=2)
@@ -95,10 +97,12 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             time.sleep(5)
             instance = self.client.servers.get(self.id)
             status = instance.status
-        self.floating_ip = self.client.floating_ips.create(pool=FLAGS.openstack_public_network)
+        self.floating_ip = self.client.floating_ips.create(
+            pool=FLAGS.openstack_public_network)
         instance.add_floating_ip(self.floating_ip)
         self.ip_address = self.floating_ip.ip
-        self.internal_ip = instance.networks[FLAGS.openstack_private_network][0]
+        self.internal_ip = instance.networks[
+            FLAGS.openstack_private_network][0]
 
     @os_utils.retry_authorization(max_retries=4)
     def _Delete(self):
@@ -131,7 +135,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     def CreateScratchDisk(self, disk_spec):
         name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
-        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone, self.project)
+        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone,
+                                             self.project)
         self.scratch_disks.append(scratch_disk)
 
         scratch_disk.Create()
@@ -151,7 +156,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             cat_cmd = ['cat',
                        vm_util.GetPublicKeyPath()]
             key_file, _ = vm_util.IssueRetryableCommand(cat_cmd)
-            pk = self.client.keypairs.create(self.key_name, public_key=key_file)
+            pk = self.client.keypairs.create(self.key_name,
+                                             public_key=key_file)
         else:
             pk = self.client.keypairs.findall(name=self.key_name)[0]
         self.pk = pk

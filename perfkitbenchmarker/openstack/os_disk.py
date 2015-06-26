@@ -54,7 +54,8 @@ class OpenStackDisk(disk.BaseDisk):
             self.__nclient.volumes.delete(self._disk)
             is_deleted = False
             while not is_deleted:
-                is_deleted = len(self.__nclient.volumes.findall(display_name=self.name)) == 0
+                is_deleted = len(self.__nclient.volumes.findall(
+                    display_name=self.name)) == 0
                 time.sleep(sleep)
                 sleep_count += 1
                 if sleep_count == 10:

@@ -14,6 +14,7 @@ flags.DEFINE_string('openstack_private_network', 'private',
 
 MAX_PORT = 65535
 
+
 class OpenStackFirewall(network.BaseFirewall):
     """
     An object representing OpenStack Firewall based on Secure Groups.
@@ -29,13 +30,15 @@ class OpenStackFirewall(network.BaseFirewall):
                                           password
                                           )
 
-        if not (self.__nclient.security_groups.findall(name='perfkit_sc_group')):
+        if not (self.__nclient.security_groups.findall(
+                name='perfkit_sc_group')):
             self.sec_group = self.__nclient.security_groups.create(
                 'perfkit_sc_group',
                 'Firewall configuration for Perfkit Benchmarker'
             )
         else:
-            self.sec_group = self.__nclient.security_groups.findall(name='perfkit_sc_group')[0]
+            self.sec_group = self.__nclient.security_groups.findall(
+                name='perfkit_sc_group')[0]
 
         self.AllowPort(None, -1, protocol='icmp')
         self.AllowPort(None, 1, MAX_PORT)
