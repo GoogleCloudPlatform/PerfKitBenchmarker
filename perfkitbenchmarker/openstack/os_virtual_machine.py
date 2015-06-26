@@ -39,14 +39,13 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
 
-    instance_counter = 0
-
     def __init__(self, vm_spec):
         super(OpenStackVirtualMachine, self).__init__(vm_spec)
         self.special_id = id_generator()
-        self.name = 'perfkit_vm_%d_%s' % (self.instance_counter, self.special_id)
-        self.key_name = 'perfkit_key_%d_%s' % (self.instance_counter, self.special_id)
-        OpenStackVirtualMachine.instance_counter += 1
+        self.name = 'perfkit_vm_%d_%s' % (self.instance_number,
+                                          self.special_id)
+        self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
+                                               self.special_id)
         password = os.getenv('OS_PASSWORD')
         self.client = os_utils.NovaClient(FLAGS.openstack_auth_url,
                                           FLAGS.openstack_tenant,
