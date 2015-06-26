@@ -13,7 +13,6 @@ FLAGS = flags.FLAGS
 
 
 class OpenStackDisk(disk.BaseDisk):
-    characters = (c for c in "cdefghijklmnopqrstuvwxyz")
 
     def __init__(self, disk_spec, name, zone, project, image=None):
         super(OpenStackDisk, self).__init__(disk_spec)
@@ -30,6 +29,7 @@ class OpenStackDisk(disk.BaseDisk):
         self.zone = zone
         self.project = project
         self.device = ""
+        self.virtual_disks = (c for c in "cdefghijklmnopqrstuvwxyz")
 
     def _Create(self):
         self._disk = self.__nclient.volumes.create(self.disk_size,
@@ -72,7 +72,7 @@ class OpenStackDisk(disk.BaseDisk):
     def Attach(self, vm):
         self.attached_vm_name = vm.name
         self.attached_vm_id = vm.id
-        device_hint_name = "/dev/vd" + self.characters.next()
+        device_hint_name = "/dev/vd" + self.virtual_disks.next()
         result = self.__nclient.volumes.create_server_volume(vm.id,
                                                              self._disk.id,
                                                              device_hint_name)
