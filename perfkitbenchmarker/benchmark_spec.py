@@ -15,7 +15,6 @@
 """Container for all data required for a benchmark to run."""
 
 import logging
-import os
 import pickle
 
 from perfkitbenchmarker import disk
@@ -97,8 +96,10 @@ flags.DEFINE_enum(
     'os_type is "rhel". In general if two OS\'s use the same package manager, '
     'and are otherwise very similar, the same os_type should work on both of '
     'them.')
-flags.DEFINE_string('scratch_dir', '/',
-                    'Directory in the VM where scratch disks will be mounted.')
+flags.DEFINE_string('scratch_dir', '/scratch',
+                    'Base name for all scratch disk directories in the VM.'
+                    'Upon creation, these directories will have numbers'
+                    'appended to them (for example /scratch0, /scratch1, etc).')
 
 
 class BenchmarkSpec(object):
@@ -165,7 +166,7 @@ class BenchmarkSpec(object):
         else:
           num_striped_disks = FLAGS.num_striped_disks
         for i in range(benchmark_info['scratch_disk']):
-          mount_point = os.path.join(FLAGS.scratch_dir, 'scratch%d' % i)
+          mount_point = '%s%d' % (FLAGS.scratch_dir, i)
           disk_spec = disk.BaseDiskSpec(
               self.scratch_disk_size, self.scratch_disk_type,
               mount_point, self.scratch_disk_iops,

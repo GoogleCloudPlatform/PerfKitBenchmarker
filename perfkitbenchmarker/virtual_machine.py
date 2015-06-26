@@ -272,7 +272,6 @@ class BaseOsMixin(object):
     """
     pass
 
-
   @abc.abstractmethod
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""

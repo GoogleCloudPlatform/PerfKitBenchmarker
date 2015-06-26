@@ -29,6 +29,7 @@ for you.
 import logging
 import os
 import pipes
+import posixpath
 import re
 import threading
 import time
@@ -788,7 +789,7 @@ class ContainerizedDebianMixin(DebianMixin):
       A tuple of stdout and stderr from running the command.
     """
     # Escapes bash sequences
-    command = command.replace("\'", "\'\\\'\'")
+    command = command.replace("'", r"'\''")
 
     logging.info('Docker running: %s' % command)
     command = "sudo docker exec %s bash -c '%s'" % (self.docker_id, command)
@@ -811,14 +812,14 @@ class ContainerizedDebianMixin(DebianMixin):
 
       # Everything in vm_util.VM_TMP_DIR is directly accessible
       # both in the host and in the container
-      source_path = os.path.join(CONTAINER_MOUNT_DIR, file_name)
+      source_path = posixpath.join(CONTAINER_MOUNT_DIR, file_name)
       command = 'cp %s %s' % (source_path, container_path)
       self.RemoteCommand(command)
     else:
       if container_path == '':
         raise errors.VirtualMachine.RemoteExceptionError('Cannot copy '
                                                          'from blank target')
-      destination_path = os.path.join(CONTAINER_MOUNT_DIR, file_name)
+      destination_path = posixpath.join(CONTAINER_MOUNT_DIR, file_name)
       command = 'cp %s %s' % (container_path, destination_path)
       self.RemoteCommand(command)
 
@@ -832,12 +833,12 @@ class ContainerizedDebianMixin(DebianMixin):
     """
     if copy_to:
       file_name = os.path.basename(file_path)
-      tmp_path = os.path.join(vm_util.VM_TMP_DIR, file_name)
+      tmp_path = posixpath.join(vm_util.VM_TMP_DIR, file_name)
       self.RemoteHostCopy(file_path, tmp_path, copy_to)
       self.ContainerCopy(file_name, remote_path, copy_to)
     else:
-      file_name = os.path.basename(remote_path)
-      tmp_path = os.path.join(vm_util.VM_TMP_DIR, file_name)
+      file_name = posixpath.basename(remote_path)
+      tmp_path = posixpath.join(vm_util.VM_TMP_DIR, file_name)
       self.ContainerCopy(file_name, remote_path, copy_to)
       self.RemoteHostCopy(file_path, tmp_path, copy_to)
 
@@ -853,13 +854,13 @@ class ContainerizedDebianMixin(DebianMixin):
       remote_path: The destination of the file on the TARGET machine, default
           is the root directory.
     """
-    file_name = os.path.basename(source_path)
+    file_name = posixpath.basename(source_path)
 
     # Copies the file to vm_util.VM_TMP_DIR in source
     self.ContainerCopy(file_name, source_path, copy_to=False)
 
     # Moves the file to vm_util.VM_TMP_DIR in target
-    source_host_path = os.path.join(vm_util.VM_TMP_DIR, file_name)
+    source_host_path = posixpath.join(vm_util.VM_TMP_DIR, file_name)
     target_host_dir = vm_util.VM_TMP_DIR
     self.MoveHostFile(target, source_host_path, target_host_dir)
 
