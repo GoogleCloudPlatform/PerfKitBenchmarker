@@ -68,7 +68,8 @@ CLASSES = {
     AWS: {
         VIRTUAL_MACHINE: {
             DEBIAN: aws_virtual_machine.DebianBasedAwsVirtualMachine,
-            RHEL: aws_virtual_machine.RhelBasedAwsVirtualMachine
+            RHEL: aws_virtual_machine.RhelBasedAwsVirtualMachine,
+            WINDOWS: aws_virtual_machine.WindowsAwsVirtualMachine
         },
         FIREWALL: aws_network.AwsFirewall
     },
