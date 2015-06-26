@@ -33,7 +33,7 @@ import perfkitbenchmarker.deployment.shared.ini_constants as ini_constants
 from perfkitbenchmarker.digitalocean import digitalocean_network
 from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
 from perfkitbenchmarker.gcp import gce_network
-from perfkitbenchmarker.gcp import gce_virtual_machine
+from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
 
 GCP = 'GCP'
 AZURE = 'Azure'
@@ -53,10 +53,10 @@ FIREWALL = 'firewall'
 CLASSES = {
     GCP: {
         VIRTUAL_MACHINE: {
-            DEBIAN: gce_virtual_machine.DebianBasedGceVirtualMachine,
-            RHEL: gce_virtual_machine.RhelBasedGceVirtualMachine,
-            UBUNTU_CONTAINER: gce_virtual_machine.ContainerizedGceVirtualMachine,
-            WINDOWS: gce_virtual_machine.WindowsGceVirtualMachine
+            DEBIAN: gce_vm.DebianBasedGceVirtualMachine,
+            RHEL: gce_vm.RhelBasedGceVirtualMachine,
+            UBUNTU_CONTAINER: gce_vm.ContainerizedGceVirtualMachine,
+            WINDOWS: gce_vm.WindowsGceVirtualMachine
         },
         FIREWALL: gce_network.GceFirewall
     },

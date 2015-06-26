@@ -23,7 +23,10 @@ from perfkitbenchmarker import sample
 FLAGS = flags.FLAGS
 
 BENCHMARK_INFO = {'name': 'bonnie++',
-                  'description': 'Runs Bonnie++.',
+                  'description': 'Runs Bonnie++. Running this benchmark inside '
+                                 'a container is currently not supported, '
+                                 'since Docker tries to run it as root, which '
+                                 'is not recommended.',
                   'scratch_disk': True,
                   'num_machines': 1}
 
