@@ -13,19 +13,19 @@
 # limitations under the License.
 
 
-"""Module containing curl installation and cleanup functions."""
+"""Module containing docker installation and cleanup functions."""
 
 
 def _Install(vm):
-  """Installs the curl package on the VM."""
-  vm.InstallPackages('curl')
+  """Installs the docker package on the VM."""
+  vm.RemoteHostCommand('wget -qO- https://get.docker.com/ | sh')
 
 
 def YumInstall(vm):
-  """Installs the curl package on the VM."""
+  """Installs the docker package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the curl package on the VM."""
+  """Installs the docker package on the VM."""
   _Install(vm)

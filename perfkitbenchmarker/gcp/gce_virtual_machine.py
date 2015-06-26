@@ -30,7 +30,7 @@ import re
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
@@ -223,13 +223,18 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     vm_util.IssueCommand(cmd)
 
 
+class ContainerizedGceVirtualMachine(GceVirtualMachine,
+                                     linux_vm.ContainerizedDebianMixin):
+  DEFAULT_IMAGE = UBUNTU_IMAGE
+
+
 class DebianBasedGceVirtualMachine(GceVirtualMachine,
-                                   linux_virtual_machine.DebianMixin):
+                                   linux_vm.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
-                                 linux_virtual_machine.RhelMixin):
+                                 linux_vm.RhelMixin):
   DEFAULT_IMAGE = RHEL_IMAGE
 
 
