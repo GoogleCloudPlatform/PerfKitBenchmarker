@@ -1,13 +1,15 @@
+import os
+
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker.openstack import utils
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('os_public_network', None,
+flags.DEFINE_string('openstack_public_network', None,
                     'Name of OpenStack public network')
 
-flags.DEFINE_string('os_private_network', 'private',
+flags.DEFINE_string('openstack_private_network', 'private',
                     'Name of OpenStack private network')
 
 
@@ -19,10 +21,11 @@ class OpenStackFirewall(network.BaseFirewall):
     def __init__(self, project):
         super(OpenStackFirewall, self).__init__(project)
         self.project = project
-        self.__nclient = utils.NovaClient(FLAGS.os_auth_url,
-                                          FLAGS.os_tenant,
-                                          FLAGS.os_username,
-                                          FLAGS.os_passwd
+        password = os.getenv('OS_PASSWORD')
+        self.__nclient = utils.NovaClient(FLAGS.openstack_auth_url,
+                                          FLAGS.openstack_tenant,
+                                          FLAGS.openstack_username,
+                                          password
                                           )
 
         if not (self.__nclient.security_groups.findall(name='perfkit_sc_group')):

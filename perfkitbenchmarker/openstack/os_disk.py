@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 
 from perfkitbenchmarker.openstack import utils as os_utils
@@ -16,10 +17,11 @@ class OpenStackDisk(disk.BaseDisk):
 
     def __init__(self, disk_spec, name, zone, project, image=None):
         super(OpenStackDisk, self).__init__(disk_spec)
-        self.__nclient = utils.NovaClient(FLAGS.os_auth_url,
-                                          FLAGS.os_tenant,
-                                          FLAGS.os_username,
-                                          FLAGS.os_passwd
+        password = os.getenv('OS_PASSWORD')
+        self.__nclient = utils.NovaClient(FLAGS.openstack_auth_url,
+                                          FLAGS.openstack_tenant,
+                                          FLAGS.openstack_username,
+                                          password
                                           )
         self.attached_vm_name = None
         self.attached_vm_id = -1

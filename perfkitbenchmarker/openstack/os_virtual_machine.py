@@ -2,6 +2,7 @@ import logging
 import random
 import string
 import time
+import os
 
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import flags
@@ -11,20 +12,17 @@ from perfkitbenchmarker.openstack import utils as os_utils, os_disk
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('os_auth_url', 'http://localhost:5000',
+flags.DEFINE_string('openstack_auth_url', 'http://localhost:5000',
                     'This determine url to Keystone authenticate service.'
                     'It is require to discovery other OpenStack services URLs')
 
-flags.DEFINE_string('os_username', 'admin',
+flags.DEFINE_string('openstack_username', 'admin',
                     'OpenStack login')
 
-flags.DEFINE_string('os_passwd', 'admin',
-                    'OpenStack password')
-
-flags.DEFINE_string('os_tenant', 'admin',
+flags.DEFINE_string('openstack_tenant', 'admin',
                     'OpenStack tenant name')
 
-flags.DEFINE_boolean('os_config_drive', False,
+flags.DEFINE_boolean('openstack_config_drive', False,
                      'Add possibilities to get metadata from external drive')
 
 flags.DEFINE_boolean('openstack_boot_from_volume', False,
@@ -49,10 +47,11 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.name = 'perfkit_vm_%d_%s' % (self.instance_counter, self.special_id)
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_counter, self.special_id)
         OpenStackVirtualMachine.instance_counter += 1
-        self.client = os_utils.NovaClient(FLAGS.os_auth_url,
-                                          FLAGS.os_tenant,
-                                          FLAGS.os_username,
-                                          FLAGS.os_passwd
+        password = os.getenv('OS_PASSWORD')
+        self.client = os_utils.NovaClient(FLAGS.openstack_auth_url,
+                                          FLAGS.openstack_tenant,
+                                          FLAGS.openstack_username,
+                                          password
                                           )
         self.id = -1
         self.pk = -1
@@ -63,7 +62,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         image = self.client.images.findall(name=self.image)[0]
         flavor = self.client.flavors.findall(name=self.machine_type)[0]
 
-        network = self.client.networks.find(label=FLAGS.os_private_network)
+        network = self.client.networks.find(label=FLAGS.openstack_private_network)
         nics = [{'net-id': network.id}]
         image_id = image.id
         boot_from_vol = []
@@ -84,7 +83,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                                         nics=nics,
                                         availability_zone='nova',
                                         block_device_mapping_v2=boot_from_vol,
-                                        config_drive=FLAGS.os_config_drive)
+                                        config_drive=FLAGS.openstack_config_drive)
         self.id = vm.id
 
     @vm_util.Retry(max_retries=4, poll_interval=2)
@@ -97,10 +96,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             time.sleep(5)
             instance = self.client.servers.get(self.id)
             status = instance.status
-        self.floating_ip = self.client.floating_ips.create(pool=FLAGS.os_public_network)
+        self.floating_ip = self.client.floating_ips.create(pool=FLAGS.openstack_public_network)
         instance.add_floating_ip(self.floating_ip)
         self.ip_address = self.floating_ip.ip
-        self.internal_ip = instance.networks[FLAGS.os_private_network][0]
+        self.internal_ip = instance.networks[FLAGS.openstack_private_network][0]
 
     @os_utils.retry_authorization(max_retries=4)
     def _Delete(self):

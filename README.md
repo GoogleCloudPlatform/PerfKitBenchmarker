@@ -123,12 +123,17 @@ You will need a project ID before you can run. Please navigate to https://consol
 create one.
 
 
-## OpenStack nova client
+## Install OpenStack Nova client and setup authentication
 Make sure you have installed pip (see the section above).
 
-And install python-novaclient by following command:
+Install python-novaclient by following command:
 ```
 sudo pip install python-novaclient
+```
+
+User name, tenant name and authentication URL need to be specified with test execution using the following flags: `--openstack_username, --openstack_tenant, --openstack_auth_url`. In order to specify a password we need to set environment variable:
+```bash
+export OS_PASSWORD=<password>
 ```
 
 ## Install AWS CLI and setup authentication
@@ -384,7 +389,7 @@ If a benchmark requires two machines like iperf you can have two both machines i
 
 HOW TO EXTEND PerfKitBenchmarker
 =================
-First start with the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md) 
+First start with the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
 file.  It has the basics on how to work with PerfKitBenchmarker, and how to submit your pull requests.
 
 In addition to the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
