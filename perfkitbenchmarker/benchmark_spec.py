@@ -42,6 +42,7 @@ DIGITALOCEAN = 'DigitalOcean'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
+CENTOS_CONTAINER = 'centos_container'
 UBUNTU_CONTAINER = 'ubuntu_container'
 IMAGE = 'image'
 WINDOWS_IMAGE = 'windows_image'
@@ -55,8 +56,9 @@ CLASSES = {
         VIRTUAL_MACHINE: {
             DEBIAN: gce_vm.DebianBasedGceVirtualMachine,
             RHEL: gce_vm.RhelBasedGceVirtualMachine,
-            UBUNTU_CONTAINER: gce_vm.ContainerizedGceVirtualMachine,
-            WINDOWS: gce_vm.WindowsGceVirtualMachine
+            WINDOWS: gce_vm.WindowsGceVirtualMachine,
+            CENTOS_CONTAINER: gce_vm.RhelContainerizedGceVirtualMachine,
+            UBUNTU_CONTAINER: gce_vm.DebianContainerizedGceVirtualMachine
         },
         FIREWALL: gce_network.GceFirewall
     },
@@ -91,7 +93,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
-    'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
+    'os_type', DEBIAN, [DEBIAN, RHEL, WINDOWS,
+                        CENTOS_CONTAINER, UBUNTU_CONTAINER],
     'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
     'built on Debian and uses the same package manager. Likewise, CentOS\'s '
     'os_type is "rhel". In general if two OS\'s use the same package manager, '
