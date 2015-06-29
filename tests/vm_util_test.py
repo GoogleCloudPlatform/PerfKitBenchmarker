@@ -122,6 +122,15 @@ class WaitUntilSleepTimer(threading.Thread):
 
 class IssueCommandTestCase(unittest.TestCase):
 
+  def setUp(self):
+    # psutil changed its API in v2.0, and we ask for a current one
+    # in test-requirements.txt. Unfortunately we may still get an old
+    # version if there's a system package already installed.
+    # Catch this and show a diagnostic to avoid obscure errors.
+    if psutil.version_info < (2, 0):
+      raise Exception('Wrong psutil version, found %s. Use virtualenv?' % (
+          psutil.__version__))
+
   def testTimeoutNotReached(self):
     _, _, retcode = vm_util.IssueCommand(['sleep', '0s'])
     self.assertEqual(retcode, 0)
