@@ -63,16 +63,21 @@ network {
 }
 
 namespace test {
-        replication-factor 2
-        memory-size 4G
-        default-ttl 30d # 30 days, use 0 to never expire/evict.
-        storage-engine device { # Configure the storage-engine to use persistence
-        {% for device_path in devices %}
-        device {{ device_path }}
-        {% endfor %}
-        write-block-size 128K   # adjust block size to make it efficient for SSDs
-        disable-odirect true
-        }
+	replication-factor 2
+	memory-size 4G
+	default-ttl 30d # 30 days, use 0 to never expire/evict.
+	{# if storage devices are passed to the template, use them for storage; otherwise use memory. -#}
+	{% if devices %}
+	storage-engine device { # Configure the storage-engine to use persistence
+	{% for device_path in devices %}
+	device {{ device_path }}
+	{% endfor %}
+	write-block-size 128K   # adjust block size to make it efficient for SSDs
+	disable-odirect true
+	}
+	{% else %}
+	storage-engine memory
+	{% endif %}
 }
 
 namespace bar {
