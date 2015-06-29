@@ -34,8 +34,8 @@ from perfkitbenchmarker.digitalocean import digitalocean_network
 from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
-from perfkitbenchmarker.openstack import os_network
-from perfkitbenchmarker.openstack import os_virtual_machine
+from perfkitbenchmarker.openstack import os_network as openstack_network
+from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 
 GCP = 'GCP'
 AZURE = 'Azure'
@@ -89,11 +89,10 @@ CLASSES = {
     },
     OPENSTACK: {
         VIRTUAL_MACHINE: {
-            DEBIAN: os_virtual_machine.DebianBasedOpenStackVirtualMachine,
-            RHEL: os_virtual_machine.OpenStackVirtualMachine
+            DEBIAN: openstack_vm.DebianBasedOpenStackVirtualMachine,
+            RHEL: openstack_vm.OpenStackVirtualMachine
         },
-        NETWORK: os_network.OpenStackNetwork,
-        FIREWALL: os_network.OpenStackFirewall
+        FIREWALL: openstack_network.OpenStackFirewall
     }
 }
 

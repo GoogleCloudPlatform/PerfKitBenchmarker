@@ -131,9 +131,31 @@ Install python-novaclient by following command:
 sudo pip install python-novaclient
 ```
 
-User name, tenant name and authentication URL need to be specified with test execution using the following flags: `--openstack_username, --openstack_tenant, --openstack_auth_url`. In order to specify a password we need to set environment variable:
+You must specify authentication information for test execution, including user
+name (``--openstack_username` flag or `OS_USERNAME` environment variable), tenant name
+(`--openstack_tenant` flag or `OS_TENANT_NAME` environment variable), and
+authentication URL (`--openstack_auth_url` flag or `OS_AUTH_URL` environment
+variable).
+
+The password cannot be set through a flag. You can specify it through the
+`OS_PASSWORD` environment variable, or alternatively you can save it in a file
+and specify the file location with the `--openstack_password_file` flag or
+`OPENSTACK_PASSWORD_FILE` environment variable.
+
+Example using environment variables:
+
 ```bash
+export OS_USERNAME=admin
+export OS_TENANT=myproject
+export OS_AUTH_URL=http://localhost:5000
 export OS_PASSWORD=<password>
+```
+
+Example using a password file at the default file location:
+
+```bash
+echo topsecretpassword > ~/.config/openstack-password.txt
+./pkb.py --cloud=OpenStack --benchmarks=ping
 ```
 
 ## Install AWS CLI and setup authentication

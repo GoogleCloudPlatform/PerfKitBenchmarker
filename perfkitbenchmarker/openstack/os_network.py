@@ -1,4 +1,16 @@
-import os
+# Copyright 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
@@ -23,12 +35,7 @@ class OpenStackFirewall(network.BaseFirewall):
     def __init__(self, project):
         super(OpenStackFirewall, self).__init__(project)
         self.project = project
-        password = os.getenv('OS_PASSWORD')
-        self.__nclient = utils.NovaClient(FLAGS.openstack_auth_url,
-                                          FLAGS.openstack_tenant,
-                                          FLAGS.openstack_username,
-                                          password
-                                          )
+        self.__nclient = utils.NovaClient()
 
         if not (self.__nclient.security_groups.findall(
                 name='perfkit_sc_group')):
@@ -57,7 +64,3 @@ class OpenStackFirewall(network.BaseFirewall):
 
     def DisallowAllPorts(self):
         pass
-
-
-class OpenStackNetwork(network.BaseNetwork):
-    pass

@@ -1,26 +1,29 @@
+# Copyright 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
-import random
-import string
 import time
-import os
 
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.openstack import utils as os_utils, os_disk
+from perfkitbenchmarker.openstack import os_disk
+from perfkitbenchmarker.openstack import utils as os_utils
 
+UBUNTU_IMAGE = 'ubuntu-14.04'
 
 FLAGS = flags.FLAGS
-
-flags.DEFINE_string('openstack_auth_url', 'http://localhost:5000',
-                    'This determine url to Keystone authenticate service.'
-                    'It is require to discovery other OpenStack services URLs')
-
-flags.DEFINE_string('openstack_username', 'admin',
-                    'OpenStack login')
-
-flags.DEFINE_string('openstack_tenant', 'admin',
-                    'OpenStack tenant name')
 
 flags.DEFINE_boolean('openstack_config_drive', False,
                      'Add possibilities to get metadata from external drive')
@@ -32,37 +35,42 @@ flags.DEFINE_integer('openstack_volume_size', 20,
                      'Size of the volume (GB)')
 
 
-def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
-    return ''.join(random.choice(chars) for _ in range(size))
-
-
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
 
+    DEFAULT_MACHINE_TYPE = 'm1.small'
+    DEFAULT_ZONE = 'nova'
+    DEFAULT_USERNAME = 'ubuntu'
+    # Subclasses should override the default image.
+    DEFAULT_IMAGE = None
+
     def __init__(self, vm_spec):
         super(OpenStackVirtualMachine, self).__init__(vm_spec)
-        self.special_id = id_generator()
-        self.name = 'perfkit_vm_%d_%s' % (self.instance_number,
-                                          self.special_id)
+        self.name = 'perfkit_vm_%d_%s' % (self.instance_number, FLAGS.run_uri)
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
-                                               self.special_id)
-        password = os.getenv('OS_PASSWORD')
-        self.client = os_utils.NovaClient(FLAGS.openstack_auth_url,
-                                          FLAGS.openstack_tenant,
-                                          FLAGS.openstack_username,
-                                          password
-                                          )
-        self.id = -1
-        self.pk = -1
-        self.user_name = 'ubuntu'
-        self.wait_time = 15
+                                               FLAGS.run_uri)
+        self.client = os_utils.NovaClient()
+        self.id = None
+        self.pk = None
+        self.user_name = self.DEFAULT_USERNAME
+        self.boot_wait_time = None
+
+    @classmethod
+    def SetVmSpecDefaults(cls, vm_spec):
+      """Updates the VM spec with cloud specific defaults."""
+      if vm_spec.machine_type is None:
+        vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
+      if vm_spec.zone is None:
+        vm_spec.zone = cls.DEFAULT_ZONE
+      if vm_spec.image is None:
+        vm_spec.image = cls.DEFAULT_IMAGE
 
     def _Create(self):
         image = self.client.images.findall(name=self.image)[0]
         flavor = self.client.flavors.findall(name=self.machine_type)[0]
 
-        network = self.client.networks.find(label=FLAGS.
-                                            openstack_private_network)
+        network = self.client.networks.find(
+            label=FLAGS.openstack_private_network)
         nics = [{'net-id': network.id}]
         image_id = image.id
         boot_from_vol = []
@@ -75,22 +83,20 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                               'destination_type': 'volume',
                               'delete_on_termination': True}]
 
-        vm = self.client.servers.create(name=self.name,
-                                        image=image_id,
-                                        flavor=flavor.id,
-                                        key_name=self.key_name,
-                                        security_groups=['perfkit_sc_group'],
-                                        nics=nics,
-                                        availability_zone='nova',
-                                        block_device_mapping_v2=boot_from_vol,
-                                        config_drive=FLAGS.
-                                        openstack_config_drive)
+        vm = self.client.servers.create(
+            name=self.name,
+            image=image_id,
+            flavor=flavor.id,
+            key_name=self.key_name,
+            security_groups=['perfkit_sc_group'],
+            nics=nics,
+            availability_zone='nova',
+            block_device_mapping_v2=boot_from_vol,
+            config_drive=FLAGS.openstack_config_drive)
         self.id = vm.id
 
     @vm_util.Retry(max_retries=4, poll_interval=2)
     def _PostCreate(self):
-        import time
-
         status = 'BUILD'
         instance = None
         while status == 'BUILD':
@@ -125,8 +131,11 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     @vm_util.Retry(log_errors=False, poll_interval=1)
     def WaitForBootCompletion(self):
-        time.sleep(self.wait_time)
-        self.wait_time = 5
+        # Do one longer sleep, then check at shorter intervals.
+        if self.boot_wait_time is None:
+          self.boot_wait_time = 15
+        time.sleep(self.boot_wait_time)
+        self.boot_wait_time = 5
         resp, _ = self.RemoteCommand('hostname', retries=1)
         if self.bootable_time is None:
             self.bootable_time = time.time()
@@ -172,4 +181,4 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                          linux_virtual_machine.DebianMixin):
-    pass
+    DEFAULT_IMAGE = UBUNTU_IMAGE
