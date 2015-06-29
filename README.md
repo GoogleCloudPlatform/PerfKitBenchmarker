@@ -341,20 +341,27 @@ PerfKitBenchmaker.
 Flag | Notes
 -----|------
 `--help`       | see all flags
-`--cloud`      | Check where the bechmarks are run.  Choices are `GCP`, `AWS`, `Azure`, `DigitalOcean`, or `OpenStack`
-`--zone`       | This flag allows you to override the default zone. See below.
+`--cloud`      | Cloud where the bechmarks are run. See the table below for choices.
+`--zone`       | This flag allows you to override the default zone. See the table below.
 `--benchmarks` | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --help`
 
-The zone (region) as specified with the --zone flag uses the same
-value that the Cloud CLIs take:
+The default cloud is 'GCP', override with the `--cloud` flag. Each cloud has a default
+zone which you can override with the `--zone` flag, the flag supports the same values
+that the corresponding Cloud CLIs take:
 
-Cloud | Default | Notes
+Cloud name | Default zone | Notes
 -------|---------|-------
 GCP | us-central1-a | |
 AWS | us-east-1a | |
 Azure | East US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
 OpenStack | nova | |
+
+Example:
+
+```bash
+./pkb.py --cloud=GCP --zone=us-central1-a --benchmarks=iperf,ping
+```
 
 ## Proxy configuration for VM guests.
 
