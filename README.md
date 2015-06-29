@@ -122,6 +122,20 @@ $ gcloud auth login
 You will need a project ID before you can run. Please navigate to https://console.developers.google.com and
 create one.
 
+
+## Install OpenStack Nova client and setup authentication
+Make sure you have installed pip (see the section above).
+
+Install python-novaclient by following command:
+```
+sudo pip install python-novaclient
+```
+
+User name, tenant name and authentication URL need to be specified with test execution using the following flags: `--openstack_username, --openstack_tenant, --openstack_auth_url`. In order to specify a password we need to set environment variable:
+```bash
+export OS_PASSWORD=<password>
+```
+
 ## Install AWS CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
@@ -263,6 +277,11 @@ $ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
 $ ./pkb.py --cloud=DigitalOcean --machine_type=16gb --benchmarks=iperf
 ```
 
+## Example run on OpenStack
+```
+$ ./pkb.py --cloud=OpenStack --benchmarks=iperf --os_auth_url=http://localhost:5000/v2.0/
+```
+
 HOW TO RUN WINDOWS BENCHMARKS
 ==================
 You must be running on a Windows machine in order to run Windows benchmarks.
@@ -300,7 +319,7 @@ PerfKitBenchmaker.
 Flag | Notes
 -----|------
 `--help`       | see all flags
-`--cloud`      | Check where the bechmarks are run.  Choices are `GCP`, `AWS`, `Azure`, or `DigitalOcean`
+`--cloud`      | Check where the bechmarks are run.  Choices are `GCP`, `AWS`, `Azure`, `DigitalOcean`, or `OpenStack`
 `--zone`       | This flag allows you to override the default zone. See below.
 `--benchmarks` | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --help`
 
@@ -313,6 +332,7 @@ GCP | us-central1-a | |
 AWS | us-east-1a | |
 Azure | East US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
+OpenStack | nova | |
 
 ## Proxy configuration for VM guests.
 
@@ -385,7 +405,7 @@ If a benchmark requires two machines like iperf you can have two both machines i
 
 HOW TO EXTEND PerfKitBenchmarker
 =================
-First start with the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md) 
+First start with the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
 file.  It has the basics on how to work with PerfKitBenchmarker, and how to submit your pull requests.
 
 In addition to the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
