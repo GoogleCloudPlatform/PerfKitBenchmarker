@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -67,8 +67,16 @@ LSBLK_REGEX = (r'NAME="(.*)"\s+MODEL="(.*)"\s+SIZE="(.*)"'
                r'\s+TYPE="(.*)"\s+MOUNTPOINT="(.*)"\s+LABEL="(.*)"')
 LSBLK_PATTERN = re.compile(LSBLK_REGEX)
 
+UBUNTU_IMAGE = '28153eac-1bae-4039-8d9f-f8b513241efe'
+RHEL_IMAGE = 'c07409c8-0931-40e4-a3bc-4869ecb5931e'
+
 
 class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
+
+  DEFAULT_ZONE = 'IAD'
+  DEFAULT_MACHINE_TYPE = 'general1-4'
+  # Subclasses should override the default image.
+  DEFAULT_IMAGE = None
 
   count = 1
   _lock = threading.Lock()
@@ -107,6 +115,16 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Error(
           'There was a problem while retrieving machine_type'
           ' information from the cloud provider.')
+
+  @classmethod
+  def SetVmSpecDefaults(cls, vm_spec):
+    """Updates the VM spec with cloud specific defaults."""
+    if vm_spec.machine_type is None:
+      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
+    if vm_spec.zone is None:
+      vm_spec.zone = cls.DEFAULT_ZONE
+    if vm_spec.image is None:
+      vm_spec.image = cls.DEFAULT_IMAGE
 
   def CreateKeyPair(self):
     """Imports the public keyfile to Rackspace."""
@@ -426,9 +444,9 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedRackspaceVirtualMachine(RackspaceVirtualMachine,
                                          linux_virtual_machine.DebianMixin):
-  pass
+  DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
 class RhelBasedRackspaceVirtualMachine(RackspaceVirtualMachine,
                                        linux_virtual_machine.RhelMixin):
-  pass
+  DEFAULT_IMAGE = RHEL_IMAGE
