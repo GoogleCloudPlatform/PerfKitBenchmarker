@@ -66,7 +66,8 @@ CLASSES = {
     AZURE: {
         VIRTUAL_MACHINE: {
             DEBIAN: azure_virtual_machine.DebianBasedAzureVirtualMachine,
-            RHEL: azure_virtual_machine.RhelBasedAzureVirtualMachine
+            RHEL: azure_virtual_machine.RhelBasedAzureVirtualMachine,
+            WINDOWS: azure_virtual_machine.WindowsAzureVirtualMachine
         },
         FIREWALL: azure_network.AzureFirewall
     },
