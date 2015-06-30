@@ -19,15 +19,3 @@ from perfkitbenchmarker import network
 class DigitalOceanFirewall(network.BaseFirewall):
   """A dummy firewall for DigitalOcean, this does nothing."""
   pass
-
-
-class DigitalOceanNetwork(network.BaseNetwork):
-  """Object representing a DigitalOcean Network."""
-
-  def Create(self):
-    """Creates the actual network."""
-    pass
-
-  def Delete(self):
-    """Deletes the actual network."""
-    pass
