@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -424,7 +424,7 @@ class BaseOsMixin(object):
       True if the internal ip address of the target VM can be reached, false
       otherwise.
     """
-    if target_vm not in self._reachable and target_vm.internal_ip:
+    if target_vm not in self._reachable:
       if target_vm.internal_ip:
         self._reachable[target_vm] = self._TestReachable(target_vm.internal_ip)
       else:
