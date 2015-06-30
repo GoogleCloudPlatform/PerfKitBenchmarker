@@ -157,6 +157,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--delete']
     return self.RemoteCommand(' '.join(wait_command), should_log=False)
 
+  def SetupHostFirewall(self):
+    """Sets up IP table configurations on the VM."""
+    if hasattr(self, 'allowed_ip_range') and self.allowed_ip_range:
+      self.RemoteHostCommand('sudo iptables -A --source %s '
+                             '-p tcp -j ACCEPT' % self.allowed_ip_range)
+      self.RemoteHostCommand('sudo iptables -A INPUT --source %s '
+                             '-p udp -j ACCEPT' % self.allowed_ip_range)
+      self.RemoteHostCommand('sudo iptables -A OUTPUT --destination %s '
+                             '-p udp -j ACCEPT' % self.allowed_ip_range)
+      self.RemoteHostCommand('sudo iptables -A OUTPUT --destination %s '
+                             '-p tcp -j ACCEPT' % self.allowed_ip_range)
+
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
     env_file = "/etc/environment"
@@ -184,6 +196,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def PrepareVMEnvironment(self):
     self.SetupProxy()
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    self.SetupHostFirewall()
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
     self.BurnCpu()

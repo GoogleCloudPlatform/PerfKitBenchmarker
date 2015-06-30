@@ -152,6 +152,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     network_interface = response['networkInterfaces'][0]
     self.internal_ip = network_interface['networkIP']
     self.ip_address = network_interface['accessConfigs'][0]['natIP']
+    self.network_name = network_interface['network']
+
+    getinstance_cmd = [FLAGS.gcloud_path,
+                       'compute',
+                       'networks',
+                       'describe', self.network_name]
+    getinstance_cmd.extend(['--format', 'json'])
+    stdout, _, _ = vm_util.IssueCommand(getinstance_cmd)
+    response = json.loads(stdout)
+    self.allowed_ip_range = response['IPv4Range']
 
   def _Delete(self):
     """Delete a GCE VM instance."""
