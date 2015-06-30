@@ -34,11 +34,14 @@ from perfkitbenchmarker.digitalocean import digitalocean_network
 from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
+from perfkitbenchmarker.openstack import os_network as openstack_network
+from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 
 GCP = 'GCP'
 AZURE = 'Azure'
 AWS = 'AWS'
 DIGITALOCEAN = 'DigitalOcean'
+OPENSTACK = 'OpenStack'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
@@ -84,11 +87,18 @@ CLASSES = {
         },
         FIREWALL: digitalocean_network.DigitalOceanFirewall
     },
+    OPENSTACK: {
+        VIRTUAL_MACHINE: {
+            DEBIAN: openstack_vm.DebianBasedOpenStackVirtualMachine,
+            RHEL: openstack_vm.OpenStackVirtualMachine
+        },
+        FIREWALL: openstack_network.OpenStackFirewall
+    }
 }
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN],
+flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN, OPENSTACK],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
