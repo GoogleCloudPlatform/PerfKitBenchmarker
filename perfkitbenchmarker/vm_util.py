@@ -244,11 +244,12 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
             for i in range(0, 10)]
     RunThreaded(MyThreadedTargetMethod, args)
   """
-  if not thread_params:
-    raise ValueError('Param "thread_params" can\'t be empty')
-
   if not isinstance(thread_params, list):
     raise ValueError('Param "thread_params" must be a list')
+
+  if not thread_params:
+    # Nothing to do.
+    return
 
   if not isinstance(thread_params[0], tuple):
     thread_params = [((arg,), {}) for arg in thread_params]
