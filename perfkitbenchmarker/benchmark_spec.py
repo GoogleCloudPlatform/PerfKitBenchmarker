@@ -209,8 +209,9 @@ class BenchmarkSpec(object):
 
   def Prepare(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
-    prepare_args = network.BaseNetwork.networks.values()
-    vm_util.RunThreaded(self.PrepareNetwork, prepare_args)
+    network_list = network.BaseNetwork.networks.values()
+    if network_list:
+      vm_util.RunThreaded(self.PrepareNetwork, network_list)
 
     if self.vms:
       prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
