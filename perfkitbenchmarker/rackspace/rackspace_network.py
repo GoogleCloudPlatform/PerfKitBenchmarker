@@ -167,15 +167,3 @@ class RackspaceSecurityGroup(network.BaseFirewall):
             vm_util.IssueRetryableCommand(firewall_cmd, env=firewall_env)
 
             self.firewall_names.remove(firewall)
-
-
-class RackspaceNetwork(network.BaseNetwork):
-    """Object representing a Rackspace Network."""
-
-    def Create(self):
-        """Creates the actual network."""
-        pass
-
-    def Delete(self):
-        """Deletes the actual network."""
-        pass

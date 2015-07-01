@@ -103,7 +103,6 @@ CLASSES = {
             DEBIAN: rax_vm.DebianBasedRackspaceVirtualMachine,
             RHEL: rax_vm.RhelBasedRackspaceVirtualMachine
         },
-        NETWORK: rax_net.RackspaceNetwork,
         FIREWALL: rax_net.RackspaceSecurityGroup
     }
 }
