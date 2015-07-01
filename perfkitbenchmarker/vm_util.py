@@ -522,7 +522,7 @@ def GetLastRunUri():
 
 
 @contextlib.contextmanager
-def NamedTemporaryFile(prefix='tmp', suffix='', dir=None):
+def NamedTemporaryFile(prefix='tmp', suffix='', dir=None, delete=True):
   """Behaves like tempfile.NamedTemporaryFile.
 
   The existing tempfile.NamedTemporaryFile has the annoying property on
@@ -539,7 +539,8 @@ def NamedTemporaryFile(prefix='tmp', suffix='', dir=None):
   finally:
     if not f.closed:
       f.close()
-    os.unlink(f.name)
+    if delete:
+      os.unlink(f.name)
 
 
 def GenerateSSHConfig(vms):

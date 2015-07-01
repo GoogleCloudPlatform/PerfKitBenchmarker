@@ -108,10 +108,12 @@ def _PrepareServer(server):
     else:
       devices = [scratch_disk.GetDevicePath()
                  for scratch_disk in server.scratch_disks]
+  else:
+    devices = []
 
-    server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
-                          aerospike_server.AEROSPIKE_CONF_PATH,
-                          {'devices': devices})
+  server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
+                        aerospike_server.AEROSPIKE_CONF_PATH,
+                        {'devices': devices})
 
   for scratch_disk in server.scratch_disks:
     server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
