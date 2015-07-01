@@ -200,14 +200,14 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.RetryableCreationError(
           'Failed to create instance')
 
-  def _WaitForInstanceUntilActive(self):
+  def _WaitForInstanceUntilActive(self, max_retries=720, poll_interval_secs=5):
     """Wait until instance achieves non-transient state."""
     env = os.environ.copy()
     env.update(util.GetDefaultRackspaceNovaEnv(self.zone))
     getinstance_cmd = [FLAGS.nova_path, 'show', self.id]
 
-    for _ in xrange(360):
-      time.sleep(5)
+    for _ in xrange(max_retries):
+      time.sleep(poll_interval_secs)
       stdout, _, _ = vm_util.IssueCommand(getinstance_cmd, env=env)
       instance = util.ParseNovaTable(stdout)
       if 'status' in instance and instance['status'] != 'BUILD':
