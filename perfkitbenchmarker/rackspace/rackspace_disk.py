@@ -94,8 +94,6 @@ class RackspaceRemoteDisk(disk.BaseDisk):
       self.name = name
       self.zone = zone
       self.id = ''
-      self.device_letter = None
-      self.num_retried_attach = 0
 
   def __str__(self):
     return ("%s(device_path=%s, id=%s, attached_vm=%s, disk_type=%s)"
