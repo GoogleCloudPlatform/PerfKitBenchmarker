@@ -53,10 +53,9 @@ if [ "$(echo "${DIFFER}" | wc -l)" -eq 4 ]; then
   LINE_PREFIX='# Copyright '
   LINE_SUFFIX=' Google Inc[.] All rights reserved[.]'
   HEADER_LINE=${LINE_PREFIX}'[0-9]+'${LINE_SUFFIX}
-  REF_LINE=${LINE_PREFIX}'2014'${LINE_SUFFIX}
   DIFF_PREFIX='[[:alnum:]]+[[:space:]]*< '
   DIFF_MIDDLE='[[:space:]]*---[[:space:]]*> '
-  DIFF_PATTERN='^'${DIFF_PREFIX}${HEADER_LINE}${DIFF_MIDDLE}${REF_LINE}'$'
+  DIFF_PATTERN='^'${DIFF_PREFIX}${HEADER_LINE}${DIFF_MIDDLE}${HEADER_LINE}'$'
   if [[ "${DIFFER}" =~ $DIFF_PATTERN ]]; then
     echo "1"
     exit 0
