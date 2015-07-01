@@ -110,7 +110,8 @@ CLASSES = {
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN, OPENSTACK, RACKSPACE],
+flags.DEFINE_enum('cloud', GCP,
+                  [GCP, AZURE, AWS, DIGITALOCEAN, OPENSTACK, RACKSPACE],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
@@ -131,8 +132,8 @@ class BenchmarkSpec(object):
   def __init__(self, benchmark_info):
     if (FLAGS.benchmark_config_pair and
         benchmark_info['name'] in FLAGS.benchmark_config_pair.keys()):
-        # TODO(user): Unify naming between config_reader and
-        # perfkitbenchmarker.
+      # TODO(user): Unify naming between config_reader and
+      # perfkitbenchmarker.
       self.config = config_reader.ConfigLoader(
           FLAGS.benchmark_config_pair[benchmark_info['name']])
     self.vms = []
