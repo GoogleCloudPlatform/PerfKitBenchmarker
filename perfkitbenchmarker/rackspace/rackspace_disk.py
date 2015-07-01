@@ -192,14 +192,18 @@ class RackspaceRemoteDisk(disk.BaseDisk):
     nova_env.update(util.GetDefaultRackspaceNovaEnv(self.zone))
     getdisk_cmd = [FLAGS.nova_path, 'volume-show', self.name]
     stdout, _, _ = vm_util.IssueCommand(getdisk_cmd, env=nova_env)
-    if stdout.strip() == '':
-      return False
     volume = util.ParseNovaTable(stdout)
+
+    attachment_list = []
     if 'attachments' in volume and volume['attachments']:
       attachment_list = json.loads(volume['attachments'])
-      if attachment_list:
-        for attachment in attachment_list:
-          if 'volume_id' in attachment and attachment['volume_id'] == self.id:
-            return attachment['device']
 
-    return ''
+    if not attachment_list:
+      raise errors.Error('Cannot determine volume %s attachments' % self.name)
+
+    for attachment in attachment_list:
+      if 'volume_id' in attachment and attachment['volume_id'] == self.id:
+        return attachment['device']
+    else:
+      raise errors.Error(
+          'Could not find device path in the volume %s attachments')
