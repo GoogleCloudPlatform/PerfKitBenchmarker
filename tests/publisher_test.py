@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -239,17 +239,17 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     p.start()
     self.addCleanup(p.stop)
 
-    mock_vm = mock.MagicMock(zone='us-central1-a')
+    mock_vm = mock.MagicMock(zone='us-central1-a',
+                             machine_type='n1-standard-1',
+                             image='ubuntu-14-04')
     self.mock_spec = mock.MagicMock(cloud='GCP',
-                                    vms=[mock_vm],
-                                    machine_type='n1-standard-1',
-                                    image='ubuntu-14-04')
+                                    vms=[mock_vm])
 
     self.default_meta = {'perfkitbenchmarker_version': 'v1',
                          'cloud': self.mock_spec.cloud,
                          'zones': 'us-central1-a',
-                         'machine_type': self.mock_spec.machine_type,
-                         'image': self.mock_spec.image,
+                         'machine_type': mock_vm.machine_type,
+                         'image': mock_vm.image,
                          'num_striped_disks': 1}
 
   def _RunTest(self, spec, expected, input_metadata=None):

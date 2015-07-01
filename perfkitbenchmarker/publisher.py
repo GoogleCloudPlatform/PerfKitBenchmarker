@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -134,8 +134,12 @@ class DefaultMetadataProvider(MetadataProvider):
     metadata['cloud'] = benchmark_spec.cloud
     # Get the unique zone names from the VMs.
     metadata['zones'] = ','.join(set([vm.zone for vm in benchmark_spec.vms]))
-    metadata['machine_type'] = benchmark_spec.machine_type
-    metadata['image'] = benchmark_spec.image
+    # Get a representative VM so that we can publish the machine type and
+    # image. If we support different machine types/images in the same benchmark
+    # this will need to be updated.
+    vm = benchmark_spec.vms[0]
+    metadata['machine_type'] = vm.machine_type
+    metadata['image'] = vm.image
 
     # Scratch disk is not defined when a benchmark config is provided.
     if getattr(benchmark_spec, 'scratch_disk', None):
