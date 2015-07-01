@@ -157,26 +157,24 @@ class RackspaceRemoteDisk(disk.BaseDisk):
         self.id, ""]
     vm_util.IssueRetryableCommand(attach_cmd, env=nova_env)
 
-    volume_show_cmd = [FLAGS.nova_path, 'volume-show', self.name]
+    if not self._WaitForDiskUntilAttached(vm):
+      raise errors.Resource.RetryableCreationError(
+          'Failed to attach all scratch disks to vms. Exiting...')
 
-    attached = False
-    for i in xrange(12):
-      stdout, _, _ = vm_util.IssueCommand(volume_show_cmd, env=nova_env)
-      attrs = stdout.split('\n')
-      for attr in attrs[3:-2]:
-        pv = [v.strip() for v in attr.split('|')
-              if v != '|' and v != '']
-        if pv[0] == 'attachments' and vm.id in pv[1]:
-            attached = True
-      if attached:
-        return
-      time.sleep(10)
+  def _WaitForDiskUntilAttached(self, vm, max_retries=30, poll_interval_secs=5):
+    """Wait until volume is attached to the instance."""
+    env = os.environ.copy()
+    env.update(util.GetDefaultRackspaceNovaEnv(self.zone))
+    volume_show_cmd = [FLAGS.nova_path, 'volume-show', self.id]
 
-    if self.num_retried_attach > 5:
-      raise Exception("Failed to attach all scratch disks to vms. "
-                      "Exiting...")
-    self.num_retried_attach += 1
-    self.Attach(vm)
+    for _ in xrange(max_retries):
+      stdout, _, _ = vm_util.IssueCommand(volume_show_cmd, env=env)
+      volume = util.ParseNovaTable(stdout)
+      if 'attachments' in volume and vm.id in volume['attachments']:
+        return True
+      time.sleep(poll_interval_secs)
+
+    return False
 
   def Detach(self):
       """Detaches the disk from a VM."""
