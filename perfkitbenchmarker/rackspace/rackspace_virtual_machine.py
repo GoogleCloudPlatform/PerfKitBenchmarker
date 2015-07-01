@@ -47,6 +47,12 @@ from perfkitbenchmarker.rackspace import rackspace_machine_types as rax
 from perfkitbenchmarker.rackspace import util
 
 FLAGS = flags.FLAGS
+flags.DEFINE_boolean(
+    'rackspace_apply_onmetal_ssd_tuning', default=False,
+    help='Apply Rackspace recommended tuning to PCIe-based flash storage '
+         'included with OnMetal IO instances. See: '
+         'http://www.rackspace.com/knowledge_center/article/'
+         'configure-flash-drives-in-high-io-instances-as-data-drives')
 
 CLOUD_CONFIG_TEMPLATE = '''#cloud-config
 users:
@@ -327,7 +333,8 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def SetupLocalDisks(self):
     """Set up any local drives that exist."""
-    if self.flavor_class == rax.ONMETAL_CLASS:
+    if (self.flavor_class == rax.ONMETAL_CLASS and
+        FLAGS.rackspace_apply_onmetal_ssd_tuning):
       onmetal_disks = [d for d in self._GetBlockDevices()
                        if d['type'] == 'disk'
                        and rax.ONMETAL_DISK_MODEL in d['model']]
