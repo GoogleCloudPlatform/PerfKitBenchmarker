@@ -239,7 +239,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Get the instance's data."""
     env = os.environ.copy()
     env.update(util.GetDefaultRackspaceNovaEnv(self.zone))
-    getinstance_cmd = [FLAGS.nova_path, 'show', self.name]
+    getinstance_cmd = [FLAGS.nova_path, 'show', self.id]
     stdout, _, _ = vm_util.IssueCommand(getinstance_cmd, env=env)
     instance = util.ParseNovaTable(stdout)
     if 'status' in instance and instance['status'] == 'ACTIVE':
