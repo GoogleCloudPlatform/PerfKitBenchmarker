@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Copyright 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -euo pipefail
+
+HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
+
+# The prepare-commit-msg hook sets an environment variable to indicate
+# that we should add details to the report. Use an empty string if
+# unset to avoid "unbound variable" failures.
+is_prepare_commit="${PREPARE_COMMIT_HOOK:-}"
+
+# Execute all the checks first, they'll print informational messages on stderr.
+status=0
+
+files_need_boilerplate=($("${HOOKS_DIR}/lib/check-boilerplate.sh" "$@"))
+
+files_with_lint_errors=($("${HOOKS_DIR}/lib/check-lint.sh" "$@"))
+
+# Do unit tests last since these don't have a separate reporting step.
+# This will show unit test diagnostics on STDERR followed by the report.
+if ! "${HOOKS_DIR}/lib/check-unittest.sh"; then
+  echo "*** ERROR: *** Unit test failure."
+  if [ -n "$is_prepare_commit" ]; then
+    echo "Your commit will be aborted unless you fix these."
+    echo "  COMMIT_BLOCKED_ON_UNIT_TESTS"
+  fi
+  status=1
+fi
+
+# Now print reports for previously collected errors to ensure that
+# they are all visible together. This way, they won't be scrolled
+# offscreen by diagnostics.
+
+if [[ "${#files_need_boilerplate[@]}" -ne 0 ]]; then
+  echo
+  echo "*** ERROR: *** Some files are missing the required boilerplate"
+  echo "header from hooks/lib/boilerplate.*.txt:"
+  for file in "${files_need_boilerplate[@]}"; do
+    echo "  ${file}"
+  done
+  echo "See hooks/boilerplate.*.txt for required headers."
+  if [ -n "$is_prepare_commit" ]; then
+    echo "Your commit will be aborted unless you fix these."
+    echo "  COMMIT_BLOCKED_ON_BOILERPLATE"
+  fi
+  status=1
+fi
+
+if [[ "${#files_with_lint_errors[@]}" -ne 0 ]]; then
+  echo
+  echo "*** ERROR: *** Some files have lint errors:"
+  for file in "${files_with_lint_errors[@]}"; do
+    echo "  ${file}"
+  done
+  if [ -n "$is_prepare_commit" ]; then
+    echo "Your commit will be aborted unless you fix these."
+    echo "  COMMIT_BLOCKED_ON_LINT"
+  fi
+  status=1
+fi
+
+if [ -n "$is_prepare_commit" ]; then
+  # For prepare-commit, only return a failure status if there were
+  # unexpected problems. Failed checks should just produce a report.
+  exit 0
+fi
+
+exit $status
