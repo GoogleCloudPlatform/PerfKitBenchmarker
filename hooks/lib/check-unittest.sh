@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,23 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Print 1 if the file in $1 passes linting, 0 otherwise
-FILE=$1
-EXT=${FILE##*.}
+set -euo pipefail
 
-LINTER="$(dirname $0)/lint.${EXT}.sh"
-
-if [ ! -e "$LINTER" ]; then
-  echo "1"
-  exit 0
+if [[ -z $(command -v tox) ]]; then
+  >&2 echo "Missing tox. Install it via 'pip' to enable unit testing."
+  exit 1
 fi
 
-LINT=$($LINTER $FILE)
-if [[ ! -z "$LINT" ]]; then
-  >&2 echo "$LINT"
-  echo "0"
-  exit 0
-fi
-
-echo "1"
-exit 0
+# Unit test failures can't easily be mapped to specific input files.
+# Always run all tests, and report a failure via nonzero exit code if
+# any test fails.
+tox -e py27 >&2

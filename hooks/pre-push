@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Copyright 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Pre-push hooks are tricky since there's no easy way to distinguish
+# which parts of the history are new and which are inherited from
+# parents without knowing the branch base point. For now, make this
+# check opt-in.
+
+set -euo pipefail
+
+HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
+REMOTE="$1"
+URL="$2"
+Z40=0000000000000000000000000000000000000000
+
+if [[ -z "${PKB_BASE:-}" ]]; then
+  echo >&2 "Skipping pre-push check. Set PKB_BASE to a base branch such as 'upstream/dev' to enable."
+  exit 0
+fi
+
+if ! git rev-parse --verify --quiet "$PKB_BASE" >/dev/null; then
+  echo >&2 "Skipping pre-push check: cannot find PKB_BASE='$PKB_BASE'."
+  exit 0
+fi
+
+# Loop over the provided refs being pushed and collect the
+# union set of changed files.
+modified_files=($(
+  IFS=' '
+  while read local_ref local_sha remote_ref remote_sha; do
+    # Nothing to do for delete.
+    [ "$local_sha" = "$Z40" ] && continue
+
+    # Find a common ancestor with the origin branch.
+    base=$(git merge-base "$PKB_BASE" "$local_sha")
+
+    # Get list of files added/changed/moved relative to the
+    # common ancestor.
+    git diff --name-only --diff-filter ACM "$base..$local_sha"
+  done | sort -u
+))
+
+if [[ "${#modified_files[@]}" -ne 0 ]]; then
+  "${HOOKS_DIR}/check" "${modified_files[@]}" >&2
+fi
