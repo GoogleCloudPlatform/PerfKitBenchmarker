@@ -55,6 +55,8 @@ SCSI = 'SCSI'
 UBUNTU_IMAGE = 'ubuntu-14-04'
 RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
+CONTAINER_UBUNTU_IMAGE = 'ubuntu:14.04'
+CONTAINER_CENTOS_IMAGE = 'centos:7'
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -64,6 +66,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_MACHINE_TYPE = 'n1-standard-1'
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
+  CONTAINER_IMAGE = None
   BOOT_DISK_SIZE_GB = 10
   BOOT_DISK_TYPE = disk.STANDARD
 
@@ -227,9 +230,18 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     vm_util.IssueCommand(cmd)
 
 
-class ContainerizedGceVirtualMachine(GceVirtualMachine,
-                                     linux_vm.ContainerizedDebianMixin):
+class DebianContainerizedGceVirtualMachine(GceVirtualMachine,
+                                           linux_vm.ContainerizedMixin,
+                                           linux_vm.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
+  CONTAINER_IMAGE = CONTAINER_UBUNTU_IMAGE
+
+
+class RhelContainerizedGceVirtualMachine(GceVirtualMachine,
+                                         linux_vm.ContainerizedMixin,
+                                         linux_vm.RhelMixin):
+  DEFAULT_IMAGE = RHEL_IMAGE
+  CONTAINER_IMAGE = CONTAINER_CENTOS_IMAGE
 
 
 class DebianBasedGceVirtualMachine(GceVirtualMachine,

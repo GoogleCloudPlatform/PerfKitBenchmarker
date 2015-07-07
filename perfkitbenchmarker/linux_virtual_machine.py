@@ -734,7 +734,7 @@ class DebianMixin(BaseLinuxMixin):
       self.RemoteCommand(";".join(commands))
 
 
-class ContainerizedDebianMixin(DebianMixin):
+class ContainerizedMixin(BaseLinuxMixin):
   """Class representing a Containerized Virtual Machine.
 
   A Containerized Virtual Machine is a VM that runs remote commands
@@ -757,11 +757,10 @@ class ContainerizedDebianMixin(DebianMixin):
     if not self._CheckDockerExists():
       self.Install('docker')
     self.InitDocker()
-    super(ContainerizedDebianMixin, self).PrepareVMEnvironment()
+    super(ContainerizedMixin, self).PrepareVMEnvironment()
 
   def InitDocker(self):
     """Initializes the docker container daemon."""
-    self.CONTAINER_IMAGE = 'ubuntu:latest'
     init_docker_cmd = ['sudo docker run -d '
                        '--net=host '
                        '--workdir=%s '
