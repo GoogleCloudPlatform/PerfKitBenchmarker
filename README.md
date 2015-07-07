@@ -234,6 +234,42 @@ PerfKitBenchmarker uses the file location `~/.config/digitalocean-oauth.curl`
 by default, you can use the `--digitalocean_curl_config` flag to
 override the path.
 
+
+## Installing CLIs and credentials for Rackspace
+
+In order to interact with the Rackspace Public Cloud, PerfKitBenchmarker makes
+use of the Nova, and the Neutron CLI clients with the Rackspace extensions.
+
+To run PerfKitBenchmarker against Rackspace is very easy. First, install the
+CLI clients as follows:
+```bash
+pip install -U rackspace-neutronclient
+pip install -U rackspace-novaclient
+```
+
+Once these are installed, all we need to do is to set 3 environment variables,
+```bash
+export OS_USERNAME=<your_rackspace_username>
+export OS_PASSWORD=<your_rackspace_API_key>
+export OS_TENANT_NAME=<your_rackspace_account_number>
+```
+
+For a Rackspace UK Public Cloud account, an extra environment variable has to
+be set, please remember that only the LON region is available under
+a Rackspace UK Public Cloud account.
+```bash
+export OS_AUTH_URL=https://lon.identity.api.rackspacecloud.com/v2.0/
+
+export OS_USERNAME=<your_rackspace_uk_username>
+export OS_PASSWORD=<your_rackspace_uk_API_key>
+export OS_TENANT_NAME=<your_rackspace_uk_account_number>
+```
+*Tip*: Put these variables in a file, and simple source them to your shell with
+`source <filename>` 
+
+**Note:** Not all flavors are supported on every region. Always check first
+if the flavor is supported in the region.
+
 ## Create and Configure a `.boto` file for object storage benchmarks
 
 In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.
@@ -304,6 +340,11 @@ $ ./pkb.py --cloud=DigitalOcean --machine_type=16gb --benchmarks=iperf
 $ ./pkb.py --cloud=OpenStack --benchmarks=iperf --os_auth_url=http://localhost:5000/v2.0/
 ```
 
+## Example run on Rackspace
+```
+$ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
+```
+
 HOW TO RUN WINDOWS BENCHMARKS
 ==================
 You must be running on a Windows machine in order to run Windows benchmarks.
@@ -356,6 +397,7 @@ AWS | us-east-1a | |
 Azure | East US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
 OpenStack | nova | |
+Rackspace | IAD | OnMetal machine-types are available only in IAD zone
 
 Example:
 
