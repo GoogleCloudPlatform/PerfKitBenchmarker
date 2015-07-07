@@ -36,15 +36,12 @@ from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.openstack import os_network as openstack_network
 from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
-from perfkitbenchmarker.rackspace import rackspace_network as rax_net
-from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
 
 GCP = 'GCP'
 AZURE = 'Azure'
 AWS = 'AWS'
 DIGITALOCEAN = 'DigitalOcean'
 OPENSTACK = 'OpenStack'
-RACKSPACE = 'Rackspace'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
@@ -97,20 +94,12 @@ CLASSES = {
             RHEL: openstack_vm.OpenStackVirtualMachine
         },
         FIREWALL: openstack_network.OpenStackFirewall
-    },
-    RACKSPACE: {
-        VIRTUAL_MACHINE: {
-            DEBIAN: rax_vm.DebianBasedRackspaceVirtualMachine,
-            RHEL: rax_vm.RhelBasedRackspaceVirtualMachine
-        },
-        FIREWALL: rax_net.RackspaceSecurityGroup
     }
 }
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('cloud', GCP,
-                  [GCP, AZURE, AWS, DIGITALOCEAN, OPENSTACK, RACKSPACE],
+flags.DEFINE_enum('cloud', GCP, [GCP, AZURE, AWS, DIGITALOCEAN, OPENSTACK],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
