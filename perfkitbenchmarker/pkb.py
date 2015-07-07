@@ -163,7 +163,7 @@ flags.DEFINE_string('ftp_proxy', '',
                     'Specify a proxy for FTP in the form '
                     '[user:passwd@]proxy.server:port.')
 
-MAX_RUN_URI_LENGTH = 10
+MAX_RUN_URI_LENGTH = 8
 
 
 # TODO(user): Consider moving to benchmark_spec.
