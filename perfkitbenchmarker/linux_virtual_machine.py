@@ -69,6 +69,10 @@ EXECUTE_COMMAND = 'execute_command.py'
 # by EXECUTE_COMMAND.
 WAIT_FOR_COMMAND = 'wait_for_command.py'
 
+flags.DEFINE_bool('setup_host_firewall', False,
+                  'Whether PKB should configure the firewall of each remote'
+                  'host VM to make sure it accepts all internal connections.')
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -196,7 +200,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def PrepareVMEnvironment(self):
     self.SetupProxy()
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
-    self.SetupHostFirewall()
+    if FLAGS.setup_host_firewall:
+      self.SetupHostFirewall()
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
     self.BurnCpu()
