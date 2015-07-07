@@ -93,7 +93,7 @@ class BaseVirtualMachine(resource.BaseResource):
     super(BaseVirtualMachine, self).__init__()
     with self._instance_counter_lock:
       self.instance_number = self._instance_counter
-      self.name = 'perfkit-%s-%d' % (FLAGS.run_uri, self.instance_number)
+      self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
       BaseVirtualMachine._instance_counter += 1
     self.project = vm_spec.project
     self.zone = vm_spec.zone

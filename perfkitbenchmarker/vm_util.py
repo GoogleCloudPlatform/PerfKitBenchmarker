@@ -686,7 +686,11 @@ def _RegisterDStatCollector(sender, parsed_flags):
 
 def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):
   """Generates a password that meets Windows complexity requirements."""
-  special_chars = '~!$%*_-+=\\[]:.?/'
+  # The special characters have to be recognized by the Azure CLI as
+  # special characters. This greatly limits the set of characters
+  # that we can safely use. See
+  # https://github.com/Azure/azure-xplat-cli/blob/master/lib/commands/arm/vm/vmOsProfile._js#L145
+  special_chars = '*!@#$%^+='
   password = [
       random.choice(string.ascii_letters + string.digits + special_chars)
       for _ in range(password_length - 4)]
