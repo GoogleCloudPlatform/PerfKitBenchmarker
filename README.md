@@ -71,6 +71,7 @@ Before you can run the PerfKit Benchmaker on Cloud providers you need accounts a
 * Get an AWS account to run tests on AWS. Their site is http://aws.amazon.com/
 * Get an Azure account to run tests on Azure. Their site is http://azure.microsoft.com/
 * Get a DigitalOcean account to run tests on DigitalOcean. Their site is https://www.digitalocean.com/
+* Get a Rackspace Cloud account to run tests on Rackspace. Their site is https://www.rackspace.com/
 
 You also need the software dependencies, which are mostly command line tools and credentials to access your
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
