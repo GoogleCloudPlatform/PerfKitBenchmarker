@@ -92,12 +92,6 @@ class KeystoneAuth(object):
 
 
 class NovaClient(object):
-    instance = None
-
-    def __new__(cls, *args):
-        if not NovaClient.instance:
-            cls.instance = object.__new__(cls, *args)
-        return cls.instance
 
     def __getattribute__(self, item):
         try:
