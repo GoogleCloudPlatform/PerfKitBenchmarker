@@ -177,10 +177,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if commands:
       self.RemoteCommand(";".join(commands))
 
-  def SetupPackageManager(self):
-    """Performs initial setup specific to the package manager."""
-    pass
-
   def PrepareVMEnvironment(self):
     self.SetupProxy()
     if self.is_static and self.install_packages:
@@ -746,7 +742,7 @@ class ContainerizedMixin(BaseLinuxMixin):
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
 
-  def CheckDockerExists(self):
+  def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
     resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
                                      suppress_warning=True)
@@ -757,7 +753,7 @@ class ContainerizedMixin(BaseLinuxMixin):
   def PrepareVMEnvironment(self):
     """Initializes docker before proceeding with preparation."""
     self.RemoteHostCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
-    if not self.CheckDockerExists():
+    if not self._CheckDockerExists():
       self.Install('docker')
     self.InitDocker()
     super(ContainerizedMixin, self).PrepareVMEnvironment()
