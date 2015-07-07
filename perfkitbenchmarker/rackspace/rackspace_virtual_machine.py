@@ -80,7 +80,7 @@ RHEL_IMAGE = 'c07409c8-0931-40e4-a3bc-4869ecb5931e'
 class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   DEFAULT_ZONE = 'IAD'
-  DEFAULT_MACHINE_TYPE = 'general1-4'
+  DEFAULT_MACHINE_TYPE = 'general1-1'
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 
