@@ -153,14 +153,18 @@ class GoogleCloudSQLBenchmark(object):
     return results
 
   def Cleanup(self, vm):
-    delete_db_cmd = [FLAGS.gcloud_path,
-                     'sql',
-                     'instances',
-                     'delete', self.db_instance_name,
-                     '--quiet']
+    if hasattr(self, 'db_instance_name'):
+      delete_db_cmd = [FLAGS.gcloud_path,
+                       'sql',
+                       'instances',
+                       'delete', self.db_instance_name,
+                       '--quiet']
 
-    stdout, _, _ = vm_util.IssueCommand(delete_db_cmd)
-    logging.info('DB cleanup command issued, response is %s', stdout)
+      stdout, stderr, _ = vm_util.IssueCommand(delete_db_cmd)
+      logging.info('DB cleanup command issued, stdout is %s, stderr is %s',
+                   stdout, stderr)
+    else:
+      logging.info('db_instance_name does not exist, no need to cleanup.')
 
 
 MYSQL_SERVICE_BENCHMARK_DICTIONARY = {
@@ -183,6 +187,11 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
 
   vms = benchmark_spec.vms
+
+  # Setup common test tools required on the client VM
+  vms[0].Install('sysbench05plus')
+
+  # Prepare service specific states (create DB instance, configure it, etc)
   MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Prepare(vms[0])
 
 
