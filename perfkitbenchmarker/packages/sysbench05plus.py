@@ -22,15 +22,22 @@ seperate installer here for 0.5 and later.
 """
 
 
-def _Install(vm):
-  """Installs the sysbench package on the VM."""
-  vm.InstallPackages('sysbench')
-
-
 def YumInstall(vm):
-  """TODO: Implement this for Yum"""
-  raise NotImplementedError('Not implemented yet: Sysbench 0.5 or later'
-                            ' installation via Yum')
+  """ Installs SysBench 0.5 for Rhel/CentOS. We have to build from source!"""
+  vm.Install('build_tools')
+  vm.InstallPackages('bzr')
+  vm.InstallPackages('mysql mysql-server mysql-devel')
+  vm.RemoteCommand('cd ~ && bzr branch lp:sysbench')
+  vm.RemoteCommand('cd ~/sysbench && ./autogen.sh &&'
+                   ' ./configure --prefix=/usr --mandir=/usr/share/man &&'
+                   ' make')
+  vm.RemoteCommand('cd ~/sysbench && sudo make install')
+  vm.RemoteCommand('sudo mkdir /usr/share/doc/sysbench/tests/db -p')
+  vm.RemoteCommand('sudo cp ~/sysbench/sysbench/tests/db/*'
+                   ' /usr/share/doc/sysbench/tests/db/')
+
+  # Cleanup the source code enlisthment from bzr, we don't need it anymore.
+  vm.RemoteCommand('cd ~ && rm -fr ./sysbench')
 
 
 def AptInstall(vm):
@@ -47,6 +54,6 @@ def AptInstall(vm):
   vm.RemoteCommand('sudo apt-key adv --keyserver keys.gnupg.net --recv-keys'
                    ' 1C4CBDCDCD2EFD2A')
   vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo apt-get install -y libc6')
-
-  _Install(vm)
+  vm.InstallPackages('libc6')
+  vm.InstallPackages('mysql-client')
+  vm.InstallPackages('sysbench')

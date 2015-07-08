@@ -85,6 +85,9 @@ class GoogleCloudSQLBenchmark(object):
     db_tier = 'db-n1-standard-%s' % FLAGS.db_instance_cores
     # Currently, we create DB instance in the same zone as the test VM.
     db_instance_zone = vm.zone
+    # Currently GCP REQUIRES you to connect to the DB instance via external IP
+    # (i.e., using external IPs of the DB instance AND the VM instance).
+    authorized_network = '%s/32' % vm.ip_address
     create_db_cmd = [FLAGS.gcloud_path,
                      'sql',
                      'instances',
@@ -94,9 +97,10 @@ class GoogleCloudSQLBenchmark(object):
                      '--async',
                      '--activation-policy=ALWAYS',
                      '--assign-ip',
+                     '--authorized-networks=%s' % authorized_network,
                      '--backup-start-time=%s' % DEFAULT_BACKUP_START_TIME,
                      '--enable-bin-log',
-                     '--tier=%s' % (db_tier),
+                     '--tier=%s' % db_tier,
                      '--gce-zone=%s' % db_instance_zone,
                      '--database-version=%s' % GCP_MY_SQL_VERSION,
                      '--pricing-plan=%s' % GCP_PRICING_PLAN]
