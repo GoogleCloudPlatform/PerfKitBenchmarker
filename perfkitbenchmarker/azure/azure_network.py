@@ -33,10 +33,23 @@ FLAGS = flags.FLAGS
 AZURE_PATH = 'azure'
 MAX_NAME_LENGTH = 24
 SSH_PORT = 22
-# The default type of storage account to create. LRS
-# stands for 'Locally Redundant Storage' and is the
-# type that we used before there were type options.
-DEFAULT_STORAGE_TYPE = 'LRS'
+# Azure Storage Account types. See
+# http://azure.microsoft.com/en-us/pricing/details/storage/ for more information
+# about the different types.
+LRS = 'LRS'
+PLRS = 'PLRS'
+ZRS = 'ZRS'
+GRS = 'GRS'
+RAGRS = 'RAGRS'
+
+flags.DEFINE_enum(
+    'azure_storage_type', LRS,
+    [LRS, PLRS, ZRS, GRS, RAGRS],
+    'The type of storage account to create. See '
+    'http://azure.microsoft.com/en-us/pricing/details/storage/ for more '
+    'information. To use remote ssd scratch disks, you must use PLRS. If you '
+    'use PLRS, you must use the DS series of machines, or else VM creation '
+    'will fail.')
 
 
 class AzureFirewall(network.BaseFirewall):
@@ -211,7 +224,7 @@ class AzureNetwork(network.BaseNetwork):
     name = ('perfkit%s%s' %
             (FLAGS.run_uri, str(uuid.uuid4())[-12:])).lower()[:MAX_NAME_LENGTH]
     self.affinity_group = AzureAffinityGroup(name, zone)
-    self.storage_account = AzureStorageAccount(name, DEFAULT_STORAGE_TYPE)
+    self.storage_account = AzureStorageAccount(name, FLAGS.azure_storage_type)
     self.vnet = AzureVirtualNetwork(name)
 
   @vm_util.Retry()
