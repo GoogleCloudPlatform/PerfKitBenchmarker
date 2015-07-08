@@ -44,7 +44,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     self.temp_dir = None
 
   def RemoteCommand(self, command, should_log=False, ignore_failure=False,
-                    suppress_warning=False):
+                    suppress_warning=False, timeout=None):
     """Runs a command on the VM.
 
     Args:
@@ -83,7 +83,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
                     create_session, invoke_command])
 
     stdout, stderr, retcode = vm_util.IssueCommand(
-        ['powershell', '-Command', cmd], timeout=None,
+        ['powershell', '-Command', cmd], timeout=timeout,
         suppress_warning=suppress_warning, force_info_log=should_log)
 
     if retcode and not ignore_failure:
