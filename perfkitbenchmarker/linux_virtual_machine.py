@@ -286,15 +286,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False,
-                    suppress_warning=False):
+                    suppress_warning=False, timeout=None):
     return self.RemoteHostCommand(command, should_log, retries,
                                   ignore_failure, login_shell,
-                                  suppress_warning)
+                                  suppress_warning, timeout)
 
   def RemoteHostCommand(self, command,
                         should_log=False, retries=SSH_RETRIES,
                         ignore_failure=False, login_shell=False,
-                        suppress_warning=False):
+                        suppress_warning=False, timeout=None):
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run
@@ -337,7 +337,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         stdout, stderr, retcode = vm_util.IssueCommand(
             ssh_cmd, force_info_log=should_log,
             suppress_warning=suppress_warning,
-            timeout=None)
+            timeout=timeout)
         if retcode != 255:  # Retry on 255 because this indicates an SSH failure
           break
     finally:

@@ -213,7 +213,7 @@ class BaseOsMixin(object):
 
   @abc.abstractmethod
   def RemoteCommand(self, command, should_log=False, ignore_failure=False,
-                    suppress_warning=False, **kwargs):
+                    suppress_warning=False, timeout=None, **kwargs):
     """Runs a command on the VM.
 
     Derived classes may add additional kwargs if necessary, but they should not
@@ -227,6 +227,8 @@ class BaseOsMixin(object):
       ignore_failure: Ignore any failure if set to true.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
+      timeout is the time to wait in seconds for the command before exiting.
+          None means no timeout.
 
     Returns:
       A tuple of stdout and stderr from running the command.
