@@ -177,6 +177,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if commands:
       self.RemoteCommand(";".join(commands))
 
+  def SetupPackageManager(self):
+    """Specific Linux flavors should override this."""
+    pass
+
   def PrepareVMEnvironment(self):
     self.SetupProxy()
     if self.is_static and self.install_packages:
@@ -535,9 +539,6 @@ class RhelMixin(BaseLinuxMixin):
                            'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                            login_shell=True)
 
-  def SetupPackageManager(self):
-    """No setup needed."""
-    pass
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
@@ -746,7 +747,7 @@ class ContainerizedDebianMixin(DebianMixin):
     """Returns whether docker is installed or not."""
     resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
                                      suppress_warning=True)
-    if resp[:-1] == "":
+    if resp.rstrip() == "":
       return False
     return True
 
@@ -773,7 +774,7 @@ class ContainerizedDebianMixin(DebianMixin):
     init_docker_cmd = ''.join(init_docker_cmd)
 
     resp, _ = self.RemoteHostCommand(init_docker_cmd)
-    self.docker_id = resp[:-1]
+    self.docker_id = resp.rstrip()
     return self.docker_id
 
   def RemoteCommand(self, command,
