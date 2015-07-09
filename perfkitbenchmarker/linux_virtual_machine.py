@@ -53,7 +53,6 @@ UPDATE_RETRIES = 5
 SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '.ssh/id_rsa'
-UBUNTU_DOCKER_IMAGE = 'ubuntu:latest'
 CONTAINER_MOUNT_DIR = '/mnt'
 CONTAINER_WORK_DIR = '/root'
 
@@ -178,11 +177,17 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if commands:
       self.RemoteCommand(";".join(commands))
 
+  def SetupPackageManager(self):
+    """Specific Linux flavors should override this."""
+    pass
+
   def PrepareVMEnvironment(self):
     self.SetupProxy()
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
     self.BurnCpu()
+    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    self.SetupPackageManager()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
@@ -530,13 +535,10 @@ class RhelMixin(BaseLinuxMixin):
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    self.RemoteCommand('echo \'Defaults:%s !requiretty\' | '
-                       'sudo tee /etc/sudoers.d/pkb' % self.user_name,
-                       login_shell=True)
+    self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
+                           'sudo tee /etc/sudoers.d/pkb' % self.user_name,
+                           login_shell=True)
 
-  def PrepareVMEnvironment(self):
-    super(RhelMixin, self).PrepareVMEnvironment()
-    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
@@ -631,11 +633,9 @@ class RhelMixin(BaseLinuxMixin):
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  def PrepareVMEnvironment(self):
+  def SetupPackageManager(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""
-    super(DebianMixin, self).PrepareVMEnvironment()
     self.AptUpdate()
-    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
   @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def AptUpdate(self):
@@ -738,20 +738,30 @@ class ContainerizedDebianMixin(DebianMixin):
   """Class representing a Containerized Virtual Machine.
 
   A Containerized Virtual Machine is a VM that runs remote commands
-  within a Docker Container running Ubuntu.
+  within a Docker Container.
   Any call to RemoteCommand() will be run within the container
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
 
+  def _CheckDockerExists(self):
+    """Returns whether docker is installed or not."""
+    resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
+                                     suppress_warning=True)
+    if resp.rstrip() == "":
+      return False
+    return True
+
   def PrepareVMEnvironment(self):
     """Initializes docker before proceeding with preparation."""
     self.RemoteHostCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
-    self.Install('docker')
+    if not self._CheckDockerExists():
+      self.Install('docker')
     self.InitDocker()
     super(ContainerizedDebianMixin, self).PrepareVMEnvironment()
 
   def InitDocker(self):
     """Initializes the docker container daemon."""
+    self.CONTAINER_IMAGE = 'ubuntu:latest'
     init_docker_cmd = ['sudo docker run -d '
                        '--net=host '
                        '--workdir=%s '
@@ -760,11 +770,11 @@ class ContainerizedDebianMixin(DebianMixin):
                                       CONTAINER_MOUNT_DIR)]
     for sd in self.scratch_disks:
       init_docker_cmd.append('-v %s:%s ' % (sd.mount_point, sd.mount_point))
-    init_docker_cmd.append('%s sleep infinity ' % UBUNTU_DOCKER_IMAGE)
+    init_docker_cmd.append('%s sleep infinity ' % self.CONTAINER_IMAGE)
     init_docker_cmd = ''.join(init_docker_cmd)
 
     resp, _ = self.RemoteHostCommand(init_docker_cmd)
-    self.docker_id = resp[:-1]
+    self.docker_id = resp.rstrip()
     return self.docker_id
 
   def RemoteCommand(self, command,

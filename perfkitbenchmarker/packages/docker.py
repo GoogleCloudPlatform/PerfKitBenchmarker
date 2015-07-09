@@ -13,19 +13,28 @@
 # limitations under the License.
 
 
-"""Module containing docker installation and cleanup functions."""
+"""Module containing docker installation and cleanup functions.
 
+This is probably the only package that should use RemoteHostCommand instead
+of RemoteCommand, since Docker has to be installed directly on the remote VM
+and not within a container running on that VM.
+"""
 
-def _Install(vm):
-  """Installs the docker package on the VM."""
-  vm.RemoteHostCommand('wget -qO- https://get.docker.com/ | sh')
+from perfkitbenchmarker import vm_util
+
+DOCKER_RPM_URL = ('https://get.docker.com/rpm/1.7.0/centos-6/'
+                  'RPMS/x86_64/docker-engine-1.7.0-1.el6.x86_64.rpm')
 
 
 def YumInstall(vm):
   """Installs the docker package on the VM."""
-  _Install(vm)
+  vm.RemoteHostCommand('curl -o %s/docker.rpm -sSL %s'
+                       % (vm_util.VM_TMP_DIR, DOCKER_RPM_URL))
+  vm.RemoteHostCommand('sudo yum localinstall '
+                       '--nogpgcheck %s/docker.rpm -y' % vm_util.VM_TMP_DIR)
+  vm.RemoteHostCommand('sudo service docker start')
 
 
 def AptInstall(vm):
   """Installs the docker package on the VM."""
-  _Install(vm)
+  vm.RemoteHostCommand('curl -sSL https://get.docker.com/ | sh')
