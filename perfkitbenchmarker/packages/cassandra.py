@@ -63,6 +63,7 @@ def CheckPrerequisites():
 def _Install(vm):
   """Installs Cassandra from a tarball."""
   vm.Install('openjdk7')
+  vm.Install('curl')
   vm.RemoteCommand('mkdir {0} && curl -L {1} | '
                    'tar -C {0} -xzf - --strip-components=1'.format(
                        CASSANDRA_DIR, CASSANDRA_TAR_URL))
@@ -138,7 +139,7 @@ def IsRunning(vm):
   try:
     vm.RemoteCommand('kill -0 {0}'.format(cassandra_pid))
     return True
-  except errors.VmUtil.SshConnectionError:
+  except errors.VirtualMachine.RemoteCommandError:
     logging.warn('%s: Cassandra is not running. '
                  'Startup STDOUT:\n%s\n\nSTDERR:\n%s',
                  vm,

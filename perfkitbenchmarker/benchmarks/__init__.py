@@ -23,5 +23,7 @@ from perfkitbenchmarker import import_util
 def _LoadBenchmarks():
   return list(import_util.LoadModulesForPath(__path__, __name__))
 
-
 BENCHMARKS = _LoadBenchmarks()
+
+VALID_BENCHMARKS = {module.BENCHMARK_INFO['name']: module
+                    for module in BENCHMARKS}

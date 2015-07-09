@@ -14,78 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 set -euo pipefail
 
 HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
+OUT_FILE="${1:-/dev/stdout}"
 
-# Lint python files
-files_with_lint_errors=()
-files_need_boilerplate=()
-for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.py"); do
-  # Check for files without the required boilerplate.
-  boilerplate=$("${HOOKS_DIR}/boilerplate.sh" "${file}")
-  if [[ "$boilerplate" -eq "0" ]]; then
-    files_need_boilerplate+=("${file}")
-  fi
+# Set of modified files is those currently staged for commit (cached).
+modified_files=($(git diff --cached --name-only --diff-filter ACM))
 
-  # Check for lint errors
-  lint_err=$("${HOOKS_DIR}/lint.sh" "${file}")
-  if [[ "$lint_err" -eq "0" ]]; then
-    files_with_lint_errors+=("${file}")
-  fi
-done
+# The checker script has a nonzero exit code on errors and reports
+# problems on STDOUT, with informational messages on STDERR. Append
+# errors to the commit message with leading comment markers added, and
+# return success so that we don't block the message. Return failure
+# only in case of unexpected errors.
 
-# Check sh files for boilerplate
-for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh"); do
-  # Check for files without the required boilerplate.
-  boilerplate=$("${HOOKS_DIR}/boilerplate.sh" "${file}")
-  if [[ "$boilerplate" -eq "0" ]]; then
-    files_need_boilerplate+=("${file}")
-  fi
-done
-
-if [[ "${#files_need_boilerplate[@]}" -ne 0 ]]; then
+if [[ "${#modified_files[@]}" -ne 0 ]]; then
   (
-    echo
-    echo "# *** ERROR: *** Some files are missing the required boilerplate"
-    echo "# header from hooks/boilerplate.txt:"
-    for file in "${files_need_boilerplate[@]}"; do
-      echo "#   ${file}"
-    done
-    echo "# See hooks/boilerplate.\${EXT}.txt for required header."
-    echo "#"
-    echo "# Your commit will be aborted unless you fix these."
-    echo "#   COMMIT_BLOCKED_ON_BOILERPLATE"
-    echo
-  ) >> $1
-fi
-
-if [[ "${#files_with_lint_errors[@]}" -ne 0 ]]; then
-  (
-    echo
-    echo "# *** ERROR: *** Some files have lint errors:"
-    for file in "${files_with_lint_errors[@]}"; do
-      echo "#   ${file}"
-    done
-    echo "# Your commit will be aborted unless you fix these."
-    echo "#   COMMIT_BLOCKED_ON_LINT"
-    echo
-  ) >> $1
-fi
-
-if [[ -z $(command -v nosetests) ]]; then
-  >&2 echo "Missing nose. Install it via 'pip' to enable unit testing."
-  exit 1
-else
-  UNITTEST_RESULT=$(nosetests -v || echo "FAILED")
-  if [[ "$UNITTEST_RESULT" == *"FAILED"* ]]; then
-    (
-      echo
-      echo "# *** ERROR: *** Unit test failure."
-      echo "# Your commit will be aborted unless you fix these."
-      echo "#   COMMIT_BLOCKED_ON_UNIT_TESTS"
-      echo
-    ) >> $1
-  fi
+    if ! PREPARE_COMMIT_HOOK="true" "${HOOKS_DIR}/check" "${modified_files[@]}"; then
+      echo >&2 "Error: unexpected error in prepare-commit-msg hook. Commit aborted."
+      exit 1
+    fi
+  ) | sed 's/^/# /' >>"$OUT_FILE"
 fi

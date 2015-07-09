@@ -53,6 +53,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import maven
+from xml.etree import ElementTree
 
 FLAGS = flags.FLAGS
 
@@ -63,6 +64,22 @@ YCSB_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 
 _DEFAULT_PERCENTILES = 50, 75, 90, 95, 99, 99.9
+
+# Binary operators to aggregate reported statistics.
+# Statistics with operator 'None' will be dropped.
+AGGREGATE_OPERATORS = {
+    'Operations': operator.add,
+    'RunTime(ms)': max,
+    'Return=0': operator.add,
+    'Return=-1': operator.add,
+    'Return=-2': operator.add,
+    'Return=-3': operator.add,
+    'AverageLatency(ms)': None,  # Requires both average and # of ops.
+    'Throughput(ops/sec)': operator.add,
+    '95thPercentileLatency(ms)': None,  # Calculated across clients.
+    '99thPercentileLatency(ms)': None,  # Calculated across clients.
+    'MinLatency(ms)': min,
+    'MaxLatency(ms)': max}
 
 
 flags.DEFINE_boolean('ycsb_histogram', True, 'Include individual '
@@ -98,6 +115,21 @@ flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'unlimited time.')
 
 
+def CreateProxyElement(proxy_type, proxy):
+    proxy = re.sub(r'^https?:\/\/', '', proxy)
+    host_addr, port_number = proxy.split(":")
+    proxy_element = ElementTree.Element("proxy")
+    active = ElementTree.SubElement(proxy_element, "active")
+    active.text = "true"
+    protocol = ElementTree.SubElement(proxy_element, "protocol")
+    protocol.text = proxy_type
+    host = ElementTree.SubElement(proxy_element, "host")
+    host.text = host_addr
+    port = ElementTree.SubElement(proxy_element, "port")
+    port.text = port_number
+    return proxy_element
+
+
 def _GetThreadsPerLoaderList():
   """Returns the list of client counts per VM to use in staircase load."""
   return [int(thread_count) for thread_count in FLAGS.ycsb_threads_per_client]
@@ -127,9 +159,29 @@ def _Install(vm):
   """Installs the YCSB package on the VM."""
   vm.Install('maven')
   vm.Install('openjdk7')
+  vm.Install('curl')
   vm.RemoteCommand(('mkdir -p {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         YCSB_BUILD_DIR, YCSB_TAR_URL))
+
+  proxy_nodes = []
+
+  if FLAGS.http_proxy:
+      proxy_nodes.append(CreateProxyElement('http', FLAGS.http_proxy))
+
+  if FLAGS.https_proxy:
+      proxy_nodes.append(CreateProxyElement('https', FLAGS.http_proxy))
+
+  if proxy_nodes:
+      settings_file = ".m2/settings.xml"
+      root = ElementTree.Element('settings')
+      proxies = ElementTree.SubElement(root, 'proxies')
+      proxies.extend(proxy_nodes)
+      vm.RemoteCommand("mkdir -p $HOME/.m2")
+      vm.RemoteCommand("touch $HOME/%s" % settings_file)
+      vm.RemoteCommand("echo -e '%s' | sudo tee %s" % (
+          ElementTree.tostring(root), settings_file))
+
   vm.RemoteCommand(('cd {0} && {1}/bin/mvn clean package '
                     '-DskipTests -Dcheckstyle.skip=true').format(
                         YCSB_BUILD_DIR, maven.MVN_DIR))
@@ -318,23 +370,12 @@ def _CombineResults(result_list, combine_histograms=True):
   Returns:
     A dictionary, as returned by ParseResults.
   """
-  result = copy.deepcopy(result_list[0])
-
-  # Binary operators to aggregate reported statistics.
-  # 'None' will be dropped.
-  operators = {
-      'Operations': operator.add,
-      'RunTime(ms)': max,
-      'Return=0': operator.add,
-      'Return=-1': operator.add,
-      'Return=-2': operator.add,
-      'Return=-3': operator.add,
-      'AverageLatency(ms)': None,
-      'Throughput(ops/sec)': operator.add,
-      '95thPercentileLatency(ms)': None,
-      '99thPercentileLatency(ms)': None,
-      'MinLatency(ms)': min,
-      'MaxLatency(ms)': max}
+  def DropUnaggregated(result):
+    """Remove statistics which 'operators' specify should not be combined."""
+    drop_keys = {k for k, v in AGGREGATE_OPERATORS.iteritems() if v is None}
+    for group in result['groups'].itervalues():
+      for k in drop_keys:
+        group['statistics'].pop(k, None)
 
   def CombineHistograms(hist1, hist2):
     h1 = dict(hist1)
@@ -345,21 +386,36 @@ def _CombineResults(result_list, combine_histograms=True):
       result.append((k, h1.get(k, 0) + h2.get(k, 0)))
     return result
 
+  result = copy.deepcopy(result_list[0])
+  DropUnaggregated(result)
+
   for indiv in result_list[1:]:
     for group_name, group in indiv['groups'].iteritems():
+      if group_name not in result['groups']:
+        logging.warn('"%s" in new dict, but not in old.', group_name)
+        result['groups'][group_name] = copy.deepcopy(group)
+        continue
+
+      # Combine reported statistics.
+      # If no combining operator is defined, the statistic is skipped.
+      # Otherwise, the aggregated value is either:
+      # * The value in 'indiv', if the statistic is not present in 'result' or
+      # * AGGREGATE_OPERATORS[statistic](result_value, indiv_value)
       for k, v in group['statistics'].iteritems():
-        if k not in result['groups'][group_name]['statistics']:
+        if k not in AGGREGATE_OPERATORS:
+          logging.warn('No operator for "%s". Skipping aggregation.', k)
+          continue
+        elif AGGREGATE_OPERATORS[k] is None:  # Drop
+          result['groups'][group_name]['statistics'].pop(k, None)
+          continue
+        elif k not in result['groups'][group_name]['statistics']:
           logging.warn('"%s" in new dict, but not in old.', k)
           result['groups'][group_name]['statistics'][k] = copy.deepcopy(v)
           continue
-        elif k not in operators:
-          logging.warn('No operator for "%s". Skipping aggregation.', k)
-          continue
-        elif operators[k] is None:
-          result['groups'][group_name]['statistics'].pop(k, None)
-          continue
+
+        op = AGGREGATE_OPERATORS[k]
         result['groups'][group_name]['statistics'][k] = (
-            operators[k](result['groups'][group_name]['statistics'][k], v))
+            op(result['groups'][group_name]['statistics'][k], v))
 
       if combine_histograms:
         result['groups'][group_name]['histogram'] = CombineHistograms(
@@ -508,7 +564,7 @@ class YCSBExecutor(object):
       param, value = pv.split('=', 1)
       kwargs[param] = value
     command = self._BuildCommand('load', **kwargs)
-    stdout, _ = vm.RemoteCommand(command)
+    stdout, _ = vm.RobustRemoteCommand(command)
     return ParseResults(str(stdout))
 
   def _LoadThreaded(self, vms, workload_file, **kwargs):
@@ -584,7 +640,7 @@ class YCSBExecutor(object):
       param, value = pv.split('=', 1)
       kwargs[param] = value
     command = self._BuildCommand('run', **kwargs)
-    stdout, _ = vm.RemoteCommand(command)
+    stdout, _ = vm.RobustRemoteCommand(command)
     return ParseResults(str(stdout))
 
   def _RunThreaded(self, vms, **kwargs):

@@ -17,7 +17,6 @@ from setuptools import setup, find_packages
 setup(
     name='perfkitbenchmarker',
     url='https://github.com/GoogleCloudPlatform/PerfKitBenchmarker',
-    version='0.6.0',
     license='Apache 2.0',
     packages=find_packages(exclude=['tests']),
     scripts=['pkb.py'],

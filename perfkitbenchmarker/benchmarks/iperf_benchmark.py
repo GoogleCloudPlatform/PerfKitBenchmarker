@@ -28,10 +28,12 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_integer('iperf_sending_thread_count', 1,
-                     'Number of connections to make to the'
-                     ' server for sending traffic.')
+                     'Number of connections to make to the '
+                     'server for sending traffic.',
+                     lower_bound=1)
 flags.DEFINE_integer('iperf_runtime_in_seconds', 60,
-                     'Number of seconds to run iperf.')
+                     'Number of seconds to run iperf.',
+                     lower_bound=1)
 
 FLAGS = flags.FLAGS
 
@@ -81,7 +83,12 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
                (receiving_ip_address, IPERF_PORT,
                 FLAGS.iperf_runtime_in_seconds,
                 FLAGS.iperf_sending_thread_count))
-  stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True)
+  # the additional time on top of the iperf runtime is to account for the
+  # time it takes for the iperf process to start and exit
+  timeout_buffer = 30 + FLAGS.iperf_sending_thread_count
+  stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
+                                       timeout=FLAGS.iperf_runtime_in_seconds +
+                                       timeout_buffer)
 
   # Example output from iperf that needs to be parsed
   # STDOUT: ------------------------------------------------------------

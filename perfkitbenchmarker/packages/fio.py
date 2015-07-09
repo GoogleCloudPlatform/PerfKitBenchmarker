@@ -21,7 +21,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 FIO_DIR = '%s/fio' % vm_util.VM_TMP_DIR
-GIT_REPO = 'git://git.kernel.dk/fio.git'
+GIT_REPO = 'http://git.kernel.dk/fio.git'
 GIT_TAG = 'fio-2.1.14'
 FIO_PATH = FIO_DIR + '/fio'
 FIO_CMD_PREFIX = '%s --output-format=json' % FIO_PATH
@@ -147,7 +147,13 @@ def ParseResults(job_file, fio_json_result):
         lat_metadata = {
             'min': job[mode]['clat']['min'],
             'max': job[mode]['clat']['max'],
-            'stddev': job[mode]['clat']['stddev']}
+            'stddev': job[mode]['clat']['stddev'],
+            'p1': job[mode]['clat']['percentile']['1.000000'],
+            'p5': job[mode]['clat']['percentile']['5.000000'],
+            'p50': job[mode]['clat']['percentile']['50.000000'],
+            'p95': job[mode]['clat']['percentile']['95.000000'],
+            'p99': job[mode]['clat']['percentile']['99.000000'],
+            'p99.99': job[mode]['clat']['percentile']['99.990000']}
         lat_metadata.update(parameters)
         samples.append(
             sample.Sample('%s:latency' % metric_name,

@@ -17,7 +17,7 @@
 from perfkitbenchmarker import vm_util
 
 OPENBLAS_DIR = '%s/OpenBLAS' % vm_util.VM_TMP_DIR
-GIT_REPO = 'git://github.com/xianyi/OpenBLAS'
+GIT_REPO = 'https://github.com/xianyi/OpenBLAS'
 GIT_TAG = 'v0.2.11'
 
 

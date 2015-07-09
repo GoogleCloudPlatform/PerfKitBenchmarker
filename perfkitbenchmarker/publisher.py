@@ -25,6 +25,7 @@ import time
 import uuid
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
@@ -131,9 +132,14 @@ class DefaultMetadataProvider(MetadataProvider):
     metadata = metadata.copy()
     metadata['perfkitbenchmarker_version'] = version.VERSION
     metadata['cloud'] = benchmark_spec.cloud
-    metadata['zones'] = ','.join(benchmark_spec.zones)
-    metadata['machine_type'] = benchmark_spec.machine_type
-    metadata['image'] = benchmark_spec.image
+    # Get the unique zone names from the VMs.
+    metadata['zones'] = ','.join(set([vm.zone for vm in benchmark_spec.vms]))
+    # Get a representative VM so that we can publish the machine type and
+    # image. If we support different machine types/images in the same benchmark
+    # this will need to be updated.
+    vm = benchmark_spec.vms[0]
+    metadata['machine_type'] = vm.machine_type
+    metadata['image'] = vm.image
 
     # Scratch disk is not defined when a benchmark config is provided.
     if getattr(benchmark_spec, 'scratch_disk', None):
@@ -551,6 +557,8 @@ class SampleCollector(object):
       sample['timestamp'] = time.time()
       sample['run_uri'] = self.run_uri
       sample['sample_uri'] = str(uuid.uuid4())
+      events.sample_created.send(benchmark_spec=benchmark_spec,
+                                 sample=sample)
       self.samples.append(sample)
 
   def PublishSamples(self):

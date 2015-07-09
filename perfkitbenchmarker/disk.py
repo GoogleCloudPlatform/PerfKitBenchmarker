@@ -63,6 +63,17 @@ class BaseDisk(resource.BaseResource):
     self.mount_point = disk_spec.mount_point
     self.iops = disk_spec.iops
 
+    # Windows related attributes.
+
+    # The disk number corresponds to the order in which disks were attached to
+    # the instance. The System Disk has a disk number of 0. Any local disks
+    # have disk numbers ranging from 1 to the number of local disks on the
+    # system. Any additional disks that were attached after boot will have
+    # disk numbers starting at the number of local disks + 1. These disk
+    # numbers are used in diskpart scripts in order to identify the disks
+    # that we want to operate on.
+    self.disk_number = None
+
   @abc.abstractmethod
   def Attach(self, vm):
     """Attaches the disk to a VM.
@@ -77,9 +88,8 @@ class BaseDisk(resource.BaseResource):
     """Detaches the disk from a VM."""
     pass
 
-  @abc.abstractmethod
   def GetDevicePath(self):
-    """Returns the path to the device inside the VM."""
+    """Returns the path to the device inside a Linux VM."""
     pass
 
 
@@ -88,13 +98,13 @@ class StripedDisk(BaseDisk):
 
   is_striped = True
 
-  def __init__(self, disk_spec, disks, device_path):
+  def __init__(self, disk_spec, disks, device_path=None):
     """Initializes a StripedDisk object.
 
     Args:
       disk_spec: A BaseDiskSpec containing the desired mount point.
       disks: A list of BaseDisk objects that constitute the StripedDisk.
-      device_path: The path of the striped device.
+      device_path: The path of the striped device in a Linux VM.
     """
     super(StripedDisk, self).__init__(disk_spec)
     self.disks = disks

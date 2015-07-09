@@ -19,8 +19,7 @@ load test with varying numbers of client threads against an Aerospike server.
 
 This test can be run in a variety of configurations including memory only,
 remote/persistent ssd, and local ssd. The Aerospike configuration is controlled
-by the "aerospike_storage_type", "scratch_disk_type", and "use_local_disk"
-flags.
+by the "aerospike_storage_type" and "scratch_disk_type" flags.
 """
 
 import re
@@ -40,8 +39,7 @@ MEMORY = 'memory'
 DISK = 'disk'
 flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
                   'The type of storage to use for Aerospike data. The type of '
-                  'disk is controlled by a combination of the '
-                  '"scratch_disk_type" and "use_local_disk" flags.')
+                  'disk is controlled by the "scratch_disk_type" flag.')
 
 BENCHMARK_INFO = {'name': 'aerospike',
                   'description': 'Runs Aerospike',
@@ -108,10 +106,12 @@ def _PrepareServer(server):
     else:
       devices = [scratch_disk.GetDevicePath()
                  for scratch_disk in server.scratch_disks]
+  else:
+    devices = []
 
-    server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
-                          aerospike_server.AEROSPIKE_CONF_PATH,
-                          {'devices': devices})
+  server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
+                        aerospike_server.AEROSPIKE_CONF_PATH,
+                        {'devices': devices})
 
   for scratch_disk in server.scratch_disks:
     server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
@@ -190,8 +190,6 @@ def Run(benchmark_spec):
         'Client Threads': threads,
         'Storage Type': FLAGS.aerospike_storage_type,
     }
-    if FLAGS.aerospike_storage_type == DISK:
-      metadata['Disk Type'] = 'Local' if FLAGS.use_local_disk else 'Remote'
     samples.append(sample.Sample('Average Latency', latency, 'ms', metadata))
     if latency < 1.0:
       max_throughput_for_completion_latency_under_1ms = max(

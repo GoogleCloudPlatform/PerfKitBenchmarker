@@ -15,7 +15,9 @@
 """Benchmark set specific functions and definitions."""
 
 from perfkitbenchmarker import benchmarks
+from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import windows_benchmarks
 
 FLAGS = flags.FLAGS
 
@@ -93,7 +95,11 @@ BENCHMARK_SETS = {
     },
     'rackspace_set': {
         MESSAGE: 'Rackspace benchmark set.',
-        BENCHMARK_LIST: [STANDARD_SET]
+        BENCHMARK_LIST: ['aerospike', 'cassandra_stress', 'cluster_boot',
+                         'copy_throughput', 'fio', 'hpcc', 'iperf',
+                         'mesh_network', 'mongodb_ycsb', 'netperf', 'ping',
+                         'redis', 'block_storage_workload', 'sysbench_oltp',
+                         'unixbench', 'oldisim', 'silo']
     },
     'red_hat_set': {
         MESSAGE: 'Red Hat benchmark set.',
@@ -147,12 +153,10 @@ def GetBenchmarksFromFlags():
                 benchmark_name][BENCHMARK_LIST])
         break
 
-  # Create a dictionary of valid benchmark names and modules
-  # TODO(voellm): I really think the benchmarks package init should
-  # build the dictionary
-  valid_benchmarks = {}
-  for benchmark_module in benchmarks.BENCHMARKS:
-    valid_benchmarks[benchmark_module.GetInfo()['name']] = benchmark_module
+  if FLAGS.os_type == benchmark_spec.WINDOWS:
+    valid_benchmarks = windows_benchmarks.VALID_BENCHMARKS
+  else:
+    valid_benchmarks = benchmarks.VALID_BENCHMARKS
 
   # create a list of modules to return
   benchmark_module_list = []
@@ -160,6 +164,7 @@ def GetBenchmarksFromFlags():
     if benchmark_name in valid_benchmarks:
       benchmark_module_list.append(valid_benchmarks[benchmark_name])
     else:
-      raise ValueError('Invalid benchmark %s' % benchmark_name)
+      raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
+                       (benchmark_name, FLAGS.os_type))
 
   return benchmark_module_list

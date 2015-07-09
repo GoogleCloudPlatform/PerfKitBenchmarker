@@ -29,8 +29,15 @@ import json
 import logging
 import threading
 
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import windows_virtual_machine
+
+WINDOWS = 'windows'
+DEBIAN = 'debian'
+RHEL = 'rhel'
+FLAGS = flags.FLAGS
 
 
 class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -41,9 +48,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   is_static = True
 
-  def __init__(self, ip_address, user_name, keyfile_path, internal_ip=None,
+  def __init__(self, ip_address, user_name, keyfile_path=None, internal_ip=None,
                zone=None, local_disks=None, scratch_disk_mountpoints=None,
-               ssh_port=22, install_packages=True):
+               ssh_port=22, install_packages=True, password=None):
     """Initialize a static virtual machine.
 
     Args:
@@ -59,7 +66,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
           useful if benchmark dependencies have already been installed.
     """
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
-        None, None, None, None, None)
+        None, None, None, None)
     super(StaticVirtualMachine, self).__init__(vm_spec)
     self.ip_address = ip_address
     self.internal_ip = internal_ip
@@ -70,6 +77,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.local_disks = local_disks or []
     self.scratch_disk_mountpoints = scratch_disk_mountpoints or []
     self.install_packages = install_packages
+    self.password = password
 
   def _Create(self):
     """StaticVirtualMachines do not implement _Create()."""
@@ -136,7 +144,17 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise ValueError('Invalid static VM file. Expected array, got: %s.' %
                        type(vm_arr))
 
-    required_keys = frozenset(['ip_address', 'user_name', 'keyfile_path'])
+    required_keys = frozenset(['ip_address', 'user_name'])
+
+    linux_required_keys = required_keys | frozenset(['keyfile_path'])
+
+    required_keys_by_os = {
+        WINDOWS: required_keys | frozenset(['password']),
+        DEBIAN: linux_required_keys,
+        RHEL: linux_required_keys
+    }
+    required_keys = required_keys_by_os[FLAGS.os_type]
+
     optional_keys = frozenset(['internal_ip', 'zone', 'local_disks',
                                'scratch_disk_mountpoints', 'os_type',
                                'ssh_port', 'install_packages'])
@@ -158,10 +176,12 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 
       ip_address = item['ip_address']
       user_name = item['user_name']
-      keyfile_path = item['keyfile_path']
+      keyfile_path = item.get('keyfile_path')
       internal_ip = item.get('internal_ip')
       zone = item.get('zone')
       local_disks = item.get('local_disks', [])
+      password = item.get('password')
+
       if not isinstance(local_disks, list):
         raise ValueError('Expected a list of local disks, got: {0}'.format(
             local_disks))
@@ -173,10 +193,15 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       ssh_port = item.get('ssh_port', 22)
       os_type = item.get('os_type')
       install_packages = item.get('install_packages', True)
+
+      if ((os_type == WINDOWS and FLAGS.os_type != WINDOWS) or
+          (os_type != WINDOWS and FLAGS.os_type == WINDOWS)):
+        raise ValueError('Please only use Windows VMs when using '
+                         '--os_type=windows and vice versa.')
       vm_class = GetStaticVirtualMachineClass(os_type)
       vm = vm_class(ip_address, user_name, keyfile_path, internal_ip, zone,
                     local_disks, scratch_disk_mountpoints, ssh_port,
-                    install_packages)
+                    install_packages, password)
       cls.vm_pool.append(vm)
 
   @classmethod
@@ -202,8 +227,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 def GetStaticVirtualMachineClass(os_type):
   """Returns the static VM class that corresponds to the os_type."""
   class_dict = {
-      'debian': DebianBasedStaticVirtualMachine,
-      'rhel': RhelBasedStaticVirtualMachine,
+      DEBIAN: DebianBasedStaticVirtualMachine,
+      RHEL: RhelBasedStaticVirtualMachine,
+      WINDOWS: WindowsBasedStaticVirtualMachine,
   }
   if os_type in class_dict:
     return class_dict[os_type]
@@ -213,10 +239,15 @@ def GetStaticVirtualMachineClass(os_type):
 
 
 class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
-                                      package_managers.AptMixin):
+                                      linux_virtual_machine.DebianMixin):
   pass
 
 
 class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
-                                    package_managers.YumMixin):
+                                    linux_virtual_machine.RhelMixin):
+  pass
+
+
+class WindowsBasedStaticVirtualMachine(StaticVirtualMachine,
+                                       windows_virtual_machine.WindowsMixin):
   pass

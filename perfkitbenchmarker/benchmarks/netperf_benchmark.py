@@ -31,11 +31,22 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import netperf
 
+flags.DEFINE_integer('netperf_max_iter', None,
+                     'Maximum number of iterations to run during '
+                     'confidence interval estimation. If unset, '
+                     'a single iteration will be run.',
+                     lower_bound=3, upper_bound=30)
+
+flags.DEFINE_integer('netperf_test_length', 60,
+                     'netperf test length, in seconds',
+                     lower_bound=1)
+
+
 FLAGS = flags.FLAGS
 
 BENCHMARK_INFO = {'name': 'netperf',
                   'description': 'Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM '
-                  'Netperf benchmarks',
+                  'netperf benchmarks',
                   'scratch_disk': False,
                   'num_machines': 2}
 
@@ -90,15 +101,24 @@ def RunNetperf(vm, benchmark_name, server_ip):
   # Flags:
   # -o specifies keys to include in CSV output.
   # -j keeps additional latency numbers
+  # -I specifies the confidence % and width - here 99% confidence that the true
+  #    value is within +/- 2.5% of the reported value
+  # -i specifies the maximum and minimum number of iterations.
+  confidence = ('-I 99,5 -i {0},3'.format(FLAGS.netperf_max_iter)
+                if FLAGS.netperf_max_iter else '')
   netperf_cmd = ('{netperf_path} -p {command_port} -j '
-                 '-t {benchmark_name} -H {server_ip} -- '
+                 '-t {benchmark_name} -H {server_ip} -l {length} {confidence} '
+                 ' -- '
                  '-P {data_port} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
-                 'P99_LATENCY').format(
+                 'P99_LATENCY,STDDEV_LATENCY,'
+                 'CONFIDENCE_ITERATION,THROUGHPUT_CONFID').format(
                      netperf_path=netperf.NETPERF_PATH,
                      benchmark_name=benchmark_name,
                      server_ip=server_ip, command_port=COMMAND_PORT,
-                     data_port=DATA_PORT)
+                     data_port=DATA_PORT,
+                     length=FLAGS.netperf_test_length,
+                     confidence=confidence)
   stdout, _ = vm.RemoteCommand(netperf_cmd, should_log=True)
 
   fp = io.StringIO(stdout)
@@ -118,7 +138,13 @@ def RunNetperf(vm, benchmark_name, server_ip):
   else:
     metric = '%s_Transaction_Rate' % benchmark_name
 
-  samples = [sample.Sample(metric, value, unit)]
+  meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
+               ('Throughput Confidence Width (%)', 'confidence_width_percent')]
+  metadata = {meta_key: row[np_key] for np_key, meta_key in meta_keys}
+  metadata.update(netperf_test_length=FLAGS.netperf_test_length,
+                  max_iter=FLAGS.netperf_max_iter or 1)
+
+  samples = [sample.Sample(metric, value, unit, metadata)]
 
   # No tail latency for throughput.
   if unit == MBPS:
@@ -127,11 +153,11 @@ def RunNetperf(vm, benchmark_name, server_ip):
   for metric_key, metric_name in [
       ('50th Percentile Latency Microseconds', 'p50'),
       ('90th Percentile Latency Microseconds', 'p90'),
-      ('99th Percentile Latency Microseconds', 'p99')]:
+      ('99th Percentile Latency Microseconds', 'p99'),
+      ('Stddev Latency Microseconds', 'stddev')]:
     samples.append(
         sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
-                      float(row[metric_key]),
-                      'us'))
+                      float(row[metric_key]), 'us', metadata))
   return samples
 
 

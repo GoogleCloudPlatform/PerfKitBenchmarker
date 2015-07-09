@@ -71,6 +71,7 @@ Before you can run the PerfKit Benchmaker on Cloud providers you need accounts a
 * Get an AWS account to run tests on AWS. Their site is http://aws.amazon.com/
 * Get an Azure account to run tests on Azure. Their site is http://azure.microsoft.com/
 * Get a DigitalOcean account to run tests on DigitalOcean. Their site is https://www.digitalocean.com/
+* Get a Rackspace Cloud account to run tests on Rackspace. Their site is https://www.rackspace.com/
 
 You also need the software dependencies, which are mostly command line tools and credentials to access your
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
@@ -122,6 +123,42 @@ $ gcloud auth login
 You will need a project ID before you can run. Please navigate to https://console.developers.google.com and
 create one.
 
+
+## Install OpenStack Nova client and setup authentication
+Make sure you have installed pip (see the section above).
+
+Install python-novaclient by following command:
+```
+sudo pip install python-novaclient
+```
+
+You must specify authentication information for test execution, including user
+name (``--openstack_username` flag or `OS_USERNAME` environment variable), tenant name
+(`--openstack_tenant` flag or `OS_TENANT_NAME` environment variable), and
+authentication URL (`--openstack_auth_url` flag or `OS_AUTH_URL` environment
+variable).
+
+The password cannot be set through a flag. You can specify it through the
+`OS_PASSWORD` environment variable, or alternatively you can save it in a file
+and specify the file location with the `--openstack_password_file` flag or
+`OPENSTACK_PASSWORD_FILE` environment variable.
+
+Example using environment variables:
+
+```bash
+export OS_USERNAME=admin
+export OS_TENANT=myproject
+export OS_AUTH_URL=http://localhost:5000
+export OS_PASSWORD=<password>
+```
+
+Example using a password file at the default file location:
+
+```bash
+echo topsecretpassword > ~/.config/openstack-password.txt
+./pkb.py --cloud=OpenStack --benchmarks=ping
+```
+
 ## Install AWS CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
@@ -142,6 +179,7 @@ $ aws configure
 
 ## Windows Azure CLI and credentials
 You first need to install node.js and NPM.
+This version of Perfkit Benchmarker is compatible with azure version 0.9.3.
 
 Go [here](https://nodejs.org/download/), and follow the setup instructions.
 
@@ -196,6 +234,42 @@ $ curl --config ~/.config/digitalocean-oauth.curl https://api.digitalocean.com/v
 PerfKitBenchmarker uses the file location `~/.config/digitalocean-oauth.curl`
 by default, you can use the `--digitalocean_curl_config` flag to
 override the path.
+
+
+## Installing CLIs and credentials for Rackspace
+
+In order to interact with the Rackspace Public Cloud, PerfKitBenchmarker makes
+use of the Nova, and the Neutron CLI clients with the Rackspace extensions.
+
+To run PerfKitBenchmarker against Rackspace is very easy. First, install the
+CLI clients as follows:
+```bash
+pip install -U rackspace-neutronclient
+pip install -U rackspace-novaclient
+```
+
+Once these are installed, all we need to do is to set 3 environment variables,
+```bash
+export OS_USERNAME=<your_rackspace_username>
+export OS_PASSWORD=<your_rackspace_API_key>
+export OS_TENANT_NAME=<your_rackspace_account_number>
+```
+
+For a Rackspace UK Public Cloud account, an extra environment variable has to
+be set, please remember that only the LON region is available under
+a Rackspace UK Public Cloud account.
+```bash
+export OS_AUTH_URL=https://lon.identity.api.rackspacecloud.com/v2.0/
+
+export OS_USERNAME=<your_rackspace_uk_username>
+export OS_PASSWORD=<your_rackspace_uk_API_key>
+export OS_TENANT_NAME=<your_rackspace_uk_account_number>
+```
+*Tip*: Put these variables in a file, and simple source them to your shell with
+`source <filename>` 
+
+**Note:** Not all flavors are supported on every region. Always check first
+if the flavor is supported in the region.
 
 ## Create and Configure a `.boto` file for object storage benchmarks
 
@@ -262,6 +336,33 @@ $ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
 $ ./pkb.py --cloud=DigitalOcean --machine_type=16gb --benchmarks=iperf
 ```
 
+## Example run on OpenStack
+```
+$ ./pkb.py --cloud=OpenStack --benchmarks=iperf --os_auth_url=http://localhost:5000/v2.0/
+```
+
+## Example run on Rackspace
+```
+$ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
+```
+
+HOW TO RUN WINDOWS BENCHMARKS
+==================
+You must be running on a Windows machine in order to run Windows benchmarks.
+Install all dependencies as above and set TrustedHosts to accept all hosts so
+that you can open PowerShell sessions with the VMs (both machines having each
+other in their TrustedHosts list is neccessary, but not sufficient to issue
+remote commands; valid credentials are still required):
+
+```
+set-item wsman:\localhost\Client\TrustedHosts -value *
+```
+
+Now you can run Windows benchmarks by running with `--os_type=windows`. Windows has a
+different set of benchmarks than Linux does. They can be found under
+perfkitbenchmarker/windows_benchmarks/. The target VM OS is Windows Server 2012
+R2.
+
 HOW TO RUN ALL STANDARD BENCHMARKS
 ==================
 Run without the --benchmarks parameter and every benchmark in the standard set will run serially which can take a couple of hours (alternatively run with --benchmarks="standard_set").  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
@@ -282,20 +383,44 @@ PerfKitBenchmaker.
 Flag | Notes
 -----|------
 `--help`       | see all flags
-`--cloud`      | Check where the bechmarks are run.  Choices are `GCP`, `AWS`, `Azure`, or `DigitalOcean`
-`--zone`       | This flag allows you to override the default zone. See below.
+`--cloud`      | Cloud where the bechmarks are run. See the table below for choices.
+`--zone`       | This flag allows you to override the default zone. See the table below.
 `--benchmarks` | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --help`
 
-The zone (region) as specified with the --zone flag uses the same
-value that the Cloud CLIs take:
+The default cloud is 'GCP', override with the `--cloud` flag. Each cloud has a default
+zone which you can override with the `--zone` flag, the flag supports the same values
+that the corresponding Cloud CLIs take:
 
-Cloud | Default | Notes
+Cloud name | Default zone | Notes
 -------|---------|-------
 GCP | us-central1-a | |
 AWS | us-east-1a | |
 Azure | East US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
+OpenStack | nova | |
+Rackspace | IAD | OnMetal machine-types are available only in IAD zone
 
+Example:
+
+```bash
+./pkb.py --cloud=GCP --zone=us-central1-a --benchmarks=iperf,ping
+```
+
+## Proxy configuration for VM guests.
+
+If the VM guests do not have direct Internet access in the cloud
+environment, you can configure proxy settings through `pkb.py` flags.
+
+To do that simple setup three flags (All urls are in notation ): The
+flag values use the same `<protocol>://<server>:<port>` syntax as the
+corresponding environment variables, for example
+`--http_proxy=http://proxy.example.com:8080` .
+
+Flag | Notes
+-----|------
+`--http_proxy`       | Needed for package manager on Guest OS and for some Perfkit packages
+`--https_proxy`      | Needed for package manager or Ubuntu guest and for from github downloaded packages
+`--ftp_proxy`       | Needed for some Perfkit packages
 
 ADVANCED: HOW TO RUN BENCHMARKS WITHOUT CLOUD PROVISIONING (eg: local workstation)
 ==================
@@ -352,7 +477,7 @@ If a benchmark requires two machines like iperf you can have two both machines i
 
 HOW TO EXTEND PerfKitBenchmarker
 =================
-First start with the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md) 
+First start with the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
 file.  It has the basics on how to work with PerfKitBenchmarker, and how to submit your pull requests.
 
 In addition to the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)

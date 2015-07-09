@@ -24,6 +24,10 @@ class Error(Exception):
 class VirtualMachine(object):
   """Errors raised by virtual_machine.py."""
 
+  class RemoteCommandError(Error):
+    """Error raised when a Remote Command or Remote Copy fails."""
+    pass
+
   class RemoteExceptionError(Error):
     pass
 
@@ -88,10 +92,6 @@ class VirtualMachine(object):
 
 class VmUtil(object):
   """Errors raised by vm_utils.py."""
-
-  class SshConnectionError(VirtualMachine.VirtualMachineError):
-    """An error raised when VM is running but not SSHable."""
-    pass
 
   class RestConnectionError(Error):
     pass

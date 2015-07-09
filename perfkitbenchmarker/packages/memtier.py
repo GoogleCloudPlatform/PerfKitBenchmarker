@@ -17,7 +17,7 @@
 
 from perfkitbenchmarker import vm_util
 
-GIT_REPO = 'git://github.com/RedisLabs/memtier_benchmark'
+GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '1.2.0'
 LIBEVENT_TAR = 'libevent-2.0.21-stable.tar.gz'
 LIBEVENT_URL = 'https://github.com/downloads/libevent/libevent/' + LIBEVENT_TAR

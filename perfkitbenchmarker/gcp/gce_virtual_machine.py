@@ -30,10 +30,12 @@ import re
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import package_managers
+from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.gcp import gce_disk
+from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import util
 
 
@@ -43,18 +45,27 @@ flags.DEFINE_integer('gce_num_local_ssds', 0,
                      '(see https://cloud.google.com/compute/docs/local-ssd).')
 flags.DEFINE_string('gcloud_scopes', None, 'If set, space-separated list of '
                     'scopes to apply to every created machine')
+flags.DEFINE_boolean('gce_migrate_on_maintenance', False, 'If true, allow VM '
+                     'migration on GCE host maintenance.')
 
 FLAGS = flags.FLAGS
 
-SET_INTERRUPTS_SH = 'set-interrupts.sh'
-BOOT_DISK_SIZE_GB = 10
-BOOT_DISK_TYPE = disk.STANDARD
 NVME = 'nvme'
 SCSI = 'SCSI'
+UBUNTU_IMAGE = 'ubuntu-14-04'
+RHEL_IMAGE = 'rhel-7'
+WINDOWS_IMAGE = 'windows-2012-r2'
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
+
+  DEFAULT_ZONE = 'us-central1-a'
+  DEFAULT_MACHINE_TYPE = 'n1-standard-1'
+  # Subclasses should override the default image.
+  DEFAULT_IMAGE = None
+  BOOT_DISK_SIZE_GB = 10
+  BOOT_DISK_TYPE = disk.STANDARD
 
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
@@ -63,11 +74,24 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
-    disk_spec = disk.BaseDiskSpec(BOOT_DISK_SIZE_GB, BOOT_DISK_TYPE, None)
+    disk_spec = disk.BaseDiskSpec(
+        self.BOOT_DISK_SIZE_GB, self.BOOT_DISK_TYPE, None)
+    self.network = gce_network.GceNetwork.GetNetwork(None)
     self.boot_disk = gce_disk.GceDisk(
         disk_spec, self.name, self.zone, self.project, self.image)
     self.max_local_disks = FLAGS.gce_num_local_ssds
-    self.local_disk_counter = 0
+    self.boot_metadata = {}
+
+
+  @classmethod
+  def SetVmSpecDefaults(cls, vm_spec):
+    """Updates the VM spec with cloud specific defaults."""
+    if vm_spec.machine_type is None:
+      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
+    if vm_spec.zone is None:
+      vm_spec.zone = cls.DEFAULT_ZONE
+    if vm_spec.image is None:
+      vm_spec.image = cls.DEFAULT_IMAGE
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -79,7 +103,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a GCE VM instance."""
-    super(GceVirtualMachine, self)._Create()
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
     with vm_util.NamedTemporaryFile(dir=vm_util.GetTempDir(),
@@ -96,12 +119,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     'mode=rw',
                     '--machine-type', self.machine_type,
                     '--tags=perfkitbenchmarker',
-                    '--maintenance-policy', 'TERMINATE',
                     '--no-restart-on-failure',
                     '--metadata-from-file',
                     'sshKeys=%s' % tf.name,
                     '--metadata',
                     'owner=%s' % FLAGS.owner]
+      for key, value in self.boot_metadata.iteritems():
+        create_cmd.append('%s=%s' % (key, value))
+      if not FLAGS.gce_migrate_on_maintenance:
+        create_cmd.extend(['--maintenance-policy', 'TERMINATE'])
+
       ssd_interface_option = NVME if NVME in self.image else SCSI
       for _ in range(self.max_local_disks):
         create_cmd.append('--local-ssd')
@@ -155,27 +182,28 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
-    # Get the names for the disk(s) we are going to create.
-    if disk_spec.disk_type == disk.LOCAL:
-      new_count = self.local_disk_counter + disk_spec.num_striped_disks
-      if new_count > self.max_local_disks:
-        raise errors.Error('Not enough local disks.')
-      disk_names = ['local-ssd-%d' % i
-                    for i in range(self.local_disk_counter, new_count)]
-      self.local_disk_counter = new_count
-    else:
-      disk_names = ['%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
-                    for i in range(disk_spec.num_striped_disks)]
+    disks = []
 
-    # Instantiate the disk(s).
-    disks = [gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
-             for name in disk_names]
+    for i in xrange(disk_spec.num_striped_disks):
+      if disk_spec.disk_type == disk.LOCAL:
+        name = 'local-ssd-%d' % self.local_disk_counter
+        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
+        # Local disk numbers start at 1 (0 is the system disk).
+        data_disk.disk_number = self.local_disk_counter + 1
+        self.local_disk_counter += 1
+        if self.local_disk_counter > self.max_local_disks:
+          raise errors.Error('Not enough local disks.')
+      else:
+        name = '%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
+        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
+        # Remote disk numbers start at 1+max_local_disks (0 is the system disk
+        # and local disks occupy 1-max_local_disks).
+        data_disk.disk_number = (self.remote_disk_counter +
+                                 1 + self.max_local_disks)
+        self.remote_disk_counter += 1
+      disks.append(data_disk)
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
-
-  def GetName(self):
-    """Get a GCE VM's unique name."""
-    return self.name
 
   def GetLocalDisks(self):
     """Returns a list of local disks on the VM.
@@ -186,11 +214,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     return ['/dev/disk/by-id/google-local-ssd-%d' % i
             for i in range(self.max_local_disks)]
-
-  def SetupLocalDisks(self):
-    """Performs GCE specific local SSD setup (runs set-interrupts.sh)."""
-    self.PushDataFile(SET_INTERRUPTS_SH)
-    self.RemoteCommand('chmod +rx set-interrupts.sh; sudo ./set-interrupts.sh')
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM via 'gcloud compute instances add-metadata'."""
@@ -204,11 +227,42 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     vm_util.IssueCommand(cmd)
 
 
+class ContainerizedGceVirtualMachine(GceVirtualMachine,
+                                     linux_vm.ContainerizedDebianMixin):
+  DEFAULT_IMAGE = UBUNTU_IMAGE
+
+
 class DebianBasedGceVirtualMachine(GceVirtualMachine,
-                                   package_managers.AptMixin):
-  pass
+                                   linux_vm.DebianMixin):
+  DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
-                                 package_managers.YumMixin):
-  pass
+                                 linux_vm.RhelMixin):
+  DEFAULT_IMAGE = RHEL_IMAGE
+
+
+class WindowsGceVirtualMachine(GceVirtualMachine,
+                               windows_virtual_machine.WindowsMixin):
+
+  DEFAULT_IMAGE = WINDOWS_IMAGE
+  BOOT_DISK_SIZE_GB = 50
+  BOOT_DISK_TYPE = disk.REMOTE_SSD
+
+  def __init__(self, vm_spec):
+    super(WindowsGceVirtualMachine, self).__init__(vm_spec)
+    self.boot_metadata[
+        'windows-startup-script-ps1'] = windows_virtual_machine.STARTUP_SCRIPT
+
+  def _PostCreate(self):
+    super(WindowsGceVirtualMachine, self)._PostCreate()
+    reset_password_cmd = [FLAGS.gcloud_path,
+                          'compute',
+                          'reset-windows-password',
+                          '--user',
+                          self.user_name,
+                          self.name]
+    reset_password_cmd.extend(util.GetDefaultGcloudFlags(self))
+    stdout, _ = vm_util.IssueRetryableCommand(reset_password_cmd)
+    response = json.loads(stdout)
+    self.password = response['password']

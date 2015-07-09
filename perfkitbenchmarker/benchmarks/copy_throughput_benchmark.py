@@ -22,8 +22,8 @@ import posixpath
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_enum('copy_benchmark_mode', 'cp', ['cp', 'dd', 'scp'],
@@ -82,7 +82,8 @@ def PrepareDataFile(vm):
 
 def PreparePrivateKey(vm):
   if not vm.has_private_key:
-    vm.PushFile(vm_util.GetPrivateKeyPath(), virtual_machine.REMOTE_KEY_PATH)
+    vm.PushFile(vm_util.GetPrivateKeyPath(),
+                linux_virtual_machine.REMOTE_KEY_PATH)
     vm.has_private_key = True
 
 
@@ -185,7 +186,7 @@ def RunScpSingleDirection(sending_vm, receiving_vm):
   cmd_template = ('sudo sync; sudo sysctl vm.drop_caches=3; '
                   'time /usr/bin/scp -o StrictHostKeyChecking=no -i %s -c %s '
                   '%s %s@%%s:%%s/;') % (
-                      virtual_machine.REMOTE_KEY_PATH, CIPHER,
+                      linux_virtual_machine.REMOTE_KEY_PATH, CIPHER,
                       '%s/data/*' % sending_vm.GetScratchDir(0),
                       receiving_vm.user_name)
 

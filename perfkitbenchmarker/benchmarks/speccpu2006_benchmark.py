@@ -246,11 +246,12 @@ def Run(benchmark_spec):
                FLAGS.runspec_iterations != 3 else ''
   defines = ' --define ' + ' --define '.join(FLAGS.runspec_define.split(','))\
             if FLAGS.runspec_define != '' else ''
-  vm.RemoteCommand('cd %s; . ./shrc; ./bin/relocate; . ./shrc; rm -rf result; '
-                   'runspec --config=%s --tune=base '
-                   '--size=ref --noreportable --rate %s%s%s %s'
-                   % (vm.spec_dir, FLAGS.runspec_config, num_cpus, iterations,
-                      defines, FLAGS.benchmark_subset))
+  cmd = ('cd %s; . ./shrc; ./bin/relocate; . ./shrc; rm -rf result; '
+         'runspec --config=%s --tune=base '
+         '--size=ref --noreportable --rate %s%s%s %s'
+         % (vm.spec_dir, FLAGS.runspec_config, num_cpus, iterations,
+            defines, FLAGS.benchmark_subset))
+  vm.RobustRemoteCommand(cmd)
   logging.info('SpecCPU2006 Results:')
   return ParseOutput(vm)
 

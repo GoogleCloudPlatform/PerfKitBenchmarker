@@ -62,12 +62,14 @@ from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.publisher import SampleCollector
 
 STAGE_ALL = 'all'
@@ -77,9 +79,6 @@ STAGE_CLEANUP = 'cleanup'
 LOG_FILE_NAME = 'pkb.log'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
-# List of functions taking a benchmark_spec. Will be called before benchmark.Run
-# with two parameters: the benchmark and benchmark_spec.
-BEFORE_RUN_HOOKS = []
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
@@ -93,7 +92,7 @@ flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
 flags.DEFINE_list(
-    'zones', None,
+    'zones', [None],
     'A list of zones within which to run PerfKitBenchmarker.'
     ' This is specific to the cloud provider you are running on. '
     'If multiple zones are given, PerfKitBenchmarker will create 1 VM in '
@@ -146,8 +145,25 @@ flags.DEFINE_integer('num_striped_disks', 1,
                      'When using local disks, they default to striping '
                      'all disks together.',
                      lower_bound=1)
+flags.DEFINE_bool('install_packages', True,
+                  'Override for determining whether packages should be '
+                  'installed. If this is false, no packages will be installed '
+                  'on any VMs. This option should probably only ever be used '
+                  'if you have already created an image with all relevant '
+                  'packages installed.')
 
-MAX_RUN_URI_LENGTH = 10
+# Support for using a proxy in the cloud environment.
+flags.DEFINE_string('http_proxy', '',
+                    'Specify a proxy for HTTP in the form '
+                    '[user:passwd@]proxy.server:port.')
+flags.DEFINE_string('https_proxy', '',
+                    'Specify a proxy for HTTPS in the form '
+                    '[user:passwd@]proxy.server:port.')
+flags.DEFINE_string('ftp_proxy', '',
+                    'Specify a proxy for FTP in the form '
+                    '[user:passwd@]proxy.server:port.')
+
+MAX_RUN_URI_LENGTH = 8
 
 
 # TODO(user): Consider moving to benchmark_spec.
@@ -160,17 +176,6 @@ def ValidateBenchmarkInfo(benchmark_info):
       # TODO(user): Raise error with info about the validation failure
       return False
   return True
-
-
-def ListUnknownBenchmarks():
-  """Identify invalid benchmark names specified in the command line flags."""
-  valid_benchmark_names = frozenset(benchmark.GetInfo()['name']
-                                    for benchmark in benchmarks.BENCHMARKS)
-  valid_benchmark_sets = frozenset(benchmark_sets.BENCHMARK_SETS)
-  specified_benchmark_names = frozenset(FLAGS.benchmarks)
-
-  return sorted((specified_benchmark_names - valid_benchmark_names) -
-                valid_benchmark_sets)
 
 
 def DoPreparePhase(benchmark, name, spec, timer):
@@ -214,12 +219,12 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
       benchmark module's Run function.
   """
   logging.info('Running benchmark %s', name)
-  for before_run_hook in BEFORE_RUN_HOOKS:
-    before_run_hook(benchmark=benchmark, benchmark_spec=spec)
-
-  with vm_util.RunDStatIfConfigured(spec.vms, suffix='-{0}-dstat'.format(name)):
+  events.before_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+  try:
     with timer.Measure('Benchmark Run'):
       samples = benchmark.Run(spec)
+  finally:
+    events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
   collector.AddSamples(samples, name, spec)
 
 
@@ -376,14 +381,14 @@ def RunBenchmarks(publish=True):
       run_uri=FLAGS.run_uri)
   _LogCommandLineFlags()
 
-  unknown_benchmarks = ListUnknownBenchmarks()
-  if unknown_benchmarks:
-    logging.error('Unknown benchmark(s) provided: %s',
-                  ', '.join(unknown_benchmarks))
+  if FLAGS.os_type == benchmark_spec.WINDOWS and not vm_util.RunningOnWindows():
+    logging.error('In order to run benchmarks on Windows VMs, you must be '
+                  'running on Windows.')
     return 1
 
   vm_util.SSHKeyGen()
   collector = SampleCollector()
+  events.initialization_complete.send(parsed_flags=FLAGS)
 
   if FLAGS.static_vm_file:
     with open(FLAGS.static_vm_file) as fp:
@@ -428,15 +433,19 @@ def RunBenchmarks(publish=True):
 def _GenerateBenchmarkDocumentation():
   """Generates benchmark documentation to show in --help."""
   benchmark_docs = []
-  for benchmark_module in benchmarks.BENCHMARKS:
+  for benchmark_module in (benchmarks.BENCHMARKS +
+                           windows_benchmarks.BENCHMARKS):
     benchmark_info = benchmark_module.BENCHMARK_INFO
     vm_count = benchmark_info.get('num_machines') or 'variable'
     scratch_disk_str = ''
     if benchmark_info.get('scratch_disk'):
       scratch_disk_str = ' with scratch volume'
 
+    name = benchmark_info['name']
+    if benchmark_module in windows_benchmarks.BENCHMARKS:
+      name += ' (Windows)'
     benchmark_docs.append('%s: %s (%s VMs%s)' %
-                          (benchmark_info['name'],
+                          (name,
                            benchmark_info['description'],
                            vm_count,
                            scratch_disk_str))
