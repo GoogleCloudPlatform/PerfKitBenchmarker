@@ -25,6 +25,7 @@ import time
 
 from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -32,6 +33,10 @@ flags.DEFINE_enum(
     'db_instance_cores', '8', ['1', '4', '8', '16'],
     'The number of cores to be provisioned for the DB instance.')
 
+flags.DEFINE_integer('oltp_tables_count', 4,
+                     'The number of tables used in sysbench oltp.lua tests')
+flags.DEFINE_integer('oltp_table_size', 100000,
+                     'The number of rows of each table used in the oltp tests')
 
 BENCHMARK_INFO = {'name': 'mysql_service',
                   'description': 'MySQL service benchmarks.',
@@ -45,8 +50,19 @@ DB_CREATION_STATUS_QUERY_INTERVAL = 15
 # total wait time is therefore: "query interval * query limit"
 DB_CREATION_STATUS_QUERY_LIMIT = 100
 
-DEFAULT_BACKUP_START_TIME = '07:00'
+# Constants defined for Sysbench tests.
+RAND_INIT_ON = 'on'
+MYSQL_ROOT_USER = 'root'
+MYSQL_ROOT_PASSWORD = ''
+
+PREPARE_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/parallel_prepare.lua'
+OLTP_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/oltp.lua'
+
+SYSBENCH_RESULT_NAME_PREPARE = 'prepare time'
+LATENCY_UNIT = 'seconds'
+
 # These are the constants that should be specified in GCP's cloud SQL command.
+DEFAULT_BACKUP_START_TIME = '07:00'
 GCP_MY_SQL_VERSION = 'MYSQL_5_6'
 GCP_PRICING_PLAN = 'PACKAGE'
 
@@ -81,7 +97,7 @@ class GoogleCloudSQLBenchmark(object):
   def Prepare(self, vm):
     logging.info('Preparing MySQL Service benchmarks for Google Cloud SQL.')
 
-    self.db_instance_name = 'pkb%s' % FLAGS.run_uri
+    vm.db_instance_name = 'pkb%s' % FLAGS.run_uri
     db_tier = 'db-n1-standard-%s' % FLAGS.db_instance_cores
     # Currently, we create DB instance in the same zone as the test VM.
     db_instance_zone = vm.zone
@@ -91,7 +107,7 @@ class GoogleCloudSQLBenchmark(object):
     create_db_cmd = [FLAGS.gcloud_path,
                      'sql',
                      'instances',
-                     'create', self.db_instance_name,
+                     'create', vm.db_instance_name,
                      '--quiet',
                      '--format=json',
                      '--async',
@@ -115,7 +131,7 @@ class GoogleCloudSQLBenchmark(object):
     status_query_cmd = [FLAGS.gcloud_path,
                         'sql',
                         'instances',
-                        'describe', self.db_instance_name,
+                        'describe', vm.db_instance_name,
                         '--format', 'json']
 
     stdout, _, _ = vm_util.IssueCommand(status_query_cmd)
@@ -148,25 +164,61 @@ class GoogleCloudSQLBenchmark(object):
     logging.info('Successfully created the DB instance. Complete response is '
                  '%s', response)
 
-    self.db_instance_ip = response['ipAddresses'][0]['ipAddress']
-    logging.info('DB IP address is: %s',
-                 self.db_instance_ip)
+    vm.db_instance_ip = response['ipAddresses'][0]['ipAddress']
+    logging.info('DB IP address is: %s', vm.db_instance_ip)
+
 
   def Run(self, vm, metadata):
     results = []
+
+    # Prepares the Sysbench test based on the input flags (load data into DB)
+    # Could take a long time if the data to be loaded is large.
+    # sysbench --test=/usr/share/doc/sysbench/tests/db/parallel_prepare.lua
+    # --oltp_tables_count=3 --oltp-table-size=100000
+    # --rand-init=on --num-threads=3 --mysql-user=root
+    # --mysql-host=146.148.35.217 --mysql-password="" run
+
+    prepare_start_time = time.time()
+    prepare_cmd_tokens = ['sysbench',
+                          '--test=%s' % PREPARE_SCRIPT_PATH,
+                          '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
+                          '--oltp-table-size=%d' % FLAGS.oltp_table_size,
+                          '--rand-init=%s' % RAND_INIT_ON,
+                          '--num-threads=%d' % FLAGS.oltp_tables_count,
+                          '--mysql-user=%s' % MYSQL_ROOT_USER,
+                          '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
+                          '--mysql-host=%s' % vm.db_instance_ip,
+                          'run']
+    prepare_cmd = ' '.join(prepare_cmd_tokens)
+    stdout, stderr = vm.RobustRemoteCommand(prepare_cmd)
+    prepare_duration = time.time() - prepare_start_time
+    logging.info('It took %d seconds to finish the prepare step',
+                 prepare_duration)
+    logging.info('Prepare results: \n stdout is:\n%s\nstderr is\n%s',
+                 stdout,
+                 stderr)
+
+    results.append(sample.Sample(
+        SYSBENCH_RESULT_NAME_PREPARE,
+        prepare_duration,
+        LATENCY_UNIT,
+        metadata))
+
+    # Runs the actual sysbench test and parse the results.
+
     return results
 
   def Cleanup(self, vm):
-    if hasattr(self, 'db_instance_name'):
+    if hasattr(vm, 'db_instance_name'):
       delete_db_cmd = [FLAGS.gcloud_path,
                        'sql',
                        'instances',
-                       'delete', self.db_instance_name,
+                       'delete', vm.db_instance_name,
                        '--quiet']
 
-      stdout, stderr, _ = vm_util.IssueCommand(delete_db_cmd)
-      logging.info('DB cleanup command issued, stdout is %s, stderr is %s',
-                   stdout, stderr)
+      stdout, stderr, status = vm_util.IssueCommand(delete_db_cmd)
+      logging.info('DB cleanup command issued, stdout is %s, stderr is %s '
+                   'status is %s', stdout, stderr, status)
     else:
       logging.info('db_instance_name does not exist, no need to cleanup.')
 
@@ -198,6 +250,14 @@ def Prepare(benchmark_spec):
   # Prepare service specific states (create DB instance, configure it, etc)
   MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Prepare(vms[0])
 
+  # Create the sbtest database to prepare the DB for Sysbench.
+  # mysql -u root -h IP -e 'create database sbtest;'
+  create_sbtest_db_cmd = ('mysql -u root -h %s '
+                          '-e \'create database sbtest;\'') % (
+                              vms[0].db_instance_ip)
+  stdout, stderr = vms[0].RemoteCommand(create_sbtest_db_cmd)
+  logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
+
 
 def Run(benchmark_spec):
   """Run the MySQL Service benchmark and publish results.
@@ -213,6 +273,10 @@ def Run(benchmark_spec):
                'Cloud Provider is %s.', FLAGS.cloud)
   vms = benchmark_spec.vms
   metadata = {}
+  metadata['oltp_tables_count'] = FLAGS.oltp_tables_count
+  metadata['oltp_table_size'] = FLAGS.oltp_table_size
+  metadata['db_instance_cores'] = FLAGS.db_instance_cores
+
   results = MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0],
                                                                   metadata)
   print results
