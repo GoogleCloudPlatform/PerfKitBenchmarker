@@ -78,7 +78,7 @@ BENCHMARK_INFO = {'name': 'object_storage_service',
                   'num_machines': 1}
 
 AWS_CREDENTIAL_LOCATION = '.aws'
-GCE_CREDENTIAL_LOCATION = '.config/gcloud'
+GCE_CREDENTIAL_LOCATION = '.config/gcloud/credentials'
 AZURE_CREDENTIAL_LOCATION = '.azure'
 
 DEFAULT_BOTO_LOCATION = '~/.boto'
@@ -230,7 +230,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
           one_byte_rw_cmd = ('%s %s') % (one_byte_rw_cmd, azure_command_suffix)
 
         _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
-        logging.info('OneByteRW raw result is %s' % raw_result)
+        logging.info('OneByteRW raw result is %s', raw_result)
 
         for up_and_down in ['upload', 'download']:
           search_string = 'One byte %s - (.*)' % up_and_down
@@ -260,7 +260,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
             single_stream_throughput_cmd, azure_command_suffix)
 
       _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
-      logging.info('SingleStreamThroughput raw result is %s' % raw_result)
+      logging.info('SingleStreamThroughput raw result is %s', raw_result)
 
       for up_and_down in ['upload', 'download']:
         search_string = 'Single stream %s throughput in Bps: (.*)' % up_and_down
@@ -298,7 +298,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
 
 
       _, raw_result = vm.RemoteCommand(list_consistency_cmd)
-      logging.info('ListConsistency raw result is %s' % raw_result)
+      logging.info('ListConsistency raw result is %s', raw_result)
 
       for scenario in LIST_CONSISTENCY_SCENARIOS:
         metric_name = '%s %s' % (scenario, LIST_CONSISTENCY_PERCENTAGE)
@@ -710,7 +710,7 @@ class GoogleCloudStorageBenchmark(object):
     except errors.VirtualMachine.RemoteCommandError:
       # If ran on existing machines, .config folder may already exists.
       pass
-    vm.PushFile(FLAGS.object_storage_credential_file, '.config/')
+    vm.PushFile(FLAGS.object_storage_credential_file, '.config/gcloud')
     vm.PushFile(FLAGS.boto_file_location, DEFAULT_BOTO_LOCATION)
 
     vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)
