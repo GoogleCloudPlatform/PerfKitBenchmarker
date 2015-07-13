@@ -21,7 +21,7 @@ set -o nounset
 set -o pipefail
 
 readonly HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
-readonly HOOK_FILES=(prepare-commit-msg commit-msg)
+readonly HOOK_FILES=(prepare-commit-msg commit-msg pre-push)
 
 pushd $HOOKS_DIR/.. > /dev/null
 

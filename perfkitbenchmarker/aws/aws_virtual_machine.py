@@ -52,29 +52,6 @@ AP_NORTHEAST_1 = 'ap-northeast-1'
 AP_SOUTHEAST_1 = 'ap-southeast-1'
 AP_SOUTHEAST_2 = 'ap-southeast-2'
 SA_EAST_1 = 'sa-east-1'
-UBUNTU_AMIS = {
-    HVM: {
-        US_EAST_1: 'ami-acff23c4',
-        US_WEST_1: 'ami-05717d40',
-        US_WEST_2: 'ami-fbce8bcb',
-        EU_WEST_1: 'ami-30b46b47',
-        AP_NORTHEAST_1: 'ami-d186dcd0',
-        AP_SOUTHEAST_1: 'ami-9afca7c8',
-        AP_SOUTHEAST_2: 'ami-956706af',
-        SA_EAST_1: 'ami-9970d884',
-    },
-    PV: {
-        US_EAST_1: 'ami-d2ff23ba',
-        US_WEST_1: 'ami-73717d36',
-        US_WEST_2: 'ami-f1ce8bc1',
-        EU_WEST_1: 'ami-4ab46b3d',
-        AP_NORTHEAST_1: 'ami-c786dcc6',
-        AP_SOUTHEAST_1: 'ami-eefca7bc',
-        AP_SOUTHEAST_2: 'ami-996706a3',
-        SA_EAST_1: 'ami-6770d87a',
-    }
-}
-HVM_US_EAST_1_WINDOWS_AMI = 'ami-cc93a8a4'
 PLACEMENT_GROUP_PREFIXES = frozenset(
     ['c3', 'c4', 'cc2', 'cg1', 'g2', 'cr1', 'r3', 'hi1', 'i2'])
 NUM_LOCAL_VOLUMES = {
@@ -128,6 +105,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   DEFAULT_ZONE = 'us-east-1a'
   DEFAULT_MACHINE_TYPE = 'm3.medium'
+  IMAGE_NAME_FILTER = None
+  DEFAULT_ROOT_DISK_TYPE = 'standard'
 
   _lock = threading.Lock()
   imported_keyfile_set = set()
@@ -158,13 +137,38 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       region = vm_spec.zone[:-1]
       vm_spec.image = cls._GetDefaultImage(vm_spec.machine_type, region)
 
-  @staticmethod
-  def _GetDefaultImage(machine_type, region):
+  @classmethod
+  def _GetDefaultImage(cls, machine_type, region):
     """Returns the default image given the machine type and region.
 
     If no default is configured, this will return None.
     """
-    return None
+    if cls.IMAGE_NAME_FILTER is None:
+      return None
+
+    prefix = machine_type.split('.')[0]
+    virt_type = 'paravirtual' if prefix in NON_HVM_PREFIXES else 'hvm'
+
+    describe_cmd = util.AWS_PREFIX + [
+        '--region=%s' % region,
+        'ec2',
+        'describe-images',
+        '--query', 'Images[*].{Name:Name,ImageId:ImageId}',
+        '--filters',
+        'Name=name,Values=%s' % cls.IMAGE_NAME_FILTER,
+        'Name=block-device-mapping.volume-type,Values=%s' %
+        cls.DEFAULT_ROOT_DISK_TYPE,
+        'Name=virtualization-type,Values=%s' % virt_type]
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+
+    if not stdout:
+      return None
+
+    images = json.loads(stdout)
+    # We want to return the latest version of the image, and since the wildcard
+    # portion of the image name is the image's creation date, we can just take
+    # the image with the 'largest' name.
+    return max(images, key=lambda image: image['Name'])['ImageId']
 
   def ImportKeyfile(self):
     """Imports the public keyfile to AWS."""
@@ -322,18 +326,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
-
-  @staticmethod
-  def _GetDefaultImage(machine_type, region):
-    """Returns the default image given the machine type and region.
-
-    If no default is configured, this will return None.
-    """
-    prefix = machine_type.split('.')[0]
-    if prefix in NON_HVM_PREFIXES:
-      return UBUNTU_AMIS[PV][region]
-    else:
-      return UBUNTU_AMIS[HVM][region]
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-*'
 
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -344,22 +337,14 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
 class WindowsAwsVirtualMachine(AwsVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
 
+  IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
+  DEFAULT_ROOT_DISK_TYPE = 'gp2'
+
   def __init__(self, vm_spec):
     super(WindowsAwsVirtualMachine, self).__init__(vm_spec)
     self.user_name = 'Administrator'
     self.user_data = ('<powershell>%s</powershell>' %
                       windows_virtual_machine.STARTUP_SCRIPT)
-
-  @staticmethod
-  def _GetDefaultImage(machine_type, region):
-    """Returns the default image given the machine type and region.
-
-    If no default is configured, this will return None.
-    """
-    prefix = machine_type.split('.')[0]
-    if prefix in NON_HVM_PREFIXES or region != US_EAST_1:
-      return None
-    return HVM_US_EAST_1_WINDOWS_AMI
 
   @vm_util.Retry()
   def _GetDecodedPasswordData(self):

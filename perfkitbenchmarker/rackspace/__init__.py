@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,12 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-if [[ "$(grep -c "COMMIT_BLOCKED" "$1")" -gt 0 ]]; then
-  echo "FAILED: Unresolved errors - aborting the commit."
-  echo "The message of your attempted commit was:"
-  cat "$1"
-  exit 1
-fi
-
-exit 0

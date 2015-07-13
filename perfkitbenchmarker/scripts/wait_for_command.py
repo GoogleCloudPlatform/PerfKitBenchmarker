@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+#
 # Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 # -*- coding: utf-8 -*-
+
 """Waits for a command started by execute_command.py to complete.
 
 Blocks until a command wrapped by "execute_command.py" completes, then mimics

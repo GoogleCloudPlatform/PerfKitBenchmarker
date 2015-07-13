@@ -1,3 +1,53 @@
+# v0.18.0
+
+(See also https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues/369
+which includes this change log with clickable GH-* links.)
+
+* New features:
+  * Support OpenStack as cloud provider (GH-305, GH-353, thanks @kivio and
+    @mateusz-blaszkowski)
+  * Support Rackspace as cloud provider (GH-336, thanks @meteorfox and @jrperritt)
+  * Add support for ContainerizedVM using docker exec (GH-333, thanks @gablg1)
+  * Windows guest VM support on Static VM (GH-350), Azure (GH-349, GH-374), AWS
+    (GH-347), and GCE (GH-338)
+  * Add NTttcp Windows networking benchmark (GH-348)
+
+* Enhancements:
+  * Support using proxies in VMs (GH-339, GH-337, thanks @kivio)
+  * Enable optional migration on GCE (GH-343)
+  * Execute long running commands via a remote agent (GH-310)
+  * Add resource creation/deletion times to logs (GH-316)
+
+* Bugfixes and maintenance updates:
+  * Update PKB to work with Azure version 0.9.3 (GH-312)
+  * Fix AWS CLI usage on Windows host (GH-313)
+  * Auto-fetch AMI IDs for AWS images (GH-364)
+  * Fix publisher missing info for default image and machine type (GH-357)
+  * Fix 'no attribute pkb_thread_log_context' error for sub-thread logs (GH-322)
+
+* Benchmark-specific changes:
+  * aerospike: config/flag handling bugfixes (GH-367, GH-360, GH-354)
+  * cassandra_ycsb: move num_vms prerequisite check
+  * fio: add latency percentiles for results (GH-344)
+  * hadoop_terasort: Fix bad SSH option (GH-328)
+  * iperf: add lower bounds to arguments (GH-314)
+  * iperf: add timeout to parallel benchmark runs to handle iperf hangs (GH-375)
+  * netperf: Support confidence intervals, increase test length, report stddev
+    (GH-317, GH-306)
+  * ycsb: Drop unaggregatable results from samples (GH-324)
+
+* Development and testing:
+  * **Breaking Change** Automated testing now uses `tox` (GH-330)
+  * Refactored hook scripts, including new opt-in pre-push hook (GH-363)
+  * Use travis for CI testing (GH-340)
+  * Speed up tests using timeouts (GH-299)
+
+* Internals:
+  * Move defaults from benchmark_spec to VM classes, move network instantiation
+    out of benchmark spec (GH-342)
+  * Add event hook support (GH-315)
+  * Refactor VM classes (GH-321)
+
 # v0.17.0
 
 * Add initial support for DigitalOcean as a cloud provider (GH-291).

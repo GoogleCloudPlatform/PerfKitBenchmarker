@@ -26,12 +26,25 @@ import logging
 import threading
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.azure import azure_network
 
 AZURE_PATH = 'azure'
 
+NONE = 'None'
+READ_ONLY = 'ReadOnly'
+READ_WRITE = 'ReadWrite'
+flags.DEFINE_enum(
+    'azure_host_caching', NONE,
+    [NONE, READ_ONLY, READ_WRITE],
+    'The type of host caching to use on Azure data disks.')
+
+
+FLAGS = flags.FLAGS
+
 DRIVE_START_LETTER = 'c'
-DISK_TYPE = {disk.STANDARD: None}  # Azure doesn't have a disk type option yet.
+DISK_TYPE = {disk.STANDARD: None, disk.REMOTE_SSD: None}
 
 
 class AzureDisk(disk.BaseDisk):
@@ -42,6 +55,7 @@ class AzureDisk(disk.BaseDisk):
 
   def __init__(self, disk_spec, vm_name):
     super(AzureDisk, self).__init__(disk_spec)
+    self.host_caching = FLAGS.azure_host_caching
     self.name = None
     self.vm_name = vm_name
     self.lun = None
@@ -49,11 +63,18 @@ class AzureDisk(disk.BaseDisk):
   def _Create(self):
     """Creates the disk."""
     assert self.disk_type in DISK_TYPE, self.disk_type
+
+    if self.disk_type == disk.REMOTE_SSD:
+      assert FLAGS.azure_storage_type == azure_network.PLRS
+    else:
+      assert FLAGS.azure_storage_type != azure_network.PLRS
+
     with self._lock:
       create_cmd = [AZURE_PATH,
                     'vm',
                     'disk',
                     'attach-new',
+                    '--host-caching=%s' % self.host_caching,
                     self.vm_name,
                     str(self.disk_size)]
       vm_util.IssueRetryableCommand(create_cmd)
