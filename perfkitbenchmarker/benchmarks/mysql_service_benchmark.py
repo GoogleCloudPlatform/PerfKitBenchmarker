@@ -133,10 +133,8 @@ def _ParseSysbenchOutput(sysbench_output):
 
   sysbench_output_io = StringIO.StringIO(sysbench_output)
   for line in sysbench_output_io.readlines():
-    print line
     if re.match('^\[', line):
       tps = re.findall('tps: (.*?),', line)
-      print 'tps is %s' % tps[0]
       all_tps.append(float(tps[0]))
       continue
 
@@ -160,17 +158,22 @@ def _ParseSysbenchOutput(sysbench_output):
         percentile_response_time = re.findall('.* percentile: +(.*)', line)[0]
 
   tps_line = ', '.join(map(str, all_tps))
-  print tps_line
+  logging.info('All TPS numbers: \n %s', tps_line)
   tps_percentile = _PercentileCalculator(all_tps)
-  print 'p50 tps %f' % tps_percentile['p50']
-  print 'p90 tps %f' % tps_percentile['p90']
-  print 'p99 tps %f' % tps_percentile['p99']
-  print 'stddev %f' % tps_percentile['stddev']
+  logging.info('p1 tps %f', tps_percentile['p1'])
+  logging.info('p5 tps %f', tps_percentile['p5'])
+  logging.info('p50 tps %f', tps_percentile['p50'])
+  logging.info('p90 tps %f', tps_percentile['p90'])
+  logging.info('p99 tps %f', tps_percentile['p99'])
+  logging.info('p99.9 tps %f', tps_percentile['p99.9'])
+  logging.info('tps average %f', tps_percentile['average'])
+  logging.info('tps stddev %f', tps_percentile['stddev'])
 
-  print min_response_time
-  print max_response_time
-  print avg_response_time
-  print percentile_response_time
+  logging.info('response time min %f', min_response_time)
+  logging.info('response time max %f', max_response_time)
+  logging.info('response time average %f', avg_response_time)
+  logging.info('%d percentile response time %f',
+               FLAGS.sysbench_latency_percentile, percentile_response_time)
 
 
 class RDSMySQLBenchmark(object):
