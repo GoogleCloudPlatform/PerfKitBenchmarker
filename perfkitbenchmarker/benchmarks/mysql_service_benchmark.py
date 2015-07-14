@@ -145,14 +145,13 @@ def _ParseSysbenchOutput(sysbench_output):
 
     if seen_general_statistics and seen_response_time:
       if re.findall('min: +(.*)', line):
-        min_response_time = float(re.findall('min: +(.*)', line)[0])
+        min_response_time = re.findall('min: +(.*)', line)[0]
       if re.findall('avg: +(.*)', line):
-        avg_response_time = float(re.findall('avg: +(.*)', line)[0])
+        avg_response_time = re.findall('avg: +(.*)', line)[0]
       if re.findall('max: +(.*)', line):
-        max_response_time = float(re.findall('max: +(.*)', line)[0])
+        max_response_time = re.findall('max: +(.*)', line)[0]
       if re.findall('.* percentile: +(.*)', line):
-        percentile_response_time = \
-            float(re.findall('.* percentile: +(.*)', line)[0])
+        percentile_response_time = re.findall('.* percentile: +(.*)', line)[0]
 
   tps_line = ', '.join(map(str, all_tps))
   logging.info('All TPS numbers: \n %s', tps_line)
@@ -166,10 +165,10 @@ def _ParseSysbenchOutput(sysbench_output):
   logging.info('tps average %f', tps_percentile['average'])
   logging.info('tps stddev %f', tps_percentile['stddev'])
 
-  logging.info('response time min %f', min_response_time)
-  logging.info('response time max %f', max_response_time)
-  logging.info('response time average %f', avg_response_time)
-  logging.info('%d percentile response time %f',
+  logging.info('response time min %s', min_response_time)
+  logging.info('response time max %s', max_response_time)
+  logging.info('response time average %s', avg_response_time)
+  logging.info('%d percentile response time %s',
                FLAGS.sysbench_latency_percentile, percentile_response_time)
 
 
