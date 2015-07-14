@@ -126,10 +126,6 @@ def _ParseSysbenchOutput(sysbench_output):
   all_tps = []
   seen_general_statistics = False
   seen_response_time = False
-  min_response_time = ''
-  avg_response_time = ''
-  max_response_time = ''
-  percentile_response_time = ''
 
   sysbench_output_io = StringIO.StringIO(sysbench_output)
   for line in sysbench_output_io.readlines():
@@ -149,13 +145,14 @@ def _ParseSysbenchOutput(sysbench_output):
 
     if seen_general_statistics and seen_response_time:
       if re.findall('min: +(.*)', line):
-        min_response_time = re.findall('min: +(.*)', line)[0]
+        min_response_time = float(re.findall('min: +(.*)', line)[0])
       if re.findall('avg: +(.*)', line):
-        avg_response_time = re.findall('avg: +(.*)', line)[0]
+        avg_response_time = float(re.findall('avg: +(.*)', line)[0])
       if re.findall('max: +(.*)', line):
-        max_response_time = re.findall('max: +(.*)', line)[0]
+        max_response_time = float(re.findall('max: +(.*)', line)[0])
       if re.findall('.* percentile: +(.*)', line):
-        percentile_response_time = re.findall('.* percentile: +(.*)', line)[0]
+        percentile_response_time = \
+            float(re.findall('.* percentile: +(.*)', line)[0])
 
   tps_line = ', '.join(map(str, all_tps))
   logging.info('All TPS numbers: \n %s', tps_line)
