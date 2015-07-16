@@ -65,6 +65,16 @@ DB_CREATION_STATUS_QUERY_INTERVAL = 15
 # total wait time is therefore: "query interval * query limit"
 DB_CREATION_STATUS_QUERY_LIMIT = 100
 
+# Storage IOPS capacity of the DB instance.
+# Currently this is fixed because the cloud provider GCP does not support
+# changing this setting. As soon as it supports changing the storage size, we
+# will expose a flag here to allow caller to select a storage size.
+# Default GCP storage size is 1TB PD-SSD which supports 10K Read or 15K Write
+# IOPS (12.5K mixed).
+# To support 12.5K IOPS on EBS-GP, we need 4170 GB disk.
+DB_STORAGE_SIZE_EBS_GP = 4170
+
+
 # Constants defined for Sysbench tests.
 RAND_INIT_ON = 'on'
 DISABLE = 'disable'
@@ -76,13 +86,20 @@ MYSQL_ROOT_PASSWORD = ''
 PREPARE_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/parallel_prepare.lua'
 OLTP_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/oltp.lua'
 
-SYSBENCH_RESULT_NAME_PREPARE = 'prepare time'
-LATENCY_UNIT = 'seconds'
+SYSBENCH_RESULT_NAME_PREPARE = 'sysbench prepare time'
+SYSBENCH_RESULT_NAME_TPS = 'sysbench tps'
+SYSBENCH_RESULT_NAME_LATENCY = 'sysbench latency'
+NA_UNIT = 'NA'
+SECONDS_UNIT = 'seconds'
+MS_UNIT = 'milliseconds'
 
 # These are the constants that should be specified in GCP's cloud SQL command.
 DEFAULT_BACKUP_START_TIME = '07:00'
 GCP_MY_SQL_VERSION = 'MYSQL_5_6'
 GCP_PRICING_PLAN = 'PACKAGE'
+
+PERCENTILES_LIST = [1, 5, 50, 90, 99, 99.9]
+RESPONSE_TIME_TOKENS = ['min', 'avg', 'max', 'percentile']
 
 
 def GetInfo():
@@ -98,12 +115,11 @@ def _PercentileCalculator(numbers):
   count = len(numbers_sorted)
   total = sum(numbers_sorted)
   result = {}
-  result['p1'] = numbers_sorted[int(count * 0.01)]
-  result['p5'] = numbers_sorted[int(count * 0.05)]
-  result['p50'] = numbers_sorted[int(count * 0.5)]
-  result['p90'] = numbers_sorted[int(count * 0.9)]
-  result['p99'] = numbers_sorted[int(count * 0.99)]
-  result['p99.9'] = numbers_sorted[int(count * 0.999)]
+  for percentile in PERCENTILES_LIST:
+    percentile_string = 'p%s' % str(percentile)
+    result[percentile_string] = numbers_sorted[
+        int(count * float(percentile) / 100)]
+
   if count > 0:
     average = total / float(count)
     result['average'] = average
@@ -116,8 +132,9 @@ def _PercentileCalculator(numbers):
   return result
 
 
-def _ParseSysbenchOutput(sysbench_output):
-  """Parses sysbench output and extract relevant TPS and latency numbers.
+def _ParseSysbenchOutput(sysbench_output, results, metadata):
+  """Parses sysbench output and extract relevant TPS and latency numbers, and
+  populate the final result collection with these information.
 
   Specifically, we are interested in tps numbers reported by each reporting
   interval, and the summary latency numbers printed at the end of the run in
@@ -126,6 +143,8 @@ def _ParseSysbenchOutput(sysbench_output):
   all_tps = []
   seen_general_statistics = False
   seen_response_time = False
+
+  response_times = {}
 
   sysbench_output_io = StringIO.StringIO(sysbench_output)
   for line in sysbench_output_io.readlines():
@@ -144,32 +163,61 @@ def _ParseSysbenchOutput(sysbench_output):
         continue
 
     if seen_general_statistics and seen_response_time:
-      if re.findall('min: +(.*)', line):
-        min_response_time = re.findall('min: +(.*)', line)[0]
-      if re.findall('avg: +(.*)', line):
-        avg_response_time = re.findall('avg: +(.*)', line)[0]
-      if re.findall('max: +(.*)', line):
-        max_response_time = re.findall('max: +(.*)', line)[0]
-      if re.findall('.* percentile: +(.*)', line):
-        percentile_response_time = re.findall('.* percentile: +(.*)', line)[0]
+      for token in RESPONSE_TIME_TOKENS:
+        search_string = '.*%s: +(.*)ms' % token
+        if re.findall(search_string, line):
+          response_times[token] = float(re.findall(search_string, line)[0])
 
   tps_line = ', '.join(map(str, all_tps))
+  # Print all tps data points in the log for reference. And report
+  # percentiles of these tps data in the final result set.
   logging.info('All TPS numbers: \n %s', tps_line)
-  tps_percentile = _PercentileCalculator(all_tps)
-  logging.info('p1 tps %f', tps_percentile['p1'])
-  logging.info('p5 tps %f', tps_percentile['p5'])
-  logging.info('p50 tps %f', tps_percentile['p50'])
-  logging.info('p90 tps %f', tps_percentile['p90'])
-  logging.info('p99 tps %f', tps_percentile['p99'])
-  logging.info('p99.9 tps %f', tps_percentile['p99.9'])
-  logging.info('tps average %f', tps_percentile['average'])
-  logging.info('tps stddev %f', tps_percentile['stddev'])
 
-  logging.info('response time min %s', min_response_time)
-  logging.info('response time max %s', max_response_time)
-  logging.info('response time average %s', avg_response_time)
-  logging.info('%d percentile response time %s',
-               FLAGS.sysbench_latency_percentile, percentile_response_time)
+  tps_percentile = _PercentileCalculator(all_tps)
+  for percentile in PERCENTILES_LIST:
+    percentile_string = 'p%s' % str(percentile)
+    logging.info('%s tps %f', percentile_string,
+                 tps_percentile[percentile_string])
+    metric_name = ('%s %s') % (SYSBENCH_RESULT_NAME_TPS, percentile_string)
+    results.append(sample.Sample(
+        metric_name,
+        tps_percentile[percentile_string],
+        NA_UNIT,
+        metadata))
+
+  # Also report average, stddev, and coefficient of variation
+  for token in ['average', 'stddev']:
+    logging.info('tps %s %f', token, tps_percentile[token])
+    metric_name = ('%s %s') % (SYSBENCH_RESULT_NAME_TPS, token)
+    results.append(sample.Sample(
+        metric_name,
+        tps_percentile[token],
+        NA_UNIT,
+        metadata))
+
+  if tps_percentile['average'] > 0:
+    cv = tps_percentile['stddev'] / tps_percentile['average']
+    logging.info('tps coefficient of variation %f', cv)
+    metric_name = ('%s %s') % (SYSBENCH_RESULT_NAME_TPS, 'cv')
+    results.append(sample.Sample(
+        metric_name,
+        cv,
+        NA_UNIT,
+        metadata))
+
+  # Now, report the latency numbers.
+  for token in RESPONSE_TIME_TOKENS:
+    logging.info('%s_response_time is %f', token, response_times[token])
+    metric_name = '%s %s' % (SYSBENCH_RESULT_NAME_LATENCY, token)
+
+    if token == 'percentile':
+      metric_name = '%s %s' % (metric_name, FLAGS.sysbench_latency_percentile)
+
+    results.append(sample.Sample(
+        metric_name,
+        response_times[token],
+        MS_UNIT,
+        metadata))
 
 
 class RDSMySQLBenchmark(object):
@@ -177,6 +225,7 @@ class RDSMySQLBenchmark(object):
 
   def Prepare(self, vm):
     logging.info('Preparing MySQL Service benchmarks for RDS.')
+
 
   def Run(self, vm, metadata):
     results = []
@@ -270,11 +319,6 @@ class GoogleCloudSQLBenchmark(object):
 
     # Prepares the Sysbench test based on the input flags (load data into DB)
     # Could take a long time if the data to be loaded is large.
-    # sysbench --test=/usr/share/doc/sysbench/tests/db/parallel_prepare.lua
-    # --oltp_tables_count=3 --oltp-table-size=100000
-    # --rand-init=on --num-threads=3 --mysql-user=root
-    # --mysql-host=146.148.35.217 --mysql-password="" run
-
     prepare_start_time = time.time()
     prepare_cmd_tokens = ['sysbench',
                           '--test=%s' % PREPARE_SCRIPT_PATH,
@@ -287,6 +331,7 @@ class GoogleCloudSQLBenchmark(object):
                           '--mysql-host=%s' % vm.db_instance_ip,
                           'run']
     prepare_cmd = ' '.join(prepare_cmd_tokens)
+
     # Sysbench output is in stdout, but we also get stderr just in case
     # something went wrong.
     stdout, stderr = vm.RobustRemoteCommand(prepare_cmd)
@@ -300,38 +345,50 @@ class GoogleCloudSQLBenchmark(object):
     results.append(sample.Sample(
         SYSBENCH_RESULT_NAME_PREPARE,
         prepare_duration,
-        LATENCY_UNIT,
+        SECONDS_UNIT,
         metadata))
 
     # Now run the sysbench OLTP test and parse the results.
 
-    # First step is to run the test long enough to cover the warmup period
-    # as requested by the caller.
-    if FLAGS.sysbench_warmup_seconds > 0:
-      run_cmd_tokens = ['sysbench',
-                        '--test=%s' % OLTP_SCRIPT_PATH,
-                        '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
-                        '--oltp-table-size=%d' % FLAGS.oltp_table_size,
-                        '--rand-init=%s' % RAND_INIT_ON,
-                        '--db-ps-mode=%s' % DISABLE,
-                        '--oltp-dist-type=%s' % UNIFORM,
-                        '--oltp-read-only=%s' % OFF,
-                        '--num-threads=%d' % FLAGS.sysbench_thread_count,
-                        '--percentile=%d' % FLAGS.sysbench_latency_percentile,
-                        '--report-interval=%d' % FLAGS.sysbench_report_interval,
-                        '--max-time=%d' % FLAGS.sysbench_warmup_seconds,
-                        '--mysql-user=%s' % MYSQL_ROOT_USER,
-                        '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
-                        '--mysql-host=%s' % vm.db_instance_ip,
-                        'run']
-      run_cmd = ' '.join(run_cmd_tokens)
-      stdout, stderr = vm.RobustRemoteCommand(run_cmd)
-      logging.info('Warmup results: \n stdout is:\n%s\nstderr is\n%s',
-                   stdout, stderr)
-      logging.info('\n Parsing Sysbench Results...\n')
-      _ParseSysbenchOutput(stdout)
+    for i in xrange(1, 3):
+      # First step is to run the test long enough to cover the warmup period
+      # as requested by the caller. Then we do the "real" run, parse and report
+      # the results.
+      duration = 0
+      if i == 1 and FLAGS.sysbench_warmup_seconds > 0:
+        duration = FLAGS.sysbench_warmup_seconds
+        logging.info('Sysbench warm-up run, duration is %d', duration)
+      elif i == 2:
+        duration = FLAGS.sysbench_run_seconds
+        logging.info('Sysbench real run, duration is %d', duration)
 
-    # Then we launch the actual test.
+      if duration > 0:
+        run_cmd_tokens = ['sysbench',
+                          '--test=%s' % OLTP_SCRIPT_PATH,
+                          '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
+                          '--oltp-table-size=%d' % FLAGS.oltp_table_size,
+                          '--rand-init=%s' % RAND_INIT_ON,
+                          '--db-ps-mode=%s' % DISABLE,
+                          '--oltp-dist-type=%s' % UNIFORM,
+                          '--oltp-read-only=%s' % OFF,
+                          '--num-threads=%d' % FLAGS.sysbench_thread_count,
+                          '--percentile=%d' % FLAGS.sysbench_latency_percentile,
+                          '--report-interval=%d' %
+                          FLAGS.sysbench_report_interval,
+                          '--max-time=%d' % duration,
+                          '--mysql-user=%s' % MYSQL_ROOT_USER,
+                          '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
+                          '--mysql-host=%s' % vm.db_instance_ip,
+                          'run']
+        run_cmd = ' '.join(run_cmd_tokens)
+        stdout, stderr = vm.RobustRemoteCommand(run_cmd)
+        logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
+                     stdout, stderr)
+
+      if i == 2:
+        # We only need to parse the results for the "real" run.
+        logging.info('\n Parsing Sysbench Results...\n')
+        _ParseSysbenchOutput(stdout, results, metadata)
 
     return results
 
@@ -378,7 +435,6 @@ def Prepare(benchmark_spec):
   MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Prepare(vms[0])
 
   # Create the sbtest database to prepare the DB for Sysbench.
-  # mysql -u root -h IP -e 'create database sbtest;'
   create_sbtest_db_cmd = ('mysql -u root -h %s '
                           '-e \'create database sbtest;\'') % (
                               vms[0].db_instance_ip)
