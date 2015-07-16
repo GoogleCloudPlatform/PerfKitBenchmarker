@@ -459,6 +459,11 @@ def Run(benchmark_spec):
   metadata['oltp_tables_count'] = FLAGS.oltp_tables_count
   metadata['oltp_table_size'] = FLAGS.oltp_table_size
   metadata['db_instance_cores'] = FLAGS.db_instance_cores
+  metadata['sysbench_warm_up_seconds'] = FLAGS.sysbench_warmup_seconds
+  metadata['sysbench_run_seconds'] = FLAGS.sysbench_run_seconds
+  metadata['sysbench_thread_count'] = FLAGS.sysbench_thread_count
+  metadata['sysbench_latency_percentile'] = FLAGS.sysbench_latency_percentile
+  metadata['sysbench_report_interval'] = FLAGS.sysbench_report_interval
 
   results = MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0],
                                                                   metadata)
