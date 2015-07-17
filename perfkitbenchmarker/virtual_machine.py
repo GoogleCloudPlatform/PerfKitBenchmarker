@@ -299,20 +299,20 @@ class BaseOsMixin(object):
     pass
 
   def PushFile(self, source_path, remote_path=''):
-    """Copies a file to the VM.
+    """Copies a file or a directory to the VM.
 
     Args:
-      source_path: The location of the file on the LOCAL machine.
+      source_path: The location of the file or directory on the LOCAL machine.
       remote_path: The destination of the file on the REMOTE machine, default
           is the home directory.
     """
     self.RemoteCopy(source_path, remote_path)
 
   def PullFile(self, source_path, remote_path=''):
-    """Copies a file from the VM.
+    """Copies a file or a directory from the VM.
 
     Args:
-      source_path: The location of the file on the REMOTE machine.
+      source_path: The location of the file or directory on the REMOTE machine.
       remote_path: The destination of the file on the LOCAL machine, default
           is the home directory.
     """
