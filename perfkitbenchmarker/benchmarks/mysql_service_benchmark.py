@@ -14,9 +14,15 @@
 
 """MySQL Service Benchmarks.
 
-This is a set of benchmarks that measures performance of MySQL DataBases.
+This is a set of benchmarks that measures performance of MySQL Databases on
+managed MySQL services.
 
-Currently it focuses on managed MySQL services.
+- On AWS, we will use RDS+MySQL.
+- On GCP, we will use Cloud SQL v2 (Performance Edition). As of July 2015, you
+ will need to request to whitelist your GCP project to get access to cloud sql
+ v2. Follow instructions on your GCP Cloud SQL project console to do that.
+- On Azure, we will use the MySQL service. (To be added here as soon as it's
+ Generally Available)
 
 """
 import json
@@ -53,18 +59,17 @@ flags.DEFINE_integer('sysbench_latency_percentile', 99,
 flags.DEFINE_integer('sysbench_report_interval', 2,
                      'The interval we ask sysbench to report results.')
 
-
 BENCHMARK_INFO = {'name': 'mysql_service',
                   'description': 'MySQL service benchmarks.',
                   'scratch_disk': False,
                   'num_machines': 1}
 
 # Query DB creation status once every 15 seconds
-DB_CREATION_STATUS_QUERY_INTERVAL = 15
+DB_STATUS_QUERY_INTERVAL = 15
 
 # How many times we will wait for the service to create the DB
 # total wait time is therefore: "query interval * query limit"
-DB_CREATION_STATUS_QUERY_LIMIT = 100
+DB_STATUS_QUERY_LIMIT = 100
 
 AWS_PREFIX = ['aws', '--output=json']
 # Map from FLAGs.db_instance_cores to RDS DB Type
@@ -85,7 +90,7 @@ RDS_DB_STORAGE_TYPE_GP2 = 'gp2'
 # Default GCP storage size is 1TB PD-SSD which supports 10K Read or 15K Write
 # IOPS (12.5K mixed).
 # To support 12.5K IOPS on EBS-GP, we need 4170 GB disk.
-RDS_DB_STORAGE_GP2_SIZE = 4170
+RDS_DB_STORAGE_GP2_SIZE = '4170'
 
 # Constants defined for Sysbench tests.
 RAND_INIT_ON = 'on'
@@ -118,11 +123,19 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
-class DBInstanceCreationError(Exception):
+class DBStatusQueryError(Exception):
     pass
 
 
 def _PercentileCalculator(numbers):
+  """Computes percentiles, stddev and mean on a set of numbers
+
+  Args:
+    numbers: The set of numbers to compute percentiles for.
+
+  Returns:
+    A dictionary of percentiles.
+  """
   numbers_sorted = sorted(numbers)
   count = len(numbers_sorted)
   total = sum(numbers_sorted)
@@ -146,11 +159,16 @@ def _PercentileCalculator(numbers):
 
 def _ParseSysbenchOutput(sysbench_output, results, metadata):
   """Parses sysbench output and extract relevant TPS and latency numbers, and
-  populate the final result collection with these information.
+   populate the final result collection with these information.
 
   Specifically, we are interested in tps numbers reported by each reporting
   interval, and the summary latency numbers printed at the end of the run in
   "General Statistics" -> "Response Time".
+
+  Args:
+    sysbench_output: The output from sysbench.
+    results: The dictionary to store results based on sysbench output.
+    metadata: The metadata to be passed along to the Samples class.
   """
   all_tps = []
   seen_general_statistics = False
@@ -232,10 +250,126 @@ def _ParseSysbenchOutput(sysbench_output, results, metadata):
         metadata))
 
 
+def _RunSysbench(vm, metadata):
+  """ Runs the Sysbench OLTP test on the DB instance as indicated by the
+  vm.db_instance_address.
+
+  Args:
+    vm: The client VM that will issue the sysbench test.
+    metadata: The PKB metadata to be passed along to the final results.
+
+  Returns:
+    Results: A list of results of this run.
+  """
+  results = []
+
+  # Prepares the Sysbench test based on the input flags (load data into DB)
+  # Could take a long time if the data to be loaded is large.
+  prepare_start_time = time.time()
+  prepare_cmd_tokens = ['sysbench',
+                        '--test=%s' % PREPARE_SCRIPT_PATH,
+                        '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
+                        '--oltp-table-size=%d' % FLAGS.oltp_table_size,
+                        '--rand-init=%s' % RAND_INIT_ON,
+                        '--num-threads=%d' % FLAGS.oltp_tables_count,
+                        '--mysql-user=%s' % MYSQL_ROOT_USER,
+                        '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
+                        '--mysql-host=%s' % vm.db_instance_address,
+                        'run']
+  prepare_cmd = ' '.join(prepare_cmd_tokens)
+
+  # Sysbench output is in stdout, but we also get stderr just in case
+  # something went wrong.
+  stdout, stderr = vm.RobustRemoteCommand(prepare_cmd)
+  prepare_duration = time.time() - prepare_start_time
+  logging.info('It took %d seconds to finish the prepare step',
+               prepare_duration)
+  logging.info('Prepare results: \n stdout is:\n%s\nstderr is\n%s',
+               stdout,
+               stderr)
+
+  results.append(sample.Sample(
+      SYSBENCH_RESULT_NAME_PREPARE,
+      prepare_duration,
+      SECONDS_UNIT,
+      metadata))
+
+  # Now run the sysbench OLTP test and parse the results.
+
+  for i in xrange(1, 3):
+    # First step is to run the test long enough to cover the warmup period
+    # as requested by the caller. Then we do the "real" run, parse and report
+    # the results.
+    duration = 0
+    if i == 1 and FLAGS.sysbench_warmup_seconds > 0:
+      duration = FLAGS.sysbench_warmup_seconds
+      logging.info('Sysbench warm-up run, duration is %d', duration)
+    elif i == 2:
+      duration = FLAGS.sysbench_run_seconds
+      logging.info('Sysbench real run, duration is %d', duration)
+
+    if duration > 0:
+      run_cmd_tokens = ['sysbench',
+                        '--test=%s' % OLTP_SCRIPT_PATH,
+                        '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
+                        '--oltp-table-size=%d' % FLAGS.oltp_table_size,
+                        '--rand-init=%s' % RAND_INIT_ON,
+                        '--db-ps-mode=%s' % DISABLE,
+                        '--oltp-dist-type=%s' % UNIFORM,
+                        '--oltp-read-only=%s' % OFF,
+                        '--num-threads=%d' % FLAGS.sysbench_thread_count,
+                        '--percentile=%d' % FLAGS.sysbench_latency_percentile,
+                        '--report-interval=%d' %
+                        FLAGS.sysbench_report_interval,
+                        '--max-time=%d' % duration,
+                        '--mysql-user=%s' % MYSQL_ROOT_USER,
+                        '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
+                        '--mysql-host=%s' % vm.db_instance_address,
+                        'run']
+      run_cmd = ' '.join(run_cmd_tokens)
+      stdout, stderr = vm.RobustRemoteCommand(run_cmd)
+      logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
+                   stdout, stderr)
+
+    if i == 2:
+      # We only need to parse the results for the "real" run.
+      logging.info('\n Parsing Sysbench Results...\n')
+      _ParseSysbenchOutput(stdout, results, metadata)
+
+  return results
+
+
+def _RDSParseDBInstanceStatus(json_response):
+  """Parses a JSON response from an RDS DB status query command.
+
+  Args:
+    json_response: The response from the DB status query command in JSON.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
+  status = ''
+  # Sometimes you look for 'DBInstance', some times you need to look for
+  # 'DBInstances' and then take the first element
+  if 'DBInstance' in json_response:
+    status = json_response['DBInstance']['DBInstanceStatus']
+  else:
+    if 'DBInstances' in json_response:
+      status = json_response['DBInstances'][0]['DBInstanceStatus']
+
+  return status
+
+
 class RDSMySQLBenchmark(object):
   """MySQL benchmark based on the RDS service on AWS."""
 
   def Prepare(self, vm):
+    """Prepares the DB and everything for the AWS-RDS provider.
+
+    Args:
+      vm: The VM to be used as the test client.
+
+    """
     logging.info('Preparing MySQL Service benchmarks for RDS.')
     logging.info('vm.zone is %s', vm.zone)
     logging.info('vm.network.vpc id is %s', vm.network.vpc.id)
@@ -260,8 +394,8 @@ class RDSMySQLBenchmark(object):
         break
 
     if new_subnet_zone == '':
-      raise DBInstanceCreationError('Cannot find a zone to create the required '
-                                    'second subnet for the DB instance.')
+      raise DBStatusQueryError('Cannot find a zone to create the required '
+                               'second subnet for the DB instance.')
 
     # Now create a new subnet in the zone that's different from where the VM is
     logging.info('Creating a second subnet in zone %s', new_subnet_zone)
@@ -318,34 +452,112 @@ class RDSMySQLBenchmark(object):
         '--availability-zone', vm.zone,
         '--db-subnet-group-name', vm.db_subnet_group_name]
 
-    logging.info('Will call this command to create db \n %s',
-                 ' '.join(create_db_cmd))
+    status_query_cmd = AWS_PREFIX + [
+        'rds',
+        'describe-db-instances',
+        '--db-instance-id', vm.db_instance_id]
 
-    """stdout, stderr, _ = vm_util.IssueCommand(create_db_cmd)
+    stdout, stderr, _ = vm_util.IssueCommand(create_db_cmd)
+    logging.info('Request to create the DB has been issued, stdout:\n%s\n'
+                 'stderr:%s\n', stdout, stderr)
     response = json.loads(stdout)
 
-    db_creation_status = ''
-    if response['DBInstances'] is not None:
-      db_creation_status = response['DBInstances'][0]['DBInstanceStatus']
+    db_creation_status = _RDSParseDBInstanceStatus(response)
+    status_query_count = 1
+    while True:
+      if (db_creation_status == 'available'):
+        break
 
-    if (db_creation_status != 'creating' and
-        db_creation_status != 'available' and
-        db_creation_status != 'modifying'):
-      raise DBInstanceCreationError('Invalid operation or unrecognized '
-                                      'operationType in DB creation response. '
-                                      ' stdout is\n%s, stderr is\n%s' % (
-                                          stdout, stderr))
-    """
+      if (db_creation_status != 'creating' and
+          db_creation_status != 'modifying' and
+          db_creation_status != 'backing-up' and
+          db_creation_status != 'rebooting'):
+        raise DBStatusQueryError('Invalid status in DB creation response. '
+                                 ' stdout is\n%s, stderr is\n%s' % (
+                                     stdout, stderr))
 
-  def Run(self, vm, metadata):
-    results = []
-    return results
+      status_query_count += 1
+      if status_query_count > DB_STATUS_QUERY_LIMIT:
+        raise DBStatusQueryError('DB creation timed-out, we have '
+                                 'waited at least %s * %s seconds.' % (
+                                     DB_STATUS_QUERY_INTERVAL,
+                                     DB_STATUS_QUERY_LIMIT))
 
+      logging.info('Querying db creation status, current state is %s, query '
+                   'count is %d', db_creation_status, status_query_count)
+      time.sleep(DB_STATUS_QUERY_INTERVAL)
+
+      stdout, stderr, _ = vm_util.IssueCommand(status_query_cmd)
+      response = json.loads(stdout)
+      db_creation_status = _RDSParseDBInstanceStatus(response)
+
+    # We are good now, db has been created. Now get the endpoint address.
+    # On RDS, you always connect with a DNS name, if you do that from a EC2 VM,
+    # that DNS name will be resolved to an internal IP address of the DB.
+    vm.db_instance_address = response['Endpoint']['Address']
+    logging.info('Successfully created an RDS DB instance. Address is %s',
+                 vm.db_instance_address)
+    logging.info('Complete output is:\n %s', response)
 
   def Cleanup(self, vm):
     """Clean up RDS instances, cleanup the extra subnet created for the
        creation of the RDS instance.
+
+    Args:
+      vm: The VM that was used as the test client, which also stores states
+          for clean-up.
     """
+
+    # Now, we can delete the DB instance. vm.db_instance_id is the id to call.
+    # We need to keep querying the status of the deletion here before we let
+    # this go. RDS DB deletion takes some time to finish. And we have to
+    # wait until this DB is deleted before we proceed because this DB holds
+    # references to various other resources: subnet groups, subnets, vpc, etc.
+    delete_db_cmd = AWS_PREFIX + [
+        'rds',
+        'delete-db-instance',
+        '--db-instance-identifier', vm.db_instance_id,
+        '--skip-final-snapshot']
+
+    logging.info('Will call this command to delete db instance: \n %s',
+                 ' '.join(delete_db_cmd))
+
+    stdout, stderr, _ = vm_util.IssueCommand(delete_db_cmd)
+    logging.info('Request to delete the DB has been issued, stdout:\n%s\n'
+                 'stderr:%s\n', stdout, stderr)
+
+    status_query_cmd = AWS_PREFIX + [
+        'rds',
+        'describe-db-instances',
+        '--db-instance-id', vm.db_instance_id]
+    status_query_count = 1
+    while True:
+      try:
+        response = json.loads(stdout)
+        db_status = _RDSParseDBInstanceStatus(response)
+        if db_status == 'deleting':
+          status_query_count += 1
+          if status_query_count > DB_STATUS_QUERY_LIMIT:
+            logging.warn('DB is still in deleting state after long wait, bail.')
+            break
+
+          # Wait for a few seconds and query status
+          time.sleep(DB_STATUS_QUERY_INTERVAL)
+          stdout, stderr, _ = vm_util.IssueCommand(status_query_cmd)
+        else:
+          break
+      except:
+        break  # stdout cannot be parsed into json, maybe empty
+
+    # Outside the loop, look at stderr, expect it to have the
+    # "DB instance Not found" string.
+    # if it does not have, log a warning but proceed forward.
+    if re.findall('DBInstanceNotFound', stderr):
+      logging.info('DB has been successfully deleted, got confirmation.')
+    else:
+      logging.warn('DB may not have been deleted, we did not get confirmation '
+                   'from stderr, which is %s', stderr)
+
     if hasattr(vm, 'db_subnet_group_name'):
       delete_db_subnet_group_cmd = AWS_PREFIX + [
           'rds',
@@ -364,29 +576,17 @@ class RDSMySQLBenchmark(object):
       logging.info('Deleted the extra subnet. stdout is:\n%s, stderr: \n%s',
                    stdout, stderr)
 
-    # Now, you can delete the DB instance. vm.db_instance_id is the id to call.
-    # you need to keep querying the status of the deletion here before you let
-    # this go. RDS DB deletion takes some time to finish. And you have to
-    # wait until this DB is deleted before you proceed becuase this DB holds
-    # references to the VPC, the subnets, etc.
-    # wrap below in a loop:
-    # try:
-    # response = json.loads(stdout).
-    # db_status=response['DBInstancesStatus']
-    # if db_status is None:
-    # break
-    # else: wait for a few seconds, add wait count, check if timed out.
-    # except:
-    #  break //stdout cannot be parsed into json. great.
-    #
-    # Outside the loop, look at stderr, expect it to have DB instance Not found
-    # if it does not have, log a warning but proceed forward.
-
 
 class GoogleCloudSQLBenchmark(object):
   """MySQL benchmark based on the Google Cloud SQL service."""
 
   def Prepare(self, vm):
+    """Prepares the DB and everything for the provider GCP (Cloud SQL)
+
+    Args:
+      vm: The VM to be used as the test client
+
+    """
     logging.info('Preparing MySQL Service benchmarks for Google Cloud SQL.')
 
     vm.db_instance_name = 'pkb%s' % FLAGS.run_uri
@@ -416,9 +616,9 @@ class GoogleCloudSQLBenchmark(object):
     stdout, _, _ = vm_util.IssueCommand(create_db_cmd)
     response = json.loads(stdout)
     if response['operation'] is None or response['operationType'] != 'CREATE':
-      raise DBInstanceCreationError('Invalid operation or unrecognized '
-                                    'operationType in DB creation response. '
-                                    ' stdout is %s' % stdout)
+      raise DBStatusQueryError('Invalid operation or unrecognized '
+                               'operationType in DB creation response. '
+                               ' stdout is %s' % stdout)
 
     status_query_cmd = [FLAGS.gcloud_path,
                         'sql',
@@ -439,15 +639,15 @@ class GoogleCloudSQLBenchmark(object):
       if state == 'RUNNABLE':
         break
       else:
-        if query_count > DB_CREATION_STATUS_QUERY_LIMIT:
-          raise DBInstanceCreationError('DB creation timed-out, we have '
-                                        'waited at least %s * %s seconds.' % (
-                                            DB_CREATION_STATUS_QUERY_INTERVAL,
-                                            DB_CREATION_STATUS_QUERY_LIMIT))
+        if query_count > DB_STATUS_QUERY_LIMIT:
+          raise DBStatusQueryError('DB creation timed-out, we have '
+                                   'waited at least %s * %s seconds.' % (
+                                       DB_STATUS_QUERY_INTERVAL,
+                                       DB_STATUS_QUERY_LIMIT))
 
         logging.info('Querying db creation status, current state is %s, query '
                      'count is %d', state, query_count)
-        time.sleep(DB_CREATION_STATUS_QUERY_INTERVAL)
+        time.sleep(DB_STATUS_QUERY_INTERVAL)
 
         stdout, _, _ = vm_util.IssueCommand(status_query_cmd)
         response = json.loads(stdout)
@@ -456,8 +656,8 @@ class GoogleCloudSQLBenchmark(object):
     logging.info('Successfully created the DB instance. Complete response is '
                  '%s', response)
 
-    vm.db_instance_ip = response['ipAddresses'][0]['ipAddress']
-    logging.info('DB IP address is: %s', vm.db_instance_ip)
+    vm.db_instance_address = response['ipAddresses'][0]['ipAddress']
+    logging.info('DB IP address is: %s', vm.db_instance_address)
 
     # Set the root password to a common one that can be referred to in common
     # code across providers.
@@ -471,84 +671,6 @@ class GoogleCloudSQLBenchmark(object):
     logging.info('Set root password completed. Stdout:\n%s\nStderr:\n%s',
                  stdout, stderr)
 
-
-  def Run(self, vm, metadata):
-    results = []
-
-    # Prepares the Sysbench test based on the input flags (load data into DB)
-    # Could take a long time if the data to be loaded is large.
-    prepare_start_time = time.time()
-    prepare_cmd_tokens = ['sysbench',
-                          '--test=%s' % PREPARE_SCRIPT_PATH,
-                          '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
-                          '--oltp-table-size=%d' % FLAGS.oltp_table_size,
-                          '--rand-init=%s' % RAND_INIT_ON,
-                          '--num-threads=%d' % FLAGS.oltp_tables_count,
-                          '--mysql-user=%s' % MYSQL_ROOT_USER,
-                          '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
-                          '--mysql-host=%s' % vm.db_instance_ip,
-                          'run']
-    prepare_cmd = ' '.join(prepare_cmd_tokens)
-
-    # Sysbench output is in stdout, but we also get stderr just in case
-    # something went wrong.
-    stdout, stderr = vm.RobustRemoteCommand(prepare_cmd)
-    prepare_duration = time.time() - prepare_start_time
-    logging.info('It took %d seconds to finish the prepare step',
-                 prepare_duration)
-    logging.info('Prepare results: \n stdout is:\n%s\nstderr is\n%s',
-                 stdout,
-                 stderr)
-
-    results.append(sample.Sample(
-        SYSBENCH_RESULT_NAME_PREPARE,
-        prepare_duration,
-        SECONDS_UNIT,
-        metadata))
-
-    # Now run the sysbench OLTP test and parse the results.
-
-    for i in xrange(1, 3):
-      # First step is to run the test long enough to cover the warmup period
-      # as requested by the caller. Then we do the "real" run, parse and report
-      # the results.
-      duration = 0
-      if i == 1 and FLAGS.sysbench_warmup_seconds > 0:
-        duration = FLAGS.sysbench_warmup_seconds
-        logging.info('Sysbench warm-up run, duration is %d', duration)
-      elif i == 2:
-        duration = FLAGS.sysbench_run_seconds
-        logging.info('Sysbench real run, duration is %d', duration)
-
-      if duration > 0:
-        run_cmd_tokens = ['sysbench',
-                          '--test=%s' % OLTP_SCRIPT_PATH,
-                          '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
-                          '--oltp-table-size=%d' % FLAGS.oltp_table_size,
-                          '--rand-init=%s' % RAND_INIT_ON,
-                          '--db-ps-mode=%s' % DISABLE,
-                          '--oltp-dist-type=%s' % UNIFORM,
-                          '--oltp-read-only=%s' % OFF,
-                          '--num-threads=%d' % FLAGS.sysbench_thread_count,
-                          '--percentile=%d' % FLAGS.sysbench_latency_percentile,
-                          '--report-interval=%d' %
-                          FLAGS.sysbench_report_interval,
-                          '--max-time=%d' % duration,
-                          '--mysql-user=%s' % MYSQL_ROOT_USER,
-                          '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
-                          '--mysql-host=%s' % vm.db_instance_ip,
-                          'run']
-        run_cmd = ' '.join(run_cmd_tokens)
-        stdout, stderr = vm.RobustRemoteCommand(run_cmd)
-        logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
-                     stdout, stderr)
-
-      if i == 2:
-        # We only need to parse the results for the "real" run.
-        logging.info('\n Parsing Sysbench Results...\n')
-        _ParseSysbenchOutput(stdout, results, metadata)
-
-    return results
 
   def Cleanup(self, vm):
     if hasattr(vm, 'db_instance_name'):
@@ -593,18 +715,19 @@ def Prepare(benchmark_spec):
   # Prepare service specific states (create DB instance, configure it, etc)
   MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Prepare(vms[0])
 
-  if hasattr(vms[0], 'db_instance_ip'):
+  if hasattr(vms[0], 'db_instance_address'):
       # Create the sbtest database to prepare the DB for Sysbench.
     create_sbtest_db_cmd = ('mysql -h %s -u %s -p%s '
                             '-e \'create database sbtest;\'') % (
-                                vms[0].db_instance_ip,
+                                vms[0].db_instance_address,
                                 MYSQL_ROOT_USER,
                                 MYSQL_ROOT_PASSWORD)
     stdout, stderr = vms[0].RemoteCommand(create_sbtest_db_cmd)
     logging.info('sbtest db created, stdout is %s, stderr is %s',
                  stdout, stderr)
   else:
-    logging.error('Prepare has likely failed, db_instance_ip is not found.')
+    logging.error(
+        'Prepare has likely failed, db_instance_address is not found.')
 
 
 def Run(benchmark_spec):
@@ -630,8 +753,9 @@ def Run(benchmark_spec):
   metadata['sysbench_latency_percentile'] = FLAGS.sysbench_latency_percentile
   metadata['sysbench_report_interval'] = FLAGS.sysbench_report_interval
 
-  results = MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Run(vms[0],
-                                                                metadata)
+  # The run phase is common across providers. The VMs[0] object contains all
+  # information and states necessary to carry out the run.
+  results = _RunSysbench(vms[0], metadata)
   print results
   return results
 
