@@ -66,6 +66,18 @@ DB_CREATION_STATUS_QUERY_INTERVAL = 15
 # total wait time is therefore: "query interval * query limit"
 DB_CREATION_STATUS_QUERY_LIMIT = 100
 
+AWS_PREFIX = ['aws', '--output=json']
+# Map from FLAGs.db_instance_cores to RDS DB Type
+RDS_CORE_TO_DB_CLASS_MAP = {
+    '1': 'db.m3.medium',
+    '4': 'db.m3.xlarge',
+    '8': 'db.m3.2xlarge',
+    '16': 'db.r3.4xlarge',  # m3 series doesn't have 16 core.
+}
+
+RDS_DB_ENGINE = 'MySQL'
+RDS_DB_ENGINE_VERSION = '5.6.23'
+RDS_DB_STORAGE_TYPE_GP2 = 'gp2'
 # Storage IOPS capacity of the DB instance.
 # Currently this is fixed because the cloud provider GCP does not support
 # changing this setting. As soon as it supports changing the storage size, we
@@ -73,9 +85,7 @@ DB_CREATION_STATUS_QUERY_LIMIT = 100
 # Default GCP storage size is 1TB PD-SSD which supports 10K Read or 15K Write
 # IOPS (12.5K mixed).
 # To support 12.5K IOPS on EBS-GP, we need 4170 GB disk.
-DB_STORAGE_SIZE_EBS_GP = 4170
-AWS_PREFIX = 'aws --output=json '
-RDS_DB_SUBNET_GROUP_NAME_PREFIX = 'pkb'
+RDS_DB_STORAGE_GP2_SIZE = 4170
 
 # Constants defined for Sysbench tests.
 RAND_INIT_ON = 'on'
@@ -83,7 +93,7 @@ DISABLE = 'disable'
 UNIFORM = 'uniform'
 OFF = 'off'
 MYSQL_ROOT_USER = 'root'
-MYSQL_ROOT_PASSWORD = ''
+MYSQL_ROOT_PASSWORD = 'Perfkit8'
 
 PREPARE_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/parallel_prepare.lua'
 OLTP_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/oltp.lua'
@@ -240,7 +250,7 @@ class RDSMySQLBenchmark(object):
 
     # Get a list of zones and pick one that's different from the zone VM is in.
     new_subnet_zone = ''
-    get_zones_cmd = AWS_PREFIX + 'ec2 describe-availability-zones'
+    get_zones_cmd = AWS_PREFIX + ['ec2', 'describe-availability-zones']
     stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
     response = json.loads(stdout)
     all_zones = response['AvailabilityZones']
@@ -257,44 +267,120 @@ class RDSMySQLBenchmark(object):
     logging.info('Creating a second subnet in zone %s', new_subnet_zone)
     new_subnet = aws_network.AwsSubnet(new_subnet_zone, vm.network.vpc.id,
                                        '10.0.1.0/24')
-    logging.info('Successfully created a new subnet, subnet id is:',
+    new_subnet.Create()
+    logging.info('Successfully created a new subnet, subnet id is: %s',
                  new_subnet.id)
     # Remember this so we can cleanup properly.
     vm.extra_subnet_for_db = new_subnet
 
     # Now we can create a new DB subnet group that has two subnets in it.
-    # aws rds create-db-subnet-group --db-subnet-group-name pkb-db-subnet
-    # --db-subnet-group-description some-description --subnet-ids
-    # subnet-240b620f subnet-3fc5e748
     db_subnet_group_name = 'pkb%s' % FLAGS.run_uri
-    db_subnet_group_description = 'pkb %s subnet created for RDS DB'
     create_db_subnet_group_cmd = AWS_PREFIX + [
         'rds',
         'create-db-subnet-group',
-        '--db-subnet-group-name=%s' % db_subnet_group_name,
-        '--db-subnet-group-description=%s' % db_subnet_group_description,
-        '--subnet-ids %s %s' % (vm.network.subnet.id, new_subnet.id)]
-    stdout, _, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
-    logging.info('Successfully created a DB subnet group, stdout is: \n%s',
-                 stdout)
+        '--db-subnet-group-name', db_subnet_group_name,
+        '--db-subnet-group-description', 'pkb_subnet_group_for_db',
+        '--subnet-ids', vm.network.subnet.id, new_subnet.id]
+    stdout, stderr, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
+    logging.info('Created a DB subnet group, stdout is:\n%s\nstderr is:\n%s',
+                 stdout, stderr)
     vm.db_subnet_group_name = db_subnet_group_name
 
-    # TODO: continue from here
+    # open up tcp port 3306 in the VPC's security group, we need that to connect
+    # to the DB.
+    open_port_cmd = AWS_PREFIX + [
+        'ec2',
+        'authorize-security-group-ingress',
+        '--group-id', vm.group_id,
+        '--source-group', vm.group_id,
+        '--protocol', 'tcp',
+        '--port', '3306']
+    stdout, stderr, _ = vm_util.IssueCommand(open_port_cmd)
+    logging.info('Granted tcp 3306 ingress, stdout is:\n%s\nstderr is:\n%s',
+                 stdout, stderr)
 
+    # Finally, it's time to create the DB instance!
+    vm.db_instance_id = 'pkb-DB-%s' % FLAGS.run_uri
+    db_class = RDS_CORE_TO_DB_CLASS_MAP['%s' % FLAGS.db_instance_cores]
 
+    create_db_cmd = AWS_PREFIX + [
+        'rds',
+        'create-db-instance',
+        '--db-instance-identifier', vm.db_instance_id,
+        '--db-instance-class', db_class,
+        '--engine', RDS_DB_ENGINE,
+        '--engine-version', RDS_DB_ENGINE_VERSION,
+        '--storage-type', RDS_DB_STORAGE_TYPE_GP2,
+        '--allocated-storage', RDS_DB_STORAGE_GP2_SIZE,
+        '--vpc-security-group-ids', vm.group_id,
+        '--master-username', MYSQL_ROOT_USER,
+        '--master-user-password', MYSQL_ROOT_PASSWORD,
+        '--availability-zone', vm.zone,
+        '--db-subnet-group-name', vm.db_subnet_group_name]
 
+    logging.info('Will call this command to create db \n %s',
+                 ' '.join(create_db_cmd))
 
+    """stdout, stderr, _ = vm_util.IssueCommand(create_db_cmd)
+    response = json.loads(stdout)
+
+    db_creation_status = ''
+    if response['DBInstances'] is not None:
+      db_creation_status = response['DBInstances'][0]['DBInstanceStatus']
+
+    if (db_creation_status != 'creating' and
+        db_creation_status != 'available' and
+        db_creation_status != 'modifying'):
+      raise DBInstanceCreationError('Invalid operation or unrecognized '
+                                      'operationType in DB creation response. '
+                                      ' stdout is\n%s, stderr is\n%s' % (
+                                          stdout, stderr))
+    """
 
   def Run(self, vm, metadata):
     results = []
     return results
 
+
   def Cleanup(self, vm):
-    """Clean up RDS instances.
-    TODO: cleanup the RDS instance, cleanup the extra subnet created for the
-    creation of the RDS instance.
+    """Clean up RDS instances, cleanup the extra subnet created for the
+       creation of the RDS instance.
     """
-    pass
+    if hasattr(vm, 'db_subnet_group_name'):
+      delete_db_subnet_group_cmd = AWS_PREFIX + [
+          'rds',
+          'delete-db-subnet-group',
+          '--db-subnet-group-name', vm.db_subnet_group_name]
+      stdout, stderr, _ = vm_util.IssueCommand(delete_db_subnet_group_cmd)
+      logging.info('Deleted the db subnet group. stdout is:\n%s, stderr: \n%s',
+                   stdout, stderr)
+
+    if hasattr(vm, 'extra_subnet_for_db'):
+      delete_extra_subnet_cmd = AWS_PREFIX + [
+          'ec2',
+          'delete-subnet',
+          '--subnet-id=%s' % vm.extra_subnet_for_db.id]
+      stdout, stderr, _ = vm_util.IssueCommand(delete_extra_subnet_cmd)
+      logging.info('Deleted the extra subnet. stdout is:\n%s, stderr: \n%s',
+                   stdout, stderr)
+
+    # Now, you can delete the DB instance. vm.db_instance_id is the id to call.
+    # you need to keep querying the status of the deletion here before you let
+    # this go. RDS DB deletion takes some time to finish. And you have to
+    # wait until this DB is deleted before you proceed becuase this DB holds
+    # references to the VPC, the subnets, etc.
+    # wrap below in a loop:
+    # try:
+    # response = json.loads(stdout).
+    # db_status=response['DBInstancesStatus']
+    # if db_status is None:
+    # break
+    # else: wait for a few seconds, add wait count, check if timed out.
+    # except:
+    #  break //stdout cannot be parsed into json. great.
+    #
+    # Outside the loop, look at stderr, expect it to have DB instance Not found
+    # if it does not have, log a warning but proceed forward.
 
 
 class GoogleCloudSQLBenchmark(object):
@@ -372,6 +458,18 @@ class GoogleCloudSQLBenchmark(object):
 
     vm.db_instance_ip = response['ipAddresses'][0]['ipAddress']
     logging.info('DB IP address is: %s', vm.db_instance_ip)
+
+    # Set the root password to a common one that can be referred to in common
+    # code across providers.
+    set_password_cmd = [FLAGS.gcloud_path,
+                        'sql',
+                        'instances',
+                        'set-root-password',
+                        vm.db_instance_name,
+                        '--password', MYSQL_ROOT_PASSWORD]
+    stdout, stderr, _ = vm_util.IssueCommand(set_password_cmd)
+    logging.info('Set root password completed. Stdout:\n%s\nStderr:\n%s',
+                 stdout, stderr)
 
 
   def Run(self, vm, metadata):
@@ -484,6 +582,7 @@ def Prepare(benchmark_spec):
   # If we don't set this, our cleanup function will only be called when the VM
   # is static VM, but we have server side states to cleanup regardless of the
   # VM type.
+
   benchmark_spec.always_call_cleanup = True
 
   vms = benchmark_spec.vms
@@ -496,9 +595,11 @@ def Prepare(benchmark_spec):
 
   if hasattr(vms[0], 'db_instance_ip'):
       # Create the sbtest database to prepare the DB for Sysbench.
-    create_sbtest_db_cmd = ('mysql -u root -h %s '
+    create_sbtest_db_cmd = ('mysql -h %s -u %s -p%s '
                             '-e \'create database sbtest;\'') % (
-                                vms[0].db_instance_ip)
+                                vms[0].db_instance_ip,
+                                MYSQL_ROOT_USER,
+                                MYSQL_ROOT_PASSWORD)
     stdout, stderr = vms[0].RemoteCommand(create_sbtest_db_cmd)
     logging.info('sbtest db created, stdout is %s, stderr is %s',
                  stdout, stderr)
@@ -529,8 +630,8 @@ def Run(benchmark_spec):
   metadata['sysbench_latency_percentile'] = FLAGS.sysbench_latency_percentile
   metadata['sysbench_report_interval'] = FLAGS.sysbench_report_interval
 
-  results = MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0],
-                                                                  metadata)
+  results = MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Run(vms[0],
+                                                                metadata)
   print results
   return results
 
