@@ -29,6 +29,7 @@ from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.aws import aws_network
 
 FLAGS = flags.FLAGS
 flags.DEFINE_enum(
@@ -73,7 +74,8 @@ DB_CREATION_STATUS_QUERY_LIMIT = 100
 # IOPS (12.5K mixed).
 # To support 12.5K IOPS on EBS-GP, we need 4170 GB disk.
 DB_STORAGE_SIZE_EBS_GP = 4170
-
+AWS_PREFIX = 'aws --output=json '
+RDS_DB_SUBNET_GROUP_NAME_PREFIX = 'pkb'
 
 # Constants defined for Sysbench tests.
 RAND_INIT_ON = 'on'
@@ -225,6 +227,62 @@ class RDSMySQLBenchmark(object):
 
   def Prepare(self, vm):
     logging.info('Preparing MySQL Service benchmarks for RDS.')
+    logging.info('vm.zone is %s', vm.zone)
+    logging.info('vm.network.vpc id is %s', vm.network.vpc.id)
+    logging.info('vm.network.subnet id is %s', vm.network.subnet.id)
+    logging.info('vm.network.subnet.vpc_id is %s', vm.network.subnet.vpc_id)
+    logging.info('vm security group id is %s', vm.group_id)
+
+    # First is to create a second subnet in the same VPC as the VM but in a
+    # different zone. RDS requires two subnets in two different zones to create
+    # a DB instance, EVEN IF you do not specify multi-AZ in your DB creation
+    # request.
+
+    # Get a list of zones and pick one that's different from the zone VM is in.
+    new_subnet_zone = ''
+    get_zones_cmd = AWS_PREFIX + 'ec2 describe-availability-zones'
+    stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
+    response = json.loads(stdout)
+    all_zones = response['AvailabilityZones']
+    for zone in all_zones:
+      if zone['ZoneName'] != vm.zone:
+        new_subnet_zone = zone['ZoneName']
+        break
+
+    if new_subnet_zone == '':
+      raise DBInstanceCreationError('Cannot find a zone to create the required '
+                                    'second subnet for the DB instance.')
+
+    # Now create a new subnet in the zone that's different from where the VM is
+    logging.info('Creating a second subnet in zone %s', new_subnet_zone)
+    new_subnet = aws_network.AwsSubnet(new_subnet_zone, vm.network.vpc.id,
+                                       '10.0.1.0/24')
+    logging.info('Successfully created a new subnet, subnet id is:',
+                 new_subnet.id)
+    # Remember this so we can cleanup properly.
+    vm.extra_subnet_for_db = new_subnet
+
+    # Now we can create a new DB subnet group that has two subnets in it.
+    # aws rds create-db-subnet-group --db-subnet-group-name pkb-db-subnet
+    # --db-subnet-group-description some-description --subnet-ids
+    # subnet-240b620f subnet-3fc5e748
+    db_subnet_group_name = 'pkb%s' % FLAGS.run_uri
+    db_subnet_group_description = 'pkb %s subnet created for RDS DB'
+    create_db_subnet_group_cmd = AWS_PREFIX + [
+        'rds',
+        'create-db-subnet-group',
+        '--db-subnet-group-name=%s' % db_subnet_group_name,
+        '--db-subnet-group-description=%s' % db_subnet_group_description,
+        '--subnet-ids %s %s' % (vm.network.subnet.id, new_subnet.id)]
+    stdout, _, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
+    logging.info('Successfully created a DB subnet group, stdout is: \n%s',
+                 stdout)
+    vm.db_subnet_group_name = db_subnet_group_name
+
+    # TODO: continue from here
+
+
+
 
 
   def Run(self, vm, metadata):
@@ -233,6 +291,8 @@ class RDSMySQLBenchmark(object):
 
   def Cleanup(self, vm):
     """Clean up RDS instances.
+    TODO: cleanup the RDS instance, cleanup the extra subnet created for the
+    creation of the RDS instance.
     """
     pass
 
@@ -434,12 +494,16 @@ def Prepare(benchmark_spec):
   # Prepare service specific states (create DB instance, configure it, etc)
   MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Prepare(vms[0])
 
-  # Create the sbtest database to prepare the DB for Sysbench.
-  create_sbtest_db_cmd = ('mysql -u root -h %s '
-                          '-e \'create database sbtest;\'') % (
-                              vms[0].db_instance_ip)
-  stdout, stderr = vms[0].RemoteCommand(create_sbtest_db_cmd)
-  logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
+  if hasattr(vms[0], 'db_instance_ip'):
+      # Create the sbtest database to prepare the DB for Sysbench.
+    create_sbtest_db_cmd = ('mysql -u root -h %s '
+                            '-e \'create database sbtest;\'') % (
+                                vms[0].db_instance_ip)
+    stdout, stderr = vms[0].RemoteCommand(create_sbtest_db_cmd)
+    logging.info('sbtest db created, stdout is %s, stderr is %s',
+                 stdout, stderr)
+  else:
+    logging.error('Prepare has likely failed, db_instance_ip is not found.')
 
 
 def Run(benchmark_spec):
@@ -479,4 +543,4 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.storage].Cleanup(vms[0])
+  MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Cleanup(vms[0])
