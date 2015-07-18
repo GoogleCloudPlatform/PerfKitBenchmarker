@@ -39,7 +39,7 @@ from perfkitbenchmarker.aws import aws_network
 
 FLAGS = flags.FLAGS
 flags.DEFINE_enum(
-    'db_instance_cores', '8', ['1', '4', '8', '16'],
+    'db_instance_cores', '4', ['1', '4', '8', '16'],
     'The number of cores to be provisioned for the DB instance.')
 
 flags.DEFINE_integer('oltp_tables_count', 4,
@@ -69,7 +69,7 @@ DB_STATUS_QUERY_INTERVAL = 15
 
 # How many times we will wait for the service to create the DB
 # total wait time is therefore: "query interval * query limit"
-DB_STATUS_QUERY_LIMIT = 100
+DB_STATUS_QUERY_LIMIT = 200
 
 AWS_PREFIX = ['aws', '--output=json']
 # Map from FLAGs.db_instance_cores to RDS DB Type
@@ -103,7 +103,7 @@ MYSQL_ROOT_PASSWORD = 'Perfkit8'
 PREPARE_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/parallel_prepare.lua'
 OLTP_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/oltp.lua'
 
-SYSBENCH_RESULT_NAME_PREPARE = 'sysbench prepare time'
+SYSBENCH_RESULT_NAME_DATA_LOAD = 'sysbench data load time'
 SYSBENCH_RESULT_NAME_TPS = 'sysbench tps'
 SYSBENCH_RESULT_NAME_LATENCY = 'sysbench latency'
 NA_UNIT = 'NA'
@@ -263,34 +263,48 @@ def _RunSysbench(vm, metadata):
   """
   results = []
 
-  # Prepares the Sysbench test based on the input flags (load data into DB)
+  if not hasattr(vm, 'db_instance_address'):
+    logging.error(
+        'Prepare has likely failed, db_instance_address is not found.')
+    raise DBStatusQueryError('RunSysbench: DB instance address not found.')
+
+  # Create the sbtest database for Sysbench.
+  create_sbtest_db_cmd = ('mysql -h %s -u %s -p%s '
+                          '-e \'create database sbtest;\'') % (
+                              vm.db_instance_address,
+                              MYSQL_ROOT_USER,
+                              MYSQL_ROOT_PASSWORD)
+  stdout, stderr = vm.RemoteCommand(create_sbtest_db_cmd)
+  logging.info('sbtest db created, stdout is %s, stderr is %s',
+               stdout, stderr)
+
+  # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
-  prepare_start_time = time.time()
-  prepare_cmd_tokens = ['sysbench',
-                        '--test=%s' % PREPARE_SCRIPT_PATH,
-                        '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
-                        '--oltp-table-size=%d' % FLAGS.oltp_table_size,
-                        '--rand-init=%s' % RAND_INIT_ON,
-                        '--num-threads=%d' % FLAGS.oltp_tables_count,
-                        '--mysql-user=%s' % MYSQL_ROOT_USER,
-                        '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
-                        '--mysql-host=%s' % vm.db_instance_address,
-                        'run']
-  prepare_cmd = ' '.join(prepare_cmd_tokens)
+  data_load_start_time = time.time()
+  data_load_cmd_tokens = ['sysbench',
+                          '--test=%s' % PREPARE_SCRIPT_PATH,
+                          '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
+                          '--oltp-table-size=%d' % FLAGS.oltp_table_size,
+                          '--rand-init=%s' % RAND_INIT_ON,
+                          '--num-threads=%d' % FLAGS.oltp_tables_count,
+                          '--mysql-user=%s' % MYSQL_ROOT_USER,
+                          '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
+                          '--mysql-host=%s' % vm.db_instance_address,
+                          'run']
+  data_load_cmd = ' '.join(data_load_cmd_tokens)
 
   # Sysbench output is in stdout, but we also get stderr just in case
   # something went wrong.
-  stdout, stderr = vm.RobustRemoteCommand(prepare_cmd)
-  prepare_duration = time.time() - prepare_start_time
-  logging.info('It took %d seconds to finish the prepare step',
-               prepare_duration)
-  logging.info('Prepare results: \n stdout is:\n%s\nstderr is\n%s',
-               stdout,
-               stderr)
+  stdout, stderr = vm.RobustRemoteCommand(data_load_cmd)
+  load_duration = time.time() - data_load_start_time
+  logging.info('It took %d seconds to finish the data loading step',
+               load_duration)
+  logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
+               stdout, stderr)
 
   results.append(sample.Sample(
-      SYSBENCH_RESULT_NAME_PREPARE,
-      prepare_duration,
+      SYSBENCH_RESULT_NAME_DATA_LOAD,
+      load_duration,
       SECONDS_UNIT,
       metadata))
 
@@ -321,6 +335,7 @@ def _RunSysbench(vm, metadata):
                         '--percentile=%d' % FLAGS.sysbench_latency_percentile,
                         '--report-interval=%d' %
                         FLAGS.sysbench_report_interval,
+                        '--max-requests=0',
                         '--max-time=%d' % duration,
                         '--mysql-user=%s' % MYSQL_ROOT_USER,
                         '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
@@ -371,13 +386,8 @@ class RDSMySQLBenchmark(object):
 
     """
     logging.info('Preparing MySQL Service benchmarks for RDS.')
-    logging.info('vm.zone is %s', vm.zone)
-    logging.info('vm.network.vpc id is %s', vm.network.vpc.id)
-    logging.info('vm.network.subnet id is %s', vm.network.subnet.id)
-    logging.info('vm.network.subnet.vpc_id is %s', vm.network.subnet.vpc_id)
-    logging.info('vm security group id is %s', vm.group_id)
 
-    # First is to create a second subnet in the same VPC as the VM but in a
+    # First is to create another subnet in the same VPC as the VM but in a
     # different zone. RDS requires two subnets in two different zones to create
     # a DB instance, EVEN IF you do not specify multi-AZ in your DB creation
     # request.
@@ -494,7 +504,13 @@ class RDSMySQLBenchmark(object):
     # We are good now, db has been created. Now get the endpoint address.
     # On RDS, you always connect with a DNS name, if you do that from a EC2 VM,
     # that DNS name will be resolved to an internal IP address of the DB.
-    vm.db_instance_address = response['Endpoint']['Address']
+    if 'DBInstance' in response:
+      vm.db_instance_address = response['DBInstance']['Endpoint']['Address']
+    else:
+      if 'DBInstances' in response:
+        vm.db_instance_address = \
+            response['DBInstances'][0]['Endpoint']['Address']
+
     logging.info('Successfully created an RDS DB instance. Address is %s',
                  vm.db_instance_address)
     logging.info('Complete output is:\n %s', response)
@@ -547,7 +563,9 @@ class RDSMySQLBenchmark(object):
         else:
           break
       except:
-        break  # stdout cannot be parsed into json, maybe empty
+        # stdout cannot be parsed into json, it might simply be empty -
+        # deletion has completed.
+        break
 
     # Outside the loop, look at stderr, expect it to have the
     # "DB instance Not found" string.
@@ -671,7 +689,6 @@ class GoogleCloudSQLBenchmark(object):
     logging.info('Set root password completed. Stdout:\n%s\nStderr:\n%s',
                  stdout, stderr)
 
-
   def Cleanup(self, vm):
     if hasattr(vm, 'db_instance_name'):
       delete_db_cmd = [FLAGS.gcloud_path,
@@ -714,20 +731,6 @@ def Prepare(benchmark_spec):
 
   # Prepare service specific states (create DB instance, configure it, etc)
   MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Prepare(vms[0])
-
-  if hasattr(vms[0], 'db_instance_address'):
-      # Create the sbtest database to prepare the DB for Sysbench.
-    create_sbtest_db_cmd = ('mysql -h %s -u %s -p%s '
-                            '-e \'create database sbtest;\'') % (
-                                vms[0].db_instance_address,
-                                MYSQL_ROOT_USER,
-                                MYSQL_ROOT_PASSWORD)
-    stdout, stderr = vms[0].RemoteCommand(create_sbtest_db_cmd)
-    logging.info('sbtest db created, stdout is %s, stderr is %s',
-                 stdout, stderr)
-  else:
-    logging.error(
-        'Prepare has likely failed, db_instance_address is not found.')
 
 
 def Run(benchmark_spec):
