@@ -20,9 +20,8 @@ managed MySQL services.
 - On AWS, we will use RDS+MySQL.
 - On GCP, we will use Cloud SQL v2 (Performance Edition). As of July 2015, you
  will need to request to whitelist your GCP project to get access to cloud sql
- v2. Follow instructions on your GCP Cloud SQL project console to do that.
-- On Azure, we will use the MySQL service. (To be added here as soon as it's
- Generally Available)
+ v2. Follow instructions on your GCP's project console to do that.
+- On Azure, we will use the MySQL service whenever it becomes availble.
 
 """
 import json
