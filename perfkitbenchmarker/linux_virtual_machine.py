@@ -801,7 +801,7 @@ class ContainerizedDebianMixin(DebianMixin):
   def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False,
-                    suppress_warning=False):
+                    suppress_warning=False, timeout=None):
     """Runs a command inside the container.
 
     Args:
