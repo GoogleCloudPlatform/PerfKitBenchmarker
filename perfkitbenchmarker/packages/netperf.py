@@ -18,7 +18,7 @@
 from perfkitbenchmarker import vm_util
 
 NETPERF_TAR = 'netperf-2.6.0.tar.gz'
-NETPERF_URL = 'ftp://ftp.netperf.org/netperf/%s' % NETPERF_TAR
+NETPERF_URL = 'ftp://ftp.netperf.org/netperf/archive/%s' % NETPERF_TAR
 NETPERF_DIR = '%s/netperf-2.6.0' % vm_util.VM_TMP_DIR
 NETSERVER_PATH = NETPERF_DIR + '/src/netserver'
 NETPERF_PATH = NETPERF_DIR + '/src/netperf'
