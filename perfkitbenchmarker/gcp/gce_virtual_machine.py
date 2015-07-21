@@ -153,7 +153,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.internal_ip = network_interface['networkIP']
     self.ip_address = network_interface['accessConfigs'][0]['natIP']
 
-    if FLAGS.setup_host_firewall:
+    if FLAGS.setup_remote_firewall:
       self.network_name = network_interface['network']
       getinstance_cmd = [FLAGS.gcloud_path,
                          'compute',

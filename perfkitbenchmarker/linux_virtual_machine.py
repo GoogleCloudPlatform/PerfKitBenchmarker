@@ -69,9 +69,9 @@ EXECUTE_COMMAND = 'execute_command.py'
 # by EXECUTE_COMMAND.
 WAIT_FOR_COMMAND = 'wait_for_command.py'
 
-flags.DEFINE_bool('setup_host_firewall', False,
+flags.DEFINE_bool('setup_remote_firewall', False,
                   'Whether PKB should configure the firewall of each remote'
-                  'host VM to make sure it accepts all internal connections.')
+                  'VM to make sure it accepts all internal connections.')
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -161,10 +161,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--delete']
     return self.RemoteCommand(' '.join(wait_command), should_log=False)
 
-  def SetupHostFirewall(self):
+  def SetupRemoteFirewall(self):
     """Sets up IP table configurations on the VM."""
     if hasattr(self, 'allowed_ip_range') and self.allowed_ip_range:
-      self.RemoteHostCommand('sudo iptables -A --source %s '
+      self.RemoteHostCommand('sudo iptables -A INPUT --source %s '
                              '-p tcp -j ACCEPT' % self.allowed_ip_range)
       self.RemoteHostCommand('sudo iptables -A INPUT --source %s '
                              '-p udp -j ACCEPT' % self.allowed_ip_range)
@@ -200,8 +200,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def PrepareVMEnvironment(self):
     self.SetupProxy()
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
-    if FLAGS.setup_host_firewall:
-      self.SetupHostFirewall()
+    if FLAGS.setup_remote_firewall:
+      self.SetupRemoteFirewall()
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
     self.BurnCpu()
