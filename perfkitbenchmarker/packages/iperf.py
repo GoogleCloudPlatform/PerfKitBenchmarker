@@ -19,9 +19,10 @@ import re
 
 from perfkitbenchmarker import errors
 
-IPERF_EL6_RPM = 'http://pkgs.repoforge.org/iperf/iperf-2.0.4-1.el6.rf.x86_64.rpm'
-IPERF_EL7_RPM = 'http://pkgs.repoforge.org/iperf/iperf-2.0.4-1.el7.rf.x86_64.rpm'
-
+IPERF_EL6_RPM = ('http://pkgs.repoforge.org/iperf/'
+                 'iperf-2.0.4-1.el6.rf.x86_64.rpm')
+IPERF_EL7_RPM = ('http://pkgs.repoforge.org/iperf/'
+                 'iperf-2.0.4-1.el7.rf.x86_64.rpm')
 
 
 def _Install(vm):
@@ -41,7 +42,7 @@ def YumInstall(vm):
     if major_version == 6:
       iperf_rpm = IPERF_EL6_RPM
     elif major_version == 7:
-      epel_rpm = IPERF_EL7_RPM
+      iperf_rpm = IPERF_EL7_RPM
     else:
       raise e
     vm.RemoteCommand('sudo rpm -ivh %s' % iperf_rpm)
