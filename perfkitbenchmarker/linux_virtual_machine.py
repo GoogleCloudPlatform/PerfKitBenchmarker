@@ -183,10 +183,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def PrepareVMEnvironment(self):
     self.SetupProxy()
+    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
     self.BurnCpu()
-    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
     self.SetupPackageManager()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
