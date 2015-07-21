@@ -641,7 +641,10 @@ class DebianMixin(BaseLinuxMixin):
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
     try:
-      self.RemoteCommand('sudo apt-get update')
+      # setting the timeout on the apt-get to 5 minutes because
+      # it is known to get stuck.  In a normal update this
+      # takes less than 30 seconds.
+      self.RemoteCommand('sudo apt-get update', timeout=300)
     except errors.VirtualMachine.RemoteCommandError as e:
       # If there is a problem, remove the lists in order to get rid of
       # "Hash Sum mismatch" errors (the files will be restored when
