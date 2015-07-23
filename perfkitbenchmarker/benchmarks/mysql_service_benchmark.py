@@ -21,7 +21,8 @@ managed MySQL services.
 - On GCP, we will use Cloud SQL v2 (Performance Edition). As of July 2015, you
  will need to request to whitelist your GCP project to get access to cloud sql
  v2. Follow instructions on your GCP's project console to do that.
-- On Azure, we will use the MySQL service whenever it becomes availble.
+
+As other cloud providers deliver a managed MySQL service, we will add it here.
 
 """
 import json
@@ -35,15 +36,16 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.aws import aws_network
+from perfkitbenchmarker.aws import util
 
 FLAGS = flags.FLAGS
 flags.DEFINE_enum(
-    'db_instance_cores', '4', ['1', '4', '8', '16'],
+    'mysql_svc_db_instance_cores', '4', ['1', '4', '8', '16'],
     'The number of cores to be provisioned for the DB instance.')
 
-flags.DEFINE_integer('oltp_tables_count', 4,
+flags.DEFINE_integer('mysql_svc_oltp_tables_count', 4,
                      'The number of tables used in sysbench oltp.lua tests')
-flags.DEFINE_integer('oltp_table_size', 100000,
+flags.DEFINE_integer('mysql_svc_oltp_table_size', 100000,
                      'The number of rows of each table used in the oltp tests')
 flags.DEFINE_integer('sysbench_warmup_seconds', 120,
                      'The duration of the warmup run in which results are '
@@ -70,8 +72,7 @@ DB_STATUS_QUERY_INTERVAL = 15
 # total wait time is therefore: "query interval * query limit"
 DB_STATUS_QUERY_LIMIT = 200
 
-AWS_PREFIX = ['aws', '--output=json']
-# Map from FLAGs.db_instance_cores to RDS DB Type
+# Map from FLAGs.mysql_svc_db_instance_cores to RDS DB Type
 RDS_CORE_TO_DB_CLASS_MAP = {
     '1': 'db.m3.medium',
     '4': 'db.m3.xlarge',
@@ -123,7 +124,7 @@ def GetInfo():
 
 
 class DBStatusQueryError(Exception):
-    pass
+  pass
 
 
 def _PercentileCalculator(numbers):
@@ -282,10 +283,13 @@ def _RunSysbench(vm, metadata):
   data_load_start_time = time.time()
   data_load_cmd_tokens = ['sysbench',
                           '--test=%s' % PREPARE_SCRIPT_PATH,
-                          '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
-                          '--oltp-table-size=%d' % FLAGS.oltp_table_size,
+                          '--mysql_svc_oltp_tables_count=%d' %
+                          FLAGS.mysql_svc_oltp_tables_count,
+                          '--oltp-table-size=%d' %
+                          FLAGS.mysql_svc_oltp_table_size,
                           '--rand-init=%s' % RAND_INIT_ON,
-                          '--num-threads=%d' % FLAGS.oltp_tables_count,
+                          '--num-threads=%d' %
+                          FLAGS.mysql_svc_oltp_tables_count,
                           '--mysql-user=%s' % MYSQL_ROOT_USER,
                           '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
                           '--mysql-host=%s' % vm.db_instance_address,
@@ -324,8 +328,10 @@ def _RunSysbench(vm, metadata):
     if duration > 0:
       run_cmd_tokens = ['sysbench',
                         '--test=%s' % OLTP_SCRIPT_PATH,
-                        '--oltp_tables_count=%d' % FLAGS.oltp_tables_count,
-                        '--oltp-table-size=%d' % FLAGS.oltp_table_size,
+                        '--mysql_svc_oltp_tables_count=%d' %
+                        FLAGS.mysql_svc_oltp_tables_count,
+                        '--oltp-table-size=%d' %
+                        FLAGS.mysql_svc_oltp_table_size,
                         '--rand-init=%s' % RAND_INIT_ON,
                         '--db-ps-mode=%s' % DISABLE,
                         '--oltp-dist-type=%s' % UNIFORM,
@@ -393,7 +399,7 @@ class RDSMySQLBenchmark(object):
 
     # Get a list of zones and pick one that's different from the zone VM is in.
     new_subnet_zone = ''
-    get_zones_cmd = AWS_PREFIX + ['ec2', 'describe-availability-zones']
+    get_zones_cmd = util.AWS_PREFIX + ['ec2', 'describe-availability-zones']
     stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
     response = json.loads(stdout)
     all_zones = response['AvailabilityZones']
@@ -418,7 +424,7 @@ class RDSMySQLBenchmark(object):
 
     # Now we can create a new DB subnet group that has two subnets in it.
     db_subnet_group_name = 'pkb%s' % FLAGS.run_uri
-    create_db_subnet_group_cmd = AWS_PREFIX + [
+    create_db_subnet_group_cmd = util.AWS_PREFIX + [
         'rds',
         'create-db-subnet-group',
         '--db-subnet-group-name', db_subnet_group_name,
@@ -431,7 +437,7 @@ class RDSMySQLBenchmark(object):
 
     # open up tcp port 3306 in the VPC's security group, we need that to connect
     # to the DB.
-    open_port_cmd = AWS_PREFIX + [
+    open_port_cmd = util.AWS_PREFIX + [
         'ec2',
         'authorize-security-group-ingress',
         '--group-id', vm.group_id,
@@ -444,9 +450,10 @@ class RDSMySQLBenchmark(object):
 
     # Finally, it's time to create the DB instance!
     vm.db_instance_id = 'pkb-DB-%s' % FLAGS.run_uri
-    db_class = RDS_CORE_TO_DB_CLASS_MAP['%s' % FLAGS.db_instance_cores]
+    db_class = \
+        RDS_CORE_TO_DB_CLASS_MAP['%s' % FLAGS.mysql_svc_db_instance_cores]
 
-    create_db_cmd = AWS_PREFIX + [
+    create_db_cmd = util.AWS_PREFIX + [
         'rds',
         'create-db-instance',
         '--db-instance-identifier', vm.db_instance_id,
@@ -461,7 +468,7 @@ class RDSMySQLBenchmark(object):
         '--availability-zone', vm.zone,
         '--db-subnet-group-name', vm.db_subnet_group_name]
 
-    status_query_cmd = AWS_PREFIX + [
+    status_query_cmd = util.AWS_PREFIX + [
         'rds',
         'describe-db-instances',
         '--db-instance-id', vm.db_instance_id]
@@ -528,7 +535,7 @@ class RDSMySQLBenchmark(object):
     # this go. RDS DB deletion takes some time to finish. And we have to
     # wait until this DB is deleted before we proceed because this DB holds
     # references to various other resources: subnet groups, subnets, vpc, etc.
-    delete_db_cmd = AWS_PREFIX + [
+    delete_db_cmd = util.AWS_PREFIX + [
         'rds',
         'delete-db-instance',
         '--db-instance-identifier', vm.db_instance_id,
@@ -541,7 +548,7 @@ class RDSMySQLBenchmark(object):
     logging.info('Request to delete the DB has been issued, stdout:\n%s\n'
                  'stderr:%s\n', stdout, stderr)
 
-    status_query_cmd = AWS_PREFIX + [
+    status_query_cmd = util.AWS_PREFIX + [
         'rds',
         'describe-db-instances',
         '--db-instance-id', vm.db_instance_id]
@@ -576,7 +583,7 @@ class RDSMySQLBenchmark(object):
                    'from stderr, which is %s', stderr)
 
     if hasattr(vm, 'db_subnet_group_name'):
-      delete_db_subnet_group_cmd = AWS_PREFIX + [
+      delete_db_subnet_group_cmd = util.AWS_PREFIX + [
           'rds',
           'delete-db-subnet-group',
           '--db-subnet-group-name', vm.db_subnet_group_name]
@@ -585,7 +592,7 @@ class RDSMySQLBenchmark(object):
                    stdout, stderr)
 
     if hasattr(vm, 'extra_subnet_for_db'):
-      delete_extra_subnet_cmd = AWS_PREFIX + [
+      delete_extra_subnet_cmd = util.AWS_PREFIX + [
           'ec2',
           'delete-subnet',
           '--subnet-id=%s' % vm.extra_subnet_for_db.id]
@@ -607,7 +614,7 @@ class GoogleCloudSQLBenchmark(object):
     logging.info('Preparing MySQL Service benchmarks for Google Cloud SQL.')
 
     vm.db_instance_name = 'pkb%s' % FLAGS.run_uri
-    db_tier = 'db-n1-standard-%s' % FLAGS.db_instance_cores
+    db_tier = 'db-n1-standard-%s' % FLAGS.mysql_svc_db_instance_cores
     # Currently, we create DB instance in the same zone as the test VM.
     db_instance_zone = vm.zone
     # Currently GCP REQUIRES you to connect to the DB instance via external IP
@@ -746,9 +753,9 @@ def Run(benchmark_spec):
                'Cloud Provider is %s.', FLAGS.cloud)
   vms = benchmark_spec.vms
   metadata = {}
-  metadata['oltp_tables_count'] = FLAGS.oltp_tables_count
-  metadata['oltp_table_size'] = FLAGS.oltp_table_size
-  metadata['db_instance_cores'] = FLAGS.db_instance_cores
+  metadata['mysql_svc_oltp_tables_count'] = FLAGS.mysql_svc_oltp_tables_count
+  metadata['mysql_svc_oltp_table_size'] = FLAGS.mysql_svc_oltp_table_size
+  metadata['mysql_svc_db_instance_cores'] = FLAGS.mysql_svc_db_instance_cores
   metadata['sysbench_warm_up_seconds'] = FLAGS.sysbench_warmup_seconds
   metadata['sysbench_run_seconds'] = FLAGS.sysbench_run_seconds
   metadata['sysbench_thread_count'] = FLAGS.sysbench_thread_count

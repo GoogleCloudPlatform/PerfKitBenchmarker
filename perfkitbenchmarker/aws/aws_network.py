@@ -157,21 +157,20 @@ class AwsSubnet(resource.BaseResource):
     self.region = zone[:-1]
     self.vpc_id = vpc_id
     self.id = None
-    self.cider_block = cider_block
+    if cider_block is None:
+      self.cider_block = '10.0.0.0/24'
+    else:
+      self.cider_block = cider_block
 
   def _Create(self):
     """Creates the subnet."""
-    if self.cider_block is None:
-      cider = '10.0.0.0/24'
-    else:
-      cider = self.cider_block
 
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-subnet',
         '--region=%s' % self.region,
         '--vpc-id=%s' % self.vpc_id,
-        '--cidr-block=%s' % cider,
+        '--cidr-block=%s' % self.cider_block,
         '--availability-zone=%s' % self.zone]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
