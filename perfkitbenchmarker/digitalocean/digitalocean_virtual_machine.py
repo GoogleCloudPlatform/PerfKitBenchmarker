@@ -30,6 +30,18 @@ from perfkitbenchmarker.digitalocean import util
 FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu-14-04-x64'
+
+# DigitalOcean sets up the root account with a temporary
+# password that's set as expired, requiring it to be changed
+# immediately. This breaks dpkg postinst scripts, for example
+# running adduser will produce errors:
+#
+#   # chfn -f 'RabbitMQ messaging server' rabbitmq
+#   You are required to change your password immediately (root enforced)
+#   chfn: PAM: Authentication token is no longer valid; new one required
+#
+# To avoid this, just disable the root password (we don't need it),
+# and remove the forced expiration.
 CLOUD_CONFIG_TEMPLATE = '''#cloud-config
 users:
   - name: {0}
@@ -38,6 +50,9 @@ users:
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     groups: sudo
     shell: /bin/bash
+runcmd:
+  - [ passwd, -l, root ]
+  - [ chage, -d, -1, -I, -1, -E, -1, -M, 999999, root ]
 '''
 
 # HTTP status codes for creation that should not be retried.
