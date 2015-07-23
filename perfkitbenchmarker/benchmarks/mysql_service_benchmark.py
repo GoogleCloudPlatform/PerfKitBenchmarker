@@ -30,6 +30,7 @@ import logging
 import re
 import StringIO
 import time
+import uuid
 
 from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
 from perfkitbenchmarker import flags
@@ -98,7 +99,7 @@ DISABLE = 'disable'
 UNIFORM = 'uniform'
 OFF = 'off'
 MYSQL_ROOT_USER = 'root'
-MYSQL_ROOT_PASSWORD = 'Perfkit8'
+MYSQL_ROOT_PASSWORD_PREFIX = 'Perfkit8'
 
 PREPARE_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/parallel_prepare.lua'
 OLTP_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/oltp.lua'
@@ -155,6 +156,16 @@ def _PercentileCalculator(numbers):
       result['stddev'] = 0
 
   return result
+
+
+def _GenerateRandomPassword():
+  """ Generates a random password to be used by the DB instance.
+  Args:
+    None
+  Returns:
+    A string that can be used as password to a DB instance.
+  """
+  return '%s%s' % (MYSQL_ROOT_PASSWORD_PREFIX, str(uuid.uuid4())[-8:])
 
 
 def _ParseSysbenchOutput(sysbench_output, results, metadata):
@@ -269,11 +280,12 @@ def _RunSysbench(vm, metadata):
     raise DBStatusQueryError('RunSysbench: DB instance address not found.')
 
   # Create the sbtest database for Sysbench.
+  # str(uuid.uuid4())[-8:]
   create_sbtest_db_cmd = ('mysql -h %s -u %s -p%s '
                           '-e \'create database sbtest;\'') % (
                               vm.db_instance_address,
-                              MYSQL_ROOT_USER,
-                              MYSQL_ROOT_PASSWORD)
+                              vm.db_instance_master_user,
+                              vm.db_instance_master_password)
   stdout, stderr = vm.RemoteCommand(create_sbtest_db_cmd)
   logging.info('sbtest db created, stdout is %s, stderr is %s',
                stdout, stderr)
@@ -290,8 +302,9 @@ def _RunSysbench(vm, metadata):
                           '--rand-init=%s' % RAND_INIT_ON,
                           '--num-threads=%d' %
                           FLAGS.mysql_svc_oltp_tables_count,
-                          '--mysql-user=%s' % MYSQL_ROOT_USER,
-                          '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
+                          '--mysql-user=%s' % vm.db_instance_master_user,
+                          '--mysql-password="%s"' %
+                          vm.db_instance_master_password,
                           '--mysql-host=%s' % vm.db_instance_address,
                           'run']
   data_load_cmd = ' '.join(data_load_cmd_tokens)
@@ -342,8 +355,9 @@ def _RunSysbench(vm, metadata):
                         FLAGS.sysbench_report_interval,
                         '--max-requests=0',
                         '--max-time=%d' % duration,
-                        '--mysql-user=%s' % MYSQL_ROOT_USER,
-                        '--mysql-password="%s"' % MYSQL_ROOT_PASSWORD,
+                        '--mysql-user=%s' % vm.db_instance_master_user,
+                        '--mysql-password="%s"' %
+                        vm.db_instance_master_password,
                         '--mysql-host=%s' % vm.db_instance_address,
                         'run']
       run_cmd = ' '.join(run_cmd_tokens)
@@ -452,6 +466,8 @@ class RDSMySQLBenchmark(object):
     vm.db_instance_id = 'pkb-DB-%s' % FLAGS.run_uri
     db_class = \
         RDS_CORE_TO_DB_CLASS_MAP['%s' % FLAGS.mysql_svc_db_instance_cores]
+    vm.db_instance_master_user = MYSQL_ROOT_USER
+    vm.db_instance_master_password = _GenerateRandomPassword()
 
     create_db_cmd = util.AWS_PREFIX + [
         'rds',
@@ -463,8 +479,8 @@ class RDSMySQLBenchmark(object):
         '--storage-type', RDS_DB_STORAGE_TYPE_GP2,
         '--allocated-storage', RDS_DB_STORAGE_GP2_SIZE,
         '--vpc-security-group-ids', vm.group_id,
-        '--master-username', MYSQL_ROOT_USER,
-        '--master-user-password', MYSQL_ROOT_PASSWORD,
+        '--master-username', vm.db_instance_master_user,
+        '--master-user-password', vm.db_instance_master_password,
         '--availability-zone', vm.zone,
         '--db-subnet-group-name', vm.db_subnet_group_name]
 
@@ -685,12 +701,14 @@ class GoogleCloudSQLBenchmark(object):
 
     # Set the root password to a common one that can be referred to in common
     # code across providers.
+    vm.db_instance_master_user = MYSQL_ROOT_USER
+    vm.db_instance_master_password = _GenerateRandomPassword()
     set_password_cmd = [FLAGS.gcloud_path,
                         'sql',
                         'instances',
                         'set-root-password',
                         vm.db_instance_name,
-                        '--password', MYSQL_ROOT_PASSWORD]
+                        '--password', vm.db_instance_master_password]
     stdout, stderr, _ = vm_util.IssueCommand(set_password_cmd)
     logging.info('Set root password completed. Stdout:\n%s\nStderr:\n%s',
                  stdout, stderr)
