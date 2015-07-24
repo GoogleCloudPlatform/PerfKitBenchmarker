@@ -138,7 +138,7 @@ def _GenerateRandomPassword():
   return '%s%s' % (MYSQL_ROOT_PASSWORD_PREFIX, str(uuid.uuid4())[-8:])
 
 
-def _ParseSysbenchOutput(sysbench_output, results, metadata):
+def ParseSysbenchOutput(sysbench_output, results, metadata):
   """Parses sysbench output and extract relevant TPS and latency numbers, and
    populate the final result collection with these information.
 
@@ -378,7 +378,7 @@ def _RunSysbench(vm, metadata):
     if i == 2:
       # We only need to parse the results for the "real" run.
       logging.info('\n Parsing Sysbench Results...\n')
-      _ParseSysbenchOutput(stdout, results, metadata)
+      ParseSysbenchOutput(stdout, results, metadata)
 
   return results
 
