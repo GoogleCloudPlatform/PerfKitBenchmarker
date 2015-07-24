@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -151,16 +151,13 @@ class AwsVpc(resource.BaseResource):
 class AwsSubnet(resource.BaseResource):
   """An object representing an Aws subnet."""
 
-  def __init__(self, zone, vpc_id, cider_block=None):
+  def __init__(self, zone, vpc_id, cidr_block='10.0.0.0/24'):
     super(AwsSubnet, self).__init__()
     self.zone = zone
     self.region = zone[:-1]
     self.vpc_id = vpc_id
     self.id = None
-    if cider_block is None:
-      self.cider_block = '10.0.0.0/24'
-    else:
-      self.cider_block = cider_block
+    self.cidr_block = cidr_block
 
   def _Create(self):
     """Creates the subnet."""

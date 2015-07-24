@@ -19,7 +19,7 @@ managed MySQL services.
 
 - On AWS, we will use RDS+MySQL.
 - On GCP, we will use Cloud SQL v2 (Performance Edition). As of July 2015, you
- will need to request to whitelist your GCP project to get access to cloud sql
+ will need to request to whitelist your GCP project to get access to Cloud SQL
  v2. Follow instructions on your GCP's project console to do that.
 
 As other cloud providers deliver a managed MySQL service, we will add it here.
@@ -50,16 +50,17 @@ flags.DEFINE_integer('mysql_svc_oltp_table_size', 100000,
                      'The number of rows of each table used in the oltp tests')
 flags.DEFINE_integer('sysbench_warmup_seconds', 120,
                      'The duration of the warmup run in which results are '
-                     'discarded.')
+                     'discarded, in seconds.')
 flags.DEFINE_integer('sysbench_run_seconds', 480,
                      'The duration of the actual run in which results are '
-                     'collected.')
+                     'collected, in seconds.')
 flags.DEFINE_integer('sysbench_thread_count', 16,
                      'The number of test threads on the client side.')
 flags.DEFINE_integer('sysbench_latency_percentile', 99,
                      'The latency percentile we ask sysbench to compute.')
 flags.DEFINE_integer('sysbench_report_interval', 2,
-                     'The interval we ask sysbench to report results.')
+                     'The interval, in seconds, we ask sysbench to report '
+                     'results.')
 
 BENCHMARK_INFO = {'name': 'mysql_service',
                   'description': 'MySQL service benchmarks.',
@@ -116,7 +117,6 @@ DEFAULT_BACKUP_START_TIME = '07:00'
 GCP_MY_SQL_VERSION = 'MYSQL_5_6'
 GCP_PRICING_PLAN = 'PACKAGE'
 
-PERCENTILES_LIST = [1, 5, 50, 90, 99, 99.9]
 RESPONSE_TIME_TOKENS = ['min', 'avg', 'max', 'percentile']
 
 
@@ -126,36 +126,6 @@ def GetInfo():
 
 class DBStatusQueryError(Exception):
   pass
-
-
-def _PercentileCalculator(numbers):
-  """Computes percentiles, stddev and mean on a set of numbers
-
-  Args:
-    numbers: The set of numbers to compute percentiles for.
-
-  Returns:
-    A dictionary of percentiles.
-  """
-  numbers_sorted = sorted(numbers)
-  count = len(numbers_sorted)
-  total = sum(numbers_sorted)
-  result = {}
-  for percentile in PERCENTILES_LIST:
-    percentile_string = 'p%s' % str(percentile)
-    result[percentile_string] = numbers_sorted[
-        int(count * float(percentile) / 100)]
-
-  if count > 0:
-    average = total / float(count)
-    result['average'] = average
-    if count > 1:
-      total_of_squares = sum([(i - average) ** 2 for i in numbers])
-      result['stddev'] = (total_of_squares / (count - 1)) ** 0.5
-    else:
-      result['stddev'] = 0
-
-  return result
 
 
 def _GenerateRandomPassword():
@@ -237,8 +207,8 @@ def _ParseSysbenchOutput(sysbench_output, results, metadata):
   # percentiles of these tps data in the final result set.
   logging.info('All TPS numbers: \n %s', tps_line)
 
-  tps_percentile = _PercentileCalculator(all_tps)
-  for percentile in PERCENTILES_LIST:
+  tps_percentile = sample.PercentileCalculator(all_tps)
+  for percentile in sample.PERCENTILES_LIST:
     percentile_string = 'p%s' % str(percentile)
     logging.info('%s tps %f', percentile_string,
                  tps_percentile[percentile_string])
