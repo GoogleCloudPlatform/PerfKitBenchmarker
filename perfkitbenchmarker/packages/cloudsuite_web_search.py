@@ -23,21 +23,27 @@ APACHE_NUTCH_TAR_URL = ('/home/vstefano/test1/apache-nutch-1.10-src.tar.gz')
 NUTCH_SITE_URL = ('/home/vstefano/test1/apache-nutch-1.10/conf/nutch-site.xml')
 CRAWLED_URL = ('/home/vstefano/test1/hadoop-2.7.1/crawl7')
 
-APACHE_SOLR_TAR_URL = ('/home/vstefano/test1/solr-5.2.1.tgz')
+SOLR_TAR_URL = ('/home/vstefano/test1/solr-5.2.1.tgz')
+SCHEMA_URL = ('/home/vstefano/test1/schema.xml')
 
 CLOUDSUITE_WEB_SEARCH_DIR = posixpath.join(vm_util.VM_TMP_DIR,
                                            'cloudsuite-web-search')
 NUTCH_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'apache-nutch-1.10')
-SOLR_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'solr')
+SOLR_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'solr-5.2.1')
 
 
 def _Install(vm):
   """Installs the iperf package on the VM."""
   vm.Install('openjdk7')
+  vm.Install('lsof')
   vm.Install('curl')
-  vm.Install('ant')
-  vm.RemoteCommand('mkdir -p {0}'.format(
-                   CLOUDSUITE_WEB_SEARCH_DIR))
+  vm.RobustRemoteCommand('mkdir -p {0} &&'
+                         'tar -C {0} -zxf {1} && '
+                         'cd {2} && '
+                         'cp {3} server/solr/configsets/'
+                         'basic_configs/conf/'.format(
+                             CLOUDSUITE_WEB_SEARCH_DIR, SOLR_TAR_URL,
+                             SOLR_HOME_DIR, SCHEMA_URL))
 
 
 def YumInstall(vm):
