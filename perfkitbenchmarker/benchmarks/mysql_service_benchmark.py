@@ -139,8 +139,10 @@ def _GenerateRandomPassword():
 
 
 def ParseSysbenchOutput(sysbench_output, results, metadata):
-  """Parses sysbench output and extract relevant TPS and latency numbers, and
-   populate the final result collection with these information.
+  """Parses sysbench output.
+
+  Extract relevant TPS and latency numbers, and populate the final result
+  collection with these information.
 
   Specifically, we are interested in tps numbers reported by each reporting
   interval, and the summary latency numbers printed at the end of the run in
@@ -255,8 +257,10 @@ def ParseSysbenchOutput(sysbench_output, results, metadata):
 
 
 def _IssueSysbenchCommand(vm, duration):
-  """ Issues a sysbench run command given a vm and a duration. Does nothing
-      if duration is <= 0
+  """ Issues a sysbench run command given a vm and a duration.
+
+      Does nothing if duration is <= 0
+
   Args:
     vm: The test VM to issue command to.
     duration: the duration of the sysbench run.
@@ -297,8 +301,9 @@ def _IssueSysbenchCommand(vm, duration):
 
 
 def _RunSysbench(vm, metadata):
-  """ Runs the Sysbench OLTP test on the DB instance as indicated by the
-  vm.db_instance_address.
+  """ Runs the Sysbench OLTP test.
+
+  The test is run on the DB instance as indicated by the vm.db_instance_address.
 
   Args:
     vm: The client VM that will issue the sysbench test.
@@ -422,7 +427,7 @@ class RDSMySQLBenchmark(object):
     # request.
 
     # Get a list of zones and pick one that's different from the zone VM is in.
-    new_subnet_zone = ''
+    new_subnet_zone = None
     get_zones_cmd = util.AWS_PREFIX + ['ec2', 'describe-availability-zones']
     stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
     response = json.loads(stdout)
@@ -432,7 +437,7 @@ class RDSMySQLBenchmark(object):
         new_subnet_zone = zone['ZoneName']
         break
 
-    if new_subnet_zone == '':
+    if new_subnet_zone is None:
       raise DBStatusQueryError('Cannot find a zone to create the required '
                                'second subnet for the DB instance.')
 
