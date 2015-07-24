@@ -176,6 +176,29 @@ def _ParseSysbenchOutput(sysbench_output, results, metadata):
   interval, and the summary latency numbers printed at the end of the run in
   "General Statistics" -> "Response Time".
 
+  Example Sysbench output:
+
+  sysbench 0.5:  multi-threaded system evaluation benchmark
+  <... lots of output we don't care here ...>
+  Threads started!
+
+  [   2s] threads: 16, tps: 526.38, reads: 7446.79, writes: 2105.52, response
+  time: 210.67ms (99%), errors: 0.00, reconnects:  0.00
+  < .... lots of tps output every 2 second, we need all those>
+
+  < ... lots of other output we don't care for now...>
+  General statistics:
+      total time:                          17.0563s
+      total number of events:              10000
+      total time taken by event execution: 272.6053s
+      response time:
+           min:                                 18.31ms
+           avg:                                 27.26ms
+           max:                                313.50ms
+           approx.  99 percentile:              57.15ms
+  < We care about the response time section above, these are latency numbers>
+  < then there are some outputs after this, we don't care either>
+
   Args:
     sysbench_output: The output from sysbench.
     results: The dictionary to store results based on sysbench output.
@@ -261,6 +284,48 @@ def _ParseSysbenchOutput(sysbench_output, results, metadata):
         metadata))
 
 
+def _IssueSysbenchCommand(vm, duration):
+  """ Issues a sysbench run command given a vm and a duration. Does nothing
+      if duration is <= 0
+  Args:
+    vm: The test VM to issue command to.
+    duration: the duration of the sysbench run.
+
+  Returns:
+    stdout, stderr: the result of the command.
+  """
+  stdout = ''
+  stderr = ''
+  if duration > 0:
+    run_cmd_tokens = ['sysbench',
+                      '--test=%s' % OLTP_SCRIPT_PATH,
+                      '--mysql_svc_oltp_tables_count=%d' %
+                      FLAGS.mysql_svc_oltp_tables_count,
+                      '--oltp-table-size=%d' %
+                      FLAGS.mysql_svc_oltp_table_size,
+                      '--rand-init=%s' % RAND_INIT_ON,
+                      '--db-ps-mode=%s' % DISABLE,
+                      '--oltp-dist-type=%s' % UNIFORM,
+                      '--oltp-read-only=%s' % OFF,
+                      '--num-threads=%d' % FLAGS.sysbench_thread_count,
+                      '--percentile=%d' % FLAGS.sysbench_latency_percentile,
+                      '--report-interval=%d' %
+                      FLAGS.sysbench_report_interval,
+                      '--max-requests=0',
+                      '--max-time=%d' % duration,
+                      '--mysql-user=%s' % vm.db_instance_master_user,
+                      '--mysql-password="%s"' %
+                      vm.db_instance_master_password,
+                      '--mysql-host=%s' % vm.db_instance_address,
+                      'run']
+    run_cmd = ' '.join(run_cmd_tokens)
+    stdout, stderr = vm.RobustRemoteCommand(run_cmd)
+    logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
+                 stdout, stderr)
+
+  return stdout, stderr
+
+
 def _RunSysbench(vm, metadata):
   """ Runs the Sysbench OLTP test on the DB instance as indicated by the
   vm.db_instance_address.
@@ -338,32 +403,7 @@ def _RunSysbench(vm, metadata):
       duration = FLAGS.sysbench_run_seconds
       logging.info('Sysbench real run, duration is %d', duration)
 
-    if duration > 0:
-      run_cmd_tokens = ['sysbench',
-                        '--test=%s' % OLTP_SCRIPT_PATH,
-                        '--mysql_svc_oltp_tables_count=%d' %
-                        FLAGS.mysql_svc_oltp_tables_count,
-                        '--oltp-table-size=%d' %
-                        FLAGS.mysql_svc_oltp_table_size,
-                        '--rand-init=%s' % RAND_INIT_ON,
-                        '--db-ps-mode=%s' % DISABLE,
-                        '--oltp-dist-type=%s' % UNIFORM,
-                        '--oltp-read-only=%s' % OFF,
-                        '--num-threads=%d' % FLAGS.sysbench_thread_count,
-                        '--percentile=%d' % FLAGS.sysbench_latency_percentile,
-                        '--report-interval=%d' %
-                        FLAGS.sysbench_report_interval,
-                        '--max-requests=0',
-                        '--max-time=%d' % duration,
-                        '--mysql-user=%s' % vm.db_instance_master_user,
-                        '--mysql-password="%s"' %
-                        vm.db_instance_master_password,
-                        '--mysql-host=%s' % vm.db_instance_address,
-                        'run']
-      run_cmd = ' '.join(run_cmd_tokens)
-      stdout, stderr = vm.RobustRemoteCommand(run_cmd)
-      logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
-                   stdout, stderr)
+    stdout, stderr = _IssueSysbenchCommand(vm, duration)
 
     if i == 2:
       # We only need to parse the results for the "real" run.
