@@ -94,6 +94,10 @@ RDS_DB_STORAGE_TYPE_GP2 = 'gp2'
 # To support 12.5K IOPS on EBS-GP, we need 4170 GB disk.
 RDS_DB_STORAGE_GP2_SIZE = '4170'
 
+# A list of status strings that are possible during RDS DB creation.
+RDS_DB_CREATION_PENDING_STATUS = frozenset(
+    ['creating', 'modifying', 'backing-up', 'rebooting'])
+
 # Constants defined for Sysbench tests.
 RAND_INIT_ON = 'on'
 DISABLE = 'disable'
@@ -101,6 +105,7 @@ UNIFORM = 'uniform'
 OFF = 'off'
 MYSQL_ROOT_USER = 'root'
 MYSQL_ROOT_PASSWORD_PREFIX = 'Perfkit8'
+MYSQL_PORT = '3306'
 
 PREPARE_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/parallel_prepare.lua'
 OLTP_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/oltp.lua'
@@ -421,6 +426,11 @@ class RDSMySQLBenchmark(object):
     """
     logging.info('Preparing MySQL Service benchmarks for RDS.')
 
+    # TODO: Refactor the RDS DB instance creation and deletion logic out
+    # to a new class called RDSDBInstance that Inherits from
+    # perfkitbenchmarker.resource.BaseResource.
+    # And do the same for GCP.
+
     # First is to create another subnet in the same VPC as the VM but in a
     # different zone. RDS requires two subnets in two different zones to create
     # a DB instance, EVEN IF you do not specify multi-AZ in your DB creation
@@ -472,9 +482,9 @@ class RDSMySQLBenchmark(object):
         '--group-id', vm.group_id,
         '--source-group', vm.group_id,
         '--protocol', 'tcp',
-        '--port', '3306']
+        '--port', MYSQL_PORT]
     stdout, stderr, _ = vm_util.IssueCommand(open_port_cmd)
-    logging.info('Granted tcp 3306 ingress, stdout is:\n%s\nstderr is:\n%s',
+    logging.info('Granted DB port ingress, stdout is:\n%s\nstderr is:\n%s',
                  stdout, stderr)
 
     # Finally, it's time to create the DB instance!
@@ -510,25 +520,15 @@ class RDSMySQLBenchmark(object):
     response = json.loads(stdout)
 
     db_creation_status = _RDSParseDBInstanceStatus(response)
-    status_query_count = 1
-    while True:
-      if (db_creation_status == 'available'):
+
+    for status_query_count in xrange(1, DB_STATUS_QUERY_LIMIT + 1):
+      if db_creation_status == 'available':
         break
 
-      if (db_creation_status != 'creating' and
-          db_creation_status != 'modifying' and
-          db_creation_status != 'backing-up' and
-          db_creation_status != 'rebooting'):
+      if db_creation_status not in RDS_DB_CREATION_PENDING_STATUS:
         raise DBStatusQueryError('Invalid status in DB creation response. '
                                  ' stdout is\n%s, stderr is\n%s' % (
                                      stdout, stderr))
-
-      status_query_count += 1
-      if status_query_count > DB_STATUS_QUERY_LIMIT:
-        raise DBStatusQueryError('DB creation timed-out, we have '
-                                 'waited at least %s * %s seconds.' % (
-                                     DB_STATUS_QUERY_INTERVAL,
-                                     DB_STATUS_QUERY_LIMIT))
 
       logging.info('Querying db creation status, current state is %s, query '
                    'count is %d', db_creation_status, status_query_count)
@@ -537,6 +537,11 @@ class RDSMySQLBenchmark(object):
       stdout, stderr, _ = vm_util.IssueCommand(status_query_cmd)
       response = json.loads(stdout)
       db_creation_status = _RDSParseDBInstanceStatus(response)
+    else:
+      raise DBStatusQueryError('DB creation timed-out, we have '
+                               'waited at least %s * %s seconds.' % (
+                                   DB_STATUS_QUERY_INTERVAL,
+                                   DB_STATUS_QUERY_LIMIT))
 
     # We are good now, db has been created. Now get the endpoint address.
     # On RDS, you always connect with a DNS name, if you do that from a EC2 VM,
@@ -572,9 +577,10 @@ class RDSMySQLBenchmark(object):
         '--db-instance-identifier', vm.db_instance_id,
         '--skip-final-snapshot']
 
-    logging.info('Will call this command to delete db instance: \n %s',
-                 ' '.join(delete_db_cmd))
+    logging.info('Deleting db instance %s...', vm.db_instance_id)
 
+    # Note below, the status of this deletion command is validated below in the
+    # loop. both stdout and stderr are checked.
     stdout, stderr, _ = vm_util.IssueCommand(delete_db_cmd)
     logging.info('Request to delete the DB has been issued, stdout:\n%s\n'
                  'stderr:%s\n', stdout, stderr)
@@ -583,35 +589,48 @@ class RDSMySQLBenchmark(object):
         'rds',
         'describe-db-instances',
         '--db-instance-id', vm.db_instance_id]
-    status_query_count = 1
-    while True:
+
+    db_status = None
+    for status_query_count in xrange(1, DB_STATUS_QUERY_LIMIT + 1):
       try:
         response = json.loads(stdout)
         db_status = _RDSParseDBInstanceStatus(response)
-        if db_status == 'deleting':
-          status_query_count += 1
-          if status_query_count > DB_STATUS_QUERY_LIMIT:
-            logging.warn('DB is still in deleting state after long wait, bail.')
-            break
 
+        if db_status == 'deleting':
+          logging.info('DB is still in the deleting state, status_query_count '
+                       'is %d', status_query_count)
           # Wait for a few seconds and query status
           time.sleep(DB_STATUS_QUERY_INTERVAL)
           stdout, stderr, _ = vm_util.IssueCommand(status_query_cmd)
         else:
+          logging.info('DB deletion status is no longer in deleting, it is %s',
+                       db_status)
           break
       except:
-        # stdout cannot be parsed into json, it might simply be empty -
-        # deletion has completed.
+        # stdout cannot be parsed into json, it might simply be empty because
+        # deletion has been completed.
         break
+    else:
+      logging.warn('DB is still in deleting state after long wait, bail.')
 
-    # Outside the loop, look at stderr, expect it to have the
-    # "DB instance Not found" string.
-    # if it does not have, log a warning but proceed forward.
-    if re.findall('DBInstanceNotFound', stderr):
+    db_instance_deletion_failed = False
+    if db_status == 'deleted' or re.findall('DBInstanceNotFound', stderr):
+      # Sometimes we get a 'deleted' status from DB status query command,
+      # but even more times, the DB status query command would fail with
+      # an "not found" error, both are positive confirmation that the DB has
+      # been deleted.
       logging.info('DB has been successfully deleted, got confirmation.')
     else:
-      logging.warn('DB may not have been deleted, we did not get confirmation '
-                   'from stderr, which is %s', stderr)
+      # We did not get a positive confirmation that the DB is deleted even after
+      # long wait, we have to bail. But we will log an error message, and
+      # then raise an exception at the end of this function so this particular
+      # run will show as a failed run to the user and allow them to examine
+      # the logs
+      db_instance_deletion_failed = True
+      logging.error(
+          'RDS DB instance %s failed to be deleted, we did not get '
+          'final confirmation from stderr, which is:\n %s', vm.db_instance_id,
+          stderr)
 
     if hasattr(vm, 'db_subnet_group_name'):
       delete_db_subnet_group_cmd = util.AWS_PREFIX + [
@@ -623,13 +642,11 @@ class RDSMySQLBenchmark(object):
                    stdout, stderr)
 
     if hasattr(vm, 'extra_subnet_for_db'):
-      delete_extra_subnet_cmd = util.AWS_PREFIX + [
-          'ec2',
-          'delete-subnet',
-          '--subnet-id=%s' % vm.extra_subnet_for_db.id]
-      stdout, stderr, _ = vm_util.IssueCommand(delete_extra_subnet_cmd)
-      logging.info('Deleted the extra subnet. stdout is:\n%s, stderr: \n%s',
-                   stdout, stderr)
+      vm.extra_subnet_for_db.Delete()
+
+    if db_instance_deletion_failed:
+      raise DBStatusQueryError('Failed to get confirmation of DB instance '
+                               'deletion! Check the log for details!')
 
 
 class GoogleCloudSQLBenchmark(object):
@@ -642,6 +659,10 @@ class GoogleCloudSQLBenchmark(object):
       vm: The VM to be used as the test client
 
     """
+    # TODO: Refactor the GCP Cloud SQL instance creation and deletion logic out
+    # to a new class called GCPCloudSQLInstance that Inherits from
+    # perfkitbenchmarker.resource.BaseResource.
+
     logging.info('Preparing MySQL Service benchmarks for Google Cloud SQL.')
 
     vm.db_instance_name = 'pkb%s' % FLAGS.run_uri
@@ -785,15 +806,16 @@ def Run(benchmark_spec):
   logging.info('Start benchmarking MySQL Service, '
                'Cloud Provider is %s.', FLAGS.cloud)
   vms = benchmark_spec.vms
-  metadata = {}
-  metadata['mysql_svc_oltp_tables_count'] = FLAGS.mysql_svc_oltp_tables_count
-  metadata['mysql_svc_oltp_table_size'] = FLAGS.mysql_svc_oltp_table_size
-  metadata['mysql_svc_db_instance_cores'] = FLAGS.mysql_svc_db_instance_cores
-  metadata['sysbench_warm_up_seconds'] = FLAGS.sysbench_warmup_seconds
-  metadata['sysbench_run_seconds'] = FLAGS.sysbench_run_seconds
-  metadata['sysbench_thread_count'] = FLAGS.sysbench_thread_count
-  metadata['sysbench_latency_percentile'] = FLAGS.sysbench_latency_percentile
-  metadata['sysbench_report_interval'] = FLAGS.sysbench_report_interval
+  metadata = {
+      'mysql_svc_oltp_tables_count': FLAGS.mysql_svc_oltp_tables_count,
+      'mysql_svc_oltp_table_size': FLAGS.mysql_svc_oltp_table_size,
+      'mysql_svc_db_instance_cores': FLAGS.mysql_svc_db_instance_cores,
+      'sysbench_warm_up_seconds': FLAGS.sysbench_warmup_seconds,
+      'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
+      'sysbench_thread_count': FLAGS.sysbench_thread_count,
+      'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
+      'sysbench_report_interval': FLAGS.sysbench_report_interval
+  }
 
   # The run phase is common across providers. The VMs[0] object contains all
   # information and states necessary to carry out the run.
