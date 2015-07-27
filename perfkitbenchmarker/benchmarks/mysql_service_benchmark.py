@@ -107,8 +107,9 @@ MYSQL_ROOT_USER = 'root'
 MYSQL_ROOT_PASSWORD_PREFIX = 'Perfkit8'
 MYSQL_PORT = '3306'
 
-PREPARE_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/parallel_prepare.lua'
-OLTP_SCRIPT_PATH = '/usr/share/doc/sysbench/tests/db/oltp.lua'
+NORMAL_SYSBENCH_PATH_PREFIX = '/usr'
+PREPARE_SCRIPT_PATH = '/share/doc/sysbench/tests/db/parallel_prepare.lua'
+OLTP_SCRIPT_PATH = '/share/doc/sysbench/tests/db/oltp.lua'
 
 SYSBENCH_RESULT_NAME_DATA_LOAD = 'sysbench data load time'
 SYSBENCH_RESULT_NAME_TPS = 'sysbench tps'
@@ -277,6 +278,19 @@ def ParseSysbenchOutput(sysbench_output, results, metadata):
         metadata))
 
 
+def _GetSysbenchCommandPrefix():
+  """ Decides what the prefix is for sysbench command based on os type.
+  Args:
+    None.
+  Returns:
+    A string representing the sysbench command prefix.
+  """
+  if FLAGS.os_type == 'rhel':
+    return vm_util.VM_TMP_DIR
+  else:
+    return NORMAL_SYSBENCH_PATH_PREFIX
+
+
 def _IssueSysbenchCommand(vm, duration):
   """ Issues a sysbench run command given a vm and a duration.
 
@@ -291,9 +305,10 @@ def _IssueSysbenchCommand(vm, duration):
   """
   stdout = ''
   stderr = ''
+  oltp_script_path = '%s%s' % (_GetSysbenchCommandPrefix(), OLTP_SCRIPT_PATH)
   if duration > 0:
     run_cmd_tokens = ['sysbench',
-                      '--test=%s' % OLTP_SCRIPT_PATH,
+                      '--test=%s' % oltp_script_path,
                       '--mysql_svc_oltp_tables_count=%d' %
                       FLAGS.mysql_svc_oltp_tables_count,
                       '--oltp-table-size=%d' %
@@ -354,8 +369,10 @@ def _RunSysbench(vm, metadata):
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
+  prepare_script_path = '%s%s' % (_GetSysbenchCommandPrefix(),
+                                  PREPARE_SCRIPT_PATH)
   data_load_cmd_tokens = ['sysbench',
-                          '--test=%s' % PREPARE_SCRIPT_PATH,
+                          '--test=%s' % prepare_script_path,
                           '--mysql_svc_oltp_tables_count=%d' %
                           FLAGS.mysql_svc_oltp_tables_count,
                           '--oltp-table-size=%d' %
