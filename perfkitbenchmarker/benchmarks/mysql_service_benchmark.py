@@ -129,6 +129,22 @@ def GetInfo():
   return BENCHMARK_INFO
 
 
+def CheckPrerequisites():
+  """Verifies that we are running on a cloud provider that supports managed
+     MySQL service.
+
+  Raises:
+    ProviderNotSupportedError
+  """
+  if FLAGS.cloud != 'GCP' and FLAGS.cloud != 'AWS':
+    raise ProviderNotSupportedError('Provider %s is not supported yet.' %
+                                    FLAGS.cloud)
+
+
+class ProviderNotSupportedError(Exception):
+  pass
+
+
 class DBStatusQueryError(Exception):
   pass
 
