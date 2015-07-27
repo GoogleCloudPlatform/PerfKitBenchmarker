@@ -121,7 +121,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AwsVirtualMachine, self).__init__(vm_spec)
     self.region = self.zone[:-1]
     self.user_name = FLAGS.aws_user_name
-    self.network = aws_network.AwsNetwork.GetNetwork(self.zone)
+    if FLAGS.existing_subnet_id is None:
+      self.network = aws_network.AwsNetwork.GetNetwork(self.zone)
+      self.existing_subnet_id = None
+    else:
+      self.network = None
+      self.existing_subnet_id = FLAGS.existing_subnet_id
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
@@ -231,15 +236,21 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Create(self):
     """Create a VM instance."""
     placement = 'AvailabilityZone=%s' % self.zone
-    if IsPlacementGroupCompatible(self.machine_type):
+    if (IsPlacementGroupCompatible(self.machine_type) and
+        self.network is not None):
       placement += ',GroupName=%s' % self.network.placement_group.name
     block_device_map = GetBlockDeviceMap(self.machine_type)
+
+    if self.network is not None:
+      subnet_id = self.network.subnet.id
+    else:
+      subnet_id = self.existing_subnet_id
 
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'run-instances',
         '--region=%s' % self.region,
-        '--subnet-id=%s' % self.network.subnet.id,
+        '--subnet-id=%s' % subnet_id,
         '--associate-public-ip-address',
         '--image-id=%s' % self.image,
         '--instance-type=%s' % self.machine_type,
