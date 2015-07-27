@@ -18,7 +18,7 @@
 Sysbench 0.5 contains breaking changes from previous versions. All existing
 oltp benchmarks depending on older version of sysbench will break if we
 install 0.5 or later for them. Therefore, it's necessary that we have a
-seperate installer here for 0.5 and later.
+separate installer here for 0.5 and later.
 """
 
 

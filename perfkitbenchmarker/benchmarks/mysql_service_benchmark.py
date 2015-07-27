@@ -370,22 +370,21 @@ def _RunSysbench(vm, metadata):
       metadata))
 
   # Now run the sysbench OLTP test and parse the results.
-
-  for i in xrange(1, 3):
+  for phase in ['warm-up', 'run']:
     # First step is to run the test long enough to cover the warmup period
     # as requested by the caller. Then we do the "real" run, parse and report
     # the results.
     duration = 0
-    if i == 1 and FLAGS.sysbench_warmup_seconds > 0:
+    if phase == 'warm-up' and FLAGS.sysbench_warmup_seconds > 0:
       duration = FLAGS.sysbench_warmup_seconds
       logging.info('Sysbench warm-up run, duration is %d', duration)
-    elif i == 2:
+    elif phase == 'run':
       duration = FLAGS.sysbench_run_seconds
       logging.info('Sysbench real run, duration is %d', duration)
 
     stdout, stderr = _IssueSysbenchCommand(vm, duration)
 
-    if i == 2:
+    if phase == 'run':
       # We only need to parse the results for the "real" run.
       logging.info('\n Parsing Sysbench Results...\n')
       ParseSysbenchOutput(stdout, results, metadata)
