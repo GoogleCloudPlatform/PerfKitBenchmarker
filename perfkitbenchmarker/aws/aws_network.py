@@ -167,7 +167,7 @@ class AwsSubnet(resource.BaseResource):
         'create-subnet',
         '--region=%s' % self.region,
         '--vpc-id=%s' % self.vpc_id,
-        '--cidr-block=%s' % self.cider_block,
+        '--cidr-block=%s' % self.cidr_block,
         '--availability-zone=%s' % self.zone]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)

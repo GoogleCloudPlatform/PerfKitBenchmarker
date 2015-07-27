@@ -37,6 +37,7 @@ def YumInstall(vm):
                    vm_util.VM_TMP_DIR)
   vm.RemoteCommand('sudo cp ~/sysbench/sysbench/tests/db/*'
                    ' %s/share/doc/sysbench/tests/db/' % vm_util.VM_TMP_DIR)
+  vm.RemoteCommand('PATH=$PATH:%s/bin && export PATH' % vm_util.VM_TMP_DIR)
 
   # Cleanup the source code enlisthment from bzr, we don't need it anymore.
   vm.RemoteCommand('cd ~ && rm -fr ./sysbench')
