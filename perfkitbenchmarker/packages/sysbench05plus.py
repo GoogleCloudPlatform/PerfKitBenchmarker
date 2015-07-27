@@ -20,6 +20,7 @@ oltp benchmarks depending on older version of sysbench will break if we
 install 0.5 or later for them. Therefore, it's necessary that we have a
 separate installer here for 0.5 and later.
 """
+from perfkitbenchmarker import vm_util
 
 
 def YumInstall(vm):
@@ -28,13 +29,14 @@ def YumInstall(vm):
   vm.InstallPackages('bzr')
   vm.InstallPackages('mysql mysql-server mysql-devel')
   vm.RemoteCommand('cd ~ && bzr branch lp:sysbench')
-  vm.RemoteCommand('cd ~/sysbench && ./autogen.sh &&'
-                   ' ./configure --prefix=/usr --mandir=/usr/share/man &&'
-                   ' make')
+  vm.RemoteCommand(('cd ~/sysbench && ./autogen.sh &&'
+                    ' ./configure --prefix=%s --mandir=%s/share/man &&'
+                    ' make') % (vm_util.VM_TMP_DIR, vm_util.VM_TMP_DIR))
   vm.RemoteCommand('cd ~/sysbench && sudo make install')
-  vm.RemoteCommand('sudo mkdir /usr/share/doc/sysbench/tests/db -p')
+  vm.RemoteCommand('sudo mkdir %s/share/doc/sysbench/tests/db -p' %
+                   vm_util.VM_TMP_DIR)
   vm.RemoteCommand('sudo cp ~/sysbench/sysbench/tests/db/*'
-                   ' /usr/share/doc/sysbench/tests/db/')
+                   ' %s/share/doc/sysbench/tests/db/' % vm_util.VM_TMP_DIR)
 
   # Cleanup the source code enlisthment from bzr, we don't need it anymore.
   vm.RemoteCommand('cd ~ && rm -fr ./sysbench')
