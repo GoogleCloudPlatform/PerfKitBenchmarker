@@ -15,10 +15,8 @@
 """Set of utility functions for working with virtual machines."""
 
 import contextlib
-import functools
 import logging
 import os
-import posixpath
 import random
 import re
 import socket
@@ -28,13 +26,11 @@ import tempfile
 import threading
 import time
 import traceback
-import uuid
 
 import jinja2
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import regex_util
@@ -68,18 +64,6 @@ flags.DEFINE_integer('default_timeout', TIMEOUT, 'The default timeout for '
 flags.DEFINE_integer('burn_cpu_seconds', 0,
                      'Amount of time in seconds to burn cpu on vm.')
 flags.DEFINE_integer('burn_cpu_threads', 1, 'Number of threads to burn cpu.')
-flags.DEFINE_boolean('dstat', False,
-                     'Run dstat (http://dag.wiee.rs/home-made/dstat/) '
-                     'on each VM to collect system performance metrics during '
-                     'each benchmark run.')
-flags.DEFINE_integer('dstat_interval', None,
-                     'dstat sample collection frequency, in seconds. Only '
-                     'applicable when --dstat is specified.')
-flags.DEFINE_string('dstat_output', None,
-                    'Output directory for dstat output. '
-                    'Only applicable when --dstat is specified. '
-                    'Default: run temporary directory.')
-
 
 
 class IpAddressSubset(object):
@@ -583,105 +567,6 @@ def ExecutableOnPath(executable_name):
   if process.returncode:
     return False
   return True
-
-
-class _DStatCollector(object):
-  """dstat collector.
-
-  Installs and runs dstat on a collection of VMs.
-  """
-
-  def __init__(self, interval=None, output_directory=None):
-    """Runs dstat on 'vms'.
-
-    Start dstat collection via `Start`. Stop via `Stop`.
-
-    Args:
-      interval: Optional int. Interval in seconds in which to collect samples.
-    """
-    self.interval = interval
-    self.output_directory = output_directory or GetTempDir()
-    self._lock = threading.Lock()
-    self._pids = {}
-    self._file_names = {}
-
-    if not os.path.isdir(self.output_directory):
-      raise IOError('dstat output directory does not exist: {0}'.format(
-          self.output_directory))
-
-  def _StartOnVm(self, vm, suffix='-dstat'):
-    vm.Install('dstat')
-
-    num_cpus = vm.num_cpus
-
-    # List block devices so that I/O to each block device can be recorded.
-    block_devices, _ = vm.RemoteCommand(
-        'lsblk --nodeps --output NAME --noheadings')
-    block_devices = block_devices.splitlines()
-    dstat_file = posixpath.join(
-        VM_TMP_DIR, '{0}{1}.csv'.format(vm.name, suffix))
-    cmd = ('dstat --epoch -C total,0-{max_cpu} '
-           '-D total,{block_devices} '
-           '-clrdngyi -pms --fs --ipc --tcp '
-           '--udp --raw --socket --unix --vm --rpc '
-           '--noheaders --output {output} {dstat_interval} > /dev/null 2>&1 & '
-           'echo $!').format(
-               max_cpu=num_cpus - 1,
-               block_devices=','.join(block_devices),
-               output=dstat_file,
-               dstat_interval=self.interval or '')
-    stdout, _ = vm.RemoteCommand(cmd)
-    with self._lock:
-      self._pids[vm.name] = stdout.strip()
-      self._file_names[vm.name] = dstat_file
-
-  def _StopOnVm(self, vm):
-    """Stop dstat on 'vm', copy the results to the run temporary directory."""
-    if vm.name not in self._pids:
-      logging.warn('No dstat PID for %s', vm.name)
-      return
-    else:
-      with self._lock:
-        pid = self._pids.pop(vm.name)
-        file_name = self._file_names.pop(vm.name)
-    cmd = 'kill {0} || true'.format(pid)
-    vm.RemoteCommand(cmd)
-    try:
-      vm.PullFile(self.output_directory, file_name)
-    except:
-      logging.exception('Failed fetching dstat result from %s.', vm.name)
-
-  def Start(self, sender, benchmark_spec):
-    """Install and start dstat on all VMs in 'benchmark_spec'."""
-    suffix = '-{0}-{1}-dstat'.format(benchmark_spec.benchmark_name,
-                                     str(uuid.uuid4())[:8])
-    start_on_vm = functools.partial(self._StartOnVm, suffix=suffix)
-    RunThreaded(start_on_vm, benchmark_spec.vms)
-
-  def Stop(self, sender, benchmark_spec):
-    """Stop dstat on all VMs in 'benchmark_spec', fetch results."""
-    RunThreaded(self._StopOnVm, benchmark_spec.vms)
-
-
-@events.initialization_complete.connect
-def _RegisterDStatCollector(sender, parsed_flags):
-  """Registers the dstat collector if FLAGS.dstat is set."""
-  if not parsed_flags.dstat:
-    return
-
-  output_directory = (parsed_flags.dstat_output
-                      if parsed_flags['dstat_output'].present
-                      else GetTempDir())
-
-  logging.debug('Registering dstat collector with interval %s, output to %s.',
-                parsed_flags.dstat_interval, output_directory)
-
-  if not os.path.isdir(output_directory):
-    os.makedirs(output_directory)
-  collector = _DStatCollector(interval=parsed_flags.dstat_interval,
-                              output_directory=output_directory)
-  events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
-  events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
 
 
 def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):

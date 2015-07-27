@@ -67,6 +67,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import timing_util
+from perfkitbenchmarker import traces
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_benchmarks
@@ -164,6 +165,9 @@ flags.DEFINE_string('ftp_proxy', '',
                     '[user:passwd@]proxy.server:port.')
 
 MAX_RUN_URI_LENGTH = 8
+
+
+events.initialization_complete.connect(traces.RegisterAll)
 
 
 # TODO(user): Consider moving to benchmark_spec.
