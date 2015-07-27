@@ -150,9 +150,20 @@ def ParseResults(job_file, fio_json_result):
             'stddev': job[mode]['clat']['stddev'],
             'p1': job[mode]['clat']['percentile']['1.000000'],
             'p5': job[mode]['clat']['percentile']['5.000000'],
+            'p10': job[mode]['clat']['percentile']['10.000000'],
+            'p20': job[mode]['clat']['percentile']['20.000000'],
+            'p30': job[mode]['clat']['percentile']['30.000000'],
+            'p40': job[mode]['clat']['percentile']['40.000000'],
             'p50': job[mode]['clat']['percentile']['50.000000'],
+            'p60': job[mode]['clat']['percentile']['60.000000'],
+            'p70': job[mode]['clat']['percentile']['70.000000'],
+            'p80': job[mode]['clat']['percentile']['80.000000'],
+            'p90': job[mode]['clat']['percentile']['90.000000'],
             'p95': job[mode]['clat']['percentile']['95.000000'],
             'p99': job[mode]['clat']['percentile']['99.000000'],
+            'p99.5': job[mode]['clat']['percentile']['99.500000'],
+            'p99.9': job[mode]['clat']['percentile']['99.900000'],
+            'p99.95': job[mode]['clat']['percentile']['99.950000'],
             'p99.99': job[mode]['clat']['percentile']['99.990000']}
         lat_metadata.update(parameters)
         samples.append(
