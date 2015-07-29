@@ -163,15 +163,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def SetupRemoteFirewall(self):
     """Sets up IP table configurations on the VM."""
-    if hasattr(self, 'allowed_ip_range') and self.allowed_ip_range:
-      self.RemoteHostCommand('sudo iptables -A INPUT --source %s '
-                             '-p tcp -j ACCEPT' % self.allowed_ip_range)
-      self.RemoteHostCommand('sudo iptables -A INPUT --source %s '
-                             '-p udp -j ACCEPT' % self.allowed_ip_range)
-      self.RemoteHostCommand('sudo iptables -A OUTPUT --destination %s '
-                             '-p udp -j ACCEPT' % self.allowed_ip_range)
-      self.RemoteHostCommand('sudo iptables -A OUTPUT --destination %s '
-                             '-p tcp -j ACCEPT' % self.allowed_ip_range)
+    self.RemoteHostCommand('sudo iptables -A INPUT -j ACCEPT')
+    self.RemoteHostCommand('sudo iptables -A OUTPUT -j ACCEPT')
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
