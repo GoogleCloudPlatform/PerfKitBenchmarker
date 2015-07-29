@@ -36,6 +36,8 @@ from perfkitbenchmarker.aws import util
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_string(
+    'existing_subnet_id', None, 'An existing subnet to create a VM in.')
 flags.DEFINE_string('aws_user_name', 'ubuntu',
                     'This determines the user name that Perfkit will '
                     'attempt to use. This must be changed in order to '

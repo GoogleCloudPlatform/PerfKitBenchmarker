@@ -81,9 +81,6 @@ REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string(
-    'existing_subnet_id', None, 'An existing subnet to create a VM in.')
-
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
 flags.DEFINE_integer('parallelism', 1,
                      'The number of benchmarks to run in parallel.')
