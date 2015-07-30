@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing wget installation and cleanup functions."""
+"""Module containing python 2.7 installation and cleanup functions."""
 
 
 def YumInstall(vm):
