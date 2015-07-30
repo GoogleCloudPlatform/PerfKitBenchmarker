@@ -1,0 +1,444 @@
+{
+  "children": [
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "MB/sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "Terasort Throughput Per Core",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hadoop_terasort"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hadoop_terasort' AND\n\tmetric = 'Terasort Throughput Per Core' AND\n    REGEXP_MATCH(labels, r'\\|scratch_disk_size:%%DISK_SIZE%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|scratch_disk_type:%%DISK_TYPE%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|num_rows:%%NUM_ROWS%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hadoop_terasort' AND\n\tmetric = 'Terasort Throughput Per Core' AND\n    REGEXP_MATCH(labels, r'\\|scratch_disk_size:500\\|') AND\n    REGEXP_MATCH(labels, r'\\|scratch_disk_type:standard\\|') AND\n    REGEXP_MATCH(labels, r'\\|num_rows:100000000\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "961707753",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "Terasort Throughput Per Core, num_rows: %%NUM_ROWS%%, %%DISK_TYPE%%, %%DISK_SIZE%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "668969385",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "sec",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "Terasort Total Time",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hadoop_terasort"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hadoop_terasort' AND\n\tmetric = 'Terasort Total Time' AND\n    REGEXP_MATCH(labels, r'\\|scratch_disk_size:%%DISK_SIZE%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|scratch_disk_type:%%DISK_TYPE%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|num_rows:%%NUM_ROWS%%\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hadoop_terasort' AND\n\tmetric = 'Terasort Total Time' AND\n    REGEXP_MATCH(labels, r'\\|scratch_disk_size:500\\|') AND\n    REGEXP_MATCH(labels, r'\\|scratch_disk_type:standard\\|') AND\n    REGEXP_MATCH(labels, r'\\|num_rows:100000000\\|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "162122659",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "Terasort Total Time, num_rows: %%NUM_ROWS%%, %%DISK_TYPE%%, %%DISK_SIZE%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "968051719",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "seconds",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "End to End Runtime",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "hadoop_terasort"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hadoop_terasort' AND\n\tmetric = 'End to End Runtime' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'hadoop_terasort' AND\n\tmetric = 'End to End Runtime' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "846828611",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "End to End Runtime - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "419419266",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    }
+  ],
+  "dataset_name": "{{ dataset_name }}",
+  "id": "5443632811212800",
+  "owner": "",
+  "params": [
+    {
+      "$$hashKey": "0EC",
+      "name": "EXPRESSION",
+      "value": "NTH(50, QUANTILES(value))"
+    },
+    {
+      "$$hashKey": "object:104",
+      "name": "DISK_TYPE",
+      "value": "standard"
+    },
+    {
+      "$$hashKey": "object:106",
+      "name": "DISK_SIZE",
+      "value": "500"
+    },
+    {
+      "$$hashKey": "object:108",
+      "name": "NUM_ROWS",
+      "value": "100000000"
+    }
+  ],
+  "project_id": "{{ project_id }}",
+  "table_name": "{{ table_name }}",
+  "table_partition": "",
+  "title": "hadoop_terasort",
+  "type": "dashboard",
+  "version": "8",
+  "writers": []
+}

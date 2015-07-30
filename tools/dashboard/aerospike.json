@@ -1,0 +1,574 @@
+{
+  "children": [
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "ms",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "logScale": false,
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    },
+                    "viwWindowMode": null
+                  },
+                  {
+                    "logScale": false,
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "Average Latency",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "aerospike"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'aerospike' AND\n\tmetric = 'Average Latency' AND\n    REGEXP_MATCH(labels, r'\\|Storage Type:%%STORAGE%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|\\Client Threads:%%CLIENT_THREAD%%|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'aerospike' AND\n\tmetric = 'Average Latency' AND\n    REGEXP_MATCH(labels, r'\\|Storage Type:memory\\|') AND\n    REGEXP_MATCH(labels, r'\\|\\Client Threads:8|')\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "549476198",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "Average Latency, Storage Type: %%STORAGE%%, Client Thread: %%CLIENT_THREAD%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "493202255",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "tps",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 371,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "logScale": false,
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viewWindowMode": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "logScale": false,
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": null,
+                  "official": true,
+                  "product_name": null,
+                  "runby": null,
+                  "start_date": {
+                    "filter_type": "WEEK",
+                    "filter_value": 2,
+                    "specify_time": false,
+                    "text": "last 2 weeks"
+                  },
+                  "test": null
+                },
+                "results": {
+                  "dataset_name": null,
+                  "date_group": "Day",
+                  "fields": [],
+                  "labels": [],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "object:500",
+                      "name": "99%"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": null,
+                  "row_limit": 100000,
+                  "show_date": true,
+                  "table_name": null,
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n    '', machine_type, cloud, %%EXPRESSION%% as number\nFROM (\nSELECT\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tFLOAT(REGEXP_EXTRACT(labels, r'\\|Average Transactions Per Second:(.*?)\\|')) as value,\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'aerospike' AND\n\tmetric = 'Average Latency' AND\n    REGEXP_MATCH(labels, r'\\|Storage Type:%%STORAGE%%\\|') AND\n    REGEXP_MATCH(labels, r'\\|\\Client Threads:%%CLIENT_THREAD%%|'))\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n    '', machine_type, cloud, NTH(50, QUANTILES(value)) as number\nFROM (\nSELECT\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tFLOAT(REGEXP_EXTRACT(labels, r'\\|Average Transactions Per Second:(.*?)\\|')) as value,\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'aerospike' AND\n\tmetric = 'Average Latency' AND\n    REGEXP_MATCH(labels, r'\\|Storage Type:memory\\|') AND\n    REGEXP_MATCH(labels, r'\\|\\Client Threads:8|'))\nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": null,
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "1867220616",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "Average Transactions Per Second, Storage Type: %%STORAGE%%, Client Thread: %%CLIENT_THREAD%% - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "400182234",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "req/s",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "max_throughput_for_completion_latency_under_1ms",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "aerospike"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'aerospike' AND\n\tmetric = 'max_throughput_for_completion_latency_under_1ms' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'aerospike' AND\n\tmetric = 'max_throughput_for_completion_latency_under_1ms' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "422341300",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "max_throughput_for_completion_latency_under_1ms - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "811030367",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    },
+    {
+      "container": {
+        "children": [
+          {
+            "chart": {
+              "chartType": "BarChart",
+              "options": {
+                "animation": {
+                  "duration": 500
+                },
+                "booleanRole": "certainty",
+                "chartArea": {},
+                "hAxis": {
+                  "logScale": false,
+                  "maxValue": null,
+                  "minValue": null,
+                  "title": "seconds",
+                  "useFormatFromData": true,
+                  "viewWindow": {
+                    "max": null,
+                    "min": null
+                  }
+                },
+                "height": 600,
+                "isStacked": true,
+                "legend": {
+                  "position": "right"
+                },
+                "vAxes": [
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "title": "machine_type",
+                    "useFormatFromData": true,
+                    "viewWindow": null,
+                    "viwWindowMode": null
+                  },
+                  {
+                    "maxValue": null,
+                    "minValue": null,
+                    "useFormatFromData": true,
+                    "viewWindow": {
+                      "max": null,
+                      "min": null
+                    }
+                  }
+                ],
+                "width": 600
+              }
+            },
+            "datasource": {
+              "config": {
+                "filters": {
+                  "end_date": null,
+                  "metadata": [],
+                  "metric": "End to End Runtime",
+                  "official": null,
+                  "product_name": "PerfKitBenchmarker",
+                  "start_date": {
+                    "filter_type": "MONTH",
+                    "filter_value": "3",
+                    "specify_time": false,
+                    "text": "last 3 months"
+                  },
+                  "test": "aerospike"
+                },
+                "results": {
+                  "dataset_name": "{{ dataset_name }}",
+                  "date_group": "",
+                  "fields": [],
+                  "labels": [
+                    {
+                      "$$hashKey": "0P6",
+                      "label": "machine_type"
+                    },
+                    {
+                      "$$hashKey": "0P8",
+                      "label": "cloud"
+                    }
+                  ],
+                  "measure_values": true,
+                  "measures": [
+                    {
+                      "$$hashKey": "0GF",
+                      "name": "number"
+                    }
+                  ],
+                  "pivot": true,
+                  "pivot_config": {
+                    "column_field": "cloud",
+                    "row_field": "machine_type",
+                    "value_field": "number"
+                  },
+                  "project_id": "{{ project_id }}",
+                  "row_limit": 100000,
+                  "show_date": false,
+                  "table_name": "{{ table_name }}",
+                  "table_partition": ""
+                }
+              },
+              "custom_query": true,
+              "query": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\t%%EXPRESSION%% AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'aerospike' AND\n\tmetric = 'End to End Runtime' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "queryError": null,
+              "query_exec": "SELECT\n\t'',\n\tREGEXP_EXTRACT(labels, r'\\|machine_type:(.*?)\\|') AS machine_type,\n\tREGEXP_EXTRACT(labels, r'\\|cloud:(.*?)\\|') AS cloud,\n\tNTH(50, QUANTILES(value)) AS number\nFROM\n\t[{{ dataset_name }}.{{ table_name }}]\nWHERE\n\ttimestamp >= TIMESTAMP_TO_SEC(DATE_ADD(CURRENT_TIMESTAMP(), -3, 'MONTH')) AND\n\tproduct_name = 'PerfKitBenchmarker' AND\n\ttest = 'aerospike' AND\n\tmetric = 'End to End Runtime' \nGROUP BY\n\tmachine_type,\n\tcloud\nORDER BY\n  number ASC;",
+              "view": {
+                "columns": [],
+                "filter": [],
+                "sort": [],
+                "sort_column_order": "",
+                "sort_column_start": 1,
+                "sort_columns": true
+              }
+            },
+            "id": "120996361",
+            "layout": {
+              "columnspan": 1,
+              "cssClasses": "pk-widget-no-overflow"
+            },
+            "title": "End to End Runtime - %%EXPRESSION%%",
+            "type": "chart",
+            "url": ""
+          }
+        ],
+        "columns": 1,
+        "flow": "row",
+        "height": 600
+      },
+      "id": "411850018",
+      "layout": {
+        "columnspan": 1,
+        "cssClasses": null
+      },
+      "title": "",
+      "type": "container",
+      "url": ""
+    }
+  ],
+  "dataset_name": "{{ dataset_name }}",
+  "id": "6267097092980736",
+  "owner": "",
+  "params": [
+    {
+      "$$hashKey": "0EC",
+      "name": "EXPRESSION",
+      "value": "NTH(50, QUANTILES(value))"
+    },
+    {
+      "$$hashKey": "object:221",
+      "name": "STORAGE",
+      "value": "memory"
+    },
+    {
+      "$$hashKey": "object:223",
+      "name": "CLIENT_THREAD",
+      "value": "8"
+    }
+  ],
+  "project_id": "{{ project_id }}",
+  "table_name": "{{ table_name }}",
+  "table_partition": "",
+  "title": "aerospike",
+  "type": "dashboard",
+  "version": "8",
+  "writers": []
+}

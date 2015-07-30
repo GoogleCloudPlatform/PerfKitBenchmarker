@@ -489,6 +489,16 @@ file we have added a lot of comments into the code to make it easy to;
 
 Even with lots of comments we make to support more detailed documention.  You will find the documatation we have on the [Wiki pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki).  Missing documentation you want?  Start a page and/or open an [issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) to get it added.
 
+
+HOW TO VISUALIZE PerfKitBenchmarker RESULTS IN PerfKitExplorer
+==================
+The dashboards directory contains pre-built dashboards for every benchmark in PerfKitBenchmarker and a summary dashboard for all benchmarks. The dashboards can be used by [PerfKitExplorer]
+(https://github.com/GoogleCloudPlatform/PerfKitExplorer/blob/master/README.md)
+.
+
+See [dashboards/README.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/dashboards/README.md) for how to setup and upload dashboards.
+
+
 PLANNED IMPROVEMENTS
 =======================
 Many... please add new requests via GitHub issues.
