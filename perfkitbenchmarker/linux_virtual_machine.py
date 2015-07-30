@@ -400,6 +400,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Authenticate a remote machine to access all peers."""
     self.RemoteHostCopy(vm_util.GetPrivateKeyPath(),
                         REMOTE_KEY_PATH)
+    self.has_private_key = True
 
   def CheckJavaVersion(self):
     """Check the version of java on remote machine.
