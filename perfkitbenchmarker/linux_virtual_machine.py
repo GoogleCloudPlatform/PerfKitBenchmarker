@@ -69,6 +69,10 @@ EXECUTE_COMMAND = 'execute_command.py'
 # by EXECUTE_COMMAND.
 WAIT_FOR_COMMAND = 'wait_for_command.py'
 
+flags.DEFINE_bool('setup_remote_firewall', False,
+                  'Whether PKB should configure the firewall of each remote'
+                  'VM to make sure it accepts all internal connections.')
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -157,6 +161,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--delete']
     return self.RemoteCommand(' '.join(wait_command), should_log=False)
 
+  def SetupRemoteFirewall(self):
+    """Sets up IP table configurations on the VM."""
+    self.RemoteHostCommand('sudo iptables -A INPUT -j ACCEPT')
+    self.RemoteHostCommand('sudo iptables -A OUTPUT -j ACCEPT')
+
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
     env_file = "/etc/environment"
@@ -184,6 +193,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def PrepareVMEnvironment(self):
     self.SetupProxy()
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    if FLAGS.setup_remote_firewall:
+      self.SetupRemoteFirewall()
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
     self.BurnCpu()
@@ -783,7 +794,7 @@ class ContainerizedDebianMixin(DebianMixin):
   def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False,
-                    suppress_warning=False):
+                    suppress_warning=False, timeout=None):
     """Runs a command inside the container.
 
     Args:
