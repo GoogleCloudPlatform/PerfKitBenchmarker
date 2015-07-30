@@ -16,16 +16,11 @@
 """Module containing wget installation and cleanup functions."""
 
 
-def _Install(vm):
-  """Installs the python package on the VM."""
-  vm.InstallPackages('python')
-
-
 def YumInstall(vm):
   """Installs the package on the VM."""
-  _Install(vm)
+  vm.InstallPackages('python-2.7.5')
 
 
 def AptInstall(vm):
   """Installs the package on the VM."""
-  _Install(vm)
+  vm.InstallPackages('python2.7')
