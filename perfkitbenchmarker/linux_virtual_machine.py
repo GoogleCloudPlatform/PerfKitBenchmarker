@@ -771,6 +771,9 @@ class ContainerizedDebianMixin(DebianMixin):
     if not self._CheckDockerExists():
       self.Install('docker')
     self.InitDocker()
+
+    # Python is needed for RobustRemoteCommands
+    self.Install('python')
     super(ContainerizedDebianMixin, self).PrepareVMEnvironment()
 
   def InitDocker(self):
