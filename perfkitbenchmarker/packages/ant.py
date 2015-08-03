@@ -23,6 +23,7 @@ ANT_TAR_URL = ('www.pirbot.com/mirrors/apache//ant/binaries/'
 
 def _Install(vm):
     """Installs the Ant package on the VM."""
+    vm.Install('wget')
     vm.RemoteCommand('cd {0} && '
                      'wget {1} && '
                      'sudo tar -C /opt/ -zxf apache-ant-1.9.6-bin.tar.gz && '
@@ -32,6 +33,7 @@ def _Install(vm):
                          vm_util.VM_TMP_DIR, ANT_TAR_URL))
     vm.RemoteCommand('sudo ln -s /opt/ant/bin/ant /usr/bin/ant && '
                      'sudo sh -c "echo ANT_HOME=/opt/ant >> /etc/environment"')
+
 
 
 def YumInstall(vm):
