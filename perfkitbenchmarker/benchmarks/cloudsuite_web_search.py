@@ -44,100 +44,16 @@ NUTCH_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'apache-nutch-1.10')
 FABAN_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'faban')
 FABAN_OUTPUT_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'outputFaban')
 SOLR_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'solr-5.2.1')
+PACKAGES_URL = ('http://parsa.epfl.ch/cloudsuite/software/perfkit/web_search')
 # following variables should be changed to URLs and used with wget command
-APACHE_NUTCH_TAR_URL = ('curl --header "Host: doc-14-b0-docs.googleusercontent'
-                        '.com" --header "User-Agent: Mozilla/5.0 '
-                        '(X11; Linux x86_64; rv:38.0) Gecko/20100101 '
-                        'Firefox/38.0" --header "Accept: text/html,application'
-                        '/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" '
-                        '--header "Accept-Language: en-US,en;q=0.5" '
-                        '--header "Cookie: AUTH_npu93f5qtsn6732s1bkk8mg68ja3'
-                        'runk=06154759484088948450|1438588800000|nkf9c7rg3rm'
-                        '9b71ch7f49n78peje37j4" --header "Connection: keep-'
-                        'alive" "https://doc-14-b0-docs.googleusercontent.c'
-                        'om/docs/securesc/ff1mikmg3qur6cbaj9vilst0ftkfegee/'
-                        't1thdu0ejdakbokb2b2kn0v0i3rljght/1438588800000/061'
-                        '54759484088948450/06154759484088948450/0BzrWXFS43e'
-                        'WAOG0wZFo1NUFrZlE?e=download" -o '
-                        '"apache-nutch-src.tar.gz" -L')
-NUTCH_SITE_URL = ('curl --header "Host: doc-0s-b0-docs.googleusercontent.com" '
-                  '--header "User-Agent: Mozilla/5.0 (X11; Linux x86_64; '
-                  'rv:38.0) Gecko/20100101 Firefox/38.0" --header "Accept: '
-                  'text/html,application/xhtml+xml,application/xml;q=0.9,'
-                  '*/*;q=0.8" --header "Accept-Language: en-US,en;q=0.5" '
-                  '--header "Cookie: AUTH_npu93f5qtsn6732s1bkk8mg68ja3runk'
-                  '=06154759484088948450|1438588800000|nkf9c7rg3rm9b71ch7f'
-                  '49n78peje37j4" --header "Connection: keep-alive" "https:'
-                  '//doc-0s-b0-docs.googleusercontent.com/docs/securesc/ff1'
-                  'mikmg3qur6cbaj9vilst0ftkfegee/mskoan3n4o83tb609o2f391c64'
-                  'qts8r4/1438588800000/06154759484088948450/06154759484088'
-                  '948450/0BzrWXFS43eWAQzNBeUpNLWNtSW8?e=download" -o '
-                  '"nutch-site.xml" -L')
-CRAWLED_URL = ('curl --header "Host: doc-0s-b0-docs.googleusercontent.com" --h'
-               'eader "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:38.0) Ge'
-               'cko/20100101 Firefox/38.0" --header "Accept: text/html,applica'
-               'tion/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" --header "Acce'
-               'pt-Language: en-US,en;q=0.5" --header "Referer: https://drive.'
-               'google.com/uc?export=download&id=0BzrWXFS43eWARGVmN3dnREdXcDQ"'
-               ' --header "Cookie: AUTH_npu93f5qtsn6732s1bkk8mg68ja3runk=06154'
-               '759484088948450|1438588800000|nkf9c7rg3rm9b71ch7f49n78peje37j4'
-               '" --header "Connection: keep-alive" "https://doc-0s-b0-docs.go'
-               'ogleusercontent.com/docs/securesc/ff1mikmg3qur6cbaj9vilst0ftkf'
-               'egee/b912v70hbvmdc5bhotdbn1ctkplq9dq6/1438588800000/0615475948'
-               '4088948450/06154759484088948450/0BzrWXFS43eWARGVmN3dnREdXcDQ?e'
-               '=download" -o "crawl.tar.gz" -L')
-SOLR_TAR_URL = ('curl --header "Host: doc-0c-b0-docs.googleusercontent.com" '
-                '--header "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:'
-                '38.0) Gecko/20100101 Firefox/38.0" --header "Accept: text'
-                '/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"'
-                ' --header "Accept-Language: en-US,en;q=0.5" --header "Referer'
-                ': https://drive.google.com/uc?export=download&id=0BzrWXFS43eW'
-                'AWVRtQXJlVFNRbk0" --header "Cookie: AUTH_npu93f5qtsn6732s1bkk'
-                '8mg68ja3runk=06154759484088948450|1438588800000|nkf9c7rg3rm9b'
-                '71ch7f49n78peje37j4" --header "Connection: keep-alive" '
-                '"https://doc-0c-b0-docs.googleusercontent.com/docs/securesc/'
-                'ff1mikmg3qur6cbaj9vilst0ftkfegee/6rkr78ibf3et7qeonu3alqb9l3n'
-                'cfq2o/1438588800000/06154759484088948450/0615475948408894845'
-                '0/0BzrWXFS43eWAWVRtQXJlVFNRbk0?e=download" -o '
-                '"solr.tar.gz" -L')
-SCHEMA_URL = ('curl --header "Host: doc-0s-b0-docs.googleusercontent.com" '
-              '--header "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:38.0) '
-              'Gecko/20100101 Firefox/38.0" --header "Accept: text/html,'
-              'application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" --header'
-              ' "Accept-Language: en-US,en;q=0.5" --header "Cookie: AUTH_npu93'
-              'f5qtsn6732s1bkk8mg68ja3runk=06154759484088948450|1438588800000|'
-              'nkf9c7rg3rm9b71ch7f49n78peje37j4" --header "Connection: keep-al'
-              'ive" "https://doc-0s-b0-docs.googleusercontent.com/docs/secures'
-              'c/ff1mikmg3qur6cbaj9vilst0ftkfegee/tngplt6r7km5rovnkjsvbse9ae7d'
-              'hlc6/1438588800000/06154759484088948450/06154759484088948450/0B'
-              'zrWXFS43eWATzJNRk9sZG5ydkU?e=download" -o "schema.xml" -L')
-FABAN_TAR_URL = ('curl --header "Host: doc-00-b0-docs.googleusercontent.com" '
-                 '--header "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:38.'
-                 '0) Gecko/20100101 Firefox/38.0" --header "Accept: text/html,'
-                 'application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" --hea'
-                 'der "Accept-Language: en-US,en;q=0.5" --header "Referer: htt'
-                 'ps://drive.google.com/uc?export=download&id=0BzrWXFS43eWAWXJ'
-                 'pb1MtWGtfM0E" --header "Cookie: AUTH_npu93f5qtsn6732s1bkk8mg'
-                 '68ja3runk=06154759484088948450|1438588800000|nkf9c7rg3rm9b71'
-                 'ch7f49n78peje37j4" --header "Connection: keep-alive" "https:'
-                 '//doc-00-b0-docs.googleusercontent.com/docs/securesc/ff1mikm'
-                 'g3qur6cbaj9vilst0ftkfegee/ldemqgpcvi61bdo5tegk9muir3rjfdcm/1'
-                 '438588800000/06154759484088948450/06154759484088948450/0BzrW'
-                 'XFS43eWAWXJpb1MtWGtfM0E?e=download" -o '
-                 '"faban-kit-latest.tar.gz" -L')
-SEARCH_DRIVER_URL = ('curl --header "Host: doc-0s-b0-docs.googleusercontent.co'
-                     'm" --header "User-Agent: Mozilla/5.0 (X11; Linux x86_64;'
-                     ' rv:38.0) Gecko/20100101 Firefox/38.0" --header "Accept:'
-                     ' text/html,application/xhtml+xml,application/xml;q=0.9,*'
-                     '/*;q=0.8" --header "Accept-Language: en-US,en;q=0.5" --h'
-                     'eader "Cookie: AUTH_npu93f5qtsn6732s1bkk8mg68ja3runk=061'
-                     '54759484088948450|1438588800000|nkf9c7rg3rm9b71ch7f49n78'
-                     'peje37j4" --header "Connection: keep-alive" "https://doc'
-                     '-0s-b0-docs.googleusercontent.com/docs/securesc/ff1mikmg'
-                     '3qur6cbaj9vilst0ftkfegee/ple89p23kk31ca9q24mc8q4aoemlqil'
-                     '1/1438588800000/06154759484088948450/0615475948408894845'
-                     '0/0BzrWXFS43eWATm1SdnpoLTJSdUE?e=download" -o "search.ta'
-                     'r.gz" -L')
+APACHE_NUTCH_TAR_URL = posixpath.join(PACKAGES_URL,
+                                      'apache-nutch-1.10-src''.tar.gz')
+NUTCH_SITE_URL = posixpath.join(PACKAGES_URL, 'nutch-site.xml')
+CRAWLED_URL = posixpath.join(PACKAGES_URL, 'crawl.tar.gz')
+SOLR_TAR_URL = posixpath.join(PACKAGES_URL, 'solr-5.2.1.tgz')
+SCHEMA_URL = posixpath.join(PACKAGES_URL, 'schema.xml')
+FABAN_TAR_URL = posixpath.join(PACKAGES_URL, 'faban-kit-latest.tar.gz')
+SEARCH_DRIVER_URL = posixpath.join(PACKAGES_URL, 'search.tar.gz')
 
 java_home = ''
 
@@ -165,16 +81,25 @@ def Prepare(benchmark_spec):
     vm.Install('lsof')
     vm.Install('curl')
     vm.Install('wget')
-    vm.RobustRemoteCommand('mkdir -p {0} &&'
-                           'cd {0} && '
-                           '{2} && '
-                           'tar -C {0} -zxf solr.tar.gz && '
-                           '{3} && '
-                           'cp schema.xml {1}/server/solr/configsets/'
-                           'basic_configs/conf/'.format(
-                               CLOUDSUITE_WEB_SEARCH_DIR,
-                               SOLR_HOME_DIR, SOLR_TAR_URL,
-                               SCHEMA_URL))
+    vm.RobustRemoteCommand('mkdir -p {0} && ')
+  vms[1].RobustRemoteCommand('cd {0} && '
+                             'wget -O solr.tar.gz {2} && '
+                             'tar -C {0} -zxf solr.tar.gz && '
+                             'wget {3} && '
+                             'cp schema.xml {1}/server/solr/configsets/'
+                             'basic_configs/conf/'.format(
+                                 CLOUDSUITE_WEB_SEARCH_DIR,
+                                 SOLR_HOME_DIR, SOLR_TAR_URL,
+                                 SCHEMA_URL))
+  vms[2].RobustRemoteCommand('cd {0} && '
+                             'wget -O solr.tar.gz {2} && '
+                             'tar -C {0} -zxf solr.tar.gz && '
+                             'wget {3} && '
+                             'cp schema.xml {1}/server/solr/configsets/'
+                             'basic_configs/conf/'.format(
+                                 CLOUDSUITE_WEB_SEARCH_DIR,
+                                 SOLR_HOME_DIR, SOLR_TAR_URL,
+                                 SCHEMA_URL))
   vms[1].RobustRemoteCommand('cd {0} && '
                              'export PATH=$PATH:/usr/sbin && '
                              'bin/solr start -cloud && '
@@ -195,9 +120,9 @@ def Prepare(benchmark_spec):
   time.sleep(20)
   vms[0].RobustRemoteCommand('cd {3} && '
                              'export JAVA_HOME={6} && '
-                             '{4} && '
+                             'wget -O apache-nutch-src.tar.gz {4} && '
                              'tar -C {3} -xzf apache-nutch-src.tar.gz && '
-                             '{1} && '
+                             'wget {1} && '
                              'cp nutch-site.xml {0}/conf/ && '
                              'cd {0} && '
                              'sed -i "/<value>http/c\\<value>http://{5}:'
@@ -205,7 +130,7 @@ def Prepare(benchmark_spec):
                              'conf/nutch-site.xml && '
                              'ant && '
                              'cd runtime/local && '
-                             '{2}  && '
+                             'wget {2}  && '
                              'tar -zxf crawl.tar.gz && '
                              'bin/nutch index crawl/crawldb/ -linkdb '
                              'crawl/linkdb/ -dir crawl/segments/'.format(
@@ -215,9 +140,9 @@ def Prepare(benchmark_spec):
                                  java_home))
   vms[0].RemoteCommand('cd {0} && '
                        'export JAVA_HOME={7} && '
-                       '{1} && '
+                       'wget {1} && '
                        'tar -C {0} -xzf faban-kit-latest.tar.gz && '
-                       '{3} && '
+                       'wget {3} && '
                        'tar -C {2} -xzf search.tar.gz && '
                        'cd {2} && '
                        'master/bin/startup.sh && '
