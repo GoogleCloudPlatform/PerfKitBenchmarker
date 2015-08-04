@@ -81,7 +81,8 @@ def Prepare(benchmark_spec):
     vm.Install('lsof')
     vm.Install('curl')
     vm.Install('wget')
-    vm.RobustRemoteCommand('mkdir -p {0} && ')
+    vm.RobustRemoteCommand('mkdir -p {0}'.format(
+                           CLOUDSUITE_WEB_SEARCH_DIR))
   vms[1].RobustRemoteCommand('cd {0} && '
                              'wget -O solr.tar.gz {2} && '
                              'tar -C {0} -zxf solr.tar.gz && '
