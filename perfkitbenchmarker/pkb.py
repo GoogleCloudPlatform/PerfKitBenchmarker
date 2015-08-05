@@ -317,7 +317,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       logging.exception('Error during benchmark %s', benchmark_name)
       # If the particular benchmark requests us to always call cleanup, do it
       # here.
-      if spec and spec.always_call_cleanup:
+      if (FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP] and spec and
+          spec.always_call_cleanup):
         DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
       raise
     finally:
