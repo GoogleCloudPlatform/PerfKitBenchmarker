@@ -1,0 +1,46 @@
+sysbench 0.5:  multi-threaded system evaluation benchmark
+
+Running the test with following options:
+Number of threads: 16
+Report intermediate results every 2 second(s)
+Initializing random number generator from timer.
+
+Random number generator seed is 0 and will be ignored
+
+
+Threads started!
+
+[   2s] threads: 16, tps: 526.38, reads: 7446.79, writes: 2105.52, response time: 210.67ms (99%), errors: 0.00, reconnects:  0.00
+[   4s] threads: 16, tps: 620.50, reads: 8678.45, writes: 2481.99, response time: 57.43ms (99%), errors: 0.00, reconnects:  0.00
+[   6s] threads: 16, tps: 636.00, reads: 8867.50, writes: 2544.00, response time: 45.10ms (99%), errors: 0.00, reconnects:  0.00
+[   8s] threads: 16, tps: 591.50, reads: 8307.02, writes: 2368.01, response time: 45.59ms (99%), errors: 0.00, reconnects:  0.00
+[  10s] threads: 16, tps: 579.50, reads: 8100.49, writes: 2316.00, response time: 55.70ms (99%), errors: 0.00, reconnects:  0.00
+[  12s] threads: 16, tps: 573.50, reads: 8023.56, writes: 2302.02, response time: 60.08ms (99%), errors: 0.00, reconnects:  0.00
+[  14s] threads: 16, tps: 567.00, reads: 8009.45, writes: 2288.99, response time: 59.96ms (99%), errors: 0.00, reconnects:  0.00
+[  16s] threads: 16, tps: 574.50, reads: 8040.51, writes: 2295.00, response time: 56.36ms (99%), errors: 0.00, reconnects:  0.00
+OLTP test statistics:
+    queries performed:
+        read:                            140000
+        write:                           40000
+        other:                           20000
+        total:                           200000
+    transactions:                        10000  (586.29 per sec.)
+    read/write requests:                 180000 (10553.27 per sec.)
+    other operations:                    20000  (1172.59 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+
+General statistics:
+    total time:                          17.0563s
+    total number of events:              10000
+    total time taken by event execution: 272.6053s
+    response time:
+         min:                                 18.31ms
+         avg:                                 27.26ms
+         max:                                313.50ms
+         approx.  99 percentile:              57.15ms
+
+Threads fairness:
+    events (avg/stddev):           625.0000/14.69
+    execution time (avg/stddev):   17.0378/0.01
+

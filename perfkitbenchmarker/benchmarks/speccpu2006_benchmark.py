@@ -55,6 +55,13 @@ flags.DEFINE_boolean('runspec_enable_32bit', default=False,
                      'instance types where 64-bit execution may be problematic '
                      ' - i.e. < 1.5-2GB/core)')
 
+flags.DEFINE_boolean('runspec_keep_partial_results', False,
+                     'speccpu will report an aggregate score even if some of '
+                     'the component tests failed with a "NR" status. If this '
+                     'flag is set to true, save the available results and '
+                     'mark metadata with partial=true. If unset, partial '
+                     'failures are treated as errors.')
+
 BENCHMARK_INFO = {'name': 'speccpu2006',
                   'description': 'Run Spec CPU2006',
                   'scratch_disk': True,
@@ -107,12 +114,15 @@ def Prepare(benchmark_spec):
                                              SPECCPU2006_TAR))
 
 
-def ExtractScore(stdout, vm):
+def ExtractScore(stdout, vm, keep_partial_results):
   """Exact the Spec (int|fp) score from stdout.
 
   Args:
     stdout: stdout from running RemoteCommand.
     vm: The vm instance where Spec CPU2006 was run.
+    keep_partial_results: A boolean indicating whether partial results should
+        be extracted in the event that not all benchmarks were successfully
+        run. See the "runspec_keep_partial_results" flag for more info.
 
   Sample input for SPECint:
       ...
@@ -180,21 +190,43 @@ def ExtractScore(stdout, vm):
     if match:
       assert in_result_section
       spec_name = str(match.group(1))
-      spec_score = float(match.group(2))
+      try:
+        spec_score = float(match.group(2))
+      except ValueError:
+        # Partial results may get reported as '--' instead of a number.
+        spec_score = None
       in_result_section = False
       # remove the final SPEC(int|fp) score, which has only 2 columns.
       result_section.pop()
 
   metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus}
-  results.append(sample.Sample(spec_name, spec_score, '', metadata))
+
+  missing_results = []
 
   for benchmark in result_section:
-    # ignore failed runs
-    if re.search('NR', benchmark):
+    # Skip over failed runs, but count them since they make the overall
+    # result invalid.
+    if 'NR' in benchmark:
+      logging.warning('SpecCPU2006 missing result: %s', benchmark)
+      missing_results.append(str(benchmark.split()[0]))
       continue
     # name, ref_time, time, score, misc
     name, _, _, score, _ = benchmark.split()
     results.append(sample.Sample(str(name), float(score), '', metadata))
+
+  if spec_score is None:
+    missing_results.append(spec_name)
+
+  if missing_results:
+    if keep_partial_results:
+      metadata['partial'] = 'true'
+      metadata['missing_results'] = ','.join(missing_results)
+    else:
+      raise errors.Benchmarks.RunError(
+          'speccpu2006: results missing, see log: ' + ','.join(missing_results))
+
+  if spec_score is not None:
+    results.append(sample.Sample(spec_name, spec_score, '', metadata))
 
   return results
 
@@ -223,7 +255,7 @@ def ParseOutput(vm):
   for log in log_files:
     stdout, _ = vm.RemoteCommand('cat %s/result/%s' % (vm.spec_dir, log),
                                  should_log=True)
-    results.extend(ExtractScore(stdout, vm))
+    results.extend(ExtractScore(stdout, vm, FLAGS.runspec_keep_partial_results))
 
   return results
 

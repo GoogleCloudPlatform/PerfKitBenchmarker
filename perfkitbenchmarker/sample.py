@@ -14,21 +14,29 @@
 """A performance sample class."""
 
 import collections
+PERCENTILES_LIST = [1, 5, 50, 90, 99, 99.9]
 
 _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata'
 
 
 def PercentileCalculator(numbers):
+  """Computes percentiles, stddev and mean on a set of numbers
+
+  Args:
+    numbers: The set of numbers to compute percentiles for.
+
+  Returns:
+    A dictionary of percentiles.
+  """
   numbers_sorted = sorted(numbers)
   count = len(numbers_sorted)
   total = sum(numbers_sorted)
   result = {}
-  result['p1'] = numbers_sorted[int(count * 0.01)]
-  result['p5'] = numbers_sorted[int(count * 0.05)]
-  result['p50'] = numbers_sorted[int(count * 0.5)]
-  result['p90'] = numbers_sorted[int(count * 0.9)]
-  result['p99'] = numbers_sorted[int(count * 0.99)]
-  result['p99.9'] = numbers_sorted[int(count * 0.999)]
+  for percentile in PERCENTILES_LIST:
+    percentile_string = 'p%s' % str(percentile)
+    result[percentile_string] = numbers_sorted[
+        int(count * float(percentile) / 100)]
+
   if count > 0:
     average = total / float(count)
     result['average'] = average

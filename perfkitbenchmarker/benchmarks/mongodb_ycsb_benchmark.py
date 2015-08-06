@@ -21,9 +21,11 @@ MongoDB homepage: http://www.mongodb.org/
 YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
+import functools
 import os
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import ycsb
 
 # See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
@@ -47,6 +49,24 @@ def _GetDataDir(vm):
   return os.path.join(vm.GetScratchDir(), 'mongodb-data')
 
 
+def _PrepareServer(vm):
+  """Installs MongoDB on the server."""
+  vm.Install('mongodb_server')
+  data_dir = _GetDataDir(vm)
+  vm.RemoteCommand('mkdir {0} && chmod a+rwx {0}'.format(data_dir))
+  vm.RemoteCommand(
+      "sudo sed -i -e '/bind_ip/ s/^/#/; s,^dbpath=.*,dbpath=%s,' %s" %
+      (data_dir,
+       vm.GetPathToConfig('mongodb_server')))
+  vm.RemoteCommand('sudo service %s restart' %
+                   vm.GetServiceName('mongodb_server'))
+
+
+def _PrepareClient(vm):
+  """Install YCSB on the client VM."""
+  vm.Install('ycsb')
+
+
 def Prepare(benchmark_spec):
   """Install MongoDB on one VM and YCSB on another.
 
@@ -56,22 +76,11 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   assert len(vms) == BENCHMARK_INFO['num_machines']
-  mongo_vm = vms[0]
+  mongo_vm, ycsb_vm = vms[:2]
 
-  # Install mongodb on the 1st machine.
-  mongo_vm.Install('mongodb_server')
-  data_dir = _GetDataDir(mongo_vm)
-  mongo_vm.RemoteCommand('mkdir {0} && chmod a+rwx {0}'.format(data_dir))
-  mongo_vm.RemoteCommand(
-      "sudo sed -i -e '/bind_ip/ s/^/#/; s,^dbpath=.*,dbpath=%s,' %s" %
-      (data_dir,
-       mongo_vm.GetPathToConfig('mongodb_server')))
-  mongo_vm.RemoteCommand('sudo service %s restart' %
-                         mongo_vm.GetServiceName('mongodb_server'))
-
-  # Setup YCSB load generator on the 2nd machine.
-  ycsb_vm = vms[1]
-  ycsb_vm.Install('ycsb')
+  vm_util.RunThreaded((lambda f: f()),
+                      [functools.partial(_PrepareServer, mongo_vm),
+                       functools.partial(_PrepareClient, ycsb_vm)])
 
 
 def Run(benchmark_spec):

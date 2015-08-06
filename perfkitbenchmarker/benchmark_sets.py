@@ -32,9 +32,9 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: [
             'aerospike', 'cassandra_stress', 'object_storage_service',
             'cluster_boot', 'copy_throughput', 'coremark', 'fio',
-            'hadoop_terasort', 'hpcc', 'iperf', 'mesh_network', 'mongodb',
-            'netperf', 'ping', 'redis', 'speccpu2006',
-            'block_storage_workload', 'sysbench_oltp', 'unixbench']
+            'hadoop_terasort', 'hpcc', 'iperf', 'mesh_network', 'mongodb_ycsb',
+            'netperf', 'ping', 'redis', 'speccpu2006', 'block_storage_workload',
+            'sysbench_oltp', 'unixbench']
     },
     'arm_set': {
         MESSAGE: 'ARM benchmark set.',
@@ -50,7 +50,7 @@ BENCHMARK_SETS = {
     },
     'centurylinkcloud_set': {
         MESSAGE: 'This benchmark set is supported on CenturyLink Cloud.',
-        BENCHMARK_LIST: ['hpcc', 'unixbench', 'sysbench_oltp', 'mongodb',
+        BENCHMARK_LIST: ['hpcc', 'unixbench', 'sysbench_oltp', 'mongodb_ycsb',
                          'mesh_network', 'ping', 'iperf', 'redis',
                          'cassandra_stress', 'copy_throughput']
     },
@@ -73,7 +73,7 @@ BENCHMARK_SETS = {
     'google_set': {
         MESSAGE: ('This benchmark set is maintained by Google Cloud Platform '
                   'Performance Team.'),
-        BENCHMARK_LIST: [STANDARD_SET, 'oldisim', 'mongodb_ycsb']
+        BENCHMARK_LIST: [STANDARD_SET, 'oldisim']
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',
