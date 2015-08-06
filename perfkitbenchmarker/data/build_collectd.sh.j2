@@ -1,0 +1,169 @@
+#!/bin/bash
+
+# Copyright 2015 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Builds collectd from source on a VM.
+# Supports Debian and RHEL-based systems.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o xtrace
+
+readonly URL='{{ collectd_url }}'
+readonly BUILD_DIR='{{ build_dir }}'
+readonly PREFIX='{{ root_dir }}'
+readonly CSV_DIR='{{ csv_dir }}'
+readonly INTERVAL='{{ interval }}'
+
+function install_deps_debian() {
+  export DEBIAN_FRONTEND=noninteractive
+  sudo aptitude install -q -y \
+    autoconf \
+    bison \
+    flex \
+    libtool \
+    pkg-config \
+    build-essential
+}
+
+function install_deps_rhel() {
+  sudo yum groupinstall -yq 'Development Tools'
+  sudo yum install -yq libtool-ltdl-devel
+}
+
+function install_deps() {
+  # Supports CentOS, RHEL, Ubuntu, Debian
+  if command -v yum; then
+    install_deps_rhel
+  elif command -v apt-get; then
+    install_deps_debian
+  else
+    >&2 echo "Unsupported OS? Neither yum nor apt-get found."
+    exit 1
+  fi
+}
+
+function build_collectd() {
+  mkdir $BUILD_DIR
+  pushd $BUILD_DIR
+  curl -L $URL | tar --strip-components 1 -xzf -
+  ./build.sh
+  ./configure --prefix "$PREFIX" \
+    --disable-perl \
+    --without-perl-bindings \
+    --disable-java \
+    --disable-rrdtool
+  make && make install
+  popd
+  rm -rf $BUILD_DIR
+}
+
+function configure_collectd() {
+  # Add a collectd configuration script.
+  # All values are their defaults, other than:
+  #   * Interval (set by flag)
+  #   * CSV plugin: loaded, and configured to write to $CSV_DIR.
+  # See:
+  # https://github.com/collectd/collectd/blob/collectd-5.5.0/src/collectd.conf.in
+  # for a more verbose description.
+  cat > $PREFIX/etc/collectd.conf << EOF
+Interval   $INTERVAL
+LoadPlugin syslog
+
+LoadPlugin cpu
+LoadPlugin csv
+LoadPlugin df
+LoadPlugin disk
+LoadPlugin entropy
+LoadPlugin ethstat
+LoadPlugin interface
+LoadPlugin ipc
+LoadPlugin irq
+LoadPlugin load
+LoadPlugin memory
+LoadPlugin processes
+LoadPlugin swap
+
+<Plugin cpu>
+    ReportByCpu true
+    ReportByState true
+    ValuesPercentage false
+</Plugin>
+<Plugin csv>
+    DataDir "$CSV_DIR"
+    StoreRates true
+</Plugin>
+<Plugin df>
+    # ignore rootfs; else, the root file-system would appear twice, causing
+    # one of the updates to fail and spam the log
+    FSType rootfs
+    # ignore the usual virtual / temporary file-systems
+    FSType sysfs
+    FSType proc
+    FSType devtmpfs
+    FSType devpts
+    FSType tmpfs
+    FSType fusectl
+    FSType cgroup
+    IgnoreSelected true
+</Plugin>
+
+<Plugin disk>
+    Disk "/^[hs]d[a-f][0-9]?$/"
+    IgnoreSelected false
+    UseBSDName false
+    UdevNameAttr "DEVNAME"
+</Plugin>
+
+<Plugin ethstat>
+    Interface "eth0"
+    Map "rx_csum_offload_errors" "if_rx_errors" "checksum_offload"
+    Map "multicast" "if_multicast"
+    MappedOnly false
+</Plugin>
+
+<Plugin interface>
+    Interface "eth0"
+    IgnoreSelected false
+</Plugin>
+
+<Plugin irq>
+    Irq 7
+    Irq 8
+    Irq 9
+    IgnoreSelected true
+</Plugin>
+
+<Plugin load>
+    ReportRelative true
+</Plugin>
+EOF
+}
+
+start_collectd() {
+  # -t checks configuration
+  if ! $PREFIX/sbin/collectd -t; then
+    2>&1 echo "collectd configuration parsing failed!"
+    exit 1
+  fi
+  $PREFIX/sbin/collectd
+}
+
+# Build and start.
+install_deps
+build_collectd
+configure_collectd
+start_collectd
