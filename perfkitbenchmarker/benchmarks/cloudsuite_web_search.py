@@ -22,7 +22,6 @@ the operations completed per second and the minimum, maximum,
 average, 90th, and 99th response times.
 """
 
-import logging
 import posixpath
 import re
 import time
@@ -44,8 +43,8 @@ NUTCH_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'apache-nutch-1.10')
 FABAN_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'faban')
 FABAN_OUTPUT_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'outputFaban')
 SOLR_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'solr-5.2.1')
+
 PACKAGES_URL = ('http://parsa.epfl.ch/cloudsuite/software/perfkit/web_search')
-# following variables should be changed to URLs and used with wget command
 APACHE_NUTCH_TAR_URL = posixpath.join(PACKAGES_URL,
                                       'apache-nutch-1.10-src''.tar.gz')
 NUTCH_SITE_URL = posixpath.join(PACKAGES_URL, 'nutch-site.xml')
@@ -198,14 +197,22 @@ def Run(benchmark_spec):
   stdout, _ = vms[0].RemoteCommand('cat {0}/*/summary.xml'.format(
                                    FABAN_OUTPUT_DIR))
   results = []
+  ops_per_sec = re.findall(r'\<metric unit="ops/sec"\>(\d+\.?\d*)', stdout)
+  sum_ops_per_sec = 0.0
+  for value in ops_per_sec:
+      sum_ops_per_sec += float(value)
+  results.append(sample.Sample('Operations per second', sum_ops_per_sec,
+                               'ops/s'))
   p90 = re.findall(r'\<p90th\>(\d+\.?\d*)', stdout)
   sum_p90 = 0.0
   for value in p90:
       sum_p90 += float(value)
-  sum_p90 *= 100
-  results.append(sample.Sample('p90th', sum_p90, '%'))
-
-  logging.info('CloudSuite Web Search Results:')
+  results.append(sample.Sample('90th percentile latency', sum_p90, 's'))
+  p99 = re.findall(r'\<p99th\>(\d+\.?\d*)', stdout)
+  sum_p99 = 0.0
+  for value in p99:
+      sum_p99 += float(value)
+  results.append(sample.Sample('99th percentile latency', sum_p99, 's'))
 
   return results
 
