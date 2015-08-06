@@ -229,18 +229,18 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase):
 
     vm = DummyVM()
 
-    samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECINT, vm)
+    samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECINT, vm, False)
     self.assertEqual(samples, EXPECTED_RESULT_SPECINT)
 
-    samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECFP, vm)
+    samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECFP, vm, False)
     self.assertEqual(samples, EXPECTED_RESULT_SPECFP)
 
     # By default, incomplete results result in error.
     with self.assertRaises(errors.Benchmarks.RunError):
-      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD1, vm)
+      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD1, vm, False)
 
     with self.assertRaises(errors.Benchmarks.RunError):
-      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD2, vm)
+      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD2, vm, False)
 
     # Now use keep_partial_results
     samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD1, vm, True)

@@ -114,13 +114,15 @@ def Prepare(benchmark_spec):
                                              SPECCPU2006_TAR))
 
 
-def ExtractScore(stdout, vm,
-                 keep_partial_results=FLAGS.runspec_keep_partial_results):
+def ExtractScore(stdout, vm, keep_partial_results):
   """Exact the Spec (int|fp) score from stdout.
 
   Args:
     stdout: stdout from running RemoteCommand.
     vm: The vm instance where Spec CPU2006 was run.
+    keep_partial_results: A boolean indicating whether partial results should
+        be extracted in the event that not all benchmarks were successfully
+        run. See the "runspec_keep_partial_results" flag for more info.
 
   Sample input for SPECint:
       ...
@@ -253,7 +255,7 @@ def ParseOutput(vm):
   for log in log_files:
     stdout, _ = vm.RemoteCommand('cat %s/result/%s' % (vm.spec_dir, log),
                                  should_log=True)
-    results.extend(ExtractScore(stdout, vm))
+    results.extend(ExtractScore(stdout, vm, FLAGS.runspec_keep_partial_results))
 
   return results
 
