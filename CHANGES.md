@@ -1,3 +1,44 @@
+# v0.19.0
+
+* New features:
+  * New mysql_service benchmark. This benchmarks a cloud's managed MySQL
+    offering using sysbench. (GH-387)
+
+* Enhancements:
+  * Added option to disable iptables if your image requires it (GH-361)
+  * mongodb_ycsb now installs client and server dependencies in parallel,
+    speeding up the end to end run time for the benchmark. (GH-402)
+  * The netperf and iperf benchmarks now only add firewall rules if they are
+    running over external ips. (GH-382)
+
+* Bugfixes and maintenance updates:
+  * The iperf package will now check the 'redhat-release' version and install
+    directly from an RPM (this enables iperf to be run on Scientific Linux 6.x).
+    (GH-392, thanks to @Vukasin92)
+  * Fix bug where VM temporary directory wasn't created before use on RHEL based
+    static VMs. (GH-389, thanks to @Vukasin92)
+  * netperf package url changed since version 2.6.0 is now in archive/ (GH-390)
+  * Fixed DigitalOcean package installation error (GH-396)
+  * The object_storage_service benchmark no longer copies gcloud logs as part of copying
+    the gcloud configuration to the VM. (GH-383)
+  * Correctly cleanup network resources when run stages are used. (GH-386)
+  * Added timeout to apt-get update command because it will occasionally hang.
+    (GH-391)
+  * Update copy_throughput benchmark so it works with
+    ContainerizedVirtualMachines. (GH-408)
+  * Install python inside ContainerizedVirtualMachines so that
+    RobustRemoteCommand works on them. (GH-404)
+
+* Benchmark-specific changes:
+  * speccpu2006 will no longer report results if the run was incomplete. This
+    behavior can be modified with a flag. (GH-397)
+  * The mongodb benchmark has been completely removed since mongodb_ycsb
+    replaced it with greater functionality. (GH-403)
+  * The fio benchmark now has more latency percentiles included in sample
+    metadata. (GH-399)
+  * Cassandra version bumped up to 2.0.16 since 2.0.0 has known issues (GH-393)
+
+
 # v0.18.0
 
 (See also https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues/369
