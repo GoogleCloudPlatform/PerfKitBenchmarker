@@ -14,11 +14,11 @@
 """Class to represent a GCE Virtual Machine object.
 
 Zones:
-run 'gcutil listzones'
+run 'gcloud compute zones list'
 Machine Types:
-run 'gcutil listmachinetypes'
+run 'gcloud compute machine-types list'
 Images:
-run 'gcutil listimages'
+run 'gcloud compute images list'
 
 All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
