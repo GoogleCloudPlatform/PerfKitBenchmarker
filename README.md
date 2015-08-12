@@ -356,10 +356,15 @@ export OS_PASSWORD=<your_rackspace_uk_API_key>
 export OS_TENANT_NAME=<your_rackspace_uk_account_number>
 ```
 *Tip*: Put these variables in a file, and simple source them to your shell with
-`source <filename>` 
+`source <filename>`
 
 **Note:** Not all flavors are supported on every region. Always check first
 if the flavor is supported in the region.
+
+## Juju configuration and benchmarking
+
+PerfKitBenchmarker uses Juju, a system for modeling, orchestrating, and scaling service-oriented architectures in the cloud, containers, or physical hardware. Please see the [Juju Getting Started Guide](https://jujucharms.com/docs/stable/getting-started) for instructions on installing and configuring Juju.
+
 
 ## Create and Configure a `.boto` file for object storage benchmarks
 
@@ -444,6 +449,11 @@ $ ./pkb.py --cloud=Kubernetes --benchmarks=iperf --kubectl=/path/to/kubectl --ku
 ## Example run on Rackspace
 ```
 $ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
+```
+
+## Example run on Juju
+```bash
+$ ./pkb.py --cloud=Juju --controller=amazon --model=mysql.yaml --benchmarks=juju --action=mysql-benchmark:oltp  --action_params="prepare=False cleanup=False max-time=60"
 ```
 
 HOW TO RUN WINDOWS BENCHMARKS
