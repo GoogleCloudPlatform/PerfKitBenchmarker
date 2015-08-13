@@ -165,9 +165,18 @@ def Prepare(benchmark_spec):
 
   """
 
-  if (FLAGS.fio_jobfile and
-      (FLAGS.against_device or FLAGS.device_fill_size or FLAGS.io_depths)):
-    logging.warning('Fio job file specified. Ignoring other fio options.')
+  if FLAGS.fio_jobfile:
+    ignored_flags = []
+    if FLAGS.against_device:
+      ignored_flags.append('--against_device')
+    if FLAGS.device_fill_size != '100%':
+      ignored_flags.append('--device_fill_size')
+    if FLAGS.io_depths != '1':
+      ignored_flags.append('--io_depths')
+
+    if ignored_flags:
+      logging.warning('Fio job file specified. Ignoring options "%s"',
+                      ', '.join(ignored_flags))
   if FLAGS.device_fill_size and not FLAGS.against_device:
     logging.warning('--device_fill_size has no effect without --against_device')
 
@@ -175,9 +184,10 @@ def Prepare(benchmark_spec):
   logging.info('FIO prepare on %s', vm)
   vm.Install('fio')
 
-  mount_point = vm.scratch_disks[0].mount_point
-  logging.info('Umount scratch disk on %s at %s', vm, mount_point)
-  vm.RemoteCommand('sudo umount %s' % mount_point)
+  if FLAGS.against_device and not FLAGS.fio_jobfile:
+    mount_point = vm.scratch_disks[0].mount_point
+    logging.info('Umount scratch disk on %s at %s', vm, mount_point)
+    vm.RemoteCommand('sudo umount %s' % mount_point)
 
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
