@@ -147,10 +147,10 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
   # initialized to use the PkbLogFilter, and it is used to derive the
   # ThreadLogContext of other threads started through vm_util.RunThreaded.
   SetThreadLogContext(ThreadLogContext())
-  logger.addFilter(PkbLogFilter())
 
   # Add handler to output to stderr.
   handler = logging.StreamHandler()
+  handler.addFilter(PkbLogFilter())
   handler.setLevel(stderr_log_level)
   if colorlog is not None and sys.stderr.isatty():
     formatter = colorlog.ColoredFormatter(stderr_color_format, reset=True)
@@ -162,6 +162,7 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
   # Add handler for output to log file.
   logging.info('Verbose logging to: %s', log_path)
   handler = logging.FileHandler(filename=log_path)
+  handler.addFilter(PkbLogFilter())
   handler.setLevel(file_log_level)
   handler.setFormatter(logging.Formatter(file_format))
   logger.addHandler(handler)
