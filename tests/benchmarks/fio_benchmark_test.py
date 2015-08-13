@@ -26,14 +26,6 @@ class TestGetIODepths(unittest.TestCase):
   def testIntegerRange(self):
     self.assertEqual(list(fio_benchmark.GetIODepths('3-5')), [3, 4, 5])
 
-  def testBadValue(self):
-    with self.assertRaises(ValueError):
-      fio_benchmark.GetIODepths('foo')
-
-  def testBadRange(self):
-    with self.assertRaises(ValueError):
-      fio_benchmark.GetIODepths('3-foo')
-
 
 if __name__ == '__main__':
   unittest.main()

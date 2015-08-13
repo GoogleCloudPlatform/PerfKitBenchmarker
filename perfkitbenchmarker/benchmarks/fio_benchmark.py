@@ -20,14 +20,18 @@ Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 
 import json
 import logging
-import os
+import posixpath
+import re
+
+import jinja2
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import fio
 
 LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
-REMOTE_JOB_FILE_PATH = '~/fio.job'
+REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
+DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
 
 
 FLAGS = flags.FLAGS
@@ -51,13 +55,28 @@ flags.DEFINE_string('io_depths', '1',
                     'like --io_depths=1, or a range, like --io_depths=1-4')
 
 
+IODEPTHS_REGEXP = re.compile(r'(\d+)(-(\d+))?')
+
+
+def IODepthsValidator(string):
+  match = IODEPTHS_REGEXP.match(string)
+  return match and match.end() == len(string) and int(match.group(1)) > 0
+
+
+flags.RegisterValidator('io_depths',
+                        IODepthsValidator,
+                        message='--io_depths must be an integer '
+                                'or a range of integers, all > 0')
+
+
 BENCHMARK_INFO = {'name': 'fio',
                   'description': 'Runs fio in sequential, random, read '
                                  'and write modes.',
                   'scratch_disk': True,
                   'num_machines': 1}
 
-GLOBALS_TEMPLATE = """
+
+JOB_FILE_TEMPLATE = """
 [global]
 ioengine=libaio
 invalidate=1
@@ -65,20 +84,21 @@ blocksize=4k
 direct=1
 runtime=10m
 time_based
-filename={filename}
+filename={{filename}}
 do_verify=0
 verify_fatal=0
 randrepeat=0
-size={size}
+size={{size}}
 
-"""
-
-SINGLE_JOB_TEMPLATE = """
-[{rwkind}-io-depth-{iodepth}]
+{% for rwkind in ('randread', 'randwrite') %}
+{% for iodepth in iodepths %}
+[{{rwkind}}-io-depth-{{iodepth}}]
 stonewall
-rw={rwkind}
-iodepth={iodepth}
+rw={{rwkind}}
+iodepth={{iodepth}}
 
+{% endfor %}
+{% endfor %}
 """
 
 
@@ -95,15 +115,12 @@ def GetIODepths(io_depths):
     ValueError if FLAGS.io_depths doesn't follow a format it recognizes.
   """
 
-  try:
-    return [int(io_depths)]
-  except ValueError:
-    bounds = io_depths.split('-', 1)
+  match = IODEPTHS_REGEXP.match(io_depths)
 
-    if len(bounds) != 2:
-      raise ValueError
-
-    return range(int(bounds[0]), int(bounds[1]) + 1)
+  if match.group(2) is None:
+    return [int(match.group(1))]
+  else:
+    return range(int(match.group(1)), int(match.group(3)) + 1)
 
 
 def WriteJobFile(mount_point):
@@ -120,15 +137,13 @@ def WriteJobFile(mount_point):
     filename = mount_point
     size = FLAGS.device_fill_size
   else:
-    filename = os.path.join(mount_point, 'fio-temp-file')
+    filename = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
     size = '100G'
-  return (GLOBALS_TEMPLATE.format(filename=filename, size=size) +
-          '\n'.join((SINGLE_JOB_TEMPLATE.format(rwkind='randread',
-                                                iodepth=str(i))
-                     for i in GetIODepths(FLAGS.io_depths))) +
-          '\n'.join((SINGLE_JOB_TEMPLATE.format(rwkind='randwrite',
-                                                iodepth=str(i))
-                     for i in GetIODepths(FLAGS.io_depths))))
+
+  return jinja2.Template(JOB_FILE_TEMPLATE).render(
+      filename=filename,
+      size=size,
+      iodepths=GetIODepths(FLAGS.io_depths))
 
 
 def JobFileString(vm):
@@ -142,7 +157,8 @@ def JobFileString(vm):
   """
 
   if FLAGS.fio_jobfile:
-    return open(FLAGS.fio_jobfile, 'r').read()
+    with open(FLAGS.fio_jobfile, 'r') as jobfile:
+      return jobfile.read()
   else:
     return WriteJobFile(vm.scratch_disks[0].mount_point)
 
@@ -177,7 +193,7 @@ def Prepare(benchmark_spec):
     if ignored_flags:
       logging.warning('Fio job file specified. Ignoring options "%s"',
                       ', '.join(ignored_flags))
-  if FLAGS.device_fill_size and not FLAGS.against_device:
+  if FLAGS.device_fill_size != '100%' and not FLAGS.against_device:
     logging.warning('--device_fill_size has no effect without --against_device')
 
   vm = benchmark_spec.vms[0]
@@ -237,4 +253,4 @@ def Cleanup(benchmark_spec):
   if not FLAGS.against_device and not FLAGS.fio_jobfile:
     # If the user supplies their own job file, then they have to clean
     # up after themselves, because we don't know their temp file name.
-    vm.RemoveFile(vm.GetScratchDir() + 'fio-temp-file')
+    vm.RemoveFile(posixpath.join(vm.GetScratchDir(), DEFAULT_TEMP_FILE_NAME))
