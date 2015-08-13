@@ -146,79 +146,46 @@ def ParseResults(job_file, fio_json_result):
                           'KB/s', bw_metadata))
 
         # There is one sample whose metric is '<metric_name>:latency'
-        # with all of the latency percentiles in its metadata, and
-        # then ten samples whose metrics are
-        # '<metric_name>:latency:min' through
-        # '<metric_name>:latency:p99.99' that hold the individual
-        # latency numbers as values. This is for historical reasons.
-        lat_metadata = {
-            'min': job[mode]['clat']['min'],
-            'max': job[mode]['clat']['max'],
-            'stddev': job[mode]['clat']['stddev'],
-            'p1': job[mode]['clat']['percentile']['1.000000'],
-            'p5': job[mode]['clat']['percentile']['5.000000'],
-            'p10': job[mode]['clat']['percentile']['10.000000'],
-            'p20': job[mode]['clat']['percentile']['20.000000'],
-            'p30': job[mode]['clat']['percentile']['30.000000'],
-            'p40': job[mode]['clat']['percentile']['40.000000'],
-            'p50': job[mode]['clat']['percentile']['50.000000'],
-            'p60': job[mode]['clat']['percentile']['60.000000'],
-            'p70': job[mode]['clat']['percentile']['70.000000'],
-            'p80': job[mode]['clat']['percentile']['80.000000'],
-            'p90': job[mode]['clat']['percentile']['90.000000'],
-            'p95': job[mode]['clat']['percentile']['95.000000'],
-            'p99': job[mode]['clat']['percentile']['99.000000'],
-            'p99.5': job[mode]['clat']['percentile']['99.500000'],
-            'p99.9': job[mode]['clat']['percentile']['99.900000'],
-            'p99.95': job[mode]['clat']['percentile']['99.950000'],
-            'p99.99': job[mode]['clat']['percentile']['99.990000']}
-        lat_metadata.update(parameters)
+        # with all of the latency statistics in its metadata, and then
+        # ten samples whose metrics are '<metric_name>:latency:min'
+        # through '<metric_name>:latency:p99.99' that hold the
+        # individual latency numbers as values. This is for historical
+        # reasons.
+        lat_statistics = [
+            ('min', job[mode]['clat']['min']),
+            ('max', job[mode]['clat']['max']),
+            ('mean', job[mode]['clat']['mean']),
+            ('stddev', job[mode]['clat']['stddev']),
+            ('p1', job[mode]['clat']['percentile']['1.000000']),
+            ('p5', job[mode]['clat']['percentile']['5.000000']),
+            ('p10', job[mode]['clat']['percentile']['10.000000']),
+            ('p20', job[mode]['clat']['percentile']['20.000000']),
+            ('p30', job[mode]['clat']['percentile']['30.000000']),
+            ('p40', job[mode]['clat']['percentile']['40.000000']),
+            ('p50', job[mode]['clat']['percentile']['50.000000']),
+            ('p60', job[mode]['clat']['percentile']['60.000000']),
+            ('p70', job[mode]['clat']['percentile']['70.000000']),
+            ('p80', job[mode]['clat']['percentile']['80.000000']),
+            ('p90', job[mode]['clat']['percentile']['90.000000']),
+            ('p95', job[mode]['clat']['percentile']['95.000000']),
+            ('p99', job[mode]['clat']['percentile']['99.000000']),
+            ('p99.5', job[mode]['clat']['percentile']['99.500000']),
+            ('p99.9', job[mode]['clat']['percentile']['99.900000']),
+            ('p99.95', job[mode]['clat']['percentile']['99.950000']),
+            ('p99.99', job[mode]['clat']['percentile']['99.990000'])]
+
+        lat_metadata = parameters.copy()
+        for name, val in lat_statistics:
+          lat_metadata[name] = val
         samples.append(
             sample.Sample('%s:latency' % metric_name,
                           job[mode]['clat']['mean'],
                           'usec', lat_metadata))
 
-        samples.append(
-            sample.Sample('%s:latency:min' % metric_name,
-                          job[mode]['clat']['min'],
-                          'usec', parameters))
-        samples.append(
-            sample.Sample('%s:latency:max' % metric_name,
-                          job[mode]['clat']['max'],
-                          'usec', parameters))
-        samples.append(
-            sample.Sample('%s:latency:mean' % metric_name,
-                          job[mode]['clat']['mean'],
-                          'usec', parameters))
-        samples.append(
-            sample.Sample('%s:latency:stddev' % metric_name,
-                          job[mode]['clat']['stddev'],
-                          'usec', parameters))
-        # these tuples map the name we will record in our sample to
-        # the name fio gave us in the JSON results
-        latency_statistic_name_pairs = [
-            ('p1', '1.000000'),
-            ('p5', '5.000000'),
-            ('p10', '10.000000'),
-            ('p20', '20.000000'),
-            ('p30', '30.000000'),
-            ('p40', '40.000000'),
-            ('p50', '50.000000'),
-            ('p60', '60.000000'),
-            ('p70', '70.000000'),
-            ('p80', '80.000000'),
-            ('p90', '90.000000'),
-            ('p95', '95.000000'),
-            ('p99', '99.000000'),
-            ('p99.5', '99.500000'),
-            ('p99.9', '99.900000'),
-            ('p99.95', '99.950000'),
-            ('p99.99', '99.990000')]
-        for pkb_name, fio_name in latency_statistic_name_pairs:
+        for stat_name, stat_val in lat_statistics:
           samples.append(
-              sample.Sample('%s:latency:%s' % (metric_name, pkb_name),
-                            job[mode]['clat']['percentile'][fio_name],
-                            'usec', parameters))
+              sample.Sample('%s:latency:%s' % (metric_name, stat_name),
+                            stat_val, 'usec', parameters))
 
         samples.append(
             sample.Sample('%s:iops' % metric_name,
