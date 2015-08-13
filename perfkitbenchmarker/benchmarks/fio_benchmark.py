@@ -98,13 +98,12 @@ def GetIODepths(io_depths):
   try:
     return [int(io_depths)]
   except ValueError:
-    pass
+    bounds = io_depths.split('-', 1)
 
-  bounds = io_depths.split('-', 1)
-  if len(bounds) != 2:
-    raise ValueError
+    if len(bounds) != 2:
+      raise ValueError
 
-  return range(int(bounds[0]), int(bounds[1]) + 1)
+    return range(int(bounds[0]), int(bounds[1]) + 1)
 
 
 def WriteJobFile(mount_point):
