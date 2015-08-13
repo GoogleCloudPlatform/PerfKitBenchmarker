@@ -176,9 +176,9 @@ def Prepare(benchmark_spec):
   logging.info('FIO prepare on %s', vm)
   vm.Install('fio')
 
-  device_path = vm.scratch_disks[0].GetDevicePath()
-  logging.info('Umount scratch disk on %s at %s', vm, device_path)
-  vm.RemoteCommand('sudo umount %s' % vm.GetScratchDir())
+  mount_point = vm.scratch_disks[0].mount_point
+  logging.info('Umount scratch disk on %s at %s', vm, mount_point)
+  vm.RemoteCommand('sudo umount %s' % mount_point)
 
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:

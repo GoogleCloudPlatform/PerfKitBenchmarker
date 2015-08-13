@@ -14,7 +14,6 @@
 
 """Tests for fio_benchmark."""
 
-import os
 import unittest
 
 from perfkitbenchmarker.benchmarks import fio_benchmark
@@ -22,12 +21,10 @@ from perfkitbenchmarker.benchmarks import fio_benchmark
 
 class TestGetIODepths(unittest.TestCase):
   def testOneInteger(self):
-    self.assertEqual(list(fio_benchmark.GetIODepths('3')),
-                      [3])
+    self.assertEqual(list(fio_benchmark.GetIODepths('3')), [3])
 
   def testIntegerRange(self):
-    self.assertEqual(list(fio_benchmark.GetIODepths('3-5')),
-                      [3, 4, 5])
+    self.assertEqual(list(fio_benchmark.GetIODepths('3-5')), [3, 4, 5])
 
   def testBadValue(self):
     with self.assertRaises(ValueError):
