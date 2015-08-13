@@ -30,6 +30,10 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
+from perfkitbenchmarker.packages import solr521 as solr
+from perfkitbenchmarker.packages import nutch110 as nutch
+from perfkitbenchmarker.packages import faban
+
 FLAGS = flags.FLAGS
 
 BENCHMARK_INFO = {'name': 'cloudsuite_web_search',
@@ -39,26 +43,104 @@ BENCHMARK_INFO = {'name': 'cloudsuite_web_search',
 
 CLOUDSUITE_WEB_SEARCH_DIR = posixpath.join(vm_util.VM_TMP_DIR,
                                            'cloudsuite-web-search')
-NUTCH_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'apache-nutch-1.10')
-FABAN_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'faban')
+
 FABAN_OUTPUT_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'outputFaban')
-SOLR_HOME_DIR = posixpath.join(CLOUDSUITE_WEB_SEARCH_DIR, 'solr-5.2.1')
 
 PACKAGES_URL = ('http://parsa.epfl.ch/cloudsuite/software/perfkit/web_search')
-APACHE_NUTCH_TAR_URL = posixpath.join(PACKAGES_URL,
-                                      'apache-nutch-1.10-src''.tar.gz')
 NUTCH_SITE_URL = posixpath.join(PACKAGES_URL, 'nutch-site.xml')
 CRAWLED_URL = posixpath.join(PACKAGES_URL, 'crawl.tar.gz')
-SOLR_TAR_URL = posixpath.join(PACKAGES_URL, 'solr-5.2.1.tgz')
 SCHEMA_URL = posixpath.join(PACKAGES_URL, 'schema.xml')
-FABAN_TAR_URL = posixpath.join(PACKAGES_URL, 'faban-kit-latest.tar.gz')
 SEARCH_DRIVER_URL = posixpath.join(PACKAGES_URL, 'search.tar.gz')
 
-java_home = ''
+SOLR_PORT = 8983
+
+fw = None
 
 
 def GetInfo():
   return BENCHMARK_INFO
+
+
+def _PrepareSolr(solr_nodes):
+  """Starts and configures SolrCloud."""
+  stdout, _ = solr_nodes[0].RemoteCommand('cd {0} && '
+                                          'wget --quiet {1} && '
+                                          'cat schema.xml'.format(
+                                              CLOUDSUITE_WEB_SEARCH_DIR,
+                                              SCHEMA_URL))
+  for vm in solr_nodes:
+    vm.Install('solr521')
+    solr.SetSchema(vm, stdout.replace('"', '\\"'))
+    if vm == solr_nodes[0]:
+      solr.StartWithZookeeper(vm, fw, SOLR_PORT)
+    else:
+      solr.Start(vm, fw, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000)
+  solr.CreateCollection(solr_nodes[0], 'cloudsuite_web_search', len(solr_nodes))
+
+
+def _BuildIndex(indexer, solr_node):
+  """Downloads data and builds Solr index from it."""
+  indexer.Install('nutch110')
+  indexer.RemoteCommand('cd {0} && '
+                        'wget {1} && '
+                        'sed -i "/<value>http/c\\<value>http://{2}:'
+                        '{3}/solr/cloudsuite_web_search</value>" '
+                        'nutch-site.xml'.format(
+                            CLOUDSUITE_WEB_SEARCH_DIR,
+                            NUTCH_SITE_URL, solr_node.ip_address,
+                            SOLR_PORT))
+  stdout, _ = indexer.RemoteCommand('cd {0} && '
+                                    'cat nutch-site.xml'.format(
+                                        CLOUDSUITE_WEB_SEARCH_DIR))
+  nutch.ConfigureNutchSite(indexer, stdout.replace('"', '\\"'), solr_node,
+                           SOLR_PORT, 'cloudsuite_web_search')
+  indexer.RobustRemoteCommand('cd {0}/runtime/local && '
+                              'wget {1}  && '
+                              'export JAVA_HOME={2} && '
+                              'tar -zxf crawl.tar.gz && '
+                              'bin/nutch index crawl/crawldb/ -linkdb '
+                              'crawl/linkdb/ -dir crawl/segments/'.format(
+                                  nutch.NUTCH_HOME_DIR, CRAWLED_URL,
+                                  nutch.java_home))
+
+
+def _PrepareClient(client, solr_nodes):
+  """Prepares client machine in the benchmark."""
+  client.Install('faban')
+  faban.Start(client, fw)
+  client.RemoteCommand('cd {0} && '
+                       'wget {1} && '
+                       'tar -xzf search.tar.gz && '
+                       'sed -i "/faban.home/c\\faban.home={0}" '
+                       'search/build.properties && '
+                       'sed -i "/ant.home/c\\ant.home='
+                       '/usr/share/ant" search/build.properties && '
+                       'sed -i "/faban.url/c\\faban.url='
+                       'http://localhost:9980/" search/build.properties && '
+                       'cd search && '
+                       'sed -i "/<ipAddress1>/c\<ipAddress1>{2}'
+                       '</ipAddress1>" deploy/run.xml && '
+                       'sed -i "/<ipAddress2>/c\<ipAddress2>{3}'
+                       '</ipAddress2>" deploy/run.xml && '
+                       'sed -i "/<logFile>/c\<logFile>{0}/logs/queries.out'
+                       '</logFile>" deploy/run.xml && '
+                       'sed -i "/<outputDir>/c\<outputDir>{4}'
+                       '</outputDir>" deploy/run.xml && '
+                       'sed -i "/<termsFile>/c\<termsFile>{0}'
+                       '/search/src/sample/searchdriver/terms_en.out'
+                       '</termsFile>" deploy/run.xml && '
+                       'sed -i "/<fa:rampUp>/c\<fa:rampUp>100'
+                       '</fa:rampUp>" deploy/run.xml && '
+                       'sed -i "/<fa:rampDown>/c\<fa:rampDown>100'
+                       '</fa:rampDown>" deploy/run.xml && '
+                       'sed -i "/<fa:steadyState>/c\<fa:steadyState>600'
+                       '</fa:steadyState>" deploy/run.xml && '
+                       'export JAVA_HOME={5} && '
+                       'ant deploy'.format(
+                           faban.FABAN_HOME_DIR, SEARCH_DRIVER_URL,
+                           solr_nodes[0].ip_address, solr_nodes[1].ip_address,
+                           FABAN_OUTPUT_DIR, faban.java_home))
+  time.sleep(20)
 
 
 def Prepare(benchmark_spec):
@@ -68,114 +150,16 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  global java_home
+  global fw
   vms = benchmark_spec.vms
   fw = benchmark_spec.firewall
-  vms[0].Install('ant')
   for vm in vms:
-    fw.AllowPort(vm, 8983)
-    fw.AllowPort(vm, 9983)
-    fw.AllowPort(vm, 9980)
-    vm.Install('openjdk7')
-    vm.Install('lsof')
-    vm.Install('curl')
     vm.Install('wget')
-    vm.RobustRemoteCommand('mkdir -p {0}'.format(
-                           CLOUDSUITE_WEB_SEARCH_DIR))
-  vms[1].RobustRemoteCommand('cd {0} && '
-                             'wget -O solr.tar.gz {2} && '
-                             'tar -C {0} -zxf solr.tar.gz && '
-                             'wget {3} && '
-                             'cp schema.xml {1}/server/solr/configsets/'
-                             'basic_configs/conf/'.format(
-                                 CLOUDSUITE_WEB_SEARCH_DIR,
-                                 SOLR_HOME_DIR, SOLR_TAR_URL,
-                                 SCHEMA_URL))
-  vms[2].RobustRemoteCommand('cd {0} && '
-                             'wget -O solr.tar.gz {2} && '
-                             'tar -C {0} -zxf solr.tar.gz && '
-                             'wget {3} && '
-                             'cp schema.xml {1}/server/solr/configsets/'
-                             'basic_configs/conf/'.format(
-                                 CLOUDSUITE_WEB_SEARCH_DIR,
-                                 SOLR_HOME_DIR, SOLR_TAR_URL,
-                                 SCHEMA_URL))
-  vms[1].RobustRemoteCommand('cd {0} && '
-                             'export PATH=$PATH:/usr/sbin && '
-                             'bin/solr start -cloud && '
-                             'echo $?'.format(
-                                 SOLR_HOME_DIR))
-  java_home, _ = vms[0].RemoteCommand('readlink -f $(which java) | '
-                                      'cut -d "/" -f 1-5')
-  java_home = java_home.rstrip()
-  time.sleep(15)
-  vms[2].RobustRemoteCommand('cd {0} && '
-                             'bin/solr start -cloud -p 8983 -z {1}:9983'.format(
-                                 SOLR_HOME_DIR, vms[1].ip_address))
-  time.sleep(15)
-  vms[1].RobustRemoteCommand('cd {0} && '
-                             'bin/solr create_collection -c cloudsuite_web_'
-                             'search -d basic_configs -shards 2'.format(
-                                 SOLR_HOME_DIR))
-  time.sleep(20)
-  vms[0].RobustRemoteCommand('cd {3} && '
-                             'export JAVA_HOME={6} && '
-                             'wget -O apache-nutch-src.tar.gz {4} && '
-                             'tar -C {3} -xzf apache-nutch-src.tar.gz && '
-                             'wget {1} && '
-                             'cp nutch-site.xml {0}/conf/ && '
-                             'cd {0} && '
-                             'sed -i "/<value>http/c\\<value>http://{5}:'
-                             '8983/solr/cloudsuite_web_search</value>" '
-                             'conf/nutch-site.xml && '
-                             'ant && '
-                             'cd runtime/local && '
-                             'wget {2}  && '
-                             'tar -zxf crawl.tar.gz && '
-                             'bin/nutch index crawl/crawldb/ -linkdb '
-                             'crawl/linkdb/ -dir crawl/segments/'.format(
-                                 NUTCH_HOME_DIR, NUTCH_SITE_URL,
-                                 CRAWLED_URL, CLOUDSUITE_WEB_SEARCH_DIR,
-                                 APACHE_NUTCH_TAR_URL, vms[1].ip_address,
-                                 java_home))
-  vms[0].RemoteCommand('cd {0} && '
-                       'export JAVA_HOME={7} && '
-                       'wget {1} && '
-                       'tar -C {0} -xzf faban-kit-latest.tar.gz && '
-                       'wget {3} && '
-                       'tar -C {2} -xzf search.tar.gz && '
-                       'cd {2} && '
-                       'master/bin/startup.sh && '
-                       'sed -i "/faban.home/c\\faban.home={2}" '
-                       'search/build.properties && '
-                       'sed -i "/ant.home/c\\ant.home='
-                       '/usr/share/ant" search/build.properties && '
-                       'sed -i "/faban.url/c\\faban.url='
-                       'http://localhost:9980/" search/build.properties && '
-                       'cd search && '
-                       'ant deploy && '
-                       'sed -i "/<ipAddress1>/c\<ipAddress1>{4}'
-                       '</ipAddress1>" deploy/run.xml && '
-                       'sed -i "/<ipAddress2>/c\<ipAddress2>{5}'
-                       '</ipAddress2>" deploy/run.xml && '
-                       'sed -i "/<logFile>/c\<logFile>{2}/logs/queries.out'
-                       '</logFile>" deploy/run.xml && '
-                       'sed -i "/<outputDir>/c\<outputDir>{6}'
-                       '</outputDir>" deploy/run.xml && '
-                       'sed -i "/<termsFile>/c\<termsFile>{2}'
-                       '/search/src/sample/searchdriver/terms_en.out'
-                       '</termsFile>" deploy/run.xml && '
-                       'sed -i "/<fa:rampUp>/c\<fa:rampUp>10'
-                       '</fa:rampUp>" deploy/run.xml && '
-                       'sed -i "/<fa:rampDown>/c\<fa:rampDown>10'
-                       '</fa:rampDown>" deploy/run.xml && '
-                       'sed -i "/<fa:steadyState>/c\<fa:steadyState>60'
-                       '</fa:steadyState>" deploy/run.xml'.format(
-                           CLOUDSUITE_WEB_SEARCH_DIR, FABAN_TAR_URL,
-                           FABAN_HOME_DIR, SEARCH_DRIVER_URL,
-                           vms[1].ip_address, vms[2].ip_address,
-                           FABAN_OUTPUT_DIR, java_home))
-  time.sleep(20)
+    vm.RemoteCommand('mkdir -p {0}'.format(
+                     CLOUDSUITE_WEB_SEARCH_DIR))
+  _PrepareSolr(vms[1:])
+  _BuildIndex(vms[0], vms[1])
+  _PrepareClient(vms[0], vms[1:])
 
 
 def Run(benchmark_spec):
@@ -188,30 +172,35 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  vms = benchmark_spec.vms
-  vms[0].RemoteCommand('cd {0} && '
-                       'export FABAN_HOME={0} && '
-                       'cd search && '
-                       'sh run.sh'.format(
-                           FABAN_HOME_DIR, FABAN_OUTPUT_DIR))
-  stdout, _ = vms[0].RemoteCommand('cat {0}/*/summary.xml'.format(
-                                   FABAN_OUTPUT_DIR))
+  client = benchmark_spec.vms[0]
+  client.RobustRemoteCommand('cd {0} && '
+                             'export FABAN_HOME={0} && '
+                             'cd search && '
+                             'sh run.sh'.format(
+                                 faban.FABAN_HOME_DIR))
+
+  def ParseOutput(client):
+    stdout, _ = client.RemoteCommand('cat {0}/*/summary.xml'.format(
+                                     FABAN_OUTPUT_DIR))
+    ops_per_sec = re.findall(r'\<metric unit="ops/sec"\>(\d+\.?\d*)', stdout)
+    sum_ops_per_sec = 0.0
+    for value in ops_per_sec:
+        sum_ops_per_sec += float(value)
+    p90 = re.findall(r'\<p90th\>(\d+\.?\d*)', stdout)
+    sum_p90 = 0.0
+    for value in p90:
+        sum_p90 += float(value)
+    p99 = re.findall(r'\<p99th\>(\d+\.?\d*)', stdout)
+    sum_p99 = 0.0
+    for value in p99:
+        sum_p99 += float(value)
+    return sum_ops_per_sec, sum_p90, sum_p99
+
   results = []
-  ops_per_sec = re.findall(r'\<metric unit="ops/sec"\>(\d+\.?\d*)', stdout)
-  sum_ops_per_sec = 0.0
-  for value in ops_per_sec:
-      sum_ops_per_sec += float(value)
+  sum_ops_per_sec, sum_p90, sum_p99 = ParseOutput(client)
   results.append(sample.Sample('Operations per second', sum_ops_per_sec,
                                'ops/s'))
-  p90 = re.findall(r'\<p90th\>(\d+\.?\d*)', stdout)
-  sum_p90 = 0.0
-  for value in p90:
-      sum_p90 += float(value)
   results.append(sample.Sample('90th percentile latency', sum_p90, 's'))
-  p99 = re.findall(r'\<p99th\>(\d+\.?\d*)', stdout)
-  sum_p99 = 0.0
-  for value in p99:
-      sum_p99 += float(value)
   results.append(sample.Sample('99th percentile latency', sum_p99, 's'))
 
   return results
@@ -225,13 +214,6 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms[0].RemoteCommand('cd {0} && '
-                       'export JAVA_HOME={1} && '
-                       'master/bin/shutdown.sh'.format(
-                           FABAN_HOME_DIR, java_home))
-  vms[1].RemoteCommand('cd {0} && '
-                       'bin/solr stop -p 8983'.format(
-                           SOLR_HOME_DIR))
-  vms[2].RemoteCommand('cd {0} && '
-                       'bin/solr stop -p 8983'.format(
-                           SOLR_HOME_DIR))
+  faban.Stop(vms[0])
+  solr.Stop(vms[1], SOLR_PORT)
+  solr.Stop(vms[2], SOLR_PORT)
