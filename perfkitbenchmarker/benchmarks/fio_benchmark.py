@@ -88,6 +88,8 @@ def Prepare(benchmark_spec):
     exit(1)
   if FLAGS.against_device:
     device_path = vm.scratch_disks[0].GetDevicePath()
+    logging.info('Umount scratch disk on %s at %s', vm, device_path)
+    vm.RemoteCommand('sudo umount %s' % vm.GetScratchDir())
     logging.info('Fill scratch disk on %s at %s', vm, device_path)
     command = (
         ('sudo %s --filename=%s --ioengine=libaio '
