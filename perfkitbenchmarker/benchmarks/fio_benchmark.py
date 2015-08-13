@@ -20,20 +20,21 @@ Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 
 import json
 import logging
+import os
 
-from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import fio
 
+LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
+REMOTE_JOB_FILE_PATH = '~/fio.job'
+
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('fio_benchmark_filename', 'fio_benchmark_file',
-                    'scratch file that fio will use')
-flags.DEFINE_string('fio_jobfile', 'fio.job', 'job file that fio will use')
-flags.DEFINE_integer('memory_multiple', 10,
-                     'size of fio scratch file compared to main memory size.')
+flags.DEFINE_string('fio_jobfile', None,
+                    'Job file that fio will use. Giving a custom job file '
+                    'overrides the other fio options.')
 flags.DEFINE_boolean('against_device', False,
                      'Test direct against scratch disk. If set True, will '
                      'create a modified job file in temp directory, '
@@ -45,6 +46,9 @@ flags.DEFINE_string('device_fill_size', '100%',
                     'represents the number of bytes to fill or a '
                     'percentage, which represents the percentage '
                     'of the device.')
+flags.DEFINE_string('io_depths', '1',
+                    'IO queue depths to run on. Can specify a single number, '
+                    'like --io_depths=1, or a range, like --io_depths=1-4')
 
 
 BENCHMARK_INFO = {'name': 'fio',
@@ -52,6 +56,96 @@ BENCHMARK_INFO = {'name': 'fio',
                                  'and write modes.',
                   'scratch_disk': True,
                   'num_machines': 1}
+
+GLOBALS_TEMPLATE = """
+[global]
+ioengine=libaio
+invalidate=1
+blocksize=4k
+direct=1
+runtime=10m
+time_based
+filename={filename}
+do_verify=0
+verify_fatal=0
+randrepeat=0
+size={size}
+
+"""
+
+SINGLE_JOB_TEMPLATE = """
+[{rwkind}-io-depth-{iodepth}]
+stonewall
+rw={rwkind}
+iodepth={iodepth}
+
+"""
+
+
+def GetIODepths(io_depths):
+  """Parse the io_depths parameter.
+
+  Args:
+    io_depths: a string in the format of the --io_depths flag.
+
+  Returns:
+    An iterable of integers.
+
+  Raises:
+    ValueError if FLAGS.io_depths doesn't follow a format it recognizes.
+  """
+
+  try:
+    return [int(io_depths)]
+  except ValueError:
+    pass
+
+  bounds = io_depths.split('-', 1)
+  if len(bounds) != 2:
+    raise ValueError
+
+  return range(int(bounds[0]), int(bounds[1]) + 1)
+
+
+def WriteJobFile(mount_point):
+  """Write a fio job file.
+
+  Args:
+    mount_point: the mount point of the disk we're testing against.
+
+  Returns:
+    The contents of a fio job file, as a string.
+  """
+
+  if FLAGS.against_device:
+    filename = mount_point
+    size = FLAGS.device_fill_size
+  else:
+    filename = os.path.join(mount_point, 'fio-temp-file')
+    size = '100G'
+  return (GLOBALS_TEMPLATE.format(filename=filename, size=size) +
+          '\n'.join((SINGLE_JOB_TEMPLATE.format(rwkind='randread',
+                                                iodepth=str(i))
+                     for i in GetIODepths(FLAGS.io_depths))) +
+          '\n'.join((SINGLE_JOB_TEMPLATE.format(rwkind='randwrite',
+                                                iodepth=str(i))
+                     for i in GetIODepths(FLAGS.io_depths))))
+
+
+def JobFileString(vm):
+  """Get the contents of our job file.
+
+  Args:
+    vm: the virtual_machine.BaseVirtualMachine that we will run on.
+
+  Returns:
+    A string containing the user's job file.
+  """
+
+  if FLAGS.fio_jobfile:
+    return open(FLAGS.fio_jobfile, 'r').read()
+  else:
+    return WriteJobFile(vm.scratch_disks[0].mount_point)
 
 
 def GetInfo():
@@ -61,53 +155,37 @@ def GetInfo():
 def Prepare(benchmark_spec):
   """Prepare the virtual machine to run FIO.
 
-     This includes installing fio, bc. and libaio1 and insuring that the
-     attached disk is large enough to support the fio benchmark.
+     This includes installing fio, bc, and libaio1 and insuring that
+     the attached disk is large enough to support the fio
+     benchmark. We also make sure the job file is always located at
+     the same path on the local machine.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
+
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
+
+  if (FLAGS.fio_jobfile and
+      (FLAGS.against_device or FLAGS.device_fill_size or FLAGS.io_depths)):
+    logging.warning('Fio job file specified. Ignoring other fio options.')
+  if FLAGS.device_fill_size and not FLAGS.against_device:
+    logging.warning('--device_fill_size has no effect without --against_device')
+
+  vm = benchmark_spec.vms[0]
   logging.info('FIO prepare on %s', vm)
   vm.Install('fio')
-  file_path = data.ResourcePath(flags.FLAGS.fio_jobfile)
 
-  disk_size_kb = vm.GetDeviceSizeFromPath(vm.GetScratchDir())
-  amount_memory_kb = vm.total_memory_kb
-  if disk_size_kb < amount_memory_kb * flags.FLAGS.memory_multiple:
-    logging.error('%s must be larger than %dx memory"',
-                  vm.GetScratchDir(),
-                  flags.FLAGS.memory_multiple)
-    # TODO(user): exiting here is probably not the correct behavor.
-    #    When FIO is run across a data set which is too not considerably
-    #    larger than the amount of memory then the benchmark results will be
-    #    invalid. Once the benchmark results are returned from Run() an
-    #    invalid (or is that rather a 'valid' flag should be added.
-    exit(1)
-  if FLAGS.against_device:
-    device_path = vm.scratch_disks[0].GetDevicePath()
-    logging.info('Umount scratch disk on %s at %s', vm, device_path)
-    vm.RemoteCommand('sudo umount %s' % vm.GetScratchDir())
-    logging.info('Fill scratch disk on %s at %s', vm, device_path)
-    command = (
-        ('sudo %s --filename=%s --ioengine=libaio '
-         '--name=fill-device --blocksize=512k --iodepth=64 '
-         '--rw=write --direct=1 --size=%s') %
-        (fio.FIO_PATH, device_path, FLAGS.device_fill_size))
-    vm.RemoteCommand(command)
-    logging.info('Removing directory and filename in job file.')
-    with open(data.ResourcePath(flags.FLAGS.fio_jobfile)) as original_f:
-      job_file = original_f.read()
-    job_file = fio.DeleteParameterFromJobFile(job_file, 'directory')
-    job_file = fio.DeleteParameterFromJobFile(job_file, 'filename')
-    tmp_dir = vm_util.GetTempDir()
-    file_path = vm_util.PrependTempDir(FLAGS.fio_jobfile)
-    logging.info('Write modified job file to temp directory %s', tmp_dir)
-    with open(file_path, 'w') as modified_f:
-      modified_f.write(job_file)
-  vm.PushFile(file_path)
+  device_path = vm.scratch_disks[0].GetDevicePath()
+  logging.info('Umount scratch disk on %s at %s', vm, device_path)
+  vm.RemoteCommand('sudo umount %s' % vm.GetScratchDir())
+
+  job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
+  with open(job_file_path, 'w') as job_file:
+    job_file.write(JobFileString(vm))
+    logging.info('Wrote fio job file at %s', job_file_path)
+
+  vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
 
 
 def Run(benchmark_spec):
@@ -123,26 +201,18 @@ def Run(benchmark_spec):
         If a 4th element is included, it is a dictionary of sample
         metadata.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
+  vm = benchmark_spec.vms[0]
   logging.info('FIO running on %s', vm)
-  if FLAGS.against_device:
-    file_path = vm_util.PrependTempDir(FLAGS.fio_jobfile)
-    fio_command = '--filename=%s %s' % (vm.scratch_disks[0].GetDevicePath(),
-                                        FLAGS.fio_jobfile)
-  else:
-    file_path = data.ResourcePath(FLAGS.fio_jobfile)
-    fio_command = '--directory=%s %s' % (
-        vm.GetScratchDir(), FLAGS.fio_jobfile)
-  fio_command = 'sudo %s --output-format=json %s' % (fio.FIO_PATH, fio_command)
+
+  fio_command = 'sudo %s --output-format=json %s' % (fio.FIO_PATH,
+                                                     REMOTE_JOB_FILE_PATH)
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
   stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
-  with open(file_path) as f:
-    job_file = f.read()
-  return fio.ParseResults(job_file, json.loads(stdout))
+
+  return fio.ParseResults(JobFileString(vm), json.loads(stdout))
 
 
 def Cleanup(benchmark_spec):
@@ -152,8 +222,10 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
+  vm = benchmark_spec.vms[0]
   logging.info('FIO Cleanup up on %s', vm)
-  vm.RemoveFile(flags.FLAGS.fio_jobfile)
-  vm.RemoveFile(vm.GetScratchDir() + flags.FLAGS.fio_benchmark_filename)
+  vm.RemoveFile(REMOTE_JOB_FILE_PATH)
+  if not FLAGS.against_device and not FLAGS.fio_jobfile:
+    # If the user supplies their own job file, then they have to clean
+    # up after themselves, because we don't know their temp file name.
+    vm.RemoveFile(vm.GetScratchDir() + 'fio-temp-file')
