@@ -123,7 +123,7 @@ def GetIODepths(io_depths):
     return range(int(match.group(1)), int(match.group(3)) + 1)
 
 
-def WriteJobFile(mount_point):
+def GenerateJobFileString(mount_point):
   """Write a fio job file.
 
   Args:
@@ -160,7 +160,7 @@ def JobFileString(vm):
     with open(FLAGS.fio_jobfile, 'r') as jobfile:
       return jobfile.read()
   else:
-    return WriteJobFile(vm.scratch_disks[0].mount_point)
+    return GenerateJobFileString(vm.scratch_disks[0].mount_point)
 
 
 def GetInfo():
