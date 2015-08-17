@@ -14,48 +14,48 @@
 """Utilities for working with Centurylink Cloud resources."""
 
 import os
-import re
-from random import randint
 import random
 import string
 
-from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 
 def AutoGenerateServerName():
-  """Returns an auto-generated server name"""
+    """Returns an auto-generated server name"""
 
-  randAlfaKey = ''
+    randAlfaKey = ''
 
-  for i in range(0,3):
-      randAlfaKey += random.choice(string.ascii_uppercase)
+    for i in range(0, 3):
+        randAlfaKey += random.choice(string.ascii_uppercase)
 
-  randIntKey = randint(100,999)
-  serverName = '%s%s' %(randAlfaKey, randIntKey)
-  return serverName
+    randIntKey = random.randint(100, 999)
+    serverName = '%s%s' % (randAlfaKey, randIntKey)
+    return serverName
+
 
 def ParseCLIResponse(output):
-  """Returns Server Name from the returned CLC CLI formatted table."""
+    """Returns Server Name from the returned CLC CLI formatted table."""
 
-  res = output.split('|')
-  return res[3].strip()
+    res = output.split('|')
+    return res[3].strip()
+
 
 def GetDefaultCenturylinkEnv():
-  """Returns a dictionary of environment variables and other locally set variables for using Centurylink Cloud SDK"""
-  
-  serverName = AutoGenerateServerName()
+    """Returns a dictionary of environment variables and other locally set \
+    variables for using Centurylink Cloud SDK"""
 
-  env = {
-      'API_KEY': os.getenv('CLC_API_KEY'),
-      'API_PASSWD': os.getenv('CLC_API_PASSWD'),
-      'GROUP': os.getenv('CLC_GROUP'),
-      'LOCATION': os.getenv('CLC_LOCATION'),
-      'NETWORK': os.getenv('CLC_NETWORK'),
-      'VM_NAME': serverName,
-      'VM_DESC': 'This server is created as a part of CLC hook development for PerfKitBenchmarker',
-      'BACKUP_LEVEL': 'Standard',
-      'CPU': 1,
-      'RAM': 1,
-  }
+    serverName = AutoGenerateServerName()
 
-  return env
+    env = {
+        'API_KEY': os.getenv('CLC_API_KEY'),
+        'API_PASSWD': os.getenv('CLC_API_PASSWD'),
+        'GROUP': os.getenv('CLC_GROUP'),
+        'LOCATION': os.getenv('CLC_LOCATION'),
+        'NETWORK': os.getenv('CLC_NETWORK'),
+        'VM_NAME': serverName,
+        'VM_DESC': 'This server is created as a part of CLC hook development \
+                    for PerfKitBenchmarker',
+        'BACKUP_LEVEL': 'Standard',
+        'CPU': 1,
+        'RAM': 1,
+    }
+
+    return env
