@@ -27,5 +27,14 @@ class TestGetIODepths(unittest.TestCase):
     self.assertEqual(list(fio_benchmark.GetIODepths('3-5')), [3, 4, 5])
 
 
+class TestGenerateJobFileString(unittest.TestCase):
+  def testAgainstDevice(self):
+    # This just checks that the template renders.
+    fio_benchmark.GenerateJobFileString('/foo', True, '100G', '1-4', 100)
+
+  def testAgainstFile(self):
+    fio_benchmark.GenerateJobFileString('/foo', False, '100G', '1-4', 100)
+
+
 if __name__ == '__main__':
   unittest.main()
