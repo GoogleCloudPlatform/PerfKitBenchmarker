@@ -15,6 +15,7 @@
 
 from perfkitbenchmarker import network
 
+
 class CenturylinkFirewall(network.BaseFirewall):
-  """A dummy firewall for Centurylink. This does nothing."""
-  pass
+    """A dummy firewall for Centurylink. This does nothing."""
+    pass
