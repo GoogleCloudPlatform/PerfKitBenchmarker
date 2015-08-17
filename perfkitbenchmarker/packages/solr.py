@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing Apache Solr 5.2.1 installation and cleanup functions."""
+"""Module containing Apache Solr installation and cleanup functions."""
 
 import posixpath
 import time
@@ -55,19 +55,28 @@ def StartWithZookeeper(vm, fw, port):
   To be used on the first node."""
   fw.AllowPort(vm, port)
   fw.AllowPort(vm, port + 1000)
+  solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
   vm.RemoteCommand('cd {0} && '
+                   'mkdir -p {2} && '
+                   'cp -R server/solr/* {2} && '
                    'export PATH=$PATH:/usr/sbin && '
-                   'bin/solr start -cloud -p {1}'.format(SOLR_HOME_DIR, port))
+                   'bin/solr start -cloud -p {1} -s {2}'.format(
+                       SOLR_HOME_DIR, port, solr_core_dir))
   time.sleep(15)
 
 
 def Start(vm, fw, port, zookeeper_node, zookeeper_port):
   """Starts SolrCloud on a node and joins a specified Zookeeper."""
   fw.AllowPort(vm, port)
+  solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
   vm.RobustRemoteCommand('cd {0} && '
-                         'bin/solr start -cloud -p {1} -z {2}:{3}'.format(
+                         'mkdir -p {4} && '
+                         'cp -R server/solr/* {4} && '
+                         'export PATH=$PATH:/usr/sbin && '
+                         'bin/solr start -cloud -p {1} '
+                         '-z {2}:{3} -s {4}'.format(
                              SOLR_HOME_DIR, port, zookeeper_node.ip_address,
-                             zookeeper_port))
+                             zookeeper_port, solr_core_dir))
   time.sleep(15)
 
 
@@ -84,3 +93,5 @@ def CreateCollection(vm, collection_name, shards_num):
 def Stop(vm, port):
   vm.RemoteCommand('cd {0} && '
                    'bin/solr stop -p {1}'.format(SOLR_HOME_DIR, port))
+  solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
+  vm.RemoteCommand('rm -R {0}'.format(solr_core_dir))

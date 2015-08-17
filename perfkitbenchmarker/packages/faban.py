@@ -18,22 +18,19 @@
 import posixpath
 
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.packages.openjdk7 import JAVA_HOME
 
 FABAN_HOME_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'faban')
 
 FABAN_TAR_URL = ('faban.org/downloads/faban-kit-latest.tar.gz')
 
-java_home = ''
+FABAN_PORT = 9980
 
 
 def _Install(vm):
   """Installs the Faban on the VM."""
-  global java_home
   vm.Install('openjdk7')
   vm.Install('ant')
-  java_home, _ = vm.RemoteCommand('readlink -f $(which java) | '
-                                  'cut -d "/" -f 1-5')
-  java_home = java_home.rstrip()
   vm.RemoteCommand('cd {0} && '
                    'wget {2} && '
                    'tar -xzf faban-kit-latest.tar.gz'.format(
@@ -51,12 +48,12 @@ def AptInstall(vm):
 
 
 def Start(vm, fw):
-  """Allows port 9980 on the VM, and starts the Faban using that port"""
-  fw.AllowPort(vm, 9980)
+  """Allows the port on the VM, and starts the Faban using that port"""
+  fw.AllowPort(vm, FABAN_PORT)
   vm.RemoteCommand('cd {0} && '
                    'export JAVA_HOME={1} && '
                    'master/bin/startup.sh'.format(
-                       FABAN_HOME_DIR, java_home))
+                       FABAN_HOME_DIR, JAVA_HOME))
 
 
 def Stop(vm):
@@ -64,4 +61,4 @@ def Stop(vm):
   vm.RemoteCommand('cd {0} && '
                    'export JAVA_HOME={1} && '
                    'master/bin/shutdown.sh'.format(
-                       FABAN_HOME_DIR, java_home))
+                       FABAN_HOME_DIR, JAVA_HOME))

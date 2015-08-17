@@ -30,8 +30,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
-from perfkitbenchmarker.packages import solr521 as solr
-from perfkitbenchmarker.packages import nutch110 as nutch
+from perfkitbenchmarker.packages import solr as solr
+from perfkitbenchmarker.packages import nutch as nutch
 from perfkitbenchmarker.packages import faban
 
 FLAGS = flags.FLAGS
@@ -54,14 +54,12 @@ SEARCH_DRIVER_URL = posixpath.join(PACKAGES_URL, 'search.tar.gz')
 
 SOLR_PORT = 8983
 
-fw = None
-
 
 def GetInfo():
   return BENCHMARK_INFO
 
 
-def _PrepareSolr(solr_nodes):
+def _PrepareSolr(solr_nodes, fw):
   """Starts and configures SolrCloud."""
   stdout, _ = solr_nodes[0].RemoteCommand('cd {0} && '
                                           'wget --quiet {1} && '
@@ -69,7 +67,7 @@ def _PrepareSolr(solr_nodes):
                                               CLOUDSUITE_WEB_SEARCH_DIR,
                                               SCHEMA_URL))
   for vm in solr_nodes:
-    vm.Install('solr521')
+    vm.Install('solr')
     solr.SetSchema(vm, stdout.replace('"', '\\"'))
     if vm == solr_nodes[0]:
       solr.StartWithZookeeper(vm, fw, SOLR_PORT)
@@ -80,7 +78,7 @@ def _PrepareSolr(solr_nodes):
 
 def _BuildIndex(indexer, solr_node):
   """Downloads data and builds Solr index from it."""
-  indexer.Install('nutch110')
+  indexer.Install('nutch')
   indexer.RemoteCommand('cd {0} && '
                         'wget {1} && '
                         'sed -i "/<value>http/c\\<value>http://{2}:'
@@ -94,37 +92,38 @@ def _BuildIndex(indexer, solr_node):
                                         CLOUDSUITE_WEB_SEARCH_DIR))
   nutch.ConfigureNutchSite(indexer, stdout.replace('"', '\\"'), solr_node,
                            SOLR_PORT, 'cloudsuite_web_search')
-  indexer.RobustRemoteCommand('cd {0}/runtime/local && '
+  scratch_dir = indexer.GetScratchDir()
+  indexer.RobustRemoteCommand('cd {0} && '
                               'wget {1}  && '
-                              'export JAVA_HOME={2} && '
-                              'tar -zxf crawl.tar.gz && '
-                              'bin/nutch index crawl/crawldb/ -linkdb '
-                              'crawl/linkdb/ -dir crawl/segments/'.format(
-                                  nutch.NUTCH_HOME_DIR, CRAWLED_URL,
-                                  nutch.java_home))
+                              'tar -zxf crawl.tar.gz'.format(
+                                  scratch_dir, CRAWLED_URL))
+  nutch.BuildIndex(indexer, posixpath.join(scratch_dir, 'crawl'))
 
 
-def _PrepareClient(client, solr_nodes):
+def _PrepareClient(client, fw, solr_nodes):
   """Prepares client machine in the benchmark."""
   client.Install('faban')
   faban.Start(client, fw)
   client.RemoteCommand('cd {0} && '
                        'wget {1} && '
-                       'tar -xzf search.tar.gz && '
+                       'tar -xzf search.tar.gz'.format(
+                           faban.FABAN_HOME_DIR, SEARCH_DRIVER_URL))
+  client.RemoteCommand('cd {0}/search && '
                        'sed -i "/faban.home/c\\faban.home={0}" '
-                       'search/build.properties && '
+                       'build.properties && '
                        'sed -i "/ant.home/c\\ant.home='
-                       '/usr/share/ant" search/build.properties && '
+                       '/usr/share/ant" build.properties && '
                        'sed -i "/faban.url/c\\faban.url='
-                       'http://localhost:9980/" search/build.properties && '
-                       'cd search && '
-                       'sed -i "/<ipAddress1>/c\<ipAddress1>{2}'
+                       'http://localhost:9980/" build.properties'.format(
+                           faban.FABAN_HOME_DIR))
+  client.RemoteCommand('cd {0}/search && '
+                       'sed -i "/<ipAddress1>/c\<ipAddress1>{1}'
                        '</ipAddress1>" deploy/run.xml && '
-                       'sed -i "/<ipAddress2>/c\<ipAddress2>{3}'
+                       'sed -i "/<ipAddress2>/c\<ipAddress2>{2}'
                        '</ipAddress2>" deploy/run.xml && '
                        'sed -i "/<logFile>/c\<logFile>{0}/logs/queries.out'
                        '</logFile>" deploy/run.xml && '
-                       'sed -i "/<outputDir>/c\<outputDir>{4}'
+                       'sed -i "/<outputDir>/c\<outputDir>{3}'
                        '</outputDir>" deploy/run.xml && '
                        'sed -i "/<termsFile>/c\<termsFile>{0}'
                        '/search/src/sample/searchdriver/terms_en.out'
@@ -134,12 +133,13 @@ def _PrepareClient(client, solr_nodes):
                        'sed -i "/<fa:rampDown>/c\<fa:rampDown>100'
                        '</fa:rampDown>" deploy/run.xml && '
                        'sed -i "/<fa:steadyState>/c\<fa:steadyState>600'
-                       '</fa:steadyState>" deploy/run.xml && '
-                       'export JAVA_HOME={5} && '
+                       '</fa:steadyState>" deploy/run.xml '.format(
+                           faban.FABAN_HOME_DIR, solr_nodes[0].ip_address,
+                           solr_nodes[1].ip_address, FABAN_OUTPUT_DIR))
+  client.RemoteCommand('cd {0}/search && '
+                       'export JAVA_HOME={1} && '
                        'ant deploy'.format(
-                           faban.FABAN_HOME_DIR, SEARCH_DRIVER_URL,
-                           solr_nodes[0].ip_address, solr_nodes[1].ip_address,
-                           FABAN_OUTPUT_DIR, faban.java_home))
+                           faban.FABAN_HOME_DIR, faban.JAVA_HOME))
   time.sleep(20)
 
 
@@ -150,16 +150,15 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  global fw
   vms = benchmark_spec.vms
   fw = benchmark_spec.firewall
   for vm in vms:
     vm.Install('wget')
     vm.RemoteCommand('mkdir -p {0}'.format(
                      CLOUDSUITE_WEB_SEARCH_DIR))
-  _PrepareSolr(vms[1:])
+  _PrepareSolr(vms[1:], fw)
+  _PrepareClient(vms[0], fw, vms[1:])
   _BuildIndex(vms[0], vms[1])
-  _PrepareClient(vms[0], vms[1:])
 
 
 def Run(benchmark_spec):
@@ -214,6 +213,9 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
+  scratch_dir = vms[0].GetScratchDir()
+  vms[0].RemoteCommand('rm {0}/crawl.tar.gz && '
+                       'rm -R {0}/crawl'.format(scratch_dir))
   faban.Stop(vms[0])
   solr.Stop(vms[1], SOLR_PORT)
   solr.Stop(vms[2], SOLR_PORT)

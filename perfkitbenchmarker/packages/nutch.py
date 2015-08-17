@@ -13,28 +13,24 @@
 # limitations under the License.
 
 
-"""Module containing Apache Nutch 1.10 installation and cleanup functions."""
+"""Module containing Apache Nutch installation and cleanup functions."""
 
 import posixpath
 
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.packages.openjdk7 import JAVA_HOME
 
 NUTCH_HOME_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'apache-nutch-1.10')
 
 APACHE_NUTCH_TAR_URL = ('archive.apache.org/dist/nutch/1.10/apache-nutch-1.10-'
                         'src.tar.gz')
 
-java_home = ''
 
 
 def _Install(vm):
   """Installs the Apache Nutch on the VM."""
-  global java_home
   vm.Install('openjdk7')
   vm.Install('ant')
-  java_home, _ = vm.RemoteCommand('readlink -f $(which java) | '
-                                  'cut -d "/" -f 1-5')
-  java_home = java_home.rstrip()
   vm.RobustRemoteCommand('cd {0} && '
                          'wget -O apache-nutch-src.tar.gz {2} && '
                          'tar -xzf apache-nutch-src.tar.gz'.format(
@@ -63,11 +59,12 @@ def ConfigureNutchSite(vm, nutch_site, solr_node=None, solr_port=None,
                    'conf/nutch-site.xml && '
                    'ant'.format(
                        NUTCH_HOME_DIR, nutch_site, solr_node.ip_address,
-                       solr_port, solr_collection, java_home))
+                       solr_port, solr_collection, JAVA_HOME))
 
 
 def BuildIndex(vm, data_path):
   """Builds Solr Index using Nutch's crawled data."""
   vm.RemoteCommand('cd {0}/runtime/local && '
-                   'bin/nutch index {1}/crawldb/ -linkdb {1}/linkdb -dir '
-                   '{1}/segments/'.format(NUTCH_HOME_DIR, data_path))
+                   'export JAVA_HOME={1} && '
+                   'bin/nutch index {2}/crawldb/ -linkdb {2}/linkdb -dir '
+                   '{2}/segments/'.format(NUTCH_HOME_DIR, JAVA_HOME, data_path))
