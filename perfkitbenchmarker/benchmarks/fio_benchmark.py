@@ -135,7 +135,7 @@ def GenerateJobFileString(mount_point, against_device,
     mount_point: the mount point of the disk we're testing against.
     against_device: bool. True if we're using a raw disk.
     device_fill_size: string. The amount of the disk to pre-fill.
-    io_depths: string. The contents of the io_depths flag.
+    io_depths: iterable. The IO queue depths to test.
     device_size: int. The size of the device, in gigabytes.
 
   Returns:
@@ -154,7 +154,7 @@ def GenerateJobFileString(mount_point, against_device,
                              undefined=jinja2.StrictUndefined).render(
       filename=filename,
       size=size,
-      iodepths=GetIODepths(io_depths)))
+      iodepths=io_depths))
 
 
 def JobFileString(fio_jobfile, mount_point, against_device,
@@ -166,7 +166,7 @@ def JobFileString(fio_jobfile, mount_point, against_device,
     mount_point: the mount point of the disk we're testing against.
     against_device: bool. True if we're using a raw disk.
     device_fill_size: string. The amount of the disk to pre-fill.
-    io_depths: string. The contents of the io_depths flag.
+    io_depths: iterable. The IO queue depths to test.
     device_size: int. The size of the device, in gigabytes.
 
     vm: the virtual_machine.BaseVirtualMachine that we will run on.
@@ -203,7 +203,8 @@ def Prepare(benchmark_spec):
 
 
   if FLAGS.fio_jobfile:
-    ignored_flags = {flag_name for flag_name in FLAGS_IGNORED_FOR_CUSTOM_JOBFILE
+    ignored_flags = {'--' + flag_name
+                     for flag_name in FLAGS_IGNORED_FOR_CUSTOM_JOBFILE
                      if FLAGS[flag_name].present}
 
     if ignored_flags:
@@ -237,7 +238,7 @@ def Prepare(benchmark_spec):
                                  disk.mount_point,
                                  FLAGS.against_device,
                                  FLAGS.device_fill_size,
-                                 FLAGS.io_depths,
+                                 GetIODepths(FLAGS.io_depths),
                                  disk.disk_size))
     logging.info('Wrote fio job file at %s', job_file_path)
 
@@ -273,7 +274,7 @@ def Run(benchmark_spec):
                                         disk.mount_point,
                                         FLAGS.against_device,
                                         FLAGS.device_fill_size,
-                                        FLAGS.io_depths,
+                                        GetIODepths(FLAGS.io_depths),
                                         disk.disk_size),
                           json.loads(stdout))
 
