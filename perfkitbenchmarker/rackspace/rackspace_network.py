@@ -47,18 +47,6 @@ class RackspaceSecurityGroup(network.BaseFirewall):
         self.firewall_names = set()
         self.sg_counter = 0
 
-    def __getstate__(self):
-        """Implements getstate to allow pickling (since locks can't be
-         pickled)."""
-        d = self.__dict__.copy()
-        del d['_lock']
-        return d
-
-    def __setstate__(self, state):
-        """Restores the lock after the object is unpickled."""
-        self.__dict__ = state
-        self._lock = threading.Lock()
-
     def AllowPort(self, vm, port):
         """Opens a port on the firewall.
 

@@ -19,6 +19,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.vm_util import POLL_INTERVAL
 
+from novaclient.exceptions import *
+
 
 FLAGS = flags.FLAGS
 
@@ -118,7 +120,6 @@ class NovaClient(object):
           return password
       except IOError as e:
         raise Exception(error_msg + ' ' + str(e))
-      raise Exception(error_msg)
 
     def __init__(self):
         from novaclient import client as noclient
