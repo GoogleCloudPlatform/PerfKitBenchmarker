@@ -42,8 +42,10 @@ from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 from perfkitbenchmarker.rackspace import rackspace_network as rax_net
 from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
 
+
 def pickle_lock(lock):
     return threading.Lock, (lock.locked(),)
+
 
 def unpickle_lock(locked, *args):
     lock = threading.Lock()
