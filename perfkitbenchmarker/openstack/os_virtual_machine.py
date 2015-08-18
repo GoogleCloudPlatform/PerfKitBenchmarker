@@ -34,6 +34,9 @@ flags.DEFINE_boolean('openstack_boot_from_volume', False,
 flags.DEFINE_integer('openstack_volume_size', 20,
                      'Size of the volume (GB)')
 
+flags.DEFINE_enum('openstack_scheduler_policy', None, [None, 'affinity', 'anti-affinity'],
+                  'Add possibility to use affinity or anti-affinity policy in scheduling process')
+
 
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
@@ -74,6 +77,16 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         nics = [{'net-id': network.id}]
         image_id = image.id
         boot_from_vol = []
+        scheduler_hints = None
+
+        if FLAGS.openstack_scheduler_policy is not None:
+            group_name = 'perfkit_%s' % FLAGS.run_uri
+            try:
+                group = self.client.server_groups.findall(name=group_name)[0]
+            except IndexError:
+                group = self.client.server_groups.create(policies=[FLAGS.openstack_scheduler_policy], name=group_name)
+            scheduler_hints = {'group': group.id}
+
         if FLAGS.openstack_boot_from_volume:
             image_id = None
             boot_from_vol = [{'boot_index': 0,
@@ -92,6 +105,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             nics=nics,
             availability_zone='nova',
             block_device_mapping_v2=boot_from_vol,
+            scheduler_hints=scheduler_hints,
             config_drive=FLAGS.openstack_config_drive)
         self.id = vm.id
 
