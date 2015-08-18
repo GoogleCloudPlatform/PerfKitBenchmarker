@@ -19,6 +19,7 @@ import posixpath
 
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages.openjdk7 import JAVA_HOME
+from perfkitbenchmarker.packages.ant import ANT_HOME_DIR
 
 NUTCH_HOME_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'apache-nutch-1.10')
 
@@ -57,9 +58,10 @@ def ConfigureNutchSite(vm, nutch_site, solr_node=None, solr_port=None,
                    'sed -i "/<value>http/c\\<value>http://{2}:'
                    '{3}/solr/{4}</value>" '
                    'conf/nutch-site.xml && '
-                   'ant'.format(
+                   '{6}/bin/ant'.format(
                        NUTCH_HOME_DIR, nutch_site, solr_node.ip_address,
-                       solr_port, solr_collection, JAVA_HOME))
+                       solr_port, solr_collection, JAVA_HOME,
+                       ANT_HOME_DIR))
 
 
 def BuildIndex(vm, data_path):

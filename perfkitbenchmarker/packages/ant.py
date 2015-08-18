@@ -15,27 +15,25 @@
 
 """Module containing Ant installation and cleanup functions."""
 
+import posixpath
 
 from perfkitbenchmarker import vm_util
 
 ANT_TAR_URL = ('archive.apache.org/dist/ant/binaries/'
                'apache-ant-1.9.6-bin.tar.gz')
 
+ANT_HOME_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ant')
+
 
 def _Install(vm):
-    """Installs the Ant package on the VM."""
-    vm.Install('wget')
-    vm.RemoteCommand('mkdir -p {0} && '
-                     'cd {0} && '
-                     'wget {1} && '
-                     'tar -zxf apache-ant-1.9.6-bin.tar.gz && '
-                     'ln -s {0}/apache-ant-1.9.6/ {0}/ant && '
-                     '(sudo mv -f /usr/bin/ant /usr/bin/ant.bak'
-                     '|| true)'.format(
-                         vm_util.VM_TMP_DIR, ANT_TAR_URL))
-    vm.RemoteCommand('sudo ln -s {0}/ant/bin/ant /usr/bin/ant'.format(
-                     vm_util.VM_TMP_DIR))
-
+  """Installs the Ant package on the VM."""
+  vm.Install('wget')
+  vm.RemoteCommand('mkdir -p {0} && '
+                   'cd {0} && '
+                   'wget {1} && '
+                   'tar -zxf apache-ant-1.9.6-bin.tar.gz && '
+                   'ln -s {0}/apache-ant-1.9.6/ {2}'.format(
+                       vm_util.VM_TMP_DIR, ANT_TAR_URL, ANT_HOME_DIR))
 
 
 def YumInstall(vm):
@@ -45,10 +43,4 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the Ant package on the VM."""
-  vm.InstallPackages('ant')
-
-
-def YumUninstall(vm):
-  """Uninstalls the Ant package on the VM."""
-  vm.RemoteCommand('sudo rm /usr/bin/ant && '
-                   '(sudo mv /usr/bin/ant.bak /usr/bin/ant || true)')
+  _Install(vm)

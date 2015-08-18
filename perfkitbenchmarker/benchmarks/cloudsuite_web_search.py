@@ -33,6 +33,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.packages import solr as solr
 from perfkitbenchmarker.packages import nutch as nutch
 from perfkitbenchmarker.packages import faban
+from perfkitbenchmarker.packages.ant import ANT_HOME_DIR
 
 FLAGS = flags.FLAGS
 
@@ -112,10 +113,10 @@ def _PrepareClient(client, fw, solr_nodes):
                        'sed -i "/faban.home/c\\faban.home={0}" '
                        'build.properties && '
                        'sed -i "/ant.home/c\\ant.home='
-                       '/usr/share/ant" build.properties && '
+                       '{1}" build.properties && '
                        'sed -i "/faban.url/c\\faban.url='
                        'http://localhost:9980/" build.properties'.format(
-                           faban.FABAN_HOME_DIR))
+                           faban.FABAN_HOME_DIR, ANT_HOME_DIR))
   client.RemoteCommand('cd {0}/search && '
                        'sed -i "/<ipAddress1>/c\<ipAddress1>{1}'
                        '</ipAddress1>" deploy/run.xml && '
@@ -138,8 +139,9 @@ def _PrepareClient(client, fw, solr_nodes):
                            solr_nodes[1].ip_address, FABAN_OUTPUT_DIR))
   client.RemoteCommand('cd {0}/search && '
                        'export JAVA_HOME={1} && '
-                       'ant deploy'.format(
-                           faban.FABAN_HOME_DIR, faban.JAVA_HOME))
+                       '{2}/bin/ant deploy'.format(
+                           faban.FABAN_HOME_DIR, faban.JAVA_HOME,
+                           ANT_HOME_DIR))
   time.sleep(20)
 
 
