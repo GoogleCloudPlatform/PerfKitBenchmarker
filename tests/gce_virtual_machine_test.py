@@ -18,7 +18,6 @@ import unittest
 import mock
 
 from perfkitbenchmarker import pkb  # noqa
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import gce_virtual_machine
@@ -26,22 +25,20 @@ from perfkitbenchmarker.gcp import gce_virtual_machine
 
 class GCEPreemptibleVMFlagTestCase(unittest.TestCase):
   def testPreemptibleVMFlag(self):
-    with mock.patch(vm_util.__name__ + '.IssueCommand') as issueCommand, \
+    with mock.patch(vm_util.__name__ + '.IssueCommand') as issue_command, \
             mock.patch('__builtin__.open'), \
-            mock.patch(vm_util.__name__ + '.NamedTemporaryFile'):
-      try:
-        old_preemptible_flag = flags.FLAGS.gce_preemptible_vms
-        flags.FLAGS.gce_preemptible_vms = True
-        vm_spec = virtual_machine.BaseVirtualMachineSpec('proj',
-                                                         'zone',
-                                                         'n1-standard-1',
-                                                         'image')
-        vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
-        vm._Create()
-        self.assertEquals(issueCommand.call_count, 1)
-        self.assertIn('--preemptible', issueCommand.call_args[0][0])
-      finally:
-        flags.FLAGS.gce_preemptible_vms = old_preemptible_flag
+            mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
+            mock.patch(gce_virtual_machine.__name__ + '.FLAGS') as gvm_flags:
+      gvm_flags.gce_preemptible_vms = True
+      gvm_flags.gcloud_scopes = None
+      vm_spec = virtual_machine.BaseVirtualMachineSpec('proj',
+                                                       'zone',
+                                                       'n1-standard-1',
+                                                       'image')
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      self.assertIn('--preemptible', issue_command.call_args[0][0])
 
 if __name__ == '__main__':
   unittest.main()
