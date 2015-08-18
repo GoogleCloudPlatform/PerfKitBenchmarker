@@ -17,7 +17,7 @@
 import unittest
 import mock
 
-from perfkitbenchmarker import pkb  # noqa
+from perfkitbenchmarker import pkb  # noqa. Imported to create needed flags.
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import gce_virtual_machine
