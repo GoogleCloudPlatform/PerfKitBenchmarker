@@ -90,6 +90,13 @@ class OpenStackDisk(disk.BaseDisk):
         self.attach_id = result.id
         self.device = "/dev/disk/by-id/virtio-" + result.id[:20]
 
+        is_unattached = True
+        while is_unattached:
+            time.sleep(1)
+            volume = self.__nclient.volumes.get(result.id)
+            if volume:
+                is_unattached = not (volume.status == "in-use" and volume.attachments)
+
     def GetDevicePath(self):
         return self.device
 
