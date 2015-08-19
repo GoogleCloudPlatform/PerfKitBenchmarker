@@ -127,28 +127,27 @@ def GetIODepths(io_depths):
     return range(int(match.group(1)), int(match.group(3)) + 1)
 
 
-def GenerateJobFileString(mount_point, against_device,
-                          device_fill_size, io_depths, device_size):
+def GenerateJobFileString(disk, against_device,
+                          device_fill_size, io_depths):
   """Write a fio job file.
 
   Args:
-    mount_point: the mount point of the disk we're testing against.
+    disk: the disk.BaseDisk object we're benchmarking with.
     against_device: bool. True if we're using a raw disk.
     device_fill_size: string. The amount of the disk to pre-fill.
     io_depths: iterable. The IO queue depths to test.
-    device_size: int. The size of the device, in gigabytes.
 
   Returns:
     The contents of a fio job file, as a string.
   """
 
   if against_device:
-    filename = mount_point
+    filename = disk.GetDevicePath()
     size = device_fill_size
   else:
-    filename = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
+    filename = posixpath.join(disk.mount_point, DEFAULT_TEMP_FILE_NAME)
     size = str(min(MAX_FILE_SIZE_GB,
-                   int(DISK_USABLE_SPACE_FRACTION * device_size))) + 'G'
+                   int(DISK_USABLE_SPACE_FRACTION * disk.disk_size))) + 'G'
 
   return str(jinja2.Template(JOB_FILE_TEMPLATE,
                              undefined=jinja2.StrictUndefined).render(
@@ -157,17 +156,16 @@ def GenerateJobFileString(mount_point, against_device,
       iodepths=io_depths))
 
 
-def JobFileString(fio_jobfile, mount_point, against_device,
-                  device_fill_size, io_depths, device_size):
+def JobFileString(fio_jobfile, disk, against_device,
+                  device_fill_size, io_depths):
   """Get the contents of our job file.
 
   Args:
     fio_jobfile: string or False. The path to the user's jobfile, if provided.
-    mount_point: the mount point of the disk we're testing against.
+    disk: the disk.BaseDisk object we're benchmarking with.
     against_device: bool. True if we're using a raw disk.
     device_fill_size: string. The amount of the disk to pre-fill.
     io_depths: iterable. The IO queue depths to test.
-    device_size: int. The size of the device, in gigabytes.
 
     vm: the virtual_machine.BaseVirtualMachine that we will run on.
 
@@ -179,8 +177,8 @@ def JobFileString(fio_jobfile, mount_point, against_device,
     with open(fio_jobfile, 'r') as jobfile:
       return jobfile.read()
   else:
-    return GenerateJobFileString(mount_point, against_device,
-                                 device_fill_size, io_depths, device_size)
+    return GenerateJobFileString(disk, against_device,
+                                 device_fill_size, io_depths)
 
 
 def GetInfo():
@@ -235,11 +233,10 @@ def Prepare(benchmark_spec):
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
     job_file.write(JobFileString(FLAGS.fio_jobfile,
-                                 disk.mount_point,
+                                 disk,
                                  FLAGS.against_device,
                                  FLAGS.device_fill_size,
-                                 GetIODepths(FLAGS.io_depths),
-                                 disk.disk_size))
+                                 GetIODepths(FLAGS.io_depths)))
     logging.info('Wrote fio job file at %s', job_file_path)
 
   vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
@@ -271,11 +268,10 @@ def Run(benchmark_spec):
 
   disk = vm.scratch_disks[0]
   return fio.ParseResults(JobFileString(FLAGS.fio_jobfile,
-                                        disk.mount_point,
+                                        disk,
                                         FLAGS.against_device,
                                         FLAGS.device_fill_size,
-                                        GetIODepths(FLAGS.io_depths),
-                                        disk.disk_size),
+                                        GetIODepths(FLAGS.io_depths)),
                           json.loads(stdout))
 
 

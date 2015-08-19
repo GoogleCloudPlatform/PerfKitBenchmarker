@@ -14,6 +14,7 @@
 
 """Tests for fio_benchmark."""
 
+import mock
 import unittest
 
 from perfkitbenchmarker.benchmarks import fio_benchmark
@@ -28,12 +29,16 @@ class TestGetIODepths(unittest.TestCase):
 
 
 class TestGenerateJobFileString(unittest.TestCase):
+  def setUp(self):
+    self.disk = mock.Mock(mount_point='/foo', disk_size=100)
+    self.disk.GetDevicePath = mock.MagicMock(return_value='/bar')
+
   def testAgainstDevice(self):
     # This just checks that the template renders.
-    fio_benchmark.GenerateJobFileString('/foo', True, '100G', '1-4', 100)
+    fio_benchmark.GenerateJobFileString(self.disk, True, '100G', range(1, 5))
 
   def testAgainstFile(self):
-    fio_benchmark.GenerateJobFileString('/foo', False, '100G', '1-4', 100)
+    fio_benchmark.GenerateJobFileString(self.disk, False, '100G', range(1, 5))
 
 
 if __name__ == '__main__':
