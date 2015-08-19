@@ -118,6 +118,7 @@ class NovaClient(object):
           return password
       except IOError as e:
         raise Exception(error_msg + ' ' + str(e))
+      raise Exception(error_msg)
 
     def __init__(self):
         from novaclient import client as noclient
