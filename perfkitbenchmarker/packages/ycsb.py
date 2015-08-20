@@ -392,7 +392,8 @@ def _CombineResults(result_list, combine_histograms=True):
   for indiv in result_list[1:]:
     for group_name, group in indiv['groups'].iteritems():
       if group_name not in result['groups']:
-        logging.warn('"%s" in new dict, but not in old.', group_name)
+        logging.warn('Found result group "%s" in individual YCSB result, '
+                     'but not in accumulator.', group_name)
         result['groups'][group_name] = copy.deepcopy(group)
         continue
 
@@ -409,7 +410,8 @@ def _CombineResults(result_list, combine_histograms=True):
           result['groups'][group_name]['statistics'].pop(k, None)
           continue
         elif k not in result['groups'][group_name]['statistics']:
-          logging.warn('"%s" in new dict, but not in old.', k)
+          logging.warn('Found statistic "%s.%s" in individual YCSB result, '
+                       'but not in accumulator.', group_name, k)
           result['groups'][group_name]['statistics'][k] = copy.deepcopy(v)
           continue
 
