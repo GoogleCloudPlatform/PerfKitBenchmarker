@@ -13,16 +13,16 @@
 # limitations under the License.
 
 
-"""Module containing OpenJDK7 installation and cleanup functions."""
+"""Module containing Autoconf installation and cleanup functions."""
 
 JAVA_HOME = '/usr'
 
 
 def YumInstall(vm):
-  """Installs the OpenJDK7 package on the VM."""
-  vm.InstallPackages('java-1.7.0-openjdk-devel')
+  """Installs the Autoconf package on the VM."""
+  vm.InstallPackages('autoconf')
 
 
 def AptInstall(vm):
-  """Installs the OpenJDK7 package on the VM."""
-  vm.InstallPackages('openjdk-7-jdk')
+  """Installs the Autoconf package on the VM."""
+  vm.InstallPackages('autoconf')

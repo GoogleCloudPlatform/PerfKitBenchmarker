@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,16 +13,20 @@
 # limitations under the License.
 
 
-"""Module containing OpenJDK7 installation and cleanup functions."""
+"""Module containing libcurl installation and cleanup functions."""
 
-JAVA_HOME = '/usr'
+
+def _Install(vm):
+  """Installs the libcurl package on the VM."""
+  vm.InstallPackages('libcurl')
+  vm.InstallPackages('libcurl-devel')
 
 
 def YumInstall(vm):
-  """Installs the OpenJDK7 package on the VM."""
-  vm.InstallPackages('java-1.7.0-openjdk-devel')
+  """Installs the libcurl package on the VM."""
+  _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the OpenJDK7 package on the VM."""
-  vm.InstallPackages('openjdk-7-jdk')
+  """Installs the libcurl package on the VM."""
+  _Install(vm)

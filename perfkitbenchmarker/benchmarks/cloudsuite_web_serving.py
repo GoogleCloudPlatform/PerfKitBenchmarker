@@ -15,8 +15,15 @@
 """Runs Cloudsuite2.0 Web Serving benchmark
 """
 import time
+import posixpath
+import re
 
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.packages import nginx
+from perfkitbenchmarker.packages import php
+# TODO: from perfkitbenchmarker import sample
+from perfkitbenchmarker.packages.openjdk7 import JAVA_HOME
 
 """Below are some constants used to set up the web serving benchmark.
 It is only necessary to modify BASE_DIR to be the directory you want it to be
@@ -25,15 +32,16 @@ We may also want to modify the options for the workload.
 """
 # options for the workload
 LOAD_SCALE = '25'
-DEFAULT_CLUSTER_SIZE = 2
-BASE_DIR = '/home/mendiola/web-release'
+DEFAULT_CLUSTER_SIZE = 3
+BASE_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'web-release')
 # environment variables
 CATALINA_HOME = '%s/apache-tomcat-6.0.35' % BASE_DIR
 OLIO_HOME = '%s/apache-olio-php-src-0.2' % BASE_DIR
 FABAN_HOME = '%s/faban' % BASE_DIR
-JAVA_HOME = '$(readlink -f $(which java) | cut -d "/" -f 1-5)'
 MYSQL_HOME = '%s/mysql-5.5.20-linux2.6-x86_64' % BASE_DIR
 GEOCODER_HOME = '%s' % BASE_DIR
+APP_DIR = '%s/app' % BASE_DIR
+PHPRC = posixpath.join(APP_DIR, 'etc')
 # base directories/build directories
 OLIO_BUILD = '%s/apache-olio-php-src-0.2/workload/php/trunk/' % BASE_DIR
 FABAN_RUN = '%s/faban/master/bin/startup.sh' % BASE_DIR
@@ -57,17 +65,111 @@ MYSQL_SERVICE_JAR = '%s/samples/services/MysqlService' % FABAN_HOME
 MEMCACHED_SERVICE_JAR = '%s/samples/services/MemcachedService' % FABAN_HOME
 '/build/MemcachedService.jar'
 MY_CNF = '/etc/my.cnf'
+# TODO: change to '%s/nginx.conf' % BASE_DIR
+NGINX_CONF = '/home/vstefano/web_serving/web-release/nginx.conf'
 
 FLAGS = flags.FLAGS
 
 BENCHMARK_INFO = {'name': 'webserving',
                   'description': 'Benchmark web2.0 apps with Cloudsuite',
-                  'scratch_disk': False,
+                  'scratch_disk': True,
                   'num_machines': DEFAULT_CLUSTER_SIZE}
 
 
 # install nginx, PHP, faban (agent)
-def setupWebFronted(benchmark_spec):
+def setupFrontend(benchmark_spec):
+  frontend = benchmark_spec.vms[2]
+  backend = benchmark_spec.vms[1]
+  frontend.Install('nginx')
+  frontend.RemoteCommand('perl -pi -e '
+                         '"s/%s/%s/g"'
+                         ' %s'
+                         % ('APP_DIR', re.escape(APP_DIR), NGINX_CONF))
+  frontend.RemoteCommand('sudo cp -f %s /usr/local/nginx/conf/'
+                         % NGINX_CONF)
+  frontend.RemoteCommand('mkdir -p %s'
+                         % APP_DIR)
+  frontend.RemoteCommand('cd %s && '
+                         'tar xzf %s'
+                         % (BASE_DIR, OLIO))
+  frontend.RemoteCommand('cp -r %s/webapp/php/trunk/* %s'
+                         % (OLIO_HOME, APP_DIR))
+  frontend.RemoteCommand('cp %s/cloudstone.patch %s'
+                         % (BASE_DIR, APP_DIR))
+  frontend.RemoteCommand('cd %s && '
+                         'patch -p1 < cloudstone.patch'
+                         % APP_DIR)
+  frontend.RemoteCommand('perl -pi -e '
+                         '"s/%s/%s/g"'
+                         ' %s/etc/config.php'
+                         % ('(\$olioconfig\[\'dbTarget\'\]).*',
+                            '\$1 = \'mysql:host=%s;'
+                            'dbname=olio\';' % backend.ip_address,
+                            APP_DIR))
+  frontend.RemoteCommand('perl -pi -e '
+                         '"s/%s/%s/g"'
+                         ' %s/etc/config.php'
+                         % ('(.*olioconfig.*cacheSystem.*MemCached.*)',
+                            '\/\/\$1', APP_DIR))
+  frontend.RemoteCommand('perl -pi -e '
+                         '"s/%s/%s/g"'
+                         ' %s/etc/config.php'
+                         % ('\/\/(.*olioconfig.*cacheSystem.*NoCache.*)',
+                            '\$1', APP_DIR))
+  frontend.RemoteCommand('perl -pi -e '
+                         '"s/%s/%s/g"'
+                         ' %s/etc/config.php'
+                         % ('GEOCODER_HOST', backend.ip_address, APP_DIR))
+  frontend.Install('php')
+  php.ConfigureAndBuild(frontend, PHPRC, True)
+  frontend.RemoteCommand('mkdir -p /tmp/http_sessions && '
+                         'chmod 777 /tmp/http_sessions')
+  frontend.RemoteCommand('echo """extension_dir=\\"/usr/local/lib/php/'
+                         'extensions/no-debug-non-zts-20090626/\\""""'
+                         ' >> %s/php.ini'
+                         % PHPRC)
+  frontend.RemoteCommand('echo """date.timezone=\\"Europe/Zurich\\"""" >> '
+                         '%s/php.ini'
+                         % PHPRC)
+  frontend.RemoteCommand('perl -pi -e '
+                         '"s/%s/%s/g"'
+                         ' %s/php.ini'
+                         % ('(display_errors).*', '\$1 = Off', PHPRC))
+  frontend.RemoteCommand('perl -pi -e '
+                         '"s/%s/%s/g"'
+                         ' %s/php.ini'
+                         % ('(error_reporting).*', '\$1 = E_ALL & ~E_NOTICE',
+                            PHPRC))
+  php.InstallAPC(frontend)
+
+  def setupFilestore(vm):
+    filestore = posixpath.join(vm.GetScratchDir(), 'filestore')
+    vm.RemoteCommand('cd %s && '
+                     'patch -p1 -t < %s/cloudsuite.patch && '
+                     'mkdir -p %s && '
+                     'chmod a+rwx %s && '
+                     'chmod +x %s/benchmarks/OlioDriver/bin/fileloader.sh'
+                     % (APP_DIR, BASE_DIR, filestore, filestore,
+                        FABAN_HOME))
+    vm.RemoteCommand('export FILESTORE=%s && '
+                     'export JAVA_HOME=%s && '
+                     '%s/benchmarks/OlioDriver/bin/fileloader.sh 102 %s'
+                     % (filestore, JAVA_HOME, FABAN_HOME, filestore))
+    frontend.RemoteCommand('perl -pi -e '
+                           '"s/%s/%s/g"'
+                           ' %s/etc/config.php'
+                           % ('(\$olioconfig\[\'localfsRoot\'\]).*',
+                              '\$1 = \'%s\';' % re.escape(filestore),
+                              APP_DIR))
+    return
+
+  frontend.RemoteCommand('cp -R /home/vstefano/web_serving/web-release/faban %s'
+                         % BASE_DIR)  # TODO: remove this and scp from client vm
+  setupFilestore(frontend)
+  frontend.RemoteCommand('sudo cp /usr/local/etc/php-fpm.conf.default '
+                         '/usr/local/etc/php-fpm.conf && '
+                         'sudo /usr/local/sbin/php-fpm')
+  nginx.Start(frontend, benchmark_spec.firewall)
   return
 
 
@@ -75,7 +177,7 @@ def setupWebFronted(benchmark_spec):
 # configure the mysql database
 def setupBackend(benchmark_spec):
   vms = benchmark_spec.vms
-  CLIENT_IP = vms[0].ip_address
+  # CLIENT_IP = vms[0].ip_address
   vms[0].RemoteCommand('sudo yum install libaio')
   # vms[1].Install('libaio')   TODO: write an Install file for libaio
   untar_command = ('cd %s && tar xzf %s')
@@ -101,9 +203,10 @@ def setupBackend(benchmark_spec):
                        % (MYSQL_HOME, FABAN_HOME))
   shutdown_mysql_command = ('cd %s && bin/mysqladmin shutdown')
   vms[0].RemoteCommand(shutdown_mysql_command % MYSQL_HOME)
-  populate_db_command = ('export JAVA_HOME=%s &&cd %s/benchmarks/OlioDriver/bin'
-                         '&& chmod +x dbloader.sh && ./dbloader.sh localhost '
-                         '%s')
+  # populate_db_command = ('export JAVA_HOME=%s && '
+  #                        'cd %s/benchmarks/OlioDriver/bin'
+  #                       '&& chmod +x dbloader.sh && ./dbloader.sh localhost '
+  #                       '%s')
   """
   vms[0].RemoteCommand(populate_db_command
                        % (JAVA_HOME, FABAN_HOME, LOAD_SCALE))
@@ -192,21 +295,25 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
+  for vm in vms:
+    download_command = ('cd %s && '
+                        'wget parsa.epfl.ch/cloudsuite/software/web.tar.gz')
+    vm.RemoteCommand(download_command % vm_util.VM_TMP_DIR)
+    vm.Install('openjdk7')
   vms[0].RemoteCommand('sudo yum install ant')
   # vm.Install('ant')  TODO: switch to this cmmd
   vms[0].Install('wget')
-  vms[0].Install('openjdk7')
-  vms[0].RemoteCommand('wget parsa.epfl.ch/cloudsuite/software/web.tar.gz')
-  vms[0].RemoteCommand('tar xzf web.tar.gz')
   vms[1].RemoteCommand('sudo yum install ant')
   vms[1].Install('wget')
   vms[1].Install('openjdk7')
-  vms[1].RemoteCommand('wget parsa.epfl.ch/cloudsuite/software/web.tar.gz')
-  vms[1].RemoteCommand('tar xzf web.tar.gz')
   setupClient(benchmark_spec)
   time.sleep(90)
   # TODO: scp from client to backend and frontend
   setupBackend(benchmark_spec)
+  vms[2].RemoteCommand('cd %s && '
+                       'tar xzf web.tar.gz'
+                       % vm_util.VM_TMP_DIR)
+  setupFrontend(benchmark_spec)  # TODO: RunThreaded?
   return
 
 
@@ -229,7 +336,7 @@ def CollectResultFile(vm, interval_op_rate_list, interval_key_rate_list,
 
 
 def CollectResults(benchmark_spec):
-  """Run Cassandra on target vms.
+  """Run Cloudsuite web serving benchmark on target vms.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data
@@ -242,12 +349,31 @@ def CollectResults(benchmark_spec):
 
 
 def Run(benchmark_spec):
-  vms = benchmark_spec.vms
-  set_java = ('export JAVA_HOME=$(readlink -f $(which java)|cut -d "/" -f 1-5)'
-              '&& %s')
-  # vms[0].RemoteCommand(set_java % (FABAN_RUN))  # run FABAN on the client
-  # time.sleep(150)
-  return
+  client = benchmark_spec.vms[0]
+  client.RobustRemoteCommand('cd %s && '
+                             'cp -f /home/vstefano/web_serving/web-release/'
+                             'run.sh . && '
+                             'cp -f /home/vstefano/web_serving/web-release/'
+                             'run.xml . && '
+                             'cp -f /home/vstefano/web_serving/web-release/'
+                             'driver.policy . && '
+                             'export FABAN_HOME=%s && '
+                             'sh run.sh'  # TODO: fix script
+                             % ('/home/vstefano/web_serving/web-release/faban',
+                                '/home/vstefano/web_serving/web-release/faban'))
+  # TODO: real FABAN_HOME on client machine
+
+  def ParseOutput(client):
+    stdout, _ = client.RemoteCommand('cat tmp/output/summary.xml')
+    # TODO: check if the output will be there once the script is fixed.
+    print stdout
+    return stdout  # TODO: Parse and return what matters
+
+  results = []
+  # ParseOutput(client)
+  # results.append(sample.Sample('Operations per second', sum_ops_per_sec,
+  #                              'ops/s'))
+  return results
 
 
 def Cleanup(benchmark_spec):
@@ -262,4 +388,18 @@ def Cleanup(benchmark_spec):
   # vms[0].RemoteCommand('~/web-release/faban/master/bin/shutdown.sh')
   # vms[0].RemoteCommand('rm -fr web-release web.tar.gz')
   # vms[1].RemoteCommand('rm -fr web-release web.tar.gz')
+  cleanupFrontend(benchmark_spec)
+  return
+
+
+def cleanupFrontend(benchmark_spec):
+  frontend = benchmark_spec.vms[2]
+  frontend.RemoteCommand('sudo killall -9 php-fpm')
+  frontend.RemoteCommand('cp -f %s.bak %s'
+                         % (NGINX_CONF, NGINX_CONF))  # TODO:
+  # Delete this once nginx.conf is incorporated into web_serving download
+  nginx.Stop(frontend)
+  filestore = posixpath.join(frontend.GetScratchDir(), 'filestore')
+  frontend.RemoteCommand('rm -R %s'
+                         % filestore)
   return
