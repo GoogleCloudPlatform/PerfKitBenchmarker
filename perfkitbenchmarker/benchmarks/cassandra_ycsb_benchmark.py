@@ -71,11 +71,6 @@ def CheckPrerequisites():
   data.ResourcePath(CREATE_TABLE_SCRIPT)
 
 
-def _InstallYCSB(vm):
-  """Install YCSB on 'vm'."""
-  vm.Install('ycsb')
-
-
 def _InstallCassandra(vm, seed_vms):
   """Install and start Cassandra on 'vm'."""
   vm.Install('cassandra')
@@ -129,14 +124,17 @@ def Prepare(benchmark_spec):
   seed_vm = by_role['seed_vm']
   assert seed_vm, 'No seed VM: {0}'.format(by_role)
 
-  install = functools.partial(_InstallCassandra, seed_vms=[seed_vm])
-  vm_util.RunThreaded(install, cassandra_vms)
+  cassandra_install_fns = [functools.partial(_InstallCassandra,
+                                             vm, seed_vms=[seed_vm])
+                           for vm in cassandra_vms]
+  ycsb_install_fns = [functools.partial(vm.Install, 'ycsb')
+                      for vm in loaders]
+
+  vm_util.RunThreaded(lambda f: f(), cassandra_install_fns + ycsb_install_fns)
 
   cassandra.StartCluster(seed_vm, by_role['non_seed_cassandra_vms'])
 
   _CreateYCSBTable(seed_vm)
-
-  vm_util.RunThreaded(_InstallYCSB, loaders)
 
 
 def Run(benchmark_spec):
