@@ -40,6 +40,7 @@ HBase web UI on 15030.
 HDFS web UI on  50070.
 """
 
+import functools
 import logging
 import os
 import posixpath
@@ -148,7 +149,6 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
   by_role = _GetVMsByRole(benchmark_spec.vms)
 
   loaders = by_role['loaders']
@@ -163,19 +163,17 @@ def Prepare(benchmark_spec):
   workers = by_role['workers']
   assert workers, 'No workers: {0}'.format(by_role)
 
-  vms = benchmark_spec.vms
+  hbase_install_fns = [functools.partial(vm.Install, 'hbase')
+                       for vm in hbase_vms]
+  ycsb_install_fns = [functools.partial(vm.Install, 'ycsb')
+                      for vm in loaders]
 
-  def InstallHBase(vm):
-    vm.Install('hbase')
-  vm_util.RunThreaded(InstallHBase, vms)
+  vm_util.RunThreaded(lambda f: f(), hbase_install_fns + ycsb_install_fns)
+
   hadoop.ConfigureAndStart(master, workers, start_yarn=False)
   hbase.ConfigureAndStart(master, workers, zk_quorum)
 
   _CreateYCSBTable(master)
-
-  def InstallYCSB(vm):
-    vm.Install('ycsb')
-  vm_util.RunThreaded(InstallYCSB, loaders)
 
   # Populate hbase-site.xml on the loaders.
   master.PullFile(
