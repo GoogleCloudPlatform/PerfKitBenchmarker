@@ -30,7 +30,7 @@ BASE_DIR = '/home/mendiola/web-release'
 # environment variables
 CATALINA_HOME = '%s/apache-tomcat-6.0.35' % BASE_DIR
 OLIO_HOME = '%s/apache-olio-php-src-0.2' % BASE_DIR
-FABAN_HOME = '%s/faban' % BASE_DIR  
+FABAN_HOME = '%s/faban' % BASE_DIR
 JAVA_HOME = '$(readlink -f $(which java) | cut -d "/" -f 1-5)'
 MYSQL_HOME = '%s/mysql-5.5.20-linux2.6-x86_64' % BASE_DIR
 GEOCODER_HOME = '%s/geo' % BASE_DIR
@@ -73,7 +73,7 @@ def setupWebFronted(benchmark_spec):
 
 def setupBackend(benchmark_spec):
   vms = benchmark_spec.vms
-  FRONTEND_IP = vms[1].ip_address
+  # FRONTEND_IP = vms[1].ip_address
   CLIENT_IP = vms[0].ip_address
   vms[1].RemoteCommand('sudo yum install libaio')
   # vms[1].Install('libaio')   TODO: write an Install file for libaio
@@ -94,7 +94,7 @@ def setupBackend(benchmark_spec):
                        '\'olio\'@\'n127\' identified by \'olio\' with grant '
                        'option;"' % MYSQL_HOME)
   vms[1].RemoteCommand('cd %s && ./bin/mysql -uroot -e "create database olio;'
-                       'use olio; \. %s/benchmarks/OlioDriver/bin/schema.sql"' 
+                       'use olio; \. %s/benchmarks/OlioDriver/bin/schema.sql"'
                        % (MYSQL_HOME, FABAN_HOME))
   populate_db_command = ('export JAVA_HOME=%s &&cd %s/benchmarks/OlioDriver/bin'
                          '&& chmod +x dbloader.sh && ./dbloader.sh localhost '
@@ -133,7 +133,6 @@ def setupClient(benchmark_spec):
   vms[0].RemoteCommand(untar_command % (BASE_DIR, FABAN))
   vms[0].RemoteCommand(untar_command % (BASE_DIR, OLIO))
   vms[0].RemoteCommand(untar_command % (BASE_DIR, MYSQL_CLIENT))
-  copy_command = ('cp %s %s')
   vms[0].RemoteCommand('cp %s/mysql-connector-java-5.0.8-bin.jar %s'
                        % (MYSQL_CLIENT_HOME, OLIO_WORKLOAD_LIB))
   copy_command2 = ('cp %s %s/services && cp %s %s/services &&cp %s %s/services')
@@ -257,12 +256,12 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data
         that is required to run the benchmark.
   """
-   vms = benchmark_spec.vms
+  vms = benchmark_spec.vms
   # vms[0].RemoteCommand('sudo yum remove ant')
-   set_java = ('export JAVA_HOME=$(readlink -f $(which java)|cut -d "/" -f 1-5)'
-               '&& %s')
-   vms[0].RemoteCommand(set_java % FABAN_SHUTDOWN)
-   vms[1].RemoteCommand('cd %s && sudo ./bin/mysqladmin shutdown' % MYSQL_HOME)
-   vms[0].RemoteCommand('rm -fr /tmp/web-release web.tar.gz')
-   vms[1].RemoteCommand('rm -fr /tmp/web-release web.tar.gz')
+  set_java = ('export JAVA_HOME=$(readlink -f $(which java)|cut -d "/" -f 1-5)'
+              '&& %s')
+  vms[0].RemoteCommand(set_java % FABAN_SHUTDOWN)
+  vms[1].RemoteCommand('cd %s && sudo ./bin/mysqladmin shutdown' % MYSQL_HOME)
+  vms[0].RemoteCommand('rm -fr /tmp/web-release web.tar.gz')
+  vms[1].RemoteCommand('rm -fr /tmp/web-release web.tar.gz')
   return
