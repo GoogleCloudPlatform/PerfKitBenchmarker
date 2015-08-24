@@ -80,19 +80,21 @@ def _PrepareSolr(solr_nodes, fw):
 def _BuildIndex(indexer, solr_node):
   """Downloads data and builds Solr index from it."""
   indexer.Install('nutch')
+  hadoop_tmp_dir = posixpath.join(indexer.GetScratchDir(), 'hadoop_tmp')
   indexer.RemoteCommand('cd {0} && '
                         'wget {1} && '
+                        'mkdir -p {4} && '
                         'sed -i "/<value>http/c\\<value>http://{2}:'
                         '{3}/solr/cloudsuite_web_search</value>" '
-                        'nutch-site.xml'.format(
+                        'nutch-site.xml && '
+                        'sed -i "s/HADOOP_TMP_DIR/{4}/g" nutch-site.xml'.format(
                             CLOUDSUITE_WEB_SEARCH_DIR,
                             NUTCH_SITE_URL, solr_node.ip_address,
-                            SOLR_PORT))
+                            SOLR_PORT, re.escape(hadoop_tmp_dir)))
   stdout, _ = indexer.RemoteCommand('cd {0} && '
                                     'cat nutch-site.xml'.format(
                                         CLOUDSUITE_WEB_SEARCH_DIR))
-  nutch.ConfigureNutchSite(indexer, stdout.replace('"', '\\"'), solr_node,
-                           SOLR_PORT, 'cloudsuite_web_search')
+  nutch.ConfigureNutchSite(indexer, stdout.replace('"', '\\"'))
   scratch_dir = indexer.GetScratchDir()
   indexer.RobustRemoteCommand('cd {0} && '
                               'wget {1}  && '
@@ -181,8 +183,10 @@ def Run(benchmark_spec):
                                  faban.FABAN_HOME_DIR))
 
   def ParseOutput(client):
-    stdout, _ = client.RemoteCommand('cat {0}/*/summary.xml'.format(
-                                     FABAN_OUTPUT_DIR))
+    stdout, _ = client.RemoteCommand('cd {0} && '
+                                     'cd `ls -Art | tail -n 1` && '
+                                     'cat summary.xml'.format(
+                                         FABAN_OUTPUT_DIR))
     ops_per_sec = re.findall(r'\<metric unit="ops/sec"\>(\d+\.?\d*)', stdout)
     sum_ops_per_sec = 0.0
     for value in ops_per_sec:
@@ -217,7 +221,8 @@ def Cleanup(benchmark_spec):
   vms = benchmark_spec.vms
   scratch_dir = vms[0].GetScratchDir()
   vms[0].RemoteCommand('rm {0}/crawl.tar.gz && '
-                       'rm -R {0}/crawl'.format(scratch_dir))
+                       'rm -R {0}/crawl && '
+                       'rm -R {0}/hadoop_tmp'.format(scratch_dir))
   faban.Stop(vms[0])
   solr.Stop(vms[1], SOLR_PORT)
   solr.Stop(vms[2], SOLR_PORT)

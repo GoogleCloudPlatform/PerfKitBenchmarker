@@ -49,18 +49,13 @@ def AptInstall(vm):
   _Install(vm)
 
 
-def ConfigureNutchSite(vm, nutch_site, solr_node=None, solr_port=None,
-                       solr_collection=None):
-  """Configures the Nutch to be used on a VM for indexing into Solr."""
+def ConfigureNutchSite(vm, nutch_site):
+  """Configures the Nutch-site."""
   vm.RemoteCommand('cd {0} && '
-                   'export JAVA_HOME={5} && '
+                   'export JAVA_HOME={2} && '
                    'echo """{1}""" > conf/nutch-site.xml && '
-                   'sed -i "/<value>http/c\\<value>http://{2}:'
-                   '{3}/solr/{4}</value>" '
-                   'conf/nutch-site.xml && '
-                   '{6}/bin/ant'.format(
-                       NUTCH_HOME_DIR, nutch_site, solr_node.ip_address,
-                       solr_port, solr_collection, JAVA_HOME,
+                   '{3}/bin/ant'.format(
+                       NUTCH_HOME_DIR, nutch_site, JAVA_HOME,
                        ANT_HOME_DIR))
 
 

@@ -59,7 +59,7 @@ def StartWithZookeeper(vm, fw, port):
   vm.RemoteCommand('cd {0} && '
                    'mkdir -p {2} && '
                    'cp -R server/solr/* {2} && '
-                   'bin/solr start -cloud -p {1} -s {2}'.format(
+                   'bin/solr start -cloud -p {1} -s {2} -m 3g'.format(
                        SOLR_HOME_DIR, port, solr_core_dir))
   time.sleep(15)
 
@@ -72,7 +72,7 @@ def Start(vm, fw, port, zookeeper_node, zookeeper_port):
                          'mkdir -p {4} && '
                          'cp -R server/solr/* {4} && '
                          'bin/solr start -cloud -p {1} '
-                         '-z {2}:{3} -s {4}'.format(
+                         '-z {2}:{3} -s {4} -m 3g'.format(
                              SOLR_HOME_DIR, port, zookeeper_node.ip_address,
                              zookeeper_port, solr_core_dir))
   time.sleep(15)
