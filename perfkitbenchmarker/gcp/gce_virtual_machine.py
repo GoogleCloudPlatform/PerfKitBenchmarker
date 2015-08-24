@@ -29,6 +29,7 @@ import re
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import virtual_machine
@@ -84,6 +85,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = FLAGS.gce_num_local_ssds
     self.boot_metadata = {}
 
+    if FLAGS.gce_preemptible_vms:
+      self.preemptible = True
+    else:
+      self.preemptible = False
+
+    events.sample_created.connect(self.AnnotateSample, weak=False)
+
 
   @classmethod
   def SetVmSpecDefaults(cls, vm_spec):
@@ -138,7 +146,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       if FLAGS.gcloud_scopes:
         create_cmd.extend(['--scopes'] +
                           re.split(r'[,; ]', FLAGS.gcloud_scopes))
-      if FLAGS.gce_preemptible_vms:
+      if self.preemptible:
         create_cmd.append('--preemptible')
       create_cmd.extend(util.GetDefaultGcloudFlags(self))
       vm_util.IssueCommand(create_cmd)
@@ -229,6 +237,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.append('{0}={1}'.format(key, value))
     cmd.extend(util.GetDefaultGcloudFlags(self))
     vm_util.IssueCommand(cmd)
+
+  def AnnotateSample(self, unused_sender, benchmark_spec, sample):
+    if self.preemptible:
+      sample['metadata']['preemptible'] = True
+    else:
+      sample['metadata']['preemptible'] = False
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
