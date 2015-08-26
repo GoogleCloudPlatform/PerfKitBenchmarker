@@ -14,9 +14,10 @@
 
 """Tests for fio_benchmark."""
 
-import mock
 import unittest
 
+from perfkitbenchmarker import disk
+from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.benchmarks import fio_benchmark
 
 
@@ -30,15 +31,26 @@ class TestGetIODepths(unittest.TestCase):
 
 class TestGenerateJobFileString(unittest.TestCase):
   def setUp(self):
-    self.disk = mock.Mock(mount_point='/foo', disk_size=100)
-    self.disk.GetDevicePath = mock.MagicMock(return_value='/bar')
+    # self.disk = mock.Mock(mount_point='/foo', disk_size=100)
+    # self.disk.GetDevicePath = mock.MagicMock(return_value='/bar')
+
+    self.disk_spec = disk.BaseDiskSpec(100, 'remote_ssd', '/scratch0')
+    self.disk = gce_disk.GceDisk(self.disk_spec, 'foo', 'us-central1-a', 'proj')
 
   def testAgainstDevice(self):
     # This just checks that the template renders.
-    fio_benchmark.GenerateJobFileString(self.disk, True, '100G', range(1, 5))
+    fio_benchmark.GenerateJobFileString(
+        self.disk,
+        True,
+        [fio_benchmark.SCENARIOS['sequential_read']],
+        range(1, 5))
 
   def testAgainstFile(self):
-    fio_benchmark.GenerateJobFileString(self.disk, False, '100G', range(1, 5))
+    fio_benchmark.GenerateJobFileString(
+        self.disk,
+        False,
+        [fio_benchmark.SCENARIOS['sequential_read']],
+        range(1, 5))
 
 
 if __name__ == '__main__':
