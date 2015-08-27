@@ -554,7 +554,11 @@ class SampleCollector(object):
       sample['product_name'] = FLAGS.product_name
       sample['official'] = FLAGS.official
       sample['owner'] = FLAGS.owner
-      sample['timestamp'] = time.time()
+      if 'timestamp' in sample['metadata']:
+        sample['timestamp'] = sample['metadata']['timestamp']
+        del sample['metadata']['timestamp']
+      else:
+        sample['timestamp'] = time.time()
       sample['run_uri'] = self.run_uri
       sample['sample_uri'] = str(uuid.uuid4())
       events.sample_created.send(benchmark_spec=benchmark_spec,

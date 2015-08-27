@@ -214,6 +214,16 @@ class SampleCollectorTestCase(unittest.TestCase):
     self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
     self._VerifyResult()
 
+  def testAddSamples_WithTimestamp(self):
+    timestamp_sample = sample.Sample('widgets', 100, 'oz', {'timestamp': 1.0})
+    samples = [timestamp_sample]
+    self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
+    self.assertDictContainsSubset(
+        {
+            'timestamp': 1.0
+        },
+        self.instance.samples[0])
+
   def testAddSamples_3Tuple(self):
     samples = [tuple(self.sample[:3])]
     self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
