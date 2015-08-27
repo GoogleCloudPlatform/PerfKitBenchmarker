@@ -65,17 +65,16 @@ SCENARIOS = {
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('fio_jobfile', None,
-                    'Job file that fio will use. Cannot use with '
-                    '--generate_scenarios.')
+                    'Job file that fio will use. If not given, use a job file '
+                    'bundled with PKB. Cannot use with --generate_scenarios.')
 flags.DEFINE_list('generate_scenarios', None,
-                  'Generate a job file with the given scenarios. If no '
-                  'scenarios are listed, generate all of them. Cannot use '
-                  'with --fio_jobfile.')
+                  'Generate a job file with the given scenarios. Special '
+                  'scenario \'all\' generates all scenarios. Cannot use with '
+                  '--fio_jobfile.')
 flags.DEFINE_boolean('against_device', False,
-                     'If --generate_scenarios is given, test against the raw '
-                     'block device. If --fio_jobfile is given, unmount the '
-                     'device\'s filesystem to enable testing against the '
-                     'device.')
+                     'Unmount the device\'s filesystem so we can test against '
+                     'the raw block device. If --generate-scenarios is given, '
+                     'will generate a job file that uses the block device.')
 flags.DEFINE_string('device_fill_size', '100%',
                     'The amount of device to fill in prepare stage. '
                     'This flag is only valid when against_device=True. '
@@ -104,6 +103,24 @@ flags.RegisterValidator('io_depths',
                         IODepthsValidator,
                         message='--io_depths must be an integer '
                                 'or a range of integers, all > 0')
+
+
+def GenerateFillCommand(fio_path, fill_path, fill_size):
+  """Generate a command to sequentially write a device or file.
+
+  Args:
+    fio_path: path to the fio executable.
+    fill_path: path to the device or file to fill.
+    fill_size: amount of device or file to fill, in fio format.
+
+  Returns:
+    A string containing the command.
+  """
+
+  return (('sudo %s --filename=%s --ioengine=libaio '
+           '--name=fill-device --blocksize=512k --iodepth=64 '
+           '--rw=write --direct=1 --size=%s') %
+          (fio_path, fill_path, fill_size))
 
 
 BENCHMARK_INFO = {'name': 'fio',
@@ -198,10 +215,11 @@ def JobFileString(fio_jobfile, disk, against_device,
   """Get the contents of our job file.
 
   Args:
-    fio_jobfile: string or False. The path to the user's jobfile, if provided.
+    fio_jobfile: string or None. The path to the user's jobfile, if provided.
     disk: the disk.BaseDisk object we're benchmarking with.
     against_device: bool. True if we're using a raw disk.
-    scenario_strings: iterable of strings. The workload scenarios to generate.
+    scenario_strings: list of strings or None. The workload scenarios to
+      generate.
     io_depths: iterable. The IO queue depths to test.
 
     vm: the virtual_machine.BaseVirtualMachine that we will run on.
@@ -218,13 +236,13 @@ def JobFileString(fio_jobfile, disk, against_device,
     with open(fio_jobfile, 'r') as jobfile:
       return jobfile.read()
   else:
-    if scenario_strings:
+    if 'all' in scenario_strings:
+      scenarios = SCENARIOS.itervalues()
+    else:
       for name in scenario_strings:
         if name not in SCENARIOS:
           logging.error('Unknown scenario name %s', name)
       scenarios = (SCENARIOS[name] for name in scenario_strings)
-    else:
-      scenarios = SCENARIOS.itervalues()
 
     return GenerateJobFileString(disk, against_device, scenarios, io_depths)
 
@@ -272,24 +290,20 @@ def Prepare(benchmark_spec):
     if FLAGS.device_fill_size:
       device_path = disk.GetDevicePath()
       logging.info('Fill scratch disk on %s at %s', vm, device_path)
-      command = (
-          ('sudo %s --filename=%s --ioengine=libaio '
-           '--name=fill-device --blocksize=512k --iodepth=64 '
-           '--rw=write --direct=1 --size=%s') %
-          (fio.FIO_PATH, device_path, FLAGS.device_fill_size))
+      command = GenerateFillCommand(fio.FIO_PATH,
+                                    device_path,
+                                    FLAGS.device_fill_size)
       vm.RemoteCommand(command)
   else:
     file_path = posixpath.join(disk.mount_point, DEFAULT_TEMP_FILE_NAME)
     # We compute in MB to avoid rounding errors with 1GB disks.
-    size = str(
+    fill_size = str(
         min(MAX_FILE_SIZE_GB * 1000,
             int(DISK_USABLE_SPACE_FRACTION * 1000 * disk.disk_size))) + 'M'
     logging.info('Fill temp file on %s at %s', vm, file_path)
-    command = (
-        ('sudo %s --filename=%s --ioengine=libaio '
-         '--name=fill-file --blocksize=512k --iodepth=64 '
-         '--rw=write --direct=1 --size=%s') %
-        (fio.FIO_PATH, file_path, size))
+    command = GenerateFillCommand(fio.FIO_PATH,
+                                  file_path,
+                                  fill_size)
     vm.RemoteCommand(command)
 
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
