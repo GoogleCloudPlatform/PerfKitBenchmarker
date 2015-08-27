@@ -22,6 +22,7 @@ from perfkitbenchmarker.openstack import os_disk
 from perfkitbenchmarker.openstack import utils as os_utils
 
 UBUNTU_IMAGE = 'ubuntu-14.04'
+NONE = 'None'
 
 FLAGS = flags.FLAGS
 
@@ -34,8 +35,10 @@ flags.DEFINE_boolean('openstack_boot_from_volume', False,
 flags.DEFINE_integer('openstack_volume_size', 20,
                      'Size of the volume (GB)')
 
-flags.DEFINE_enum('openstack_scheduler_policy', None, [None, 'affinity', 'anti-affinity'],
-                  'Add possibility to use affinity or anti-affinity policy in scheduling process')
+flags.DEFINE_enum('openstack_scheduler_policy', NONE,
+                  [NONE, 'affinity', 'anti-affinity'],
+                  'Add possibility to use affinity or anti-affinity '
+                  'policy in scheduling process')
 
 
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -79,12 +82,14 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         boot_from_vol = []
         scheduler_hints = None
 
-        if FLAGS.openstack_scheduler_policy is not None:
+        if FLAGS.openstack_scheduler_policy != NONE:
             group_name = 'perfkit_%s' % FLAGS.run_uri
             try:
                 group = self.client.server_groups.findall(name=group_name)[0]
             except IndexError:
-                group = self.client.server_groups.create(policies=[FLAGS.openstack_scheduler_policy], name=group_name)
+                group = self.client.server_groups.create(
+                    policies=[FLAGS.openstack_scheduler_policy],
+                    name=group_name)
             scheduler_hints = {'group': group.id}
 
         if FLAGS.openstack_boot_from_volume:
