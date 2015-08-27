@@ -1,3 +1,16 @@
+# v0.20.0
+
+* Enhancements:
+  * Specify project to gcloud alpha bigtable clusters list (GH-433)
+  * More Samples in FIO (GH-416)
+
+* Bugfixes and maintenance updates:
+  * pkb label problem in OpenStack driver fixes (GH-410)
+  * On exception, only cleanup if run stage is all/cleanup (GH-412)
+  * Fix issue with using a flag before flags are parsed (GH-413)
+  * Umount disk when running fio against raw device. (GH-417)
+  * Clarify warnings from ycsb._CombineResults. (GH-432)
+
 # v0.19.0
 
 * New features:
