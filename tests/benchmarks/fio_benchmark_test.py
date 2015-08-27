@@ -43,14 +43,16 @@ class TestGenerateJobFileString(unittest.TestCase):
         self.disk,
         True,
         [fio_benchmark.SCENARIOS['sequential_read']],
-        range(1, 5))
+        range(1, 5),
+        None)
 
   def testAgainstFile(self):
     fio_benchmark.GenerateJobFileString(
         self.disk,
         False,
         [fio_benchmark.SCENARIOS['sequential_read']],
-        range(1, 5))
+        range(1, 5),
+        None)
 
 
 if __name__ == '__main__':

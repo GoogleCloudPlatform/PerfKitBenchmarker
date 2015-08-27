@@ -85,6 +85,11 @@ flags.DEFINE_string('device_fill_size', '100%',
 flags.DEFINE_string('io_depths', '1',
                     'IO queue depths to run on. Can specify a single number, '
                     'like --io_depths=1, or a range, like --io_depths=1-4')
+flags.DEFINE_integer('working_set_size', None,
+                     'The size of the working set, in GB. If not given, use '
+                     'the full size of the device.',
+                     lower_bound=0)
+
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -150,6 +155,7 @@ stonewall
 rw={{rwkind}}
 blocksize={{blocksize}}
 iodepth={{iodepth}}
+size={{size}}
 {% endfor %}
 """
 
@@ -176,7 +182,7 @@ def GetIODepths(io_depths):
 
 
 def GenerateJobFileString(disk, against_device,
-                          scenarios, io_depths):
+                          scenarios, io_depths, working_set_size):
   """Write a fio job file.
 
   Args:
@@ -184,6 +190,7 @@ def GenerateJobFileString(disk, against_device,
     against_device: bool. True if we're using a raw disk.
     scenarios: iterable of dicts, taken from SCENARIOS.
     io_depths: iterable. The IO queue depths to test.
+    working_set_size: int or None. If int, the size of the working set in GB.
 
   Returns:
     The contents of a fio job file, as a string.
@@ -200,18 +207,20 @@ def GenerateJobFileString(disk, against_device,
                                  undefined=jinja2.StrictUndefined)
 
   file_string = str(globals_template.render(filename=filename))
+  size_string = str(working_set_size) + 'G' if working_set_size else '100%'
   for scenario in scenarios:
     file_string = file_string + str(job_template.render(
         name=scenario['name'],
         rwkind=scenario['rwkind'],
         blocksize=scenario['blocksize'],
-        iodepths=io_depths))
+        iodepths=io_depths,
+        size=size_string))
 
   return file_string
 
 
 def JobFileString(fio_jobfile, disk, against_device,
-                  scenario_strings, io_depths):
+                  scenario_strings, io_depths, working_set_size):
   """Get the contents of our job file.
 
   Args:
@@ -221,7 +230,7 @@ def JobFileString(fio_jobfile, disk, against_device,
     scenario_strings: list of strings or None. The workload scenarios to
       generate.
     io_depths: iterable. The IO queue depths to test.
-
+    working_set_size: int or None. If int, the size of the working set in GB.
     vm: the virtual_machine.BaseVirtualMachine that we will run on.
 
   Returns:
@@ -244,7 +253,8 @@ def JobFileString(fio_jobfile, disk, against_device,
           logging.error('Unknown scenario name %s', name)
       scenarios = (SCENARIOS[name] for name in scenario_strings)
 
-    return GenerateJobFileString(disk, against_device, scenarios, io_depths)
+    return GenerateJobFileString(disk, against_device, scenarios,
+                                 io_depths, working_set_size)
 
 
 def GetInfo():
@@ -312,7 +322,8 @@ def Prepare(benchmark_spec):
                                  disk,
                                  FLAGS.against_device,
                                  FLAGS.generate_scenarios,
-                                 GetIODepths(FLAGS.io_depths)))
+                                 GetIODepths(FLAGS.io_depths),
+                                 FLAGS.working_set_size))
     logging.info('Wrote fio job file at %s', job_file_path)
 
   vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
@@ -347,7 +358,8 @@ def Run(benchmark_spec):
                                         disk,
                                         FLAGS.against_device,
                                         FLAGS.generate_scenarios,
-                                        GetIODepths(FLAGS.io_depths)),
+                                        GetIODepths(FLAGS.io_depths),
+                                        FLAGS.working_set_size),
                           json.loads(stdout))
 
 
