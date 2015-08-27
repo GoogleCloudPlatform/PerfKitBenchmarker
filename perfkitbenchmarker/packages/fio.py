@@ -138,6 +138,7 @@ def ParseResults(job_file, fio_json_result):
         # The samples should all have the same timestamp because they
         # come from the same fio run.
         parameters['timestamp'] = timestamp
+        parameters['fio_job'] = job_name
         bw_metadata = {
             'bw_min': job[mode]['bw_min'],
             'bw_max': job[mode]['bw_max'],
