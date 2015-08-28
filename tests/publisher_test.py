@@ -215,7 +215,7 @@ class SampleCollectorTestCase(unittest.TestCase):
     self._VerifyResult()
 
   def testAddSamples_WithTimestamp(self):
-    timestamp_sample = sample.Sample('widgets', 100, 'oz', {'timestamp': 1.0})
+    timestamp_sample = sample.Sample('widgets', 100, 'oz', {}, 1.0)
     samples = [timestamp_sample]
     self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
     self.assertDictContainsSubset(
@@ -230,7 +230,7 @@ class SampleCollectorTestCase(unittest.TestCase):
     self._VerifyResult(False)
 
   def testAddSamples_4Tuple(self):
-    samples = [tuple(self.sample)]
+    samples = [tuple(self.sample[:4])]
     self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
     self._VerifyResult()
 

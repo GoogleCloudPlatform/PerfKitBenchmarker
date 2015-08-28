@@ -538,7 +538,7 @@ class SampleCollector(object):
     for s in samples:
       # Convert input in deprecated format to Sample objects.
       if isinstance(s, (list, tuple)):
-        if len(s) not in (3, 4):
+        if len(s) not in (3, 4, 5):
           raise ValueError(
               'Invalid sample "{0}": should be 3- or 4-tuple.'.format(s))
         s = Sample(*s)
@@ -554,11 +554,6 @@ class SampleCollector(object):
       sample['product_name'] = FLAGS.product_name
       sample['official'] = FLAGS.official
       sample['owner'] = FLAGS.owner
-      if 'timestamp' in sample['metadata']:
-        sample['timestamp'] = sample['metadata']['timestamp']
-        del sample['metadata']['timestamp']
-      else:
-        sample['timestamp'] = time.time()
       sample['run_uri'] = self.run_uri
       sample['sample_uri'] = str(uuid.uuid4())
       events.sample_created.send(benchmark_spec=benchmark_spec,

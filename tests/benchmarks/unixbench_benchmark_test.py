@@ -14,7 +14,10 @@
 """Tests for unixbench_benchmark."""
 
 import os
+import time
 import unittest
+
+import mock
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.benchmarks import unixbench_benchmark
@@ -34,7 +37,8 @@ class UnixBenchBenchmarkTestCase(unittest.TestCase):
     pass
 
   def testParseUnixBench(self):
-    result = unixbench_benchmark.ParseResults(self.contents)
+    with mock.patch(time.__name__ + '.time', return_value=1.0):
+      result = unixbench_benchmark.ParseResults(self.contents)
     expected_result = [
         ['Dhrystone 2 using register variables', 34872897.7, 'lps',
          {'num_parallel_copies': 1, 'samples': 7, 'time': '10.0s'}],
@@ -136,7 +140,8 @@ class UnixBenchBenchmarkTestCase(unittest.TestCase):
          {'index': 6859.2, 'baseline': 15000.0, 'num_parallel_copies': 8}],
         ['System Benchmarks Index Score', 4596.2, '',
          {'num_parallel_copies': 8}]]
-    expected_result = [sample.Sample(*exp) for exp in expected_result]
+    with mock.patch(time.__name__ + '.time', return_value=1.0):
+      expected_result = [sample.Sample(*exp) for exp in expected_result]
     self.assertEqual(result, expected_result)
 
 

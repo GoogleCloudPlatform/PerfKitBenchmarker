@@ -15,7 +15,10 @@
 """Tests for ntttcp_benchmark."""
 
 import os
+import time
 import unittest
+
+import mock
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.windows_packages import ntttcp
@@ -34,8 +37,9 @@ class NtttcpBenchmarkTestCase(unittest.TestCase):
 
   def testNtttcpParsing(self):
     extra_metadata = {}
-    samples = ntttcp.ParseNtttcpResults(self.ntttcp_xml_results,
-                                        extra_metadata)
+    with mock.patch(time.__name__ + '.time', return_value=1.0):
+      samples = ntttcp.ParseNtttcpResults(self.ntttcp_xml_results,
+                                          extra_metadata)
 
     expected_metadata = {
         'async': 'False', 'bind_sender': 'False', 'cooldown_time': '15000',
@@ -52,12 +56,13 @@ class NtttcpBenchmarkTestCase(unittest.TestCase):
     expected_thread_1_metadata = expected_metadata.copy()
     expected_thread_1_metadata['thread_index'] = '1'
 
-    expected_samples = [
-        sample.Sample('Total Throughput', 1990.541, 'Mbps',
-                      expected_metadata),
-        sample.Sample('Thread Throughput', 975.871, 'Mbps',
-                      expected_thread_0_metadata),
-        sample.Sample('Thread Throughput', 1014.669, 'Mbps',
-                      expected_thread_1_metadata)]
+    with mock.patch(time.__name__ + '.time', return_value=1.0):
+      expected_samples = [
+          sample.Sample('Total Throughput', 1990.541, 'Mbps',
+                        expected_metadata),
+          sample.Sample('Thread Throughput', 975.871, 'Mbps',
+                        expected_thread_0_metadata),
+          sample.Sample('Thread Throughput', 1014.669, 'Mbps',
+                        expected_thread_1_metadata)]
 
     self.assertListEqual(expected_samples, samples)
