@@ -55,12 +55,13 @@ flags.DEFINE_string('google_bigtable_cluster_name', None,
 flags.DEFINE_string(
     'google_bigtable_alpn_jar_url',
     'http://central.maven.org/maven2/org/mortbay/jetty/alpn/'
-    'alpn-boot/7.0.0.v20140317/alpn-boot-7.0.0.v20140317.jar',
+    'alpn-boot/7.1.3.v20150130/alpn-boot-7.1.3.v20150130.jar',
     'URL for the ALPN boot JAR, required for HTTP2')
 flags.DEFINE_string(
     'google_bigtable_hbase_jar_url',
-    'https://storage.googleapis.com/cloud-bigtable/jars/'
-    'bigtable-hbase/bigtable-hbase-0.1.5.jar',
+    'https://oss.sonatype.org/service/local/repositories/releases/content/'
+    'com/google/cloud/bigtable/bigtable-hbase-1.0/'
+    '0.2.1/bigtable-hbase-1.0-0.2.1.jar',
     'URL for the Bigtable-HBase client JAR.')
 
 
@@ -137,9 +138,11 @@ def _GetClusterDescription(project, zone, cluster_name):
   Raises:
     KeyError: when the cluster was not found.
   """
+  env = {'CLOUDSDK_CORE_DISABLE_PROMPTS': '1'}
+  env.update(os.environ)
   cmd = [FLAGS.gcloud_path, 'alpha', 'bigtable', 'clusters', 'list', '--quiet',
          '--format', 'json', '--project', project]
-  stdout, stderr, returncode = vm_util.IssueCommand(cmd)
+  stdout, stderr, returncode = vm_util.IssueCommand(cmd, env=env)
   if returncode:
     raise IOError('Command "{0}" failed:\nSTDOUT:\n{1}\nSTDERR:\n{2}'.format(
         ' '.join(cmd), stdout, stderr))
