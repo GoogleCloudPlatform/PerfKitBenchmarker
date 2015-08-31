@@ -657,7 +657,7 @@ class AzureBlobStorageBenchmark(object):
                            _MakeAzureCommandSuffix(vm.azure_account,
                                                    vm.azure_key,
                                                    False)))
-    if FLAGS.cli_test_size = 'normal':
+    if FLAGS.cli_test_size == 'normal':
       upload_cmd = ('time for i in {0..99}; do azure storage blob upload '
                     '%s/run/data/file-$i.dat %s %s; done' %
                     (scratch_dir,
@@ -672,11 +672,11 @@ class AzureBlobStorageBenchmark(object):
                      self.bucket_name,
                      _MakeAzureCommandSuffix(vm.azure_account,
                                              vm.azure_key,
-                                             True)))      
+                                             True)))
 
     cleanup_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
 
-    if FLAGS.cli_test_size = 'normal':
+    if FLAGS.cli_test_size == 'normal':
       download_cmd = ('time for i in {0..99}; do azure storage blob download '
                       '%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
                           self.bucket_name,
