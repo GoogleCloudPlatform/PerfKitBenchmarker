@@ -59,10 +59,12 @@ flags.DEFINE_enum('object_storage_scenario', 'all',
                   'api_namespace: runs API based benchmarking for namespace '
                   'operations.')
 
-flags.DEFINE_enum('cli_size', 'normal',
+flags.DEFINE_enum('cli_test_size', 'normal',
                   ['normal', 'large'],
-                  'size of the cli tests. Normal means half small and half \n'
-                  'large files. large means all large files each with 1GB.')
+                  'size of the cli tests. Normal means a mixture of various \n'
+                  'object sizes up to 32MiB (see '
+                  'data/cloud-storage-workload.sh). \n'
+                  'Large means all objects are of at least 1GiB.')
 
 flags.DEFINE_string('object_storage_credential_file', None,
                     'Directory of credential file.')
@@ -97,7 +99,7 @@ DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data used in the CLI tests.
 DATA_SIZE_IN_BYTES = 256.1 * 1024 * 1024
 DATA_SIZE_IN_MBITS = 8 * DATA_SIZE_IN_BYTES / 1000 / 1000
-LARGE_DATA_SIZE_IN_BYTES = 1024 * 1024 * 1024
+LARGE_DATA_SIZE_IN_BYTES = 3 * 1024 * 1024 * 1024
 LARGE_DATA_SIZE_IN_MBITS = 8 * LARGE_DATA_SIZE_IN_BYTES / 1000 / 1000
 
 API_TEST_SCRIPT = 'object_storage_api_tests.py'
@@ -445,7 +447,7 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
   cli_upload_results = []
   cli_download_results = []
   data_size_in_mbits = 0
-  if FLAGS.cli_size == 'normal':
+  if FLAGS.cli_test_size == 'normal':
     data_size_in_mbits = DATA_SIZE_IN_MBITS
   else:
     data_size_in_mbits = LARGE_DATA_SIZE_IN_MBITS
@@ -494,8 +496,8 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
 
   # Report various percentiles.
   metrics_prefix = ''
-  if FLAGS.cli_size != 'normal':
-    metrics_prefix = '%s ' % FLAGS.cli_size
+  if FLAGS.cli_test_size != 'normal':
+    metrics_prefix = '%s ' % FLAGS.cli_test_size
 
   _AppendPercentilesToResults(output_results,
                               cli_upload_results,
@@ -557,7 +559,7 @@ class S3StorageBenchmark(object):
     download_cmd = 'time aws s3 sync s3://%s/ %s/run/temp/' % (
                    self.bucket_name, scratch_dir)
 
-    if FLAGS.cli_size == 'normal':
+    if FLAGS.cli_test_size == 'normal':
       iteration_count = CLI_TEST_ITERATION_COUNT
     else:
       iteration_count = LARGE_CLI_TEST_ITERATION_COUNT
@@ -655,23 +657,42 @@ class AzureBlobStorageBenchmark(object):
                            _MakeAzureCommandSuffix(vm.azure_account,
                                                    vm.azure_key,
                                                    False)))
-
-    upload_cmd = ('time for i in {0..99}; do azure storage blob upload '
-                  '%s/run/data/file-$i.dat %s %s; done' %
-                  (scratch_dir,
-                   self.bucket_name,
-                   _MakeAzureCommandSuffix(vm.azure_account,
-                                           vm.azure_key,
-                                           True)))
+    if FLAGS.cli_test_size = 'normal':
+      upload_cmd = ('time for i in {0..99}; do azure storage blob upload '
+                    '%s/run/data/file-$i.dat %s %s; done' %
+                    (scratch_dir,
+                     self.bucket_name,
+                     _MakeAzureCommandSuffix(vm.azure_account,
+                                             vm.azure_key,
+                                             True)))
+    else:
+      upload_cmd = ('time azure storage blob upload '
+                    '%s/run/data/file_large_3gib.dat %s %s' %
+                    (scratch_dir,
+                     self.bucket_name,
+                     _MakeAzureCommandSuffix(vm.azure_account,
+                                             vm.azure_key,
+                                             True)))      
 
     cleanup_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
-    download_cmd = ('time for i in {0..99}; do azure storage blob download '
-                    '%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
-                        self.bucket_name,
-                        scratch_dir,
-                        _MakeAzureCommandSuffix(vm.azure_account,
-                                                vm.azure_key,
-                                                True)))
+
+    if FLAGS.cli_test_size = 'normal':
+      download_cmd = ('time for i in {0..99}; do azure storage blob download '
+                      '%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
+                          self.bucket_name,
+                          scratch_dir,
+                          _MakeAzureCommandSuffix(vm.azure_account,
+                                                  vm.azure_key,
+                                                  True)))
+    else:
+      download_cmd = ('time azure storage blob download %s '
+                      'file_large_3gib.dat '
+                      '%s/run/temp/file_large_3gib.dat %s' % (
+                          self.bucket_name,
+                          scratch_dir,
+                          _MakeAzureCommandSuffix(vm.azure_account,
+                                                  vm.azure_key,
+                                                  True)))
 
     _CliBasedTests(results, metadata, vm, CLI_TEST_ITERATION_COUNT_AZURE,
                    cleanup_bucket_cmd, upload_cmd, cleanup_local_temp_cmd,
@@ -779,7 +800,7 @@ class GoogleCloudStorageBenchmark(object):
     download_cmd = 'time %s -m cp gs://%s/* %s/run/temp/' % (vm.gsutil_path,
                                                              self.bucket_name,
                                                              scratch_dir)
-    if FLAGS.cli_size == 'normal':
+    if FLAGS.cli_test_size == 'normal':
       iteration_count = CLI_TEST_ITERATION_COUNT
     else:
       iteration_count = LARGE_CLI_TEST_ITERATION_COUNT
@@ -896,7 +917,7 @@ def Run(benchmark_spec):
   # The client tool based tests requires some provisioning on the VMs first.
   vms[0].RemoteCommand(
       'cd %s/run/; bash cloud-storage-workload.sh %s' % (vms[0].GetScratchDir(),
-                                                         FLAGS.cli_size))
+                                                         FLAGS.cli_test_size))
   results = OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0],
                                                                    metadata)
   print results
