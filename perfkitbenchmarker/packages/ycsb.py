@@ -52,14 +52,11 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.packages import maven
-from xml.etree import ElementTree
 
 FLAGS = flags.FLAGS
 
-YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/archive/'
-                '5ab241210adbb2d10fd89e755c433dd99cddb5ba.tar.gz')
-YCSB_BUILD_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb-build')
+YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases/'
+                'download/0.3.0/ycsb-0.3.0.tar.gz')
 YCSB_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 
@@ -115,21 +112,6 @@ flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'unlimited time.')
 
 
-def CreateProxyElement(proxy_type, proxy):
-    proxy = re.sub(r'^https?:\/\/', '', proxy)
-    host_addr, port_number = proxy.split(":")
-    proxy_element = ElementTree.Element("proxy")
-    active = ElementTree.SubElement(proxy_element, "active")
-    active.text = "true"
-    protocol = ElementTree.SubElement(proxy_element, "protocol")
-    protocol.text = proxy_type
-    host = ElementTree.SubElement(proxy_element, "host")
-    host.text = host_addr
-    port = ElementTree.SubElement(proxy_element, "port")
-    port.text = port_number
-    return proxy_element
-
-
 def _GetThreadsPerLoaderList():
   """Returns the list of client counts per VM to use in staircase load."""
   return [int(thread_count) for thread_count in FLAGS.ycsb_threads_per_client]
@@ -157,39 +139,11 @@ def CheckPrerequisites():
 
 def _Install(vm):
   """Installs the YCSB package on the VM."""
-  vm.Install('maven')
   vm.Install('openjdk7')
   vm.Install('curl')
   vm.RemoteCommand(('mkdir -p {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
-                        YCSB_BUILD_DIR, YCSB_TAR_URL))
-
-  proxy_nodes = []
-
-  if FLAGS.http_proxy:
-      proxy_nodes.append(CreateProxyElement('http', FLAGS.http_proxy))
-
-  if FLAGS.https_proxy:
-      proxy_nodes.append(CreateProxyElement('https', FLAGS.http_proxy))
-
-  if proxy_nodes:
-      settings_file = ".m2/settings.xml"
-      root = ElementTree.Element('settings')
-      proxies = ElementTree.SubElement(root, 'proxies')
-      proxies.extend(proxy_nodes)
-      vm.RemoteCommand("mkdir -p $HOME/.m2")
-      vm.RemoteCommand("touch $HOME/%s" % settings_file)
-      vm.RemoteCommand("echo -e '%s' | sudo tee %s" % (
-          ElementTree.tostring(root), settings_file))
-
-  vm.RemoteCommand(('cd {0} && {1}/bin/mvn clean package '
-                    '-DskipTests -Dcheckstyle.skip=true').format(
-                        YCSB_BUILD_DIR, maven.MVN_DIR))
-
-  tar = posixpath.join(
-      YCSB_BUILD_DIR, 'distribution', 'target', 'ycsb-*.tar.gz')
-  vm.RemoteCommand(('mkdir -p {0} && tar --strip-components 1 -C {0} '
-                    '-xf {1}').format(YCSB_DIR, tar))
+                        YCSB_DIR, YCSB_TAR_URL))
 
 
 def YumInstall(vm):
@@ -530,7 +484,7 @@ class YCSBExecutor(object):
       hotspotdatafraction: float.
   """
 
-  FLAG_ATTRIBUTES = 'target', 'threads'
+  FLAG_ATTRIBUTES = 'cp', 'jvm-args', 'target', 'threads'
 
   def __init__(self, database, parameter_files=None, **kwargs):
     self.database = database

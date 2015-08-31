@@ -179,10 +179,15 @@ def Prepare(benchmark_spec):
   master.PullFile(
       vm_util.GetTempDir(),
       posixpath.join(hbase.HBASE_CONF_DIR, HBASE_SITE))
-  for loader_vm in loaders:
-    loader_vm.PushFile(
+
+  def PushHBaseSite(vm):
+    conf_dir = posixpath.join(ycsb.YCSB_DIR, 'hbase-binding', 'conf')
+    vm.RemoteCommand('mkdir -p {}'.format(conf_dir))
+    vm.PushFile(
         os.path.join(vm_util.GetTempDir(), HBASE_SITE),
-        posixpath.join(ycsb.YCSB_DIR, 'hbase-binding', 'conf', HBASE_SITE))
+        posixpath.join(conf_dir, HBASE_SITE))
+
+  vm_util.RunThreaded(PushHBaseSite, loaders)
 
 
 def Run(benchmark_spec):
