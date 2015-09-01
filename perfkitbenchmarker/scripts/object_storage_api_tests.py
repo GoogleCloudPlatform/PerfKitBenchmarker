@@ -33,7 +33,7 @@ import time
 import boto
 import gflags as flags
 import gcs_oauth2_boto_plugin  # noqa
-from azure.storage import BlobService
+from azure.storage.blob import BlobService
 
 FLAGS = flags.FLAGS
 
