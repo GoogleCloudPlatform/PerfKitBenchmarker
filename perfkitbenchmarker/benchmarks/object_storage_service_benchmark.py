@@ -501,12 +501,14 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
 
   _AppendPercentilesToResults(output_results,
                               cli_upload_results,
-                              '%sUPLOAD_THROUGHPUT_VIA_CLI' % metrics_prefix,
+                              '%s%s' % (metrics_prefix,
+                                        UPLOAD_THROUGHPUT_VIA_CLI),
                               THROUGHPUT_UNIT,
                               metadata)
   _AppendPercentilesToResults(output_results,
                               cli_download_results,
-                              '%sDOWNLOAD_THROUGHPUT_VIA_CLI' % metrics_prefix,
+                              '%s%s' % (metrics_prefix,
+                                        DOWNLOAD_THROUGHPUT_VIA_CLI),
                               THROUGHPUT_UNIT,
                               metadata)
 
