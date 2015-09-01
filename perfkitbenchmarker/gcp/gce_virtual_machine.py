@@ -14,11 +14,11 @@
 """Class to represent a GCE Virtual Machine object.
 
 Zones:
-run 'gcutil listzones'
+run 'gcloud compute zones list'
 Machine Types:
-run 'gcutil listmachinetypes'
+run 'gcloud compute machine-types list'
 Images:
-run 'gcutil listimages'
+run 'gcloud compute images list'
 
 All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
@@ -29,6 +29,7 @@ import re
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import virtual_machine
@@ -47,6 +48,8 @@ flags.DEFINE_string('gcloud_scopes', None, 'If set, space-separated list of '
                     'scopes to apply to every created machine')
 flags.DEFINE_boolean('gce_migrate_on_maintenance', False, 'If true, allow VM '
                      'migration on GCE host maintenance.')
+flags.DEFINE_boolean('gce_preemptible_vms', False, 'If true, use preemptible '
+                     'VMs on GCE.')
 
 FLAGS = flags.FLAGS
 
@@ -81,6 +84,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         disk_spec, self.name, self.zone, self.project, self.image)
     self.max_local_disks = FLAGS.gce_num_local_ssds
     self.boot_metadata = {}
+
+    self.preemptible = FLAGS.gce_preemptible_vms
+
+    events.sample_created.connect(self.AnnotateSample, weak=False)
 
 
   @classmethod
@@ -136,6 +143,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       if FLAGS.gcloud_scopes:
         create_cmd.extend(['--scopes'] +
                           re.split(r'[,; ]', FLAGS.gcloud_scopes))
+      if self.preemptible:
+        create_cmd.append('--preemptible')
       create_cmd.extend(util.GetDefaultGcloudFlags(self))
       vm_util.IssueCommand(create_cmd)
 
@@ -225,6 +234,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.append('{0}={1}'.format(key, value))
     cmd.extend(util.GetDefaultGcloudFlags(self))
     vm_util.IssueCommand(cmd)
+
+  def AnnotateSample(self, unused_sender, benchmark_spec, sample):
+    sample['metadata']['preemptible'] = self.preemptible
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
