@@ -85,10 +85,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = FLAGS.gce_num_local_ssds
     self.boot_metadata = {}
 
-    if FLAGS.gce_preemptible_vms:
-      self.preemptible = True
-    else:
-      self.preemptible = False
+    self.preemptible = FLAGS.gce_preemptible_vms
 
     events.sample_created.connect(self.AnnotateSample, weak=False)
 
@@ -239,10 +236,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     vm_util.IssueCommand(cmd)
 
   def AnnotateSample(self, unused_sender, benchmark_spec, sample):
-    if self.preemptible:
-      sample['metadata']['preemptible'] = True
-    else:
-      sample['metadata']['preemptible'] = False
+    sample['metadata']['preemptible'] = self.preemptible
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
