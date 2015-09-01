@@ -43,17 +43,17 @@ from perfkitbenchmarker.rackspace import rackspace_network as rax_net
 from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
 
 
-def pickle_lock(lock):
+def PickleLock(lock):
     return threading.Lock, (lock.locked(),)
 
 
-def unpickle_lock(locked, *args):
+def UnPickleLock(locked, *args):
     lock = threading.Lock()
     if locked:
         if not lock.acquire(False):
             raise pickle.UnpicklingError("Cannot acquire lock")
 
-copy_reg.pickle(thread.LockType, pickle_lock, unpickle_lock)
+copy_reg.pickle(thread.LockType, PickleLock, UnPickleLock)
 
 GCP = 'GCP'
 AZURE = 'Azure'
