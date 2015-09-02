@@ -69,7 +69,9 @@ flags.DEFINE_string('fio_jobfile', None,
                     'bundled with PKB. Cannot use with --generate_scenarios.')
 flags.DEFINE_list('generate_scenarios', None,
                   'Generate a job file with the given scenarios. Special '
-                  'scenario \'all\' generates all scenarios. Cannot use with '
+                  'scenario \'all\' generates all scenarios. Available '
+                  'scenarios are sequential_write, sequential_read, '
+                  'random_write, and random_read. Cannot use with '
                   '--fio_jobfile.')
 flags.DEFINE_boolean('against_device', False,
                      'Unmount the device\'s filesystem so we can test against '
@@ -77,7 +79,6 @@ flags.DEFINE_boolean('against_device', False,
                      'will generate a job file that uses the block device.')
 flags.DEFINE_string('device_fill_size', '100%',
                     'The amount of device to fill in prepare stage. '
-                    'This flag is only valid when against_device=True. '
                     'The valid value can either be an integer, which '
                     'represents the number of bytes to fill or a '
                     'percentage, which represents the percentage '
@@ -264,10 +265,9 @@ def GetInfo():
 def Prepare(benchmark_spec):
   """Prepare the virtual machine to run FIO.
 
-     This includes installing fio, bc, and libaio1 and insuring that
-     the attached disk is large enough to support the fio
-     benchmark. We also make sure the job file is always located at
-     the same path on the local machine.
+     This includes installing fio, bc, and libaio1 and pre-filling the
+     attached disk. We also make sure the job file is always located
+     at the same path on the local machine.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -283,8 +283,6 @@ def Prepare(benchmark_spec):
     if ignored_flags:
       logging.warning('Fio job file specified. Ignoring options "%s"',
                       ', '.join(ignored_flags))
-  if FLAGS['device_fill_size'].present and not FLAGS['against_device'].present:
-    logging.warning('--device_fill_size has no effect without --against_device')
 
   vm = benchmark_spec.vms[0]
   logging.info('FIO prepare on %s', vm)
@@ -292,27 +290,26 @@ def Prepare(benchmark_spec):
 
   # Fill the disk or file we're using
   disk = vm.scratch_disks[0]
+  device_path = disk.GetDevicePath()
+  mount_point = disk.mount_point
   if FLAGS.against_device:
-    mount_point = disk.mount_point
     logging.info('Umount scratch disk on %s at %s', vm, mount_point)
     vm.RemoteCommand('sudo umount %s' % mount_point)
 
-    if FLAGS.device_fill_size:
-      device_path = disk.GetDevicePath()
-      logging.info('Fill scratch disk on %s at %s', vm, device_path)
-      command = GenerateFillCommand(fio.FIO_PATH,
-                                    device_path,
-                                    FLAGS.device_fill_size)
-      vm.RemoteCommand(command)
-  else:
-    file_path = posixpath.join(disk.mount_point, DEFAULT_TEMP_FILE_NAME)
-    # We compute in MB to avoid rounding errors with 1GB disks.
-    fill_size = str(
-        min(MAX_FILE_SIZE_GB * 1000,
-            int(DISK_USABLE_SPACE_FRACTION * 1000 * disk.disk_size))) + 'M'
-    logging.info('Fill temp file on %s at %s', vm, file_path)
+  if FLAGS.device_fill_size is not '0':
+    if FLAGS.against_device:
+      fill_path = device_path
+      fill_size = FLAGS.device_fill_size
+    else:
+      fill_path = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
+      # Compute in MB to avoid rounding errors with 1GB disks.
+      fill_size = str(
+          min(MAX_FILE_SIZE_GB * 1000,
+              int(DISK_USABLE_SPACE_FRACTION * 1000 * disk.disk_size))) + 'M'
+
+    logging.info('Fill file %s on %s', fill_path, vm)
     command = GenerateFillCommand(fio.FIO_PATH,
-                                  file_path,
+                                  fill_path,
                                   fill_size)
     vm.RemoteCommand(command)
 
