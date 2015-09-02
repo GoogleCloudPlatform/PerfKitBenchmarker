@@ -33,7 +33,6 @@ from perfkitbenchmarker.packages import fio
 LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
-MAX_FILE_SIZE_GB = 100
 DISK_USABLE_SPACE_FRACTION = 0.9
 
 
@@ -302,10 +301,13 @@ def Prepare(benchmark_spec):
       fill_size = FLAGS.device_fill_size
     else:
       fill_path = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
-      # Compute in MB to avoid rounding errors with 1GB disks.
-      fill_size = str(
-          min(MAX_FILE_SIZE_GB * 1000,
-              int(DISK_USABLE_SPACE_FRACTION * 1000 * disk.disk_size))) + 'M'
+      if FLAGS['disk_fill_size'].present:
+        fill_size = FLAGS.disk_fill_size
+      else:
+        # Default to 90% of capacity because the file system will add
+        # some overhead.
+        fill_size = str(DISK_USABLE_SPACE_FRACTION *
+                        1000 * disk.disk_size) + 'M'
 
     logging.info('Fill file %s on %s', fill_path, vm)
     command = GenerateFillCommand(fio.FIO_PATH,
