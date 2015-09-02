@@ -40,6 +40,19 @@ DISK = 'disk'
 flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
                   'The type of storage to use for Aerospike data. The type of '
                   'disk is controlled by the "scratch_disk_type" flag.')
+flags.DEFINE_integer('aerospike_min_client_threads', 8,
+                     'The minimum number of Aerospike client threads.',
+                     lower_bound=1)
+flags.DEFINE_integer('aerospike_max_client_threads', 128,
+                     'The maximum number of Aerospike client threads.',
+                     lower_bound=1)
+flags.DEFINE_integer('aerospike_client_threads_step_size', 8,
+                     'The number to increase the Aerospike client threads by '
+                     'for each iteration of the test.',
+                     lower_bound=1)
+flags.DEFINE_integer('aerospike_read_percent', 90,
+                     'The percent of operations which are reads.',
+                     lower_bound=0, upper_bound=100)
 
 BENCHMARK_INFO = {'name': 'aerospike',
                   'description': 'Runs Aerospike',
@@ -48,10 +61,6 @@ AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
 CLIENT_DIR = 'aerospike-client-c'
 CLIENT_VERSION = '3.0.84'
 PATCH_FILE = 'aerospike.patch'
-READ_PERCENT = 90
-MAX_THREADS = 128
-MIN_THREADS = 8
-THREAD_STEP = 8
 
 
 def GetInfo():
@@ -165,8 +174,9 @@ def Run(benchmark_spec):
     """
     write_latency, read_latency = re.findall(
         r'Overall Average Latency \(ms\) ([0-9]+\.[0-9]+)', output)[-2:]
-    average_latency = ((READ_PERCENT / 100.0) * float(read_latency) +
-                       ((100 - READ_PERCENT) / 100.0) * float(write_latency))
+    average_latency = (
+        (FLAGS.aerospike_read_percent / 100.0) * float(read_latency) +
+        ((100 - FLAGS.aerospike_read_percent) / 100.0) * float(write_latency))
     tps = map(int, re.findall(r'total\(tps=([0-9]+)', output)[:-1])
     return float(sum(tps)) / len(tps), average_latency
 
@@ -176,11 +186,13 @@ def Run(benchmark_spec):
   client.RemoteCommand(load_command, should_log=True)
 
   max_throughput_for_completion_latency_under_1ms = 0.0
-  for threads in range(MIN_THREADS, MAX_THREADS + 1, THREAD_STEP):
+  for threads in range(FLAGS.aerospike_min_client_threads,
+                       FLAGS.aerospike_max_client_threads + 1,
+                       FLAGS.aerospike_client_threads_step_size):
     load_command = ('timeout 15 ./%s/benchmarks/target/benchmarks '
                     '-z %s -n test -w RU,%s -o B:1000 -k 1000000 '
                     '--latency 5,1 -h %s;:' %
-                    (CLIENT_DIR, threads, READ_PERCENT,
+                    (CLIENT_DIR, threads, FLAGS.aerospike_read_percent,
                      server.internal_ip))
     stdout, _ = client.RemoteCommand(load_command, should_log=True)
     tps, latency = ParseOutput(stdout)
@@ -189,6 +201,7 @@ def Run(benchmark_spec):
         'Average Transactions Per Second': tps,
         'Client Threads': threads,
         'Storage Type': FLAGS.aerospike_storage_type,
+        'Read Percent': FLAGS.aerospike_read_percent,
     }
     samples.append(sample.Sample('Average Latency', latency, 'ms', metadata))
     if latency < 1.0:
