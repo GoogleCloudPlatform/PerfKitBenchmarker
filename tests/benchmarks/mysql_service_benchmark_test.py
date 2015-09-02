@@ -14,16 +14,13 @@
 """Tests for mysql_service_benchmark."""
 import logging
 import os
-import time
 import unittest
-
-import mock
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.benchmarks import mysql_service_benchmark
 
 
-class MySQLServiceBenchmarkTestCase(unittest.TestCase):
+class MySQLServiceBenchmarkTestCase(unittest.TestCase, sample.SamplesTestMixin):
 
   def setUp(self):
     path = os.path.join(os.path.dirname(__file__), '..', 'data',
@@ -34,27 +31,26 @@ class MySQLServiceBenchmarkTestCase(unittest.TestCase):
   def testParseSysbenchResult(self):
     results = []
     metadata = {}
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      mysql_service_benchmark.ParseSysbenchOutput(
-          self.contents, results, metadata)
-      logging.info('results are, %s', results)
-      expected_results = [
-          sample.Sample('sysbench tps p1', 526.38, 'NA', {}),
-          sample.Sample('sysbench tps p5', 526.38, 'NA', {}),
-          sample.Sample('sysbench tps p50', 579.5, 'NA', {}),
-          sample.Sample('sysbench tps p90', 636.0, 'NA', {}),
-          sample.Sample('sysbench tps p99', 636.0, 'NA', {}),
-          sample.Sample('sysbench tps p99.9', 636.0, 'NA', {}),
-          sample.Sample('sysbench tps average', 583.61, 'NA', {}),
-          sample.Sample('sysbench tps stddev', 33.639045340624214, 'NA', {}),
-          sample.Sample('sysbench tps cv', 0.05763959723209714, 'NA', {}),
-          sample.Sample('sysbench latency min', 18.31, 'milliseconds', {}),
-          sample.Sample('sysbench latency avg', 27.26, 'milliseconds', {}),
-          sample.Sample('sysbench latency max', 313.5, 'milliseconds', {}),
-          sample.Sample(
-              'sysbench latency percentile 99', 57.15,
-              'milliseconds', {})]
-    self.assertEqual(results, expected_results)
+    mysql_service_benchmark.ParseSysbenchOutput(
+        self.contents, results, metadata)
+    logging.info('results are, %s', results)
+    expected_results = [
+        sample.Sample('sysbench tps p1', 526.38, 'NA', {}),
+        sample.Sample('sysbench tps p5', 526.38, 'NA', {}),
+        sample.Sample('sysbench tps p50', 579.5, 'NA', {}),
+        sample.Sample('sysbench tps p90', 636.0, 'NA', {}),
+        sample.Sample('sysbench tps p99', 636.0, 'NA', {}),
+        sample.Sample('sysbench tps p99.9', 636.0, 'NA', {}),
+        sample.Sample('sysbench tps average', 583.61, 'NA', {}),
+        sample.Sample('sysbench tps stddev', 33.639045340624214, 'NA', {}),
+        sample.Sample('sysbench tps cv', 0.05763959723209714, 'NA', {}),
+        sample.Sample('sysbench latency min', 18.31, 'milliseconds', {}),
+        sample.Sample('sysbench latency avg', 27.26, 'milliseconds', {}),
+        sample.Sample('sysbench latency max', 313.5, 'milliseconds', {}),
+        sample.Sample(
+            'sysbench latency percentile 99', 57.15,
+            'milliseconds', {})]
+    self.assertSampleListsEqual(results, expected_results)
 
 
 if __name__ == '__main__':

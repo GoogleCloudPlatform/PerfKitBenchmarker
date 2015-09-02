@@ -16,10 +16,7 @@
 
 """Tests for scimark2_benchmark."""
 
-import time
 import unittest
-
-import mock
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.benchmarks import scimark2_benchmark
@@ -70,53 +67,49 @@ EXPECTED_JAVA_METADATA = {
     'java.version': '1.7.0_75',
 }
 
-with mock.patch(time.__name__ + '.time', return_value=1.0):
-  EXPECTED_RESULT_C = [
-      sample.Sample(metric='Composite Score', value=1596.04,
-                    unit='Mflops', metadata=EXPECTED_C_METADATA),
-      sample.Sample(metric='FFT (N=1024)', value=1568.64,
-                    unit='Mflops', metadata=EXPECTED_C_METADATA),
-      sample.Sample(metric='SOR (100 x 100)', value=1039.98,
-                    unit='Mflops', metadata=EXPECTED_C_METADATA),
-      sample.Sample(metric='MonteCarlo', value=497.64,
-                    unit='Mflops', metadata=EXPECTED_C_METADATA),
-      sample.Sample(metric='Sparse matmult (N=1000, nz=5000)', value=1974.39,
-                    unit='Mflops', metadata=EXPECTED_C_METADATA),
-      sample.Sample(metric='LU (M=100, N=100)', value=2899.56,
-                    unit='Mflops', metadata=EXPECTED_C_METADATA),
-  ]
+EXPECTED_RESULT_C = [
+    sample.Sample(metric='Composite Score', value=1596.04,
+                  unit='Mflops', metadata=EXPECTED_C_METADATA),
+    sample.Sample(metric='FFT (N=1024)', value=1568.64,
+                  unit='Mflops', metadata=EXPECTED_C_METADATA),
+    sample.Sample(metric='SOR (100 x 100)', value=1039.98,
+                  unit='Mflops', metadata=EXPECTED_C_METADATA),
+    sample.Sample(metric='MonteCarlo', value=497.64,
+                  unit='Mflops', metadata=EXPECTED_C_METADATA),
+    sample.Sample(metric='Sparse matmult (N=1000, nz=5000)', value=1974.39,
+                  unit='Mflops', metadata=EXPECTED_C_METADATA),
+    sample.Sample(metric='LU (M=100, N=100)', value=2899.56,
+                  unit='Mflops', metadata=EXPECTED_C_METADATA),
+]
 
-  EXPECTED_RESULT_JAVA = [
-      sample.Sample(metric='Composite Score', value=1716.3662351463677,
-                    unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
-      sample.Sample(metric='FFT (1024)', value=1000.1380057152871,
-                    unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
-      sample.Sample(metric='SOR (100x100)', value=1353.1987180103354,
-                    unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
-      sample.Sample(metric='Monte Carlo', value=727.7138820888014,
-                    unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
-      sample.Sample(metric='Sparse matmult (N=1000, nz=5000)',
-                    value=1495.40225150659, unit='Mflops',
-                    metadata=EXPECTED_JAVA_METADATA),
-      sample.Sample(metric='LU (100x100)', value=4005.3783184108247,
-                    unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
-  ]
+EXPECTED_RESULT_JAVA = [
+    sample.Sample(metric='Composite Score', value=1716.3662351463677,
+                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
+    sample.Sample(metric='FFT (1024)', value=1000.1380057152871,
+                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
+    sample.Sample(metric='SOR (100x100)', value=1353.1987180103354,
+                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
+    sample.Sample(metric='Monte Carlo', value=727.7138820888014,
+                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
+    sample.Sample(metric='Sparse matmult (N=1000, nz=5000)',
+                  value=1495.40225150659, unit='Mflops',
+                  metadata=EXPECTED_JAVA_METADATA),
+    sample.Sample(metric='LU (100x100)', value=4005.3783184108247,
+                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
+]
 
 
-class Scimark2BenchmarkTestCase(unittest.TestCase):
+class Scimark2BenchmarkTestCase(unittest.TestCase, sample.SamplesTestMixin):
 
   def testParseResultsC(self):
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      samples = scimark2_benchmark.ParseResults(TEST_OUTPUT_C)
-    self.assertEqual(samples, EXPECTED_RESULT_C)
+    samples = scimark2_benchmark.ParseResults(TEST_OUTPUT_C)
+    self.assertSampleListsEqual(samples, EXPECTED_RESULT_C)
 
   def testParseResultsJava(self):
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      samples = scimark2_benchmark.ParseResults(TEST_OUTPUT_JAVA)
-    self.assertEqual(samples, EXPECTED_RESULT_JAVA)
+    samples = scimark2_benchmark.ParseResults(TEST_OUTPUT_JAVA)
+    self.assertSampleListsEqual(samples, EXPECTED_RESULT_JAVA)
 
   def testParseResultsCombined(self):
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      samples = scimark2_benchmark.ParseResults(
-          TEST_OUTPUT_C + TEST_OUTPUT_JAVA)
-    self.assertEqual(samples, EXPECTED_RESULT_C + EXPECTED_RESULT_JAVA)
+    samples = scimark2_benchmark.ParseResults(TEST_OUTPUT_C + TEST_OUTPUT_JAVA)
+    self.assertSampleListsEqual(samples,
+                                EXPECTED_RESULT_C + EXPECTED_RESULT_JAVA)

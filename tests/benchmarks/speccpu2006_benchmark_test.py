@@ -14,10 +14,7 @@
 
 """Tests for speccpu2006_benchmark."""
 
-import time
 import unittest
-
-import mock
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
@@ -40,35 +37,34 @@ TEST_OUTPUT_SPECINT = """
  Est. SPECint(R)_base2006              22.7
 """
 
-with mock.patch(time.__name__ + '.time', return_value=1.0):
-  EXPECTED_RESULT_SPECINT = [
-      sample.Sample(metric='400.perlbench', value=23.4, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='401.bzip2', value=17.1, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='403.gcc', value=22.1, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='429.mcf', value=25.1, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='445.gobmk', value=21.0, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='456.hmmer', value=19.0, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='458.sjeng', value=20.6, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='462.libquantum', value=44.2, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='464.h264ref', value=31.6, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='471.omnetpp', value=17.9, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='473.astar', value=14.6, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='483.xalancbmk', value=27.8, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='SPECint(R)_base2006', value=22.7, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-  ]
+EXPECTED_RESULT_SPECINT = [
+    sample.Sample(metric='400.perlbench', value=23.4, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='401.bzip2', value=17.1, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='403.gcc', value=22.1, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='429.mcf', value=25.1, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='445.gobmk', value=21.0, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='456.hmmer', value=19.0, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='458.sjeng', value=20.6, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='462.libquantum', value=44.2, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='464.h264ref', value=31.6, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='471.omnetpp', value=17.9, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='473.astar', value=14.6, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='483.xalancbmk', value=27.8, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='SPECint(R)_base2006', value=22.7, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+]
 
 TEST_OUTPUT_SPECFP = """
 =============================================
@@ -92,45 +88,45 @@ TEST_OUTPUT_SPECFP = """
  Est. SPECfp(R)_base2006              17.5
 """
 
-with mock.patch(time.__name__ + '.time', return_value=1.0):
-  EXPECTED_RESULT_SPECFP = [
-      sample.Sample(metric='410.bwaves', value=19.0, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='416.gamess', value=21.2, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='433.milc', value=19.1, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='434.zeusmp', value=15.2, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='435.gromacs', value=11.8, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='436.cactusADM', value=9.27, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='437.leslie3d', value=10.9, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='444.namd', value=15.9, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='447.dealII', value=28.0, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='450.soplex', value=30.6, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='453.povray', value=23.0, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='454.calculix', value=8.31, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='459.GemsFDTD', value=13.7, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='465.tonto', value=17.4, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='470.lbm', value=37.7, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='481.wrf', value=14.2, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='482.sphinx3', value=29.2, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-      sample.Sample(metric='SPECfp(R)_base2006', value=17.5, unit='',
-                    metadata={'machine_type': 'big', 'num_cpus': 256}),
-  ]
+EXPECTED_RESULT_SPECFP = [
+
+    sample.Sample(metric='410.bwaves', value=19.0, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='416.gamess', value=21.2, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='433.milc', value=19.1, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='434.zeusmp', value=15.2, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='435.gromacs', value=11.8, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='436.cactusADM', value=9.27, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='437.leslie3d', value=10.9, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='444.namd', value=15.9, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='447.dealII', value=28.0, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='450.soplex', value=30.6, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='453.povray', value=23.0, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='454.calculix', value=8.31, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='459.GemsFDTD', value=13.7, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='465.tonto', value=17.4, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='470.lbm', value=37.7, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='481.wrf', value=14.2, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='482.sphinx3', value=29.2, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+    sample.Sample(metric='SPECfp(R)_base2006', value=17.5, unit='',
+                  metadata={'machine_type': 'big', 'num_cpus': 256}),
+]
 
 # Invalid result, multiple NR failures and no aggregate score.
 TEST_OUTPUT_BAD1 = """
@@ -159,23 +155,22 @@ EXPECTED_BAD1_METADATA = {
 }
 
 # Invalid result, multiple NR failures, but aggregate score present.
-with mock.patch(time.__name__ + '.time', return_value=1.0):
-  EXPECTED_RESULT_BAD1 = [
-      sample.Sample(metric='445.gobmk', value=15.8, unit='',
-                    metadata=EXPECTED_BAD1_METADATA),
-      sample.Sample(metric='456.hmmer', value=14.8, unit='',
-                    metadata=EXPECTED_BAD1_METADATA),
-      sample.Sample(metric='458.sjeng', value=15.6, unit='',
-                    metadata=EXPECTED_BAD1_METADATA),
-      sample.Sample(metric='462.libquantum', value=37.5, unit='',
-                    metadata=EXPECTED_BAD1_METADATA),
-      sample.Sample(metric='464.h264ref', value=28.4, unit='',
-                    metadata=EXPECTED_BAD1_METADATA),
-      sample.Sample(metric='471.omnetpp', value=11.7, unit='',
-                    metadata=EXPECTED_BAD1_METADATA),
-      sample.Sample(metric='473.astar', value=10.7, unit='',
-                    metadata=EXPECTED_BAD1_METADATA),
-  ]
+EXPECTED_RESULT_BAD1 = [
+    sample.Sample(metric='445.gobmk', value=15.8, unit='',
+                  metadata=EXPECTED_BAD1_METADATA),
+    sample.Sample(metric='456.hmmer', value=14.8, unit='',
+                  metadata=EXPECTED_BAD1_METADATA),
+    sample.Sample(metric='458.sjeng', value=15.6, unit='',
+                  metadata=EXPECTED_BAD1_METADATA),
+    sample.Sample(metric='462.libquantum', value=37.5, unit='',
+                  metadata=EXPECTED_BAD1_METADATA),
+    sample.Sample(metric='464.h264ref', value=28.4, unit='',
+                  metadata=EXPECTED_BAD1_METADATA),
+    sample.Sample(metric='471.omnetpp', value=11.7, unit='',
+                  metadata=EXPECTED_BAD1_METADATA),
+    sample.Sample(metric='473.astar', value=10.7, unit='',
+                  metadata=EXPECTED_BAD1_METADATA),
+]
 
 TEST_OUTPUT_BAD2 = """
 ==============================================================================
@@ -201,25 +196,24 @@ EXPECTED_BAD2_METADATA = {
     'num_cpus': 256,
 }
 
-with mock.patch(time.__name__ + '.time', return_value=1.0):
-  EXPECTED_RESULT_BAD2 = [
-      sample.Sample(metric='445.gobmk', value=15.8, unit='',
-                    metadata=EXPECTED_BAD2_METADATA),
-      sample.Sample(metric='456.hmmer', value=14.8, unit='',
-                    metadata=EXPECTED_BAD2_METADATA),
-      sample.Sample(metric='458.sjeng', value=15.6, unit='',
-                    metadata=EXPECTED_BAD2_METADATA),
-      sample.Sample(metric='462.libquantum', value=37.5, unit='',
-                    metadata=EXPECTED_BAD2_METADATA),
-      sample.Sample(metric='464.h264ref', value=28.4, unit='',
-                    metadata=EXPECTED_BAD2_METADATA),
-      sample.Sample(metric='471.omnetpp', value=11.7, unit='',
-                    metadata=EXPECTED_BAD2_METADATA),
-      sample.Sample(metric='473.astar', value=10.7, unit='',
-                    metadata=EXPECTED_BAD2_METADATA),
-      sample.Sample(metric='SPECint(R)_rate_base2006', value=42.0, unit='',
-                    metadata=EXPECTED_BAD2_METADATA),
-  ]
+EXPECTED_RESULT_BAD2 = [
+    sample.Sample(metric='445.gobmk', value=15.8, unit='',
+                  metadata=EXPECTED_BAD2_METADATA),
+    sample.Sample(metric='456.hmmer', value=14.8, unit='',
+                  metadata=EXPECTED_BAD2_METADATA),
+    sample.Sample(metric='458.sjeng', value=15.6, unit='',
+                  metadata=EXPECTED_BAD2_METADATA),
+    sample.Sample(metric='462.libquantum', value=37.5, unit='',
+                  metadata=EXPECTED_BAD2_METADATA),
+    sample.Sample(metric='464.h264ref', value=28.4, unit='',
+                  metadata=EXPECTED_BAD2_METADATA),
+    sample.Sample(metric='471.omnetpp', value=11.7, unit='',
+                  metadata=EXPECTED_BAD2_METADATA),
+    sample.Sample(metric='473.astar', value=10.7, unit='',
+                  metadata=EXPECTED_BAD2_METADATA),
+    sample.Sample(metric='SPECint(R)_rate_base2006', value=42.0, unit='',
+                  metadata=EXPECTED_BAD2_METADATA),
+]
 
 
 class DummyVM(object):
@@ -228,34 +222,29 @@ class DummyVM(object):
     self.num_cpus = 256
 
 
-class Speccpu2006BenchmarkTestCase(unittest.TestCase):
+class Speccpu2006BenchmarkTestCase(unittest.TestCase, sample.SamplesTestMixin):
 
   def testParseResultsC(self):
     self.maxDiff = None
 
     vm = DummyVM()
 
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECINT,
-                                                   vm, False)
-      self.assertEqual(samples, EXPECTED_RESULT_SPECINT)
+    samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECINT, vm, False)
+    self.assertSampleListsEqual(samples, EXPECTED_RESULT_SPECINT)
 
-      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECFP,
-                                                   vm, False)
-      self.assertEqual(samples, EXPECTED_RESULT_SPECFP)
+    samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECFP, vm, False)
+    self.assertSampleListsEqual(samples, EXPECTED_RESULT_SPECFP)
 
-      # By default, incomplete results result in error.
-      with self.assertRaises(errors.Benchmarks.RunError):
-        samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD1,
-                                                     vm, False)
+    # By default, incomplete results result in error.
+    with self.assertRaises(errors.Benchmarks.RunError):
+      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD1, vm, False)
 
-      with self.assertRaises(errors.Benchmarks.RunError):
-        samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD2,
-                                                     vm, False)
+    with self.assertRaises(errors.Benchmarks.RunError):
+      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD2, vm, False)
 
-      # Now use keep_partial_results
-      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD1, vm, True)
-      self.assertEqual(samples, EXPECTED_RESULT_BAD1)
+    # Now use keep_partial_results
+    samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD1, vm, True)
+    self.assertSampleListsEqual(samples, EXPECTED_RESULT_BAD1)
 
-      samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD2, vm, True)
-      self.assertEqual(samples, EXPECTED_RESULT_BAD2)
+    samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD2, vm, True)
+    self.assertSampleListsEqual(samples, EXPECTED_RESULT_BAD2)

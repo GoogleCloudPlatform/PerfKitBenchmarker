@@ -528,10 +528,11 @@ class SampleCollector(object):
     """Adds data samples to the publisher.
 
     Args:
-      samples: Either a list of Sample objects (preferred) or a list of 3 or
-        4-tuples (deprecated). The tuples contain the metric name (string), the
+      samples: Either a list of Sample objects (preferred) or a list of 3, 4, or
+        5-tuples (deprecated). The tuples contain the metric name (string), the
         value (float), and unit (string) of each sample. If a 4th element is
-        included, it is a dictionary of metadata associated with the sample.
+        included, it is a dictionary of metadata associated with the sample. If
+        a 5th element is included, it is the sample's timestamp.
       benchmark: string. The name of the benchmark.
       benchmark_spec: BenchmarkSpec. Benchmark specification.
     """

@@ -15,16 +15,13 @@
 """Tests for bonnie_benchmark."""
 
 import os
-import time
 import unittest
-
-import mock
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.benchmarks import bonnie_benchmark
 
 
-class BonnieBenchmarkTestCase(unittest.TestCase):
+class BonnieBenchmarkTestCase(unittest.TestCase, sample.SamplesTestMixin):
 
   def setUp(self):
     path = os.path.join(os.path.dirname(__file__), '..', 'data',
@@ -33,8 +30,7 @@ class BonnieBenchmarkTestCase(unittest.TestCase):
       self.contents = fp.read()
 
   def testParseCSVResults(self):
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      result = bonnie_benchmark.ParseCSVResults(self.contents)
+    result = bonnie_benchmark.ParseCSVResults(self.contents)
     expected_result = [
         ['put_block', 72853.0, 'K/sec',
          {'name': 'perfkit-7b22f510-0', 'format_version': '1.96',
@@ -140,10 +136,9 @@ class BonnieBenchmarkTestCase(unittest.TestCase):
          {'name': 'perfkit-7b22f510-0', 'format_version': '1.96',
           'num_files': '100', 'seed': '1421800799', 'concurrency': '1',
           'file_size': '7423M', 'bonnie_version': '1.96'}]]
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      expected_result = [sample.Sample(*sample_tuple)
-                         for sample_tuple in expected_result]
-    self.assertEqual(result, expected_result)
+    expected_result = [sample.Sample(*sample_tuple)
+                       for sample_tuple in expected_result]
+    self.assertSampleListsEqual(result, expected_result)
 
 
 if __name__ == '__main__':

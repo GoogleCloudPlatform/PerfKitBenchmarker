@@ -74,3 +74,41 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
   def asdict(self):
     """Converts the Sample to a dictionary."""
     return self._asdict()
+
+
+class SamplesTestMixin(object):
+  """A mixin for unittest.TestCase that adds a type-specific equality
+  predicate for samples.
+  """
+
+  def __init__(self, *args, **kwargs):
+    super(SamplesTestMixin, self).__init__(self, *args, **kwargs)
+
+    self.addTypeEqualityFunc(Sample, self.assertSamplesEqual)
+
+  def assertSamplesEqual(self, a, b, msg=None):
+    self.assertEqual(a.metric, b.metric,
+                     msg or 'Samples %s and %s have different metrics' % (a, b))
+    self.assertEqual(a.value, b.value,
+                     msg or 'Samples %s and %s have different values' % (a, b))
+    self.assertEqual(a.unit, b.unit,
+                     msg or 'Samples %s and %s have different units' % (a, b))
+    self.assertEqual(a.metadata, b.metadata,
+                     msg or 'Samples %s and %s have different metadata' %
+                     (a, b))
+    # Deliberately don't compare the timestamp fields of the samples.
+
+  def assertSampleListsEqual(self, a, b, msg=None):
+    """Compare two lists of samples.
+
+    Sadly, the builtin assertListsEqual will only use Python's
+    built-in equality predicate for testing the equality of elements
+    in a list. Since we compare lists of samples a lot, we need a
+    custom test for that.
+    """
+
+    self.assertEqual(len(a), len(b), msg=msg)
+    for i in xrange(len(a)):
+      self.assertIsInstance(a[i], Sample)
+      self.assertIsInstance(b[i], Sample)
+      self.assertSamplesEqual(a[i], b[i], msg=msg)

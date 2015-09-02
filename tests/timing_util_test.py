@@ -13,10 +13,7 @@
 # limitations under the License.
 
 import re
-import time
 import unittest
-
-import mock
 
 from perfkitbenchmarker import flags_validators
 from perfkitbenchmarker import sample
@@ -55,7 +52,7 @@ class ValidateMeasurementsFlagTestCase(unittest.TestCase):
         validate(['end_to_end_runtime', 'runtimes', 'timestamps']), True)
 
 
-class IntervalTimerTestCase(unittest.TestCase):
+class IntervalTimerTestCase(unittest.TestCase, sample.SamplesTestMixin):
   """Tests exercising IntervalTimer."""
 
   def testMeasureSequential(self):
@@ -138,13 +135,12 @@ class IntervalTimerTestCase(unittest.TestCase):
     stop0 = timer.intervals[0][2]
     start1 = timer.intervals[1][1]
     stop1 = timer.intervals[1][2]
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      samples = timer.GenerateSamples(
-          include_runtime=True, include_timestamps=False)
-      exp_samples = [
-          sample.Sample('First Runtime', stop0 - start0, 'seconds'),
-          sample.Sample('Second Runtime', stop1 - start1, 'seconds')]
-    self.assertEqual(samples, exp_samples)
+    samples = timer.GenerateSamples(
+        include_runtime=True, include_timestamps=False)
+    exp_samples = [
+        sample.Sample('First Runtime', stop0 - start0, 'seconds'),
+        sample.Sample('Second Runtime', stop1 - start1, 'seconds')]
+    self.assertSampleListsEqual(samples, exp_samples)
 
   def testGenerateSamplesTimestampsNoRuntime(self):
     """Test generating timestamp samples but no runtime sample."""
@@ -157,15 +153,14 @@ class IntervalTimerTestCase(unittest.TestCase):
     stop0 = timer.intervals[0][2]
     start1 = timer.intervals[1][1]
     stop1 = timer.intervals[1][2]
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      samples = timer.GenerateSamples(
-          include_runtime=False, include_timestamps=True)
-      exp_samples = [
-          sample.Sample('First Start Timestamp', start0, 'seconds'),
-          sample.Sample('First Stop Timestamp', stop0, 'seconds'),
-          sample.Sample('Second Start Timestamp', start1, 'seconds'),
-          sample.Sample('Second Stop Timestamp', stop1, 'seconds')]
-    self.assertEqual(samples, exp_samples)
+    samples = timer.GenerateSamples(
+        include_runtime=False, include_timestamps=True)
+    exp_samples = [
+        sample.Sample('First Start Timestamp', start0, 'seconds'),
+        sample.Sample('First Stop Timestamp', stop0, 'seconds'),
+        sample.Sample('Second Start Timestamp', start1, 'seconds'),
+        sample.Sample('Second Stop Timestamp', stop1, 'seconds')]
+    self.assertSampleListsEqual(samples, exp_samples)
 
   def testGenerateSamplesRuntimeAndTimestamps(self):
     """Test generating both runtime and timestamp samples."""
@@ -178,17 +173,16 @@ class IntervalTimerTestCase(unittest.TestCase):
     stop0 = timer.intervals[0][2]
     start1 = timer.intervals[1][1]
     stop1 = timer.intervals[1][2]
-    with mock.patch(time.__name__ + '.time', return_value=1.0):
-      samples = timer.GenerateSamples(
-          include_runtime=True, include_timestamps=True)
-      exp_samples = [
-          sample.Sample('First Runtime', stop0 - start0, 'seconds'),
-          sample.Sample('First Start Timestamp', start0, 'seconds'),
-          sample.Sample('First Stop Timestamp', stop0, 'seconds'),
-          sample.Sample('Second Runtime', stop1 - start1, 'seconds'),
-          sample.Sample('Second Start Timestamp', start1, 'seconds'),
-          sample.Sample('Second Stop Timestamp', stop1, 'seconds')]
-    self.assertEqual(samples, exp_samples)
+    samples = timer.GenerateSamples(
+        include_runtime=True, include_timestamps=True)
+    exp_samples = [
+        sample.Sample('First Runtime', stop0 - start0, 'seconds'),
+        sample.Sample('First Start Timestamp', start0, 'seconds'),
+        sample.Sample('First Stop Timestamp', stop0, 'seconds'),
+        sample.Sample('Second Runtime', stop1 - start1, 'seconds'),
+        sample.Sample('Second Start Timestamp', start1, 'seconds'),
+        sample.Sample('Second Stop Timestamp', stop1, 'seconds')]
+    self.assertSampleListsEqual(samples, exp_samples)
 
 
 if __name__ == '__main__':
