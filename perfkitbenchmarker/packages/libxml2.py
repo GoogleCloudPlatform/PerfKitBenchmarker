@@ -27,4 +27,7 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the libxml2 package-version 2.7.6 on the VM."""
   vm.InstallPackages('gcc build-essential')
-  vm.RemoteCommand('cd %s && wget xmlsoft.org/sources/libxml2-2.7.6.tar.gz && tar xzf libxml2-2.7.6.tar.gz && cd libxml2-2.7.6 && ./configure && make && sudo make install' % posixpath.join(vm_util.VM_TMP_DIR, 'web-release'))
+  vm.RemoteCommand('cd %s && wget xmlsoft.org/sources/libxml2-2.7.6.tar.gz && '
+                   'tar xzf libxml2-2.7.6.tar.gz && cd libxml2-2.7.6 && '
+                   './configure && make && sudo make install'
+                   % posixpath.join(vm_util.VM_TMP_DIR, 'web-release'))

@@ -22,14 +22,12 @@ import re
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker.packages import nginx
 from perfkitbenchmarker.packages import php
-from perfkitbenchmarker.packages.openjdk7 import JAVA_HOME
 
 # options for the workload
 LOAD_SCALE = '100'
-DEFAULT_CLUSTER_SIZE = 2
+NUM_VMS = 3
 BASE_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'web-release')
 # environment variables
 CATALINA_HOME = '%s/apache-tomcat-6.0.35' % BASE_DIR
@@ -47,15 +45,15 @@ OLIO_BUILD = '%s/apache-olio-php-src-0.2/workload/php/trunk/' % BASE_DIR
 MY_CNF = '/etc/my.cnf'
 NGINX_CONF = '%s/nginx.conf' % BASE_DIR
 CL = 0
-BK = 0
-FR = 1
+BK = 1
+FR = 2
 
 FLAGS = flags.FLAGS
 
 BENCHMARK_INFO = {'name': 'webserving',
                   'description': 'Benchmark web2.0 apps with Cloudsuite',
                   'scratch_disk': True,
-                  'num_machines': DEFAULT_CLUSTER_SIZE}
+                  'num_machines': NUM_VMS}
 
 
 # install nginx, PHP, faban (agent)
@@ -161,7 +159,7 @@ def setupBackend(benchmark_spec):
   FRONTEND_IP = frontend.ip_address
   backend.Install('libaio')
   untar_command = ('cd %s && tar xzf %s')
-  backend.RemoteCommand(untar_command % 
+  backend.RemoteCommand(untar_command %
                         (BASE_DIR, 'mysql-5.5.20-linux2.6-x86_64.tar.gz'))
   copy_command = ('cd %s && sudo cp support-files/my-medium.cnf %s')
   backend.RemoteCommand(copy_command % (MYSQL_HOME, MY_CNF))
@@ -170,24 +168,25 @@ def setupBackend(benchmark_spec):
   backend.RobustRemoteCommand('cd %s && ./bin/mysqld_safe &' % MYSQL_HOME)
   time.sleep(15)
   sql_cmd = 'create user \'olio\'@\'%\' identified by \'olio\';'
-  backend.RemoteCommand('cd %s'
-                        ' && ./bin/mysql -uroot -e "%s"' % (MYSQL_HOME, sql_cmd))
-  backend.RemoteCommand('cd %s && ./bin/mysql -uroot -e "grant all privileges on'
-                        ' *.* to \'olio\'@\'localhost\' identified by \'olio\' '
-                        'with grant option; grant all privileges on *.* to '
+  backend.RemoteCommand('cd %s && '
+                        './bin/mysql -uroot -e "%s"' % (MYSQL_HOME, sql_cmd))
+  backend.RemoteCommand('cd %s && ./bin/mysql -uroot -e "grant all privileges '
+                        'on *.* to \'olio\'@\'localhost\' '
+                        'identified by \'olio\' with grant option; '
+                        'grant all privileges on *.* to '
                         '\'olio\'@\'%s\' identified by \'olio\' with grant '
                         'option;"' % (MYSQL_HOME, FRONTEND_IP))
   backend.RemoteCommand('cd %s && ./bin/mysql -uroot -e "create database olio;'
-                       'use olio; \. %s/benchmarks/OlioDriver/bin/schema.sql"'
-                       % (MYSQL_HOME, FABAN_HOME))
+                        'use olio; \. %s/benchmarks/OlioDriver/bin/schema.sql"'
+                        % (MYSQL_HOME, FABAN_HOME))
   populate_db_command = ('export JAVA_HOME=%s && '
                          'cd %s/benchmarks/OlioDriver/bin'
                          '&& chmod +x dbloader.sh && ./dbloader.sh localhost '
                          '%s')
   backend.RobustRemoteCommand(populate_db_command
-                        % (JAVA_HOME, FABAN_HOME, LOAD_SCALE))
+                              % (JAVA_HOME, FABAN_HOME, LOAD_SCALE))
   time.sleep(100)
-  backend.RemoteCommand(untar_command % 
+  backend.RemoteCommand(untar_command %
                         (BASE_DIR, 'apache-tomcat-6.0.35.tar.gz'))
   backend.RemoteCommand('cd %s/apache-tomcat-6.0.35/bin && '
                         'tar xzf commons-daemon-native.tar.gz' % (BASE_DIR))
@@ -197,20 +196,19 @@ def setupBackend(benchmark_spec):
   backend.InstallPackages('gcc build-essential')
   backend.RemoteCommand(build_tomcat % (JAVA_HOME, CATALINA_HOME))
   backend.RemoteCommand('mkdir %s' % GEOCODER_HOME)
-  str = '%s:%s/geocoder' % (CLIENT_IP, OLIO_HOME)
-  backend.RemoteCommand('scp -r -o StrictHostKeyChecking=no %s:%s/geocoder %s' % (CLIENT_IP, OLIO_HOME, GEOCODER_HOME))
-  #backend.RemoteHostCopy(str, GEOCODER_HOME, True)
+  backend.RemoteCommand('scp -r -o StrictHostKeyChecking=no %s:%s/geocoder %s' %
+                        (CLIENT_IP, OLIO_HOME, GEOCODER_HOME))
   backend.RemoteCommand('cd %s/geocoder && cp build.properties.template '
-                       'build.properties' % GEOCODER_HOME)
+                        'build.properties' % GEOCODER_HOME)
   editor_command = ('perl -pi -e '
                     '"s/\/usr\/local\/apache-tomcat-6.0.13\/lib/%s\/lib/g"'
                     ' %s/geocoder/build.properties')
   backend.RemoteCommand(editor_command %
-                       ('\/tmp\/pkb\/web-release\/apache-tomcat-6.0.35',
-                        GEOCODER_HOME))
+                        ('\/tmp\/pkb\/web-release\/apache-tomcat-6.0.35',
+                         GEOCODER_HOME))
   backend.RemoteCommand('cd %s/geocoder && %s/ant all &&'
-                       'cp dist/geocoder.war %s/webapps'
-                       % (GEOCODER_HOME, ANT_HOME, CATALINA_HOME))
+                        'cp dist/geocoder.war %s/webapps'
+                        % (GEOCODER_HOME, ANT_HOME, CATALINA_HOME))
   run_tomcat = ('%s/bin/startup.sh')
   backend.RemoteCommand(run_tomcat % CATALINA_HOME)
   return
@@ -228,9 +226,9 @@ def setupClient(benchmark_spec):
   FRONTEND_IP = frontend.ip_address
   untar_command = ('cd %s && tar xzf %s')
   client.RemoteCommand(untar_command % (BASE_DIR, 'faban-kit-022311.tar.gz'))
-  client.RemoteCommand(untar_command % 
+  client.RemoteCommand(untar_command %
                        (BASE_DIR, 'apache-olio-php-src-0.2.tar.gz'))
-  client.RemoteCommand(untar_command % 
+  client.RemoteCommand(untar_command %
                        (BASE_DIR, 'mysql-connector-java-5.0.8.tar.gz'))
   client.RemoteCommand('cp %s/mysql-connector-java-5.0.8/mysql-connector'
                        '-java-5.0.8-bin.jar %s/workload/php/trunk/lib'
@@ -249,7 +247,7 @@ def setupClient(benchmark_spec):
   client.RemoteCommand('perl -pi -e '
                        '"s/\/export\/home\/faban/%s'
                        '/g" %s/workload/php/trunk/build.properties'
-                       % (re.escape(FABAN_HOME),OLIO_HOME))
+                       % (re.escape(FABAN_HOME), OLIO_HOME))
   client.RemoteCommand('perl -pi -e "s/host.sfbay/localhost/g" '
                        '%s/workload/php/trunk/build.properties'
                        % OLIO_HOME)
@@ -263,7 +261,7 @@ def setupClient(benchmark_spec):
   client.RemoteCommand('cd %s/benchmarks && jar xf OlioDriver.jar' % FABAN_HOME)
   client.RemoteCommand('curl http://%s:9980/' % CLIENT_IP)
   client.RemoteCommand('cp -R %s/workload/php/trunk/build %s/'
-                        % (OLIO_HOME, FABAN_HOME))      
+                       % (OLIO_HOME, FABAN_HOME))
   client.RemoteCommand('cp -R %s/workload/php/trunk/lib %s/lib_olio'
                        % (OLIO_HOME, FABAN_HOME))
   client.RemoteCommand('cd %s '
@@ -276,33 +274,34 @@ def setupClient(benchmark_spec):
                              'cp -f %s'
                              '/run.xml . && '
                              'cp -f %s'
-                             '/driver.policy . && '                                                                                  'cp -rf %s/build . && '
+                             '/driver.policy . && '
+                             'cp -rf %s/build . && '
                              'mkdir -p lib_olio && '
                              'cp -rf %s/* lib_olio/ && '
                              'cp -rf %s/resources build/ && '
                              'export FABAN_HOME=%s  '
                              % (FABAN_HOME, BASE_DIR, BASE_DIR, BASE_DIR,
-                             OLIO_BUILD,OLIO_BUILD, OLIO_BUILD,
-                             FABAN_HOME))
+                                OLIO_BUILD, OLIO_BUILD, OLIO_BUILD,
+                                FABAN_HOME))
   client.RemoteCommand('perl -pi -e '
                        '"s/CLIENT_IP/%s/g"'
-                       ' %s/run.xml' % (CLIENT_IP,FABAN_HOME))
+                       ' %s/run.xml' % (CLIENT_IP, FABAN_HOME))
   client.RemoteCommand('perl -pi -e '
                        '"s/FRONTEND_IP/%s/g"'
-                       ' %s/run.xml' % (FRONTEND_IP,FABAN_HOME))
+                       ' %s/run.xml' % (FRONTEND_IP, FABAN_HOME))
   client.RemoteCommand('perl -pi -e '
                        '"s/MYSQL_DIR/%s/g" '
-                       '%s/run.xml' % (re.escape(MYSQL_HOME),FABAN_HOME))
+                       '%s/run.xml' % (re.escape(MYSQL_HOME), FABAN_HOME))
   client.RemoteCommand('perl -pi -e '
                        '"s/OUTPUT_DIR/%s/g" '
                        '%s/run.xml' % (re.escape(OUTPUT_DIR), FABAN_HOME))
   filestore = posixpath.join(frontend.GetScratchDir(), 'filestore')
   client.RemoteCommand('perl -pi -e '
                        '"s/FILESTORE_DIR/%s/g" '
-                       '%s/run.xml' % (re.escape(filestore),FABAN_HOME))
+                       '%s/run.xml' % (re.escape(filestore), FABAN_HOME))
   client.RemoteCommand('perl -pi -e '
                        '"s/BACKEND_IP/%s/g" '
-                       '%s/run.xml' % (BACKEND_IP,FABAN_HOME))
+                       '%s/run.xml' % (BACKEND_IP, FABAN_HOME))
   return
 
 
@@ -318,6 +317,7 @@ def CheckPrerequisites():
   if FLAGS['num_vms'].present and FLAGS.num_vms < 3:
     raise ValueError('Web Serving requires at least 3 VMs')
   return
+
 
 def PreparePrivateKey(vm):
   vm.AuthenticateVm()
@@ -345,8 +345,8 @@ def Prepare(benchmark_spec):
                        'wget parsa.epfl.ch/cloudsuite/software/web.tar.gz && '
                        'tar xzf web.tar.gz' % vm_util.VM_TMP_DIR)
   backend.RemoteCommand('cd %s && '
-                       'wget parsa.epfl.ch/cloudsuite/software/web.tar.gz && '
-                       'tar xzf web.tar.gz' % vm_util.VM_TMP_DIR)
+                        'wget parsa.epfl.ch/cloudsuite/software/web.tar.gz && '
+                        'tar xzf web.tar.gz' % vm_util.VM_TMP_DIR)
   frontend.RemoteCommand('cd %s && '
                          'wget parsa.epfl.ch/cloudsuite/software/web.tar.gz && '
                          'tar xzf web.tar.gz' % vm_util.VM_TMP_DIR)
@@ -356,23 +356,20 @@ def Prepare(benchmark_spec):
                          'tar xzf webservingfiles.tgz' % BASE_DIR)
   setupClient(benchmark_spec)
   time.sleep(30)
-  str = '%s:%s' % (CLIENT_IP, FABAN_HOME)
-  frontend.RemoteCommand('scp -r -o StrictHostKeyChecking=no %s:%s %s' % (CLIENT_IP, FABAN_HOME, BASE_DIR))
-  backend.RemoteCommand('scp -r -o StrictHostKeyChecking=no %s:%s %s' % (CLIENT_IP, FABAN_HOME, BASE_DIR))
-  #frontend.RemoteHostCopy(str, BASE_DIR, True)
-  #backend.RemoteHostCopy(str, BASE_DIR, True)
+  frontend.RemoteCommand('scp -r -o StrictHostKeyChecking=no %s:%s %s' %
+                         (CLIENT_IP, FABAN_HOME, BASE_DIR))
+  backend.RemoteCommand('scp -r -o StrictHostKeyChecking=no %s:%s %s' %
+                        (CLIENT_IP, FABAN_HOME, BASE_DIR))
   setupBackend(benchmark_spec)
   setupFrontend(benchmark_spec)
   return
 
 
 def Run(benchmark_spec):
-  vms = benchmark_spec.vms
   client = benchmark_spec.vms[CL]
-  CLIENT_IP = client.ip_address
-  FRONTEND_IP = vms[FR].ip_address
   set_faban_home = ('export FABAN_HOME=%s && cd %s && ./run.sh')
   client.RobustRemoteCommand(set_faban_home % (FABAN_HOME, FABAN_HOME))
+
   def ParseOutput(client):
     stdout, _ = client.RemoteCommand('cd %s && cd $(ls -Art | tail -n 1) && '
                                      'cat summary.xml' % OUTPUT_DIR)
@@ -381,15 +378,11 @@ def Run(benchmark_spec):
     for value in ops_per_sec:
       sum_ops_per_sec += float(value)
     sum_ops_per_sec /= 2
-    num_ops_total = re.findall(r'\<totalOps unit="operations">(\d+)', stdout)
-    num_ops = 0
-    for value in num_ops_total:
-      num_ops += int(value)
-    return sum_ops_per_sec, num_ops
+    return sum_ops_per_sec
   results = []
-  sum_ops_per_sec, num_ops = ParseOutput(client)
-  results.append(sample.Sample('Operations per second', sum_ops_per_sec, 'ops/s'))
-  results.append(sample.Sample('Total Operations', num_ops, 'ops'))
+  sum_ops_per_sec = ParseOutput(client)
+  results.append(sample.Sample('Operations per second',
+                 sum_ops_per_sec, 'ops/s'))
   return results
 
 

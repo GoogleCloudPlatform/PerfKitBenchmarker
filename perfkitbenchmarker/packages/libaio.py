@@ -15,6 +15,7 @@
 
 """Module containing libaio installation and cleanup functions."""
 
+
 def YumInstall(vm):
   """Installs the libaio package on the VM."""
   vm.InstallPackages('libaio')
