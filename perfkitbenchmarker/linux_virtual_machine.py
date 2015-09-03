@@ -91,20 +91,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._remote_command_script_upload_lock = threading.Lock()
     self._has_remote_command_script = False
 
-  def __getstate__(self):
-    """Get state for pickling."""
-    d = self.__dict__.copy()
-    # Locks cannot be pickled, so we just drop it and create a new one in
-    # __setstate__.
-    del d['_remote_command_script_upload_lock']
-    return d
-
-  def __setstate__(self, state):
-    """Restores state after unpickling."""
-    self.__dict__ = state
-    # Locks cannot be pickled, so we create a new one after deserialization.
-    self._remote_command_script_upload_lock = threading.Lock()
-
   def _PushRobustCommandScripts(self):
     """Pushes the scripts required by RobustRemoteCommand to this VM.
 
