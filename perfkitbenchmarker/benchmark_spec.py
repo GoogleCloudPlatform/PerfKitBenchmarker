@@ -39,12 +39,16 @@ from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 from perfkitbenchmarker.rackspace import rackspace_network as rax_net
 from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
 
+from perfkitbenchmarker.centurylink import clc_network as clc_net
+from perfkitbenchmarker.centurylink import clc_virtual_machine as clc_vm
+
 GCP = 'GCP'
 AZURE = 'Azure'
 AWS = 'AWS'
 DIGITALOCEAN = 'DigitalOcean'
 OPENSTACK = 'OpenStack'
 RACKSPACE = 'Rackspace'
+CENTURYLINK = 'Centurylink'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
@@ -104,13 +108,19 @@ CLASSES = {
             RHEL: rax_vm.RhelBasedRackspaceVirtualMachine
         },
         FIREWALL: rax_net.RackspaceSecurityGroup
+    },
+    CENTURYLINK: {
+        VIRTUAL_MACHINE: {
+            DEBIAN: clc_vm.DebianBasedCenturylinkVirtualMachine,
+        },
+        FIREWALL: clc_net.CenturylinkFirewall
     }
 }
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP,
-                  [GCP, AZURE, AWS, DIGITALOCEAN, OPENSTACK, RACKSPACE],
+                  [GCP, AZURE, AWS, DIGITALOCEAN, OPENSTACK, RACKSPACE, CENTURYLINK],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
@@ -348,7 +358,6 @@ class BenchmarkSpec(object):
 
   def PickleSpec(self):
     """Pickles the spec so that it can be unpickled on a subsequent run."""
-    self.networks = network.BaseNetwork.networks
     with open(self.file_name, 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)
 
@@ -369,7 +378,6 @@ class BenchmarkSpec(object):
     except Exception as e:  # pylint: disable=broad-except
       logging.error('Unable to unpickle spec file for benchmark %s.', name)
       raise e
-    network.BaseNetwork.networks = spec.networks
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.
     spec.deleted = False

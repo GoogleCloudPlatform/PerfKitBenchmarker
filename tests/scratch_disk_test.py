@@ -31,6 +31,8 @@ from perfkitbenchmarker.azure import azure_disk
 from perfkitbenchmarker.azure import azure_virtual_machine
 from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.gcp import gce_virtual_machine
+from perfkitbenchmarker.centurylink import clc_disk
+from perfkitbenchmarker.centurylink import clc_virtual_machine
 
 
 class ScratchDiskTestMixin(object):
