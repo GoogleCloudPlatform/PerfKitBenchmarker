@@ -31,28 +31,88 @@ class TestGetIODepths(unittest.TestCase):
 
 class TestGenerateJobFileString(unittest.TestCase):
   def setUp(self):
-    # self.disk = mock.Mock(mount_point='/foo', disk_size=100)
-    # self.disk.GetDevicePath = mock.MagicMock(return_value='/bar')
-
     self.disk_spec = disk.BaseDiskSpec(100, 'remote_ssd', '/scratch0')
     self.disk = gce_disk.GceDisk(self.disk_spec, 'foo', 'us-central1-a', 'proj')
 
   def testAgainstDevice(self):
-    # This just checks that the template renders.
-    fio_benchmark.GenerateJobFileString(
-        self.disk,
-        True,
-        [fio_benchmark.SCENARIOS['sequential_read']],
-        range(1, 5),
-        None)
+    expected_jobfile = """
+[global]
+ioengine=libaio
+invalidate=1
+direct=1
+runtime=10m
+time_based
+filename=/dev/disk/by-id/google-foo
+do_verify=0
+verify_fatal=0
+randrepeat=0
+
+
+
+[sequential_read-io-depth-1]
+stonewall
+rw=read
+blocksize=512k
+iodepth=1
+size=100%
+
+[sequential_read-io-depth-2]
+stonewall
+rw=read
+blocksize=512k
+iodepth=2
+size=100%
+
+"""
+
+    self.assertEqual(
+        fio_benchmark.GenerateJobFileString(
+            self.disk,
+            True,
+            [fio_benchmark.SCENARIOS['sequential_read']],
+            [1, 2],
+            None),
+        expected_jobfile)
 
   def testAgainstFile(self):
-    fio_benchmark.GenerateJobFileString(
-        self.disk,
-        False,
-        [fio_benchmark.SCENARIOS['sequential_read']],
-        range(1, 5),
-        None)
+    expected_jobfile = """
+[global]
+ioengine=libaio
+invalidate=1
+direct=1
+runtime=10m
+time_based
+filename=/scratch0/fio-temp-file
+do_verify=0
+verify_fatal=0
+randrepeat=0
+
+
+
+[sequential_read-io-depth-1]
+stonewall
+rw=read
+blocksize=512k
+iodepth=1
+size=100%
+
+[sequential_read-io-depth-2]
+stonewall
+rw=read
+blocksize=512k
+iodepth=2
+size=100%
+
+"""
+
+    self.assertEqual(
+        fio_benchmark.GenerateJobFileString(
+            self.disk,
+            False,
+            [fio_benchmark.SCENARIOS['sequential_read']],
+            [1, 2],
+            None),
+        expected_jobfile)
 
 
 if __name__ == '__main__':

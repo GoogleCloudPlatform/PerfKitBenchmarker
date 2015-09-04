@@ -136,7 +136,7 @@ BENCHMARK_INFO = {'name': 'fio',
                   'num_machines': 1}
 
 
-GLOBALS_TEMPLATE = """
+JOB_FILE_TEMPLATE = """
 [global]
 ioengine=libaio
 invalidate=1
@@ -147,16 +147,16 @@ filename={{filename}}
 do_verify=0
 verify_fatal=0
 randrepeat=0
-"""
 
-JOB_TEMPLATE = """
+{% for scenario in scenarios %}
 {% for iodepth in iodepths %}
-[{{name}}-io-depth-{{iodepth}}]
+[{{scenario['name']}}-io-depth-{{iodepth}}]
 stonewall
-rw={{rwkind}}
-blocksize={{blocksize}}
+rw={{scenario['rwkind']}}
+blocksize={{scenario['blocksize']}}
 iodepth={{iodepth}}
 size={{size}}
+{% endfor %}
 {% endfor %}
 """
 
@@ -202,26 +202,20 @@ def GenerateJobFileString(disk, against_device,
   else:
     filename = posixpath.join(disk.mount_point, DEFAULT_TEMP_FILE_NAME)
 
-  globals_template = jinja2.Template(GLOBALS_TEMPLATE,
-                                     undefined=jinja2.StrictUndefined)
-  job_template = jinja2.Template(JOB_TEMPLATE,
-                                 undefined=jinja2.StrictUndefined)
-
-  file_string = str(globals_template.render(filename=filename))
   size_string = str(working_set_size) + 'G' if working_set_size else '100%'
-  for scenario in scenarios:
-    file_string = file_string + str(job_template.render(
-        name=scenario['name'],
-        rwkind=scenario['rwkind'],
-        blocksize=scenario['blocksize'],
-        iodepths=io_depths,
-        size=size_string))
 
-  return file_string
+  job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
+                                      undefined=jinja2.StrictUndefined)
+
+  return str(job_file_template.render(
+      filename=filename,
+      size=size_string,
+      scenarios=scenarios,
+      iodepths=io_depths))
 
 
-def JobFileString(fio_jobfile, disk, against_device,
-                  scenario_strings, io_depths, working_set_size):
+def GetOrGenerateJobFileString(fio_jobfile, disk, against_device,
+                               scenario_strings, io_depths, working_set_size):
   """Get the contents of the fio job file we're working with.
 
   This will either read the user's job file, if given, or generate a
@@ -320,12 +314,12 @@ def Prepare(benchmark_spec):
 
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
-    job_file.write(JobFileString(FLAGS.fio_jobfile,
-                                 disk,
-                                 FLAGS.against_device,
-                                 FLAGS.generate_scenarios,
-                                 GetIODepths(FLAGS.io_depths),
-                                 FLAGS.working_set_size))
+    job_file.write(GetOrGenerateJobFileString(FLAGS.fio_jobfile,
+                                              disk,
+                                              FLAGS.against_device,
+                                              FLAGS.generate_scenarios,
+                                              GetIODepths(FLAGS.io_depths),
+                                              FLAGS.working_set_size))
     logging.info('Wrote fio job file at %s', job_file_path)
 
   vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
@@ -353,13 +347,14 @@ def Run(benchmark_spec):
   stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
 
   disk = vm.scratch_disks[0]
-  return fio.ParseResults(JobFileString(FLAGS.fio_jobfile,
-                                        disk,
-                                        FLAGS.against_device,
-                                        FLAGS.generate_scenarios,
-                                        GetIODepths(FLAGS.io_depths),
-                                        FLAGS.working_set_size),
-                          json.loads(stdout))
+  return fio.ParseResults(
+      GetOrGenerateJobFileString(FLAGS.fio_jobfile,
+                                 disk,
+                                 FLAGS.against_device,
+                                 FLAGS.generate_scenarios,
+                                 GetIODepths(FLAGS.io_depths),
+                                 FLAGS.working_set_size),
+      json.loads(stdout))
 
 
 def Cleanup(benchmark_spec):
