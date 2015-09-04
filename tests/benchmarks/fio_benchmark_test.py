@@ -114,6 +114,49 @@ size=100%
             None),
         expected_jobfile)
 
+  def testMultipleScenarios(self):
+    expected_jobfile = """
+[global]
+ioengine=libaio
+invalidate=1
+direct=1
+runtime=10m
+time_based
+filename=/scratch0/fio-temp-file
+do_verify=0
+verify_fatal=0
+randrepeat=0
+
+
+
+[sequential_read-io-depth-1]
+stonewall
+rw=read
+blocksize=512k
+iodepth=1
+size=100%
+
+
+
+[sequential_write-io-depth-1]
+stonewall
+rw=write
+blocksize=512k
+iodepth=1
+size=100%
+
+"""
+
+    self.assertEqual(
+        fio_benchmark.GenerateJobFileString(
+            self.disk,
+            False,
+            [fio_benchmark.SCENARIOS['sequential_read'],
+             fio_benchmark.SCENARIOS['sequential_write']],
+            [1],
+            None),
+        expected_jobfile)
+
 
 if __name__ == '__main__':
   unittest.main()
