@@ -81,7 +81,8 @@ flags.DEFINE_string('device_fill_size', '100%',
                     'The valid value can either be an integer, which '
                     'represents the number of bytes to fill or a '
                     'percentage, which represents the percentage '
-                    'of the device.')
+                    'of the device. Default to filling 100% of a raw device or '
+                    '90% of a filesystem.')
 flags.DEFINE_string('io_depths', '1',
                     'IO queue depths to run on. Can specify a single number, '
                     'like --io_depths=1, or a range, like --io_depths=1-4')
@@ -183,7 +184,7 @@ def GetIODepths(io_depths):
 
 def GenerateJobFileString(disk, against_device,
                           scenarios, io_depths, working_set_size):
-  """Write a fio job file.
+  """Make a string with our fio job file.
 
   Args:
     disk: the disk.BaseDisk object we're benchmarking with.
@@ -221,7 +222,10 @@ def GenerateJobFileString(disk, against_device,
 
 def JobFileString(fio_jobfile, disk, against_device,
                   scenario_strings, io_depths, working_set_size):
-  """Get the contents of our job file.
+  """Get the contents of the fio job file we're working with.
+
+  This will either read the user's job file, if given, or generate a
+  new one.
 
   Args:
     fio_jobfile: string or None. The path to the user's jobfile, if provided.
@@ -231,10 +235,9 @@ def JobFileString(fio_jobfile, disk, against_device,
       generate.
     io_depths: iterable. The IO queue depths to test.
     working_set_size: int or None. If int, the size of the working set in GB.
-    vm: the virtual_machine.BaseVirtualMachine that we will run on.
 
   Returns:
-    A string containing the user's job file.
+    A string containing a fio job file.
   """
 
   # The default behavior is to run with the standard fio job file.
@@ -336,10 +339,7 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of samples in the form of 3 or 4 tuples. The tuples contain
-        the sample metric (string), value (float), and unit (string).
-        If a 4th element is included, it is a dictionary of sample
-        metadata.
+    A list of sample.Sample objects.
   """
   vm = benchmark_spec.vms[0]
   logging.info('FIO running on %s', vm)
