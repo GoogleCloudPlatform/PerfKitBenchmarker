@@ -126,6 +126,8 @@ def ParseResults(job_file, fio_json_result):
     A list of sample.Sample objects.
   """
   samples = []
+  # The samples should all have the same timestamp because they
+  # come from the same fio run.
   timestamp = time.time()
   parameter_metadata = ParseJobFile(job_file)
   io_modes = ['read', 'write', 'trim']
@@ -135,9 +137,6 @@ def ParseResults(job_file, fio_json_result):
       if job[mode]['io_bytes']:
         metric_name = '%s:%s' % (job_name, mode)
         parameters = parameter_metadata[job_name]
-        # The samples should all have the same timestamp because they
-        # come from the same fio run.
-        parameters['timestamp'] = timestamp
         parameters['fio_job'] = job_name
         bw_metadata = {
             'bw_min': job[mode]['bw_min'],
@@ -188,16 +187,16 @@ def ParseResults(job_file, fio_json_result):
         samples.append(
             sample.Sample('%s:latency' % metric_name,
                           job[mode]['clat']['mean'],
-                          'usec', lat_metadata))
+                          'usec', lat_metadata, timestamp))
 
         for stat_name, stat_val in lat_statistics:
           samples.append(
               sample.Sample('%s:latency:%s' % (metric_name, stat_name),
-                            stat_val, 'usec', parameters))
+                            stat_val, 'usec', parameters, timestamp))
 
         samples.append(
             sample.Sample('%s:iops' % metric_name,
-                          job[mode]['iops'], '', parameters))
+                          job[mode]['iops'], '', parameters, timestamp))
   return samples
 
 
