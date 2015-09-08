@@ -752,6 +752,7 @@ class GoogleCloudStorageBenchmark(object):
                      '--rc-path=.bash_profile '
                      '--path-update=true '
                      '--bash-completion=true')
+    vm.RemoteCommand('sudo pip install -U crcmod')
 
     try:
       vm.RemoteCommand('mkdir .config')
