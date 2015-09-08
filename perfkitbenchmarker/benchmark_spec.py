@@ -16,6 +16,9 @@
 
 import logging
 import pickle
+import copy_reg
+import thread
+import threading
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -38,6 +41,19 @@ from perfkitbenchmarker.openstack import os_network as openstack_network
 from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 from perfkitbenchmarker.rackspace import rackspace_network as rax_net
 from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
+
+
+def PickleLock(lock):
+    return threading.Lock, (lock.locked(),)
+
+
+def UnPickleLock(locked, *args):
+    lock = threading.Lock()
+    if locked:
+        if not lock.acquire(False):
+            raise pickle.UnpicklingError("Cannot acquire lock")
+
+copy_reg.pickle(thread.LockType, PickleLock, UnPickleLock)
 
 GCP = 'GCP'
 AZURE = 'Azure'
