@@ -73,11 +73,11 @@ class OpenStackPublicNetwork(object):
     def __init__(self, pool):
         self.__nclient = utils.NovaClient()
         self.__floating_ip_lock = threading.Lock()
-        self.pool = pool
+        self.ip_pool_name = pool
 
     def allocate(self):
         with self.__floating_ip_lock:
-            return self.__nclient.floating_ips.create(pool=self.pool)
+            return self.__nclient.floating_ips.create(pool=self.ip_pool_name)
 
     def release(self, floating_ip):
         f_id = floating_ip.id
@@ -92,7 +92,7 @@ class OpenStackPublicNetwork(object):
         with self.__floating_ip_lock:
             floating_ips = self.__nclient.floating_ips.findall(
                 fixed_ip=None,
-                pool=self.pool
+                pool=self.ip_pool_name
             )
         if floating_ips:
             return floating_ips[0]
