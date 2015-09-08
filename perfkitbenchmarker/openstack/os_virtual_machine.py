@@ -19,6 +19,7 @@ from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.openstack import os_disk
+from perfkitbenchmarker.openstack import os_network
 from perfkitbenchmarker.openstack import utils as os_utils
 
 UBUNTU_IMAGE = 'ubuntu-14.04'
@@ -56,6 +57,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
                                                FLAGS.run_uri)
         self.client = os_utils.NovaClient()
+        self.public_network = os_network.OpenStackPublicNetwork(
+            FLAGS.openstack_public_network
+        )
         self.id = None
         self.pk = None
         self.user_name = self.DEFAULT_USERNAME
@@ -122,9 +126,13 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             time.sleep(5)
             instance = self.client.servers.get(self.id)
             status = instance.status
-        self.floating_ip = self.client.floating_ips.create(
-            pool=FLAGS.openstack_public_network)
+
+        self.floating_ip = self.public_network.get_or_create()
         instance.add_floating_ip(self.floating_ip)
+
+        while not self.public_network.is_attached(self.floating_ip):
+            time.sleep(1)
+
         self.ip_address = self.floating_ip.ip
         self.internal_ip = instance.networks[
             FLAGS.openstack_private_network][0]
@@ -134,9 +142,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         try:
             self.client.servers.delete(self.id)
             time.sleep(5)
-            self.client.floating_ips.delete(self.floating_ip)
         except os_utils.NotFound:
             logging.info('Instance already deleted')
+
+        self.public_network.release(self.floating_ip)
 
     @os_utils.retry_authorization(max_retries=4)
     def _Exists(self):
