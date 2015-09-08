@@ -31,7 +31,7 @@ flags.DEFINE_boolean('openstack_config_drive', False,
 flags.DEFINE_boolean('openstack_boot_from_volume', False,
                      'Boot from volume instead of an image')
 
-flags.DEFINE_integer('openstack_volume_size', 20,
+flags.DEFINE_integer('openstack_volume_size', -1,
                      'Size of the volume (GB)')
 
 
@@ -75,10 +75,16 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         image_id = image.id
         boot_from_vol = []
         if FLAGS.openstack_boot_from_volume:
+
+            if FLAGS.openstack_volume_size > 0:
+                volume_size = FLAGS.openstack_volume_size
+            else:
+                volume_size = flavor.disk
+
             image_id = None
             boot_from_vol = [{'boot_index': 0,
                               'uuid': image.id,
-                              'volume_size': FLAGS.openstack_volume_size,
+                              'volume_size': volume_size,
                               'source_type': 'image',
                               'destination_type': 'volume',
                               'delete_on_termination': True}]
