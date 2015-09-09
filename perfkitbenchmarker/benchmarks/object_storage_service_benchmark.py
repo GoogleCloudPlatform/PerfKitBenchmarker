@@ -781,7 +781,15 @@ class GoogleCloudStorageBenchmark(object):
     result_string = re.findall(search_string, raw_result)
     if len(result_string) == 0:
       logging.info('compiled crcmod is not available, installing now...')
-      vm.RemoteCommand('sudo pip install -U crcmod')
+      try:
+        # Try uninstall first just in case there is a pure python version of
+        # crcmod on the system already.
+        vm.RemoteCommand('/usr/bin/yes |sudo pip uninstall crcmod')
+      except:
+        logging.info('pip uninstall crcmod failed, could be normal if crcmod '
+                     'is not available at all.')
+        pass
+      vm.Install('crcmod')
       vm.installed_crcmod = True
     else:
       logging.info('compiled crcmod is available, not installing again.')
