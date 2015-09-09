@@ -18,10 +18,11 @@ import os
 import unittest
 
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker.windows_packages import ntttcp
 
 
-class NtttcpBenchmarkTestCase(unittest.TestCase, sample.SamplesTestMixin):
+class NtttcpBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
     self.maxDiff = None
@@ -60,4 +61,4 @@ class NtttcpBenchmarkTestCase(unittest.TestCase, sample.SamplesTestMixin):
         sample.Sample('Thread Throughput', 1014.669, 'Mbps',
                       expected_thread_1_metadata)]
 
-    self.assertSampleListsEqual(expected_samples, samples)
+    self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)

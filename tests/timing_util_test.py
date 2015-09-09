@@ -17,6 +17,7 @@ import unittest
 
 from perfkitbenchmarker import flags_validators
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker import timing_util
 
 
@@ -52,7 +53,7 @@ class ValidateMeasurementsFlagTestCase(unittest.TestCase):
         validate(['end_to_end_runtime', 'runtimes', 'timestamps']), True)
 
 
-class IntervalTimerTestCase(unittest.TestCase, sample.SamplesTestMixin):
+class IntervalTimerTestCase(unittest.TestCase, test_util.SamplesTestMixin):
   """Tests exercising IntervalTimer."""
 
   def testMeasureSequential(self):
@@ -140,7 +141,7 @@ class IntervalTimerTestCase(unittest.TestCase, sample.SamplesTestMixin):
     exp_samples = [
         sample.Sample('First Runtime', stop0 - start0, 'seconds'),
         sample.Sample('Second Runtime', stop1 - start1, 'seconds')]
-    self.assertSampleListsEqual(samples, exp_samples)
+    self.assertSampleListsEqualUpToTimestamp(samples, exp_samples)
 
   def testGenerateSamplesTimestampsNoRuntime(self):
     """Test generating timestamp samples but no runtime sample."""
@@ -160,7 +161,7 @@ class IntervalTimerTestCase(unittest.TestCase, sample.SamplesTestMixin):
         sample.Sample('First Stop Timestamp', stop0, 'seconds'),
         sample.Sample('Second Start Timestamp', start1, 'seconds'),
         sample.Sample('Second Stop Timestamp', stop1, 'seconds')]
-    self.assertSampleListsEqual(samples, exp_samples)
+    self.assertSampleListsEqualUpToTimestamp(samples, exp_samples)
 
   def testGenerateSamplesRuntimeAndTimestamps(self):
     """Test generating both runtime and timestamp samples."""
@@ -182,7 +183,7 @@ class IntervalTimerTestCase(unittest.TestCase, sample.SamplesTestMixin):
         sample.Sample('Second Runtime', stop1 - start1, 'seconds'),
         sample.Sample('Second Start Timestamp', start1, 'seconds'),
         sample.Sample('Second Stop Timestamp', stop1, 'seconds')]
-    self.assertSampleListsEqual(samples, exp_samples)
+    self.assertSampleListsEqualUpToTimestamp(samples, exp_samples)
 
 
 if __name__ == '__main__':

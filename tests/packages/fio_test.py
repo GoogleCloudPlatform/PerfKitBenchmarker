@@ -21,10 +21,11 @@ import unittest
 import mock
 
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker.packages import fio
 
 
-class FioTestCase(unittest.TestCase, sample.SamplesTestMixin):
+class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   maxDiff = None
 
@@ -363,7 +364,7 @@ class FioTestCase(unittest.TestCase, sample.SamplesTestMixin):
            {'fio_job': 'random_read_test_parallel'}]]
       expected_result = [sample.Sample(*sample_tuple)
                          for sample_tuple in expected_result]
-      self.assertSampleListsEqual(result, expected_result)
+      self.assertSampleListsEqualUpToTimestamp(result, expected_result)
 
   def testFioCommandToJob(self):
     fio_parameters = (

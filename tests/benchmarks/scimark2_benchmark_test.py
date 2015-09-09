@@ -19,6 +19,7 @@
 import unittest
 
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker.benchmarks import scimark2_benchmark
 
 TEST_OUTPUT_C = """;;; C small
@@ -99,17 +100,18 @@ EXPECTED_RESULT_JAVA = [
 ]
 
 
-class Scimark2BenchmarkTestCase(unittest.TestCase, sample.SamplesTestMixin):
+class Scimark2BenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testParseResultsC(self):
     samples = scimark2_benchmark.ParseResults(TEST_OUTPUT_C)
-    self.assertSampleListsEqual(samples, EXPECTED_RESULT_C)
+    self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_C)
 
   def testParseResultsJava(self):
     samples = scimark2_benchmark.ParseResults(TEST_OUTPUT_JAVA)
-    self.assertSampleListsEqual(samples, EXPECTED_RESULT_JAVA)
+    self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_JAVA)
 
   def testParseResultsCombined(self):
     samples = scimark2_benchmark.ParseResults(TEST_OUTPUT_C + TEST_OUTPUT_JAVA)
-    self.assertSampleListsEqual(samples,
-                                EXPECTED_RESULT_C + EXPECTED_RESULT_JAVA)
+    self.assertSampleListsEqualUpToTimestamp(
+        samples,
+        EXPECTED_RESULT_C + EXPECTED_RESULT_JAVA)
