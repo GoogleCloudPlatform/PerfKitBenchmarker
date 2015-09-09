@@ -15,6 +15,7 @@
 
 from perfkitbenchmarker import sample
 
+
 class SamplesTestMixin(object):
   """A mixin for unittest.TestCase that adds a type-specific equality
   predicate for samples.
