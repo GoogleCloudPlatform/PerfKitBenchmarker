@@ -15,7 +15,6 @@
 """Runs Cloudsuite2.0 Web Serving benchmark
    More info: http://parsa.epfl.ch/cloudsuite/web.html
 """
-import time
 import posixpath
 import re
 
@@ -34,7 +33,6 @@ MYSQL_HOME = '%s/mysql-5.5.20-linux2.6-x86_64' % BASE_DIR
 GEOCODER_HOME = '%s/geo' % BASE_DIR
 APP_DIR = '%s/app' % BASE_DIR
 JAVA_HOME = '$(readlink -f $(which java) | cut -d "/" -f 1-5)'
-#JAVA_HOME = '/usr'
 PHPRC = posixpath.join(APP_DIR, 'etc')
 OUTPUT_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'out1')
 ANT_HOME = posixpath.join(vm_util.VM_TMP_DIR, 'ant/bin')
@@ -46,9 +44,9 @@ CL = 0
 BK = 1
 FR = 2
 
-flags.DEFINE_integer('load_scale', 100, 
+flags.DEFINE_integer('load_scale', 100,
                      'The maximum number of concurrent users '
-                     'that can be simulated.', lower_bound=1)
+                     'that can be simulated.', lower_bound=2)
 FLAGS = flags.FLAGS
 
 BENCHMARK_INFO = {'name': 'cloudsuite_web_serving',
@@ -73,7 +71,7 @@ def setupFrontend(benchmark_spec):
   frontend.RemoteCommand('cd %s && patch -p1 < cloudstone.patch' % APP_DIR)
   frontend.RemoteCommand('perl -pi -e "s/%s/%s/g" %s/etc/config.php'
                          % ('(\$olioconfig\[\'dbTarget\'\]).*',
-                            '\$1 = \'mysql:host=%s;dbname=olio\';' 
+                            '\$1 = \'mysql:host=%s;dbname=olio\';'
                             % backend.ip_address, APP_DIR))
   frontend.RemoteCommand('perl -pi -e "s/%s/%s/g" %s/etc/config.php'
                          % ('(.*olioconfig.*cacheSystem.*MemCached.*)',
@@ -289,8 +287,8 @@ def PrepareVms(vm):
   vm.Install('ant')
   vm.Install('openjdk7')
   vm.RemoteCommand('cd %s && '
-                       'wget parsa.epfl.ch/cloudsuite/software/web.tar.gz && '
-                       'tar xzf web.tar.gz' % vm_util.VM_TMP_DIR)
+                   'wget parsa.epfl.ch/cloudsuite/software/web.tar.gz && '
+                   'tar xzf web.tar.gz' % vm_util.VM_TMP_DIR)
 
 
 def Prepare(benchmark_spec):
@@ -331,7 +329,7 @@ def ParseOutput(client):
     latency = re.findall(r'\<p90th>(\d+\.\d*)', stdout)
     latency99 = re.findall(r'\<p99th>(\d+\.\d*)', stdout)
     return sum_ops_per_sec, latency, latency99
- 
+
 
 def Run(benchmark_spec):
   client = benchmark_spec.vms[CL]
