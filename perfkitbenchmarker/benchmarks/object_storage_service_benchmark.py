@@ -772,7 +772,7 @@ class GoogleCloudStorageBenchmark(object):
     vm.RemoteCommand('%s mb -c DRA -l %s gs://%s' % (vm.gsutil_path,
                                                      DEFAULT_GCS_REGION,
                                                      self.regional_bucket_name))
-    
+
     # Detect if we need to install crcmod for gcp.
     # See "gsutil help crc" for details.
     _, raw_result = vm.RemoteCommand('%s version -l' % vm.gsutil_path)
