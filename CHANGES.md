@@ -1,3 +1,22 @@
+# v0.21.0
+
+* New features:
+  * Add support for OpenStack affinity and anti-affinity groups. (GH-440, thanks to @kivio)
+  * Add large object scenario for CLI tests in object_storage_service. (GH-445)
+  * Add support for pre-emptible GCE VMs. (GH-415)
+
+* Enhancements:
+  * Parallelize cassandra_ycsb and hbase_ycsb benchmark setups. (GH-435)
+  * Add more config options for aerospike benchmark. (GH-450)
+
+* Bugfixes and maintenance updates:
+  * Refactor OpenStack network IP management. (GH-438, thanks to @kivio)
+  * Fix thread lock pickling bug. (GH-425, thanks to @kivio)
+  * Update jars used in cloud_bigtable_ycsb benchmark. (GH-444)
+  * Update YCSB to v0.3.0. (GH-428)
+  * Fix object_storage_service bug introduced by Azure breaking change. (GH-446)
+  * Fix object storage CLI output format. (GH-449)
+
 # v0.20.0
 
 * Enhancements:
