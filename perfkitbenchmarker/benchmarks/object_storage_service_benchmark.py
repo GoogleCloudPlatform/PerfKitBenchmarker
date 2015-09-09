@@ -783,7 +783,9 @@ class GoogleCloudStorageBenchmark(object):
       logging.info('compiled crcmod is not available, installing now...')
       try:
         # Try uninstall first just in case there is a pure python version of
-        # crcmod on the system already.
+        # crcmod on the system already, this is required by gsutil doc:
+        # https://cloud.google.com/storage/docs/
+        # gsutil/addlhelp/CRC32CandInstallingcrcmod
         vm.RemoteCommand('/usr/bin/yes |sudo pip uninstall crcmod')
       except:
         logging.info('pip uninstall crcmod failed, could be normal if crcmod '
