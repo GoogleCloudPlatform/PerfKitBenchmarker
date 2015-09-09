@@ -752,8 +752,6 @@ class GoogleCloudStorageBenchmark(object):
                      '--rc-path=.bash_profile '
                      '--path-update=true '
                      '--bash-completion=true')
-    # Need to install crcmod for gcp. See "gsutil help crc" for details.
-    vm.RemoteCommand('sudo pip install -U crcmod')
 
     try:
       vm.RemoteCommand('mkdir .config')
@@ -775,6 +773,30 @@ class GoogleCloudStorageBenchmark(object):
                                                      DEFAULT_GCS_REGION,
                                                      self.regional_bucket_name))
 
+    # Detect if we need to install crcmod for gcp.
+    # See "gsutil help crc" for details.
+    raw_result, _ = vm.RemoteCommand('%s version -l' % vm.gsutil_path)
+    logging.info('gsutil version -l raw result is %s', raw_result)
+    search_string = 'compiled crcmod: True'
+    result_string = re.findall(search_string, raw_result)
+    if len(result_string) == 0:
+      logging.info('compiled crcmod is not available, installing now...')
+      try:
+        # Try uninstall first just in case there is a pure python version of
+        # crcmod on the system already, this is required by gsutil doc:
+        # https://cloud.google.com/storage/docs/
+        # gsutil/addlhelp/CRC32CandInstallingcrcmod
+        vm.RemoteCommand('/usr/bin/yes |sudo pip uninstall crcmod')
+      except:
+        logging.info('pip uninstall crcmod failed, could be normal if crcmod '
+                     'is not available at all.')
+        pass
+      vm.Install('crcmod')
+      vm.installed_crcmod = True
+    else:
+      logging.info('compiled crcmod is available, not installing again.')
+      vm.installed_crcmod = False
+
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with gsutil tool.
@@ -794,6 +816,7 @@ class GoogleCloudStorageBenchmark(object):
       the results of all scenarios run here.
     """
     results = []
+    metadata['pkb_installed_crcmod'] = vm.installed_crcmod
     # CLI tool based tests.
     scratch_dir = vm.GetScratchDir()
     clean_up_bucket_cmd = '%s rm gs://%s/*' % (vm.gsutil_path, self.bucket_name)
@@ -875,7 +898,7 @@ def Prepare(benchmark_spec):
 
   vms[0].Install('pip')
   vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
-  vms[0].RemoteCommand('sudo pip install azure')
+  vms[0].RemoteCommand('sudo pip install azure==1.0.0')
   vms[0].Install('gcs_boto_plugin')
 
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
