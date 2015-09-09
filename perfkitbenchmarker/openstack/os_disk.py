@@ -95,7 +95,8 @@ class OpenStackDisk(disk.BaseDisk):
             time.sleep(1)
             volume = self.__nclient.volumes.get(result.id)
             if volume:
-                is_unattached = not (volume.status == "in-use" and volume.attachments)
+                is_unattached = not(volume.status == "in-use"
+                                    and volume.attachments)
 
     def GetDevicePath(self):
         return self.device
