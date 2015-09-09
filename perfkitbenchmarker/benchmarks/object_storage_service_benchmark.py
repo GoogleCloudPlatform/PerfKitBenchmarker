@@ -775,7 +775,7 @@ class GoogleCloudStorageBenchmark(object):
 
     # Detect if we need to install crcmod for gcp.
     # See "gsutil help crc" for details.
-    _, raw_result = vm.RemoteCommand('%s version -l' % vm.gsutil_path)
+    raw_result, _ = vm.RemoteCommand('%s version -l' % vm.gsutil_path)
     logging.info('gsutil version -l raw result is %s', raw_result)
     search_string = 'compiled crcmod: True'
     result_string = re.findall(search_string, raw_result)
