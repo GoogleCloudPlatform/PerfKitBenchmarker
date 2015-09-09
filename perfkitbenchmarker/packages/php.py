@@ -20,14 +20,14 @@ import posixpath
 from perfkitbenchmarker import vm_util
 
 PHP_HOME_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'php-5.3.9')
-PHP_TAR_URL = ('museum.php.net/php5/php-5.3.9.tar.gz')
+PHP_TAR_URL = 'museum.php.net/php5/php-5.3.9.tar.gz'
 
 MYSQL_TAR_URL = ('downloads.mysql.com/archives/get/file/'
                  'mysql-5.5.20-linux2.6-x86_64.tar.gz')
 MYSQL_HOME_DIR = posixpath.join(vm_util.VM_TMP_DIR,
                                 'mysql-5.5.20-linux2.6-x86_64')
 
-APC_TAR_URL = ('pecl.php.net/get/APC-3.1.9.tgz')
+APC_TAR_URL = 'pecl.php.net/get/APC-3.1.9.tgz'
 
 
 def _Install(vm):
@@ -85,6 +85,6 @@ def InstallAPC(vm):
                    'phpize && '
                    './configure --enable-apc --enable-apc-mmap '
                    '--with-php-config=/usr/local/bin/php-config && '
-                   'make && '
-                   'sudo make install'
+                   'make -j && '
+                   'sudo make -j install'
                    % (vm_util.VM_TMP_DIR, APC_TAR_URL))

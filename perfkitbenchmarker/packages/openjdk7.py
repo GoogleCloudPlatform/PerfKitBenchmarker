@@ -15,8 +15,6 @@
 
 """Module containing OpenJDK7 installation and cleanup functions."""
 
-JAVA_HOME = '/usr'
-
 
 def YumInstall(vm):
   """Installs the OpenJDK7 package on the VM."""

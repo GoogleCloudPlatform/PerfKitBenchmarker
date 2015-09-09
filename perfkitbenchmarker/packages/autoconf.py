@@ -15,8 +15,6 @@
 
 """Module containing Autoconf installation and cleanup functions."""
 
-JAVA_HOME = '/usr'
-
 
 def YumInstall(vm):
   """Installs the Autoconf package on the VM."""
