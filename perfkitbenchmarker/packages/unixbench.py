@@ -17,9 +17,10 @@
 
 from perfkitbenchmarker import vm_util
 
-UNIXBENCH_TAR = 'UnixBench5.1.3.tgz'
-UNIXBENCH_URL = 'http://byte-unixbench.googlecode.com/files/' + UNIXBENCH_TAR
-UNIXBENCH_DIR = '%s/UnixBench' % vm_util.VM_TMP_DIR
+UNIXBENCH_TAR = 'v5.1.3.tar.gz'
+UNIXBENCH_URL = ('https://github.com/kdlucas/byte-unixbench/archive/'
+                 + UNIXBENCH_TAR)
+UNIXBENCH_DIR = '%s/byte-unixbench-5.1.3/UnixBench' % vm_util.VM_TMP_DIR
 
 
 def _Install(vm):
