@@ -15,6 +15,7 @@
 
 """Module containing Apache Nutch 1.10 installation and cleanup functions."""
 
+import time
 import posixpath
 
 from perfkitbenchmarker import vm_util
@@ -62,3 +63,41 @@ def Stop(vm):
                    'export JAVA_HOME={1} && '
                    'master/bin/shutdown.sh'.format(
                        FABAN_HOME_DIR, JAVA_HOME))
+
+
+def StartRegistry(vm, classpath, policy_path):
+  vm.RobustRemoteCommand('export FABAN_HOME={2} && '
+                         'java -classpath {1} -Djava.security.policy={0} '
+                         'com.sun.faban.common.RegistryImpl &'.format(
+                             policy_path, classpath, FABAN_HOME_DIR))
+  time.sleep(3)
+
+
+def StopRegistry(vm):
+  vm.RemoteCommand('kill -9 `jps | grep RegistryImpl | cut -d " " -f 1`')
+
+
+def StartAgent(vm, classpath, driver_dir, driver_class, agent_id,
+               java_heap_size, policy_path, faban_master):
+  """Runs Registry on faban client."""
+  vm.RobustRemoteCommand('export FABAN_HOME={6} && '
+                         'java -classpath {5} -Xmx{0} -Xms{0} '
+                         '-Djava.security.policy={1} '
+                         'com.sun.faban.driver.engine.AgentImpl'
+                         ' {2} {3} {4} &'.format(
+                             java_heap_size, policy_path, driver_class,
+                             agent_id, faban_master, classpath, FABAN_HOME_DIR))
+  time.sleep(3)
+
+
+def StopAgent(vm):
+  vm.RemoteCommand('kill -9 `jps | grep AgentImpl | cut -d " " -f 1`')
+
+
+def StartMaster(vm, classpath, java_heap_size, policy_path, benchmark_config):
+  vm.RobustRemoteCommand('export FABAN_HOME={4} && '  # TODO: maybe not robust?
+                         'java -classpath {3} -Xmx{0} -Xms{0} '
+                         '-Djava.security.policy={1} -Dbenchmark.config={2} '
+                         'com.sun.faban.driver.engine.MasterImpl'.format(
+                             java_heap_size, policy_path, benchmark_config,
+                             classpath, FABAN_HOME_DIR))

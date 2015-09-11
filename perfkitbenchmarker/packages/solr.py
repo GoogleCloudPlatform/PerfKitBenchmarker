@@ -43,38 +43,40 @@ def AptInstall(vm):
   _Install(vm)
 
 
-def SetSchema(vm, schema):
-  """Sets Solr schema."""
-  vm.RemoteCommand('echo """{0}""" > {1}/server/solr/configsets/'
-                   'basic_configs/conf/schema.xml'.format(
-                       schema, SOLR_HOME_DIR))
+def ReloadConfiguration(vm, solr_core_dir):
+  vm.RemoteCommand('cd {0} && '
+                   'mkdir -p {1} && '
+                   'cp -R server/solr/* {1}'.format(
+                       SOLR_HOME_DIR, solr_core_dir))
 
 
-def StartWithZookeeper(vm, fw, port):
+def StartWithZookeeper(vm, fw, port, java_heap_size,
+                       reload_conf=True):
   """Starts SolrCloud on a node with a Zookeeper.
   To be used on the first node."""
   fw.AllowPort(vm, port)
   fw.AllowPort(vm, port + 1000)
   solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
+  if reload_conf:
+    ReloadConfiguration(vm, solr_core_dir)
   vm.RemoteCommand('cd {0} && '
-                   'mkdir -p {2} && '
-                   'cp -R server/solr/* {2} && '
-                   'bin/solr start -cloud -p {1} -s {2} -m 3g'.format(
-                       SOLR_HOME_DIR, port, solr_core_dir))
+                   'bin/solr start -cloud -p {1} -s {2} -m {3}'.format(
+                       SOLR_HOME_DIR, port, solr_core_dir, java_heap_size))
   time.sleep(15)
 
 
-def Start(vm, fw, port, zookeeper_node, zookeeper_port):
+def Start(vm, fw, port, zookeeper_node, zookeeper_port, java_heap_size,
+          reload_conf=True):
   """Starts SolrCloud on a node and joins a specified Zookeeper."""
   fw.AllowPort(vm, port)
   solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
+  if reload_conf:
+    ReloadConfiguration(vm, solr_core_dir)
   vm.RobustRemoteCommand('cd {0} && '
-                         'mkdir -p {4} && '
-                         'cp -R server/solr/* {4} && '
                          'bin/solr start -cloud -p {1} '
-                         '-z {2}:{3} -s {4} -m 3g'.format(
+                         '-z {2}:{3} -s {4} -m {5}'.format(
                              SOLR_HOME_DIR, port, zookeeper_node.ip_address,
-                             zookeeper_port, solr_core_dir))
+                             zookeeper_port, solr_core_dir, java_heap_size))
   time.sleep(15)
 
 

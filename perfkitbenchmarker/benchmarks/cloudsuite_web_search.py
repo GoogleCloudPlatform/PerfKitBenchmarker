@@ -31,7 +31,6 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
 from perfkitbenchmarker.packages import solr as solr
-from perfkitbenchmarker.packages import nutch as nutch
 from perfkitbenchmarker.packages import faban
 from perfkitbenchmarker.packages.ant import ANT_HOME_DIR
 
@@ -40,110 +39,201 @@ FLAGS = flags.FLAGS
 BENCHMARK_INFO = {'name': 'cloudsuite_web_search',
                   'description': 'Run CloudSuite Web Search',
                   'scratch_disk': True,
-                  'num_machines': 3}
+                  'num_machines': None}
 
 CLOUDSUITE_WEB_SEARCH_DIR = posixpath.join(vm_util.VM_TMP_DIR,
                                            'cloudsuite-web-search')
 
 FABAN_OUTPUT_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'outputFaban')
 
-PACKAGES_URL = ('http://parsa.epfl.ch/cloudsuite/software/perfkit/web_search')
-NUTCH_SITE_URL = posixpath.join(PACKAGES_URL, 'nutch-site.xml')
-CRAWLED_URL = posixpath.join(PACKAGES_URL, 'crawl.tar.gz')
+PACKAGES_URL = ('http://lsi-www.epfl.ch/parsa')
+INDEX_URL = posixpath.join(PACKAGES_URL, 'index')
+SOLR_CONFIG_URL = posixpath.join(PACKAGES_URL, 'solrconfig.xml')
 SCHEMA_URL = posixpath.join(PACKAGES_URL, 'schema.xml')
 SEARCH_DRIVER_URL = posixpath.join(PACKAGES_URL, 'search.tar.gz')
 
 SOLR_PORT = 8983
 
+NUM_SERVERS = 1
+CLASSPATH = ('$FABAN_HOME/lib/fabanagents.jar:$FABAN_HOME/lib/fabancommon.jar:'
+             '$FABAN_HOME/lib/fabandriver.jar:$JAVA_HOME/lib/tools.jar:'
+             '$FABAN_HOME/search/build/lib/search.jar')
+
+flags.DEFINE_string('client_heap_size', '8g',
+                    'Java heap size for Faban client in the usual java format.'
+                    ' Default: 8g.')
+flags.DEFINE_string('server_heap_size', '6g',
+                    'Java heap size for Solr server in the usual java format.'
+                    ' Default: 6g.')
+flags.DEFINE_string('distr', 'Random',
+                    'Distribution of query terms. '
+                    'Random and Ziphian distributions are available. '
+                    'Default: Random.')
+flags.DEFINE_integer('num_clients', 1, 'Number of client machines.')
+flags.DEFINE_integer('ramp_up', 90, 'Benchmark ramp up time in seconds.')
+flags.DEFINE_integer('steady_state', 60,
+                     'Benchmark steady state time in seconds.')
+flags.DEFINE_integer('scale', 500, 'Number of simulated web search users.')
+
+
+
+def CheckPrerequisites():
+  """Verifies that the required resources are present.
+  Raises:
+      perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  if FLAGS.num_vms < 1:
+    raise ValueError('Cloudsuite Web Search requires at least 1 client VM.')
+  server_heap_size = FLAGS.server_heap_size
+  unit = server_heap_size[-1]
+  number = int(server_heap_size[:-1])
+  if number <= 0:
+    raise ValueError('Java heap size must be positive number')
+  allowed_units = 'mg'
+  if unit not in allowed_units:
+    raise ValueError('Allowed units for java heap size are '
+                     '"g" for gigabytes, and "m" for megabytes.')
+  client_heap_size = FLAGS.client_heap_size
+  unit = client_heap_size[-1]
+  number = int(client_heap_size[:-1])
+  if number <= 0:
+    raise ValueError('Java heap size must be positive number')
+  allowed_units = 'mg'
+  if unit not in allowed_units:
+    raise ValueError('Allowed units for java heap size are '
+                     '"g" for gigabytes, and "m" for megabytes.')
+  allowed_distributions = ['Random', 'Ziphian']
+  if FLAGS.distr not in allowed_distributions:
+    raise ValueError('Allowed distributions are Random and Ziphian.')
+  if FLAGS.steady_state <= 0:
+    raise ValueError('Steady state time must be positive integer number.')
+  if FLAGS.ramp_up <= 0:
+    raise ValueError('Ramp up time must be positive integer number.')
+  if FLAGS.scale <= 0:
+    raise ValueError('Scale must be positive integer number.')
+
 
 def GetInfo():
-  return BENCHMARK_INFO
+  info = BENCHMARK_INFO.copy()
+  num_clients = FLAGS.num_clients
+  info['num_machines'] = num_clients + NUM_SERVERS
+  return info
 
 
 def _PrepareSolr(solr_nodes, fw):
   """Starts and configures SolrCloud."""
-  stdout, _ = solr_nodes[0].RemoteCommand('cd {0} && '
-                                          'wget --quiet {1} && '
-                                          'cat schema.xml'.format(
-                                              CLOUDSUITE_WEB_SEARCH_DIR,
-                                              SCHEMA_URL))
+  basic_configs_dir = posixpath.join(solr.SOLR_HOME_DIR, 'server/solr/'
+                                     'configsets/basic_configs/conf')
+  server_heap_size = FLAGS.server_heap_size
   for vm in solr_nodes:
     vm.Install('solr')
-    solr.SetSchema(vm, stdout.replace('"', '\\"'))
+    solr_nodes[0].RemoteCommand('cd {0} && '
+                                'wget {1}'
+                                .format(
+                                    basic_configs_dir,
+                                    SCHEMA_URL))
+    solr_nodes[0].RemoteCommand('cd {0} && '
+                                'wget {1}'
+                                .format(
+                                    basic_configs_dir,
+                                    SOLR_CONFIG_URL))
     if vm == solr_nodes[0]:
-      solr.StartWithZookeeper(vm, fw, SOLR_PORT)
+      solr.StartWithZookeeper(vm, fw, SOLR_PORT, server_heap_size)
     else:
-      solr.Start(vm, fw, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000)
+      solr.Start(vm, fw, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000,
+                 server_heap_size)
   solr.CreateCollection(solr_nodes[0], 'cloudsuite_web_search', len(solr_nodes))
 
 
-def _BuildIndex(indexer, solr_node):
-  """Downloads data and builds Solr index from it."""
-  indexer.Install('nutch')
-  hadoop_tmp_dir = posixpath.join(indexer.GetScratchDir(), 'hadoop_tmp')
-  indexer.RemoteCommand('cd {0} && '
-                        'wget {1} && '
-                        'mkdir -p {4} && '
-                        'sed -i "/<value>http/c\\<value>http://{2}:'
-                        '{3}/solr/cloudsuite_web_search</value>" '
-                        'nutch-site.xml && '
-                        'sed -i "s/HADOOP_TMP_DIR/{4}/g" nutch-site.xml'.format(
-                            CLOUDSUITE_WEB_SEARCH_DIR,
-                            NUTCH_SITE_URL, solr_node.ip_address,
-                            SOLR_PORT, re.escape(hadoop_tmp_dir)))
-  stdout, _ = indexer.RemoteCommand('cd {0} && '
-                                    'cat nutch-site.xml'.format(
-                                        CLOUDSUITE_WEB_SEARCH_DIR))
-  nutch.ConfigureNutchSite(indexer, stdout.replace('"', '\\"'))
-  scratch_dir = indexer.GetScratchDir()
-  indexer.RobustRemoteCommand('cd {0} && '
-                              'wget {1}  && '
-                              'tar -zxf crawl.tar.gz'.format(
-                                  scratch_dir, CRAWLED_URL))
-  nutch.BuildIndex(indexer, posixpath.join(scratch_dir, 'crawl'))
+def _BuildIndex(solr_nodes, fw):
+  """Downloads Solr index and set it up."""
+  for vm in solr_nodes:
+    vm.RemoteCommand('cd {0} && '
+                     'bin/solr stop -p {1}'.format(
+                         solr.SOLR_HOME_DIR, SOLR_PORT))
+
+  def DownloadIndex(vm):
+    solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
+    vm.RemoteCommand('cd {0} && '
+                     'wget {1} && '
+                     'tar zxvf index -C {2}'.format(
+                         solr_core_dir, INDEX_URL, 'cloudsuite_web_search*'))
+
+  vm_util.RunThreaded(DownloadIndex, solr_nodes, len(solr_nodes))
+  server_heap_size = FLAGS.server_heap_size
+  for vm in solr_nodes:
+    if vm == solr_nodes[0]:
+      solr.StartWithZookeeper(vm, fw, SOLR_PORT, server_heap_size, False)
+    else:
+      solr.Start(vm, fw, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000,
+                 server_heap_size, False)
 
 
-def _PrepareClient(client, fw, solr_nodes):
+def _PrepareClient(clients, fw, solr_nodes):
   """Prepares client machine in the benchmark."""
-  client.Install('faban')
-  faban.Start(client, fw)
-  client.RemoteCommand('cd {0} && '
-                       'wget {1} && '
-                       'tar -xzf search.tar.gz'.format(
-                           faban.FABAN_HOME_DIR, SEARCH_DRIVER_URL))
-  client.RemoteCommand('cd {0}/search && '
-                       'sed -i "/faban.home/c\\faban.home={0}" '
-                       'build.properties && '
-                       'sed -i "/ant.home/c\\ant.home='
-                       '{1}" build.properties && '
-                       'sed -i "/faban.url/c\\faban.url='
-                       'http://localhost:9980/" build.properties'.format(
-                           faban.FABAN_HOME_DIR, ANT_HOME_DIR))
-  client.RemoteCommand('cd {0}/search && '
-                       'sed -i "/<ipAddress1>/c\<ipAddress1>{1}'
-                       '</ipAddress1>" deploy/run.xml && '
-                       'sed -i "/<ipAddress2>/c\<ipAddress2>{2}'
-                       '</ipAddress2>" deploy/run.xml && '
-                       'sed -i "/<logFile>/c\<logFile>{0}/logs/queries.out'
-                       '</logFile>" deploy/run.xml && '
-                       'sed -i "/<outputDir>/c\<outputDir>{3}'
-                       '</outputDir>" deploy/run.xml && '
-                       'sed -i "/<termsFile>/c\<termsFile>{0}'
-                       '/search/src/sample/searchdriver/terms_en.out'
-                       '</termsFile>" deploy/run.xml && '
-                       'sed -i "/<fa:rampUp>/c\<fa:rampUp>100'
-                       '</fa:rampUp>" deploy/run.xml && '
-                       'sed -i "/<fa:rampDown>/c\<fa:rampDown>100'
-                       '</fa:rampDown>" deploy/run.xml && '
-                       'sed -i "/<fa:steadyState>/c\<fa:steadyState>600'
-                       '</fa:steadyState>" deploy/run.xml '.format(
-                           faban.FABAN_HOME_DIR, solr_nodes[0].ip_address,
-                           solr_nodes[1].ip_address, FABAN_OUTPUT_DIR))
-  client.RemoteCommand('cd {0}/search && '
-                       'export JAVA_HOME={1} && '
-                       '{2}/bin/ant deploy'.format(
-                           faban.FABAN_HOME_DIR, faban.JAVA_HOME,
-                           ANT_HOME_DIR))
+  distribution = FLAGS.distr
+  search_driver = None
+  terms_file = None
+  if distribution == 'Random':
+    search_driver = 'Random.java'
+    terms_file = 'terms_random'
+  elif distribution == 'Ziphian':
+    search_driver = 'Ziphian.java'
+    terms_file = 'terms_ordered'
+  client_master = clients[0]
+  for client in clients:
+    client = clients[0]
+    client.Install('faban')
+    client.RemoteCommand('cd {0} && '
+                         'wget {1} && '
+                         'tar -xzf search.tar.gz'.format(
+                             faban.FABAN_HOME_DIR, SEARCH_DRIVER_URL))
+    client.RemoteCommand('cd {0}/search && '
+                         'cp distributions/{2} '
+                         'src/sample/searchdriver/SearchDriver.java && '
+                         'sed -i "/faban.home/c\\faban.home={0}" '
+                         'build.properties && '
+                         'sed -i "/ant.home/c\\ant.home='
+                         '{1}" build.properties && '
+                         'sed -i "/faban.url/c\\faban.url='
+                         'http://localhost:9980/" build.properties'.format(
+                             faban.FABAN_HOME_DIR, ANT_HOME_DIR,
+                             search_driver))
+  client_master.RemoteCommand('cd {0}/search && '
+                              'sed -i "/<ipAddress1>/c\<ipAddress1>{1}'
+                              '</ipAddress1>" deploy/run.xml && '
+                              'sed -i "/<portNumber1>/c\<portNumber1>{3}'
+                              '</portNumber1>" deploy/run.xml && '
+                              'sed -i "/<outputDir>/c\<outputDir>{2}'
+                              '</outputDir>" deploy/run.xml && '
+                              'sed -i "/<termsFile>/c\<termsFile>{0}'
+                              '/search/src/sample/searchdriver/{4}'
+                              '</termsFile>" deploy/run.xml && '
+                              'sed -i "/<fa:scale>/c\<fa:scale>{7}'
+                              '</fa:scale>" deploy/run.xml && '
+                              'sed -i "/<fa:rampUp>/c\<fa:rampUp>{5}'
+                              '</fa:rampUp>" deploy/run.xml && '
+                              'sed -i "/<fa:rampDown>/c\<fa:rampDown>60'
+                              '</fa:rampDown>" deploy/run.xml && '
+                              'sed -i "/<fa:steadyState>/c\<fa:steadyState>{6}'
+                              '</fa:steadyState>" deploy/run.xml '.format(
+                                  faban.FABAN_HOME_DIR,
+                                  solr_nodes[0].ip_address,
+                                  FABAN_OUTPUT_DIR, SOLR_PORT, terms_file,
+                                  FLAGS.ramp_up, FLAGS.steady_state,
+                                  FLAGS.scale))
+  faban.Start(client_master, fw)
+  for client in clients:
+    target = None
+    if client != client_master:
+      target = 'deploy.jar'
+    else:
+      target = 'deploy'
+    client.RemoteCommand('cd {0}/search && '
+                         'export JAVA_HOME={1} && '
+                         '{2}/bin/ant {3}'.format(
+                             faban.FABAN_HOME_DIR, faban.JAVA_HOME,
+                             ANT_HOME_DIR, target))
   time.sleep(20)
 
 
@@ -160,9 +250,9 @@ def Prepare(benchmark_spec):
     vm.Install('wget')
     vm.RemoteCommand('mkdir -p {0}'.format(
                      CLOUDSUITE_WEB_SEARCH_DIR))
-  _PrepareSolr(vms[1:], fw)
-  _PrepareClient(vms[0], fw, vms[1:])
-  _BuildIndex(vms[0], vms[1])
+  _PrepareSolr(vms[:NUM_SERVERS], fw)
+  _PrepareClient(vms[NUM_SERVERS:], fw, vms[:NUM_SERVERS])
+  _BuildIndex(vms[:NUM_SERVERS], fw)
 
 
 def Run(benchmark_spec):
@@ -175,12 +265,22 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  client = benchmark_spec.vms[0]
-  client.RobustRemoteCommand('cd {0} && '
-                             'export FABAN_HOME={0} && '
-                             'cd search && '
-                             'sh run.sh'.format(
-                                 faban.FABAN_HOME_DIR))
+  clients = benchmark_spec.vms[NUM_SERVERS:]
+  client_master = clients[0]
+  agent_id = 1
+  client_heap_size = FLAGS.client_heap_size
+  driver_dir = posixpath.join(faban.FABAN_HOME_DIR, 'search')
+  policy_path = posixpath.join(driver_dir, 'config/security/driver.policy')
+  for vm in clients:
+    if vm == client_master:
+      faban.StartRegistry(vm, CLASSPATH, policy_path)
+      faban.StartAgent(vm, CLASSPATH, driver_dir, 'SearchDriver', agent_id,
+                       client_heap_size, policy_path, client_master.ip_address)
+      agent_id = agent_id + 1
+  benchmark_config = posixpath.join(faban.FABAN_HOME_DIR,
+                                    'search/deploy/run.xml')
+  faban.StartMaster(client_master, CLASSPATH, client_heap_size,
+                    policy_path, benchmark_config)
 
   def ParseOutput(client):
     stdout, _ = client.RemoteCommand('cd {0} && '
@@ -202,12 +302,14 @@ def Run(benchmark_spec):
     return sum_ops_per_sec, sum_p90, sum_p99
 
   results = []
-  sum_ops_per_sec, sum_p90, sum_p99 = ParseOutput(client)
+  sum_ops_per_sec, sum_p90, sum_p99 = ParseOutput(client_master)
   results.append(sample.Sample('Operations per second', sum_ops_per_sec,
                                'ops/s'))
   results.append(sample.Sample('90th percentile latency', sum_p90, 's'))
   results.append(sample.Sample('99th percentile latency', sum_p99, 's'))
-
+  for vm in clients:
+    faban.StopAgent(vm)
+  faban.StopRegistry(client_master)
   return results
 
 
@@ -219,10 +321,7 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  scratch_dir = vms[0].GetScratchDir()
-  vms[0].RemoteCommand('rm {0}/crawl.tar.gz && '
-                       'rm -R {0}/crawl && '
-                       'rm -R {0}/hadoop_tmp'.format(scratch_dir))
-  faban.Stop(vms[0])
-  solr.Stop(vms[1], SOLR_PORT)
-  solr.Stop(vms[2], SOLR_PORT)
+  client_master = vms[NUM_SERVERS]
+  faban.Stop(client_master)
+  for vm in vms[:NUM_SERVERS]:
+    solr.Stop(vm, SOLR_PORT)
