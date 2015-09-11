@@ -154,10 +154,11 @@ def _BuildIndex(solr_nodes, fw):
 
   def DownloadIndex(vm):
     solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
-    vm.RemoteCommand('cd {0} && '
-                     'wget {1} && '
-                     'tar zxvf index -C {2}'.format(
-                         solr_core_dir, INDEX_URL, 'cloudsuite_web_search*'))
+    vm.RobustRemoteCommand('cd {0} && '
+                           'wget {1} && '
+                           'tar zxvf index -C {2}'.format(
+                               solr_core_dir, INDEX_URL,
+                               'cloudsuite_web_search*'))
 
   vm_util.RunThreaded(DownloadIndex, solr_nodes, len(solr_nodes))
   server_heap_size = FLAGS.server_heap_size
