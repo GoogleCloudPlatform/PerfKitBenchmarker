@@ -133,6 +133,7 @@ flags.DEFINE_string('static_vm_file', None,
                     'The file path for the Static Machine file. See '
                     'static_virtual_machine.py for a description of this file.')
 flags.DEFINE_boolean('version', False, 'Display the version and exit.')
+flags.DEFINE_boolean('v', False, 'Display the version and exit.')
 flags.DEFINE_enum(
     'scratch_disk_type', disk.STANDARD,
     [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
@@ -350,7 +351,7 @@ def RunBenchmarks(publish=True):
   Returns:
     Exit status for the process.
   """
-  if FLAGS.version:
+  if FLAGS.version or FLAGS.v:
     print version.VERSION
     return
 
@@ -384,6 +385,7 @@ def RunBenchmarks(publish=True):
       stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
       log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
       run_uri=FLAGS.run_uri)
+  logging.info('PerfKitBenchmarker version: %s', version.VERSION)
   _LogCommandLineFlags()
 
   if FLAGS.os_type == benchmark_spec.WINDOWS and not vm_util.RunningOnWindows():
@@ -468,9 +470,13 @@ def Main(argv=sys.argv):
       '%s:  %s' %
       (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
       for set_name in benchmark_sets.BENCHMARK_SETS]
-  sys.modules['__main__'].__doc__ = __doc__ + (
-      '\nBenchmarks (default requirements):\n\t%s' %
-      _GenerateBenchmarkDocumentation())
+  sys.modules['__main__'].__doc__ = (
+      'PerfKitBenchmarker version: {version}\n\n{doc}\n'
+      'Benchmarks (default requirements):\n'
+      '\t{benchmark_doc}').format(
+          version=version.VERSION,
+          doc=__doc__,
+          benchmark_doc=_GenerateBenchmarkDocumentation())
   sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
                                       % '\n\t'.join(benchmark_sets_list))
   try:
