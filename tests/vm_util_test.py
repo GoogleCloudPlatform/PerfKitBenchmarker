@@ -14,6 +14,7 @@
 
 """Tests for perfkitbenchmarker.vm_util."""
 
+import multiprocessing
 import os
 import psutil
 import subprocess
@@ -23,6 +24,7 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 
 
@@ -118,6 +120,40 @@ class WaitUntilSleepTimer(threading.Thread):
     if not self.finished.is_set():
       self.function()
     self.finished.set()
+
+
+def _ReturnArgs(a, b=None):
+  return b, a
+
+
+def _RaiseValueError():
+  raise ValueError('ValueError')
+
+
+def _IncrementCounter(counter):
+  with counter.get_lock():
+    counter.value += 1
+
+
+class RunParallelProcessesTestCase(unittest.TestCase):
+
+  def testLessThreadsThanConcurrencyLimit(self):
+    calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(2)]
+    result = vm_util.RunParallelProcesses(calls, max_concurrency=4)
+    self.assertEqual(result, [(0, 'a'), (1, 'a')])
+
+  def testMoreThreadsThanConcurrencyLimit(self):
+    calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(10)]
+    result = vm_util.RunParallelProcesses(calls, max_concurrency=4)
+    self.assertEqual(result, [(i, 'a') for i in range(10)])
+
+  def testException(self):
+    counter = multiprocessing.Value('i', 0, lock=True)
+    calls = [(_IncrementCounter, (counter,), {}), (_RaiseValueError, (), {}),
+             (_IncrementCounter, (counter,), {})]
+    with self.assertRaises(errors.VmUtil.CalledProcessException):
+      vm_util.RunParallelProcesses(calls, max_concurrency=1)
+    self.assertEqual(counter.value, 2)
 
 
 class IssueCommandTestCase(unittest.TestCase):
