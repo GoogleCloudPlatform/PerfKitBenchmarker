@@ -14,10 +14,9 @@
 
 """Set of utility functions for working with virtual machines."""
 
+from concurrent import futures
 import contextlib
-import copy
 import logging
-import multiprocessing
 import os
 import random
 import re
@@ -277,27 +276,28 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
         '\n'.join([stacktrace for stacktrace in exceptions]))
 
 
-def _ExecuteProcessCall(target, args, kwargs, call_id, active_id, result_queue):
+def _ExecuteProcCall(target_arg_tuple):
   """Function invoked in another process by RunParallelProcesses.
 
-  Executes a specified function call and writes the result to a result queue.
+  Executes a specified function call.
 
   Args:
-    target: Function to call.
-    args: Tuple or list. Function arguments.
-    kwargs: Dictionary. Function arguments.
-    call_id: int. Call identifier.
-    active_id: int. Active call identifier.
-    result_queue: multiprocessing.Queue. Receives results upon call completion
-        or error.
+    target_arg_tuple: (target, args, kwargs) tuple containing the function to
+        call and the arguments to pass it.
+
+  Returns:
+    (result, exception) tuple. The first element is the return value from the
+    called function, or None if the function raised an exception. The second
+    element is the raised exception, or None if the function succeeded.
   """
+  target, args, kwargs = target_arg_tuple
   try:
-    result_queue.put((call_id, active_id, target(*args, **kwargs), None))
+    return target(*args, **kwargs), None
   except:
-    result_queue.put((call_id, active_id, None, traceback.format_exc()))
+    return None, traceback.format_exc()
 
 
-def RunParallelProcesses(target_arg_tuples, max_concurrency=8):
+def RunParallelProcesses(target_arg_tuples, max_concurrency=None):
   """Executes function calls concurrently in separate processes.
 
   Args:
@@ -313,51 +313,13 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency=8):
     errors.VmUtil.CalledProcessException: When an exception occurred in any
         of the called functions.
   """
-  # Maintain a small list of active processes that are currently executing
-  # function calls from the input list. As the processes complete, replace them
-  # by grabbing the next calls from the input list. When there are no more calls
-  # in the input list, and all active processes have completed, we are done.
-  total_call_count = len(target_arg_tuples)
-  max_concurrency = min(max_concurrency, total_call_count)
-  call_id = 0
-  active_processes = [None] * max_concurrency
-  result_queue = multiprocessing.Queue()
-  results = [None] * total_call_count
+  results = []
   exceptions = []
-  # Initialize the active list with the first calls from the input list.
-  while call_id < max_concurrency:
-    target, args, kwargs = target_arg_tuples[call_id]
-    process = multiprocessing.Process(
-        target=_ExecuteProcessCall,
-        args=(target, args, kwargs, call_id, call_id, result_queue))
-    process.start()
-    active_processes[call_id] = process
-    call_id += 1
-  active_process_count = call_id
-  while active_process_count:
-    # Wait for an active process to complete.
-    completed_call_id, active_id, result, exception = copy.deepcopy(
-        result_queue.get(block=True))
-    process = active_processes[active_id]
-    active_processes[active_id] = None
-    active_process_count -= 1
-    while process.is_alive():
-      process.join(timeout=60.)
-    process.join()
-    if exception is not None:
-      exceptions.append(exception)
-    else:
-      results[completed_call_id] = result
-    # Grab the next call from the input list.
-    if call_id < total_call_count:
-      target, args, kwargs = target_arg_tuples[call_id]
-      process = multiprocessing.Process(
-          target=_ExecuteProcessCall,
-          args=(target, args, kwargs, call_id, active_id, result_queue))
-      process.start()
-      active_processes[active_id] = process
-      active_process_count += 1
-      call_id += 1
+  with futures.ProcessPoolExecutor(max_workers=max_concurrency) as executor:
+    for result, exception in executor.map(_ExecuteProcCall, target_arg_tuples):
+      results.append(result)
+      if exception:
+        exceptions.append(exception)
   if exceptions:
     msg = ('The following exceptions occurred during parallel execution: '
            '{0}'.format('\n'.join([stacktrace for stacktrace in exceptions])))

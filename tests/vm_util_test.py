@@ -15,6 +15,7 @@
 """Tests for perfkitbenchmarker.vm_util."""
 
 import multiprocessing
+import multiprocessing.managers
 import os
 import psutil
 import subprocess
@@ -130,8 +131,8 @@ def _RaiseValueError():
   raise ValueError('ValueError')
 
 
-def _IncrementCounter(counter):
-  with counter.get_lock():
+def _IncrementCounter(lock, counter):
+  with lock:
     counter.value += 1
 
 
@@ -148,9 +149,13 @@ class RunParallelProcessesTestCase(unittest.TestCase):
     self.assertEqual(result, [(i, 'a') for i in range(10)])
 
   def testException(self):
-    counter = multiprocessing.Value('i', 0, lock=True)
-    calls = [(_IncrementCounter, (counter,), {}), (_RaiseValueError, (), {}),
-             (_IncrementCounter, (counter,), {})]
+    manager = multiprocessing.managers.SyncManager()
+    manager.start()
+    lock = manager.Lock()
+    counter = manager.Value('i', 0)
+    calls = [(_IncrementCounter, (lock, counter), {}),
+             (_RaiseValueError, (), {}),
+             (_IncrementCounter, (lock, counter), {})]
     with self.assertRaises(errors.VmUtil.CalledProcessException):
       vm_util.RunParallelProcesses(calls, max_concurrency=1)
     self.assertEqual(counter.value, 2)
