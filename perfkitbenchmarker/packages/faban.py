@@ -90,14 +90,10 @@ def StartAgent(vm, classpath, driver_dir, driver_class, agent_id,
   time.sleep(3)
 
 
-def StopAgent(vm):
-  vm.RemoteCommand('kill -9 `jps | grep AgentImpl | cut -d " " -f 1`')
-
-
 def StartMaster(vm, classpath, java_heap_size, policy_path, benchmark_config):
-  vm.RobustRemoteCommand('export FABAN_HOME={4} && '  # TODO: maybe not robust?
-                         'java -classpath {3} -Xmx{0} -Xms{0} '
-                         '-Djava.security.policy={1} -Dbenchmark.config={2} '
-                         'com.sun.faban.driver.engine.MasterImpl'.format(
-                             java_heap_size, policy_path, benchmark_config,
-                             classpath, FABAN_HOME_DIR))
+  vm.RemoteCommand('export FABAN_HOME={4} && '
+                   'java -classpath {3} -Xmx{0} -Xms{0} '
+                   '-Djava.security.policy={1} -Dbenchmark.config={2} '
+                   'com.sun.faban.driver.engine.MasterImpl'.format(
+                       java_heap_size, policy_path, benchmark_config,
+                       classpath, FABAN_HOME_DIR))

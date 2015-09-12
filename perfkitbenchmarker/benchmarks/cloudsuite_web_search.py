@@ -59,12 +59,12 @@ CLASSPATH = ('$FABAN_HOME/lib/fabanagents.jar:$FABAN_HOME/lib/fabancommon.jar:'
              '$FABAN_HOME/lib/fabandriver.jar:$JAVA_HOME/lib/tools.jar:'
              '$FABAN_HOME/search/build/lib/search.jar')
 
-flags.DEFINE_string('client_heap_size', '8g',
+flags.DEFINE_string('client_heap_size', '2g',
                     'Java heap size for Faban client in the usual java format.'
-                    ' Default: 8g.')
-flags.DEFINE_string('server_heap_size', '6g',
+                    ' Default: 2g.')
+flags.DEFINE_string('server_heap_size', '3g',
                     'Java heap size for Solr server in the usual java format.'
-                    ' Default: 6g.')
+                    ' Default: 3g.')
 flags.DEFINE_string('distr', 'Random',
                     'Distribution of query terms. '
                     'Random and Ziphian distributions are available. '
@@ -73,7 +73,7 @@ flags.DEFINE_integer('num_clients', 1, 'Number of client machines.')
 flags.DEFINE_integer('ramp_up', 90, 'Benchmark ramp up time in seconds.')
 flags.DEFINE_integer('steady_state', 60,
                      'Benchmark steady state time in seconds.')
-flags.DEFINE_integer('scale', 500, 'Number of simulated web search users.')
+flags.DEFINE_integer('scale', 100, 'Number of simulated web search users.')
 
 
 
@@ -142,7 +142,8 @@ def _PrepareSolr(solr_nodes, fw):
     else:
       solr.Start(vm, fw, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000,
                  server_heap_size)
-  solr.CreateCollection(solr_nodes[0], 'cloudsuite_web_search', len(solr_nodes))
+  solr.CreateCollection(solr_nodes[0], 'cloudsuite_web_search',
+                        len(solr_nodes), SOLR_PORT)
 
 
 def _BuildIndex(solr_nodes, fw):
@@ -170,71 +171,23 @@ def _BuildIndex(solr_nodes, fw):
                  server_heap_size, False)
 
 
-def _PrepareClient(clients, fw, solr_nodes):
+def _PrepareClient(clients, fw):
   """Prepares client machine in the benchmark."""
-  distribution = FLAGS.distr
-  search_driver = None
-  terms_file = None
-  if distribution == 'Random':
-    search_driver = 'Random.java'
-    terms_file = 'terms_random'
-  elif distribution == 'Ziphian':
-    search_driver = 'Ziphian.java'
-    terms_file = 'terms_ordered'
   client_master = clients[0]
   for client in clients:
-    client = clients[0]
     client.Install('faban')
     client.RemoteCommand('cd {0} && '
                          'wget {1} && '
                          'tar -xzf search.tar.gz'.format(
                              faban.FABAN_HOME_DIR, SEARCH_DRIVER_URL))
-    client.RemoteCommand('cd {0}/search && '
-                         'cp distributions/{2} '
-                         'src/sample/searchdriver/SearchDriver.java && '
-                         'sed -i "/faban.home/c\\faban.home={0}" '
+    client.RemoteCommand('sed -i "/faban.home/c\\faban.home={0}" '
                          'build.properties && '
                          'sed -i "/ant.home/c\\ant.home='
                          '{1}" build.properties && '
                          'sed -i "/faban.url/c\\faban.url='
                          'http://localhost:9980/" build.properties'.format(
-                             faban.FABAN_HOME_DIR, ANT_HOME_DIR,
-                             search_driver))
-  client_master.RemoteCommand('cd {0}/search && '
-                              'sed -i "/<ipAddress1>/c\<ipAddress1>{1}'
-                              '</ipAddress1>" deploy/run.xml && '
-                              'sed -i "/<portNumber1>/c\<portNumber1>{3}'
-                              '</portNumber1>" deploy/run.xml && '
-                              'sed -i "/<outputDir>/c\<outputDir>{2}'
-                              '</outputDir>" deploy/run.xml && '
-                              'sed -i "/<termsFile>/c\<termsFile>{0}'
-                              '/search/src/sample/searchdriver/{4}'
-                              '</termsFile>" deploy/run.xml && '
-                              'sed -i "/<fa:scale>/c\<fa:scale>{7}'
-                              '</fa:scale>" deploy/run.xml && '
-                              'sed -i "/<fa:rampUp>/c\<fa:rampUp>{5}'
-                              '</fa:rampUp>" deploy/run.xml && '
-                              'sed -i "/<fa:rampDown>/c\<fa:rampDown>60'
-                              '</fa:rampDown>" deploy/run.xml && '
-                              'sed -i "/<fa:steadyState>/c\<fa:steadyState>{6}'
-                              '</fa:steadyState>" deploy/run.xml '.format(
-                                  faban.FABAN_HOME_DIR,
-                                  solr_nodes[0].ip_address,
-                                  FABAN_OUTPUT_DIR, SOLR_PORT, terms_file,
-                                  FLAGS.ramp_up, FLAGS.steady_state,
-                                  FLAGS.scale))
+                             faban.FABAN_HOME_DIR, ANT_HOME_DIR))
   faban.Start(client_master, fw)
-  for client in clients:
-    target = None
-    if client != client_master:
-      target = 'deploy.jar'
-    else:
-      target = 'deploy'
-    client.RemoteCommand('cd {0}/search && '
-                         'export JAVA_HOME={1} && '
-                         '{2}/bin/ant {3}'.format(
-                             faban.FABAN_HOME_DIR, faban.JAVA_HOME,
-                             ANT_HOME_DIR, target))
   time.sleep(20)
 
 
@@ -252,7 +205,7 @@ def Prepare(benchmark_spec):
     vm.RemoteCommand('mkdir -p {0}'.format(
                      CLOUDSUITE_WEB_SEARCH_DIR))
   _PrepareSolr(vms[:NUM_SERVERS], fw)
-  _PrepareClient(vms[NUM_SERVERS:], fw, vms[:NUM_SERVERS])
+  _PrepareClient(vms[NUM_SERVERS:], fw)
   _BuildIndex(vms[:NUM_SERVERS], fw)
 
 
@@ -268,6 +221,58 @@ def Run(benchmark_spec):
   """
   clients = benchmark_spec.vms[NUM_SERVERS:]
   client_master = clients[0]
+  distribution = FLAGS.distr
+  terms_file = None
+  search_driver = None
+  if distribution == 'Random':
+    terms_file = 'terms_random'
+    search_driver = 'Random.java'
+  elif distribution == 'Ziphian':
+    terms_file = 'terms_ordered'
+    search_driver = 'Ziphian.java'
+  agents = ''
+  for client in clients:
+    client.RemoteCommand('cd {0}/search && '
+                         'cp distributions/{1} '
+                         'src/sample/searchdriver/SearchDriver.java'.format(
+                             faban.FABAN_HOME_DIR, search_driver))
+    target = None
+    if client != client_master:
+      target = 'deploy.jar'
+      agents += ' '
+    else:
+      target = 'deploy'
+    client.RemoteCommand('cd {0}/search && '
+                         'export JAVA_HOME={1} && '
+                         '{2}/bin/ant {3}'.format(
+                             faban.FABAN_HOME_DIR, faban.JAVA_HOME,
+                             ANT_HOME_DIR, target))
+    agents += client.ip_address + ':' + str(1)
+  client_master.RemoteCommand('cd {0}/search && '
+                              'sed -i "/<ipAddress1>/c\<ipAddress1>{1}'
+                              '</ipAddress1>" deploy/run.xml && '
+                              'sed -i "/<portNumber1>/c\<portNumber1>{3}'
+                              '</portNumber1>" deploy/run.xml && '
+                              'sed -i "/<outputDir>/c\<outputDir>{2}'
+                              '</outputDir>" deploy/run.xml && '
+                              'sed -i "/<termsFile>/c\<termsFile>{0}'
+                              '/search/src/sample/searchdriver/{4}'
+                              '</termsFile>" deploy/run.xml && '
+                              'sed -i "/<fa:scale>/c\<fa:scale>{7}'
+                              '</fa:scale>" deploy/run.xml && '
+                              'sed -i "/<agents>/c\<agents>{8}'
+                              '</agents>" deploy/run.xml && '
+                              'sed -i "/<fa:rampUp>/c\<fa:rampUp>{5}'
+                              '</fa:rampUp>" deploy/run.xml && '
+                              'sed -i "/<fa:rampDown>/c\<fa:rampDown>60'
+                              '</fa:rampDown>" deploy/run.xml && '
+                              'sed -i "/<fa:steadyState>/c\<fa:steadyState>{6}'
+                              '</fa:steadyState>" deploy/run.xml '.format(
+                                  faban.FABAN_HOME_DIR,
+                                  benchmark_spec.vms[0].ip_address,
+                                  FABAN_OUTPUT_DIR, SOLR_PORT, terms_file,
+                                  FLAGS.ramp_up, FLAGS.steady_state,
+                                  FLAGS.scale, agents))
   agent_id = 1
   client_heap_size = FLAGS.client_heap_size
   driver_dir = posixpath.join(faban.FABAN_HOME_DIR, 'search')
@@ -277,7 +282,10 @@ def Run(benchmark_spec):
       faban.StartRegistry(vm, CLASSPATH, policy_path)
       faban.StartAgent(vm, CLASSPATH, driver_dir, 'SearchDriver', agent_id,
                        client_heap_size, policy_path, client_master.ip_address)
-      agent_id = agent_id + 1
+    else:
+      faban.StartAgent(vm, CLASSPATH, driver_dir, 'SearchDriver', agent_id,
+                       client_heap_size, policy_path, client_master.ip_address)
+    agent_id = agent_id + 1
   benchmark_config = posixpath.join(faban.FABAN_HOME_DIR,
                                     'search/deploy/run.xml')
   faban.StartMaster(client_master, CLASSPATH, client_heap_size,
@@ -308,8 +316,6 @@ def Run(benchmark_spec):
                                'ops/s'))
   results.append(sample.Sample('90th percentile latency', sum_p90, 's'))
   results.append(sample.Sample('99th percentile latency', sum_p99, 's'))
-  for vm in clients:
-    faban.StopAgent(vm)
   faban.StopRegistry(client_master)
   return results
 

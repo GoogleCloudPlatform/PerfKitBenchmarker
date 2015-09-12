@@ -59,9 +59,10 @@ def StartWithZookeeper(vm, fw, port, java_heap_size,
   solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
   if reload_conf:
     ReloadConfiguration(vm, solr_core_dir)
-  vm.RemoteCommand('cd {0} && '
-                   'bin/solr start -cloud -p {1} -s {2} -m {3}'.format(
-                       SOLR_HOME_DIR, port, solr_core_dir, java_heap_size))
+  vm.RobustRemoteCommand('cd {0} && '
+                         'bin/solr start -cloud -p {1} -s {2} -m {3}'.format(
+                             SOLR_HOME_DIR, port, solr_core_dir,
+                             java_heap_size))
   time.sleep(15)
 
 
@@ -80,13 +81,13 @@ def Start(vm, fw, port, zookeeper_node, zookeeper_port, java_heap_size,
   time.sleep(15)
 
 
-def CreateCollection(vm, collection_name, shards_num):
+def CreateCollection(vm, collection_name, shards_num, port):
   """Creates collection with a basic_config set."""
   vm.RobustRemoteCommand('cd {0} && '
                          'bin/solr create_collection -c {1} '
-                         '-d basic_configs -shards {2}'.format(
+                         '-d basic_configs -shards {2} -p {3}'.format(
                              SOLR_HOME_DIR, collection_name,
-                             shards_num))
+                             shards_num, port))
   time.sleep(20)
 
 
