@@ -73,7 +73,7 @@ flags.DEFINE_integer('num_clients', 1, 'Number of client machines.')
 flags.DEFINE_integer('ramp_up', 90, 'Benchmark ramp up time in seconds.')
 flags.DEFINE_integer('steady_state', 60,
                      'Benchmark steady state time in seconds.')
-flags.DEFINE_integer('scale', 100, 'Number of simulated web search users.')
+flags.DEFINE_integer('scale', 50, 'Number of simulated web search users.')
 
 
 
@@ -180,7 +180,8 @@ def _PrepareClient(clients, fw):
                          'wget {1} && '
                          'tar -xzf search.tar.gz'.format(
                              faban.FABAN_HOME_DIR, SEARCH_DRIVER_URL))
-    client.RemoteCommand('sed -i "/faban.home/c\\faban.home={0}" '
+    client.RemoteCommand('cd {0}/search && '
+                         'sed -i "/faban.home/c\\faban.home={0}" '
                          'build.properties && '
                          'sed -i "/ant.home/c\\ant.home='
                          '{1}" build.properties && '

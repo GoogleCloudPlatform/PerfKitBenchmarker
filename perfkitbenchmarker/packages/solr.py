@@ -60,7 +60,8 @@ def StartWithZookeeper(vm, fw, port, java_heap_size,
   if reload_conf:
     ReloadConfiguration(vm, solr_core_dir)
   vm.RobustRemoteCommand('cd {0} && '
-                         'bin/solr start -cloud -p {1} -s {2} -m {3}'.format(
+                         'bin/solr start -cloud -p {1} '
+                         '-s {2} -m {3}'.format(
                              SOLR_HOME_DIR, port, solr_core_dir,
                              java_heap_size))
   time.sleep(15)
