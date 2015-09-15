@@ -144,5 +144,29 @@ class IssueCommandTestCase(unittest.TestCase):
     self.assertFalse(HaveSleepSubprocess())
 
 
+class ThreadLocalBenchmarkSpecTestCase(unittest.TestCase):
+
+  def testSetGet(self):
+    benchmark_spec = mock.MagicMock()
+    vm_util.SetThreadBenchmarkSpec(benchmark_spec)
+    self.assertEqual(benchmark_spec, vm_util.GetThreadBenchmarkSpec())
+
+  def testGetWithoutSet(self):
+    self.assertEqual(None, vm_util.GetThreadBenchmarkSpec())
+
+  def testPropagation(self):
+    benchmark_spec = mock.MagicMock()
+    vm_util.SetThreadBenchmarkSpec(benchmark_spec)
+
+    def _DoWork(_):
+      self.assertEqual(benchmark_spec, vm_util.GetThreadBenchmarkSpec())
+      new_benchmark_spec = mock.MagicMock()
+      vm_util.SetThreadBenchmarkSpec(new_benchmark_spec)
+      self.assertNotEqual(benchmark_spec, vm_util.GetThreadBenchmarkSpec())
+      self.assertEqual(new_benchmark_spec, vm_util.GetThreadBenchmarkSpec())
+
+    vm_util.RunThreaded(_DoWork, range(10))
+
+
 if __name__ == '__main__':
   unittest.main()

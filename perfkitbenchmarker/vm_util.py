@@ -172,6 +172,28 @@ def GetSshOptions(ssh_key_filename):
   return options
 
 
+class _ThreadData(threading.local):
+  def __init__(self):
+    self.benchmark_spec = None
+
+
+thread_local = _ThreadData()
+
+
+def SetThreadBenchmarkSpec(benchmark_spec):
+  """Sets the current thread's BenchmarkSpec object."""
+  thread_local.benchmark_spec = benchmark_spec
+
+
+def GetThreadBenchmarkSpec():
+  """Gets the current thread's BenchmarkSpec object.
+
+  If SetThreadBenchmarkSpec() has not been called in either the current thread
+  or in an ancestor, then this method will return None by default.
+  """
+  return thread_local.benchmark_spec
+
+
 class ThreadWithExceptions(threading.Thread):
   """Extension of threading.Thread that propagates exceptions on join."""
 
@@ -180,10 +202,12 @@ class ThreadWithExceptions(threading.Thread):
     self.exception = None
     self._log_context = log_util.ThreadLogContext(
         log_util.GetThreadLogContext())
+    self.benchmark_spec = GetThreadBenchmarkSpec()
 
   def run(self):
     try:
       log_util.SetThreadLogContext(self._log_context)
+      SetThreadBenchmarkSpec(self.benchmark_spec)
       self.RunWithExceptions()
     except Exception:  # pylint: disable=broad-except
       self.exception = ('Exception occured in thread %s:\n%s' %
