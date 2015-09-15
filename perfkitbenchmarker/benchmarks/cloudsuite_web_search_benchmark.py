@@ -65,15 +65,18 @@ flags.DEFINE_string('client_heap_size', '2g',
 flags.DEFINE_string('server_heap_size', '3g',
                     'Java heap size for Solr server in the usual java format.'
                     ' Default: 3g.')
-flags.DEFINE_string('distr', 'Random',
-                    'Distribution of query terms. '
-                    'Random and Ziphian distributions are available. '
-                    'Default: Random.')
-flags.DEFINE_integer('num_clients', 1, 'Number of client machines.')
-flags.DEFINE_integer('ramp_up', 90, 'Benchmark ramp up time in seconds.')
+flags.DEFINE_enum('distr', 'Random', ['Random', 'Ziphian'],
+                  'Distribution of query terms. '
+                  'Random and Ziphian distributions are available. '
+                  'Default: Random.')
+flags.DEFINE_integer('num_clients', 1, 'Number of client machines.',
+                     lower_bound=1)
+flags.DEFINE_integer('ramp_up', 90, 'Benchmark ramp up time in seconds.',
+                     lower_bound=1)
 flags.DEFINE_integer('steady_state', 60,
-                     'Benchmark steady state time in seconds.')
-flags.DEFINE_integer('scale', 50, 'Number of simulated web search users.')
+                     'Benchmark steady state time in seconds.', lower_bound=1)
+flags.DEFINE_integer('scale', 50, 'Number of simulated web search users.',
+                     lower_bound=1)
 
 
 
@@ -102,15 +105,6 @@ def CheckPrerequisites():
   if unit not in allowed_units:
     raise ValueError('Allowed units for java heap size are '
                      '"g" for gigabytes, and "m" for megabytes.')
-  allowed_distributions = ['Random', 'Ziphian']
-  if FLAGS.distr not in allowed_distributions:
-    raise ValueError('Allowed distributions are Random and Ziphian.')
-  if FLAGS.steady_state <= 0:
-    raise ValueError('Steady state time must be positive integer number.')
-  if FLAGS.ramp_up <= 0:
-    raise ValueError('Ramp up time must be positive integer number.')
-  if FLAGS.scale <= 0:
-    raise ValueError('Scale must be positive integer number.')
 
 
 def GetInfo():
