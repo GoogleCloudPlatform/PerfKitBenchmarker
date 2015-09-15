@@ -292,9 +292,11 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
           # a reference to the spec in order to delete it in the "finally"
           # section below.
           spec = benchmark_spec.BenchmarkSpec(benchmark_info)
+          vm_util.SetThreadBenchmarkSpec(spec)
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
           spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_name)
+          vm_util.SetThreadBenchmarkSpec(spec)
 
         if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
           DoRunPhase(benchmark, benchmark_name, spec, collector, detailed_timer)
