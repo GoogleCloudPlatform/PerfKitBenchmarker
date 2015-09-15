@@ -97,12 +97,12 @@ FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
     'generate_scenarios', 'io_depths'}
 
 
-IODEPTHS_REGEXP = re.compile(r'(\d+)(-(\d+))?')
+IODEPTHS_REGEXP = re.compile(r'(\d+)(-(\d+))?$')
 
 
 def IODepthsValidator(string):
   match = IODEPTHS_REGEXP.match(string)
-  return match and match.end() == len(string) and int(match.group(1)) > 0
+  return match and int(match.group(1)) > 0
 
 
 flags.RegisterValidator('io_depths',
