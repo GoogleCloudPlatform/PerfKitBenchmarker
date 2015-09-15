@@ -14,9 +14,10 @@
 """A performance sample class."""
 
 import collections
+import time
 PERCENTILES_LIST = [1, 5, 50, 90, 99, 99.9]
 
-_SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata'
+_SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 
 
 def PercentileCalculator(numbers):
@@ -57,11 +58,18 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
     value: float. Result for 'metric'.
     unit: string. Units for 'value'.
     metadata: dict. Additional metadata to include with the sample.
+    timestamp: float. Unix timestamp.
   """
 
-  def __new__(cls, metric, value, unit, metadata=None, **kwargs):
+  def __new__(cls, metric, value, unit, metadata=None, timestamp=None,
+              **kwargs):
+    if timestamp is None:
+      timestamp = time.time()
+
     return super(Sample, cls).__new__(cls, metric, value, unit,
-                                      metadata=metadata or {}, **kwargs)
+                                      metadata=metadata or {},
+                                      timestamp=timestamp,
+                                      **kwargs)
 
   def asdict(self):
     """Converts the Sample to a dictionary."""

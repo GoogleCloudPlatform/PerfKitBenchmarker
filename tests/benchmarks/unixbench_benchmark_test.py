@@ -17,10 +17,11 @@ import os
 import unittest
 
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker.benchmarks import unixbench_benchmark
 
 
-class UnixBenchBenchmarkTestCase(unittest.TestCase):
+class UnixBenchBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   maxDiff = None
 
@@ -137,7 +138,7 @@ class UnixBenchBenchmarkTestCase(unittest.TestCase):
         ['System Benchmarks Index Score', 4596.2, '',
          {'num_parallel_copies': 8}]]
     expected_result = [sample.Sample(*exp) for exp in expected_result]
-    self.assertEqual(result, expected_result)
+    self.assertSampleListsEqualUpToTimestamp(result, expected_result)
 
 
 if __name__ == '__main__':

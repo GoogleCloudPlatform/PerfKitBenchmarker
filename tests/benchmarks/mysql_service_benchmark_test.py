@@ -17,10 +17,12 @@ import os
 import unittest
 
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker.benchmarks import mysql_service_benchmark
 
 
-class MySQLServiceBenchmarkTestCase(unittest.TestCase):
+class MySQLServiceBenchmarkTestCase(unittest.TestCase,
+                                    test_util.SamplesTestMixin):
 
   def setUp(self):
     path = os.path.join(os.path.dirname(__file__), '..', 'data',
@@ -50,7 +52,7 @@ class MySQLServiceBenchmarkTestCase(unittest.TestCase):
         sample.Sample(
             'sysbench latency percentile 99', 57.15,
             'milliseconds', {})]
-    self.assertEqual(results, expected_results)
+    self.assertSampleListsEqualUpToTimestamp(results, expected_results)
 
 
 if __name__ == '__main__':

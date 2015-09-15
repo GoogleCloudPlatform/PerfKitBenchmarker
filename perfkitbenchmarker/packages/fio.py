@@ -15,6 +15,7 @@
 """Module containing fio installation, cleanup, parsing functions."""
 import ConfigParser
 import io
+import time
 
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -125,6 +126,9 @@ def ParseResults(job_file, fio_json_result):
     A list of sample.Sample objects.
   """
   samples = []
+  # The samples should all have the same timestamp because they
+  # come from the same fio run.
+  timestamp = time.time()
   parameter_metadata = ParseJobFile(job_file)
   io_modes = ['read', 'write', 'trim']
   for job in fio_json_result['jobs']:
@@ -133,6 +137,7 @@ def ParseResults(job_file, fio_json_result):
       if job[mode]['io_bytes']:
         metric_name = '%s:%s' % (job_name, mode)
         parameters = parameter_metadata[job_name]
+        parameters['fio_job'] = job_name
         bw_metadata = {
             'bw_min': job[mode]['bw_min'],
             'bw_max': job[mode]['bw_max'],
@@ -182,16 +187,16 @@ def ParseResults(job_file, fio_json_result):
         samples.append(
             sample.Sample('%s:latency' % metric_name,
                           job[mode]['clat']['mean'],
-                          'usec', lat_metadata))
+                          'usec', lat_metadata, timestamp))
 
         for stat_name, stat_val in lat_statistics:
           samples.append(
               sample.Sample('%s:latency:%s' % (metric_name, stat_name),
-                            stat_val, 'usec', parameters))
+                            stat_val, 'usec', parameters, timestamp))
 
         samples.append(
             sample.Sample('%s:iops' % metric_name,
-                          job[mode]['iops'], '', parameters))
+                          job[mode]['iops'], '', parameters, timestamp))
   return samples
 
 

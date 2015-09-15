@@ -18,6 +18,7 @@ import unittest
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker.benchmarks import speccpu2006_benchmark
 
 TEST_OUTPUT_SPECINT = """
@@ -222,7 +223,8 @@ class DummyVM(object):
     self.num_cpus = 256
 
 
-class Speccpu2006BenchmarkTestCase(unittest.TestCase):
+class Speccpu2006BenchmarkTestCase(unittest.TestCase,
+                                   test_util.SamplesTestMixin):
 
   def testParseResultsC(self):
     self.maxDiff = None
@@ -230,10 +232,10 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase):
     vm = DummyVM()
 
     samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECINT, vm, False)
-    self.assertEqual(samples, EXPECTED_RESULT_SPECINT)
+    self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_SPECINT)
 
     samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_SPECFP, vm, False)
-    self.assertEqual(samples, EXPECTED_RESULT_SPECFP)
+    self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_SPECFP)
 
     # By default, incomplete results result in error.
     with self.assertRaises(errors.Benchmarks.RunError):
@@ -244,7 +246,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase):
 
     # Now use keep_partial_results
     samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD1, vm, True)
-    self.assertEqual(samples, EXPECTED_RESULT_BAD1)
+    self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_BAD1)
 
     samples = speccpu2006_benchmark.ExtractScore(TEST_OUTPUT_BAD2, vm, True)
-    self.assertEqual(samples, EXPECTED_RESULT_BAD2)
+    self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_BAD2)

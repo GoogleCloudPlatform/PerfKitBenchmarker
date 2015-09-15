@@ -18,10 +18,11 @@ import os
 import unittest
 
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker.benchmarks import bonnie_benchmark
 
 
-class BonnieBenchmarkTestCase(unittest.TestCase):
+class BonnieBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
     path = os.path.join(os.path.dirname(__file__), '..', 'data',
@@ -138,7 +139,7 @@ class BonnieBenchmarkTestCase(unittest.TestCase):
           'file_size': '7423M', 'bonnie_version': '1.96'}]]
     expected_result = [sample.Sample(*sample_tuple)
                        for sample_tuple in expected_result]
-    self.assertEqual(result, expected_result)
+    self.assertSampleListsEqualUpToTimestamp(result, expected_result)
 
 
 if __name__ == '__main__':
