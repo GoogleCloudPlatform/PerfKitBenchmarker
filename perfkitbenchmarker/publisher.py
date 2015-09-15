@@ -541,7 +541,7 @@ class SampleCollector(object):
       if isinstance(s, (list, tuple)):
         if len(s) not in (3, 4, 5):
           raise ValueError(
-              'Invalid sample "{0}": should be 3- or 4-tuple.'.format(s))
+              'Invalid sample "{0}": should be 3-, 4-, or 5-tuple.'.format(s))
         s = Sample(*s)
 
       # Annotate the sample.
