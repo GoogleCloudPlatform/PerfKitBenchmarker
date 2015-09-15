@@ -276,34 +276,15 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
         '\n'.join([stacktrace for stacktrace in exceptions]))
 
 
-def _ExecuteProcCall(target_arg_tuple):
-  """Function invoked in another process by RunParallelProcesses.
-
-  Executes a specified function call.
-
-  Args:
-    target_arg_tuple: (target, args, kwargs) tuple containing the function to
-        call and the arguments to pass it.
-
-  Returns:
-    (result, exception) tuple. The first element is the return value from the
-    called function, or None if the function raised an exception. The second
-    element is the raised exception, or None if the function succeeded.
-  """
-  target, args, kwargs = target_arg_tuple
-  try:
-    return target(*args, **kwargs), None
-  except:
-    return None, traceback.format_exc()
-
-
 def RunParallelProcesses(target_arg_tuples, max_concurrency=None):
   """Executes function calls concurrently in separate processes.
 
   Args:
     target_arg_tuples: list of (target, args, kwargs) tuples. Each tuple
         contains the function to call and the arguments to pass it.
-    max_concurrency: int. The maximum number of concurrent new processes.
+    max_concurrency: int or None. The maximum number of concurrent new
+        processes. If None, it will default to the number of processors on the
+        machine.
 
   Returns:
     list of function return values in the order corresponding to the order of
@@ -313,16 +294,24 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency=None):
     errors.VmUtil.CalledProcessException: When an exception occurred in any
         of the called functions.
   """
+  call_futures = []
   results = []
-  exceptions = []
+  error_strings = []
   with futures.ProcessPoolExecutor(max_workers=max_concurrency) as executor:
-    for result, exception in executor.map(_ExecuteProcCall, target_arg_tuples):
-      results.append(result)
-      if exception:
-        exceptions.append(exception)
-  if exceptions:
+    for target, args, kwargs in target_arg_tuples:
+      call_futures.append(executor.submit(target, *args, **kwargs))
+    for index, future in enumerate(call_futures):
+      try:
+        results.append(future.result())
+      except:
+        results.append(None)
+        msg = 'Exception occured in call {0}:{1}{2}'.format(
+            index, os.linesep, traceback.format_exc())
+        logging.error(msg)
+        error_strings.append(msg)
+  if error_strings:
     msg = ('The following exceptions occurred during parallel execution: '
-           '{0}'.format('\n'.join([stacktrace for stacktrace in exceptions])))
+           '{0}'.format(os.linesep.join([e for e in error_strings])))
     raise errors.VmUtil.CalledProcessException(msg)
   return results
 

@@ -138,7 +138,7 @@ def _IncrementCounter(lock, counter):
 
 class RunParallelProcessesTestCase(unittest.TestCase):
 
-  def testLessThreadsThanConcurrencyLimit(self):
+  def testFewerThreadsThanConcurrencyLimit(self):
     calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(2)]
     result = vm_util.RunParallelProcesses(calls, max_concurrency=4)
     self.assertEqual(result, [(0, 'a'), (1, 'a')])
