@@ -49,8 +49,20 @@ class SamplesTestMixin(object):
     custom test for that.
     """
 
-    self.assertEqual(len(a), len(b), msg=msg)
+    self.assertEqual(len(a), len(b),
+                     msg or 'Lists %s and %s are not the same length' % (a, b))
     for i in xrange(len(a)):
-      self.assertIsInstance(a[i], sample.Sample)
-      self.assertIsInstance(b[i], sample.Sample)
-      self.assertSamplesEqualUpToTimestamp(a[i], b[i], msg=msg)
+      self.assertIsInstance(a[i], sample.Sample,
+                            msg or ('%s (item %s in list) is '
+                                    'not a sample.Sample object' %
+                                    (a[i], i)))
+      self.assertIsInstance(b[i], sample.Sample,
+                            msg or ('%s (item %s in list) is '
+                                    'not a sample.Sample object' %
+                                    (b[i], i)))
+      try:
+        self.assertSamplesEqualUpToTimestamp(a[i], b[i], msg=msg)
+      except self.failureException as ex:
+        ex.message = ex.message + (' (was item %s in list)' % i)
+        ex.args = (ex.message,)
+        raise ex
