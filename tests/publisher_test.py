@@ -224,16 +224,6 @@ class SampleCollectorTestCase(unittest.TestCase):
         },
         self.instance.samples[0])
 
-  def testAddSamples_3Tuple(self):
-    samples = [tuple(self.sample[:3])]
-    self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
-    self._VerifyResult(False)
-
-  def testAddSamples_4Tuple(self):
-    samples = [tuple(self.sample[:4])]
-    self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
-    self._VerifyResult()
-
 
 class DefaultMetadataProviderTestCase(unittest.TestCase):
 
