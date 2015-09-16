@@ -303,8 +303,8 @@ def Prepare(benchmark_spec):
       else:
         # Default to 90% of capacity because the file system will add
         # some overhead.
-        fill_size = str(DISK_USABLE_SPACE_FRACTION *
-                        1000 * disk.disk_size) + 'M'
+        fill_size = str(int(DISK_USABLE_SPACE_FRACTION *
+                            1000 * disk.disk_size)) + 'M'
 
     logging.info('Fill file %s on %s', fill_path, vm)
     command = GenerateFillCommand(fio.FIO_PATH,
