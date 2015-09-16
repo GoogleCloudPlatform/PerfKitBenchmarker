@@ -19,7 +19,6 @@ import logging
 import os
 import random
 import re
-import socket
 import string
 import subprocess
 import tempfile
@@ -274,14 +273,6 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
     raise errors.VmUtil.ThreadException(
         'The following exceptions occurred during threaded execution: %s' %
         '\n'.join([stacktrace for stacktrace in exceptions]))
-
-
-def ValdiateIP(addr):
-  try:
-    socket.inet_aton(addr)
-    return True
-  except socket.error:
-    return False
 
 
 def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
