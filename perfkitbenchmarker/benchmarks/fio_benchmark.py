@@ -298,9 +298,8 @@ def Prepare(benchmark_spec):
       fill_size = FLAGS.device_fill_size
     else:
       fill_path = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
-
-      if FLAGS.FlagValuesDict().get('disk_fill_size') is not None:
-        fill_size = FLAGS.disk_fill_size
+      if FLAGS['device_fill_size'].present:
+        fill_size = FLAGS.device_fill_size
       else:
         # Default to 90% of capacity because the file system will add
         # some overhead.
