@@ -15,7 +15,6 @@
 
 import json
 import os
-import time
 import unittest
 
 import mock
@@ -81,10 +80,7 @@ class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             'sequential_read': {},
             'random_write_test': {},
             'random_read_test': {},
-            'random_read_test_parallel': {}}), \
-        mock.patch(
-            time.__name__ + '.time',
-            return_value=1.0):
+            'random_read_test_parallel': {}}):
       result = fio.ParseResults('', self.result_contents)
       expected_result = [
           ['sequential_write:write:bandwidth', 68118, 'KB/s',
