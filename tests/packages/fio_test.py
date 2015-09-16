@@ -362,6 +362,23 @@ class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
                          for sample_tuple in expected_result]
       self.assertSampleListsEqualUpToTimestamp(result, expected_result)
 
+  def testParseResultsBaseMetadata(self):
+    BASE_METADATA = {'foo': 'bar'}
+
+    with mock.patch(
+        fio.__name__ + '.ParseJobFile',
+        return_value={
+            'sequential_write': {},
+            'sequential_read': {},
+            'random_write_test': {},
+            'random_read_test': {},
+            'random_read_test_parallel': {}}):
+      results = fio.ParseResults('', self.result_contents,
+                                 base_metadata=BASE_METADATA)
+
+      for result in results:
+        self.assertDictContainsSubset(BASE_METADATA, result.metadata)
+
   def testFioCommandToJob(self):
     fio_parameters = (
         '--filesize=10g --directory=/scratch0 --ioengine=libaio '
