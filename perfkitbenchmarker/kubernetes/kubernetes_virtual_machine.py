@@ -321,7 +321,21 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
                       (SELECTOR_PREFIX, self.name))
     port = stdout.replace('"', '')
     self.ssh_port = port
-    self.ip_address = self.internal_ip = random.choice(FLAGS.kubernetes_nodes)
+    self.ip_address = random.choice(FLAGS.kubernetes_nodes)
+
+    get_internal_ip_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
+                           'get', 'pod', '-l', '%s=%s' %
+                           (SELECTOR_PREFIX, self.name), '-o', 'jsonpath',
+                           '--template', '"{.items[0].status.podIP}"']
+
+    stdout, _, _ = vm_util.IssueCommand(get_internal_ip_cmd,
+                                        suppress_warning=True)
+    if not stdout:
+      logging.warning("Internal POD IP address not found. External address"
+                      "will be used instead.")
+      self.internal_ip = self.ip_address
+    else:
+      self.internal_ip = stdout.replace('"', '')
 
   def _ConfigureProxy(self):
     """
