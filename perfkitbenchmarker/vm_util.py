@@ -276,6 +276,31 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
         '\n'.join([stacktrace for stacktrace in exceptions]))
 
 
+def _ExecuteProcCall(target_arg_tuple):
+  """Function invoked in another process by RunParallelProcesses.
+
+  Executes a specified function call and captures the traceback upon exception.
+  TODO(skschneider): Remove this helper function when moving to Python 3.5 or
+  when the backport of concurrent.futures.ProcessPoolExecutor is able to
+  preserve original traceback.
+
+  Args:
+    target_arg_tuple: (target, args, kwargs) tuple containing the function to
+        call and the arguments to pass it.
+
+  Returns:
+    (result, traceback) tuple. The first element is the return value from the
+    called function, or None if the function raised an exception. The second
+    element is the exception traceback string, or None if the function
+    succeeded.
+  """
+  target, args, kwargs = target_arg_tuple
+  try:
+    return target(*args, **kwargs), None
+  except:
+    return None, traceback.format_exc()
+
+
 def RunParallelProcesses(target_arg_tuples, max_concurrency=None):
   """Executes function calls concurrently in separate processes.
 
@@ -298,20 +323,23 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency=None):
   results = []
   error_strings = []
   with futures.ProcessPoolExecutor(max_workers=max_concurrency) as executor:
-    for target, args, kwargs in target_arg_tuples:
-      call_futures.append(executor.submit(target, *args, **kwargs))
+    for target_arg_tuple in target_arg_tuples:
+      call_futures.append(executor.submit(_ExecuteProcCall, target_arg_tuple))
     for index, future in enumerate(call_futures):
       try:
-        results.append(future.result())
+        result, stacktrace = future.result()
       except:
-        results.append(None)
+        result = None
+        stacktrace = traceback.format_exc()
+      results.append(result)
+      if stacktrace:
         msg = 'Exception occured in call {0}:{1}{2}'.format(
-            index, os.linesep, traceback.format_exc())
+            index, os.linesep, stacktrace)
         logging.error(msg)
         error_strings.append(msg)
   if error_strings:
-    msg = ('The following exceptions occurred during parallel execution: '
-           '{0}'.format(os.linesep.join([e for e in error_strings])))
+    msg = ('The following exceptions occurred during parallel execution:'
+           '{0}{1}'.format(os.linesep, os.linesep.join(error_strings)))
     raise errors.VmUtil.CalledProcessException(msg)
   return results
 
