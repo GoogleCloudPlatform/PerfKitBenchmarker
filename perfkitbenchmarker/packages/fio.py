@@ -115,7 +115,7 @@ def FioParametersToJob(fio_parameters):
                                 JOB_STONEWALL_PARAMETER)
 
 
-def ParseResults(job_file, fio_json_result, base_metadata={}):
+def ParseResults(job_file, fio_json_result, base_metadata=None):
   """Parse fio json output into samples.
 
   Args:
@@ -138,7 +138,8 @@ def ParseResults(job_file, fio_json_result, base_metadata={}):
       if job[mode]['io_bytes']:
         metric_name = '%s:%s' % (job_name, mode)
         parameters = parameter_metadata[job_name]
-        parameters.update(base_metadata)
+        if base_metadata:
+          parameters.update(base_metadata)
         parameters['fio_job'] = job_name
         bw_metadata = {
             'bw_min': job[mode]['bw_min'],
