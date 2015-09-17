@@ -16,9 +16,12 @@
 
 import unittest
 
+import mock
+
 from perfkitbenchmarker import disk
 from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.benchmarks import fio_benchmark
+from perfkitbenchmarker.packages import fio
 
 
 class TestGetIODepths(unittest.TestCase):
@@ -156,6 +159,29 @@ size=100%
             [1],
             None),
         expected_jobfile)
+
+
+class TestRunForMinutes(unittest.TestCase):
+  def testRunForMinutes(self):
+    vm = mock.Mock()
+    vm.RemoteCommand = mock.MagicMock()
+    vm.scratch_disks = [mock.Mock()]
+    benchmark_spec = mock.Mock()
+    benchmark_spec.vms = [vm]
+
+    bench_module = fio_benchmark.__name__
+    with mock.patch(bench_module + '.FLAGS') as fb_flags, \
+            mock.patch(bench_module + '.GetOrGenerateJobFileString'), \
+            mock.patch(fio.__name__ + '.ParseResults') as parse_results:
+      # Pick a length of time that forces rounding
+      fb_flags.run_for_minutes = int(round(fio_benchmark.MINUTES_PER_JOB * 2.5))
+      fb_flags.io_depths = '1'
+      fb_flags.generate_scenarios = ['random_read']
+      parse_results.return_value = ['spam']
+      vm.RemoteCommand.return_value = '{"foo": "bar"}', ''
+      self.assertEquals(fio_benchmark.Run(benchmark_spec),
+                        ['spam', 'spam', 'spam'])
+      self.assertEquals(vm.RemoteCommand.call_count, 3)
 
 
 if __name__ == '__main__':
