@@ -140,8 +140,8 @@ def _BuildIndex(solr_nodes, fw):
   def DownloadIndex(vm):
     solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
     vm.RobustRemoteCommand('cd {0} && '
-                           'wget {1} && '
-                           'tar zxvf index -C {2}'.format(
+                           'curl -L {1} | '
+                           'tar zxvf - -C {2}'.format(
                                solr_core_dir, INDEX_URL,
                                'cloudsuite_web_search*'))
 
