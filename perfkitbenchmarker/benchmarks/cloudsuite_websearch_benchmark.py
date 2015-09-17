@@ -36,7 +36,7 @@ from perfkitbenchmarker.packages.ant import ANT_HOME_DIR
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'cloudsuite_web_search',
+BENCHMARK_INFO = {'name': 'cloudsuite_websearch',
                   'description': 'Run CloudSuite Web Search',
                   'scratch_disk': True,
                   'num_machines': None}
@@ -59,23 +59,23 @@ CLASSPATH = ('$FABAN_HOME/lib/fabanagents.jar:$FABAN_HOME/lib/fabancommon.jar:'
              '$FABAN_HOME/lib/fabandriver.jar:$JAVA_HOME/lib/tools.jar:'
              '$FABAN_HOME/search/build/lib/search.jar')
 
-flags.DEFINE_string('websearch_client_heap_size', '2g',
+flags.DEFINE_string('cs_websearch_client_heap_size', '2g',
                     'Java heap size for Faban client in the usual java format.'
                     ' Default: 2g.')
-flags.DEFINE_string('websearch_server_heap_size', '3g',
+flags.DEFINE_string('cs_websearch_server_heap_size', '3g',
                     'Java heap size for Solr server in the usual java format.'
                     ' Default: 3g.')
-flags.DEFINE_enum('websearch_query_distr', 'Random', ['Random', 'Ziphian'],
+flags.DEFINE_enum('cs_websearch_query_distr', 'Random', ['Random', 'Ziphian'],
                   'Distribution of query terms. '
                   'Random and Ziphian distributions are available. '
                   'Default: Random.')
-flags.DEFINE_integer('websearch_num_clients', 1, 'Number of client machines.',
-                     lower_bound=1)
-flags.DEFINE_integer('websearch_ramp_up', 90,
+flags.DEFINE_integer('cs_websearch_num_clients', 1,
+                     'Number of client machines.', lower_bound=1)
+flags.DEFINE_integer('cs_websearch_ramp_up', 90,
                      'Benchmark ramp up time in seconds.', lower_bound=1)
-flags.DEFINE_integer('websearch_steady_state', 60,
+flags.DEFINE_integer('cs_websearch_steady_state', 60,
                      'Benchmark steady state time in seconds.', lower_bound=1)
-flags.DEFINE_integer('websearch_scale', 50,
+flags.DEFINE_integer('cs_websearch_scale', 50,
                      'Number of simulated web search users.',
                      lower_bound=1)
 
@@ -93,13 +93,13 @@ def CheckPrerequisites():
     if not m:
       raise ValueError('Invalid heap size: {0}'.format(heap_size_str))
 
-  _CheckHeapSize(FLAGS.websearch_server_heap_size)
-  _CheckHeapSize(FLAGS.websearch_client_heap_size)
+  _CheckHeapSize(FLAGS.cs_websearch_server_heap_size)
+  _CheckHeapSize(FLAGS.cs_websearch_client_heap_size)
 
 
 def GetInfo():
   info = BENCHMARK_INFO.copy()
-  num_clients = FLAGS.websearch_num_clients
+  num_clients = FLAGS.cs_websearch_num_clients
   info['num_machines'] = num_clients + NUM_SERVERS
   return info
 
@@ -108,7 +108,7 @@ def _PrepareSolr(solr_nodes, fw):
   """Starts and configures SolrCloud."""
   basic_configs_dir = posixpath.join(solr.SOLR_HOME_DIR, 'server/solr/'
                                      'configsets/basic_configs/conf')
-  server_heap_size = FLAGS.websearch_server_heap_size
+  server_heap_size = FLAGS.cs_websearch_server_heap_size
   for vm in solr_nodes:
     vm.Install('solr')
     solr_nodes[0].RemoteCommand('cd {0} && '
@@ -146,7 +146,7 @@ def _BuildIndex(solr_nodes, fw):
                                'cloudsuite_web_search*'))
 
   vm_util.RunThreaded(DownloadIndex, solr_nodes, len(solr_nodes))
-  server_heap_size = FLAGS.websearch_server_heap_size
+  server_heap_size = FLAGS.cs_websearch_server_heap_size
   for vm in solr_nodes:
     if vm == solr_nodes[0]:
       solr.StartWithZookeeper(vm, fw, SOLR_PORT, server_heap_size, False)
@@ -206,7 +206,7 @@ def Run(benchmark_spec):
   """
   clients = benchmark_spec.vms[NUM_SERVERS:]
   client_master = clients[0]
-  distribution = FLAGS.websearch_query_distr
+  distribution = FLAGS.cs_websearch_query_distr
   terms_file = None
   search_driver = None
   if distribution == 'Random':
@@ -258,11 +258,11 @@ def Run(benchmark_spec):
                                   faban.FABAN_HOME_DIR,
                                   benchmark_spec.vms[0].ip_address,
                                   FABAN_OUTPUT_DIR, SOLR_PORT, terms_file,
-                                  FLAGS.websearch_ramp_up,
-                                  FLAGS.websearch_steady_state,
-                                  FLAGS.websearch_scale, agents))
+                                  FLAGS.cs_websearch_ramp_up,
+                                  FLAGS.cs_websearch_steady_state,
+                                  FLAGS.cs_websearch_scale, agents))
   agent_id = 1
-  client_heap_size = FLAGS.websearch_client_heap_size
+  client_heap_size = FLAGS.cs_websearch_client_heap_size
   driver_dir = posixpath.join(faban.FABAN_HOME_DIR, 'search')
   policy_path = posixpath.join(driver_dir, 'config/security/driver.policy')
   for vm in clients:
