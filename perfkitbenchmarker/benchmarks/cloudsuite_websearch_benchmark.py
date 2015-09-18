@@ -140,7 +140,7 @@ def _BuildIndex(solr_nodes, fw):
   def DownloadIndex(vm):
     solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
     vm.RobustRemoteCommand('cd {0} && '
-                           'curl -L {1} | '
+                           'wget -O - {1} | '
                            'tar zxvf - -C {2}'.format(
                                solr_core_dir, INDEX_URL,
                                'cloudsuite_web_search*'))
@@ -161,8 +161,8 @@ def _PrepareClient(clients, fw):
   for client in clients:
     client.Install('faban')
     client.RemoteCommand('cd {0} && '
-                         'wget {1} && '
-                         'tar -xzf search.tar.gz'.format(
+                         'wget -O - {1} | '
+                         'tar -xzf -'.format(
                              faban.FABAN_HOME_DIR, SEARCH_DRIVER_URL))
     client.RemoteCommand('cd {0}/search && '
                          'sed -i "/faban.home/c\\faban.home={0}" '
@@ -185,10 +185,14 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   fw = benchmark_spec.firewall
-  for vm in vms:
+
+  def PrepareVM(vm):
     vm.Install('wget')
     vm.RemoteCommand('mkdir -p {0}'.format(
                      CLOUDSUITE_WEB_SEARCH_DIR))
+
+  vm_util.RunThreaded(PrepareVM, vms)
+
   _PrepareSolr(vms[:NUM_SERVERS], fw)
   _PrepareClient(vms[NUM_SERVERS:], fw)
   _BuildIndex(vms[:NUM_SERVERS], fw)
