@@ -136,6 +136,33 @@ def _IncrementCounter(lock, counter):
     counter.value += 1
 
 
+def _AppendAndCheck(int_list):
+  list_size = len(int_list)
+  int_list.append(list_size)
+  if list_size == 1:
+    raise ValueError('Called with input list length of 1.')
+
+
+class RunThreadedTestCase(unittest.TestCase):
+
+  def testFewerThreadsThanConcurrencyLimit(self):
+    args = [(('a',), {'b': i}) for i in range(2)]
+    result = vm_util.RunThreaded(_ReturnArgs, args, max_concurrent_threads=4)
+    self.assertEqual(result, [(0, 'a'), (1, 'a')])
+
+  def testMoreThreadsThanConcurrencyLimit(self):
+    args = [(('a',), {'b': i}) for i in range(10)]
+    result = vm_util.RunThreaded(_ReturnArgs, args, max_concurrent_threads=4)
+    self.assertEqual(result, [(i, 'a') for i in range(10)])
+
+  def testException(self):
+    int_list = []
+    args = [int_list for _ in range(3)]
+    with self.assertRaises(errors.VmUtil.ThreadException):
+      vm_util.RunThreaded(_AppendAndCheck, args, max_concurrent_threads=1)
+    self.assertEqual(int_list, [0, 1, 2])
+
+
 class RunParallelProcessesTestCase(unittest.TestCase):
 
   def testFewerThreadsThanConcurrencyLimit(self):
