@@ -118,7 +118,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             key_name=self.key_name,
             security_groups=['perfkit_sc_group'],
             nics=nics,
-            availability_zone='nova',
+            availability_zone=self.zone,
             block_device_mapping_v2=boot_from_vol,
             scheduler_hints=scheduler_hints,
             config_drive=FLAGS.openstack_config_drive)
