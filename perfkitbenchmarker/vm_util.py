@@ -190,8 +190,8 @@ def _ExecuteThreadCall(target_arg_tuple, call_id, queue, parent_log_context):
     parent_log_context: ThreadLogContext of the parent thread.
   """
   target, args, kwargs = target_arg_tuple
-  log_context = log_util.ThreadLogContext(parent_log_context)
   try:
+    log_context = log_util.ThreadLogContext(parent_log_context)
     log_util.SetThreadLogContext(log_context)
     queue.put((call_id, target(*args, **kwargs), None))
   except:
@@ -209,6 +209,10 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
         in the list can either be a singleton or a (args, kwargs) tuple/list.
         Usually this is a list of VMs.
     max_concurrent_threads: The maximum number of concurrent threads to allow.
+
+  Returns:
+    List of the same length as thread_params. Contains the return value from
+    each threaded function call in the corresponding order as thread_params.
 
   Raises:
     ValueError: when thread_params is not valid.
