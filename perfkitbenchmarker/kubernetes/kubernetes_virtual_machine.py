@@ -116,7 +116,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise NotImplementedError('Only Ceph volumes are supported right now. '
                                 'Exiting.')
     if self.disk_specs and not FLAGS.ceph_secret:
-      raise Exception('Please provide the name of Ceph Secret using '
+      raise Exception('Please provide the name of Ceph Secret used by '
+                      'Kubernetes in order to authenticate with Ceph.'
                       '--ceph_secret flag')
 
   def _CreatePod(self):

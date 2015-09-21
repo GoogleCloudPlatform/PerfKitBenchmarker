@@ -28,8 +28,11 @@ flags.DEFINE_boolean('use_ceph_volumes', True,
                      'Use Ceph volumes for scratch disks')
 
 flags.DEFINE_string('ceph_secret', None,
-                    'Name of the Ceph Secret which Kubernetes uses to '
+                    'Name of the Ceph Secret used by Kubernetes in order to '
                     'authenticate with Ceph.')
+
+flags.DEFINE_string('rbd_pool', 'rbd',
+                    'Name of RBD pool for Ceph volumes.')
 
 flags.DEFINE_list('ceph_monitors', [],
                   'IP addresses and ports of Ceph Monitors. '
@@ -95,7 +98,7 @@ class CephDisk(disk.BaseDisk):
         "name": self.image_name,
         "rbd": {
             "monitors": FLAGS.ceph_monitors,
-            "pool": "rbd",
+            "pool": FLAGS.rbd_pool,
             "image": self.image_name,
             "secretRef": {
                 "name": FLAGS.ceph_secret
