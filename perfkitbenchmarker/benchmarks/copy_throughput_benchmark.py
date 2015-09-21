@@ -105,7 +105,7 @@ def RunCp(vms):
   Returns:
     A list of sample.Sample objects.
   """
-  cmd = ('rm %s/*; sudo sync; sudo sysctl vm.drop_caches=3; '
+  cmd = ('rm -rf %s/*; sudo sync; sudo sysctl vm.drop_caches=3; '
          'time cp %s/data/* %s/; ' %
          (vms[0].GetScratchDir(1), vms[0].GetScratchDir(0),
           vms[0].GetScratchDir(1)))

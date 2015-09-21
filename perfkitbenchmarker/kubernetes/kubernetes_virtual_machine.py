@@ -16,8 +16,8 @@ import base64
 import json
 import logging
 import random
-import re
 
+from kubernetes_disk import CephDisk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
@@ -45,14 +45,6 @@ flags.DEFINE_list('kubernetes_nodes', [],
                   'IP addresses of Kubernetes Nodes. These need to be '
                   'accessible from the machine running Perfkit '
                   'benchmarker. Example: "10.20.30.40,10.20.30.41"')
-
-flags.DEFINE_boolean('use_ceph_volumes', True,
-                     'Use Ceph volumes for scratch disks')
-
-flags.DEFINE_list('ceph_monitors', [],
-                  'IP addresses and ports of Ceph Monitors. '
-                  'Must be provided when scratch disk is required. '
-                  'Example: "127.0.0.1:6789,192.168.1.1:6789"')
 
 DEFAULT_ZONE = 'k8s'
 SECRET_PREFIX = 'public-key-'
@@ -86,10 +78,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _CreateDependencies(self):
     self._CheckPrerequisites()
     self._CreateSecret()
-    self._CreateCephVolumes()
+    self._CreateVolumes()
 
   def _DeleteDependencies(self):
-    self._DeleteCephVolumes()
+    self._DeleteVolumes()
     self._DeleteSecret()
 
   def _Create(self):
@@ -108,12 +100,24 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._DeleteService()
 
   def _CheckPrerequisites(self):
-    if self.disk_specs and not FLAGS.use_ceph_volumes:
-      raise NotImplementedError('Only Ceph volumes are supported right now. '
-                                'Exiting.')
+    """
+    Exits if any of the prerequisites is not met.
+    """
     if not FLAGS.kubernetes_nodes:
       raise Exception('Kubernetes Nodes IP addresses not found. Please specify'
                       'them using --kubernetes_nodes flag. Exiting.')
+    if not FLAGS.kubectl:
+      raise Exception('Please provide path to kubectl tool using --kubectl '
+                      'flag. Exiting.')
+    if not FLAGS.kubeconfig:
+      raise Exception('Please provide path to kubeconfig using --kubeconfig '
+                      'flag. Exiting.')
+    if self.disk_specs and not FLAGS.use_ceph_volumes:
+      raise NotImplementedError('Only Ceph volumes are supported right now. '
+                                'Exiting.')
+    if self.disk_specs and not FLAGS.ceph_secret:
+      raise Exception('Please provide the name of Ceph Secret using '
+                      '--ceph_secret flag')
 
   def _CreatePod(self):
     """
@@ -188,9 +192,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     Deletes a POD.
     """
-    delete_rc = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                 'delete', 'pod', '-l', '%s=%s' % (SELECTOR_PREFIX, self.name)]
-    output = vm_util.IssueCommand(delete_rc)
+    delete_pod = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
+                  'delete', 'pod', '-l', '%s=%s' % (SELECTOR_PREFIX, self.name)]
+    output = vm_util.IssueCommand(delete_pod)
     logging.info(output[STDOUT].rstrip())
 
   def _DeleteService(self):
@@ -218,66 +222,26 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       return False
     return True
 
-  def _CreateCephVolumes(self):
+  def _CreateVolumes(self):
     """
-    Creates Rados Block Device volumes and installs filesystem on them.
-
-    These volumes have to be created BEFORE containers creation
-    because Kubernetes doesn't allow to attach volume to currently
-    running containers.
+    Creates volumes for scratch disks. These volumes have to be created
+    BEFORE containers creation because Kubernetes doesn't allow to attach
+    volume to currently running containers.
     """
     for disk_num, disk_spec in enumerate(self.disk_specs):
-      image_name = 'rbd_%s_%s' % (self.name, disk_num)
-      disk_spec.image_name = image_name
-
-      cmd = ['rbd', 'create', image_name, '--size',
-             str(1024 * disk_spec.disk_size)]
-      output = vm_util.IssueCommand(cmd)
-      if output[EXIT_CODE] == 0:
-        raise Exception("Creating RBD image failed: %s" % output[STDERR])
-
-      cmd = ['rbd', 'map', image_name]
-      output = vm_util.IssueCommand(cmd)
-      if output[EXIT_CODE] == 0:
-        raise Exception("Mapping RBD image failed: %s" % output[STDERR])
-      rbd_device = output[STDOUT].rstrip()
-      if '/dev/rbd' not in rbd_device:
-        # Sometimes 'rbd map' command doesn't return any output.
-        # Trying to find device location another way.
-        cmd = ['rbd', 'showmapped']
-        output = vm_util.IssueCommand(cmd)
-        for image_device in output[STDOUT].split('\n'):
-          if image_name in image_device:
-            pattern = re.compile("/dev/rbd.*")
-            output = pattern.findall(image_device)
-            rbd_device = output[STDOUT].rstrip()
-            break
-
-      cmd = ['mkfs.ext4', rbd_device]
-      output = vm_util.IssueCommand(cmd)
-      if output[EXIT_CODE] == 0:
-        raise Exception("Formatting partition failed: %s" % output[STDERR])
-
-      cmd = ['rbd', 'unmap', rbd_device]
-      output = vm_util.IssueCommand(cmd)
-      if output[EXIT_CODE] == 0:
-        raise Exception("Unmapping block device failed: %s" % output[STDERR])
-
-      self.scratch_disks.append(disk_spec)
+      # Currently only Ceph storage is supported
+      disk = CephDisk(disk_num, disk_spec, self.name)
+      disk._Create()
+      self.scratch_disks.append(disk)
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
-  def _DeleteCephVolumes(self):
+  def _DeleteVolumes(self):
     """
-    Deletes RBD volumes.
+    Deletes volumes.
     """
-    for disk_spec in self.scratch_disks[:]:
-      cmd = ['rbd', 'rm', disk_spec.image_name]
-      output = vm_util.IssueCommand(cmd)
-      if output[EXIT_CODE] != 0:
-        msg = "Removing RBD image failed. Reattempting."
-        logging.warning(msg)
-        raise Exception(msg)
-      self.scratch_disks.remove(disk_spec)
+    for disk in self.scratch_disks[:]:
+      disk._Delete()
+      self.scratch_disks.remove(disk)
 
   def _CreateSecret(self):
     """
@@ -406,23 +370,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     }
     volumes.append(secret_volume)
 
-    disc_specs_count = len(self.disk_specs)
-    for disk_num in range(0, disc_specs_count):
-      image_name = 'rbd_%s_%s' % (self.name, disk_num)
-      ceph_volume = {
-          "name": "rbdpd-%s-%s" % (self.instance_number, disk_num),
-          "rbd": {
-              "monitors": FLAGS.ceph_monitors,
-              "pool": "rbd",
-              "image": image_name,
-              "secretRef": {
-                  "name": "ceph-secret"
-              },
-              "fsType": "ext4",
-              "readOnly": False
-          }
-      }
-      volumes.append(ceph_volume)
+    for disk in self.scratch_disks:
+      volume = disk.BuildVolumeBody()
+      volumes.append(volume)
+
     return volumes
 
   def _BuildContainerBody(self):
@@ -456,13 +407,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
             }
         ]
     }
-    for disk_num, disk_spec in enumerate(self.disk_specs):
-      mount_point = disk_spec.mount_point
-      ceph_volume_mount = {
-          "mountPath": mount_point,
-          "name": "rbdpd-%s-%s" % (self.instance_number, disk_num)
+
+    for disk in self.scratch_disks:
+      volume_mount = {
+          "mountPath": disk.mount_point,
+          "name": disk.image_name
       }
-      container['volumeMounts'].append(ceph_volume_mount)
+      container['volumeMounts'].append(volume_mount)
 
     return container
 
