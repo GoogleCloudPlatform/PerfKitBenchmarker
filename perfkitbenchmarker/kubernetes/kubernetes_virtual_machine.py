@@ -18,11 +18,11 @@ import logging
 import random
 import re
 
-from subprocess import Popen, PIPE, STDOUT
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
+    OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
 
 FLAGS = flags.FLAGS
 
@@ -58,7 +58,6 @@ DEFAULT_ZONE = 'k8s'
 SECRET_PREFIX = 'public-key-'
 UBUNTU_IMAGE = 'ubuntu-upstart'
 SELECTOR_PREFIX = 'pkb'
-OUTPUT_EXIT_CODE = 2
 
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -85,13 +84,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec.zone = DEFAULT_ZONE
 
   def _CreateDependencies(self):
-    if self.disk_specs and not FLAGS.use_ceph_volumes:
-      raise NotImplementedError('Only Ceph volumes are supported right '
-                                'now. Exiting')
-    if not FLAGS.kubernetes_nodes:
-      raise Exception('Kubernetes Nodes IP addresses not found. Please specify'
-                      'them using --kubernetes_nodes flag. Exiting.')
-
+    self._CheckPrerequisites()
     self._CreateSecret()
     self._CreateCephVolumes()
 
@@ -114,16 +107,25 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._DeletePod()
     self._DeleteService()
 
+  def _CheckPrerequisites(self):
+    if self.disk_specs and not FLAGS.use_ceph_volumes:
+      raise NotImplementedError('Only Ceph volumes are supported right now. '
+                                'Exiting.')
+    if not FLAGS.kubernetes_nodes:
+      raise Exception('Kubernetes Nodes IP addresses not found. Please specify'
+                      'them using --kubernetes_nodes flag. Exiting.')
+
   def _CreatePod(self):
     """
     Creates a POD (Docker container with optional volumes).
     """
     create_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                   'create', '-f', '-']
-    process = Popen(create_cmd, stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     create_rc_body = self._BuildPodBody()
-    output = process.communicate(input=create_rc_body)
-    logging.info(output[0].rstrip())
+    output = vm_util.IssueCommand(create_cmd, input=create_rc_body)
+    if output[EXIT_CODE]:
+      raise Exception("Creating POD failed: %s" % output[STDERR])
+    logging.info(output[STDOUT].rstrip())
 
   def _CreateService(self):
     """
@@ -132,9 +134,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                   'create', '-f', '-']
     create_svc_body = self._BuildServiceBody()
-    process = Popen(create_cmd, stdout=PIPE, stdin=PIPE, stderr=STDOUT)
-    output = process.communicate(input=create_svc_body)
-    logging.info(output[0].rstrip())
+    output = vm_util.IssueCommand(create_cmd, input=create_svc_body)
+    if output[EXIT_CODE]:
+      raise Exception("Creating Service failed: %s" % output[STDERR])
+    logging.info(output[STDOUT].rstrip())
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
   def _WaitForPodBootCompletion(self):
@@ -157,7 +160,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
             and pod_status == "Running"):
           logging.info("POD is up and running.")
           return
-    raise Exception()
+    raise Exception("POD %s=%s is not running. Retrying to check status." %
+                    pod_selector)
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
   def _WaitForEndpoint(self):
@@ -178,7 +182,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         logging.info("Endpoint found. Service is successfully matched with "
                      "POD.")
         return
-    raise Exception()
+    raise Exception("Endpoint %s=%s not found. Retrying." % endpoint_selector)
 
   def _DeletePod(self):
     """
@@ -187,7 +191,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     delete_rc = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                  'delete', 'pod', '-l', '%s=%s' % (SELECTOR_PREFIX, self.name)]
     output = vm_util.IssueCommand(delete_rc)
-    logging.info(output[0].rstrip())
+    logging.info(output[STDOUT].rstrip())
 
   def _DeleteService(self):
     """
@@ -197,7 +201,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
                       'delete', 'service', '-l', '%s=%s' % (SELECTOR_PREFIX,
                                                             self.name)]
     output = vm_util.IssueCommand(delete_service)
-    logging.info(output[0].rstrip())
+    logging.info(output[STDOUT].rstrip())
 
   @vm_util.Retry(poll_interval=10, max_retries=20)
   def _Exists(self):
@@ -225,30 +229,39 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     for disk_num, disk_spec in enumerate(self.disk_specs):
       image_name = 'rbd_%s_%s' % (self.name, disk_num)
       disk_spec.image_name = image_name
+
       cmd = ['rbd', 'create', image_name, '--size',
              str(1024 * disk_spec.disk_size)]
-      vm_util.IssueCommand(cmd)
+      output = vm_util.IssueCommand(cmd)
+      if output[EXIT_CODE] == 0:
+        raise Exception("Creating RBD image failed: %s" % output[STDERR])
 
       cmd = ['rbd', 'map', image_name]
       output = vm_util.IssueCommand(cmd)
-      rbd_device = output[0].rstrip()
+      if output[EXIT_CODE] == 0:
+        raise Exception("Mapping RBD image failed: %s" % output[STDERR])
+      rbd_device = output[STDOUT].rstrip()
       if '/dev/rbd' not in rbd_device:
         # Sometimes 'rbd map' command doesn't return any output.
         # Trying to find device location another way.
         cmd = ['rbd', 'showmapped']
         output = vm_util.IssueCommand(cmd)
-        for image_device in output[0].split('\n'):
+        for image_device in output[STDOUT].split('\n'):
           if image_name in image_device:
             pattern = re.compile("/dev/rbd.*")
             output = pattern.findall(image_device)
-            rbd_device = output[0].rstrip()
+            rbd_device = output[STDOUT].rstrip()
             break
 
       cmd = ['mkfs.ext4', rbd_device]
-      vm_util.IssueCommand(cmd)
+      output = vm_util.IssueCommand(cmd)
+      if output[EXIT_CODE] == 0:
+        raise Exception("Formatting partition failed: %s" % output[STDERR])
 
       cmd = ['rbd', 'unmap', rbd_device]
-      vm_util.IssueCommand(cmd)
+      output = vm_util.IssueCommand(cmd)
+      if output[EXIT_CODE] == 0:
+        raise Exception("Unmapping block device failed: %s" % output[STDERR])
 
       self.scratch_disks.append(disk_spec)
 
@@ -260,7 +273,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     for disk_spec in self.scratch_disks[:]:
       cmd = ['rbd', 'rm', disk_spec.image_name]
       output = vm_util.IssueCommand(cmd)
-      if output[OUTPUT_EXIT_CODE] != 0:
+      if output[EXIT_CODE] != 0:
         msg = "Removing RBD image failed. Reattempting."
         logging.warning(msg)
         raise Exception(msg)
@@ -287,9 +300,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_secret_body = json.dumps(template)
     create_secret = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                      'create', '-f', '-']
-    process = Popen(create_secret, stdout=PIPE, stdin=PIPE, stderr=STDOUT)
-    result = process.communicate(input=create_secret_body)
-    logging.info(result[0].rstrip())
+    output = vm_util.IssueCommand(create_secret, input=create_secret_body)
+    if output[EXIT_CODE]:
+      raise Exception("Creating secret failed: %s" % output[STDERR])
+    logging.info(output[STDOUT].rstrip())
 
   def _DeleteSecret(self):
     """
@@ -298,7 +312,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     delete_secret = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                      'delete', 'secret', SECRET_PREFIX + self.name]
     result = vm_util.IssueCommand(delete_secret)
-    logging.info(result[0].rstrip())
+    logging.info(result[STDOUT].rstrip())
 
   def DeleteScratchDisks(self):
     pass
@@ -374,7 +388,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         "spec": {
             "volumes": volumes,
             "containers": [container],
-            "dnsPolicy": "Default"
+            "dnsPolicy": "ClusterFirst"
         }
     }
     return json.dumps(template)
