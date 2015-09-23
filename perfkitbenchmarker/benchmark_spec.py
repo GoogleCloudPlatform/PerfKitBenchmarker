@@ -339,8 +339,11 @@ class BenchmarkSpec(object):
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
-    for port in vm.remote_access_ports:
-      firewall.AllowPort(vm, port)
+    # If the user has requested to use a specific subnet ID, that has already
+    # been setup with allowed port, we cannot invoke it again here.
+    if FLAGS.existing_subnet_id is None:
+      for port in vm.remote_access_ports:
+        firewall.AllowPort(vm, port)
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.OnStartup()

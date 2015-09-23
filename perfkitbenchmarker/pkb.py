@@ -357,7 +357,7 @@ def RunBenchmarks(publish=True):
 
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):
-      logging.error('Could not find required executable "%s".' % executable)
+      logging.error('Could not find required executable "%s".', executable)
       return 1
 
   if FLAGS.run_uri is None:
