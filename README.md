@@ -161,7 +161,7 @@ echo topsecretpassword > ~/.config/openstack-password.txt
 
 ## Kubernetes configuration and credentials
 Perfkit uses `kubectl` binary in order to communicate with Kubernetes cluster - you need to pass the path to `kubectl` binary using `--kubectl` flag.  
-Authentication to Kubernetes cluster is done via `kubeconfig` file. Its path is passed using `--kubeconfig` flag.
+Authentication to Kubernetes cluster is done via `kubeconfig` file (https://github.com/kubernetes/kubernetes/blob/release-1.0/docs/user-guide/kubeconfig-file.md). Its path is passed using `--kubeconfig` flag.
 
 **Image prerequisites**  
 Docker instances by default doesn't allow to SSH into them. Thus it is important to configure your Docker image so that it has SSH server installed. You can rely on `https://quay.io/repository/mateusz_blaszkowski/pkb-k8s ` while creating your own image.
@@ -186,9 +186,9 @@ Note that some benchmark require to run within a privileged container. By defaul
 
 **Ceph integration**  
 Currently only Ceph volumes are supported. Running benchmarks which require scratch volume is only permitted if you have Kubernetes cluster integrated with Ceph. There are some configuration steps you need to follow before you will be able to spawn Kubernetes PODs with Ceph volume. On each of Kubernetes-Nodes do the following:
-1. copy /etc/ceph directory from Ceph-host,
-2. install `ceph-common` package so that `rbd` command is available
-  * if your Kubernetes cluster is running on CoreOS, then you need to create a bash script called `rbd` which will run `rbd` command inside a Docker container:
+1. Copy /etc/ceph directory from Ceph-host
+2. Install `ceph-common` package so that `rbd` command is available
+  * If your Kubernetes cluster is running on CoreOS, then you need to create a bash script called `rbd` which will run `rbd` command inside a Docker container:
       ```
       #!/usr/bin/bash
       /usr/bin/docker run -v /etc/ceph:/etc/ceph -v /dev:/dev -v /sys:/sys  --net=host --privileged=true --rm=true ceph/rbd $@
@@ -209,6 +209,25 @@ Currently only Ceph volumes are supported. Running benchmarks which require scra
       sudo cp 50-rbd.rules /etc/udev/rules.d
       sudo reboot
       ```
+3. Create Ceph Secret which will be used by Kubernetes in order to authenticate with Ceph. Retrieve base64-encoded Ceph admin key:
+   ```
+   ceph auth get-key client.admin | base64
+   QVFEYnpPWlZWWnJLQVJBQXdtNDZrUDlJUFo3OXdSenBVTUdYNHc9PQ==  
+   ```
+   Create a file called `create_ceph_admin.yml` and replace the `key` value with the output from the previous command:
+   ```
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: my-ceph-secret
+   data:
+     key: QVFEYnpPWlZWWnJLQVJBQXdtNDZrUDlJUFo3OXdSenBVTUdYNHc9PQ==
+   ```
+   Add secret to Kubernetes:  
+   ```
+   kubectl create -f create_ceph_admin.yml
+   ```
+   You will have to pass the Secret name (using `--ceph_secret` flag) when running the benchmakrs. In this case it should be: `--ceph_secret=my-ceph-secret`.
 
 ## Install AWS CLI and setup authentication
 Make sure you have installed pip (see the section above).
