@@ -23,7 +23,6 @@ by the "aerospike_storage_type" and "scratch_disk_type" flags.
 """
 
 import re
-import time
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
@@ -35,11 +34,6 @@ from perfkitbenchmarker.packages import aerospike_server
 
 FLAGS = flags.FLAGS
 
-MEMORY = 'memory'
-DISK = 'disk'
-flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
-                  'The type of storage to use for Aerospike data. The type of '
-                  'disk is controlled by the "scratch_disk_type" flag.')
 flags.DEFINE_integer('aerospike_min_client_threads', 8,
                      'The minimum number of Aerospike client threads.',
                      lower_bound=1)
@@ -65,7 +59,7 @@ PATCH_FILE = 'aerospike.patch'
 
 def GetInfo():
   info = BENCHMARK_INFO.copy()
-  if (FLAGS.aerospike_storage_type == DISK and
+  if (FLAGS.aerospike_storage_type == aerospike_server.DISK and
       FLAGS.scratch_disk_type != disk.LOCAL):
     info['scratch_disk'] = True
   else:
@@ -105,32 +99,6 @@ def _PrepareClient(client):
   client.RemoteCommand('cd %s/benchmarks && make' % CLIENT_DIR)
 
 
-def _PrepareServer(server):
-  """Prepare the Aerospike server on a VM."""
-  server.Install('aerospike_server')
-
-  if FLAGS.aerospike_storage_type == DISK:
-    if FLAGS.scratch_disk_type == disk.LOCAL:
-      devices = server.GetLocalDisks()
-    else:
-      devices = [scratch_disk.GetDevicePath()
-                 for scratch_disk in server.scratch_disks]
-  else:
-    devices = []
-
-  server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
-                        aerospike_server.AEROSPIKE_CONF_PATH,
-                        {'devices': devices})
-
-  for scratch_disk in server.scratch_disks:
-    server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
-
-  server.RemoteCommand('cd %s && make init' % aerospike_server.AEROSPIKE_DIR)
-  server.RemoteCommand('cd %s; nohup sudo make start &> /dev/null &' %
-                       aerospike_server.AEROSPIKE_DIR)
-  time.sleep(5)  # Wait for server to come up
-
-
 def Prepare(benchmark_spec):
   """Install Aerospike server on one VM and Aerospike C client on the other.
 
@@ -145,7 +113,7 @@ def Prepare(benchmark_spec):
     if vm == client:
       _PrepareClient(vm)
     else:
-      _PrepareServer(vm)
+      aerospike_server.ConfigureAndStart(vm)
 
   vm_util.RunThreaded(_Prepare, benchmark_spec.vms)
 

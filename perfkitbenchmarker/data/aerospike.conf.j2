@@ -38,16 +38,14 @@ network {
 	}
 
 	heartbeat {
-		mode multicast
-		address 239.1.99.222
-		port 9918
+		mode mesh                   # Send heartbeats using Mesh (Unicast) protocol
 
-		# To use unicast-mesh heartbeats, comment out the 3 lines above and
-		# use the following 4 lines instead.
-#		mode mesh
-#		port 3002
-#		mesh-address 10.1.1.1
-#		mesh-port 3002
+		port 3002                   # port on which this node is listening to
+
+{%- for address in seed_addresses|default([], true) %}
+		mesh-address {{ address }}  # IP address for seed node in the cluster
+{% endfor %}
+		mesh-port 3002
 
 		interval 150
 		timeout 10
@@ -63,7 +61,7 @@ network {
 }
 
 namespace test {
-	replication-factor 2
+	replication-factor 3  # To match HBase / Cassandra tests.
 	memory-size 4G
 	default-ttl 30d # 30 days, use 0 to never expire/evict.
 	{# if storage devices are passed to the template, use them for storage; otherwise use memory. -#}

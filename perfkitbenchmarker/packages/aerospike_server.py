@@ -15,12 +15,25 @@
 
 """Module containing aerospike server installation and cleanup functions."""
 
+import time
+
+from perfkitbenchmarker import data
+from perfkitbenchmarker import disk
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+
+FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/aerospike-server.git'
 GIT_TAG = '3.3.19'
 AEROSPIKE_DIR = '%s/aerospike-server' % vm_util.VM_TMP_DIR
 AEROSPIKE_CONF_PATH = '%s/as/etc/aerospike_dev.conf' % AEROSPIKE_DIR
+
+MEMORY = 'memory'
+DISK = 'disk'
+flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
+                  'The type of storage to use for Aerospike data. The type of '
+                  'disk is controlled by the "scratch_disk_type" flag.')
 
 
 def _Install(vm):
@@ -41,3 +54,37 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the memtier package on the VM."""
   _Install(vm)
+
+
+def ConfigureAndStart(server, seed_node_ips=None):
+  """Prepare the Aerospike server on a VM.
+
+  Args:
+    server: VirtualMachine to install and start Aerospike on.
+    seed_node_ips: internal IP addresses of seed nodes in the cluster.
+      Leave unspecified for a single-node deployment.
+  """
+  server.Install('aerospike_server')
+  seed_node_ips = seed_node_ips or [server.internal_ip]
+
+  if FLAGS.aerospike_storage_type == DISK:
+    if FLAGS.scratch_disk_type == disk.LOCAL:
+      devices = server.GetLocalDisks()
+    else:
+      devices = [scratch_disk.GetDevicePath()
+                 for scratch_disk in server.scratch_disks]
+  else:
+    devices = []
+
+  server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
+                        AEROSPIKE_CONF_PATH,
+                        {'devices': devices,
+                         'seed_addresses': seed_node_ips})
+
+  for scratch_disk in server.scratch_disks:
+    server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
+
+  server.RemoteCommand('cd %s && make init' % AEROSPIKE_DIR)
+  server.RemoteCommand('cd %s; nohup sudo make start &> /dev/null &' %
+                       AEROSPIKE_DIR)
+  time.sleep(5)  # Wait for server to come up
