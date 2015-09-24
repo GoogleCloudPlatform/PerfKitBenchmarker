@@ -65,18 +65,23 @@ def main():
     with open(options.stderr, 'r') as stderr:
       with open(options.status, 'r') as status:
         fcntl.lockf(status, fcntl.LOCK_SH)
-        return_code = int(status.read())
-        status.close()
+        return_code_str = status.read()
 
-        stderr_copier = threading.Thread(target=shutil.copyfileobj,
-                                         args=[stderr, sys.stderr],
-                                         name='stderr-copier')
-        stderr_copier.daemon = True
-        stderr_copier.start()
-        try:
-          shutil.copyfileobj(stdout, sys.stdout)
-        finally:
-          stderr_copier.join()
+      if return_code_str:
+        return_code = int(return_code_str)
+      else:
+        print >> sys.stderr, 'WARNING: wrapper script interrupted.'
+        return_code = 1
+
+      stderr_copier = threading.Thread(target=shutil.copyfileobj,
+                                       args=[stderr, sys.stderr],
+                                       name='stderr-copier')
+      stderr_copier.daemon = True
+      stderr_copier.start()
+      try:
+        shutil.copyfileobj(stdout, sys.stdout)
+      finally:
+        stderr_copier.join()
 
   if options.delete:
     for f in [options.stdout, options.stderr, options.status]:

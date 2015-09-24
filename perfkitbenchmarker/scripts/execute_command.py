@@ -74,9 +74,9 @@ def main():
         # acquisition fails, which is desirable here.
         fcntl.lockf(status, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-        # Initialize the status to -1; will be filled with the exit status
+        # Initialize the status to 99; will be filled with the exit status
         # on subprocess completion.
-        status.write('-1')
+        status.write('')
         status.flush()
         status.seek(0)
 
