@@ -17,10 +17,10 @@
 
 from perfkitbenchmarker import vm_util
 
-MVN_TAR = 'apache-maven-3.2.5-bin.tar.gz'
-MVN_URL = ('http://download.nextag.com/apache/maven/maven-3/3.2.5/binaries/' +
+MVN_TAR = 'apache-maven-3.3.3-bin.tar.gz'
+MVN_URL = ('http://www.us.apache.org/dist/maven/maven-3/3.3.3/binaries/' +
            MVN_TAR)
-MVN_DIR = '%s/apache-maven-3.2.5' % vm_util.VM_TMP_DIR
+MVN_DIR = '%s/apache-maven-3.3.3' % vm_util.VM_TMP_DIR
 
 
 def _Install(vm):
