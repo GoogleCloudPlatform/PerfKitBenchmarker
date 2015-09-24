@@ -11,3 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from perfkitbenchmarker import events
+from perfkitbenchmarker.azure import util
+
+
+def _CheckAzureVersion(sender, parsed_flags):
+  if parsed_flags.cloud == 'Azure':
+    util.CheckAzureVersion()
+
+
+events.initialization_complete.connect(_CheckAzureVersion)

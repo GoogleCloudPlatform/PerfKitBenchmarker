@@ -377,7 +377,7 @@ def RunBenchmarks(publish=True):
       FLAGS.run_uri = str(uuid.uuid4())[-8:]
   elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
     logging.error('run_uri must be alphanumeric and less than or equal '
-                  'to 10 characters in length.')
+                  'to 8 characters in length.')
     return 1
 
   vm_util.GenTempDir()
