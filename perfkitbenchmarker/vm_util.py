@@ -61,6 +61,10 @@ MAX_RETRIES = -1
 WINDOWS = 'nt'
 PASSWORD_LENGTH = 15
 
+OUTPUT_STDOUT = 0
+OUTPUT_STDERR = 1
+OUTPUT_EXIT_CODE = 2
+
 flags.DEFINE_integer('default_timeout', TIMEOUT, 'The default timeout for '
                      'retryable commands in seconds.')
 flags.DEFINE_integer('burn_cpu_seconds', 0,
@@ -461,7 +465,7 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
 
 
 def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
-                 env=None, timeout=DEFAULT_TIMEOUT):
+                 env=None, timeout=DEFAULT_TIMEOUT, input=None):
   """Tries running the provided command once.
 
   Args:
@@ -493,7 +497,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
 
   shell_value = RunningOnWindows()
   process = subprocess.Popen(cmd, env=env, shell=shell_value,
-                             stdout=subprocess.PIPE,
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
 
   def _KillProcess():
@@ -505,7 +509,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   timer.start()
 
   try:
-    stdout, stderr = process.communicate()
+    stdout, stderr = process.communicate(input)
   finally:
     timer.cancel()
 

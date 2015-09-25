@@ -37,6 +37,8 @@ from perfkitbenchmarker.digitalocean import digitalocean_network
 from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
+from perfkitbenchmarker.kubernetes import kubernetes_virtual_machine
+from perfkitbenchmarker.kubernetes import kubernetes_network
 from perfkitbenchmarker.openstack import os_network as openstack_network
 from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 from perfkitbenchmarker.rackspace import rackspace_network as rax_net
@@ -60,6 +62,7 @@ copy_reg.pickle(thread.LockType, PickleLock)
 GCP = 'GCP'
 AZURE = 'Azure'
 AWS = 'AWS'
+KUBERNETES = 'Kubernetes'
 DIGITALOCEAN = 'DigitalOcean'
 OPENSTACK = 'OpenStack'
 RACKSPACE = 'Rackspace'
@@ -109,6 +112,14 @@ CLASSES = {
         },
         FIREWALL: digitalocean_network.DigitalOceanFirewall
     },
+    KUBERNETES: {
+        VIRTUAL_MACHINE: {
+            DEBIAN:
+                kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine,
+            RHEL: kubernetes_virtual_machine.KubernetesVirtualMachine
+        },
+        FIREWALL: kubernetes_network.KubernetesFirewall
+    },
     OPENSTACK: {
         VIRTUAL_MACHINE: {
             DEBIAN: openstack_vm.DebianBasedOpenStackVirtualMachine,
@@ -128,7 +139,8 @@ CLASSES = {
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP,
-                  [GCP, AZURE, AWS, DIGITALOCEAN, OPENSTACK, RACKSPACE],
+                  [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                   RACKSPACE],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],

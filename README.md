@@ -159,6 +159,76 @@ echo topsecretpassword > ~/.config/openstack-password.txt
 ./pkb.py --cloud=OpenStack --benchmarks=ping
 ```
 
+## Kubernetes configuration and credentials
+Perfkit uses `kubectl` binary in order to communicate with Kubernetes cluster - you need to pass the path to `kubectl` binary using `--kubectl` flag.  
+Authentication to Kubernetes cluster is done via `kubeconfig` file (https://github.com/kubernetes/kubernetes/blob/release-1.0/docs/user-guide/kubeconfig-file.md). Its path is passed using `--kubeconfig` flag.
+
+**Image prerequisites**  
+Docker instances by default doesn't allow to SSH into them. Thus it is important to configure your Docker image so that it has SSH server installed. You can rely on `https://quay.io/repository/mateusz_blaszkowski/pkb-k8s ` while creating your own image.
+
+**Kubernetes cluster configuration**  
+If your Kubernetes cluster is running on CoreOS:
+1. Fix `$PATH` environment variable so that the appropriate binaries can be found:
+   ```
+   sudo mkdir /etc/systemd/system/kubelet.service.d
+   sudo vim /etc/systemd/system/kubelet.service.d/10-env.conf
+   ```
+   Add the following line to `[Service]` section:
+   ```
+   Environment=PATH=/opt/bin:/usr/bin:/usr/sbin:$PATH
+   ```
+2. Reboot the node:
+   ```
+   sudo reboot
+   ```
+
+Note that some benchmark require to run within a privileged container. By default Kubernetes doesn't allow to schedule Dockers in privileged mode - you have to add `--allow-privileged=true` flag to `kube-apiserver` and each `kubelet` startup commands.
+
+**Ceph integration**  
+Currently only Ceph volumes are supported. Running benchmarks which require scratch volume is only permitted if you have Kubernetes cluster integrated with Ceph. There are some configuration steps you need to follow before you will be able to spawn Kubernetes PODs with Ceph volume. On each of Kubernetes-Nodes do the following:
+1. Copy /etc/ceph directory from Ceph-host
+2. Install `ceph-common` package so that `rbd` command is available
+  * If your Kubernetes cluster is running on CoreOS, then you need to create a bash script called `rbd` which will run `rbd` command inside a Docker container:
+      ```
+      #!/usr/bin/bash
+      /usr/bin/docker run -v /etc/ceph:/etc/ceph -v /dev:/dev -v /sys:/sys  --net=host --privileged=true --rm=true ceph/rbd $@
+      ```
+      Save the file as 'rbd'. Then:
+      ```
+      chmod +x rbd
+      sudo mkdir /opt/bin
+      sudo cp rbd /opt/bin
+      ```
+      Install `rbdmap` (https://github.com/ceph/ceph-docker/tree/master/examples/coreos/rbdmap):
+      ```
+      git clone https://github.com/ceph/ceph-docker.git
+      cd ceph-docker/examples/coreos/rbdmap/
+      sudo mkdir /opt/sbin
+      sudo cp rbdmap /opt/sbin
+      sudo cp ceph-rbdnamer /opt/bin
+      sudo cp 50-rbd.rules /etc/udev/rules.d
+      sudo reboot
+      ```
+3. Create Ceph Secret which will be used by Kubernetes in order to authenticate with Ceph. Retrieve base64-encoded Ceph admin key:
+   ```
+   ceph auth get-key client.admin | base64
+   QVFEYnpPWlZWWnJLQVJBQXdtNDZrUDlJUFo3OXdSenBVTUdYNHc9PQ==  
+   ```
+   Create a file called `create_ceph_admin.yml` and replace the `key` value with the output from the previous command:
+   ```
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: my-ceph-secret
+   data:
+     key: QVFEYnpPWlZWWnJLQVJBQXdtNDZrUDlJUFo3OXdSenBVTUdYNHc9PQ==
+   ```
+   Add secret to Kubernetes:  
+   ```
+   kubectl create -f create_ceph_admin.yml
+   ```
+   You will have to pass the Secret name (using `--ceph_secret` flag) when running the benchmakrs. In this case it should be: `--ceph_secret=my-ceph-secret`.
+
 ## Install AWS CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
@@ -341,6 +411,11 @@ $ ./pkb.py --cloud=DigitalOcean --machine_type=16gb --benchmarks=iperf
 $ ./pkb.py --cloud=OpenStack --benchmarks=iperf --os_auth_url=http://localhost:5000/v2.0/
 ```
 
+## Example run on Kubernetes
+```
+$ ./pkb.py --cloud=Kubernetes --benchmarks=iperf --kubectl=/path/to/kubectl --kubeconfig=/path/to/kubeconfig --image=image-with-ssh-server  --ceph_monitors=10.20.30.40:6789,10.20.30.41:6789 --kubernetes_nodes=10.20.30.42,10.20.30.43
+```
+
 ## Example run on Rackspace
 ```
 $ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
@@ -399,6 +474,7 @@ Azure | East US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
 OpenStack | nova | |
 Rackspace | IAD | OnMetal machine-types are available only in IAD zone
+Kubernetes | k8s | |
 
 Example:
 
