@@ -32,7 +32,7 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 
 HADOOP_VERSION = '2.5.2'
-HADOOP_URL = ('http://apache.mirrors.tds.net/hadoop/common/hadoop-{0}/'
+HADOOP_URL = ('http://www.us.apache.org/dist/hadoop/common/hadoop-{0}/'
               'hadoop-{0}.tar.gz').format(HADOOP_VERSION)
 
 DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
