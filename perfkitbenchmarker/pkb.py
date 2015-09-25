@@ -415,16 +415,13 @@ def RunBenchmarks(publish=True):
     benchmark_list = benchmark_sets.GetBenchmarksFromFlags()
     total_benchmarks = len(benchmark_list)
     if FLAGS.parallelism > 1:
-      sequence_range = range(total_benchmarks, 0, -1)
-      args = [((benchmark, collector, sequence_counter, total_benchmarks), {})
-              for benchmark, sequence_counter
-              in zip(benchmark_list, sequence_range)]
+      args = [((benchmark, collector, i + 1, total_benchmarks), {})
+              for i, benchmark in enumerate(benchmark_list)]
       vm_util.RunThreaded(
           RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
     else:
-      sequence_range = range(1, total_benchmarks + 1)
-      for benchmark, sequence_counter in zip(benchmark_list, sequence_range):
-        RunBenchmark(benchmark, collector, sequence_counter, total_benchmarks)
+      for i, benchmark in enumerate(benchmark_list):
+        RunBenchmark(benchmark, collector, i + 1, total_benchmarks)
   finally:
     if collector.samples:
       collector.PublishSamples()

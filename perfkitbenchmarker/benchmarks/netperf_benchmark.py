@@ -119,7 +119,8 @@ def RunNetperf(vm, benchmark_name, server_ip):
                      data_port=DATA_PORT,
                      length=FLAGS.netperf_test_length,
                      confidence=confidence)
-  stdout, _ = vm.RemoteCommand(netperf_cmd, should_log=True)
+  stdout, _ = vm.RemoteCommand(netperf_cmd, should_log=True,
+                               timeout=2 * FLAGS.netperf_test_length)
 
   fp = io.StringIO(stdout)
   # "-o" flag above specifies CSV output, but there is one extra header line:

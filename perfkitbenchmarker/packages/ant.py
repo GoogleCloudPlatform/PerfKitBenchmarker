@@ -13,29 +13,34 @@
 # limitations under the License.
 
 
-"""Module containing maven installation and cleanup functions."""
+"""Module containing Ant installation and cleanup functions."""
+
+import posixpath
 
 from perfkitbenchmarker import vm_util
 
-MVN_TAR = 'apache-maven-3.3.3-bin.tar.gz'
-MVN_URL = ('http://www.us.apache.org/dist/maven/maven-3/3.3.3/binaries/' +
-           MVN_TAR)
-MVN_DIR = '%s/apache-maven-3.3.3' % vm_util.VM_TMP_DIR
+ANT_TAR_URL = ('archive.apache.org/dist/ant/binaries/'
+               'apache-ant-1.9.6-bin.tar.gz')
+
+ANT_HOME_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ant')
 
 
 def _Install(vm):
-  """Installs the maven package on the VM."""
-  vm.Install('openjdk7')
+  """Installs the Ant package on the VM."""
   vm.Install('wget')
-  vm.RemoteCommand('wget %s -P %s' % (MVN_URL, vm_util.VM_TMP_DIR))
-  vm.RemoteCommand('cd %s && tar xvzf %s' % (vm_util.VM_TMP_DIR, MVN_TAR))
+  vm.RemoteCommand('mkdir -p {0} && '
+                   'cd {0} && '
+                   'wget {1} && '
+                   'tar -zxf apache-ant-1.9.6-bin.tar.gz && '
+                   'ln -s {0}/apache-ant-1.9.6/ {2}'.format(
+                       vm_util.VM_TMP_DIR, ANT_TAR_URL, ANT_HOME_DIR))
 
 
 def YumInstall(vm):
-  """Installs the maven package on the VM."""
+  """Installs the Ant package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the maven package on the VM."""
+  """Installs the Ant package on the VM."""
   _Install(vm)
