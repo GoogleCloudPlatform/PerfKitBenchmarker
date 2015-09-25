@@ -33,6 +33,10 @@ FLAGS = flags.FLAGS
 AZURE_PATH = 'azure'
 MAX_NAME_LENGTH = 24
 SSH_PORT = 22
+# We need to prefix storage account names so that VMs won't create their own
+# account upon creation.
+# See https://github.com/MSOpenTech/azure-xplat-cli/pull/349
+STORAGE_ACCOUNT_PREFIX = 'portalvhds'
 # Azure Storage Account types. See
 # http://azure.microsoft.com/en-us/pricing/details/storage/ for more information
 # about the different types.
@@ -74,9 +78,9 @@ class AzureFirewall(network.BaseFirewall):
                   vm.name,
                   str(port)]
     vm_util.IssueRetryableCommand(
-        create_cmd + ['--endpoint-protocol=tcp'])
+        create_cmd + ['--protocol=tcp'])
     vm_util.IssueRetryableCommand(
-        create_cmd + ['--endpoint-protocol=udp'])
+        create_cmd + ['--protocol=udp'])
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
@@ -131,10 +135,11 @@ class AzureAffinityGroup(resource.BaseResource):
 class AzureStorageAccount(resource.BaseResource):
   """Object representing an Azure Storage Account."""
 
-  def __init__(self, name, storage_type):
+  def __init__(self, name, storage_type, affinity_group_name):
     super(AzureStorageAccount, self).__init__()
     self.name = name
     self.storage_type = storage_type
+    self.affinity_group_name = affinity_group_name
 
   def _Create(self):
     """Creates the storage account."""
@@ -142,7 +147,7 @@ class AzureStorageAccount(resource.BaseResource):
                   'storage',
                   'account',
                   'create',
-                  '--affinity-group=%s' % self.name,
+                  '--affinity-group=%s' % self.affinity_group_name,
                   '--type=%s' % self.storage_type,
                   self.name]
     vm_util.IssueCommand(create_cmd)
@@ -201,7 +206,7 @@ class AzureVirtualNetwork(resource.BaseResource):
     vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
-    """Returns true if the storage account exists."""
+    """Returns true if the virtual network exists."""
     show_cmd = [AZURE_PATH,
                 'network',
                 'vnet',
@@ -209,11 +214,10 @@ class AzureVirtualNetwork(resource.BaseResource):
                 '--json',
                 self.name]
     stdout, _, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
-    try:
-      json.loads(stdout)
-    except ValueError:
-      return False
-    return True
+    vnet = json.loads(stdout)
+    if vnet:
+      return True
+    return False
 
 
 class AzureNetwork(network.BaseNetwork):
@@ -221,10 +225,12 @@ class AzureNetwork(network.BaseNetwork):
 
   def __init__(self, zone):
     super(AzureNetwork, self).__init__(zone)
-    name = ('perfkit%s%s' %
+    name = ('pkb%s%s' %
             (FLAGS.run_uri, str(uuid.uuid4())[-12:])).lower()[:MAX_NAME_LENGTH]
     self.affinity_group = AzureAffinityGroup(name, zone)
-    self.storage_account = AzureStorageAccount(name, FLAGS.azure_storage_type)
+    storage_account_name = (STORAGE_ACCOUNT_PREFIX + name)[:MAX_NAME_LENGTH]
+    self.storage_account = AzureStorageAccount(
+        storage_account_name, FLAGS.azure_storage_type, name)
     self.vnet = AzureVirtualNetwork(name)
 
   @vm_util.Retry()
