@@ -125,6 +125,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     uid = uuid.uuid4()
     file_base = os.path.join(vm_util.VM_TMP_DIR, 'cmd%s' % uid)
+    wrapper_log = file_base + '.log'
     stdout_file = file_base + '.stdout'
     stderr_file = file_base + '.stderr'
     status_file = file_base + '.status'
@@ -138,14 +139,23 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                      '--status', status_file,
                      '--command', pipes.quote(command)]
 
-    start_command = '%s 1> /dev/null 2> /dev/null &' % ' '.join(start_command)
+    start_command = '%s 1> %s 2>&1 &' % (' '.join(start_command),
+                                         wrapper_log)
     self.RemoteCommand(start_command)
 
     wait_command = ['python', wait_path, '--stdout', stdout_file,
                     '--stderr', stderr_file,
                     '--status', status_file,
                     '--delete']
-    return self.RemoteCommand(' '.join(wait_command), should_log=False)
+    try:
+      return self.RemoteCommand(' '.join(wait_command), should_log=False)
+    except:
+      # In case the error was with the wrapper script itself, print the log.
+      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
+      if stdout.strip():
+        logging.warn('Exception during RobustRemoteCommand. '
+                     'Wrapper script log:\n%s', stdout)
+      raise
 
   def SetupRemoteFirewall(self):
     """Sets up IP table configurations on the VM."""
