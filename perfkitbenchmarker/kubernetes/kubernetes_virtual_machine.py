@@ -29,7 +29,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('kubeconfig', '',
                     'Path to kubeconfig to be used by kubectl')
 
-flags.DEFINE_string('kubectl', '/opt/bin/kubectl',
+flags.DEFINE_string('kubectl', 'kubectl',
                     'Path to kubectl tool')
 
 flags.DEFINE_string('username', 'root',
@@ -331,6 +331,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     if FLAGS.https_proxy:
       https_proxy = "sed -i '1i export https_proxy=%s' /etc/bash.bashrc"
       self.RemoteCommand(https_proxy % FLAGS.http_proxy)
+    if FLAGS.ftp_proxy:
+      ftp_proxy = "sed -i '1i export ftp_proxy=%s' /etc/bash.bashrc"
+      self.RemoteCommand(ftp_proxy % FLAGS.ftp_proxy)
 
   def _BuildPodBody(self):
     """
