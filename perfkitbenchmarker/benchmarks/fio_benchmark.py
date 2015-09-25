@@ -35,6 +35,7 @@ LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
 DISK_USABLE_SPACE_FRACTION = 0.9
+MINUTES_PER_JOB = 10
 
 
 # This dictionary maps scenario names to dictionaries of fio settings.
@@ -95,7 +96,8 @@ flags.DEFINE_integer('run_for_minutes', 10,
                      'Repeat the job scenario(s) for the given number of '
                      'minutes. Only valid when using --generate_scenarios. '
                      'When using multiple scenarios, each one is run for the '
-                     'given number of minutes.',
+                     'given number of minutes. Time will be rounded up to the '
+                     'next multiple of %s minutes.' % (MINUTES_PER_JOB,),
                      lower_bound=0)
 
 
@@ -167,7 +169,6 @@ size={{size}}
 {% endfor %}
 """
 
-MINUTES_PER_JOB = 10
 SECONDS_PER_MINUTE = 60
 
 
@@ -390,9 +391,8 @@ def Run(benchmark_spec):
       stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
 
       seconds_since_start = int(round((run_start - start_time).total_seconds()))
-      minutes_since_start = seconds_since_start // SECONDS_PER_MINUTE
-      if seconds_since_start % SECONDS_PER_MINUTE > (SECONDS_PER_MINUTE // 2):
-        minutes_since_start += 1
+      minutes_since_start = int(round(float(seconds_since_start)
+                                      / float(SECONDS_PER_MINUTE)))
       base_metadata = {
           'repeat_number': rep_num,
           'minutes_since_start': minutes_since_start
