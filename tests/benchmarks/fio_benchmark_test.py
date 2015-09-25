@@ -28,6 +28,26 @@ class TestGetIODepths(unittest.TestCase):
   def testIntegerRange(self):
     self.assertEqual(list(fio_benchmark.GetIODepths('3-5')), [3, 4, 5])
 
+  def testIntegerList(self):
+    self.assertEqual(list(fio_benchmark.GetIODepths('3-5,8,10-12')),
+                     [3, 4, 5, 8, 10, 11, 12])
+
+  def testNoInteger(self):
+    with self.assertRaises(ValueError):
+      fio_benchmark.GetIODepths('a')
+
+  def testBadRange(self):
+    with self.assertRaises(ValueError):
+      fio_benchmark.GetIODepths('3-a')
+
+  def testBadList(self):
+    with self.assertRaises(ValueError):
+      fio_benchmark.GetIODepths('3-5,8a')
+
+  def testTrailingComma(self):
+    with self.assertRaises(ValueError):
+      fio_benchmark.GetIODepths('3-5,')
+
 
 class TestGenerateJobFileString(unittest.TestCase):
   def setUp(self):
