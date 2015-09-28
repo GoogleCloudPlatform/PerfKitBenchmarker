@@ -129,9 +129,31 @@ def GetIODepths(io_depths):
   return result
 
 
+def WarnIODepths(depths_list):
+  """Given a list of IO depths, log warnings if it seems "weird".
+
+  Args:
+    depths_list: a list of IO depths.
+  """
+
+  for i in range(len(depths_list) - 1):
+    if depths_list[i] >= depths_list[i + 1]:
+      logging.warning('IO depths list is not monotonically increasing: '
+                      '%s comes before %s.', depths_list[i], depths_list[i + 1])
+
+  values = set()
+  warned_on = set()
+  for val in depths_list:
+    if val in values and val not in warned_on:
+      logging.warning('IO depths list contains duplicate entry %s.', val)
+      warned_on.add(val)
+    else:
+      values.add(val)
+
+
 def IODepthsValidator(string):
   try:
-    GetIODepths(string)
+    WarnIODepths(GetIODepths(string))
     return True
   except ValueError:
     return False
@@ -139,8 +161,9 @@ def IODepthsValidator(string):
 
 flags.RegisterValidator('io_depths',
                         IODepthsValidator,
-                        message='--io_depths must be an integer '
-                                'or a list of integers, all > 0')
+                        message='--io_depths must be an integer, '
+                                'range of integers, or a list of '
+                                'integers and ranges, all > 0')
 
 
 def GenerateFillCommand(fio_path, fill_path, fill_size):
