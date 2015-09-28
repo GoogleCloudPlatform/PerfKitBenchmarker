@@ -85,7 +85,8 @@ flags.DEFINE_string('device_fill_size', '100%',
                     '90% of a filesystem.')
 flags.DEFINE_string('io_depths', '1',
                     'IO queue depths to run on. Can specify a single number, '
-                    'like --io_depths=1, or a range, like --io_depths=1-4')
+                    'like --io_depths=1, a range, like --io_depths=1-4, or a '
+                    'list, like --io_depths=1-4,6-8')
 flags.DEFINE_integer('working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
                      'the full size of the device.',
@@ -100,15 +101,69 @@ FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
 IODEPTHS_REGEXP = re.compile(r'(\d+)(-(\d+))?$')
 
 
+def GetIODepths(io_depths):
+  """Parse the io_depths parameter.
+
+  Args:
+    io_depths: a string in the format of the --io_depths flag.
+
+  Returns:
+    A list of integers.
+
+  Raises:
+    ValueError if io_depths doesn't follow a format it recognizes.
+  """
+
+  groups = io_depths.split(',')
+  result = []
+
+  for group in groups:
+    match = IODEPTHS_REGEXP.match(group)
+    if match is None:
+      raise ValueError('Invalid io_depths expression %s', io_depths)
+    elif match.group(2) is None:
+      result.append(int(match.group(1)))
+    else:
+      result.extend(range(int(match.group(1)), int(match.group(3)) + 1))
+
+  return result
+
+
+def WarnIODepths(depths_list):
+  """Given a list of IO depths, log warnings if it seems "weird".
+
+  Args:
+    depths_list: a list of IO depths.
+  """
+
+  for i in range(len(depths_list) - 1):
+    if depths_list[i] >= depths_list[i + 1]:
+      logging.warning('IO depths list is not monotonically increasing: '
+                      '%s comes before %s.', depths_list[i], depths_list[i + 1])
+
+  values = set()
+  warned_on = set()
+  for val in depths_list:
+    if val in values and val not in warned_on:
+      logging.warning('IO depths list contains duplicate entry %s.', val)
+      warned_on.add(val)
+    else:
+      values.add(val)
+
+
 def IODepthsValidator(string):
-  match = IODEPTHS_REGEXP.match(string)
-  return match and int(match.group(1)) > 0
+  try:
+    WarnIODepths(GetIODepths(string))
+    return True
+  except ValueError:
+    return False
 
 
 flags.RegisterValidator('io_depths',
                         IODepthsValidator,
-                        message='--io_depths must be an integer '
-                                'or a range of integers, all > 0')
+                        message='--io_depths must be an integer, '
+                                'range of integers, or a list of '
+                                'integers and ranges, all > 0')
 
 
 def GenerateFillCommand(fio_path, fill_path, fill_size):
@@ -159,27 +214,6 @@ size={{size}}
 {% endfor %}
 {% endfor %}
 """
-
-
-def GetIODepths(io_depths):
-  """Parse the io_depths parameter.
-
-  Args:
-    io_depths: a string in the format of the --io_depths flag.
-
-  Returns:
-    An iterable of integers.
-
-  Raises:
-    ValueError if io_depths doesn't follow a format it recognizes.
-  """
-
-  match = IODEPTHS_REGEXP.match(io_depths)
-
-  if match.group(2) is None:
-    return [int(match.group(1))]
-  else:
-    return range(int(match.group(1)), int(match.group(3)) + 1)
 
 
 def GenerateJobFileString(disk, against_device,
