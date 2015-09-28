@@ -18,6 +18,7 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
+import datetime
 import json
 import logging
 import posixpath
@@ -34,6 +35,7 @@ LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
 DISK_USABLE_SPACE_FRACTION = 0.9
+MINUTES_PER_JOB = 10
 
 
 # This dictionary maps scenario names to dictionaries of fio settings.
@@ -91,11 +93,18 @@ flags.DEFINE_integer('working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
                      'the full size of the device.',
                      lower_bound=0)
+flags.DEFINE_integer('run_for_minutes', 10,
+                     'Repeat the job scenario(s) for the given number of '
+                     'minutes. Only valid when using --generate_scenarios. '
+                     'When using multiple scenarios, each one is run for the '
+                     'given number of minutes. Time will be rounded up to the '
+                     'next multiple of %s minutes.' % (MINUTES_PER_JOB,),
+                     lower_bound=0)
 
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
-    'generate_scenarios', 'io_depths'}
+    'generate_scenarios', 'io_depths', 'run_for_minutes'}
 
 
 IODEPTHS_REGEXP = re.compile(r'(\d+)(-(\d+))?$')
@@ -196,7 +205,7 @@ JOB_FILE_TEMPLATE = """
 ioengine=libaio
 invalidate=1
 direct=1
-runtime=10m
+runtime={{minutes_per_job}}m
 time_based
 filename={{filename}}
 do_verify=0
@@ -214,6 +223,8 @@ size={{size}}
 {% endfor %}
 {% endfor %}
 """
+
+SECONDS_PER_MINUTE = 60
 
 
 def GenerateJobFileString(disk, against_device,
@@ -242,6 +253,7 @@ def GenerateJobFileString(disk, against_device,
                                       undefined=jinja2.StrictUndefined)
 
   return str(job_file_template.render(
+      minutes_per_job=MINUTES_PER_JOB,
       filename=filename,
       size=size_string,
       scenarios=scenarios,
@@ -314,6 +326,10 @@ def Prepare(benchmark_spec):
       logging.warning('Fio job file specified. Ignoring options "%s"',
                       ', '.join(ignored_flags))
 
+  if FLAGS.run_for_minutes % MINUTES_PER_JOB != 0:
+    logging.warning('Runtime %s will be rounded up to the next multiple of %s '
+                    'minutes.', FLAGS.run_for_minutes, MINUTES_PER_JOB)
+
   vm = benchmark_spec.vms[0]
   logging.info('FIO prepare on %s', vm)
   vm.Install('fio')
@@ -332,14 +348,13 @@ def Prepare(benchmark_spec):
       fill_size = FLAGS.device_fill_size
     else:
       fill_path = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
-
-      if FLAGS.FlagValuesDict().get('disk_fill_size') is not None:
-        fill_size = FLAGS.disk_fill_size
+      if FLAGS['device_fill_size'].present:
+        fill_size = FLAGS.device_fill_size
       else:
         # Default to 90% of capacity because the file system will add
         # some overhead.
-        fill_size = str(DISK_USABLE_SPACE_FRACTION *
-                        1000 * disk.disk_size) + 'M'
+        fill_size = str(int(DISK_USABLE_SPACE_FRACTION *
+                            1000 * disk.disk_size)) + 'M'
 
     logging.info('Fill file %s on %s', fill_path, vm)
     command = GenerateFillCommand(fio.FIO_PATH,
@@ -375,21 +390,58 @@ def Run(benchmark_spec):
 
   fio_command = 'sudo %s --output-format=json %s' % (fio.FIO_PATH,
                                                      REMOTE_JOB_FILE_PATH)
+
+  disk = vm.scratch_disks[0]
+
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
-  stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
 
-  disk = vm.scratch_disks[0]
-  return fio.ParseResults(
-      GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                 disk,
-                                 FLAGS.against_device,
-                                 FLAGS.generate_scenarios,
-                                 GetIODepths(FLAGS.io_depths),
-                                 FLAGS.working_set_size),
-      json.loads(stdout))
+  if not FLAGS.generate_scenarios:
+    stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
+
+    return fio.ParseResults(
+        GetOrGenerateJobFileString(FLAGS.fio_jobfile,
+                                   disk,
+                                   FLAGS.against_device,
+                                   FLAGS.generate_scenarios,
+                                   GetIODepths(FLAGS.io_depths),
+                                   FLAGS.working_set_size),
+        json.loads(stdout))
+  else:
+    # We want to run each scenario for FLAGS.run_for_minutes time.
+    run_reps = FLAGS.run_for_minutes // MINUTES_PER_JOB
+    if FLAGS.run_for_minutes % MINUTES_PER_JOB != 0:
+      run_reps += 1
+      # We already warned the user about rounding during the prepare
+      # phase. No need to warn them again here.
+
+    samples = []
+    start_time = datetime.datetime.now()
+    for rep_num in xrange(run_reps):
+      logging.info('**** Repetition number %s of %s ****', rep_num, run_reps)
+      run_start = datetime.datetime.now()
+      stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
+
+      seconds_since_start = int(round((run_start - start_time).total_seconds()))
+      minutes_since_start = int(round(float(seconds_since_start)
+                                      / float(SECONDS_PER_MINUTE)))
+      base_metadata = {
+          'repeat_number': rep_num,
+          'minutes_since_start': minutes_since_start
+      }
+      samples.extend(fio.ParseResults(
+          GetOrGenerateJobFileString(FLAGS.fio_jobfile,
+                                     disk,
+                                     FLAGS.against_device,
+                                     FLAGS.generate_scenarios,
+                                     GetIODepths(FLAGS.io_depths),
+                                     FLAGS.working_set_size),
+          json.loads(stdout),
+          base_metadata=base_metadata))
+
+    return samples
 
 
 def Cleanup(benchmark_spec):
