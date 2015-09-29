@@ -67,7 +67,9 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('fio_jobfile', None,
                     'Job file that fio will use. If not given, use a job file '
-                    'bundled with PKB. Cannot use with --generate_scenarios.')
+                    'bundled with PKB. {{filename}} in the job file will be '
+                    'replaced by the path of the disk or file we pre-filled, '
+                    'if requested. Cannot use with --generate_scenarios.')
 flags.DEFINE_list('generate_scenarios', None,
                   'Generate a job file with the given scenarios. Special '
                   'scenario \'all\' generates all scenarios. Available '
@@ -227,13 +229,11 @@ size={{size}}
 SECONDS_PER_MINUTE = 60
 
 
-def GenerateJobFileString(disk, against_device,
-                          scenarios, io_depths, working_set_size):
+def GenerateJobFileString(filename, scenarios, io_depths, working_set_size):
   """Make a string with our fio job file.
 
   Args:
-    disk: the disk.BaseDisk object we're benchmarking with.
-    against_device: bool. True if we're using a raw disk.
+    filename: the file or disk we pre-filled, if any.
     scenarios: iterable of dicts, taken from SCENARIOS.
     io_depths: iterable. The IO queue depths to test.
     working_set_size: int or None. If int, the size of the working set in GB.
@@ -241,11 +241,6 @@ def GenerateJobFileString(disk, against_device,
   Returns:
     The contents of a fio job file, as a string.
   """
-
-  if against_device:
-    filename = disk.GetDevicePath()
-  else:
-    filename = posixpath.join(disk.mount_point, DEFAULT_TEMP_FILE_NAME)
 
   size_string = str(working_set_size) + 'G' if working_set_size else '100%'
 
@@ -260,8 +255,8 @@ def GenerateJobFileString(disk, against_device,
       iodepths=io_depths))
 
 
-def GetOrGenerateJobFileString(fio_jobfile, disk, against_device,
-                               scenario_strings, io_depths, working_set_size):
+def GetOrGenerateJobFileString(fio_jobfile, filename, scenario_strings,
+                               io_depths, working_set_size):
   """Get the contents of the fio job file we're working with.
 
   This will either read the user's job file, if given, or generate a
@@ -269,8 +264,7 @@ def GetOrGenerateJobFileString(fio_jobfile, disk, against_device,
 
   Args:
     fio_jobfile: string or None. The path to the user's jobfile, if provided.
-    disk: the disk.BaseDisk object we're benchmarking with.
-    against_device: bool. True if we're using a raw disk.
+    filename: the file or disk we pre-filled, if any.
     scenario_strings: list of strings or None. The workload scenarios to
       generate.
     io_depths: iterable. The IO queue depths to test.
@@ -286,7 +280,10 @@ def GetOrGenerateJobFileString(fio_jobfile, disk, against_device,
 
   if fio_jobfile:
     with open(fio_jobfile, 'r') as jobfile:
-      return jobfile.read()
+      jobfile_template = jinja2.Template(jobfile.read(),
+                                         undefined=jinja2.StrictUndefined)
+      return str(jobfile_template.render(
+          filename=filename))
   else:
     if 'all' in scenario_strings:
       scenarios = SCENARIOS.itervalues()
@@ -296,7 +293,7 @@ def GetOrGenerateJobFileString(fio_jobfile, disk, against_device,
           logging.error('Unknown scenario name %s', name)
       scenarios = (SCENARIOS[name] for name in scenario_strings)
 
-    return GenerateJobFileString(disk, against_device, scenarios,
+    return GenerateJobFileString(filename, scenarios,
                                  io_depths, working_set_size)
 
 
@@ -334,20 +331,23 @@ def Prepare(benchmark_spec):
   logging.info('FIO prepare on %s', vm)
   vm.Install('fio')
 
-  # Fill the disk or file we're using
+  # Choose a disk or file name and optionally fill it
   disk = vm.scratch_disks[0]
-  device_path = disk.GetDevicePath()
   mount_point = disk.mount_point
+
+  if FLAGS.against_device:
+    filename = disk.GetDevicePath()
+  else:
+    filename = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
+
   if FLAGS.against_device:
     logging.info('Umount scratch disk on %s at %s', vm, mount_point)
     vm.RemoteCommand('sudo umount %s' % mount_point)
 
   if FLAGS.device_fill_size is not '0':
     if FLAGS.against_device:
-      fill_path = device_path
       fill_size = FLAGS.device_fill_size
     else:
-      fill_path = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
       if FLAGS['device_fill_size'].present:
         fill_size = FLAGS.device_fill_size
       else:
@@ -356,17 +356,16 @@ def Prepare(benchmark_spec):
         fill_size = str(int(DISK_USABLE_SPACE_FRACTION *
                             1000 * disk.disk_size)) + 'M'
 
-    logging.info('Fill file %s on %s', fill_path, vm)
+    logging.info('Fill file %s on %s', filename, vm)
     command = GenerateFillCommand(fio.FIO_PATH,
-                                  fill_path,
+                                  filename,
                                   fill_size)
     vm.RemoteCommand(command)
 
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
     job_file.write(GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                              disk,
-                                              FLAGS.against_device,
+                                              filename,
                                               FLAGS.generate_scenarios,
                                               GetIODepths(FLAGS.io_depths),
                                               FLAGS.working_set_size))
@@ -398,13 +397,17 @@ def Run(benchmark_spec):
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
 
+  if FLAGS.against_device:
+    filename = disk.GetDevicePath()
+  else:
+    filename = posixpath.join(disk.mount_point, DEFAULT_TEMP_FILE_NAME)
+
   if not FLAGS.generate_scenarios:
     stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
 
     return fio.ParseResults(
         GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                   disk,
-                                   FLAGS.against_device,
+                                   filename,
                                    FLAGS.generate_scenarios,
                                    GetIODepths(FLAGS.io_depths),
                                    FLAGS.working_set_size),
@@ -433,8 +436,7 @@ def Run(benchmark_spec):
       }
       samples.extend(fio.ParseResults(
           GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                     disk,
-                                     FLAGS.against_device,
+                                     filename,
                                      FLAGS.generate_scenarios,
                                      GetIODepths(FLAGS.io_depths),
                                      FLAGS.working_set_size),

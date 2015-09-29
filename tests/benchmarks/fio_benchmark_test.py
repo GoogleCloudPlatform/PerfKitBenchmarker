@@ -18,8 +18,6 @@ import unittest
 
 import mock
 
-from perfkitbenchmarker import disk
-from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.benchmarks import fio_benchmark
 from perfkitbenchmarker.packages import fio
 
@@ -54,10 +52,9 @@ class TestGetIODepths(unittest.TestCase):
 
 class TestGenerateJobFileString(unittest.TestCase):
   def setUp(self):
-    self.disk_spec = disk.BaseDiskSpec(100, 'remote_ssd', '/scratch0')
-    self.disk = gce_disk.GceDisk(self.disk_spec, 'foo', 'us-central1-a', 'proj')
+    self.filename = '/test/filename'
 
-  def testAgainstDevice(self):
+  def testBasicGeneration(self):
     expected_jobfile = """
 [global]
 ioengine=libaio
@@ -65,7 +62,7 @@ invalidate=1
 direct=1
 runtime=10m
 time_based
-filename=/dev/disk/by-id/google-foo
+filename=/test/filename
 do_verify=0
 verify_fatal=0
 randrepeat=0
@@ -90,48 +87,7 @@ size=100%
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
-            self.disk,
-            True,
-            [fio_benchmark.SCENARIOS['sequential_read']],
-            [1, 2],
-            None),
-        expected_jobfile)
-
-  def testAgainstFile(self):
-    expected_jobfile = """
-[global]
-ioengine=libaio
-invalidate=1
-direct=1
-runtime=10m
-time_based
-filename=/scratch0/fio-temp-file
-do_verify=0
-verify_fatal=0
-randrepeat=0
-
-
-
-[sequential_read-io-depth-1]
-stonewall
-rw=read
-blocksize=512k
-iodepth=1
-size=100%
-
-[sequential_read-io-depth-2]
-stonewall
-rw=read
-blocksize=512k
-iodepth=2
-size=100%
-
-"""
-
-    self.assertEqual(
-        fio_benchmark.GenerateJobFileString(
-            self.disk,
-            False,
+            self.filename,
             [fio_benchmark.SCENARIOS['sequential_read']],
             [1, 2],
             None),
@@ -145,7 +101,7 @@ invalidate=1
 direct=1
 runtime=10m
 time_based
-filename=/scratch0/fio-temp-file
+filename=/test/filename
 do_verify=0
 verify_fatal=0
 randrepeat=0
@@ -172,13 +128,21 @@ size=100%
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
-            self.disk,
-            False,
+            self.filename,
             [fio_benchmark.SCENARIOS['sequential_read'],
              fio_benchmark.SCENARIOS['sequential_write']],
             [1],
             None),
         expected_jobfile)
+
+
+class TestGetOrGenerateJobFileString(unittest.TestCase):
+  def testFilenameSubstitution(self):
+    filename = '1234567890'
+    jobfile = str(fio_benchmark.GetOrGenerateJobFileString(
+        None, filename, None, '1', None))
+
+    self.assertIn(filename, jobfile)
 
 
 class TestRunForMinutes(unittest.TestCase):
