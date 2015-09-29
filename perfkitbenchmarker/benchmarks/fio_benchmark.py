@@ -90,7 +90,13 @@ flags.DEFINE_integer('working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
                      'the full size of the device.',
                      lower_bound=0)
-
+flags.DEFINE_integer('run_for_minutes', 10,
+                     'Repeat the job scenario(s) for the given number of '
+                     'minutes. Only valid when using --generate_scenarios. '
+                     'When using multiple scenarios, each one is run for the '
+                     'given number of minutes. Time will be rounded up to the '
+                     'next multiple of %s minutes.' % MINUTES_PER_JOB,
+                     lower_bound=0)
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
