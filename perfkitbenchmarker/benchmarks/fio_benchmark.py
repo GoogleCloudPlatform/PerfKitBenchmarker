@@ -98,9 +98,8 @@ flags.DEFINE_integer('run_for_minutes', 10,
                      'minutes. Only valid when using --generate_scenarios. '
                      'When using multiple scenarios, each one is run for the '
                      'given number of minutes. Time will be rounded up to the '
-                     'next multiple of %s minutes.' % (MINUTES_PER_JOB,),
+                     'next multiple of %s minutes.' % MINUTES_PER_JOB,
                      lower_bound=0)
-
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
