@@ -226,23 +226,34 @@ size={{size}}
 SECONDS_PER_MINUTE = 60
 
 
-def GenerateJobFileString(filename, scenarios, io_depths, working_set_size):
+def GenerateJobFileString(filename, scenario_strings,
+                          io_depths_string, working_set_size):
   """Make a string with our fio job file.
 
   Args:
     filename: the file or disk we pre-filled, if any.
-    scenarios: iterable of dicts, taken from SCENARIOS.
-    io_depths: iterable. The IO queue depths to test.
+    scenario_strings: list of strings with names in SCENARIOS.
+    io_depths_string: string. The IO queue depths to test.
     working_set_size: int or None. If int, the size of the working set in GB.
 
   Returns:
     The contents of a fio job file, as a string.
   """
 
+  if 'all' in scenario_strings:
+    scenarios = SCENARIOS.itervalues()
+  else:
+    for name in scenario_strings:
+      if name not in SCENARIOS:
+        logging.error('Unknown scenario name %s', name)
+    scenarios = (SCENARIOS[name] for name in scenario_strings)
+
   size_string = str(working_set_size) + 'G' if working_set_size else '100%'
 
   job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
                                       undefined=jinja2.StrictUndefined)
+
+  io_depths = GetIODepths(io_depths_string)
 
   return str(job_file_template.render(
       minutes_per_job=MINUTES_PER_JOB,
@@ -255,14 +266,16 @@ def GenerateJobFileString(filename, scenarios, io_depths, working_set_size):
 FILENAME_PARAM_REGEXP = re.compile('filename\s*=.*$', re.MULTILINE)
 
 
-def ProcessUserJobFile(fio_jobfile, remove_filename):
-  """Get the contents of a user job file, slightly edited.
+def ProcessedJobFileString(fio_jobfile, remove_filename):
+  """Get the contents of a job file as a string, slightly edited.
 
   Args:
     fio_jobfile: the path to a fio job file.
+    remove_filename: bool. If true, remove the filename parameter from
+      the job file.
 
   Returns:
-    The user's job file as a string, possibly without filename parameters.
+    The job file as a string, possibly without filename parameters.
   """
 
   with open(fio_jobfile, 'r') as jobfile:
@@ -272,8 +285,8 @@ def ProcessUserJobFile(fio_jobfile, remove_filename):
       return jobfile.read()
 
 
-def GetOrGenerateJobFileString(fio_jobfile, remove_filename,
-                               filename, scenario_strings,
+def GetOrGenerateJobFileString(job_file_path, scenario_strings,
+                               against_device, disk,
                                io_depths, working_set_size):
   """Get the contents of the fio job file we're working with.
 
@@ -281,35 +294,36 @@ def GetOrGenerateJobFileString(fio_jobfile, remove_filename,
   new one.
 
   Args:
-    fio_jobfile: string or None. The path to the user's jobfile, if provided.
-    remove_filename: bool. If true, remove the filename from a user job file.
-    filename: the file or disk we pre-filled, if any.
-    scenario_strings: list of strings or None. The workload scenarios to
-      generate.
-    io_depths: iterable. The IO queue depths to test.
-    working_set_size: int or None. If int, the size of the working set in GB.
+    job_file_path: string or None. The path to the user's job file, if
+      provided.
+    scenario_strings: list of strings or None. The workload scenarios
+      to generate.
+    against_device: bool. True if testing against a raw device, False
+      if testing against a filesystem.
+    disk: the disk.BaseDisk object to test against.
+    io_depths: string. The IO queue depths to test.
+    working_set_size: int or None. If int, the size of the working set
+      in GB.
 
   Returns:
     A string containing a fio job file.
   """
 
-  # The default behavior is to run with the standard fio job file.
-  if scenario_strings is None and not fio_jobfile:
-    fio_jobfile = data.ResourcePath('fio.job')
+  use_user_jobfile = job_file_path or not scenario_strings
 
-  if fio_jobfile:
-    return ProcessUserJobFile(fio_jobfile,
-                              remove_filename)
+  if use_user_jobfile:
+    remove_filename = against_device
+    return ProcessedJobFileString(job_file_path or data.ResourcePath('fio.job'),
+                                  remove_filename)
   else:
-    if 'all' in scenario_strings:
-      scenarios = SCENARIOS.itervalues()
+    if against_device:
+      filename = disk.GetDevicePath()
     else:
-      for name in scenario_strings:
-        if name not in SCENARIOS:
-          logging.error('Unknown scenario name %s', name)
-      scenarios = (SCENARIOS[name] for name in scenario_strings)
+      # Since we pass --directory to fio, we must use relative file
+      # paths or get an error.
+      filename = DEFAULT_TEMP_FILE_NAME
 
-    return GenerateJobFileString(filename, scenarios,
+    return GenerateJobFileString(filename, scenario_strings,
                                  io_depths, working_set_size)
 
 
@@ -357,13 +371,6 @@ def Prepare(benchmark_spec):
   disk = vm.scratch_disks[0]
   mount_point = disk.mount_point
 
-  if FLAGS.against_device:
-    filename = disk.GetDevicePath()
-  else:
-    # Since we pass --directory to fio, we must use relative file
-    # paths or get an error.
-    filename = DEFAULT_TEMP_FILE_NAME
-
   logging.info('Umount scratch disk on %s at %s', vm, mount_point)
   vm.RemoteCommand('sudo umount %s' % mount_point)
 
@@ -377,14 +384,15 @@ def Prepare(benchmark_spec):
     # and changes its permissions, which we have already done.
     vm.RemoteCommand('sudo mount %s %s' % (disk.GetDevicePath(), mount_point))
 
+  job_file_string = GetOrGenerateJobFileString(FLAGS.fio_jobfile,
+                                               FLAGS.generate_scenarios,
+                                               FLAGS.against_device,
+                                               disk,
+                                               FLAGS.io_depths,
+                                               FLAGS.working_set_size)
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
-    job_file.write(GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                              FLAGS.against_device,
-                                              filename,
-                                              FLAGS.generate_scenarios,
-                                              GetIODepths(FLAGS.io_depths),
-                                              FLAGS.working_set_size))
+    job_file.write(job_file_string)
     logging.info('Wrote fio job file at %s', job_file_path)
 
   vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
@@ -407,21 +415,17 @@ def Run(benchmark_spec):
   mount_point = disk.mount_point
 
   if FLAGS.against_device:
-    filename = disk.GetDevicePath()
-    remove_user_filename = True
     fio_command = 'sudo %s --output-format=json --filename=%s %s' % (
-        fio.FIO_PATH, filename, REMOTE_JOB_FILE_PATH)
+        fio.FIO_PATH, disk.GetDevicePath(), REMOTE_JOB_FILE_PATH)
   else:
-    filename = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
-    remove_user_filename = False
     fio_command = 'sudo %s --output-format=json --directory=%s %s' % (
         fio.FIO_PATH, mount_point, REMOTE_JOB_FILE_PATH)
 
   job_file_string = GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                               remove_user_filename,
-                                               filename,
                                                FLAGS.generate_scenarios,
-                                               GetIODepths(FLAGS.io_depths),
+                                               FLAGS.against_device,
+                                               disk,
+                                               FLAGS.io_depths,
                                                FLAGS.working_set_size)
 
   # TODO(user): This only gives results at the end of a job run

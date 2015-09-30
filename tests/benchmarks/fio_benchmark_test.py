@@ -88,8 +88,8 @@ size=100%
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
             self.filename,
-            [fio_benchmark.SCENARIOS['sequential_read']],
-            [1, 2],
+            ['sequential_read'],
+            '1,2',
             None),
         expected_jobfile)
 
@@ -129,14 +129,13 @@ size=100%
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
             self.filename,
-            [fio_benchmark.SCENARIOS['sequential_read'],
-             fio_benchmark.SCENARIOS['sequential_write']],
-            [1],
+            ['sequential_read', 'sequential_write'],
+            '1',
             None),
         expected_jobfile)
 
 
-class TestProcessUserJobFile(unittest.TestCase):
+class TestProcessedJobFileString(unittest.TestCase):
   def testReplaceFilenames(self):
     file_contents = """
 [global]
@@ -155,7 +154,7 @@ blocksize = 8k
     manager.__exit__.return_value = mock.Mock()
 
     with mock.patch('__builtin__.open', open_mock):
-      jobfile = fio_benchmark.ProcessUserJobFile('filename', True)
+      jobfile = fio_benchmark.ProcessedJobFileString('filename', True)
       self.assertNotIn('filename', jobfile)
       self.assertNotIn('zanzibar', jobfile)
       self.assertNotIn('asdf', jobfile)
