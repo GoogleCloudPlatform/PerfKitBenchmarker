@@ -14,7 +14,7 @@
 
 [global]
 filesize=10*10*1000*$mb_memory
-filename={{ filename }}
+filename=fio_test_file
 ioengine=libaio
 
 [sequential_write]

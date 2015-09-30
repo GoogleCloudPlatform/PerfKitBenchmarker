@@ -136,13 +136,29 @@ size=100%
         expected_jobfile)
 
 
-class TestGetOrGenerateJobFileString(unittest.TestCase):
-  def testFilenameSubstitution(self):
-    filename = '1234567890'
-    jobfile = str(fio_benchmark.GetOrGenerateJobFileString(
-        None, filename, None, '1', None))
+class TestProcessUserJobFile(unittest.TestCase):
+  def testReplaceFilenames(self):
+    file_contents = """
+[global]
+blocksize = 4k
+filename = zanzibar
+ioengine=libaio
 
-    self.assertIn(filename, jobfile)
+[job1]
+filename = asdf
+blocksize = 8k
+"""
+
+    open_mock = mock.MagicMock()
+    manager = open_mock.return_value.__enter__.return_value
+    manager.read.return_value = file_contents
+    manager.__exit__.return_value = mock.Mock()
+
+    with mock.patch('__builtin__.open', open_mock):
+      jobfile = fio_benchmark.ProcessUserJobFile('filename', True)
+      self.assertNotIn('filename', jobfile)
+      self.assertNotIn('zanzibar', jobfile)
+      self.assertNotIn('asdf', jobfile)
 
 
 class TestRunForMinutes(unittest.TestCase):
