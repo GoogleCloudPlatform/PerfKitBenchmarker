@@ -67,9 +67,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('fio_jobfile', None,
                     'Job file that fio will use. If not given, use a job file '
-                    'bundled with PKB. {{filename}} in the job file will be '
-                    'replaced by the path of the disk or file we pre-filled, '
-                    'if requested. Cannot use with --generate_scenarios.')
+                    'bundled with PKB. Cannot use with --generate_scenarios.')
 flags.DEFINE_list('generate_scenarios', None,
                   'Generate a job file with the given scenarios. Special '
                   'scenario \'all\' generates all scenarios. Available '
