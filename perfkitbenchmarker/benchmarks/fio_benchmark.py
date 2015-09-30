@@ -34,7 +34,6 @@ from perfkitbenchmarker.packages import fio
 LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
-DISK_USABLE_SPACE_FRACTION = 0.9
 MINUTES_PER_JOB = 10
 
 
@@ -83,8 +82,8 @@ flags.DEFINE_string('device_fill_size', '100%',
                     'The valid value can either be an integer, which '
                     'represents the number of bytes to fill or a '
                     'percentage, which represents the percentage '
-                    'of the device. Default to filling 100% of a raw device or '
-                    '90% of a filesystem.')
+                    'of the device. A filesystem will be unmounted before '
+                    'filling and remounted afterwards. Default is 100%')
 flags.DEFINE_string('io_depths', '1',
                     'IO queue depths to run on. Can specify a single number, '
                     'like --io_depths=1, a range, like --io_depths=1-4, or a '
@@ -175,22 +174,22 @@ flags.RegisterValidator('io_depths',
                                 'integers and ranges, all > 0')
 
 
-def GenerateFillCommand(fio_path, fill_path, fill_size):
-  """Generate a command to sequentially write a device or file.
+def FillDevice(fio_path, vm, disk, fill_size):
+  """Fill the given disk on the given vm up to fill_size.
 
   Args:
     fio_path: path to the fio executable.
-    fill_path: path to the device or file to fill.
-    fill_size: amount of device or file to fill, in fio format.
-
-  Returns:
-    A string containing the command.
+    vm: a virtual_machine.VirtualMachine object.
+    disk: a disk.BaseDisk attached to the given vm.
+    fill_size: amount of device to fill, in fio format.
   """
 
-  return (('sudo %s --filename=%s --ioengine=libaio '
-           '--name=fill-device --blocksize=512k --iodepth=64 '
-           '--rw=write --direct=1 --size=%s') %
-          (fio_path, fill_path, fill_size))
+  command = (('sudo %s --filename=%s --ioengine=libaio '
+              '--name=fill-device --blocksize=512k --iodepth=64 '
+              '--rw=write --direct=1 --size=%s') %
+             (fio_path, disk.GetDevicePath(), fill_size))
+
+  vm.RemoteCommand(command)
 
 
 BENCHMARK_INFO = {'name': 'fio',
@@ -365,29 +364,18 @@ def Prepare(benchmark_spec):
     # paths or get an error.
     filename = DEFAULT_TEMP_FILE_NAME
 
-  if FLAGS.against_device:
-    logging.info('Umount scratch disk on %s at %s', vm, mount_point)
-    vm.RemoteCommand('sudo umount %s' % mount_point)
+  logging.info('Umount scratch disk on %s at %s', vm, mount_point)
+  vm.RemoteCommand('sudo umount %s' % mount_point)
 
   if FLAGS.device_fill_size is not '0':
-    if FLAGS.against_device:
-      fill_size = FLAGS.device_fill_size
-      fill_path = filename
-    else:
-      if FLAGS['device_fill_size'].present:
-        fill_size = FLAGS.device_fill_size
-      else:
-        # Default to 90% of capacity because the file system will add
-        # some overhead.
-        fill_size = str(int(DISK_USABLE_SPACE_FRACTION *
-                            1000 * disk.disk_size)) + 'M'
-      fill_path = posixpath.join(mount_point, filename)
+    logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
+    FillDevice(fio.FIO_PATH, vm, disk, FLAGS.device_fill_size)
 
-    logging.info('Fill file %s on %s', filename, vm)
-    command = GenerateFillCommand(fio.FIO_PATH,
-                                  fill_path,
-                                  fill_size)
-    vm.RemoteCommand(command)
+  if not FLAGS.against_device:
+    vm.FormatDisk(disk.GetDevicePath())
+    # Don't use vm.MountDisk() because that also creates the mount point
+    # and changes its permissions, which we have already done.
+    vm.RemoteCommand('sudo mount %s %s' % (disk.GetDevicePath(), mount_point))
 
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
