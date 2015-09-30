@@ -316,6 +316,23 @@ def GetOrGenerateJobFileString(fio_jobfile, remove_filename,
                                  io_depths, working_set_size)
 
 
+def WarnOnBadFlags():
+  """Warn the user if they pass bad flag combinations."""
+
+  if FLAGS.fio_jobfile:
+    ignored_flags = {'--' + flag_name
+                     for flag_name in FLAGS_IGNORED_FOR_CUSTOM_JOBFILE
+                     if FLAGS[flag_name].present}
+
+    if ignored_flags:
+      logging.warning('Fio job file specified. Ignoring options "%s"',
+                      ', '.join(ignored_flags))
+
+  if FLAGS.run_for_minutes % MINUTES_PER_JOB != 0:
+    logging.warning('Runtime %s will be rounded up to the next multiple of %s '
+                    'minutes.', FLAGS.run_for_minutes, MINUTES_PER_JOB)
+
+
 def GetInfo():
   return BENCHMARK_INFO
 
@@ -333,18 +350,7 @@ def Prepare(benchmark_spec):
 
   """
 
-  if FLAGS.fio_jobfile:
-    ignored_flags = {'--' + flag_name
-                     for flag_name in FLAGS_IGNORED_FOR_CUSTOM_JOBFILE
-                     if FLAGS[flag_name].present}
-
-    if ignored_flags:
-      logging.warning('Fio job file specified. Ignoring options "%s"',
-                      ', '.join(ignored_flags))
-
-  if FLAGS.run_for_minutes % MINUTES_PER_JOB != 0:
-    logging.warning('Runtime %s will be rounded up to the next multiple of %s '
-                    'minutes.', FLAGS.run_for_minutes, MINUTES_PER_JOB)
+  WarnOnBadFlags()
 
   vm = benchmark_spec.vms[0]
   logging.info('FIO prepare on %s', vm)
