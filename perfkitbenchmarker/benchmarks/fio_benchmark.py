@@ -344,11 +344,36 @@ def WarnOnBadFlags():
                     'minutes.', FLAGS.run_for_minutes, MINUTES_PER_JOB)
 
 
+def RunForMinutes(proc, mins_to_run, mins_per_call):
+  """Call func until expected execution time passes threshold.
+
+  Args:
+    proc: a procedure to call.
+    mins_to_run: the minimum number of minutes to run func for.
+    mins_per_call: the expected elapsed time of each call to func.
+  """
+
+  run_reps = mins_to_run // mins_per_call
+  if mins_to_run % mins_per_call != 0:
+    run_reps += 1
+
+  start_time = datetime.datetime.now()
+  for rep_num in xrange(run_reps):
+    run_start = datetime.datetime.now()
+    seconds_since_start = int(round((run_start - start_time).total_seconds()))
+    minutes_since_start = int(round(float(seconds_since_start)
+                                    / float(SECONDS_PER_MINUTE)))
+    proc(repeat_number=rep_num,
+         minutes_since_start=minutes_since_start,
+         total_repeats=run_reps)
+
+
 def GetInfo():
   return BENCHMARK_INFO
 
 
 def Prepare(benchmark_spec):
+
   """Prepare the virtual machine to run FIO.
 
      This includes installing fio, bc, and libaio1 and pre-filling the
@@ -428,42 +453,38 @@ def Run(benchmark_spec):
                                                FLAGS.io_depths,
                                                FLAGS.working_set_size)
 
+  samples = []
+
+  def RunIt(repeat_number=None, minutes_since_start=None, total_repeats=None):
+    if repeat_number:
+      logging.info('**** Repetition number %s of %s ****',
+                   repeat_number, total_repeats)
+
+    stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
+
+    if repeat_number:
+      base_metadata = {
+          'repeat_number': repeat_number,
+          'minutes_since_start': minutes_since_start
+      }
+    else:
+      base_metadata = None
+
+    samples.extend(fio.ParseResults(job_file_string,
+                                    json.loads(stdout),
+                                    base_metadata=base_metadata))
+
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
 
-  if not FLAGS.generate_scenarios:
-    stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
-
-    return fio.ParseResults(job_file_string, json.loads(stdout))
+  if not FLAGS.run_for_minutes:
+    RunIt()
   else:
-    # We want to run each scenario for FLAGS.run_for_minutes time.
-    run_reps = FLAGS.run_for_minutes // MINUTES_PER_JOB
-    if FLAGS.run_for_minutes % MINUTES_PER_JOB != 0:
-      run_reps += 1
-      # We already warned the user about rounding during the prepare
-      # phase. No need to warn them again here.
+    RunForMinutes(RunIt, FLAGS.run_for_minutes, MINUTES_PER_JOB)
 
-    samples = []
-    start_time = datetime.datetime.now()
-    for rep_num in xrange(run_reps):
-      logging.info('**** Repetition number %s of %s ****', rep_num, run_reps)
-      run_start = datetime.datetime.now()
-      stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
-
-      seconds_since_start = int(round((run_start - start_time).total_seconds()))
-      minutes_since_start = int(round(float(seconds_since_start)
-                                      / float(SECONDS_PER_MINUTE)))
-      base_metadata = {
-          'repeat_number': rep_num,
-          'minutes_since_start': minutes_since_start
-      }
-      samples.extend(fio.ParseResults(job_file_string,
-                                      json.loads(stdout),
-                                      base_metadata=base_metadata))
-
-    return samples
+  return samples
 
 
 def Cleanup(benchmark_spec):
