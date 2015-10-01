@@ -350,7 +350,8 @@ def WarnOnBadFlags():
 
   if (FLAGS.fio_jobfile is None and
       FLAGS.generate_scenarios and
-      not FLAGS.working_set_size):
+      not FLAGS.working_set_size and
+      not FLAGS.against_device):
     logging.error(NEED_SIZE_MESSAGE)
     raise AssertionError(NEED_SIZE_MESSAGE)
 
@@ -420,19 +421,6 @@ def Prepare(benchmark_spec):
     # and changes its permissions, which we have already done.
     vm.RemoteCommand('sudo mount %s %s' % (disk.GetDevicePath(), mount_point))
 
-  job_file_string = GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                               FLAGS.generate_scenarios,
-                                               FLAGS.against_device,
-                                               disk,
-                                               FLAGS.io_depths,
-                                               FLAGS.working_set_size)
-  job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
-  with open(job_file_path, 'w') as job_file:
-    job_file.write(job_file_string)
-    logging.info('Wrote fio job file at %s', job_file_path)
-
-  vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
-
 
 def Run(benchmark_spec):
   """Spawn fio and gather the results.
@@ -450,6 +438,19 @@ def Run(benchmark_spec):
   disk = vm.scratch_disks[0]
   mount_point = disk.mount_point
 
+  job_file_string = GetOrGenerateJobFileString(FLAGS.fio_jobfile,
+                                               FLAGS.generate_scenarios,
+                                               FLAGS.against_device,
+                                               disk,
+                                               FLAGS.io_depths,
+                                               FLAGS.working_set_size)
+  job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
+  with open(job_file_path, 'w') as job_file:
+    job_file.write(job_file_string)
+    logging.info('Wrote fio job file at %s', job_file_path)
+
+  vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
+
   if FLAGS.against_device:
     fio_command = 'sudo %s --output-format=json --filename=%s %s' % (
         fio.FIO_PATH, disk.GetDevicePath(), REMOTE_JOB_FILE_PATH)
@@ -457,12 +458,6 @@ def Run(benchmark_spec):
     fio_command = 'sudo %s --output-format=json --directory=%s %s' % (
         fio.FIO_PATH, mount_point, REMOTE_JOB_FILE_PATH)
 
-  job_file_string = GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                               FLAGS.generate_scenarios,
-                                               FLAGS.against_device,
-                                               disk,
-                                               FLAGS.io_depths,
-                                               FLAGS.working_set_size)
 
   samples = []
 
