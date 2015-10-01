@@ -50,12 +50,12 @@ def ReloadConfiguration(vm, solr_core_dir):
                        SOLR_HOME_DIR, solr_core_dir))
 
 
-def StartWithZookeeper(vm, fw, port, java_heap_size,
+def StartWithZookeeper(vm, port, java_heap_size,
                        reload_conf=True):
   """Starts SolrCloud on a node with a Zookeeper.
   To be used on the first node."""
-  fw.AllowPort(vm, port)
-  fw.AllowPort(vm, port + 1000)
+  vm.AllowPort(port)
+  vm.AllowPort(port + 1000)
   solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
   if reload_conf:
     ReloadConfiguration(vm, solr_core_dir)
@@ -67,10 +67,10 @@ def StartWithZookeeper(vm, fw, port, java_heap_size,
   time.sleep(15)
 
 
-def Start(vm, fw, port, zookeeper_node, zookeeper_port, java_heap_size,
+def Start(vm, port, zookeeper_node, zookeeper_port, java_heap_size,
           reload_conf=True):
   """Starts SolrCloud on a node and joins a specified Zookeeper."""
-  fw.AllowPort(vm, port)
+  vm.AllowPort(port)
   solr_core_dir = posixpath.join(vm.GetScratchDir(), 'solr_cores')
   if reload_conf:
     ReloadConfiguration(vm, solr_core_dir)

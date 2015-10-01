@@ -85,15 +85,14 @@ class GceFirewallRule(resource.BaseResource):
 class GceFirewall(network.BaseFirewall):
   """An object representing the GCE Firewall."""
 
-  def __init__(self, project):
+  def __init__(self):
     """Initialize GCE firewall class.
 
     Args:
       project: The GCP project name under which firewall is created.
     """
     self._lock = threading.Lock()
-    self.firewall_rules = []
-    self.project = project
+    self.firewall_rules = {}
 
   def AllowPort(self, vm, port):
     """Opens a port on the firewall.
@@ -107,15 +106,16 @@ class GceFirewall(network.BaseFirewall):
     with self._lock:
       firewall_name = ('perfkit-firewall-%s-%d' %
                        (FLAGS.run_uri, port))
-      firewall_rule = GceFirewallRule(firewall_name, self.project, port)
-      if firewall_rule in self.firewall_rules:
+      key = (vm.project, port)
+      if key in self.firewall_rules:
         return
-      self.firewall_rules.append(firewall_rule)
+      firewall_rule = GceFirewallRule(firewall_name, vm.project, port)
+      self.firewall_rules[key] = firewall_rule
       firewall_rule.Create()
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
-    for firewall_rule in self.firewall_rules:
+    for firewall_rule in self.firewall_rules.itervalues():
       firewall_rule.Delete()
 
 

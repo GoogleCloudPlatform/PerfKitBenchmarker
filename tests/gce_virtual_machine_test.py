@@ -35,7 +35,7 @@ class GCEPreemptibleVMFlagTestCase(unittest.TestCase):
                                                        'zone',
                                                        'n1-standard-1',
                                                        'image')
-      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec, None, None)
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)
       self.assertIn('--preemptible', issue_command.call_args[0][0])

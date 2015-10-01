@@ -89,14 +89,16 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   has_keypair = False
 
   "Object representing a Rackspace Virtual Machine"
-  def __init__(self, vm_spec):
+  def __init__(self, vm_spec, network, firewall):
     """Initialize Rackspace virtual machine
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      network: network.BaseNetwork object corresponding to the VM.
+      firewall: network.BaseFirewall object corresponding to the VM.
     """
 
-    super(RackspaceVirtualMachine, self).__init__(vm_spec)
+    super(RackspaceVirtualMachine, self).__init__(vm_spec, network, firewall)
     with RackspaceVirtualMachine._lock:
       self.name = 'perfkit-%s-%s' % (FLAGS.run_uri,
                                      RackspaceVirtualMachine.count)

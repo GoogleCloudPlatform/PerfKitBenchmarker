@@ -38,7 +38,7 @@ FLAGS = flags.FLAGS
 class AwsFirewall(network.BaseFirewall):
   """An object representing the AWS Firewall."""
 
-  def __init__(self, project):
+  def __init__(self):
     self.firewall_set = set()
     self._lock = threading.Lock()
 

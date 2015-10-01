@@ -57,8 +57,15 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   Object representing a Kubernetes POD.
   """
 
-  def __init__(self, vm_spec):
-    super(KubernetesVirtualMachine, self).__init__(vm_spec)
+  def __init__(self, vm_spec, network, firewall):
+    """Initialize a Kubernetes virtual machine.
+
+    Args:
+      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      network: network.BaseNetwork object corresponding to the VM.
+      firewall: network.BaseFirewall object corresponding to the VM.
+    """
+    super(KubernetesVirtualMachine, self).__init__(vm_spec, network, firewall)
     self.num_scratch_disks = 0
     self.name = self.name.replace('_', '-')
     self.user_name = FLAGS.username

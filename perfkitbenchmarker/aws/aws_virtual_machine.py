@@ -31,7 +31,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.aws import aws_disk
-from perfkitbenchmarker.aws import aws_network
 from perfkitbenchmarker.aws import util
 
 FLAGS = flags.FLAGS
@@ -112,16 +111,17 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   imported_keyfile_set = set()
   deleted_keyfile_set = set()
 
-  def __init__(self, vm_spec):
+  def __init__(self, vm_spec, network, firewall):
     """Initialize a AWS virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      network: network.BaseNetwork object corresponding to the VM.
+      firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(AwsVirtualMachine, self).__init__(vm_spec)
+    super(AwsVirtualMachine, self).__init__(vm_spec, network, firewall)
     self.region = self.zone[:-1]
     self.user_name = FLAGS.aws_user_name
-    self.network = aws_network.AwsNetwork.GetNetwork(self.zone)
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
@@ -340,8 +340,8 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
 
-  def __init__(self, vm_spec):
-    super(WindowsAwsVirtualMachine, self).__init__(vm_spec)
+  def __init__(self, vm_spec, network, firewall):
+    super(WindowsAwsVirtualMachine, self).__init__(vm_spec, network, firewall)
     self.user_name = 'Administrator'
     self.user_data = ('<powershell>%s</powershell>' %
                       windows_virtual_machine.STARTUP_SCRIPT)

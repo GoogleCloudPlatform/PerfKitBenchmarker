@@ -33,14 +33,13 @@ def GetInfo():
 
 def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
-  fw = benchmark_spec.firewall
 
   for vm in vms:
     vm.Install('ntttcp')
-    fw.AllowPort(vm, ntttcp.CONTROL_PORT)
+    vm.AllowPort(ntttcp.CONTROL_PORT)
     for port in xrange(ntttcp.BASE_DATA_PORT,
                        ntttcp.BASE_DATA_PORT + FLAGS.ntttcp_threads):
-      fw.AllowPort(vm, port)
+      vm.AllowPort(port)
 
 
 def Run(benchmark_spec):

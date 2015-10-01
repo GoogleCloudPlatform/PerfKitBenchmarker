@@ -36,7 +36,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.azure import azure_disk
-from perfkitbenchmarker.azure import azure_network
 
 FLAGS = flags.FLAGS
 
@@ -98,14 +97,15 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 
-  def __init__(self, vm_spec):
+  def __init__(self, vm_spec, network, firewall):
     """Initialize a Azure virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      network: network.BaseNetwork object corresponding to the VM.
+      firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(AzureVirtualMachine, self).__init__(vm_spec)
-    self.network = azure_network.AzureNetwork.GetNetwork(self.zone)
+    super(AzureVirtualMachine, self).__init__(vm_spec, network, firewall)
     self.service = AzureService(self.name,
                                 self.network.affinity_group.name)
     disk_spec = disk.BaseDiskSpec(None, None, None)
@@ -238,8 +238,8 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
 
   DEFAULT_IMAGE = WINDOWS_IMAGE
 
-  def __init__(self, vm_spec):
-    super(WindowsAzureVirtualMachine, self).__init__(vm_spec)
+  def __init__(self, vm_spec, network, firewall):
+    super(WindowsAzureVirtualMachine, self).__init__(vm_spec, network, firewall)
     self.user_name = self.name
     self.password = vm_util.GenerateRandomWindowsPassword()
 

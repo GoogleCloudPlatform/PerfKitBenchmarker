@@ -92,7 +92,7 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
     self.vm = aws_virtual_machine.AwsVirtualMachine(
         virtual_machine.BaseVirtualMachineSpec(
-            None, 'us-east-1a', 'c3.large', None))
+            None, 'us-east-1a', 'c3.large', None), None, None)
     self.vm.id = 'i-foo'
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'aws-describe-instance.json')

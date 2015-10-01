@@ -67,7 +67,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     vm_spec = virtual_machine.BaseVirtualMachineSpec(
         None, None, None, None)
-    super(StaticVirtualMachine, self).__init__(vm_spec)
+    super(StaticVirtualMachine, self).__init__(vm_spec, None, None)
     self.ip_address = ip_address
     self.internal_ip = internal_ip
     self.zone = zone or ('Static - %s@%s' % (user_name, ip_address))
