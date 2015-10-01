@@ -79,9 +79,8 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(PrepareNetperf, vms)
 
   if vm_util.ShouldRunOnExternalIpAddress():
-    fw = benchmark_spec.firewall
-    fw.AllowPort(vms[1], COMMAND_PORT)
-    fw.AllowPort(vms[1], DATA_PORT)
+    vms[1].AllowPort(COMMAND_PORT)
+    vms[1].AllowPort(DATA_PORT)
 
   vms[1].RemoteCommand('%s -p %s' %
                        (netperf.NETSERVER_PATH, COMMAND_PORT))

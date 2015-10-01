@@ -57,13 +57,11 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-
-  fw = benchmark_spec.firewall
   vms = benchmark_spec.vms
   for vm in vms:
     vm.Install('iperf')
     if vm_util.ShouldRunOnExternalIpAddress():
-      fw.AllowPort(vm, IPERF_PORT)
+      vm.AllowPort(IPERF_PORT)
     vm.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
                      IPERF_PORT)
 

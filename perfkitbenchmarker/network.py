@@ -30,13 +30,16 @@ FLAGS = flags.FLAGS
 class BaseFirewall(object):
   """An object representing the Base Firewall."""
 
-  def __init__(self, project):
-    """Initialize firewall class.
+  # Lock used to serialize the instantiation of new BaseFirewall objects.
+  _class_lock = threading.Lock()
 
-    Args:
-      project: The project firewall belongs to.
-    """
-    self.project = project
+  @classmethod
+  def GetFirewall(cls, firewalls_dict):
+    """Returns the Firewall."""
+    with cls._class_lock:
+      if cls not in firewalls_dict:
+        firewalls_dict[cls] = cls()
+      return firewalls_dict[cls]
 
   def AllowPort(self, vm, port):
     """Opens a port on the firewall.
@@ -55,9 +58,6 @@ class BaseFirewall(object):
 class BaseNetwork(object):
   """Object representing a Base Network."""
 
-  # Dictionary holding all BaseNetwork objects.
-  networks = {}
-
   # Lock used to serialize the instantiation of new BaseNetwork objects.
   _class_lock = threading.Lock()
 
@@ -65,7 +65,7 @@ class BaseNetwork(object):
     self.zone = zone
 
   @classmethod
-  def GetNetwork(cls, zone):
+  def GetNetwork(cls, zone, networks_dict):
     """Returns the network corresponding to the given zone."""
     with cls._class_lock:
       # This probably will never happen, but we want to ensure that
@@ -73,9 +73,9 @@ class BaseNetwork(object):
       # in addition to using the zone, we also use the class as part
       # of the key.
       key = (cls, zone)
-      if key not in cls.networks:
-        cls.networks[key] = cls(zone)
-      return cls.networks[key]
+      if key not in networks_dict:
+        networks_dict[key] = cls(zone)
+      return networks_dict[key]
 
   def Create(self):
     """Creates the actual network."""

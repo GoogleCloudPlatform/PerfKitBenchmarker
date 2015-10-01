@@ -104,7 +104,7 @@ def GetInfo():
   return info
 
 
-def _PrepareSolr(solr_nodes, fw):
+def _PrepareSolr(solr_nodes):
   """Starts and configures SolrCloud."""
   basic_configs_dir = posixpath.join(solr.SOLR_HOME_DIR, 'server/solr/'
                                      'configsets/basic_configs/conf')
@@ -122,15 +122,15 @@ def _PrepareSolr(solr_nodes, fw):
                                     basic_configs_dir,
                                     SOLR_CONFIG_URL))
     if vm == solr_nodes[0]:
-      solr.StartWithZookeeper(vm, fw, SOLR_PORT, server_heap_size)
+      solr.StartWithZookeeper(vm, SOLR_PORT, server_heap_size)
     else:
-      solr.Start(vm, fw, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000,
+      solr.Start(vm, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000,
                  server_heap_size)
   solr.CreateCollection(solr_nodes[0], 'cloudsuite_web_search',
                         len(solr_nodes), SOLR_PORT)
 
 
-def _BuildIndex(solr_nodes, fw):
+def _BuildIndex(solr_nodes):
   """Downloads Solr index and set it up."""
   for vm in solr_nodes:
     vm.RemoteCommand('cd {0} && '
@@ -149,13 +149,13 @@ def _BuildIndex(solr_nodes, fw):
   server_heap_size = FLAGS.cs_websearch_server_heap_size
   for vm in solr_nodes:
     if vm == solr_nodes[0]:
-      solr.StartWithZookeeper(vm, fw, SOLR_PORT, server_heap_size, False)
+      solr.StartWithZookeeper(vm, SOLR_PORT, server_heap_size, False)
     else:
-      solr.Start(vm, fw, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000,
+      solr.Start(vm, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000,
                  server_heap_size, False)
 
 
-def _PrepareClient(clients, fw):
+def _PrepareClient(clients):
   """Prepares client machine in the benchmark."""
   client_master = clients[0]
   for client in clients:
@@ -172,7 +172,7 @@ def _PrepareClient(clients, fw):
                          'sed -i "/faban.url/c\\faban.url='
                          'http://localhost:9980/" build.properties'.format(
                              faban.FABAN_HOME_DIR, ANT_HOME_DIR))
-  faban.Start(client_master, fw)
+  faban.Start(client_master)
   time.sleep(20)
 
 
@@ -184,7 +184,6 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  fw = benchmark_spec.firewall
 
   def PrepareVM(vm):
     vm.Install('wget')
@@ -193,9 +192,9 @@ def Prepare(benchmark_spec):
 
   vm_util.RunThreaded(PrepareVM, vms)
 
-  _PrepareSolr(vms[:NUM_SERVERS], fw)
-  _PrepareClient(vms[NUM_SERVERS:], fw)
-  _BuildIndex(vms[:NUM_SERVERS], fw)
+  _PrepareSolr(vms[:NUM_SERVERS])
+  _PrepareClient(vms[NUM_SERVERS:])
+  _BuildIndex(vms[:NUM_SERVERS])
 
 
 def Run(benchmark_spec):

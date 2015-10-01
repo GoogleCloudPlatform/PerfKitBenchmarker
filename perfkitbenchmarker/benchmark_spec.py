@@ -23,7 +23,6 @@ import threading
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import network
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -33,12 +32,10 @@ from perfkitbenchmarker.azure import azure_network
 from perfkitbenchmarker.azure import azure_virtual_machine
 from perfkitbenchmarker.deployment.config import config_reader
 import perfkitbenchmarker.deployment.shared.ini_constants as ini_constants
-from perfkitbenchmarker.digitalocean import digitalocean_network
 from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.kubernetes import kubernetes_virtual_machine
-from perfkitbenchmarker.kubernetes import kubernetes_network
 from perfkitbenchmarker.openstack import os_network as openstack_network
 from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 from perfkitbenchmarker.rackspace import rackspace_network as rax_net
@@ -85,7 +82,8 @@ CLASSES = {
             UBUNTU_CONTAINER: gce_vm.ContainerizedGceVirtualMachine,
             WINDOWS: gce_vm.WindowsGceVirtualMachine
         },
-        FIREWALL: gce_network.GceFirewall
+        FIREWALL: gce_network.GceFirewall,
+        NETWORK: gce_network.GceNetwork,
     },
     AZURE: {
         VIRTUAL_MACHINE: {
@@ -93,7 +91,8 @@ CLASSES = {
             RHEL: azure_virtual_machine.RhelBasedAzureVirtualMachine,
             WINDOWS: azure_virtual_machine.WindowsAzureVirtualMachine
         },
-        FIREWALL: azure_network.AzureFirewall
+        NETWORK: azure_network.AzureNetwork,
+        FIREWALL: azure_network.AzureFirewall,
     },
     AWS: {
         VIRTUAL_MACHINE: {
@@ -101,7 +100,8 @@ CLASSES = {
             RHEL: aws_virtual_machine.RhelBasedAwsVirtualMachine,
             WINDOWS: aws_virtual_machine.WindowsAwsVirtualMachine
         },
-        FIREWALL: aws_network.AwsFirewall
+        FIREWALL: aws_network.AwsFirewall,
+        NETWORK: aws_network.AwsNetwork,
     },
     DIGITALOCEAN: {
         VIRTUAL_MACHINE: {
@@ -110,7 +110,6 @@ CLASSES = {
             RHEL:
             digitalocean_virtual_machine.RhelBasedDigitalOceanVirtualMachine,
         },
-        FIREWALL: digitalocean_network.DigitalOceanFirewall
     },
     KUBERNETES: {
         VIRTUAL_MACHINE: {
@@ -118,7 +117,6 @@ CLASSES = {
                 kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine,
             RHEL: kubernetes_virtual_machine.KubernetesVirtualMachine
         },
-        FIREWALL: kubernetes_network.KubernetesFirewall
     },
     OPENSTACK: {
         VIRTUAL_MACHINE: {
@@ -165,6 +163,8 @@ class BenchmarkSpec(object):
       # perfkitbenchmarker.
       self.config = config_reader.ConfigLoader(
           FLAGS.benchmark_config_pair[benchmark_info['name']])
+    self.networks = {}
+    self.firewalls = {}
     self.vms = []
     self.vm_dict = {'default': []}
     self.benchmark_name = benchmark_info['name']
@@ -233,20 +233,16 @@ class BenchmarkSpec(object):
               num_striped_disks)
           vm.disk_specs.append(disk_spec)
 
-    firewall_class = CLASSES[self.cloud][FIREWALL]
-    self.firewall = firewall_class(self.project)
     self.file_name = '%s/%s' % (vm_util.GetTempDir(), benchmark_info['name'])
     self.deleted = False
     self.always_call_cleanup = False
 
   def Prepare(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
-    prepare_args = network.BaseNetwork.networks.values()
-    vm_util.RunThreaded(self.PrepareNetwork, prepare_args)
+    vm_util.RunThreaded(lambda net: net.Create(), self.networks.values())
 
     if self.vms:
-      prepare_args = [((vm, self.firewall), {}) for vm in self.vms]
-      vm_util.RunThreaded(self.PrepareVm, prepare_args)
+      vm_util.RunThreaded(self.PrepareVm, self.vms)
       if FLAGS.os_type != WINDOWS:
         vm_util.GenerateSSHConfig(self.vms)
 
@@ -260,22 +256,19 @@ class BenchmarkSpec(object):
       except Exception:
         logging.exception('Got an exception deleting VMs. '
                           'Attempting to continue tearing down.')
-    try:
-      self.firewall.DisallowAllPorts()
-    except Exception:
-      logging.exception('Got an exception disabling firewalls. '
-                        'Attempting to continue tearing down.')
-    for net in network.BaseNetwork.networks.itervalues():
+    for firewall in self.firewalls.itervalues():
+      try:
+        firewall.DisallowAllPorts()
+      except Exception:
+        logging.exception('Got an exception disabling firewalls. '
+                          'Attempting to continue tearing down.')
+    for net in self.networks.itervalues():
       try:
         net.Delete()
       except Exception:
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
     self.deleted = True
-
-  def PrepareNetwork(self, network):
-    """Initialize the network."""
-    network.Create()
 
   def CreateVirtualMachine(self, zone):
     """Create a vm in zone.
@@ -301,7 +294,19 @@ class BenchmarkSpec(object):
         self.project, zone, self.machine_type, self.image)
     vm_class.SetVmSpecDefaults(vm_spec)
 
-    return vm_class(vm_spec)
+    if NETWORK in CLASSES[self.cloud]:
+      net_class = CLASSES[self.cloud][NETWORK]
+      network = net_class.GetNetwork(vm_spec.zone, self.networks)
+    else:
+      network = None
+
+    if FIREWALL in CLASSES[self.cloud]:
+      firewall_class = CLASSES[self.cloud][FIREWALL]
+      firewall = firewall_class.GetFirewall(self.firewalls)
+    else:
+      firewall = None
+
+    return vm_class(vm_spec, network, firewall)
 
   def CreateVirtualMachineFromNodeSection(self, node_section, node_name):
     """Create a VirtualMachine object from NodeSection.
@@ -341,18 +346,17 @@ class BenchmarkSpec(object):
         for vm in vms:
           vm.disk_specs.append(disk_spec)
 
-  def PrepareVm(self, vm, firewall):
+  def PrepareVm(self, vm):
     """Creates a single VM and prepares a scratch disk if required.
 
     Args:
         vm: The BaseVirtualMachine object representing the VM.
-        firewall: The BaseFirewall object representing the firewall.
     """
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
     for port in vm.remote_access_ports:
-      firewall.AllowPort(vm, port)
+      vm.AllowPort(port)
     vm.AddMetadata(benchmark=self.benchmark_name)
     vm.WaitForBootCompletion()
     vm.OnStartup()
@@ -378,7 +382,6 @@ class BenchmarkSpec(object):
 
   def PickleSpec(self):
     """Pickles the spec so that it can be unpickled on a subsequent run."""
-    self.networks = network.BaseNetwork.networks
     with open(self.file_name, 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)
 
@@ -399,7 +402,6 @@ class BenchmarkSpec(object):
     except Exception as e:  # pylint: disable=broad-except
       logging.error('Unable to unpickle spec file for benchmark %s.', name)
       raise e
-    network.BaseNetwork.networks = spec.networks
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.
     spec.deleted = False

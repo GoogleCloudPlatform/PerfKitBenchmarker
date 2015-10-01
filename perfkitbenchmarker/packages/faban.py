@@ -48,9 +48,9 @@ def AptInstall(vm):
   _Install(vm)
 
 
-def Start(vm, fw):
+def Start(vm):
   """Allows the port on the VM, and starts the Faban using that port"""
-  fw.AllowPort(vm, FABAN_PORT)
+  vm.AllowPort(FABAN_PORT)
   vm.RemoteCommand('cd {0} && '
                    'export JAVA_HOME={1} && '
                    'master/bin/startup.sh'.format(
