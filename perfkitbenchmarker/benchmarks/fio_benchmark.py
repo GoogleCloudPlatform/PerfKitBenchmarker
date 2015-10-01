@@ -23,6 +23,7 @@ import json
 import logging
 import posixpath
 import re
+import sys
 
 import jinja2
 
@@ -90,7 +91,9 @@ flags.DEFINE_string('io_depths', '1',
                     'list, like --io_depths=1-4,6-8')
 flags.DEFINE_integer('working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
-                     'the full size of the device.',
+                     'the full size of the device. If using '
+                     '--generate_scenarios and not --against_device, you must '
+                     'pass --working_set_size.',
                      lower_bound=0)
 flags.DEFINE_integer('run_for_minutes', 10,
                      'Repeat the job scenario(s) for the given number of '
@@ -342,6 +345,13 @@ def WarnOnBadFlags():
   if FLAGS.run_for_minutes % MINUTES_PER_JOB != 0:
     logging.warning('Runtime %s will be rounded up to the next multiple of %s '
                     'minutes.', FLAGS.run_for_minutes, MINUTES_PER_JOB)
+
+  if (FLAGS.fio_jobfile is None and
+      FLAGS.generate_scenarios and
+      not FLAGS.working_set_size):
+    logging.error('You must specify the working set size when using generated '
+                  'scenarios against a filesystem.')
+    sys.exit(1)
 
 
 def RunForMinutes(proc, mins_to_run, mins_per_call):
