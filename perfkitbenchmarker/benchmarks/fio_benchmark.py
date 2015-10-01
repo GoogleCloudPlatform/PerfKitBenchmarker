@@ -23,7 +23,6 @@ import json
 import logging
 import posixpath
 import re
-import sys
 
 import jinja2
 
@@ -177,11 +176,10 @@ flags.RegisterValidator('io_depths',
                                 'integers and ranges, all > 0')
 
 
-def FillDevice(fio_path, vm, disk, fill_size):
+def FillDevice(vm, disk, fill_size):
   """Fill the given disk on the given vm up to fill_size.
 
   Args:
-    fio_path: path to the fio executable.
     vm: a virtual_machine.VirtualMachine object.
     disk: a disk.BaseDisk attached to the given vm.
     fill_size: amount of device to fill, in fio format.
@@ -190,7 +188,7 @@ def FillDevice(fio_path, vm, disk, fill_size):
   command = (('sudo %s --filename=%s --ioengine=libaio '
               '--name=fill-device --blocksize=512k --iodepth=64 '
               '--rw=write --direct=1 --size=%s') %
-             (fio_path, disk.GetDevicePath(), fill_size))
+             (fio.FIO_PATH, disk.GetDevicePath(), fill_size))
 
   vm.RemoteCommand(command)
 
@@ -330,6 +328,10 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
                                  io_depths, working_set_size)
 
 
+NEED_SIZE_MESSAGE = ('You must specify the working set size when using '
+                     'generated scenarios with a filesystem.')
+
+
 def WarnOnBadFlags():
   """Warn the user if they pass bad flag combinations."""
 
@@ -349,9 +351,8 @@ def WarnOnBadFlags():
   if (FLAGS.fio_jobfile is None and
       FLAGS.generate_scenarios and
       not FLAGS.working_set_size):
-    logging.error('You must specify the working set size when using generated '
-                  'scenarios against a filesystem.')
-    sys.exit(1)
+    logging.error(NEED_SIZE_MESSAGE)
+    raise AssertionError(NEED_SIZE_MESSAGE)
 
 
 def RunForMinutes(proc, mins_to_run, mins_per_call):
@@ -411,7 +412,7 @@ def Prepare(benchmark_spec):
 
   if FLAGS.device_fill_size is not '0':
     logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
-    FillDevice(fio.FIO_PATH, vm, disk, FLAGS.device_fill_size)
+    FillDevice(vm, disk, FLAGS.device_fill_size)
 
   if not FLAGS.against_device:
     vm.FormatDisk(disk.GetDevicePath())
