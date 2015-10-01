@@ -490,7 +490,7 @@ def Run(benchmark_spec):
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
 
-  if not FLAGS.run_for_minutes:
+  if not FLAGS['run_for_minutes'].present:
     RunIt()
   else:
     RunForMinutes(RunIt, FLAGS.run_for_minutes, MINUTES_PER_JOB)
