@@ -18,10 +18,7 @@ import unittest
 
 import mock
 
-from perfkitbenchmarker import disk
-from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.benchmarks import fio_benchmark
-from perfkitbenchmarker.packages import fio
 
 
 class TestGetIODepths(unittest.TestCase):
@@ -54,10 +51,9 @@ class TestGetIODepths(unittest.TestCase):
 
 class TestGenerateJobFileString(unittest.TestCase):
   def setUp(self):
-    self.disk_spec = disk.BaseDiskSpec(100, 'remote_ssd', '/scratch0')
-    self.disk = gce_disk.GceDisk(self.disk_spec, 'foo', 'us-central1-a', 'proj')
+    self.filename = '/test/filename'
 
-  def testAgainstDevice(self):
+  def testBasicGeneration(self):
     expected_jobfile = """
 [global]
 ioengine=libaio
@@ -65,7 +61,7 @@ invalidate=1
 direct=1
 runtime=10m
 time_based
-filename=/dev/disk/by-id/google-foo
+filename=/test/filename
 do_verify=0
 verify_fatal=0
 randrepeat=0
@@ -90,50 +86,9 @@ size=100%
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
-            self.disk,
-            True,
-            [fio_benchmark.SCENARIOS['sequential_read']],
-            [1, 2],
-            None),
-        expected_jobfile)
-
-  def testAgainstFile(self):
-    expected_jobfile = """
-[global]
-ioengine=libaio
-invalidate=1
-direct=1
-runtime=10m
-time_based
-filename=/scratch0/fio-temp-file
-do_verify=0
-verify_fatal=0
-randrepeat=0
-
-
-
-[sequential_read-io-depth-1]
-stonewall
-rw=read
-blocksize=512k
-iodepth=1
-size=100%
-
-[sequential_read-io-depth-2]
-stonewall
-rw=read
-blocksize=512k
-iodepth=2
-size=100%
-
-"""
-
-    self.assertEqual(
-        fio_benchmark.GenerateJobFileString(
-            self.disk,
-            False,
-            [fio_benchmark.SCENARIOS['sequential_read']],
-            [1, 2],
+            self.filename,
+            ['sequential_read'],
+            '1,2',
             None),
         expected_jobfile)
 
@@ -145,7 +100,7 @@ invalidate=1
 direct=1
 runtime=10m
 time_based
-filename=/scratch0/fio-temp-file
+filename=/test/filename
 do_verify=0
 verify_fatal=0
 randrepeat=0
@@ -172,36 +127,58 @@ size=100%
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
-            self.disk,
-            False,
-            [fio_benchmark.SCENARIOS['sequential_read'],
-             fio_benchmark.SCENARIOS['sequential_write']],
-            [1],
+            self.filename,
+            ['sequential_read', 'sequential_write'],
+            '1',
             None),
         expected_jobfile)
 
 
-class TestRunForMinutes(unittest.TestCase):
-  def testRunForMinutes(self):
-    vm = mock.Mock()
-    vm.RemoteCommand = mock.MagicMock()
-    vm.scratch_disks = [mock.Mock()]
-    benchmark_spec = mock.Mock()
-    benchmark_spec.vms = [vm]
+class TestProcessedJobFileString(unittest.TestCase):
+  def testReplaceFilenames(self):
+    file_contents = """
+[global]
+blocksize = 4k
+filename = zanzibar
+ioengine=libaio
 
-    bench_module = fio_benchmark.__name__
-    with mock.patch(bench_module + '.FLAGS') as fb_flags, \
-            mock.patch(bench_module + '.GetOrGenerateJobFileString'), \
-            mock.patch(fio.__name__ + '.ParseResults') as parse_results:
-      # Pick a length of time that forces rounding
-      fb_flags.run_for_minutes = int(round(fio_benchmark.MINUTES_PER_JOB * 2.5))
-      fb_flags.io_depths = '1'
-      fb_flags.generate_scenarios = ['random_read']
-      parse_results.return_value = ['spam']
-      vm.RemoteCommand.return_value = '{"foo": "bar"}', ''
-      self.assertEquals(fio_benchmark.Run(benchmark_spec),
-                        ['spam', 'spam', 'spam'])
-      self.assertEquals(vm.RemoteCommand.call_count, 3)
+[job1]
+filename = asdf
+blocksize = 8k
+"""
+
+    open_mock = mock.MagicMock()
+    manager = open_mock.return_value.__enter__.return_value
+    manager.read.return_value = file_contents
+    manager.__exit__.return_value = mock.Mock()
+
+    with mock.patch('__builtin__.open', open_mock):
+      jobfile = fio_benchmark.ProcessedJobFileString('filename', True)
+      self.assertNotIn('filename', jobfile)
+      self.assertNotIn('zanzibar', jobfile)
+      self.assertNotIn('asdf', jobfile)
+
+
+class TestRunForMinutes(unittest.TestCase):
+  def testBasicRun(self):
+    proc = mock.Mock()
+    fio_benchmark.RunForMinutes(proc, 20, 10)
+    self.assertEquals(proc.call_count, 2)
+
+  def TestRounding(self):
+    proc = mock.Mock()
+    fio_benchmark.RunForMinutes(proc, 18, 10)
+    self.assertEquals(proc.call_count, 2)
+
+  def TestRoundsUp(self):
+    proc = mock.Mock()
+    fio_benchmark.RunForMinutes(proc, 12, 10)
+    self.assertEquals(proc.call_count, 2)
+
+  def TestZeroMinutes(self):
+    proc = mock.Mock()
+    fio_benchmark.RunForMinutes(proc, 0, 10)
+    self.assertEquals(proc.call_count, 0)
 
 
 if __name__ == '__main__':

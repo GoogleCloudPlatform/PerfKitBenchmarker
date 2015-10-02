@@ -27,6 +27,7 @@ import re
 import jinja2
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import fio
@@ -34,7 +35,6 @@ from perfkitbenchmarker.packages import fio
 LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
-DISK_USABLE_SPACE_FRACTION = 0.9
 MINUTES_PER_JOB = 10
 
 
@@ -83,15 +83,17 @@ flags.DEFINE_string('device_fill_size', '100%',
                     'The valid value can either be an integer, which '
                     'represents the number of bytes to fill or a '
                     'percentage, which represents the percentage '
-                    'of the device. Default to filling 100% of a raw device or '
-                    '90% of a filesystem.')
+                    'of the device. A filesystem will be unmounted before '
+                    'filling and remounted afterwards. Default is 100%')
 flags.DEFINE_string('io_depths', '1',
                     'IO queue depths to run on. Can specify a single number, '
                     'like --io_depths=1, a range, like --io_depths=1-4, or a '
                     'list, like --io_depths=1-4,6-8')
 flags.DEFINE_integer('working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
-                     'the full size of the device.',
+                     'the full size of the device. If using '
+                     '--generate_scenarios and not --against_device, you must '
+                     'pass --working_set_size.',
                      lower_bound=0)
 flags.DEFINE_integer('run_for_minutes', 10,
                      'Repeat the job scenario(s) for the given number of '
@@ -174,22 +176,21 @@ flags.RegisterValidator('io_depths',
                                 'integers and ranges, all > 0')
 
 
-def GenerateFillCommand(fio_path, fill_path, fill_size):
-  """Generate a command to sequentially write a device or file.
+def FillDevice(vm, disk, fill_size):
+  """Fill the given disk on the given vm up to fill_size.
 
   Args:
-    fio_path: path to the fio executable.
-    fill_path: path to the device or file to fill.
-    fill_size: amount of device or file to fill, in fio format.
-
-  Returns:
-    A string containing the command.
+    vm: a virtual_machine.VirtualMachine object.
+    disk: a disk.BaseDisk attached to the given vm.
+    fill_size: amount of device to fill, in fio format.
   """
 
-  return (('sudo %s --filename=%s --ioengine=libaio '
-           '--name=fill-device --blocksize=512k --iodepth=64 '
-           '--rw=write --direct=1 --size=%s') %
-          (fio_path, fill_path, fill_size))
+  command = (('sudo %s --filename=%s --ioengine=libaio '
+              '--name=fill-device --blocksize=512k --iodepth=64 '
+              '--rw=write --direct=1 --size=%s') %
+             (fio.FIO_PATH, disk.GetDevicePath(), fill_size))
+
+  vm.RemoteCommand(command)
 
 
 BENCHMARK_INFO = {'name': 'fio',
@@ -226,30 +227,34 @@ size={{size}}
 SECONDS_PER_MINUTE = 60
 
 
-def GenerateJobFileString(disk, against_device,
-                          scenarios, io_depths, working_set_size):
+def GenerateJobFileString(filename, scenario_strings,
+                          io_depths_string, working_set_size):
   """Make a string with our fio job file.
 
   Args:
-    disk: the disk.BaseDisk object we're benchmarking with.
-    against_device: bool. True if we're using a raw disk.
-    scenarios: iterable of dicts, taken from SCENARIOS.
-    io_depths: iterable. The IO queue depths to test.
+    filename: the file or disk we pre-filled, if any.
+    scenario_strings: list of strings with names in SCENARIOS.
+    io_depths_string: string. The IO queue depths to test.
     working_set_size: int or None. If int, the size of the working set in GB.
 
   Returns:
     The contents of a fio job file, as a string.
   """
 
-  if against_device:
-    filename = disk.GetDevicePath()
+  if 'all' in scenario_strings:
+    scenarios = SCENARIOS.itervalues()
   else:
-    filename = posixpath.join(disk.mount_point, DEFAULT_TEMP_FILE_NAME)
+    for name in scenario_strings:
+      if name not in SCENARIOS:
+        logging.error('Unknown scenario name %s', name)
+    scenarios = (SCENARIOS[name] for name in scenario_strings)
 
   size_string = str(working_set_size) + 'G' if working_set_size else '100%'
 
   job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
                                       undefined=jinja2.StrictUndefined)
+
+  io_depths = GetIODepths(io_depths_string)
 
   return str(job_file_template.render(
       minutes_per_job=MINUTES_PER_JOB,
@@ -259,62 +264,76 @@ def GenerateJobFileString(disk, against_device,
       iodepths=io_depths))
 
 
-def GetOrGenerateJobFileString(fio_jobfile, disk, against_device,
-                               scenario_strings, io_depths, working_set_size):
+FILENAME_PARAM_REGEXP = re.compile('filename\s*=.*$', re.MULTILINE)
+
+
+def ProcessedJobFileString(fio_jobfile, remove_filename):
+  """Get the contents of a job file as a string, slightly edited.
+
+  Args:
+    fio_jobfile: the path to a fio job file.
+    remove_filename: bool. If true, remove the filename parameter from
+      the job file.
+
+  Returns:
+    The job file as a string, possibly without filename parameters.
+  """
+
+  with open(fio_jobfile, 'r') as jobfile:
+    if remove_filename:
+      return FILENAME_PARAM_REGEXP.sub('', jobfile.read())
+    else:
+      return jobfile.read()
+
+
+def GetOrGenerateJobFileString(job_file_path, scenario_strings,
+                               against_device, disk,
+                               io_depths, working_set_size):
   """Get the contents of the fio job file we're working with.
 
   This will either read the user's job file, if given, or generate a
   new one.
 
   Args:
-    fio_jobfile: string or None. The path to the user's jobfile, if provided.
-    disk: the disk.BaseDisk object we're benchmarking with.
-    against_device: bool. True if we're using a raw disk.
-    scenario_strings: list of strings or None. The workload scenarios to
-      generate.
-    io_depths: iterable. The IO queue depths to test.
-    working_set_size: int or None. If int, the size of the working set in GB.
+    job_file_path: string or None. The path to the user's job file, if
+      provided.
+    scenario_strings: list of strings or None. The workload scenarios
+      to generate.
+    against_device: bool. True if testing against a raw device, False
+      if testing against a filesystem.
+    disk: the disk.BaseDisk object to test against.
+    io_depths: string. The IO queue depths to test.
+    working_set_size: int or None. If int, the size of the working set
+      in GB.
 
   Returns:
     A string containing a fio job file.
   """
 
-  # The default behavior is to run with the standard fio job file.
-  if scenario_strings is None and not fio_jobfile:
-    fio_jobfile = data.ResourcePath('fio.job')
+  use_user_jobfile = job_file_path or not scenario_strings
 
-  if fio_jobfile:
-    with open(fio_jobfile, 'r') as jobfile:
-      return jobfile.read()
+  if use_user_jobfile:
+    remove_filename = against_device
+    return ProcessedJobFileString(job_file_path or data.ResourcePath('fio.job'),
+                                  remove_filename)
   else:
-    if 'all' in scenario_strings:
-      scenarios = SCENARIOS.itervalues()
+    if against_device:
+      filename = disk.GetDevicePath()
     else:
-      for name in scenario_strings:
-        if name not in SCENARIOS:
-          logging.error('Unknown scenario name %s', name)
-      scenarios = (SCENARIOS[name] for name in scenario_strings)
+      # Since we pass --directory to fio, we must use relative file
+      # paths or get an error.
+      filename = DEFAULT_TEMP_FILE_NAME
 
-    return GenerateJobFileString(disk, against_device, scenarios,
+    return GenerateJobFileString(filename, scenario_strings,
                                  io_depths, working_set_size)
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+NEED_SIZE_MESSAGE = ('You must specify the working set size when using '
+                     'generated scenarios with a filesystem.')
 
 
-def Prepare(benchmark_spec):
-  """Prepare the virtual machine to run FIO.
-
-     This includes installing fio, bc, and libaio1 and pre-filling the
-     attached disk. We also make sure the job file is always located
-     at the same path on the local machine.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-
-  """
+def WarnOnBadFlags():
+  """Warn the user if they pass bad flag combinations."""
 
   if FLAGS.fio_jobfile:
     ignored_flags = {'--' + flag_name
@@ -329,49 +348,78 @@ def Prepare(benchmark_spec):
     logging.warning('Runtime %s will be rounded up to the next multiple of %s '
                     'minutes.', FLAGS.run_for_minutes, MINUTES_PER_JOB)
 
+  if (FLAGS.fio_jobfile is None and
+      FLAGS.generate_scenarios and
+      not FLAGS.working_set_size and
+      not FLAGS.against_device):
+    logging.error(NEED_SIZE_MESSAGE)
+    raise errors.Benchmarks.PrepareException(NEED_SIZE_MESSAGE)
+
+
+def RunForMinutes(proc, mins_to_run, mins_per_call):
+  """Call func until expected execution time passes threshold.
+
+  Args:
+    proc: a procedure to call.
+    mins_to_run: the minimum number of minutes to run func for.
+    mins_per_call: the expected elapsed time of each call to func.
+  """
+
+  run_reps = mins_to_run // mins_per_call
+  if mins_to_run % mins_per_call != 0:
+    run_reps += 1
+
+  start_time = datetime.datetime.now()
+  for rep_num in xrange(run_reps):
+    run_start = datetime.datetime.now()
+    seconds_since_start = int(round((run_start - start_time).total_seconds()))
+    minutes_since_start = int(round(float(seconds_since_start)
+                                    / float(SECONDS_PER_MINUTE)))
+    proc(repeat_number=rep_num,
+         minutes_since_start=minutes_since_start,
+         total_repeats=run_reps)
+
+
+def GetInfo():
+  return BENCHMARK_INFO
+
+
+def Prepare(benchmark_spec):
+
+  """Prepare the virtual machine to run FIO.
+
+     This includes installing fio, bc, and libaio1 and pre-filling the
+     attached disk. We also make sure the job file is always located
+     at the same path on the local machine.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+
+  """
+
+  WarnOnBadFlags()
+
   vm = benchmark_spec.vms[0]
   logging.info('FIO prepare on %s', vm)
   vm.Install('fio')
 
-  # Fill the disk or file we're using
+  # Choose a disk or file name and optionally fill it
   disk = vm.scratch_disks[0]
-  device_path = disk.GetDevicePath()
   mount_point = disk.mount_point
-  if FLAGS.against_device:
-    logging.info('Umount scratch disk on %s at %s', vm, mount_point)
-    vm.RemoteCommand('sudo umount %s' % mount_point)
+
+  logging.info('Umount scratch disk on %s at %s', vm, mount_point)
+  vm.RemoteCommand('sudo umount %s' % mount_point)
 
   if FLAGS.device_fill_size is not '0':
-    if FLAGS.against_device:
-      fill_path = device_path
-      fill_size = FLAGS.device_fill_size
-    else:
-      fill_path = posixpath.join(mount_point, DEFAULT_TEMP_FILE_NAME)
-      if FLAGS['device_fill_size'].present:
-        fill_size = FLAGS.device_fill_size
-      else:
-        # Default to 90% of capacity because the file system will add
-        # some overhead.
-        fill_size = str(int(DISK_USABLE_SPACE_FRACTION *
-                            1000 * disk.disk_size)) + 'M'
+    logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
+    FillDevice(vm, disk, FLAGS.device_fill_size)
 
-    logging.info('Fill file %s on %s', fill_path, vm)
-    command = GenerateFillCommand(fio.FIO_PATH,
-                                  fill_path,
-                                  fill_size)
-    vm.RemoteCommand(command)
-
-  job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
-  with open(job_file_path, 'w') as job_file:
-    job_file.write(GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                              disk,
-                                              FLAGS.against_device,
-                                              FLAGS.generate_scenarios,
-                                              GetIODepths(FLAGS.io_depths),
-                                              FLAGS.working_set_size))
-    logging.info('Wrote fio job file at %s', job_file_path)
-
-  vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
+  if not FLAGS.against_device:
+    vm.FormatDisk(disk.GetDevicePath())
+    # Don't use vm.MountDisk() because that also creates the mount point
+    # and changes its permissions, which we have already done.
+    vm.RemoteCommand('sudo mount %s %s' % (disk.GetDevicePath(), mount_point))
 
 
 def Run(benchmark_spec):
@@ -387,60 +435,69 @@ def Run(benchmark_spec):
   vm = benchmark_spec.vms[0]
   logging.info('FIO running on %s', vm)
 
-  fio_command = 'sudo %s --output-format=json %s' % (fio.FIO_PATH,
-                                                     REMOTE_JOB_FILE_PATH)
-
   disk = vm.scratch_disks[0]
+  mount_point = disk.mount_point
+
+  job_file_string = GetOrGenerateJobFileString(FLAGS.fio_jobfile,
+                                               FLAGS.generate_scenarios,
+                                               FLAGS.against_device,
+                                               disk,
+                                               FLAGS.io_depths,
+                                               FLAGS.working_set_size)
+  job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
+  with open(job_file_path, 'w') as job_file:
+    job_file.write(job_file_string)
+    logging.info('Wrote fio job file at %s', job_file_path)
+
+  vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
+
+  if FLAGS.against_device:
+    fio_command = 'sudo %s --output-format=json --filename=%s %s' % (
+        fio.FIO_PATH, disk.GetDevicePath(), REMOTE_JOB_FILE_PATH)
+  else:
+    fio_command = 'sudo %s --output-format=json --directory=%s %s' % (
+        fio.FIO_PATH, mount_point, REMOTE_JOB_FILE_PATH)
+
+  samples = []
+
+  def RunIt(repeat_number=None, minutes_since_start=None, total_repeats=None):
+    """Run the actual fio command on the VM and save the results.
+
+    Args:
+      repeat_number: if given, our number in a sequence of repetitions.
+      minutes_since_start: if given, minutes since the start of repetition.
+      total_repeats: if given, the total number of repetitions to do.
+    """
+
+    if repeat_number:
+      logging.info('**** Repetition number %s of %s ****',
+                   repeat_number, total_repeats)
+
+    stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
+
+    if repeat_number:
+      base_metadata = {
+          'repeat_number': repeat_number,
+          'minutes_since_start': minutes_since_start
+      }
+    else:
+      base_metadata = None
+
+    samples.extend(fio.ParseResults(job_file_string,
+                                    json.loads(stdout),
+                                    base_metadata=base_metadata))
 
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
 
-  if not FLAGS.generate_scenarios:
-    stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
-
-    return fio.ParseResults(
-        GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                   disk,
-                                   FLAGS.against_device,
-                                   FLAGS.generate_scenarios,
-                                   GetIODepths(FLAGS.io_depths),
-                                   FLAGS.working_set_size),
-        json.loads(stdout))
+  if not FLAGS['run_for_minutes'].present:
+    RunIt()
   else:
-    # We want to run each scenario for FLAGS.run_for_minutes time.
-    run_reps = FLAGS.run_for_minutes // MINUTES_PER_JOB
-    if FLAGS.run_for_minutes % MINUTES_PER_JOB != 0:
-      run_reps += 1
-      # We already warned the user about rounding during the prepare
-      # phase. No need to warn them again here.
+    RunForMinutes(RunIt, FLAGS.run_for_minutes, MINUTES_PER_JOB)
 
-    samples = []
-    start_time = datetime.datetime.now()
-    for rep_num in xrange(run_reps):
-      logging.info('**** Repetition number %s of %s ****', rep_num, run_reps)
-      run_start = datetime.datetime.now()
-      stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
-
-      seconds_since_start = int(round((run_start - start_time).total_seconds()))
-      minutes_since_start = int(round(float(seconds_since_start)
-                                      / float(SECONDS_PER_MINUTE)))
-      base_metadata = {
-          'repeat_number': rep_num,
-          'minutes_since_start': minutes_since_start
-      }
-      samples.extend(fio.ParseResults(
-          GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                     disk,
-                                     FLAGS.against_device,
-                                     FLAGS.generate_scenarios,
-                                     GetIODepths(FLAGS.io_depths),
-                                     FLAGS.working_set_size),
-          json.loads(stdout),
-          base_metadata=base_metadata))
-
-    return samples
+  return samples
 
 
 def Cleanup(benchmark_spec):
