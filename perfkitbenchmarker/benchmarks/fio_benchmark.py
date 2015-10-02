@@ -27,6 +27,7 @@ import re
 import jinja2
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import fio
@@ -353,7 +354,7 @@ def WarnOnBadFlags():
       not FLAGS.working_set_size and
       not FLAGS.against_device):
     logging.error(NEED_SIZE_MESSAGE)
-    raise AssertionError(NEED_SIZE_MESSAGE)
+    raise errors.Benchmarks.PrepareException(NEED_SIZE_MESSAGE)
 
 
 def RunForMinutes(proc, mins_to_run, mins_per_call):
@@ -458,10 +459,17 @@ def Run(benchmark_spec):
     fio_command = 'sudo %s --output-format=json --directory=%s %s' % (
         fio.FIO_PATH, mount_point, REMOTE_JOB_FILE_PATH)
 
-
   samples = []
 
   def RunIt(repeat_number=None, minutes_since_start=None, total_repeats=None):
+    """Run the actual fio command on the VM and save the results.
+
+    Args:
+      repeat_number: if given, our number in a sequence of repetitions.
+      minutes_since_start: if given, minutes since the start of repetition.
+      total_repeats: if given, the total number of repetitions to do.
+    """
+
     if repeat_number:
       logging.info('**** Repetition number %s of %s ****',
                    repeat_number, total_repeats)
