@@ -41,6 +41,7 @@ import logging
 import math
 import re
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -54,10 +55,15 @@ MACHINEFILE = 'machinefile'
 BLOCK_SIZE = 192
 STREAM_METRICS = ['Copy', 'Scale', 'Add', 'Triad']
 
-BENCHMARK_INFO = {'name': 'hpcc',
-                  'description': 'Runs HPCC. Specify the number of VMs with '
-                  '--num_vms',
-                  'scratch_disk': False}
+BENCHMARK_NAME = 'hpcc'
+BENCHMARK_CONFIG = """
+hpcc:
+  description: Runs HPCC. Specify the number of VMs with --num_vms
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      vm_count: null
+"""
 
 flags.DEFINE_integer('memory_size_mb',
                      None,
@@ -65,10 +71,8 @@ flags.DEFINE_integer('memory_size_mb',
                      'default it will use the entire system\'s memory.')
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
-  info['num_machines'] = FLAGS.num_vms
-  return info
+def GetConfig():
+  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

@@ -40,6 +40,25 @@ DISK_TYPE = {
 }
 
 
+class AwsDiskSpec(disk.BaseDiskSpec):
+  """Object holding the information needed to create an AwsDisk."""
+
+  def __init__(self, iops=None, **kwargs):
+    """Initializes the Disk Spec.
+
+    Args:
+      iops: The number of provisioned IOPS for a PIOPS disk type.
+      kwargs: The key word arguments to disk.BaseDiskSpec's __init__ method.
+    """
+    super(AwsDiskSpec, self).__init__(**kwargs)
+    self.iops = iops
+
+  def ApplyFlags(self, flags):
+    """Apply flags to the DiskSpec."""
+    super(AwsDiskSpec, self).ApplyFlags(flags)
+    self.iops = flags.iops or self.iops
+
+
 class AwsDisk(disk.BaseDisk):
   """Object representing an Aws Disk."""
 
@@ -48,6 +67,7 @@ class AwsDisk(disk.BaseDisk):
 
   def __init__(self, disk_spec, zone):
     super(AwsDisk, self).__init__(disk_spec)
+    self.iops = disk_spec.iops
     self.id = None
     self.zone = zone
     self.region = zone[:-1]

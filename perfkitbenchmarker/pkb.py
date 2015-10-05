@@ -62,6 +62,7 @@ from perfkitbenchmarker import archive
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
@@ -95,13 +96,10 @@ flags.DEFINE_string('archive_bucket', None,
                     'Archive results to the given S3/GCS bucket.')
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
-flags.DEFINE_list(
-    'zones', [None],
-    'A list of zones within which to run PerfKitBenchmarker.'
-    ' This is specific to the cloud provider you are running on. '
-    'If multiple zones are given, PerfKitBenchmarker will create 1 VM in '
-    'zone, until enough VMs are created as specified in each '
-    'benchmark.')
+flags.DEFINE_string(
+    'zone', None,
+    'A zone within which to run PerfKitBenchmarker. '
+    'This is specific to the cloud provider you are running on.')
 # TODO(user): note that this is currently very GCE specific. Need to create a
 #    module which can traslate from some generic types to provider specific
 #    nomenclature.
@@ -112,8 +110,8 @@ flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
                      'variable number of machines, the number of VMs to use.')
 flags.DEFINE_string('image', None, 'Default image that will be '
                     'linked to the VM')
-flags.DEFINE_integer('scratch_disk_size', 500, 'Size, in gb, for all scratch '
-                     'disks, default is 500')
+flags.DEFINE_integer('scratch_disk_size', None, 'Size, in gb, for all scratch '
+                     'disks.')
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'should be alphanumeric and less than or equal to 10 '
                     'characters in length.')
@@ -127,8 +125,6 @@ flags.DEFINE_enum(
     'run_stage', STAGE_ALL,
     [STAGE_ALL, STAGE_PREPARE, STAGE_RUN, STAGE_CLEANUP],
     'The stage of perfkitbenchmarker to run. By default it runs all stages.')
-flags.DEFINE_list('benchmark_config_pair', None,
-                  'Benchmark and its config file pair, separated by :.')
 flags.DEFINE_integer('duration_in_seconds', None,
                      'duration of benchmarks. '
                      '(only valid for mesh_benchmark)')
@@ -137,12 +133,12 @@ flags.DEFINE_string('static_vm_file', None,
                     'static_virtual_machine.py for a description of this file.')
 flags.DEFINE_boolean('version', False, 'Display the version and exit.')
 flags.DEFINE_enum(
-    'scratch_disk_type', disk.STANDARD,
+    'scratch_disk_type', None,
     [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
     'Type for all scratch disks. The default is standard')
-flags.DEFINE_integer('scratch_disk_iops', 1500,
+flags.DEFINE_integer('scratch_disk_iops', None,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
-flags.DEFINE_integer('num_striped_disks', 1,
+flags.DEFINE_integer('num_striped_disks', None,
                      'The number of disks to stripe together to form one '
                      '"logical" scratch disk. This defaults to 1 '
                      '(except with local disks), which means no striping. '
@@ -171,18 +167,6 @@ MAX_RUN_URI_LENGTH = 8
 
 
 events.initialization_complete.connect(traces.RegisterAll)
-
-
-# TODO(user): Consider moving to benchmark_spec.
-def ValidateBenchmarkInfo(benchmark_info):
-  for required_key in REQUIRED_INFO:
-    if required_key not in benchmark_info:
-      logging.error('Benchmark information %s is corrupt. It does not contain'
-                    'the key %s. Please add the specified key to the benchmark'
-                    'info. Skipping benchmark.', benchmark_info, required_key)
-      # TODO(user): Raise error with info about the validation failure
-      return False
-  return True
 
 
 def DoPreparePhase(benchmark, name, spec, timer):
@@ -264,10 +248,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       relative to the other benchmarks in the suite.
     total_benchmarks: The total number of benchmarks in the suite.
   """
-  benchmark_info = benchmark.GetInfo()
-  if not ValidateBenchmarkInfo(benchmark_info):
-    return
-  benchmark_name = benchmark_info['name']
+  benchmark_config = benchmark.GetConfig()
+  benchmark_name = benchmark.BENCHMARK_NAME
 
   # Modify the logger prompt for messages logged within this function.
   label_extension = '{}({}/{})'.format(
@@ -293,7 +275,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
           # because if DoPreparePhase raises an exception, we still need
           # a reference to the spec in order to delete it in the "finally"
           # section below.
-          spec = benchmark_spec.BenchmarkSpec(benchmark_info)
+          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name)
+          spec.ConstructVirtualMachines()
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
           spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_name)
@@ -404,15 +387,6 @@ def RunBenchmarks(publish=True):
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
-  if FLAGS.benchmark_config_pair:
-    # Convert benchmark_config_pair into a {benchmark_name: file_name}
-    # dictionary.
-    tmp_dict = {}
-    for config_pair in FLAGS.benchmark_config_pair:
-      pair = config_pair.split(':')
-      tmp_dict[pair[0]] = pair[1]
-    FLAGS.benchmark_config_pair = tmp_dict
-
   try:
     benchmark_list = benchmark_sets.GetBenchmarksFromFlags()
     total_benchmarks = len(benchmark_list)
@@ -446,25 +420,36 @@ def _GenerateBenchmarkDocumentation():
   benchmark_docs = []
   for benchmark_module in (benchmarks.BENCHMARKS +
                            windows_benchmarks.BENCHMARKS):
-    benchmark_info = benchmark_module.BENCHMARK_INFO
-    vm_count = benchmark_info.get('num_machines') or 'variable'
+    benchmark_config = configs.LoadMinimalConfig(
+        benchmark_module.BENCHMARK_CONFIG, benchmark_module.BENCHMARK_NAME)
+    vm_groups = benchmark_config['vm_groups']
+    total_vm_count = 0
+    vm_str = ''
     scratch_disk_str = ''
-    if benchmark_info.get('scratch_disk'):
-      scratch_disk_str = ' with scratch volume'
+    for group in vm_groups.itervalues():
+      group_vm_count = group.get('vm_count', 1)
+      if group_vm_count is None:
+        vm_str = 'variable'
+      else:
+        total_vm_count += group_vm_count
+      if group.get('disk_spec'):
+        scratch_disk_str = ' with scratch volume(s)'
 
-    name = benchmark_info['name']
+
+    name = benchmark_module.BENCHMARK_NAME
     if benchmark_module in windows_benchmarks.BENCHMARKS:
       name += ' (Windows)'
     benchmark_docs.append('%s: %s (%s VMs%s)' %
                           (name,
-                           benchmark_info['description'],
-                           vm_count,
+                           benchmark_config['description'],
+                           vm_str or total_vm_count,
                            scratch_disk_str))
   return '\n\t'.join(benchmark_docs)
 
 
 def Main(argv=sys.argv):
   logging.basicConfig(level=logging.INFO)
+
   # TODO: Verify if there is other way of appending additional help
   # message.
   # Inject more help documentation
@@ -483,10 +468,12 @@ def Main(argv=sys.argv):
           benchmark_doc=_GenerateBenchmarkDocumentation())
   sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
                                       % '\n\t'.join(benchmark_sets_list))
+
   try:
     argv = FLAGS(argv)  # parse flags
   except flags.FlagsError as e:
     logging.error(
         '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
+
   return RunBenchmarks()

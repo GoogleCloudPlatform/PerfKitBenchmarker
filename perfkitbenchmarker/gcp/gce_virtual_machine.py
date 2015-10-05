@@ -59,11 +59,39 @@ RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
 
 
+class GceVmSpec(virtual_machine.BaseVmSpec):
+  """Object containing the information needed to create a GceVirtualMachine."""
+
+  def __init__(self, project=None, num_local_ssds=0,
+               preemptible=False, **kwargs):
+    """Initializes the VmSpec.
+
+    Args:
+      num_local_ssds: The number of local ssds to attach to the instance.
+      project: The project to create the VM in.
+      preemptible: True if the VM should be preemptible and False otherwise.
+      kwargs: The key word arguments to virtual_machine.BaseVmSpec's __init__
+        method.
+    """
+    super(GceVmSpec, self).__init__(**kwargs)
+    self.project = project
+    self.num_local_ssds = num_local_ssds
+    self.preemptible = preemptible
+
+  def ApplyFlags(self, flags):
+    """Apply flags to the VmSpec."""
+    super(GceVmSpec, self).ApplyFlags(flags)
+    self.project = flags.project or self.project
+    if flags['gce_num_local_ssds'].present:
+      self.num_local_ssds = FLAGS.gce_num_local_ssds
+    if flags['gce_preemptible_vms'].present:
+      self.preemptible = flags.gce_preemptible_vms
+
+
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
-  DEFAULT_ZONE = 'us-central1-a'
-  DEFAULT_MACHINE_TYPE = 'n1-standard-1'
+  CLOUD = 'GCP'
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
   BOOT_DISK_SIZE_GB = 10
@@ -78,27 +106,18 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       firewall: network.BaseFirewall object corresponding to the VM.
     """
     super(GceVirtualMachine, self).__init__(vm_spec, network, firewall)
+    self.image = self.image or self.DEFAULT_IMAGE
+    self.project = vm_spec.project
     disk_spec = disk.BaseDiskSpec(
-        self.BOOT_DISK_SIZE_GB, self.BOOT_DISK_TYPE, None)
+        disk_size=self.BOOT_DISK_SIZE_GB, disk_type=self.BOOT_DISK_TYPE)
     self.boot_disk = gce_disk.GceDisk(
         disk_spec, self.name, self.zone, self.project, self.image)
-    self.max_local_disks = FLAGS.gce_num_local_ssds
+    self.max_local_disks = vm_spec.num_local_ssds
     self.boot_metadata = {}
 
-    self.preemptible = FLAGS.gce_preemptible_vms
+    self.preemptible = vm_spec.preemptible
 
     events.sample_created.connect(self.AnnotateSample, weak=False)
-
-
-  @classmethod
-  def SetVmSpecDefaults(cls, vm_spec):
-    """Updates the VM spec with cloud specific defaults."""
-    if vm_spec.machine_type is None:
-      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
-    if vm_spec.zone is None:
-      vm_spec.zone = cls.DEFAULT_ZONE
-    if vm_spec.image is None:
-      vm_spec.image = cls.DEFAULT_IMAGE
 
   def _CreateDependencies(self):
     """Create VM dependencies."""

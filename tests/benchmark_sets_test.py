@@ -29,7 +29,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # create set of valid benchmark names from the benchmark directory
     self.valid_benchmark_names = set()
     for benchmark_module in benchmarks.BENCHMARKS:
-        self.valid_benchmark_names.add(benchmark_module.GetInfo()['name'])
+        self.valid_benchmark_names.add(benchmark_module.BENCHMARK_NAME)
 
     self.valid_benchmark_set_names = set()
     # include the benchmark_set names since these can also appear
@@ -71,7 +71,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
       self.assertIsNotNone(benchmark_module_list)
       self.assertGreater(len(benchmark_module_list), 0)
       for benchmark_module in benchmark_module_list:
-        self.assertIn(benchmark_module.GetInfo()['name'],
+        self.assertIn(benchmark_module.BENCHMARK_NAME,
                       self.valid_benchmark_names)
 
   def testBenchmarkNestedDerivedSets(self):
@@ -92,7 +92,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
       self.assertIsNotNone(standard_module_list)
       self.assertEqual(len(benchmark_module_list), len(standard_module_list))
       for benchmark_module in benchmark_module_list:
-        self.assertIn(benchmark_module.GetInfo()['name'],
+        self.assertIn(benchmark_module.BENCHMARK_NAME,
                       self.valid_benchmark_names)
 
   def testBenchmarkValidCommandLine1(self):
@@ -102,13 +102,13 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertIsNotNone(benchmark_module_list)
     self.assertGreater(len(benchmark_module_list), 0)
     for benchmark_module in benchmark_module_list:
-      self.assertIn(benchmark_module.GetInfo()['name'],
+      self.assertIn(benchmark_module.BENCHMARK_NAME,
                     self.valid_benchmark_names)
 
   @staticmethod
   def _ContainsModule(module_name, module_list):
     for module in module_list:
-      if module.GetInfo()['name'] == module_name:
+      if module.BENCHMARK_NAME == module_name:
         return True
     return False
 
@@ -120,7 +120,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertIsNotNone(benchmark_module_list)
     self.assertGreater(len(benchmark_module_list), 0)
     for benchmark_module in benchmark_module_list:
-      self.assertIn(benchmark_module.GetInfo()['name'],
+      self.assertIn(benchmark_module.BENCHMARK_NAME,
                     self.valid_benchmark_names)
     # make sure bonnie++ is a listed benchmark
     self.assertTrue(self._ContainsModule('bonnie++', benchmark_module_list))
@@ -132,7 +132,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertIsNotNone(benchmark_module_list)
     self.assertEqual(len(benchmark_module_list), 2)
     for benchmark_module in benchmark_module_list:
-      self.assertIn(benchmark_module.GetInfo()['name'],
+      self.assertIn(benchmark_module.BENCHMARK_NAME,
                     self.valid_benchmark_names)
     # make sure listed benchmarks are present
     self.assertTrue(self._ContainsModule('iperf', benchmark_module_list))

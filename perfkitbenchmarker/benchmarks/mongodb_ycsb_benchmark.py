@@ -24,6 +24,7 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 import functools
 import os
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import ycsb
@@ -34,15 +35,20 @@ flags.DEFINE_string('mongodb_writeconcern', 'safe',
 
 FLAGS = flags.FLAGS
 
+BENCHMARK_NAME = 'mongodb_ycsb'
+BENCHMARK_CONFIG = """
+mongodb_ycsb:
+  description: Run YCSB against MongoDB.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+      vm_count: 2
+"""
 
-BENCHMARK_INFO = {'name': 'mongodb_ycsb',
-                  'description': 'Run YCSB against MongoDB.',
-                  'scratch_disk': True,
-                  'num_machines': 2}
 
-
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig():
+  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
 
 
 def _GetDataDir(vm):
@@ -75,7 +81,6 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  assert len(vms) == BENCHMARK_INFO['num_machines']
   mongo_vm, ycsb_vm = vms[:2]
 
   vm_util.RunThreaded((lambda f: f()),

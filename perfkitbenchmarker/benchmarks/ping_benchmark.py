@@ -18,21 +18,26 @@ This benchmark runs ping using the internal ips of vms in the same zone.
 """
 
 import logging
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 import re
 
 
-BENCHMARK_INFO = {
-    'name': 'ping',
-    'description': 'Benchmarks ping latency over internal IP addresses',
-    'scratch_disk': False,
-    'num_machines': 2}
+BENCHMARK_NAME = 'ping'
+BENCHMARK_CONFIG = """
+ping:
+  description: Benchmarks ping latency over internal IP addresses
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      vm_count: 2
+"""
 
 METRICS = ('Min Latency', 'Average Latency', 'Max Latency', 'Latency Std Dev')
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig():
+  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):  # pylint: disable=unused-argument

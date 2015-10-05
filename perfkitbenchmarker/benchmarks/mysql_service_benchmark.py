@@ -33,6 +33,7 @@ import time
 import uuid
 
 from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -62,10 +63,14 @@ flags.DEFINE_integer('sysbench_report_interval', 2,
                      'The interval, in seconds, we ask sysbench to report '
                      'results.')
 
-BENCHMARK_INFO = {'name': 'mysql_service',
-                  'description': 'MySQL service benchmarks.',
-                  'scratch_disk': False,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'mysql_service'
+BENCHMARK_CONFIG = """
+mysql_service:
+  description: MySQL service benchmarks.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+"""
 
 # Query DB creation status once every 15 seconds
 DB_STATUS_QUERY_INTERVAL = 15
@@ -126,8 +131,8 @@ GCP_PRICING_PLAN = 'PACKAGE'
 RESPONSE_TIME_TOKENS = ['min', 'avg', 'max', 'percentile']
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig():
+  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

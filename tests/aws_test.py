@@ -20,7 +20,6 @@ import unittest
 
 import mock
 
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.aws import aws_disk
 from perfkitbenchmarker.aws import aws_network
@@ -34,7 +33,7 @@ class AwsVolumeExistsTestCase(unittest.TestCase):
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
-    self.disk = aws_disk.AwsDisk(disk.BaseDiskSpec(None, None, None), 'zone-a')
+    self.disk = aws_disk.AwsDisk(aws_disk.AwsDiskSpec(), 'zone-a')
     self.disk.id = 'vol-foo'
 
   def testVolumePresent(self):
@@ -91,8 +90,8 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
     p.start()
     self.addCleanup(p.stop)
     self.vm = aws_virtual_machine.AwsVirtualMachine(
-        virtual_machine.BaseVirtualMachineSpec(
-            None, 'us-east-1a', 'c3.large', None), None, None)
+        virtual_machine.BaseVmSpec(
+            zone='us-east-1a', machine_type='c3.large'), None, None)
     self.vm.id = 'i-foo'
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'aws-describe-instance.json')

@@ -32,7 +32,7 @@ from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_multistring('data_search_paths', ['.', 'data'],
+flags.DEFINE_multistring('data_search_paths', ['.'],
                          'Additional paths to search for data files. '
                          'These paths will be searched prior to using files '
                          'bundled with PerfKitBenchmarker')
@@ -127,8 +127,10 @@ class PackageResourceLoader(ResourceLoader):
 
 DATA_PACKAGE_NAME = 'perfkitbenchmarker.data'
 SCRIPT_PACKAGE_NAME = 'perfkitbenchmarker.scripts'
+CONFIG_PACKAGE_NAME = 'perfkitbenchmarker.configs'
 DEFAULT_RESOURCE_LOADERS = [PackageResourceLoader(DATA_PACKAGE_NAME),
-                            PackageResourceLoader(SCRIPT_PACKAGE_NAME)]
+                            PackageResourceLoader(SCRIPT_PACKAGE_NAME),
+                            PackageResourceLoader(CONFIG_PACKAGE_NAME)]
 
 
 def _GetResourceLoaders():

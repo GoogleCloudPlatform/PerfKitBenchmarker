@@ -26,6 +26,7 @@ approximate Mflops (Millions of floating point operations per second).
 import logging
 import re
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -50,14 +51,18 @@ SCIMARK2_C_SRC = '{0}/src'.format(SCIMARK2_PATH)
 # https://llvm.org/bugs/show_bug.cgi?id=22589 .
 SCIMARK2_C_CFLAGS = '-O3 -march=native'
 
-BENCHMARK_INFO = {'name': 'scimark2',
-                  'description': 'Runs SciMark2',
-                  'scratch_disk': False,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'scimark2'
+BENCHMARK_CONFIG = """
+scimark2:
+  description: Runs SciMark2
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+"""
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig():
+  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

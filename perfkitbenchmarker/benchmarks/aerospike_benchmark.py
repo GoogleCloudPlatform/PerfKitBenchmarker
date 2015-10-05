@@ -24,6 +24,7 @@ by the "aerospike_storage_type" and "scratch_disk_type" flags.
 
 import re
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
@@ -48,23 +49,31 @@ flags.DEFINE_integer('aerospike_read_percent', 90,
                      'The percent of operations which are reads.',
                      lower_bound=0, upper_bound=100)
 
-BENCHMARK_INFO = {'name': 'aerospike',
-                  'description': 'Runs Aerospike',
-                  'num_machines': 2}
+BENCHMARK_NAME = 'aerospike'
+BENCHMARK_CONFIG = """
+aerospike:
+  description: Runs Aerospike.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+      vm_count: 2
+"""
+
 AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
 CLIENT_DIR = 'aerospike-client-c'
 CLIENT_VERSION = '3.0.84'
 PATCH_FILE = 'aerospike.patch'
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
+def GetConfig():
+  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
   if (FLAGS.aerospike_storage_type == aerospike_server.DISK and
       FLAGS.scratch_disk_type != disk.LOCAL):
-    info['scratch_disk'] = True
+    config['vm_groups']['default']['disk_count'] = 1
   else:
-    info['scratch_disk'] = False
-  return info
+    config['vm_groups']['default']['disk_count'] = 0
+  return config
 
 
 def CheckPrerequisites():

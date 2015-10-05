@@ -26,6 +26,7 @@ import posixpath
 import re
 import time
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -36,10 +37,16 @@ from perfkitbenchmarker.packages.ant import ANT_HOME_DIR
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'cloudsuite_websearch',
-                  'description': 'Run CloudSuite Web Search',
-                  'scratch_disk': True,
-                  'num_machines': None}
+BENCHMARK_NAME = 'cloudsuite_web_search'
+BENCHMARK_CONFIG = """
+cloudsuite_web_search:
+  description: Run CloudSuite Web Search
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+      vm_count: null
+"""
 
 CLOUDSUITE_WEB_SEARCH_DIR = posixpath.join(vm_util.VM_TMP_DIR,
                                            'cloudsuite-web-search')
@@ -97,11 +104,11 @@ def CheckPrerequisites():
   _CheckHeapSize(FLAGS.cs_websearch_client_heap_size)
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
+def GetConfig():
+  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
   num_clients = FLAGS.cs_websearch_num_clients
-  info['num_machines'] = num_clients + NUM_SERVERS
-  return info
+  config['vm_groups']['default']['vm_count'] = num_clients + NUM_SERVERS
+  return config
 
 
 def _PrepareSolr(solr_nodes):

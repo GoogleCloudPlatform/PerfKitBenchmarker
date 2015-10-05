@@ -45,6 +45,7 @@ EBS-GP and PIOPS.
 import json
 import logging
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.packages import fio
 
@@ -65,11 +66,18 @@ flags.DEFINE_integer('maxjobs', 0,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'block_storage_workload',
-                  'description': 'Runs FIO in sequential, random, read and '
-                                 'write modes to simulate various scenarios.',
-                  'scratch_disk': True,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'block_storage_workload'
+BENCHMARK_CONFIG = """
+block_storage_workload:
+  description: >
+      Runs FIO in sequential, random, read and
+      write modes to simulate various scenarios.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+"""
+
 DESCRIPTION = 'description'
 METHOD = 'method'
 
@@ -81,8 +89,8 @@ LATENCY_REGEX = r'[=\s]+([\d\.]+)[\s,]+'
 BANDWIDTH_REGEX = r'(\d+)(\w+/*\w*)'
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig():
+  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):

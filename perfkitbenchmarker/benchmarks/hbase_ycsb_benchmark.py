@@ -45,6 +45,7 @@ import logging
 import os
 import posixpath
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -58,12 +59,18 @@ flags.DEFINE_integer('hbase_zookeeper_nodes', 1, 'Number of Zookeeper nodes.')
 flags.DEFINE_boolean('hbase_use_snappy', True,
                      'Whether to use snappy compression.')
 
-BENCHMARK_INFO = {'name': 'hbase_ycsb',
-                  'description': 'Run YCSB against HBase. Specify the HBase '
-                  'cluster size with --num_vms. Specify the number of YCSB VMs '
-                  'with --ycsb_client_vms.',
-                  'scratch_disk': True,
-                  'num_machines': None}
+BENCHMARK_NAME = 'hbase_ycsb'
+BENCHMARK_CONFIG = """
+hbase_ycsb:
+  description: >
+      Run YCSB against HBase. Specify the HBase
+      cluster size with --num_vms. Specify the number of YCSB VMs
+      with --ycsb_client_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+"""
 
 HBASE_SITE = 'hbase-site.xml'
 
@@ -73,13 +80,13 @@ COLUMN_FAMILY = 'cf'
 TABLE_SPLIT_COUNT = 200
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
+def GetConfig():
+  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
   num_vms = max(FLAGS.num_vms, 2)
   if FLAGS['num_vms'].present and FLAGS.num_vms < 2:
     raise ValueError('hbase_ycsb requires at least 2 HBase VMs.')
-  info['num_machines'] = num_vms + FLAGS.ycsb_client_vms
-  return info
+  config['vm_groups']['default']['vm_count'] = num_vms + FLAGS.ycsb_client_vms
+  return config
 
 
 def CheckPrerequisites():

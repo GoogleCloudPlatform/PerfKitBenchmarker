@@ -24,6 +24,7 @@ import functools
 import logging
 import os
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -32,14 +33,19 @@ from perfkitbenchmarker.packages import ycsb
 
 FLAGS = flags.FLAGS
 
-
-BENCHMARK_INFO = {'name': 'cassandra_ycsb',
-                  'description': 'Run YCSB against Cassandra. Specify the '
-                  'Cassandra cluster size with --num_vms. Specify the number '
-                  'of YCSB VMs with --ycsb_client_vms.',
-                  'scratch_disk': True,
-                  'num_machines': None}
-
+BENCHMARK_NAME = 'cassandra_ycsb'
+BENCHMARK_CONFIG = """
+cassandra_ycsb:
+  description: >
+      Run YCSB against Cassandra. Specify the
+      Cassandra cluster size with --num_vms. Specify the number
+      of YCSB VMs with --ycsb_client_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+      vm_count: null
+"""
 
 # TODO: Add flags.
 REPLICATION_FACTOR = 3
@@ -51,11 +57,11 @@ COLUMN_FAMILY = 'data'
 CREATE_TABLE_SCRIPT = 'cassandra/create-ycsb-table.cql.j2'
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
+def GetConfig():
+  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
   num_vms = max(FLAGS.num_vms, 3)
-  info['num_machines'] = num_vms + FLAGS.ycsb_client_vms
-  return info
+  config['vm_groups']['default']['vm_count'] = num_vms + FLAGS.ycsb_client_vms
+  return config
 
 
 def CheckPrerequisites():

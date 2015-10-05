@@ -22,22 +22,28 @@ Linux to share code.
 
 import logging
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
-BENCHMARK_INFO = {'name': 'cluster_boot',
-                  'description': 'Create a cluster, record all times to boot. '
-                  'Specify the cluster size with --num_vms.',
-                  'scratch_disk': False,
-                  'num_machines': None}  # Set in GetInfo()
+
+BENCHMARK_NAME = 'cluster_boot'
+BENCHMARK_CONFIG = """
+cluster_boot:
+  description: >
+      Create a cluster, record all times to boot.
+      Specify the cluster size with --num_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      vm_count: null
+"""
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
-  info['num_machines'] = FLAGS.num_vms
-  return info
+def GetConfig():
+  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
 
 
 def Prepare(unused_benchmark_spec):

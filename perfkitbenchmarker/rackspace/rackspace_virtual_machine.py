@@ -79,8 +79,7 @@ RHEL_IMAGE = 'c07409c8-0931-40e4-a3bc-4869ecb5931e'
 
 class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
-  DEFAULT_ZONE = 'IAD'
-  DEFAULT_MACHINE_TYPE = 'general1-1'
+  CLOUD = 'Rackspace'
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 
@@ -123,16 +122,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Error(
           'There was a problem while retrieving machine_type'
           ' information from the cloud provider.')
-
-  @classmethod
-  def SetVmSpecDefaults(cls, vm_spec):
-    """Updates the VM spec with cloud specific defaults."""
-    if vm_spec.machine_type is None:
-      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
-    if vm_spec.zone is None:
-      vm_spec.zone = cls.DEFAULT_ZONE
-    if vm_spec.image is None:
-      vm_spec.image = cls.DEFAULT_IMAGE
+    vm_spec.image = self.image or self.DEFAULT_IMAGE
 
   def CreateKeyPair(self):
     """Imports the public keyfile to Rackspace."""

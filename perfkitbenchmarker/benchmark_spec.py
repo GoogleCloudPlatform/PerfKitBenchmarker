@@ -14,24 +14,25 @@
 
 """Container for all data required for a benchmark to run."""
 
+import copy
 import logging
 import pickle
 import copy_reg
+import os
 import thread
 import threading
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import static_virtual_machine
+from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.aws import aws_disk
 from perfkitbenchmarker.aws import aws_network
 from perfkitbenchmarker.aws import aws_virtual_machine
 from perfkitbenchmarker.azure import azure_network
 from perfkitbenchmarker.azure import azure_virtual_machine
-from perfkitbenchmarker.deployment.config import config_reader
-import perfkitbenchmarker.deployment.shared.ini_constants as ini_constants
 from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
@@ -55,6 +56,17 @@ def UnPickleLock(locked, *args):
 
 
 copy_reg.pickle(thread.LockType, PickleLock)
+# Config constants.
+VM_GROUPS = 'vm_groups'
+CONFIG_FLAGS = 'flags'
+DISK_COUNT = 'disk_count'
+VM_COUNT = 'vm_count'
+DEFAULT_COUNT = 1
+CLOUD = 'cloud'
+OS_TYPE = 'os_type'
+STATIC_VMS = 'static_vms'
+VM_SPEC = 'vm_spec'
+DISK_SPEC = 'disk_spec'
 
 GCP = 'GCP'
 AZURE = 'Azure'
@@ -67,10 +79,6 @@ DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
 UBUNTU_CONTAINER = 'ubuntu_container'
-IMAGE = 'image'
-WINDOWS_IMAGE = 'windows_image'
-MACHINE_TYPE = 'machine_type'
-ZONE = 'zone'
 VIRTUAL_MACHINE = 'virtual_machine'
 NETWORK = 'network'
 FIREWALL = 'firewall'
@@ -84,6 +92,7 @@ CLASSES = {
         },
         FIREWALL: gce_network.GceFirewall,
         NETWORK: gce_network.GceNetwork,
+        VM_SPEC: gce_vm.GceVmSpec
     },
     AZURE: {
         VIRTUAL_MACHINE: {
@@ -102,6 +111,7 @@ CLASSES = {
         },
         FIREWALL: aws_network.AwsFirewall,
         NETWORK: aws_network.AwsNetwork,
+        DISK_SPEC: aws_disk.AwsDiskSpec
     },
     DIGITALOCEAN: {
         VIRTUAL_MACHINE: {
@@ -153,89 +163,111 @@ flags.DEFINE_string('scratch_dir', '/scratch',
                     'appended to them (for example /scratch0, /scratch1, etc).')
 
 
+def _GetVmSpecClass(cloud):
+  """Gets the VmSpec class corresponding to the cloud."""
+  if VM_SPEC in CLASSES[cloud]:
+    return CLASSES[cloud][VM_SPEC]
+  return virtual_machine.BaseVmSpec
+
+
+def _GetDiskSpecClass(cloud):
+  """Gets the DiskSpec class corresponding to the cloud."""
+  if DISK_SPEC in CLASSES[cloud]:
+    return CLASSES[cloud][DISK_SPEC]
+  return disk.BaseDiskSpec
+
+
 class BenchmarkSpec(object):
   """Contains the various data required to make a benchmark run."""
 
-  def __init__(self, benchmark_info):
-    if (FLAGS.benchmark_config_pair and
-        benchmark_info['name'] in FLAGS.benchmark_config_pair.keys()):
-      # TODO(user): Unify naming between config_reader and
-      # perfkitbenchmarker.
-      self.config = config_reader.ConfigLoader(
-          FLAGS.benchmark_config_pair[benchmark_info['name']])
+  def __init__(self, benchmark_config, benchmark_name):
+    """Initialize a BenchmarkSpec object.
+
+    Args:
+      benchmark_config: A Python dictionary representation of the configuration
+        for the benchmark. For a complete explanation, see the README.
+      benchmark_name: The name of the benchmark.
+    """
+    self.config = benchmark_config
+    self.name = benchmark_name
+    self.vms = []
     self.networks = {}
     self.firewalls = {}
-    self.vms = []
-    self.vm_dict = {'default': []}
-    self.benchmark_name = benchmark_info['name']
-    if hasattr(self, 'config'):
-      config_dict = {}
-      for section in self.config._config.sections():
-        config_dict[section] = self.config.GetSectionOptionsAsDictionary(
-            section)
-      self.cloud = config_dict['cluster']['type']
-      self.project = config_dict['cluster']['project']
-      self.zones = [config_dict['cluster']['zone']]
-      self.image = []
-      self.machine_type = []
-      for node in self.config.node_sections:
-        self.vm_dict[node.split(':')[1]] = []
-      args = [((config_dict[node],
-                node.split(':')[1]), {}) for node in self.config.node_sections]
-      vm_util.RunThreaded(
-          self.CreateVirtualMachineFromNodeSection, args)
-      self.num_vms = len(self.vms)
-      self.image = ','.join(self.image)
-      self.zones = ','.join(self.zones)
-      self.machine_type = ','.join(self.machine_type)
-    else:
-      self.cloud = FLAGS.cloud
-      self.project = FLAGS.project
-      self.zones = FLAGS.zones
-      self.image = FLAGS.image
-      self.machine_type = FLAGS.machine_type
-      if benchmark_info['num_machines'] is None:
-        self.num_vms = FLAGS.num_vms
-      else:
-        self.num_vms = benchmark_info['num_machines']
-      self.scratch_disk = benchmark_info['scratch_disk']
-      self.scratch_disk_size = FLAGS.scratch_disk_size
-      self.scratch_disk_type = FLAGS.scratch_disk_type
-      self.scratch_disk_iops = FLAGS.scratch_disk_iops
-
-      self.vms = [
-          self.CreateVirtualMachine(
-              self.zones[min(index, len(self.zones) - 1)])
-          for index in range(self.num_vms)]
-      self.vm_dict['default'] = self.vms
-      for vm in self.vms:
-        # If we are using local disks and num_striped_disks has not been
-        # set, then we want to set it to stripe all local disks together.
-        if (FLAGS.scratch_disk_type == disk.LOCAL and
-            benchmark_info['scratch_disk'] and
-            not FLAGS['num_striped_disks'].present):
-          num_striped_disks = (vm.max_local_disks //
-                               benchmark_info['scratch_disk'])
-          if num_striped_disks == 0:
-            raise errors.Error(
-                'Not enough local disks to run benchmark "%s". It requires at '
-                'least %d local disk(s). The specified machine type has %d '
-                'local disk(s).' % (benchmark_info['name'],
-                                    int(benchmark_info['scratch_disk']),
-                                    vm.max_local_disks))
-        else:
-          num_striped_disks = FLAGS.num_striped_disks
-        for i in range(benchmark_info['scratch_disk']):
-          mount_point = '%s%d' % (FLAGS.scratch_dir, i)
-          disk_spec = disk.BaseDiskSpec(
-              self.scratch_disk_size, self.scratch_disk_type,
-              mount_point, self.scratch_disk_iops,
-              num_striped_disks)
-          vm.disk_specs.append(disk_spec)
-
-    self.file_name = '%s/%s' % (vm_util.GetTempDir(), benchmark_info['name'])
+    self.vm_groups = {}
     self.deleted = False
+    self.file_name = os.path.join(vm_util.GetTempDir(), self.name)
     self.always_call_cleanup = False
+
+  def _GetCloudForGroup(self, group_name):
+    """Gets the cloud for a VM group by looking at flags and the config."""
+    group_spec = self.config[VM_GROUPS][group_name]
+    if not FLAGS[CLOUD].present and CLOUD in group_spec:
+      return group_spec[CLOUD]
+    return FLAGS.cloud
+
+  def _GetOsTypeForGroup(self, group_name):
+    """Gets the OS type for a VM group by looking at flags and the config."""
+    group_spec = self.config[VM_GROUPS][group_name]
+    if not FLAGS[OS_TYPE].present and OS_TYPE in group_spec:
+      return group_spec[OS_TYPE]
+    return FLAGS.os_type
+
+  def ConstructVirtualMachines(self):
+    """Constructs the BenchmarkSpec's VirtualMachine objects."""
+    vm_group_specs = self.config[VM_GROUPS]
+
+    for group_name, group_spec in vm_group_specs.iteritems():
+      vms = []
+      vm_count = group_spec.get(VM_COUNT, DEFAULT_COUNT)
+      if vm_count is None:
+        vm_count = FLAGS.num_vms
+      disk_count = group_spec.get(DISK_COUNT, DEFAULT_COUNT)
+
+      try:
+        # First create the Static VMs.
+        if STATIC_VMS in group_spec:
+          static_vm_specs = group_spec[STATIC_VMS][:vm_count]
+          for spec_kwargs in static_vm_specs:
+            vm_spec = static_vm.StaticVmSpec(**spec_kwargs)
+            static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
+            vms.append(static_vm_class(vm_spec))
+
+        os_type = self._GetOsTypeForGroup(group_name)
+        cloud = self._GetCloudForGroup(group_name)
+
+        # Then create a VmSpec and possibly a DiskSpec which we can
+        # use to create the remaining VMs.
+        vm_spec_class = _GetVmSpecClass(cloud)
+        vm_spec = vm_spec_class(**group_spec[VM_SPEC][cloud])
+        vm_spec.ApplyFlags(FLAGS)
+
+        if DISK_SPEC in group_spec:
+          disk_spec_class = _GetDiskSpecClass(cloud)
+          disk_spec = disk_spec_class(**group_spec[DISK_SPEC][cloud])
+          disk_spec.ApplyFlags(FLAGS)
+        else:
+          disk_spec = None
+
+      except TypeError as e:
+        # This is what we get if one of the kwargs passed into a spec's
+        # __init__ method was unexpected.
+        raise errors.Config.ValueError(
+            'Config contained an unexpected parameter. Error message:\n%s' % e)
+
+      # Create the remaining VMs using the specs we created earlier.
+      for _ in xrange(vm_count - len(vms)):
+        vm = self._CreateVirtualMachine(vm_spec, os_type, cloud)
+        if disk_spec:
+          vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
+          # In the event that we need to create multiple disks from the same
+          # DiskSpec, we need to ensure that they have different mount points.
+          if (disk_count > 1 and disk_spec.mount_point):
+            for i, spec in enumerate(vm.disk_specs):
+              spec.mount_point += str(i)
+        vms.append(vm)
+
+      self.vm_groups[group_name] = vms
+      self.vms.extend(vms)
 
   def Prepare(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
@@ -270,81 +302,42 @@ class BenchmarkSpec(object):
                           'Attempting to continue tearing down.')
     self.deleted = True
 
-  def CreateVirtualMachine(self, zone):
+  def _CreateVirtualMachine(self, vm_spec, os_type, cloud):
     """Create a vm in zone.
 
     Args:
-      zone: The zone in which the vm will be created. If zone is None,
-        the VM class's DEFAULT_ZONE will be used instead.
+      vm_spec: A virtual_machine.BaseVmSpec object.
+      os_type: The type of operating system for the VM. See the flag of the
+          same name for more information.
+      cloud: The cloud for the VM. See the flag of the same name for more
+          information.
     Returns:
-      A vm object.
+      A virtual_machine.BaseVirtualMachine object.
     """
-    vm = static_virtual_machine.StaticVirtualMachine.GetStaticVirtualMachine()
+    vm = static_vm.StaticVirtualMachine.GetStaticVirtualMachine()
     if vm:
       return vm
 
-    vm_classes = CLASSES[self.cloud][VIRTUAL_MACHINE]
-    if FLAGS.os_type not in vm_classes:
+    vm_classes = CLASSES[cloud][VIRTUAL_MACHINE]
+    if os_type not in vm_classes:
       raise errors.Error(
           'VMs of type %s" are not currently supported on cloud "%s".' %
-          (FLAGS.os_type, self.cloud))
-    vm_class = vm_classes[FLAGS.os_type]
+          (os_type, cloud))
+    vm_class = vm_classes[os_type]
 
-    vm_spec = virtual_machine.BaseVirtualMachineSpec(
-        self.project, zone, self.machine_type, self.image)
-    vm_class.SetVmSpecDefaults(vm_spec)
-
-    if NETWORK in CLASSES[self.cloud]:
-      net_class = CLASSES[self.cloud][NETWORK]
+    if NETWORK in CLASSES[cloud]:
+      net_class = CLASSES[cloud][NETWORK]
       network = net_class.GetNetwork(vm_spec.zone, self.networks)
     else:
       network = None
 
-    if FIREWALL in CLASSES[self.cloud]:
-      firewall_class = CLASSES[self.cloud][FIREWALL]
+    if FIREWALL in CLASSES[cloud]:
+      firewall_class = CLASSES[cloud][FIREWALL]
       firewall = firewall_class.GetFirewall(self.firewalls)
     else:
       firewall = None
 
     return vm_class(vm_spec, network, firewall)
-
-  def CreateVirtualMachineFromNodeSection(self, node_section, node_name):
-    """Create a VirtualMachine object from NodeSection.
-
-    Args:
-      node_section: A dictionary of (option name, option value) pairs.
-      node_name: The name of node.
-    """
-    zone = node_section['zone'] if 'zone' in node_section else self.zones[0]
-    if zone not in self.zones:
-      self.zones.append(zone)
-    if node_section['image'] not in self.image:
-      self.image.append(node_section['image'])
-    if node_section['vm_type'] not in self.machine_type:
-      self.machine_type.append(node_section['vm_type'])
-    if zone not in self.networks:
-      network_class = CLASSES[self.cloud][NETWORK]
-      self.networks[zone] = network_class(zone)
-    vm_spec = virtual_machine.BaseVirtualMachineSpec(
-        self.project,
-        zone,
-        node_section['vm_type'],
-        node_section['image'],
-        self.networks[zone])
-    vm_class = CLASSES[self.cloud][VIRTUAL_MACHINE]
-    vms = [vm_class(vm_spec) for _ in range(int(node_section['count']))]
-    self.vms.extend(vms)
-    self.vm_dict[node_name].extend(vms)
-    # Create disk spec.
-    for option in node_section:
-      if option.startswith(ini_constants.OPTION_PD_PREFIX):
-        # Create disk spec.
-        disk_size, disk_type, mnt_point = node_section[option].split(':')
-        disk_size = int(disk_size)
-        disk_spec = disk.BaseDiskSpec(
-            disk_size, disk_type, mnt_point)
-        for vm in vms:
-          vm.disk_specs.append(disk_spec)
 
   def PrepareVm(self, vm):
     """Creates a single VM and prepares a scratch disk if required.
@@ -357,7 +350,7 @@ class BenchmarkSpec(object):
     logging.info('Waiting for boot completion.')
     for port in vm.remote_access_ports:
       vm.AllowPort(port)
-    vm.AddMetadata(benchmark=self.benchmark_name)
+    vm.AddMetadata(benchmark=self.name)
     vm.WaitForBootCompletion()
     vm.OnStartup()
     if FLAGS.scratch_disk_type == disk.LOCAL:

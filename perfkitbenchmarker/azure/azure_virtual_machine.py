@@ -92,8 +92,7 @@ class AzureService(resource.BaseResource):
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
 
-  DEFAULT_ZONE = 'East US'
-  DEFAULT_MACHINE_TYPE = 'Small'
+  CLOUD = 'Azure'
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 
@@ -108,19 +107,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AzureVirtualMachine, self).__init__(vm_spec, network, firewall)
     self.service = AzureService(self.name,
                                 self.network.affinity_group.name)
-    disk_spec = disk.BaseDiskSpec(None, None, None)
+    disk_spec = disk.BaseDiskSpec()
     self.os_disk = azure_disk.AzureDisk(disk_spec, self.name)
     self.max_local_disks = 1
-
-  @classmethod
-  def SetVmSpecDefaults(cls, vm_spec):
-    """Updates the VM spec with cloud specific defaults."""
-    if vm_spec.machine_type is None:
-      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
-    if vm_spec.zone is None:
-      vm_spec.zone = cls.DEFAULT_ZONE
-    if vm_spec.image is None:
-      vm_spec.image = cls.DEFAULT_IMAGE
+    self.image = self.image or self.DEFAULT_IMAGE
 
   def _CreateDependencies(self):
     """Create VM dependencies."""

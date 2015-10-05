@@ -21,6 +21,7 @@ import mock
 
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.static_virtual_machine import StaticVirtualMachine
+from perfkitbenchmarker.static_virtual_machine import StaticVmSpec
 
 
 class StaticVirtualMachineTest(unittest.TestCase):
@@ -78,12 +79,14 @@ class StaticVirtualMachineTest(unittest.TestCase):
     vm_pool = StaticVirtualMachine.vm_pool
     self.assertEqual(2, len(vm_pool))
     self._AssertStaticVMsEqual(
-        StaticVirtualMachine(
-            '174.12.14.1', 'perfkitbenchmarker',
-            'perfkitbenchmarker.pem'), vm_pool[0])
+        StaticVirtualMachine(StaticVmSpec(
+            ip_address='174.12.14.1', user_name='perfkitbenchmarker',
+            ssh_private_key='perfkitbenchmarker.pem')), vm_pool[0])
     self._AssertStaticVMsEqual(
-        StaticVirtualMachine('174.12.14.121', 'ubuntu', 'rackspace.pem',
-                             '10.10.10.2', 'rackspace_dallas'),
+        StaticVirtualMachine(
+            StaticVmSpec(ip_address='174.12.14.121', user_name='ubuntu',
+                         ssh_private_key='rackspace.pem',
+                         internal_ip='10.10.10.2', zone='rackspace_dallas')),
         vm_pool[1])
 
   def testReadFromFile_InvalidScratchDisksType(self):

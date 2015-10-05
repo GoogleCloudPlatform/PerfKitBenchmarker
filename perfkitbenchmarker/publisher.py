@@ -130,23 +130,24 @@ class DefaultMetadataProvider(MetadataProvider):
   def AddMetadata(self, metadata, benchmark_spec):
     metadata = metadata.copy()
     metadata['perfkitbenchmarker_version'] = version.VERSION
-    metadata['cloud'] = benchmark_spec.cloud
-    # Get the unique zone names from the VMs.
-    metadata['zones'] = ','.join(set([vm.zone for vm in benchmark_spec.vms]))
-    # Get a representative VM so that we can publish the machine type and
-    # image. If we support different machine types/images in the same benchmark
-    # this will need to be updated.
-    vm = benchmark_spec.vms[0]
-    metadata['machine_type'] = vm.machine_type
-    metadata['image'] = vm.image
+    for name, vms in benchmark_spec.vm_groups.iteritems():
+      if len(vms) == 0:
+        continue
+      # Get a representative VM so that we can publish the cloud, zone,
+      # machine type, and image.
+      vm = vms[-1]
+      metadata[name + '_cloud'] = vm.CLOUD
+      metadata[name + '_zone'] = vm.zone
+      metadata[name + '_machine_type'] = vm.machine_type
+      metadata[name + '_image'] = vm.image
 
-    # Scratch disk is not defined when a benchmark config is provided.
-    if getattr(benchmark_spec, 'scratch_disk', None):
-      metadata.update(scratch_disk_type=benchmark_spec.scratch_disk_type,
-                      scratch_disk_size=benchmark_spec.scratch_disk_size,
-                      num_striped_disks=FLAGS.num_striped_disks)
-      if benchmark_spec.scratch_disk_type == disk.PIOPS:
-        metadata['scratch_disk_iops'] = benchmark_spec.scratch_disk_iops
+      if vm.scratch_disks:
+        data_disk = vm.scratch_disks[0]
+        metadata[name + '_scratch_disk_type'] = data_disk.disk_type
+        metadata[name + '_scratch_disk_size'] = data_disk.disk_size
+        metadata[name + '_num_striped_disks'] = data_disk.num_striped_disks
+        if data_disk.disk_type == disk.PIOPS:
+          metadata[name + '_scratch_disk_iops'] = data_disk.iops
 
     # User specified metadata
     for pair in FLAGS.metadata:

@@ -234,23 +234,27 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                                    num_striped_disks=1)
     self.addCleanup(p.stop)
 
+    self.maxDiff = None
     p = mock.patch(publisher.__name__ + '.version',
                    VERSION='v1')
     p.start()
     self.addCleanup(p.stop)
 
-    mock_vm = mock.MagicMock(zone='us-central1-a',
-                             machine_type='n1-standard-1',
-                             image='ubuntu-14-04')
-    self.mock_spec = mock.MagicMock(cloud='GCP',
-                                    vms=[mock_vm])
+    self.mock_disk = mock.MagicMock(disk_size=20, num_striped_disks=1)
+
+    self.mock_vm = mock.MagicMock(CLOUD='GCP',
+                                  zone='us-central1-a',
+                                  machine_type='n1-standard-1',
+                                  image='ubuntu-14-04',
+                                  scratch_disks=[])
+    self.mock_spec = mock.MagicMock(vm_groups={'default': [self.mock_vm]})
 
     self.default_meta = {'perfkitbenchmarker_version': 'v1',
-                         'cloud': self.mock_spec.cloud,
-                         'zones': 'us-central1-a',
-                         'machine_type': mock_vm.machine_type,
-                         'image': mock_vm.image,
-                         'num_striped_disks': 1}
+                         'default_cloud': self.mock_vm.CLOUD,
+                         'default_zone': 'us-central1-a',
+                         'default_machine_type': self.mock_vm.machine_type,
+                         'default_image': self.mock_vm.image,
+                         'default_num_striped_disks': 1}
 
   def _RunTest(self, spec, expected, input_metadata=None):
     input_metadata = input_metadata or {}
@@ -263,29 +267,28 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
   def testAddMetadata_ScratchDiskUndefined(self):
     del self.mock_spec.scratch_disk
     meta = self.default_meta.copy()
-    meta.pop('num_striped_disks')
+    meta.pop('default_num_striped_disks')
     self._RunTest(self.mock_spec, meta)
 
   def testAddMetadata_NoScratchDisk(self):
     self.mock_spec.scratch_disk = False
     meta = self.default_meta.copy()
-    meta.pop('num_striped_disks')
+    meta.pop('default_num_striped_disks')
     self._RunTest(self.mock_spec, meta)
 
   def testAddMetadata_WithScratchDisk(self):
-    self.mock_spec.configure_mock(scratch_disk=True,
-                                  scratch_disk_size=20,
-                                  scratch_disk_type='remote_ssd')
+    self.mock_disk.configure_mock(disk_type=disk.REMOTE_SSD)
+    self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(scratch_disk_size=20, scratch_disk_type='remote_ssd')
+    expected.update(default_scratch_disk_size=20,
+                    default_scratch_disk_type=disk.REMOTE_SSD)
     self._RunTest(self.mock_spec, expected)
 
   def testAddMetadata_PIOPS(self):
-    self.mock_spec.configure_mock(scratch_disk=True,
-                                  scratch_disk_size=20,
-                                  scratch_disk_type=disk.PIOPS,
-                                  scratch_disk_iops=1000)
+    self.mock_disk.configure_mock(disk_type=disk.PIOPS, iops=1000)
+    self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(scratch_disk_size=20, scratch_disk_type=disk.PIOPS,
-                    scratch_disk_iops=1000)
+    expected.update(default_scratch_disk_size=20,
+                    default_scratch_disk_type=disk.PIOPS,
+                    default_scratch_disk_iops=1000)
     self._RunTest(self.mock_spec, expected)

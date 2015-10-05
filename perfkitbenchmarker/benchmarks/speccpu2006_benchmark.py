@@ -25,6 +25,7 @@ import logging
 import posixpath
 import re
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -62,17 +63,22 @@ flags.DEFINE_boolean('runspec_keep_partial_results', False,
                      'mark metadata with partial=true. If unset, partial '
                      'failures are treated as errors.')
 
-BENCHMARK_INFO = {'name': 'speccpu2006',
-                  'description': 'Run Spec CPU2006',
-                  'scratch_disk': True,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'speccpu2006'
+BENCHMARK_CONFIG = """
+speccpu2006:
+  description: Run Spec CPU2006
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+"""
 
 SPECCPU2006_TAR = 'cpu2006v1.2.tgz'
 SPECCPU2006_DIR = 'cpu2006'
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig():
+  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

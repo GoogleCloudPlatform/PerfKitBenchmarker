@@ -23,6 +23,7 @@ import logging
 import re
 import threading
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -39,24 +40,29 @@ flags.DEFINE_integer('num_iterations', 1,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'mesh_network',
-                  'description': 'Measures VM to VM cross section bandwidth in '
-                  'a mesh network. Specify the number of VMs in the network '
-                  'with --num_vms.',
-                  'scratch_disk': False,
-                  'num_machines': None}  # Set in GetInfo()
+BENCHMARK_NAME = 'mesh_network'
+BENCHMARK_CONFIG = """
+mesh_network:
+  description: >
+    Measures VM to VM cross section bandwidth in
+    a mesh network. Specify the number of VMs in the network
+    with --num_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+"""
 
 NETPERF_BENCHMARKSS = ['TCP_RR', 'TCP_STREAM']
 VALUE_INDEX = 1
 RESULT_LOCK = threading.Lock()
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
-  info['num_machines'] = FLAGS.num_vms
+def GetConfig():
+  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+  config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
   if FLAGS.num_vms < 2:  # Needs at least 2 vms to run the benchmark.
-    info['num_machines'] = 2
-  return info
+    config['vm_groups']['default']['vm_count'] = 2
+  return config
 
 
 def PrepareVM(vm):

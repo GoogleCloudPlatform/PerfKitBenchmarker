@@ -56,6 +56,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   """
   Object representing a Kubernetes POD.
   """
+  CLOUD = 'Kubernetes'
 
   def __init__(self, vm_spec, network, firewall):
     """Initialize a Kubernetes virtual machine.
@@ -69,18 +70,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.num_scratch_disks = 0
     self.name = self.name.replace('_', '-')
     self.user_name = FLAGS.username
-
-  @classmethod
-  def SetVmSpecDefaults(cls, vm_spec):
-    """
-    Updates VM spec with cloud specific defaults.
-    """
-    if vm_spec.image is None:
-      vm_spec.image = UBUNTU_IMAGE
-    if vm_spec.zone is None:
-      # Although Kubernetes doesn't have zone mechanism,
-      # Perfkit requires zone to be set.
-      vm_spec.zone = DEFAULT_ZONE
+    self.image = self.image or UBUNTU_IMAGE
 
   def _CreateDependencies(self):
     self._CheckPrerequisites()
