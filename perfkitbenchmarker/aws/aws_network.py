@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -151,23 +151,21 @@ class AwsVpc(resource.BaseResource):
 class AwsSubnet(resource.BaseResource):
   """An object representing an Aws subnet."""
 
-  def __init__(self, zone, vpc_id, cidr_block='10.0.0.0/24'):
+  def __init__(self, zone, vpc_id):
     super(AwsSubnet, self).__init__()
     self.zone = zone
     self.region = zone[:-1]
     self.vpc_id = vpc_id
     self.id = None
-    self.cidr_block = cidr_block
 
   def _Create(self):
     """Creates the subnet."""
-
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-subnet',
         '--region=%s' % self.region,
         '--vpc-id=%s' % self.vpc_id,
-        '--cidr-block=%s' % self.cidr_block,
+        '--cidr-block=10.0.0.0/24',
         '--availability-zone=%s' % self.zone]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)

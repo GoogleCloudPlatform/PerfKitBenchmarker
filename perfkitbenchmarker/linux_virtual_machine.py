@@ -53,6 +53,7 @@ UPDATE_RETRIES = 5
 SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '.ssh/id_rsa'
+UBUNTU_DOCKER_IMAGE = 'ubuntu:latest'
 CONTAINER_MOUNT_DIR = '/mnt'
 CONTAINER_WORK_DIR = '/root'
 
@@ -68,10 +69,6 @@ EXECUTE_COMMAND = 'execute_command.py'
 # then copies the stdout and stderr, exiting with the status of the command run
 # by EXECUTE_COMMAND.
 WAIT_FOR_COMMAND = 'wait_for_command.py'
-
-flags.DEFINE_bool('setup_remote_firewall', False,
-                  'Whether PKB should configure the firewall of each remote'
-                  'VM to make sure it accepts all internal connections.')
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -161,11 +158,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--delete']
     return self.RemoteCommand(' '.join(wait_command), should_log=False)
 
-  def SetupRemoteFirewall(self):
-    """Sets up IP table configurations on the VM."""
-    self.RemoteHostCommand('sudo iptables -A INPUT -j ACCEPT')
-    self.RemoteHostCommand('sudo iptables -A OUTPUT -j ACCEPT')
-
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
     env_file = "/etc/environment"
@@ -186,19 +178,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if commands:
       self.RemoteCommand(";".join(commands))
 
-  def SetupPackageManager(self):
-    """Specific Linux flavors should override this."""
-    pass
-
   def PrepareVMEnvironment(self):
     self.SetupProxy()
-    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
-    if FLAGS.setup_remote_firewall:
-      self.SetupRemoteFirewall()
     if self.is_static and self.install_packages:
       self.SnapshotPackages()
     self.BurnCpu()
-    self.SetupPackageManager()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
@@ -400,7 +384,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Authenticate a remote machine to access all peers."""
     self.RemoteHostCopy(vm_util.GetPrivateKeyPath(),
                         REMOTE_KEY_PATH)
-    self.has_private_key = True
 
   def CheckJavaVersion(self):
     """Check the version of java on remote machine.
@@ -547,10 +530,13 @@ class RhelMixin(BaseLinuxMixin):
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
-                           'sudo tee /etc/sudoers.d/pkb' % self.user_name,
-                           login_shell=True)
+    self.RemoteCommand('echo \'Defaults:%s !requiretty\' | '
+                       'sudo tee /etc/sudoers.d/pkb' % self.user_name,
+                       login_shell=True)
 
+  def PrepareVMEnvironment(self):
+    super(RhelMixin, self).PrepareVMEnvironment()
+    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
@@ -645,18 +631,17 @@ class RhelMixin(BaseLinuxMixin):
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  def SetupPackageManager(self):
+  def PrepareVMEnvironment(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""
+    super(DebianMixin, self).PrepareVMEnvironment()
     self.AptUpdate()
+    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
   @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
     try:
-      # setting the timeout on the apt-get to 5 minutes because
-      # it is known to get stuck.  In a normal update this
-      # takes less than 30 seconds.
-      self.RemoteCommand('sudo apt-get update', timeout=300)
+      self.RemoteCommand('sudo apt-get update')
     except errors.VirtualMachine.RemoteCommandError as e:
       # If there is a problem, remove the lists in order to get rid of
       # "Hash Sum mismatch" errors (the files will be restored when
@@ -753,33 +738,20 @@ class ContainerizedDebianMixin(DebianMixin):
   """Class representing a Containerized Virtual Machine.
 
   A Containerized Virtual Machine is a VM that runs remote commands
-  within a Docker Container.
+  within a Docker Container running Ubuntu.
   Any call to RemoteCommand() will be run within the container
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
 
-  def _CheckDockerExists(self):
-    """Returns whether docker is installed or not."""
-    resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
-                                     suppress_warning=True)
-    if resp.rstrip() == "":
-      return False
-    return True
-
   def PrepareVMEnvironment(self):
     """Initializes docker before proceeding with preparation."""
     self.RemoteHostCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
-    if not self._CheckDockerExists():
-      self.Install('docker')
+    self.Install('docker')
     self.InitDocker()
-
-    # Python is needed for RobustRemoteCommands
-    self.Install('python')
     super(ContainerizedDebianMixin, self).PrepareVMEnvironment()
 
   def InitDocker(self):
     """Initializes the docker container daemon."""
-    self.CONTAINER_IMAGE = 'ubuntu:latest'
     init_docker_cmd = ['sudo docker run -d '
                        '--net=host '
                        '--workdir=%s '
@@ -788,17 +760,17 @@ class ContainerizedDebianMixin(DebianMixin):
                                       CONTAINER_MOUNT_DIR)]
     for sd in self.scratch_disks:
       init_docker_cmd.append('-v %s:%s ' % (sd.mount_point, sd.mount_point))
-    init_docker_cmd.append('%s sleep infinity ' % self.CONTAINER_IMAGE)
+    init_docker_cmd.append('%s sleep infinity ' % UBUNTU_DOCKER_IMAGE)
     init_docker_cmd = ''.join(init_docker_cmd)
 
     resp, _ = self.RemoteHostCommand(init_docker_cmd)
-    self.docker_id = resp.rstrip()
+    self.docker_id = resp[:-1]
     return self.docker_id
 
   def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False,
-                    suppress_warning=False, timeout=None):
+                    suppress_warning=False):
     """Runs a command inside the container.
 
     Args:

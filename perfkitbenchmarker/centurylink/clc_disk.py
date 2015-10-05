@@ -12,36 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import clc
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
 
 class CenturylinkDisk(disk.BaseDisk):
 
-    def __init__(self, disk_spec, api_key, api_pass, server_name, disk_size):
+    def __init__(self, disk_spec):
         super(CenturylinkDisk, self).__init__(disk_spec)
-        self.api_key = api_key
-        self.api_pass = api_pass
-        self.server_name = server_name
-        self.disk_size = disk_size
 
     def _Create(self):
 
-        create_cmd = "clc \
-            --v1-api-key %s \
-            --v1-api-passwd %s \
-            servers add-disk \
-            --server %s \
-            --size %d" % (
-            self.api_key,
-            self.api_pass,
-            self.server_name,
-            self.disk_size)
-
-        vm_util.IssueCommand(create_cmd)
+        print "*" * 25 + " Creating ScratchDisk - _Create" + "*" * 25
+        clc.v2.Server(self.server_name).Disks().Add(size=1, path=None, type="raw").WaitUntilComplete()
 
     def _Exists(self):
         pass

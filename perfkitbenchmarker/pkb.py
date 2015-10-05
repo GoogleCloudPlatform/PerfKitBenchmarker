@@ -67,7 +67,6 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import timing_util
-from perfkitbenchmarker import traces
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_benchmarks
@@ -165,9 +164,6 @@ flags.DEFINE_string('ftp_proxy', '',
                     '[user:passwd@]proxy.server:port.')
 
 MAX_RUN_URI_LENGTH = 8
-
-
-events.initialization_complete.connect(traces.RegisterAll)
 
 
 # TODO(user): Consider moving to benchmark_spec.
@@ -321,8 +317,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
       logging.exception('Error during benchmark %s', benchmark_name)
       # If the particular benchmark requests us to always call cleanup, do it
       # here.
-      if (FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP] and spec and
-          spec.always_call_cleanup):
+      if spec and spec.always_call_cleanup:
         DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
       raise
     finally:

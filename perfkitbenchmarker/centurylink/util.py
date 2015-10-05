@@ -21,41 +21,31 @@ import string
 def AutoGenerateServerName():
     """Returns an auto-generated server name"""
 
-    randAlfaKey = ''
+    rand_alpha_key = ''
 
     for i in range(0, 3):
-        randAlfaKey += random.choice(string.ascii_uppercase)
+        rand_alpha_key += random.choice(string.ascii_uppercase)
 
-    randIntKey = random.randint(100, 999)
-    serverName = '%s%s' % (randAlfaKey, randIntKey)
-    return serverName
-
-
-def ParseCLIResponse(output):
-    """Returns Server Name from the returned CLC CLI formatted table."""
-
-    res = output.split('|')
-    return res[3].strip()
+    rand_int_key = random.randint(100, 999)
+    server_name = '%s%s' % (rand_alpha_key, rand_int_key)
+    return server_name
 
 
 def GetDefaultCenturylinkEnv():
     """Returns a dictionary of environment variables and other locally set \
     variables for using Centurylink Cloud SDK"""
 
-    serverName = AutoGenerateServerName()
+    server_name = AutoGenerateServerName()
 
     env = {
-        'API_KEY': os.getenv('CLC_API_KEY'),
-        'API_PASSWD': os.getenv('CLC_API_PASSWD'),
+        'USERNAME': os.getenv('CLC_USERNAME'),
+        'PASSWORD': os.getenv('CLC_PASSWORD'),
         'GROUP': os.getenv('CLC_GROUP'),
-        'LOCATION': os.getenv('CLC_LOCATION'),
-        'NETWORK': os.getenv('CLC_NETWORK'),
-        'VM_NAME': serverName,
+        'VM_NAME': server_name,
         'VM_DESC': 'This server is created as a part of CLC hook development \
                     for PerfKitBenchmarker',
-        'BACKUP_LEVEL': 'Standard',
-        'CPU': 1,
-        'RAM': 1,
+        'CPU': os.getenv('CLC_CPU'),
+        'RAM': os.getenv('CLC_RAM'),
     }
 
     return env

@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# ./pkb.py --cloud=Centurylink --machine_type=UBUNTU-12-64-TEMPLATE
-# --benchmarks=iperf
-
+import clc
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.centurylink import clc_disk
 from perfkitbenchmarker.centurylink import util
+from perfkitbenchmarker.centurylink import clc_disk
 
 
 class CenturylinkVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -37,10 +35,11 @@ class CenturylinkVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.disk_size = 1
         self.max_local_disks = 1
         self.local_disk_counter = 0
+        self.location = self.zone
 
         env = util.GetDefaultCenturylinkEnv()
-        self.api_key = env['API_KEY']
-        self.api_passwd = env['API_PASSWD']
+        self.user_name = env['USERNAME']
+        self.password = env['PASSWORD']
 
     @classmethod
     def SetVmSpecDefaults(cls, vm_spec):
@@ -56,72 +55,57 @@ class CenturylinkVirtualMachine(virtual_machine.BaseVirtualMachine):
     def _Create(self):
         """Create a Centurylink VM instance."""
 
+        print "*" * 25 + " Creating server " + "*" * 25
         env = util.GetDefaultCenturylinkEnv()
-        GROUP = env['GROUP']
-        LOCATION = env['LOCATION']
-        MACHINE_TYPE = self.machine_type
-        NAME = env['VM_NAME']
-        DESC = env['VM_DESC']
-        BACKUP_LEVEL = env['BACKUP_LEVEL']
-        NETWORK = env['NETWORK']
-        CPU = env['CPU']
-        RAM = env['RAM']
+        group_name = env['GROUP']
+        vm_name = env['VM_NAME']
+        vm_desc = env['VM_DESC']
+        cpu = int(env['CPU'])
+        ram = int(env['RAM'])
 
-        # Create a server with the specified inputs
-        create_cmd = "clc \
-            --v1-api-key %s \
-            --v1-api-passwd %s servers create \
-            --name %s \
-            --location %s \
-            --group '%s' \
-            --description '%s' \
-            --template %s \
-            --backup-level %s \
-            --network %s \
-            --cpu %d \
-            --ram %d" % (
-            self.api_key,
-            self.api_passwd,
-            NAME,
-            LOCATION,
-            GROUP,
-            DESC,
-            MACHINE_TYPE,
-            BACKUP_LEVEL,
-            NETWORK,
-            CPU,
-            RAM)
+        clc.v2.SetCredentials(self.user_name, self.password)
+        alias = clc.v2.Account.GetAlias()
+        d = clc.v2.Datacenter(self.location)
 
-        stdout, _, _ = vm_util.IssueCommand(create_cmd)
-        server_name = util.ParseCLIResponse(stdout)
-        self.server_name = server_name
+        clc.v2.Server.Create(name=vm_name, cpu=cpu, memory=ram, description=vm_desc,
+                         group_id=d.Groups().Get(group_name).id,
+                         template=d.Templates().Search(self.machine_type)[0].id,
+                         network_id=d.Networks().networks[0].id).WaitUntilComplete()
 
-        self.CreateScratchDisk()
+        self.server_name = self.location + alias + vm_name + "01"
 
-    def CreateScratchDisk(self, disk_spec):
+    @vm_util.Retry()
+    def _PostCreate(self):
+        """Get the instance's data."""
 
-        scratch_disk = clc_disk.CenturylinkDisk(
-            disk_spec,
-            self.api_key,
-            self.api_passwd,
-            self.server_name,
-            self.disk_size)
+        # Add Public IP and assign ports
+        print "*" * 25 + " Creating Public IP and assigning port 22 to it " + "*" * 25
+        p = clc.v2.Server(self.server_name).PublicIPs()
+        p.Add(ports=[{"protocol": "TCP", "port": 22}, {"protocol": "ICMP", "port": 0}]).WaitUntilComplete()
+        print "*" * 25 + " Updating Public IP " + "*" * 25
+        p.public_ips[0].Update().WaitUntilComplete()
+        print "Public IP: " + p.public_ips[0].id
 
-        scratch_disk._Create()
+        self.ip_address = p.public_ips[0].id
+        self.hostname = p.public_ips[0].id
 
     def _Delete(self):
-        """Delete a Centurylink VM instance."""
+        print "*" * 20 + " Deleting server " + "*" * 20
+        c = clc.v2.Server(self.server_name)
+        c.Delete().WaitUntilComplete()
 
-        delete_cmd = "clc --async \
-            --v1-api-key %s \
-            --v1-api-passwd %s \
-            servers delete \
-            --server %s" % (
-            self.api_key,
-            self.api_passwd,
-            self.server_name)
+    def _Exists(self):
+        print "*" * 25 + " Checking whether server exists " + "*" * 25
 
-        vm_util.IssueCommand(delete_cmd)
+        s = clc.v2.Server(self.server_name).status
+        if s == "active":
+            return True
+        else:
+            return False
+
+    def CreateScratchDisk(self, disk_spec):
+        print "*" * 25 + " Creating ScratchDisk " + "*" * 25
+        clc_disk.CenturylinkDisk(self, disk_spec)
 
 
 class DebianBasedCenturylinkVirtualMachine(

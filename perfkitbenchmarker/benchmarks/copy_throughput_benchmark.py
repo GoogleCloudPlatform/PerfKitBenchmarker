@@ -81,7 +81,10 @@ def PrepareDataFile(vm):
 
 
 def PreparePrivateKey(vm):
-  vm.AuthenticateVm()
+  if not vm.has_private_key:
+    vm.PushFile(vm_util.GetPrivateKeyPath(),
+                linux_virtual_machine.REMOTE_KEY_PATH)
+    vm.has_private_key = True
 
 
 def Prepare(benchmark_spec):
