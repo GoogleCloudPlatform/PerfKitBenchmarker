@@ -130,6 +130,10 @@ def GetUserConfig():
     raise errors.Config.ParseError(
         'Encountered a problem loading config. Please ensure that the config '
         'is valid YAML. Error received:\n%s' % e)
+  except yaml.composer.ComposerError as e:
+    raise errors.Config.ParseError(
+        'Encountered a problem loading config. Please ensure that all '
+        'references are defined. Error received:\n%s' % e)
 
   return config
 
@@ -192,6 +196,10 @@ def LoadMinimalConfig(benchmark_config, benchmark_name):
     raise errors.Config.ParseError(
         'Encountered a problem loading the default benchmark config. Please '
         'ensure that the config is valid YAML. Error received:\n%s' % e)
+  except yaml.composer.ComposerError as e:
+    raise errors.Config.ParseError(
+        'Encountered a problem loading the default benchmark config. Please '
+        'ensure that all references are defined. Error received:\n%s' % e)
 
   return config[benchmark_name]
 
