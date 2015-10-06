@@ -160,8 +160,8 @@ RETRY_WAIT_INTERVAL_SECONDS = 30
 DEFAULT_GCS_REGION = 'US-CENTRAL1'
 
 
-def GetConfig():
-  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 # Raised when we fail to remove a bucket or its content after many retries.

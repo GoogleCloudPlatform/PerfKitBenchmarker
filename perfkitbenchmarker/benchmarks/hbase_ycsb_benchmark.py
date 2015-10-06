@@ -80,8 +80,8 @@ COLUMN_FAMILY = 'cf'
 TABLE_SPLIT_COUNT = 200
 
 
-def GetConfig():
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   num_vms = max(FLAGS.num_vms, 2)
   if FLAGS['num_vms'].present and FLAGS.num_vms < 2:
     raise ValueError('hbase_ycsb requires at least 2 HBase VMs.')

@@ -49,8 +49,8 @@ aerospike_ycsb:
 """
 
 
-def GetConfig():
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
   if (FLAGS.aerospike_storage_type == aerospike_server.DISK and
       FLAGS.scratch_disk_type != disk.LOCAL):

@@ -44,8 +44,8 @@ COREMARK_BUILDFILE = 'linux64/core_portme.mak'
 ITERATIONS_PER_CPU = 200000
 
 
-def GetConfig():
-  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

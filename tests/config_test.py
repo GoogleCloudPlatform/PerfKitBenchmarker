@@ -41,15 +41,16 @@ class ConfigsTestCase(unittest.TestCase):
   def testLoadAllDefaultConfigs(self):
     all_benchmarks = benchmarks.BENCHMARKS + windows_benchmarks.BENCHMARKS
     for benchmark_module in all_benchmarks:
-      self.assertIsInstance(benchmark_module.GetConfig(), dict)
+      self.assertIsInstance(benchmark_module.GetConfig({}), dict)
 
   def testLoadValidConfig(self):
-    self.assertIsInstance(configs.LoadConfig(VALID_CONFIG, CONFIG_NAME), dict)
+    self.assertIsInstance(
+        configs.LoadConfig(VALID_CONFIG, {}, CONFIG_NAME), dict)
 
   def testWrongName(self):
     with self.assertRaises(KeyError):
-      configs.LoadConfig(VALID_CONFIG, INVALID_NAME)
+      configs.LoadConfig(VALID_CONFIG, {}, INVALID_NAME)
 
   def testLoadInvalidYaml(self):
     with self.assertRaises(errors.Config.ParseError):
-      configs.LoadConfig(INVALID_YAML_CONFIG, CONFIG_NAME)
+      configs.LoadConfig(INVALID_YAML_CONFIG, {}, CONFIG_NAME)

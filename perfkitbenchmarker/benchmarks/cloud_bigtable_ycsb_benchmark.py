@@ -92,8 +92,8 @@ REQUIRED_SCOPES = (
 COLUMN_FAMILY = 'cf'
 
 
-def GetConfig():
-  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

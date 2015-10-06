@@ -77,8 +77,8 @@ SPECCPU2006_TAR = 'cpu2006v1.2.tgz'
 SPECCPU2006_DIR = 'cpu2006'
 
 
-def GetConfig():
-  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

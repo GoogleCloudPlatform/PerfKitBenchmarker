@@ -104,8 +104,8 @@ def CheckPrerequisites():
   _CheckHeapSize(FLAGS.cs_websearch_client_heap_size)
 
 
-def GetConfig():
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   num_clients = FLAGS.cs_websearch_num_clients
   config['vm_groups']['default']['vm_count'] = num_clients + NUM_SERVERS
   return config

@@ -238,7 +238,8 @@ def DoCleanupPhase(benchmark, name, spec, timer):
     spec.Delete()
 
 
-def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
+def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
+                 benchmark_config):
   """Runs a single benchmark and adds the results to the collector.
 
   Args:
@@ -247,8 +248,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks):
     sequence_number: The sequence number of when the benchmark was started
       relative to the other benchmarks in the suite.
     total_benchmarks: The total number of benchmarks in the suite.
+    benchmark_config: The config to run the benchmark with.
   """
-  benchmark_config = benchmark.GetConfig()
   benchmark_name = benchmark.BENCHMARK_NAME
 
   # Modify the logger prompt for messages logged within this function.
@@ -388,16 +389,16 @@ def RunBenchmarks(publish=True):
           fp)
 
   try:
-    benchmark_list = benchmark_sets.GetBenchmarksFromFlags()
-    total_benchmarks = len(benchmark_list)
-    if FLAGS.parallelism > 1:
-      args = [((benchmark, collector, i + 1, total_benchmarks), {})
-              for i, benchmark in enumerate(benchmark_list)]
-      vm_util.RunThreaded(
-          RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
-    else:
-      for i, benchmark in enumerate(benchmark_list):
-        RunBenchmark(benchmark, collector, i + 1, total_benchmarks)
+    benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    total_benchmarks = len(benchmark_tuple_list)
+
+    args = []
+    for i, benchmark_tuple in enumerate(benchmark_tuple_list):
+      benchmark_module, user_config = benchmark_tuple
+      args.append(((benchmark_module, collector, i + 1, total_benchmarks,
+                    benchmark_module.GetConfig(user_config)), {}))
+    vm_util.RunThreaded(
+        RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
   finally:
     if collector.samples:
       collector.PublishSamples()

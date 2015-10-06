@@ -57,8 +57,8 @@ COLUMN_FAMILY = 'data'
 CREATE_TABLE_SCRIPT = 'cassandra/create-ycsb-table.cql.j2'
 
 
-def GetConfig():
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   num_vms = max(FLAGS.num_vms, 3)
   config['vm_groups']['default']['vm_count'] = num_vms + FLAGS.ycsb_client_vms
   return config

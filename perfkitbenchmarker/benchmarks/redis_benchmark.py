@@ -52,8 +52,8 @@ redis:
 """
 
 
-def GetConfig():
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   config['vm_groups']['default']['vm_count'] = 1 + FLAGS.redis_clients
   return config
 

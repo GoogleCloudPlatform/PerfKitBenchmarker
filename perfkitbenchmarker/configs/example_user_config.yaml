@@ -27,7 +27,7 @@ static_vms:
       - mount_point: /scratch
 
 # Multi cloud iperf config.
-iperf:
+iperf: &iperf_multicloud
   vm_groups:
     iperf_vm_1:
       cloud: GCP
@@ -46,3 +46,10 @@ fio:
     default:
       static_vms:
         - *vm2
+
+# If you choose to, you can specify which benchmarks should be
+# run in your config file. This will even let you run the same
+# benchmark multiple times with different configs.
+benchmarks:
+  - iperf: null # This means use the default config
+  - iperf: *iperf_multicloud

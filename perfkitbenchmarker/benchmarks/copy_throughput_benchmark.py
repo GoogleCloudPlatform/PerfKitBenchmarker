@@ -55,9 +55,9 @@ DISK_SIZE_IN_GB = 500
 UNIT = 'MB/sec'
 
 
-def GetConfig():
+def GetConfig(user_config):
   """Decide number of vms needed and return infomation for copy benchmark."""
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS.copy_benchmark_mode != 'scp':
     config['vm_groups']['default']['vm_count'] = 1
     config['vm_groups']['default']['disk_count'] = 2

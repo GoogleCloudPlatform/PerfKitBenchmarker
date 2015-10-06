@@ -57,8 +57,8 @@ VALUE_INDEX = 1
 RESULT_LOCK = threading.Lock()
 
 
-def GetConfig():
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
   if FLAGS.num_vms < 2:  # Needs at least 2 vms to run the benchmark.
     config['vm_groups']['default']['vm_count'] = 2

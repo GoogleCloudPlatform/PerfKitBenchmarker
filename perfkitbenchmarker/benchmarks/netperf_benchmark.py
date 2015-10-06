@@ -64,8 +64,8 @@ COMMAND_PORT = 20000
 DATA_PORT = 20001
 
 
-def GetConfig():
-  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def PrepareNetperf(vm):

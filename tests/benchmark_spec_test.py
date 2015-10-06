@@ -84,7 +84,7 @@ name:
 class ConstructVmsTestCase(unittest.TestCase):
 
   def testSimpleConfig(self):
-    config = configs.LoadConfig(SIMPLE_CONFIG, NAME)
+    config = configs.LoadConfig(SIMPLE_CONFIG, {}, NAME)
     spec = benchmark_spec.BenchmarkSpec(config, NAME)
     spec.ConstructVirtualMachines()
 
@@ -96,7 +96,7 @@ class ConstructVmsTestCase(unittest.TestCase):
     self.assertEqual(vm.project, 'my-project')
 
   def testMultiCloud(self):
-    config = configs.LoadConfig(MULTI_CLOUD_CONFIG, NAME)
+    config = configs.LoadConfig(MULTI_CLOUD_CONFIG, {}, NAME)
     spec = benchmark_spec.BenchmarkSpec(config, NAME)
     spec.ConstructVirtualMachines()
 
@@ -105,7 +105,7 @@ class ConstructVmsTestCase(unittest.TestCase):
     self.assertIsInstance(spec.vm_groups['group2'][0], gce_vm.GceVirtualMachine)
 
   def testStaticVms(self):
-    config = configs.LoadConfig(STATIC_VM_CONFIG, NAME)
+    config = configs.LoadConfig(STATIC_VM_CONFIG, {}, NAME)
     spec = benchmark_spec.BenchmarkSpec(config, NAME)
     spec.ConstructVirtualMachines()
 
@@ -122,7 +122,7 @@ class ConstructVmsTestCase(unittest.TestCase):
     self.assertEqual(vm2.disk_specs[0].mount_point, '/scratch')
 
   def testBadParameter(self):
-    config = configs.LoadConfig(BAD_VM_PARAMETER_CONFIG, NAME)
+    config = configs.LoadConfig(BAD_VM_PARAMETER_CONFIG, {}, NAME)
     spec = benchmark_spec.BenchmarkSpec(config, NAME)
     with self.assertRaises(errors.Config.ValueError):
       spec.ConstructVirtualMachines()

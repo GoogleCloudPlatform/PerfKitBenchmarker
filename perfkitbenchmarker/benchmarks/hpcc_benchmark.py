@@ -71,8 +71,8 @@ flags.DEFINE_integer('memory_size_mb',
                      'default it will use the entire system\'s memory.')
 
 
-def GetConfig():
-  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

@@ -90,8 +90,8 @@ BONNIE_RESULTS_MAPPING = {
     'ran_del_latency': 47}
 
 
-def GetConfig():
-  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):

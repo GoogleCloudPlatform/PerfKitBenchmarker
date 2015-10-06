@@ -51,8 +51,8 @@ NUM_BYTES_PER_ROW = 100
 NUM_MB_PER_ROW = NUM_BYTES_PER_ROW / (1024.0 ** 2)
 
 
-def GetConfig():
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['num_vms'].present:
     config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
   return config

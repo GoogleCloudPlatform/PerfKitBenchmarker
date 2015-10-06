@@ -59,8 +59,8 @@ PARALLEL_COPIES_REGEX = r'running (\d+) parallel cop[yies]+ of tests'
 RESULT_START_STRING = 'Benchmark Run:'
 
 
-def GetConfig():
-  return configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

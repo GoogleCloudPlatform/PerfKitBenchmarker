@@ -42,8 +42,8 @@ redis_ycsb:
 REDIS_PID_FILE = posixpath.join(redis_server.REDIS_DIR, 'redis.pid')
 
 
-def GetConfig():
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   config['vm_groups']['default']['vm_count'] = 1 + FLAGS.ycsb_client_vms
   return config
 

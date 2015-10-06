@@ -79,9 +79,9 @@ oldisim:
 """
 
 
-def GetConfig():
+def GetConfig(user_config):
   """Decide number of vms needed to run oldisim."""
-  config = configs.LoadConfig(BENCHMARK_CONFIG, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   config['vm_groups']['default']['vm_count'] = (FLAGS.oldisim_num_leaves
                                                 + NUM_DRIVERS + NUM_ROOTS)
   return config

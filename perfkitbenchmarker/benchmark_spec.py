@@ -165,16 +165,12 @@ flags.DEFINE_string('scratch_dir', '/scratch',
 
 def _GetVmSpecClass(cloud):
   """Gets the VmSpec class corresponding to the cloud."""
-  if VM_SPEC in CLASSES[cloud]:
-    return CLASSES[cloud][VM_SPEC]
-  return virtual_machine.BaseVmSpec
+  return CLASSES[cloud].get(VM_SPEC, virtual_machine.BaseVmSpec)
 
 
 def _GetDiskSpecClass(cloud):
   """Gets the DiskSpec class corresponding to the cloud."""
-  if DISK_SPEC in CLASSES[cloud]:
-    return CLASSES[cloud][DISK_SPEC]
-  return disk.BaseDiskSpec
+  return CLASSES[cloud].get(DISK_SPEC, disk.BaseDiskSpec)
 
 
 class BenchmarkSpec(object):
@@ -185,7 +181,8 @@ class BenchmarkSpec(object):
 
     Args:
       benchmark_config: A Python dictionary representation of the configuration
-        for the benchmark. For a complete explanation, see the README.
+        for the benchmark. For a complete explanation, see
+        perfkitbenchmarker/configs/__init__.py.
       benchmark_name: The name of the benchmark.
     """
     self.config = benchmark_config
