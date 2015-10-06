@@ -67,7 +67,12 @@ hbase_ycsb:
       cluster size with --num_vms. Specify the number of YCSB VMs
       with --ycsb_client_vms.
   vm_groups:
-    default:
+    loaders:
+      vm_spec: *default_single_core
+    master:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+    workers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
 """
@@ -85,7 +90,9 @@ def GetConfig(user_config):
   num_vms = max(FLAGS.num_vms, 2)
   if FLAGS['num_vms'].present and FLAGS.num_vms < 2:
     raise ValueError('hbase_ycsb requires at least 2 HBase VMs.')
-  config['vm_groups']['default']['vm_count'] = num_vms + FLAGS.ycsb_client_vms
+  config['vm_groups']['loaders']['vm_count'] = FLAGS.ycsb_client_vms
+  if FLAGS['num_vms'].present:
+    config['vm_groups']['workers']['vm_count'] = num_vms - 1
   return config
 
 
@@ -128,7 +135,7 @@ def CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
   vm.RemoteCommand(command, should_log=True)
 
 
-def _GetVMsByRole(vms):
+def _GetVMsByRole(vm_groups):
   """Partition "vms" by role in the benchmark.
 
   * The first VM is the master.
@@ -137,19 +144,20 @@ def _GetVMsByRole(vms):
   * The nodes which are neither the master nor loaders are HBase region servers.
 
   Args:
-    vms: A list of virtual machines.
+    vm_groups: The benchmark_spec's vm_groups dict.
 
   Returns:
     A dictionary with keys 'vms', 'hbase_vms', 'master', 'zk_quorum', 'workers',
     and 'loaders'.
   """
-  hbase_vms = vms[:-FLAGS.ycsb_client_vms]
+  hbase_vms = vm_groups['master'] + vm_groups['workers']
+  vms = hbase_vms + vm_groups['loaders']
   return {'vms': vms,
           'hbase_vms': hbase_vms,
-          'master': hbase_vms[0],
+          'master': vm_groups['master'][0],
           'zk_quorum': hbase_vms[:FLAGS.hbase_zookeeper_nodes],
-          'workers': hbase_vms[1:],
-          'loaders': vms[-FLAGS.ycsb_client_vms:]}
+          'workers': vm_groups['workers'],
+          'loaders': vm_groups['loaders']}
 
 
 def Prepare(benchmark_spec):
@@ -159,7 +167,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  by_role = _GetVMsByRole(benchmark_spec.vms)
+  by_role = _GetVMsByRole(benchmark_spec.vm_groups)
 
   loaders = by_role['loaders']
   assert loaders, 'No loader VMs: {0}'.format(by_role)
@@ -210,8 +218,7 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  vms = benchmark_spec.vms
-  by_role = _GetVMsByRole(vms)
+  by_role = _GetVMsByRole(benchmark_spec.vm_groups)
   loaders = by_role['loaders']
   logging.info('Loaders: %s', loaders)
 
@@ -246,7 +253,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  by_role = _GetVMsByRole(benchmark_spec.vms)
+  by_role = _GetVMsByRole(benchmark_spec.vm_groups)
   hbase.Stop(by_role['master'])
   hadoop.StopHDFS(by_role['master'])
   vm_util.RunThreaded(hadoop.CleanDatanode, by_role['workers'])
