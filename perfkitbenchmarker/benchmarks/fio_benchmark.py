@@ -77,9 +77,7 @@ flags.DEFINE_list('generate_scenarios', None,
 flags.DEFINE_boolean('against_device', False,
                      'Unmount the device\'s filesystem so we can test against '
                      'the raw block device. If --generate-scenarios is given, '
-                     'will generate a job file that uses the block device. '
-                     'When using --against_device, default to pre-filling the '
-                     'device to 100% unless modified with --device_fill_size.')
+                     'will generate a job file that uses the block device.')
 flags.DEFINE_boolean('prefill_device', False,
                      'If true, write on the device before starting the '
                      'benchmark. The amount to write is given by '
