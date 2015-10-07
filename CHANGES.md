@@ -7,6 +7,10 @@
 * Enhancements:
   * OpenStack checks/changes for attaching volumes, default volume size, config improvements, … (thanks @kivio) (GH-454, GH-459, GH-464)
   * Fio test improvements and clean-up - template files, logging, ...  (GH-421, GH-501, GH-502)
+    * * * BREAKING CHANGE - BEGIN * * * 
+    fio runs now fill the whole disk prior to running.  This can add considerable time depending on disk size.  
+    Use "--device_fill_size=0" to get the prior behavior.
+    * * * BREAKING CHANGE - END * * *
   * Add improvement to use compiled crcmod when benchmarking Google Cloud Storage (GH-461)
   * Collect Fio data over time via “--run_for_minutes” flag (GH-477)
   * Execute command improvements to add better logging and parallelism (GH-488, GH-470)
