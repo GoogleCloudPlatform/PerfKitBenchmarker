@@ -77,14 +77,16 @@ flags.DEFINE_list('generate_scenarios', None,
 flags.DEFINE_boolean('against_device', False,
                      'Unmount the device\'s filesystem so we can test against '
                      'the raw block device. If --generate-scenarios is given, '
-                     'will generate a job file that uses the block device.')
+                     'will generate a job file that uses the block device. '
+                     'When using --against_device, default to pre-filling the '
+                     'device to 100% unless modified with --device_fill_size.')
 flags.DEFINE_string('device_fill_size', '100%',
                     'The amount of device to fill in prepare stage. '
                     'The valid value can either be an integer, which '
                     'represents the number of bytes to fill or a '
                     'percentage, which represents the percentage '
                     'of the device. A filesystem will be unmounted before '
-                    'filling and remounted afterwards. Default is 100%')
+                    'filling and remounted afterwards. Default is not to fill.')
 flags.DEFINE_string('io_depths', '1',
                     'IO queue depths to run on. Can specify a single number, '
                     'like --io_depths=1, a range, like --io_depths=1-4, or a '
@@ -411,7 +413,7 @@ def Prepare(benchmark_spec):
   logging.info('Umount scratch disk on %s at %s', vm, mount_point)
   vm.RemoteCommand('sudo umount %s' % mount_point)
 
-  if FLAGS.device_fill_size is not '0':
+  if FLAGS['device_fill_size'].present or FLAGS.against_device:
     logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
     FillDevice(vm, disk, FLAGS.device_fill_size)
 
