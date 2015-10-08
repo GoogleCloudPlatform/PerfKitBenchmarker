@@ -1,3 +1,27 @@
+# v0.22.0
+* New Features:
+  * Add Kubernetes as a provider where benchmarks can be run (thanks @mateusz-blaszkowski) (GH-475)
+  * Add EPFL CloudSuite WebSearch Workload (thanks @Vukasin92) (GH-422, GH-479)
+  * Aerospike_yscb_benchmark (GH-486)
+
+* Enhancements:
+  * OpenStack checks/changes for attaching volumes, default volume size, config improvements, … (thanks @kivio) (GH-454, GH-459, GH-464)
+  * Fio test improvements and clean-up - template files, logging, ...  (GH-421, GH-501, GH-502)
+  * Add improvement to use compiled crcmod when benchmarking Google Cloud Storage (GH-461)
+  * Collect Fio data over time via “--run_for_minutes” flag (GH-477)
+  * Execute command improvements to add better logging and parallelism (GH-488, GH-470)
+
+* Bugfixes and maintenance updates:
+  * Update to allow PKB to work with the latest Azure CLI 0.9.9 (GH-485)
+  * Updated fio version to 2.2.10 (GH-509)
+  * fio iodepth flag fix “--io_depths”  (GH-495)
+  * Fixes a race condition on AWS/Azure where networks in use were deleted (GH-506)
+  * Added a note on how to fix dependencies when tox tests fail (GH-505)
+  * Fixed  broken Apache project links (GH-492, GH-467)
+  * Netperf timeout to work around occasional hangs (GH-483)
+  * Fixed lock pickling issues (GH-471)
+  * Added a “-v” flag (GH-463)
+
 # v0.21.0
 
 * New features:
