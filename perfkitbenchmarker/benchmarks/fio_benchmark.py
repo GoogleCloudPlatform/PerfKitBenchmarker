@@ -76,11 +76,14 @@ flags.DEFINE_list('generate_scenarios', None,
                   '--fio_jobfile.')
 flags.DEFINE_boolean('against_device', False,
                      'Unmount the device\'s filesystem so we can test against '
-                     'the raw block device. If --generate-scenarios is given, '
+                     'the raw block device; will always prefill the device to '
+                     'device_fill_size. '
+                     'If --generate-scenarios is given, '
                      'will generate a job file that uses the block device.')
 flags.DEFINE_boolean('prefill_device', False,
-                     'If true, write on the device before starting the '
-                     'benchmark. The amount to write is given by '
+                     'Used when against_device is false: decides if it is '
+                     'required to prefill the device before the fio run. '
+                     'The amount to prefill is given by '
                      '--device_fill_size.')
 flags.DEFINE_string('device_fill_size', '100%',
                     'The amount of device to fill in prepare stage. '
@@ -416,7 +419,7 @@ def Prepare(benchmark_spec):
   logging.info('Umount scratch disk on %s at %s', vm, mount_point)
   vm.RemoteCommand('sudo umount %s' % mount_point)
 
-  if FLAGS.prefill_device:
+  if FLAGS.against_device or FLAGS.prefill_device:
     logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
     FillDevice(vm, disk, FLAGS.device_fill_size)
 
