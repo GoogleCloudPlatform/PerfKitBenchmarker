@@ -15,7 +15,7 @@
 # See: https://issues.apache.org/jira/browse/HBASE-4163
 # Creates 4GB files.
 create "{{ table_name }}", {NAME => "{{ family }}"{% if use_snappy %}, COMPRESSION => 'snappy'{% endif %} },
-       {SPLITS => (1..{{ n_splits }}).map {|i| "user#{1000+i*(9999-1000)/{{n_splits}}}"},
-        MAX_FILESIZE => 4*1024**3};
+       {SPLITS => (1..{{ n_splits }}).map {|i| "user#{1000+i*(9999-1000)/{{n_splits}}}"}{%if limit_filesize %},
+        MAX_FILESIZE => 4*1024**3{% endif %}};
 
 exit;
