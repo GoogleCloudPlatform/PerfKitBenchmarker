@@ -32,7 +32,8 @@ from perfkitbenchmarker.azure import azure_network
 from perfkitbenchmarker.azure import azure_virtual_machine
 from perfkitbenchmarker.deployment.config import config_reader
 import perfkitbenchmarker.deployment.shared.ini_constants as ini_constants
-from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
+from perfkitbenchmarker.digitalocean import (
+    digitalocean_virtual_machine as digitalocean_vm)
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.kubernetes import kubernetes_virtual_machine
@@ -106,9 +107,11 @@ CLASSES = {
     DIGITALOCEAN: {
         VIRTUAL_MACHINE: {
             DEBIAN:
-            digitalocean_virtual_machine.DebianBasedDigitalOceanVirtualMachine,
+            digitalocean_vm.DebianBasedDigitalOceanVirtualMachine,
             RHEL:
-            digitalocean_virtual_machine.RhelBasedDigitalOceanVirtualMachine,
+            digitalocean_vm.RhelBasedDigitalOceanVirtualMachine,
+            UBUNTU_CONTAINER:
+            digitalocean_vm.ContainerziedDigitalOceanVirtualMachine,
         },
     },
     KUBERNETES: {
