@@ -7,14 +7,6 @@
 * Enhancements:
   * OpenStack checks/changes for attaching volumes, default volume size, config improvements, … (thanks @kivio) (GH-454, GH-459, GH-464)
   * Fio test improvements and clean-up - template files, logging, ...  (GH-421, GH-501, GH-502)
-    * * * BREAKING CHANGE - BEGIN * * * 
-      If you used the "--against_device=True" flag in prior releases
-      you also need to set "--prefill_device=True" now to maintain the same
-      behavior.  Prior to this change it was assumed setting 
-      "--against_device=True" meant to prefill.  We have changed this to
-      support prefilling disks (or not) when using filesystems and for 
-      added clarity.
-    * * * BREAKING CHANGE - END * * *
   * Add improvement to use compiled crcmod when benchmarking Google Cloud Storage (GH-461)
   * Collect Fio data over time via “--run_for_minutes” flag (GH-477)
   * Execute command improvements to add better logging and parallelism (GH-488, GH-470)
