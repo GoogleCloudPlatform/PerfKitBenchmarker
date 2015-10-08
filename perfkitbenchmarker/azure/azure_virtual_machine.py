@@ -41,7 +41,7 @@ FLAGS = flags.FLAGS
 
 AZURE_PATH = 'azure'
 UBUNTU_IMAGE = ('b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-'
-                '14_04_1-LTS-amd64-server-20150123-en-us-30GB')
+                '14_04_3-LTS-amd64-server-20150908-en-us-30GB')
 CENTOS_IMAGE = ('0b11de9248dd4d87b18621318e037d37__RightImage-'
                 'CentOS-7.0-x64-v14.2.1')
 WINDOWS_IMAGE = ('a699494373c04fc0bc8f2bb1389d6106__Windows-Server'
