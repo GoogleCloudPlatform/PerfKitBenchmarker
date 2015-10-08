@@ -39,6 +39,7 @@ from perfkitbenchmarker import windows_virtual_machine
 WINDOWS = 'windows'
 DEBIAN = 'debian'
 RHEL = 'rhel'
+UBUNTU_CONTAINER = 'ubuntu_container'
 FLAGS = flags.FLAGS
 
 
@@ -191,7 +192,8 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     required_keys_by_os = {
         WINDOWS: required_keys | frozenset(['password']),
         DEBIAN: linux_required_keys,
-        RHEL: linux_required_keys
+        RHEL: linux_required_keys,
+        UBUNTU_CONTAINER: linux_required_keys,
     }
     required_keys = required_keys_by_os[FLAGS.os_type]
 
@@ -278,6 +280,7 @@ def GetStaticVmClass(os_type):
       DEBIAN: DebianBasedStaticVirtualMachine,
       RHEL: RhelBasedStaticVirtualMachine,
       WINDOWS: WindowsBasedStaticVirtualMachine,
+      UBUNTU_CONTAINER: ContainerizedStaticVirtualMachine,
   }
   if os_type in class_dict:
     return class_dict[os_type]
@@ -286,16 +289,21 @@ def GetStaticVmClass(os_type):
     return DebianBasedStaticVirtualMachine
 
 
+class ContainerizedStaticVirtualMachine(
+        StaticVirtualMachine, linux_virtual_machine.ContainerizedDebianMixin):
+    pass
+
+
 class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
                                       linux_virtual_machine.DebianMixin):
-  pass
+    pass
 
 
 class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
                                     linux_virtual_machine.RhelMixin):
-  pass
+    pass
 
 
 class WindowsBasedStaticVirtualMachine(StaticVirtualMachine,
                                        windows_virtual_machine.WindowsMixin):
-  pass
+    pass
