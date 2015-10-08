@@ -133,7 +133,6 @@ flags.DEFINE_string('static_vm_file', None,
                     'The file path for the Static Machine file. See '
                     'static_virtual_machine.py for a description of this file.')
 flags.DEFINE_boolean('version', False, 'Display the version and exit.')
-flags.DEFINE_boolean('v', False, 'Display the version and exit.')
 flags.DEFINE_enum(
     'scratch_disk_type', disk.STANDARD,
     [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
@@ -351,7 +350,7 @@ def RunBenchmarks(publish=True):
   Returns:
     Exit status for the process.
   """
-  if FLAGS.version or FLAGS.v:
+  if FLAGS.version:
     print version.VERSION
     return
 
