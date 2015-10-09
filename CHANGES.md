@@ -1,3 +1,8 @@
+# v0.22.1
+
+* Update the default image used in Azure tests to Ubuntu 14.04.3 (runs failed
+  with the current image.) (cherry-pick of #520)
+
 # v0.22.0
 * New Features:
   * Add Kubernetes as a provider where benchmarks can be run (thanks @mateusz-blaszkowski) (GH-475)
