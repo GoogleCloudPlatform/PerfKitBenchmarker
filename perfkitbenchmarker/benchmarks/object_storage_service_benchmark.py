@@ -891,7 +891,7 @@ def Prepare(benchmark_spec):
   FLAGS.boto_file_location = os.path.expanduser(FLAGS.boto_file_location)
 
   if not os.path.isfile(FLAGS.boto_file_location):
-    if FLAGS.storage is not benchmark_spec_class.AZURE:
+    if FLAGS.storage != benchmark_spec_class.AZURE:
       raise errors.Benchmarks.MissingObjectCredentialException(
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)
