@@ -153,7 +153,8 @@ def _SetupBackend(benchmark_spec):
                          '&& chmod +x dbloader.sh && ./dbloader.sh localhost '
                          '%s')
   backend.RobustRemoteCommand(populate_db_command
-                              % (JAVA_HOME, FABAN_HOME, FLAGS.cloudsuite_web_serving_load_scale))
+                              % (JAVA_HOME, FABAN_HOME,
+                                 FLAGS.cloudsuite_web_serving_load_scale))
   backend.RemoteCommand(untar_command %
                         (BASE_DIR, 'apache-tomcat-6.0.35.tar.gz'))
   backend.RemoteCommand('cd %s/apache-tomcat-6.0.35/bin && '
@@ -324,7 +325,7 @@ def Prepare(benchmark_spec):
                          (client.ip_address, FABAN_HOME, BASE_DIR))
   backend.RemoteCommand('scp -r -o StrictHostKeyChecking=no %s:%s %s' %
                         (client.ip_address, FABAN_HOME, BASE_DIR))
-  args = [((benchmark_spec, BK),{}), ((benchmark_spec, FR), {})]
+  args = [((benchmark_spec, BK), {}), ((benchmark_spec, FR), {})]
   vm_util.RunThreaded(_SetupVM, args)
 
 
