@@ -20,7 +20,6 @@
   * Fixed  broken Apache project links (GH-492, GH-467)
   * Netperf timeout to work around occasional hangs (GH-483)
   * Fixed lock pickling issues (GH-471)
-  * Added a “-v” flag (GH-463)
 
 # v0.21.0
 
