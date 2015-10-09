@@ -296,9 +296,9 @@ def _SetupVM(benchmark_spec, thread_id):
   """Passes the vm to either the backend or frontend setup functions.
      Used to run frontend and backend threaded.
   """
-  if thread_id == 1:
+  if thread_id == BK:
     _SetupBackend(benchmark_spec)
-  if thread_id == 2:
+  if thread_id == FR:
     _SetupFrontend(benchmark_spec)
 
 
