@@ -140,8 +140,17 @@ def _GetResourceLoaders():
     DEFAULT_RESOURCE_LOADERS.
   """
   loaders = []
-  for path in FLAGS.data_search_paths:
-    loaders.append(FileResourceLoader(path))
+
+  # Add all paths to list if they are specified on the command line (will warn
+  # if any are invalid).
+  # Otherwise add members of the default list iff they exist.
+  if FLAGS['data_search_paths'].present:
+    for path in FLAGS.data_search_paths:
+      loaders.append(FileResourceLoader(path))
+  else:
+    for path in FLAGS.data_search_paths:
+      if os.path.isdir(path):
+        loaders.append(FileResourceLoader(path))
   loaders.extend(DEFAULT_RESOURCE_LOADERS)
   return loaders
 
