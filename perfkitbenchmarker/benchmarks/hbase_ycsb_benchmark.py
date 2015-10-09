@@ -93,14 +93,16 @@ def CheckPrerequisites():
   ycsb.CheckPrerequisites()
 
 
-def _CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
-                     n_splits=TABLE_SPLIT_COUNT):
+def CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
+                    n_splits=TABLE_SPLIT_COUNT, limit_filesize=True,
+                    use_snappy=True):
   """Create a table for use with YCSB.
 
   Args:
     vm: Virtual machine from which to create the table.
     table_name: Name for the table.
     family: Column family name.
+    limit_filesize: boolean. Should the filesize be limited to 4GB?
     n_splits: Initial number of regions for the table. Default follows
       HBASE-4163.
   """
@@ -111,8 +113,9 @@ def _CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
   vm.RenderTemplate(template_path, remote,
                     context={'table_name': table_name,
                              'family': family,
+                             'limit_filesize': limit_filesize,
                              'n_splits': n_splits,
-                             'use_snappy': FLAGS.hbase_use_snappy})
+                             'use_snappy': use_snappy})
   # TODO(connormccoy): on HBase update, add '-n' flag.
   command = "{0}/hbase shell {1}".format(hbase.HBASE_BIN, remote)
   vm.RemoteCommand(command, should_log=True)
@@ -173,7 +176,7 @@ def Prepare(benchmark_spec):
   hadoop.ConfigureAndStart(master, workers, start_yarn=False)
   hbase.ConfigureAndStart(master, workers, zk_quorum)
 
-  _CreateYCSBTable(master)
+  CreateYCSBTable(master, use_snappy=FLAGS.hbase_use_snappy)
 
   # Populate hbase-site.xml on the loaders.
   master.PullFile(

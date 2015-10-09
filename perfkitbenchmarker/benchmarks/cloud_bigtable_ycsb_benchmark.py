@@ -38,6 +38,7 @@ import subprocess
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.benchmarks import hbase_ycsb_benchmark as hbase_ycsb
 from perfkitbenchmarker.packages import hbase
 from perfkitbenchmarker.packages import ycsb
 
@@ -227,9 +228,8 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(_Install, vms)
 
   # Create table
-  command = """echo 'create "{0}", "{1}"; exit' | {2}/hbase shell""".format(
-      _GetTableName(), COLUMN_FAMILY, hbase.HBASE_BIN)
-  vms[0].RemoteCommand(command, should_log=True)
+  hbase_ycsb.CreateYCSBTable(vms[0], table_name=_GetTableName(),
+                             use_snappy=False, limit_filesize=False)
 
 
 def Run(benchmark_spec):
