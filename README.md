@@ -256,7 +256,7 @@ Go [here](https://nodejs.org/download/), and follow the setup instructions.
 Next, run the following (omit the `sudo` on Windows):
 
 ```
-$ sudo npm install azure-cli -g
+$ sudo npm install azure-cli@0.9.9 -g
 $ azure account download
 ```
 
