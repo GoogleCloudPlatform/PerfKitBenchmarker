@@ -32,6 +32,7 @@ Valid config keys:
   vm_groups: A YAML dictionary mapping the names of VM groups to the groups
       themselves. These names can be any string.
   description: A description of the benchmark.
+  flags: A YAML dictionary with overrides for default flag values.
 
 Valid VM group keys:
   vm_spec: A YAML dictionary mapping names of clouds (e.g. AWS) to the
@@ -56,6 +57,7 @@ For valid disk spec keys, see disk.BaseDiskSpec and derived classes.
 """
 
 import copy
+import logging
 import yaml
 
 from perfkitbenchmarker import data
@@ -78,6 +80,37 @@ flags.DEFINE_multistring(
     'a higher priority than that config. The value of the flag should be '
     'fully.qualified.key=value (e.g. --config_override=cluster_boot.vm_groups.'
     'default.vm_count=4). This flag can be repeated.')
+
+# Config keys.
+VM_GROUPS = 'vm_groups'
+DESCRIPTION = 'description'
+CONFIG_FLAGS = 'flags'
+CONFIG_VALUE_TYPES = {
+    VM_GROUPS: [dict],
+    DESCRIPTION: [str],
+    CONFIG_FLAGS: [dict]
+}
+VALID_CONFIG_KEYS = frozenset(CONFIG_VALUE_TYPES.keys())
+REQUIRED_CONFIG_KEYS = frozenset([VM_GROUPS])
+# Group keys.
+VM_SPEC = 'vm_spec'
+DISK_SPEC = 'disk_spec'
+VM_COUNT = 'vm_count'
+DISK_COUNT = 'disk_count'
+CLOUD = 'cloud'
+OS_TYPE = 'os_type'
+STATIC_VMS = 'static_vms'
+GROUP_VALUE_TYPES = {
+    VM_SPEC: [dict],
+    DISK_SPEC: [dict],
+    VM_COUNT: [int, type(None)],
+    DISK_COUNT: [int],
+    CLOUD: [str],
+    OS_TYPE: [str],
+    STATIC_VMS: [list]
+}
+VALID_GROUP_KEYS = frozenset(GROUP_VALUE_TYPES.keys())
+REQUIRED_GROUP_KEYS = frozenset([VM_SPEC])
 
 
 def _LoadUserConfig(path):
@@ -138,7 +171,7 @@ def GetUserConfig():
   return config
 
 
-def MergeConfigs(default_config, override_config):
+def MergeConfigs(default_config, override_config, warn_new_key=False):
   """Merges the override config into the default config.
 
   This function will recursively merge two nested dicts.
@@ -149,6 +182,8 @@ def MergeConfigs(default_config, override_config):
   Args:
     default_config: The dict which will have its values overridden.
     override_config: The dict wich contains the overrides.
+    warn_new_key: Determines whether we warn the user if the override config
+      has a key that the default config did not have.
 
   Returns:
     A dict containing the values from the default_config merged with those from
@@ -159,6 +194,10 @@ def MergeConfigs(default_config, override_config):
     for k, v in d2.iteritems():
       if k not in d1:
         merged_dict[k] = copy.deepcopy(v)
+        if warn_new_key:
+          logging.warning('The key "%s" was not in the default config, '
+                          'but was in user overrides. This may indicate '
+                          'a typo.' % k)
       elif isinstance(v, dict):
         merged_dict[k] = _Merge(d1[k], v)
       else:
@@ -204,6 +243,62 @@ def LoadMinimalConfig(benchmark_config, benchmark_name):
   return config[benchmark_name]
 
 
+def _ValidateGroup(group_name, group):
+  """Raises an exception if the group config is not valid."""
+  group_keys = frozenset(group.keys())
+
+  invalid_group_keys = group_keys - VALID_GROUP_KEYS
+  if invalid_group_keys:
+    raise ValueError(
+        'Invalid key(s) found in group "%s": %s' %
+        (group_name, ' '.join(invalid_group_keys)))
+
+  missing_group_keys = REQUIRED_GROUP_KEYS - group_keys
+  if missing_group_keys:
+    raise ValueError(
+        'Missing required key(s) in group "%s": %s' %
+        (group_name, ' '.join(missing_group_keys)))
+
+  bad_types = []
+  for key in group_keys:
+    value_type = type(group[key])
+    if value_type not in GROUP_VALUE_TYPES[key]:
+      bad_types.append('Key:%s Value Type: %s Expected Type(s): %s' %
+                       (key, value_type, GROUP_VALUE_TYPES[key]))
+  if bad_types:
+    raise ValueError(
+        'Value(s) in group "%s" didn\'t match expected type(s): %s' %
+        (group_name, ','.join(bad_types)))
+
+
+def _ValidateConfig(config):
+  """Raises an exception if the config is not valid."""
+  config_keys = frozenset(config.keys())
+
+  invalid_config_keys = config_keys - VALID_CONFIG_KEYS
+  if invalid_config_keys:
+    raise ValueError('Invalid key(s) found in config: %s' %
+                     ' '.join(invalid_config_keys))
+
+  missing_config_keys = REQUIRED_CONFIG_KEYS - config_keys
+  if missing_config_keys:
+    raise ValueError('Missing required key(s) in config: %s' %
+                     ' '.join(missing_config_keys))
+  bad_types = []
+  for key in config_keys:
+    value_type = type(config[key])
+    if value_type not in CONFIG_VALUE_TYPES[key]:
+      bad_types.append('Key:%s Value Type: %s Expected Type(s): %s' %
+                       (key, value_type, CONFIG_VALUE_TYPES[key]))
+  if bad_types:
+    raise ValueError(
+        "Values(s) didn't match expected type(s): %s" % ','.join(bad_types))
+
+
+  for group_name, group in config[VM_GROUPS].iteritems():
+    _ValidateGroup(group_name, group)
+
+
 def LoadConfig(benchmark_config, user_config, benchmark_name):
   """Loads a benchmark configuration.
 
@@ -221,5 +316,8 @@ def LoadConfig(benchmark_config, user_config, benchmark_name):
     dict. The loaded config.
   """
   config = LoadMinimalConfig(benchmark_config, benchmark_name)
+  config = MergeConfigs(config, user_config, warn_new_key=True)
 
-  return MergeConfigs(config, user_config)
+  _ValidateConfig(config)
+
+  return config

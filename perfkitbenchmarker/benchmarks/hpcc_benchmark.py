@@ -102,7 +102,7 @@ def CreateMachineFile(vms):
 
 def CreateHpccinf(vm, benchmark_spec):
   """Creates the HPCC input file."""
-  num_vms = benchmark_spec.num_vms
+  num_vms = len(benchmark_spec.vms)
   if FLAGS.memory_size_mb:
     total_memory = FLAGS.memory_size_mb * 1024 * 1024 * num_vms
   else:
@@ -181,7 +181,7 @@ def ParseOutput(hpcc_output, benchmark_spec):
   metadata = dict()
   match = re.search('HPLMaxProcs=([0-9]*)', hpcc_output)
   metadata['num_cpus'] = match.group(1)
-  metadata['num_machines'] = benchmark_spec.num_vms
+  metadata['num_machines'] = len(benchmark_spec.vms)
   metadata['memory_size_mb'] = FLAGS.memory_size_mb
   value = regex_util.ExtractFloat('HPL_Tflops=([0-9]*\\.[0-9]*)', hpcc_output)
   results.append(sample.Sample('HPL Throughput', value, 'Tflops', metadata))

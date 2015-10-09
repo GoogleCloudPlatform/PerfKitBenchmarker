@@ -83,7 +83,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     super(GceVmSpec, self).ApplyFlags(flags)
     self.project = flags.project or self.project
     if flags['gce_num_local_ssds'].present:
-      self.num_local_ssds = FLAGS.gce_num_local_ssds
+      self.num_local_ssds = flags.gce_num_local_ssds
     if flags['gce_preemptible_vms'].present:
       self.preemptible = flags.gce_preemptible_vms
 

@@ -122,7 +122,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Error(
           'There was a problem while retrieving machine_type'
           ' information from the cloud provider.')
-    vm_spec.image = self.image or self.DEFAULT_IMAGE
+    self.image = self.image or self.DEFAULT_IMAGE
 
   def CreateKeyPair(self):
     """Imports the public keyfile to Rackspace."""

@@ -40,8 +40,8 @@ copy_throughput:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
-      disk_count: null
-      vm_count: null
+      disk_count: 2
+      vm_count: 1
 """
 
 CIPHER = 'aes128-cbc'
@@ -58,10 +58,7 @@ UNIT = 'MB/sec'
 def GetConfig(user_config):
   """Decide number of vms needed and return infomation for copy benchmark."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  if FLAGS.copy_benchmark_mode != 'scp':
-    config['vm_groups']['default']['vm_count'] = 1
-    config['vm_groups']['default']['disk_count'] = 2
-  else:
+  if FLAGS.copy_benchmark_mode == 'scp':
     config['vm_groups']['default']['vm_count'] = 2
     config['vm_groups']['default']['disk_count'] = 1
   return config

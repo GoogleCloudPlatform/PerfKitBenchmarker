@@ -397,8 +397,13 @@ def RunBenchmarks(publish=True):
       benchmark_module, user_config = benchmark_tuple
       args.append(((benchmark_module, collector, i + 1, total_benchmarks,
                     benchmark_module.GetConfig(user_config)), {}))
-    vm_util.RunThreaded(
-        RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
+    if FLAGS.parallelism > 1:
+      vm_util.RunThreaded(
+          RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
+    else:
+      for run_args, kwargs in args:
+        RunBenchmark(*run_args, **kwargs)
+
   finally:
     if collector.samples:
       collector.PublishSamples()

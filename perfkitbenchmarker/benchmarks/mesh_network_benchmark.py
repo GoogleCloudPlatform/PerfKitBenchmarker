@@ -87,7 +87,7 @@ def Prepare(benchmark_spec):
   for vm in vms:
     vms[0].MoveFile(vm, netperf.NETPERF_PATH)
     vms[0].MoveFile(vm, netperf.NETSERVER_PATH)
-  vm_util.RunThreaded(PrepareVM, vms, benchmark_spec.num_vms)
+  vm_util.RunThreaded(PrepareVM, vms, len(vms))
 
 
 def RunNetperf(vm, benchmark_name, servers, result):
@@ -148,11 +148,12 @@ def Run(benchmark_spec):
         the sample metric (string), value (float), unit (string).
   """
   vms = benchmark_spec.vms
+  num_vms = len(vms)
   results = []
   for netperf_benchmark in NETPERF_BENCHMARKSS:
     args = []
     metadata = {
-        'number_machines': benchmark_spec.num_vms,
+        'number_machines': num_vms,
         'number_connections': FLAGS.num_connections
     }
 
@@ -166,11 +167,11 @@ def Run(benchmark_spec):
       value = 0.0
     result = [metric, value, unit, metadata]
     args = [((source, netperf_benchmark, vms, result), {}) for source in vms]
-    vm_util.RunThreaded(RunNetperf, args, benchmark_spec.num_vms)
+    vm_util.RunThreaded(RunNetperf, args, num_vms)
     result = sample.Sample(*result)
     if netperf_benchmark == 'TCP_RR':
-      denom = ((benchmark_spec.num_vms - 1) *
-               benchmark_spec.num_vms *
+      denom = ((num_vms - 1) *
+               num_vms *
                FLAGS.num_connections)
       result = result._replace(value=result.value / denom)
 

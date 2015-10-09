@@ -196,14 +196,28 @@ class BenchmarkSpec(object):
     self.always_call_cleanup = False
 
   def _GetCloudForGroup(self, group_name):
-    """Gets the cloud for a VM group by looking at flags and the config."""
+    """Gets the cloud for a VM group by looking at flags and the config.
+
+    The precedence is as follows (in decreasing order):
+      * FLAGS.cloud (if specified on the command line)
+      * The "cloud" key in the group config (set by a config override)
+      * The "cloud" key in the group config (set by the config file)
+      * FLAGS.cloud (the default value)
+    """
     group_spec = self.config[VM_GROUPS][group_name]
     if not FLAGS[CLOUD].present and CLOUD in group_spec:
       return group_spec[CLOUD]
     return FLAGS.cloud
 
   def _GetOsTypeForGroup(self, group_name):
-    """Gets the OS type for a VM group by looking at flags and the config."""
+    """Gets the OS type for a VM group by looking at flags and the config.
+
+    The precedence is as follows (in decreasing order):
+      * FLAGS.os_type (if specified on the command line)
+      * The "os_type" key in the group config (set by a config override)
+      * The "os_type" key in the group config (set by the config file)
+      * FLAGS.os_type (the default value)
+    """
     group_spec = self.config[VM_GROUPS][group_name]
     if not FLAGS[OS_TYPE].present and OS_TYPE in group_spec:
       return group_spec[OS_TYPE]
@@ -248,7 +262,7 @@ class BenchmarkSpec(object):
       except TypeError as e:
         # This is what we get if one of the kwargs passed into a spec's
         # __init__ method was unexpected.
-        raise errors.Config.ValueError(
+        raise ValueError(
             'Config contained an unexpected parameter. Error message:\n%s' % e)
 
       # Create the remaining VMs using the specs we created earlier.

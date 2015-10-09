@@ -138,7 +138,3 @@ class Config(object):
   class ParseError(Error):
     """Error raised when a config can't be loaded properly."""
     pass
-
-  class ValueError(Error):
-    """Error raised when there is a problem with the content of the config."""
-    pass

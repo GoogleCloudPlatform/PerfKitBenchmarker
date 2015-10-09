@@ -42,6 +42,7 @@ a:
   flags:
     flag1: old_value
     flag2: not_overwritten
+  vm_groups: {}
 """
 CONFIG_B = """
 a:

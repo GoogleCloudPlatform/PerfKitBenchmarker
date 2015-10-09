@@ -501,20 +501,20 @@ Flag | Notes
 CONFIGURATIONS AND CONFIGURATION OVERRIDES
 ==================
 Each benchmark now has an independent configuration which is written in YAML.
-A user config is a way to override this default configuration on a per benchmark
-basis. This allows for much more complex setups than previously possible,
+Users may override this default configuration by providing a configuration.
+This allows for much more complex setups than previously possible,
 including running benchmarks across clouds.
 
 A benchmark configuration has a somewhat simple structure. It is essentially
 just a series of nested dictionaries. At the top level, it contains VM groups.
 VM groups are logical groups of homogenous machines. The VM groups hold both a
-"vm_spec" and a "disk_spec" which contain the parameters needed to
+`vm_spec` and a `disk_spec` which contain the parameters needed to
 create members of that group. Here is an example of an expanded configuration:
 ```
-iperf:
+hbase_ycsb:
   vm_groups:
-    iperf_vm_1:
-      vm_count: 1
+    loaders:
+      vm_count: 4
       vm_spec:
         GCP:
           machine_type: n1-standard-1
@@ -525,26 +525,45 @@ iperf:
           image: ami-######
           zone: us-east-1a
         # Other clouds here...
-    iperf_vm_2:
-      vm_count: 1
       # This specifies the cloud to use for the group. This allows for
-      benchmark configurations that span clouds.
+      # benchmark configurations that span clouds.
       cloud: AWS
+      # No disk_spec here since these are loaders.
+    master:
+      vm_count: 1
+      cloud: GCP
       vm_spec:
         GCP:
           machine_type: n1-standard-1
           image: ubuntu-14-04
           zone: us-central1-c
         # Other clouds here...
-      disk_count: 0
+      disk_count: 1
+      disk_spec:
+        GCP:
+          disk_size: 100
+          disk_type: standard
+          mount_point: /scratch
+        # Other clouds here...
+    workers:
+      vm_count: 4
+      cloud: GCP
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+          image: ubuntu-14-04
+          zone: us-central1-c
+        # Other clouds here...
+      disk_count: 1
       disk_spec:
         GCP:
           disk_size: 500
-          disk_type: standard
+          disk_type: remote_ssd
+          mount_point: /scratch
         # Other clouds here...
 ```
 
-For a complete list of keys for vm_specs and disk_specs see
+For a complete list of keys for `vm_spec`s and `disk_spec`s see
 [virtual_machine.BaseVmSpec](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/virtual_machine.py)
 and
 [disk.BaseDiskSpec](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/disk.py)
@@ -552,25 +571,25 @@ and their derived classes.
 
 User configs are applied on top of the existing default config and can be
 specified in two ways. The first is by supplying a config file via the
---benchmark_config_file flag. The second is by specifying a single setting to
-override via the `--config_override flag`.
+`--benchmark_config_file` flag. The second is by specifying a single setting to
+override via the `--config_override` flag.
 
 A user config file only needs to specify the settings which it is intended to
 override. For example if the only thing you want to do is change the number of
-VMs in a group, this config is sufficient:
+VMs for the `cluster_boot` benchmark, this config is sufficient:
 ```
 cluster_boot:
   vm_groups:
     default:
       vm_count: 100
 ```
-You can achieve the same effect by specifying the `config_override` flag.
+You can achieve the same effect by specifying the `--config_override` flag.
 The value of the flag should be a path within the YAML (with keys delimited by
 periods), an equals sign, and finally the new value:
 ```
 --config_override=cluster_boot.vm_groups.default.vm_count=100
 ```
-See the section below for how to use pre-provisioned machines in your config.
+See the section below for how to use static (i.e. pre-provisioned) machines in your config.
 
 ADVANCED: HOW TO RUN BENCHMARKS WITHOUT CLOUD PROVISIONING (eg: local workstation)
 ==================

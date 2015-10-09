@@ -56,7 +56,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
   def ApplyFlags(self, flags):
     """Apply flags to the DiskSpec."""
     super(AwsDiskSpec, self).ApplyFlags(flags)
-    self.iops = flags.iops or self.iops
+    self.iops = flags.scratch_disk_iops or self.iops
 
 
 class AwsDisk(disk.BaseDisk):

@@ -50,7 +50,7 @@ class BaseVmSpec(object):
     self.image = image
 
   def ApplyFlags(self, flags):
-    """Applys flags to the VmSpec."""
+    """Applies flags to the VmSpec."""
     self.zone = flags.zone or self.zone
     self.machine_type = flags.machine_type or self.machine_type
     self.image = flags.image or self.image

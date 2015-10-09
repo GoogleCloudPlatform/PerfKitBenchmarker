@@ -136,18 +136,20 @@ class DefaultMetadataProvider(MetadataProvider):
       # Get a representative VM so that we can publish the cloud, zone,
       # machine type, and image.
       vm = vms[-1]
-      metadata[name + '_cloud'] = vm.CLOUD
-      metadata[name + '_zone'] = vm.zone
-      metadata[name + '_machine_type'] = vm.machine_type
-      metadata[name + '_image'] = vm.image
+      name_prefix = '' if name == 'default' else name + '_'
+      metadata[name_prefix + 'cloud'] = vm.CLOUD
+      metadata[name_prefix + 'zone'] = vm.zone
+      metadata[name_prefix + 'machine_type'] = vm.machine_type
+      metadata[name_prefix + 'image'] = vm.image
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
-        metadata[name + '_scratch_disk_type'] = data_disk.disk_type
-        metadata[name + '_scratch_disk_size'] = data_disk.disk_size
-        metadata[name + '_num_striped_disks'] = data_disk.num_striped_disks
+        metadata[name_prefix + 'scratch_disk_type'] = data_disk.disk_type
+        metadata[name_prefix + 'scratch_disk_size'] = data_disk.disk_size
+        metadata[name_prefix + 'num_striped_disks'] = (
+            data_disk.num_striped_disks)
         if data_disk.disk_type == disk.PIOPS:
-          metadata[name + '_scratch_disk_iops'] = data_disk.iops
+          metadata[name_prefix + 'scratch_disk_iops'] = data_disk.iops
 
     # User specified metadata
     for pair in FLAGS.metadata:

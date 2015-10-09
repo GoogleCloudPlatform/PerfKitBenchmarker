@@ -250,11 +250,11 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     self.mock_spec = mock.MagicMock(vm_groups={'default': [self.mock_vm]})
 
     self.default_meta = {'perfkitbenchmarker_version': 'v1',
-                         'default_cloud': self.mock_vm.CLOUD,
-                         'default_zone': 'us-central1-a',
-                         'default_machine_type': self.mock_vm.machine_type,
-                         'default_image': self.mock_vm.image,
-                         'default_num_striped_disks': 1}
+                         'cloud': self.mock_vm.CLOUD,
+                         'zone': 'us-central1-a',
+                         'machine_type': self.mock_vm.machine_type,
+                         'image': self.mock_vm.image,
+                         'num_striped_disks': 1}
 
   def _RunTest(self, spec, expected, input_metadata=None):
     input_metadata = input_metadata or {}
@@ -267,28 +267,28 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
   def testAddMetadata_ScratchDiskUndefined(self):
     del self.mock_spec.scratch_disk
     meta = self.default_meta.copy()
-    meta.pop('default_num_striped_disks')
+    meta.pop('num_striped_disks')
     self._RunTest(self.mock_spec, meta)
 
   def testAddMetadata_NoScratchDisk(self):
     self.mock_spec.scratch_disk = False
     meta = self.default_meta.copy()
-    meta.pop('default_num_striped_disks')
+    meta.pop('num_striped_disks')
     self._RunTest(self.mock_spec, meta)
 
   def testAddMetadata_WithScratchDisk(self):
     self.mock_disk.configure_mock(disk_type=disk.REMOTE_SSD)
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(default_scratch_disk_size=20,
-                    default_scratch_disk_type=disk.REMOTE_SSD)
+    expected.update(scratch_disk_size=20,
+                    scratch_disk_type=disk.REMOTE_SSD)
     self._RunTest(self.mock_spec, expected)
 
   def testAddMetadata_PIOPS(self):
     self.mock_disk.configure_mock(disk_type=disk.PIOPS, iops=1000)
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(default_scratch_disk_size=20,
-                    default_scratch_disk_type=disk.PIOPS,
-                    default_scratch_disk_iops=1000)
+    expected.update(scratch_disk_size=20,
+                    scratch_disk_type=disk.PIOPS,
+                    scratch_disk_iops=1000)
     self._RunTest(self.mock_spec, expected)

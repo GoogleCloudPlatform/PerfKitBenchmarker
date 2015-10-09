@@ -41,7 +41,7 @@ SSH_PORT = 22
 class RackspaceSecurityGroup(network.BaseFirewall):
     """An object representing the Rackspace Security Group."""
 
-    def __init__(self, project):
+    def __init__(self):
         """Initialize Rackspace security group class."""
         self._lock = threading.Lock()
         self.firewall_names = set()

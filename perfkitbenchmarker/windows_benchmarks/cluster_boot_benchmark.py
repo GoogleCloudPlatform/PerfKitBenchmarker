@@ -79,7 +79,7 @@ def Run(benchmark_spec):
   params = [((vm, i, samples), {}) for i, vm in enumerate(vms)]
   vm_util.RunThreaded(_GetTimeToBoot, params)
   logging.info(samples)
-  assert len(samples) == benchmark_spec.num_vms
+  assert len(samples) == len(benchmark_spec.vms)
   return samples
 
 

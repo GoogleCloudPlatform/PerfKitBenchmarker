@@ -56,6 +56,9 @@ def GetConfig(user_config):
       FLAGS.scratch_disk_type != disk.LOCAL):
     config['vm_groups']['default']['disk_count'] = 1
 
+  config['vm_groups']['default']['vm_count'] = (FLAGS.ycsb_client_vms +
+                                                FLAGS.num_vms)
+
   return config
 
 
