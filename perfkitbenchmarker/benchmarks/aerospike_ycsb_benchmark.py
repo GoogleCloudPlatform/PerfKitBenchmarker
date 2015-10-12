@@ -42,6 +42,7 @@ BENCHMARK_INFO = {'name': 'aerospike_ycsb',
 
 def GetInfo():
   info = BENCHMARK_INFO.copy()
+  info['num_machines'] = FLAGS.num_vms + FLAGS.ycsb_client_vms
   info['scratch_disk'] = (
       FLAGS.aerospike_storage_type == aerospike_server.DISK and
       FLAGS.scratch_disk_type != disk.LOCAL)
