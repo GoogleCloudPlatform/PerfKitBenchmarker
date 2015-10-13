@@ -151,11 +151,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--status', status_file,
                     '--delete']
     try:
-      return self.RemoteCommand(' '.join(wait_command), should_log=False)
+      return self.RemoteCommand(' '.join(wait_command), should_log=should_log)
     except:
       # In case the error was with the wrapper script itself, print the log.
-      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log,
-                                     should_log=should_log)
+      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
       if stdout.strip():
         logging.warn('Exception during RobustRemoteCommand. '
                      'Wrapper script log:\n%s', stdout)
