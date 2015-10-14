@@ -176,23 +176,24 @@ def _GetDiskSpecClass(cloud):
 class BenchmarkSpec(object):
   """Contains the various data required to make a benchmark run."""
 
-  def __init__(self, benchmark_config, benchmark_name):
+  def __init__(self, benchmark_config, benchmark_uid):
     """Initialize a BenchmarkSpec object.
 
     Args:
       benchmark_config: A Python dictionary representation of the configuration
         for the benchmark. For a complete explanation, see
         perfkitbenchmarker/configs/__init__.py.
-      benchmark_name: The name of the benchmark.
+      benchmark_uid: An identifier unique to this run of the benchmark even
+        if the same benchmark is run multiple times with different configs.
     """
     self.config = benchmark_config
-    self.name = benchmark_name
+    self.uid = benchmark_uid
     self.vms = []
     self.networks = {}
     self.firewalls = {}
     self.vm_groups = {}
     self.deleted = False
-    self.file_name = os.path.join(vm_util.GetTempDir(), self.name)
+    self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
     self.always_call_cleanup = False
 
   def _GetCloudForGroup(self, group_name):
@@ -361,7 +362,7 @@ class BenchmarkSpec(object):
     logging.info('Waiting for boot completion.')
     for port in vm.remote_access_ports:
       vm.AllowPort(port)
-    vm.AddMetadata(benchmark=self.name)
+    vm.AddMetadata(benchmark=self.uid)
     vm.WaitForBootCompletion()
     vm.OnStartup()
     if FLAGS.scratch_disk_type == disk.LOCAL:

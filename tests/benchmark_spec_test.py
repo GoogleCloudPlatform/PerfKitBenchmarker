@@ -22,6 +22,7 @@ from perfkitbenchmarker.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
 
 NAME = 'name'
+UID = 'name0'
 SIMPLE_CONFIG = """
 name:
   vm_groups:
@@ -84,7 +85,7 @@ class ConstructVmsTestCase(unittest.TestCase):
 
   def testSimpleConfig(self):
     config = configs.LoadConfig(SIMPLE_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME)
+    spec = benchmark_spec.BenchmarkSpec(config, UID)
     spec.ConstructVirtualMachines()
 
     self.assertEqual(len(spec.vms), 1)
@@ -96,7 +97,7 @@ class ConstructVmsTestCase(unittest.TestCase):
 
   def testMultiCloud(self):
     config = configs.LoadConfig(MULTI_CLOUD_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME)
+    spec = benchmark_spec.BenchmarkSpec(config, UID)
     spec.ConstructVirtualMachines()
 
     self.assertEqual(len(spec.vms), 2)
@@ -105,7 +106,7 @@ class ConstructVmsTestCase(unittest.TestCase):
 
   def testStaticVms(self):
     config = configs.LoadConfig(STATIC_VM_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME)
+    spec = benchmark_spec.BenchmarkSpec(config, UID)
     spec.ConstructVirtualMachines()
 
     self.assertEqual(len(spec.vms), 4)
@@ -122,6 +123,6 @@ class ConstructVmsTestCase(unittest.TestCase):
 
   def testBadParameter(self):
     config = configs.LoadConfig(BAD_VM_PARAMETER_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME)
+    spec = benchmark_spec.BenchmarkSpec(config, UID)
     with self.assertRaises(ValueError):
       spec.ConstructVirtualMachines()
