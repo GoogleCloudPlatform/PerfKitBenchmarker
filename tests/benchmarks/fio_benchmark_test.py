@@ -21,34 +21,6 @@ import mock
 from perfkitbenchmarker.benchmarks import fio_benchmark
 
 
-class TestGetIODepths(unittest.TestCase):
-  def testOneInteger(self):
-    self.assertEqual(list(fio_benchmark.GetIODepths('3')), [3])
-
-  def testIntegerRange(self):
-    self.assertEqual(list(fio_benchmark.GetIODepths('3-5')), [3, 4, 5])
-
-  def testIntegerList(self):
-    self.assertEqual(list(fio_benchmark.GetIODepths('3-5,8,10-12')),
-                     [3, 4, 5, 8, 10, 11, 12])
-
-  def testNoInteger(self):
-    with self.assertRaises(ValueError):
-      fio_benchmark.GetIODepths('a')
-
-  def testBadRange(self):
-    with self.assertRaises(ValueError):
-      fio_benchmark.GetIODepths('3-a')
-
-  def testBadList(self):
-    with self.assertRaises(ValueError):
-      fio_benchmark.GetIODepths('3-5,8a')
-
-  def testTrailingComma(self):
-    with self.assertRaises(ValueError):
-      fio_benchmark.GetIODepths('3-5,')
-
-
 class TestGenerateJobFileString(unittest.TestCase):
   def setUp(self):
     self.filename = '/test/filename'
@@ -88,7 +60,7 @@ size=100%
         fio_benchmark.GenerateJobFileString(
             self.filename,
             ['sequential_read'],
-            '1,2',
+            [1, 2],
             None),
         expected_jobfile)
 
@@ -129,7 +101,7 @@ size=100%
         fio_benchmark.GenerateJobFileString(
             self.filename,
             ['sequential_read', 'sequential_write'],
-            '1',
+            [1],
             None),
         expected_jobfile)
 
