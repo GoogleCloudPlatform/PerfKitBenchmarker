@@ -14,16 +14,17 @@
 
 """Tests for perfkitbenchmarker.vm_util."""
 
+import functools
 import multiprocessing
 import multiprocessing.managers
 import os
-import psutil
 import subprocess
 import threading
 import time
 import unittest
 
 import mock
+import psutil
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -160,6 +161,17 @@ class GetCallStringTestCase(unittest.TestCase):
 
 
 class RunParallelThreadsTestCase(unittest.TestCase):
+
+  def testErrorRaisingPartialFunction(self):
+
+    def RaiseArgument(x):
+      raise ValueError(x)
+
+    p = functools.partial(RaiseArgument, 'a')
+    calls = [(p, [], {})]
+    with self.assertRaisesRegexp(errors.VmUtil.ThreadException,
+                                 r'ValueError: a'):
+      vm_util.RunParallelThreads(calls, max_concurrency=1)
 
   def testFewerThreadsThanConcurrencyLimit(self):
     calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(2)]
