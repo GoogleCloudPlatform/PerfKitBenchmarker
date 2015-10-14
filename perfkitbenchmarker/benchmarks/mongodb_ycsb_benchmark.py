@@ -30,7 +30,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import ycsb
 
 # See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
-flags.DEFINE_string('mongodb_writeconcern', 'safe',
+flags.DEFINE_string('mongodb_writeconcern', 'acknowledged',
                     'MongoDB write concern.')
 
 FLAGS = flags.FLAGS
