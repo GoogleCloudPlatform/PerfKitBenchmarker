@@ -1,0 +1,60 @@
+# All anchors defined in this file should be compatible
+# with *all* clouds. That means any vm_specs or disk_specs
+# defined here should have keys for every cloud.
+default_single_core: &default_single_core
+  GCP:
+    machine_type: n1-standard-1
+    zone: us-central1-a
+    image: null
+  Azure:
+    machine_type: Small
+    zone: East US
+    image: null
+  AWS:
+    machine_type: m3.medium
+    zone: us-east-1a
+    image: null
+  DigitalOcean:
+    machine_type: 2gb
+    zone: sfo1
+    image: null
+  OpenStack:
+    machine_type: m1.small
+    zone: nova
+    image: null
+  Rackspace:
+    machine_type: general1-1
+    zone: IAD
+    image: null
+  Kubernetes:
+    image: null
+
+default_500_gb: &default_500_gb
+  GCP:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  Azure:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  AWS:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  DigitalOcean:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  OpenStack:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  Rackspace:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  Kubernetes:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch

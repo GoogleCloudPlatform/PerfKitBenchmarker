@@ -20,6 +20,7 @@ scp copy across different vms using external networks.
 import logging
 import posixpath
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
@@ -31,11 +32,17 @@ flags.DEFINE_enum('copy_benchmark_mode', 'cp', ['cp', 'dd', 'scp'],
 
 FLAGS = flags.FLAGS
 
-# 'num_machines' set in GetInfo, as it depends on 'copy_benchmark_mode'.
-BENCHMARK_INFO = {'name': 'copy_throughput',
-                  'description': 'Get cp and scp performance between vms.',
-                  'scratch_disk': True,
-                  'num_machines': None}
+BENCHMARK_NAME = 'copy_throughput'
+BENCHMARK_CONFIG = """
+copy_throughput:
+  description: Get cp and scp performance between vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+      disk_count: 2
+      vm_count: 1
+"""
 
 CIPHER = 'aes128-cbc'
 
@@ -48,15 +55,13 @@ DISK_SIZE_IN_GB = 500
 UNIT = 'MB/sec'
 
 
-def GetInfo():
+def GetConfig(user_config):
   """Decide number of vms needed and return infomation for copy benchmark."""
-  info = BENCHMARK_INFO.copy()
-  if FLAGS.copy_benchmark_mode != 'scp':
-    info['num_machines'] = 1
-    info['scratch_disk'] = 2
-  else:
-    info['num_machines'] = 2
-  return info
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS.copy_benchmark_mode == 'scp':
+    config['vm_groups']['default']['vm_count'] = 2
+    config['vm_groups']['default']['disk_count'] = 1
+  return config
 
 
 def CheckPrerequisites():

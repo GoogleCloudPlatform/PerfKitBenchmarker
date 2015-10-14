@@ -23,15 +23,20 @@ Coremark homepage: http://www.eembc.org/coremark/
 
 import logging
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 
-BENCHMARK_INFO = {'name': 'coremark',
-                  'description': 'Run Coremark a simple processor benchmark',
-                  'scratch_disk': False,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'coremark'
+BENCHMARK_CONFIG = """
+coremark:
+  description: Run Coremark a simple processor benchmark
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+"""
 
 COREMARK_TAR = 'coremark_v1.0.tgz'
 COREMARK_DIR = 'coremark_v1.0'
@@ -39,8 +44,8 @@ COREMARK_BUILDFILE = 'linux64/core_portme.mak'
 ITERATIONS_PER_CPU = 200000
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

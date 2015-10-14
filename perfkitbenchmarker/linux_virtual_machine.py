@@ -486,8 +486,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """
     if len(disks) > 1:
       # If the disk_spec called for a striped disk, create one.
-      device_path = '/dev/md%d' % len(self.scratch_disks)
-      data_disk = disk.StripedDisk(disk_spec, disks, device_path)
+      disk_spec.device_path = '/dev/md%d' % len(self.scratch_disks)
+      data_disk = disk.StripedDisk(disk_spec, disks)
     else:
       data_disk = disks[0]
 

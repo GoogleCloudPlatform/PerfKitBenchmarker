@@ -35,6 +35,7 @@ import pipes
 import posixpath
 import subprocess
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -66,13 +67,17 @@ flags.DEFINE_string(
     '0.2.1/bigtable-hbase-1.0-0.2.1.jar',
     'URL for the Bigtable-HBase client JAR.')
 
-
-BENCHMARK_INFO = {'name': 'cloud_bigtable_ycsb',
-                  'description': 'Run YCSB against an existing Cloud Bigtable '
-                  'cluster. Configure the number of client VMs via '
-                  '--num_vms.',
-                  'scratch_disk': False,
-                  'num_machines': None}
+BENCHMARK_NAME = 'cloud_bigtable_ycsb'
+BENCHMARK_CONFIG = """
+cloud_bigtable_ycsb:
+  description: >
+      Run YCSB against an existing Cloud Bigtable
+      cluster. Configure the number of client VMs via --num_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      vm_count: null
+"""
 
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
@@ -87,9 +92,8 @@ REQUIRED_SCOPES = (
 COLUMN_FAMILY = 'cf'
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
-  return info
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

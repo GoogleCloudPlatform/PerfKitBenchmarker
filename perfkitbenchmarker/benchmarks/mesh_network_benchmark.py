@@ -23,6 +23,7 @@ import logging
 import re
 import threading
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -39,24 +40,29 @@ flags.DEFINE_integer('num_iterations', 1,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'mesh_network',
-                  'description': 'Measures VM to VM cross section bandwidth in '
-                  'a mesh network. Specify the number of VMs in the network '
-                  'with --num_vms.',
-                  'scratch_disk': False,
-                  'num_machines': None}  # Set in GetInfo()
+BENCHMARK_NAME = 'mesh_network'
+BENCHMARK_CONFIG = """
+mesh_network:
+  description: >
+    Measures VM to VM cross section bandwidth in
+    a mesh network. Specify the number of VMs in the network
+    with --num_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+"""
 
 NETPERF_BENCHMARKSS = ['TCP_RR', 'TCP_STREAM']
 VALUE_INDEX = 1
 RESULT_LOCK = threading.Lock()
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
-  info['num_machines'] = FLAGS.num_vms
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
   if FLAGS.num_vms < 2:  # Needs at least 2 vms to run the benchmark.
-    info['num_machines'] = 2
-  return info
+    config['vm_groups']['default']['vm_count'] = 2
+  return config
 
 
 def PrepareVM(vm):
@@ -81,7 +87,7 @@ def Prepare(benchmark_spec):
   for vm in vms:
     vms[0].MoveFile(vm, netperf.NETPERF_PATH)
     vms[0].MoveFile(vm, netperf.NETSERVER_PATH)
-  vm_util.RunThreaded(PrepareVM, vms, benchmark_spec.num_vms)
+  vm_util.RunThreaded(PrepareVM, vms, len(vms))
 
 
 def RunNetperf(vm, benchmark_name, servers, result):
@@ -142,11 +148,12 @@ def Run(benchmark_spec):
         the sample metric (string), value (float), unit (string).
   """
   vms = benchmark_spec.vms
+  num_vms = len(vms)
   results = []
   for netperf_benchmark in NETPERF_BENCHMARKSS:
     args = []
     metadata = {
-        'number_machines': benchmark_spec.num_vms,
+        'number_machines': num_vms,
         'number_connections': FLAGS.num_connections
     }
 
@@ -160,11 +167,11 @@ def Run(benchmark_spec):
       value = 0.0
     result = [metric, value, unit, metadata]
     args = [((source, netperf_benchmark, vms, result), {}) for source in vms]
-    vm_util.RunThreaded(RunNetperf, args, benchmark_spec.num_vms)
+    vm_util.RunThreaded(RunNetperf, args, num_vms)
     result = sample.Sample(*result)
     if netperf_benchmark == 'TCP_RR':
-      denom = ((benchmark_spec.num_vms - 1) *
-               benchmark_spec.num_vms *
+      denom = ((num_vms - 1) *
+               num_vms *
                FLAGS.num_connections)
       result = result._replace(value=result.value / denom)
 

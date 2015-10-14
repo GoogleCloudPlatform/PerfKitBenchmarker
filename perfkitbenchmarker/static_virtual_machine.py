@@ -14,11 +14,12 @@
 
 """Class to represent a Static Virtual Machine object.
 
-All static VMs provided will be used before any non-static VMs are provisioned.
-For example, in a test that uses 4 VMs, if 3 static VMs are provided, all
-of them will be used and one additional non-static VM will be provisioned.
-The VM's should be set up with passwordless ssh and passwordless sudo (neither
-sshing nor running a sudo command should prompt the user for a password).
+All static VMs provided in a given group will be used before any non-static
+VMs are provisioned. For example, in a test that uses 4 VMs, if 3 static VMs
+are provided, all of them will be used and one additional non-static VM
+will be provisioned. The VM's should be set up with passwordless ssh and
+passwordless sudo (neither sshing nor running a sudo command should prompt
+the user for a password).
 
 All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
@@ -29,6 +30,7 @@ import json
 import logging
 import threading
 
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
@@ -40,44 +42,88 @@ RHEL = 'rhel'
 FLAGS = flags.FLAGS
 
 
-class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
-  """Object representing a Static Virtual Machine."""
+class StaticVmSpec(virtual_machine.BaseVmSpec):
+  """Object containing all info needed to create a Static VM."""
 
-  vm_pool = []
-  vm_pool_lock = threading.Lock()
-
-  is_static = True
-
-  def __init__(self, ip_address, user_name, keyfile_path=None, internal_ip=None,
-               zone=None, local_disks=None, scratch_disk_mountpoints=None,
-               ssh_port=22, install_packages=True, password=None):
-    """Initialize a static virtual machine.
+  def __init__(self, ip_address=None, user_name=None, ssh_private_key=None,
+               internal_ip=None, ssh_port=22, install_packages=True,
+               password=None, disk_specs=None, os_type=None, **kwargs):
+    """Initialize the StaticVmSpec object.
 
     Args:
-      ip_address: The ip address of the vm.
-      user_name: The username of the vm that the keyfile corresponds to.
-      keyfile_path: The absolute path of the private keyfile for the vm.
-      internal_ip: The internal ip address of the vm.
-      zone: The zone of the VM.
-      local_disks: A list of the paths of local disks on the VM.
-      scratch_disk_mountpoints: A list of scratch disk mountpoints.
+      ip_address: The public ip address of the VM.
+      user_name: The username of the VM that the keyfile corresponds to.
+      ssh_private_key: The absolute path to the private keyfile to use to ssh
+          to the VM.
+      internal_ip: The internal ip address of the VM.
       ssh_port: The port number to use for SSH and SCP commands.
       install_packages: If false, no packages will be installed. This is
           useful if benchmark dependencies have already been installed.
+      password: The password used to log into the VM (Windows Only).
+      disk_specs: A list of dictionaries containing kwargs used to create
+          disk.BaseDiskSpecs.
+      os_type: The OS type of the VM. See the flag of the same name for more
+          information.
     """
-    vm_spec = virtual_machine.BaseVirtualMachineSpec(
-        None, None, None, None)
-    super(StaticVirtualMachine, self).__init__(vm_spec, None, None)
+    super(StaticVmSpec, self).__init__(**kwargs)
     self.ip_address = ip_address
-    self.internal_ip = internal_ip
-    self.zone = zone or ('Static - %s@%s' % (user_name, ip_address))
     self.user_name = user_name
+    self.ssh_private_key = ssh_private_key
+    self.internal_ip = internal_ip
     self.ssh_port = ssh_port
-    self.ssh_private_key = keyfile_path
-    self.local_disks = local_disks or []
-    self.scratch_disk_mountpoints = scratch_disk_mountpoints or []
     self.install_packages = install_packages
     self.password = password
+    self.os_type = os_type
+    self.disk_specs = disk_specs
+
+
+class StaticDisk(disk.BaseDisk):
+  """Object representing a static Disk."""
+
+  def _Create(self):
+    """StaticDisks don't implement _Create()."""
+    pass
+
+  def _Delete(self):
+    """StaticDisks don't implement _Delete()."""
+    pass
+
+  def Attach(self):
+    """StaticDisks don't implement Attach()."""
+    pass
+
+  def Detach(self):
+    """StaticDisks don't implement Detach()."""
+    pass
+
+
+class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
+  """Object representing a Static Virtual Machine."""
+
+  is_static = True
+  vm_pool = []
+  vm_pool_lock = threading.Lock()
+
+  def __init__(self, vm_spec):
+    """Initialize a static virtual machine.
+
+    Args:
+      vm_spec: A StaticVmSpec object containing arguments.
+    """
+    super(StaticVirtualMachine, self).__init__(vm_spec, None, None)
+    self.ip_address = vm_spec.ip_address
+    self.user_name = vm_spec.user_name
+    self.ssh_private_key = vm_spec.ssh_private_key
+    self.internal_ip = vm_spec.internal_ip
+    self.zone = self.zone or ('Static - %s@%s' % (self.user_name,
+                                                  self.ip_address))
+    self.ssh_port = vm_spec.ssh_port
+    self.install_packages = vm_spec.install_packages
+    self.password = vm_spec.password
+
+    if vm_spec.disk_specs:
+      for spec in vm_spec.disk_specs:
+        self.disk_specs.append(disk.BaseDiskSpec(**spec))
 
   def _Create(self):
     """StaticVirtualMachines do not implement _Create()."""
@@ -87,28 +133,24 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     """StaticVirtualMachines do not implement _Delete()."""
     pass
 
+  def CreateScratchDisk(self, disk_spec):
+    """Create a VM's scratch disk.
+
+    Args:
+      disk_spec: virtual_machine.BaseDiskSpec object of the disk.
+    """
+    spec = self.disk_specs[len(self.scratch_disks)]
+    self.scratch_disks.append(StaticDisk(spec))
+
   def DeleteScratchDisks(self):
     """StaticVirtualMachines do not delete scratch disks."""
     pass
 
-  def GetScratchDir(self, disk_num=0):
-    """Gets the path to the scratch directory.
+  def GetLocalDisks(self):
+    """Returns a list of local disks on the VM."""
+    return [disk_spec.device_path
+            for disk_spec in self.disk_specs if disk_spec.device_path]
 
-    Args:
-      disk_num: The number of the mounted disk.
-    Returns:
-      The mounted disk directory path.
-    Raises:
-      IndexError: On missing scratch disks.
-    """
-    try:
-      scratch_dir = self.scratch_disk_mountpoints[disk_num]
-    except IndexError:
-      logging.exception('No scratch disk configured for disk_num %d.  '
-                        'Add one to the static VM file using '
-                        '"scratch_disk_mountpoints"', disk_num)
-      raise
-    return scratch_dir
 
   @classmethod
   def ReadStaticVirtualMachineFile(cls, file_obj):
@@ -129,8 +171,6 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       scratch_disk_mountpoints: array of strings, optional
       os_type: string, optional (see package_managers)
       install_packages: bool, optional
-
-    See the constructor for descriptions.
 
     Args:
       file_obj: An open handle to a file containing the static VM info.
@@ -198,11 +238,23 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
           (os_type != WINDOWS and FLAGS.os_type == WINDOWS)):
         raise ValueError('Please only use Windows VMs when using '
                          '--os_type=windows and vice versa.')
-      vm_class = GetStaticVirtualMachineClass(os_type)
-      vm = vm_class(ip_address, user_name, keyfile_path, internal_ip, zone,
-                    local_disks, scratch_disk_mountpoints, ssh_port,
-                    install_packages, password)
+
+      disk_kwargs_list = []
+      for path in scratch_disk_mountpoints:
+        disk_kwargs_list.append({'mount_point': path})
+      for local_disk in local_disks:
+        disk_kwargs_list.append({'device_path': local_disk})
+
+      vm_spec = StaticVmSpec(
+          ip_address=ip_address, user_name=user_name, ssh_port=ssh_port,
+          install_packages=install_packages, ssh_private_key=keyfile_path,
+          internal_ip=internal_ip, zone=zone, disk_specs=disk_kwargs_list,
+          password=password)
+
+      vm_class = GetStaticVmClass(os_type)
+      vm = vm_class(vm_spec)
       cls.vm_pool.append(vm)
+
 
   @classmethod
   def GetStaticVirtualMachine(cls):
@@ -219,12 +271,8 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       else:
         return None
 
-  def GetLocalDisks(self):
-    """Returns a list of local disks on the VM."""
-    return self.local_disks
 
-
-def GetStaticVirtualMachineClass(os_type):
+def GetStaticVmClass(os_type):
   """Returns the static VM class that corresponds to the os_type."""
   class_dict = {
       DEBIAN: DebianBasedStaticVirtualMachine,

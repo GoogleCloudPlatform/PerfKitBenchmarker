@@ -35,22 +35,25 @@ FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
 
 
-class BaseVirtualMachineSpec(object):
+class BaseVmSpec(object):
   """Storing various data about a single vm.
 
   Attributes:
-    project: The provider-specific project to associate the VM with (e.g.
-      artisanal-lightbulb-883).
     zone: The region / zone the in which to launch the VM.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     image: The disk image to boot from.
   """
 
-  def __init__(self, project, zone, machine_type, image):
-    self.project = project
+  def __init__(self, zone=None, machine_type=None, image=None):
     self.zone = zone
     self.machine_type = machine_type
     self.image = image
+
+  def ApplyFlags(self, flags):
+    """Applies flags to the VmSpec."""
+    self.zone = flags.zone or self.zone
+    self.machine_type = flags.machine_type or self.machine_type
+    self.image = flags.image or self.image
 
 
 class BaseVirtualMachine(resource.BaseResource):
@@ -80,6 +83,7 @@ class BaseVirtualMachine(resource.BaseResource):
   """
 
   is_static = False
+  CLOUD = None
 
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
@@ -97,7 +101,6 @@ class BaseVirtualMachine(resource.BaseResource):
       self.instance_number = self._instance_counter
       self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
       BaseVirtualMachine._instance_counter += 1
-    self.project = vm_spec.project
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.image = vm_spec.image
@@ -114,16 +117,6 @@ class BaseVirtualMachine(resource.BaseResource):
     self.remote_disk_counter = 0
     self.network = network
     self.firewall = firewall
-
-  @classmethod
-  def SetVmSpecDefaults(cls, vm_spec):
-    """Updates the VM spec with cloud specific defaults.
-
-    If any of the VM spec attributes haven't been set by the time this is
-    called, this should set them. This method should not override any
-    attributes which have been set.
-    """
-    pass
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(

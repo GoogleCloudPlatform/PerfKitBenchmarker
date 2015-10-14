@@ -1,0 +1,55 @@
+# Declare any anchors you may want to use later.
+four_core: &four_core
+  GCP:
+    machine_type: n1-standard-4
+  AWS:
+    machine_type: c4.xlarge
+
+# You may also want to declare static VMs.
+# For a complete list of valid keys, see
+#  static_virtual_machine.StaticVmSpec.
+static_vms:
+  - &vm1
+    user_name: perfkit
+    ssh_private_key: /absolute/path/to/key
+    ip_address: 1.1.1.1
+  - &vm2
+    user_name: perfkit
+    ssh_private_key: /absolute/path/to/key
+    ip_address: 2.2.2.2
+    # Declare the OS type of the VM if necessary.
+    os_type: rhel
+    # If you want to run any benchmarks that use disks you
+    # should declare them.
+    disk_specs:
+      # For most benchmarks, just declaring the mount point
+      # is sufficient.
+      - mount_point: /scratch
+
+# Multi cloud iperf config.
+iperf: &iperf_multicloud
+  vm_groups:
+    iperf_vm_1:
+      cloud: GCP
+      vm_spec: *four_core
+    iperf_vm_2:
+      cloud: AWS
+      vm_spec: *four_core
+
+
+# If you've already declared your static VMs,
+# here's how to use them.
+# Don't run fio using this config because the
+# static VM example values are completely bogus.
+fio:
+  vm_groups:
+    default:
+      static_vms:
+        - *vm2
+
+# If you choose to, you can specify which benchmarks should be
+# run in your config file. This will even let you run the same
+# benchmark multiple times with different configs.
+benchmarks:
+  - iperf: null # This means use the default config
+  - iperf: *iperf_multicloud

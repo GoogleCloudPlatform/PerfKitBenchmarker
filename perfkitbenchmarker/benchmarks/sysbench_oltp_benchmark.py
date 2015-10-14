@@ -20,15 +20,21 @@ Manual: http://sysbench.sourceforge.net/docs/#database_mode
 import logging
 import re
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'sysbench_oltp',
-                  'description': 'Runs Sysbench OLTP',
-                  'scratch_disk': True,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'sysbench_oltp'
+BENCHMARK_CONFIG = """
+sysbench_oltp:
+  description: Runs Sysbench OLTP
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+"""
 
 # TODO(user): Validate that the oltp-table-size stresses PD.
 SYSBENCH_CMD = ('sudo sysbench '
@@ -41,8 +47,8 @@ SYSBENCH_CMD = ('sudo sysbench '
                 '--mysql-password=perfkitbenchmarker ')
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):

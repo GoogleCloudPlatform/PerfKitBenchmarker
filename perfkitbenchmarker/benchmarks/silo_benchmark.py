@@ -22,6 +22,7 @@ Documentation & code: https://github.com/stephentu/silo
 
 import logging
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -29,10 +30,15 @@ from perfkitbenchmarker.packages import silo
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'silo',
-                  'description': 'Runs Silo',
-                  'scratch_disk': False,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'silo'
+BENCHMARK_CONFIG = """
+silo:
+  description: Runs Silo
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+"""
+
 
 flags.DEFINE_string('silo_benchmark', 'tpcc',
                     'benchmark to run with silo. Options include tpcc, ycsb,'
@@ -45,8 +51,8 @@ PER_CORE_THPUT_REGEX = \
 LAT_REGEX = r'(avg_latency):\s+(\d+\.?\d*e?[+-]?\d*)\s+([a-z]+)'
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):

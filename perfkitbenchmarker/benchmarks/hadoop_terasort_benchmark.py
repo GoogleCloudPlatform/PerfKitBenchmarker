@@ -25,6 +25,7 @@ import logging
 import posixpath
 import time
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -35,21 +36,26 @@ flags.DEFINE_integer('terasort_num_rows', 100000000,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'hadoop_terasort',
-                  'description': 'Runs Terasort. Control the number of VMs '
-                  'with --num_vms.',
-                  'scratch_disk': True,
-                  'num_machines': 9}
+BENCHMARK_NAME = 'hadoop_terasort'
+BENCHMARK_CONFIG = """
+hadoop_terasort:
+  description: Runs Terasort. Control the number of VMs with --num_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+      vm_count: 9
+"""
 
 NUM_BYTES_PER_ROW = 100
 NUM_MB_PER_ROW = NUM_BYTES_PER_ROW / (1024.0 ** 2)
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['num_vms'].present:
-    info['num_machines'] = FLAGS.num_vms
-  return info
+    config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
+  return config
 
 
 def CheckPrerequisites():

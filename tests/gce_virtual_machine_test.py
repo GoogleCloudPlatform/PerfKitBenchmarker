@@ -18,7 +18,6 @@ import unittest
 import mock
 
 from perfkitbenchmarker import pkb  # noqa. Imported to create needed flags.
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import gce_virtual_machine
 
@@ -31,10 +30,8 @@ class GCEPreemptibleVMFlagTestCase(unittest.TestCase):
             mock.patch(gce_virtual_machine.__name__ + '.FLAGS') as gvm_flags:
       gvm_flags.gce_preemptible_vms = True
       gvm_flags.gcloud_scopes = None
-      vm_spec = virtual_machine.BaseVirtualMachineSpec('proj',
-                                                       'zone',
-                                                       'n1-standard-1',
-                                                       'image')
+      vm_spec = gce_virtual_machine.GceVmSpec(image='image')
+      vm_spec.ApplyFlags(gvm_flags)
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec, None, None)
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)

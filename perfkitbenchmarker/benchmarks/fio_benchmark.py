@@ -26,6 +26,7 @@ import re
 
 import jinja2
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -201,11 +202,15 @@ def FillDevice(vm, disk, fill_size):
   vm.RemoteCommand(command)
 
 
-BENCHMARK_INFO = {'name': 'fio',
-                  'description': 'Runs fio in sequential, random, read '
-                                 'and write modes.',
-                  'scratch_disk': True,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'fio'
+BENCHMARK_CONFIG = """
+fio:
+  description: Runs fio in sequential, random, read and write modes.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+"""
 
 
 JOB_FILE_TEMPLATE = """
@@ -388,8 +393,8 @@ def RunForMinutes(proc, mins_to_run, mins_per_call):
          total_repeats=run_reps)
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):

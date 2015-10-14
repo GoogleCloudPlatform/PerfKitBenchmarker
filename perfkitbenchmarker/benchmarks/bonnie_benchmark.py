@@ -16,19 +16,26 @@
 
 import logging
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'bonnie++',
-                  'description': 'Runs Bonnie++. Running this benchmark inside '
-                                 'a container is currently not supported, '
-                                 'since Docker tries to run it as root, which '
-                                 'is not recommended.',
-                  'scratch_disk': True,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'bonnie++'
+BENCHMARK_CONFIG = """
+bonnie++:
+  description: >
+      Runs Bonnie++. Running this benchmark inside
+      a container is currently not supported,
+      since Docker tries to run it as root, which
+      is not recommended.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+"""
 
 LATENCY_REGEX = r'([0-9]*\.?[0-9]+)(\w+)'
 # Bonnie++ result fields mapping, see man bon_csv2txt for details.
@@ -83,8 +90,8 @@ BONNIE_RESULTS_MAPPING = {
     'ran_del_latency': 47}
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):

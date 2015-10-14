@@ -45,8 +45,7 @@ flags.DEFINE_enum('openstack_scheduler_policy', NONE,
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
 
-    DEFAULT_MACHINE_TYPE = 'm1.small'
-    DEFAULT_ZONE = 'nova'
+    CLOUD = 'OpenStack'
     DEFAULT_USERNAME = 'ubuntu'
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None
@@ -72,16 +71,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.pk = None
         self.user_name = self.DEFAULT_USERNAME
         self.boot_wait_time = None
-
-    @classmethod
-    def SetVmSpecDefaults(cls, vm_spec):
-      """Updates the VM spec with cloud specific defaults."""
-      if vm_spec.machine_type is None:
-        vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
-      if vm_spec.zone is None:
-        vm_spec.zone = cls.DEFAULT_ZONE
-      if vm_spec.image is None:
-        vm_spec.image = cls.DEFAULT_IMAGE
+        self.image = self.image or self.DEFAULT_IMAGE
 
     def _Create(self):
         image = self.client.images.findall(name=self.image)[0]

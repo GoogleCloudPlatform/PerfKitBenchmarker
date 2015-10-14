@@ -26,5 +26,5 @@ def _LoadBenchmarks():
 
 BENCHMARKS = _LoadBenchmarks()
 
-VALID_BENCHMARKS = {module.BENCHMARK_INFO['name']: module
+VALID_BENCHMARKS = {module.BENCHMARK_NAME: module
                     for module in BENCHMARKS}

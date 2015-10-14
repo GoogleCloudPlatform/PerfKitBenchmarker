@@ -16,6 +16,7 @@
 
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import windows_benchmarks
 
@@ -124,6 +125,31 @@ BENCHMARK_SETS = {
 }
 
 
+def _GetValidBenchmarks():
+  """Returns a dict mapping valid benchmark names to their modules."""
+  if FLAGS.os_type == benchmark_spec.WINDOWS:
+    return windows_benchmarks.VALID_BENCHMARKS
+  return benchmarks.VALID_BENCHMARKS
+
+
+def _GetBenchmarksFromUserConfig(user_config):
+  """Returns a list of benchmark module, config tuples."""
+  benchmarks = user_config.get('benchmarks', [])
+  valid_benchmarks = _GetValidBenchmarks()
+  benchmark_config_list = []
+
+  for entry in benchmarks:
+    name, user_config = entry.popitem()
+    try:
+      benchmark_module = valid_benchmarks[name]
+    except KeyError:
+      raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
+                       (name, FLAGS.os_type))
+    benchmark_config_list.append((benchmark_module, user_config))
+
+  return benchmark_config_list
+
+
 def GetBenchmarksFromFlags():
   """Returns a list of benchmarks to run based on the benchmarks flag.
 
@@ -131,6 +157,11 @@ def GetBenchmarksFromFlags():
   If multiple sets or mixes of sets and benchmarks are specified, this will
   return the union of all sets and individual benchmarks.
   """
+  user_config = configs.GetUserConfig()
+  benchmark_config_list = _GetBenchmarksFromUserConfig(user_config)
+  if benchmark_config_list and not FLAGS['benchmarks'].present:
+    return benchmark_config_list
+
   benchmark_names = set()
   for benchmark in FLAGS.benchmarks:
     if benchmark in BENCHMARK_SETS:
@@ -153,18 +184,17 @@ def GetBenchmarksFromFlags():
                 benchmark_name][BENCHMARK_LIST])
         break
 
-  if FLAGS.os_type == benchmark_spec.WINDOWS:
-    valid_benchmarks = windows_benchmarks.VALID_BENCHMARKS
-  else:
-    valid_benchmarks = benchmarks.VALID_BENCHMARKS
+  valid_benchmarks = _GetValidBenchmarks()
 
-  # create a list of modules to return
-  benchmark_module_list = []
+  # create a list of module, config tuples to return
+  benchmark_config_list = []
   for benchmark_name in benchmark_names:
     if benchmark_name in valid_benchmarks:
-      benchmark_module_list.append(valid_benchmarks[benchmark_name])
+      benchmark_module = valid_benchmarks[benchmark_name]
+      user_config = user_config.get(benchmark_name, {})
+      benchmark_config_list.append((benchmark_module, user_config))
     else:
       raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
                        (benchmark_name, FLAGS.os_type))
 
-  return benchmark_module_list
+  return benchmark_config_list

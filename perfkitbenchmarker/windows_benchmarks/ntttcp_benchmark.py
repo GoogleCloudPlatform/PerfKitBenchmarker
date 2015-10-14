@@ -14,6 +14,7 @@
 
 """Run NTttcp between two VMs."""
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
@@ -21,14 +22,19 @@ from perfkitbenchmarker.windows_packages import ntttcp
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'ntttcp',
-                  'description': 'Run ntttcp between two VMs.',
-                  'scratch_disk': False,
-                  'num_machines': 2}
+BENCHMARK_NAME = 'ntttcp'
+BENCHMARK_CONFIG = """
+ntttcp:
+  description: Run ntttcp between two VMs.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      vm_count: 2
+"""
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):

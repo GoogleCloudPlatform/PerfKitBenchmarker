@@ -23,6 +23,7 @@ YCSB and workloads described in perfkitbenchmarker.packages.ycsb.
 import functools
 import logging
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -32,21 +33,33 @@ from perfkitbenchmarker.packages import ycsb
 FLAGS = flags.FLAGS
 
 
-BENCHMARK_INFO = {'name': 'aerospike_ycsb',
-                  'description': 'Run YCSB against an Aerospike '
-                  'installation. Specify the number of YCSB VMs with '
-                  '--ycsb_client_vms.',
-                  'num_machines': None}
+BENCHMARK_NAME = 'aerospike_ycsb'
+BENCHMARK_CONFIG = """
+aerospike_ycsb:
+  description: >
+    Run YCSB against an Aerospike
+    installation. Specify the number of YCSB VMs with
+    --ycsb_client_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+      vm_count: null
+      disk_count: 0
+"""
 
 
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
-  info['num_machines'] = FLAGS.num_vms + FLAGS.ycsb_client_vms
-  info['scratch_disk'] = (
-      FLAGS.aerospike_storage_type == aerospike_server.DISK and
-      FLAGS.scratch_disk_type != disk.LOCAL)
-  return info
+  if (FLAGS.aerospike_storage_type == aerospike_server.DISK and
+      FLAGS.scratch_disk_type != disk.LOCAL):
+    config['vm_groups']['default']['disk_count'] = 1
+
+  config['vm_groups']['default']['vm_count'] = (FLAGS.ycsb_client_vms +
+                                                FLAGS.num_vms)
+
+  return config
 
 
 def CheckPrerequisites():

@@ -19,25 +19,33 @@ Redis homepage: http://redis.io/
 import functools
 import posixpath
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import redis_server
 from perfkitbenchmarker.packages import ycsb
 
 FLAGS = flags.FLAGS
-BENCHMARK_INFO = {'name': 'redis_ycsb',
-                  'description': 'Run YCSB against a single Redis server. '
-                  'Specify the number of client VMs with --ycsb_client_vms.',
-                  'scratch_disk': False,
-                  'num_machines': None}  # Set in GetInfo below
+BENCHMARK_NAME = 'redis_ycsb'
+BENCHMARK_CONFIG = """
+redis_ycsb:
+  description: >
+      Run YCSB against a single Redis server.
+      Specify the number of client VMs with --ycsb_client_vms.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      vm_count: null
+"""
+
 
 REDIS_PID_FILE = posixpath.join(redis_server.REDIS_DIR, 'redis.pid')
 
 
-def GetInfo():
-  benchmark_info = BENCHMARK_INFO.copy()
-  benchmark_info['num_machines'] = 1 + FLAGS.ycsb_client_vms
-  return benchmark_info
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config['vm_groups']['default']['vm_count'] = 1 + FLAGS.ycsb_client_vms
+  return config
 
 
 def PrepareLoadgen(load_vm):

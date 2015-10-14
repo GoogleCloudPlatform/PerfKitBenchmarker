@@ -23,6 +23,7 @@ Runs Iperf to collect network throughput.
 import logging
 import re
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -37,17 +38,23 @@ flags.DEFINE_integer('iperf_runtime_in_seconds', 60,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'iperf',
-                  'description': 'Run iperf',
-                  'scratch_disk': False,
-                  'num_machines': 2}
+BENCHMARK_NAME = 'iperf'
+BENCHMARK_CONFIG = """
+iperf:
+  description: Run iperf
+  vm_groups:
+    iperf_vm_1:
+      vm_spec: *default_single_core
+    iperf_vm_2:
+      vm_spec: *default_single_core
+"""
 
 IPERF_PORT = 20000
 IPERF_RETRIES = 5
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):

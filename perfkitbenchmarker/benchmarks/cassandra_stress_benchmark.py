@@ -28,6 +28,7 @@ import re
 import time
 
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -49,18 +50,23 @@ flags.DEFINE_integer('num_cassandra_stress_threads', 50,
 
 FLAGS = flags.FLAGS
 
-DEFAULT_CLUSTER_SIZE = 4
-
-# Disks and machines are set in config file.
-BENCHMARK_INFO = {'name': 'cassandra_stress',
-                  'description': 'Benchmark Cassandra using cassandra-stress',
-                  'scratch_disk': False,
-                  'num_machines': DEFAULT_CLUSTER_SIZE}
+BENCHMARK_NAME = 'cassandra_stress'
+BENCHMARK_CONFIG = """
+cassandra_stress:
+  description: Benchmark Cassandra using cassandra-stress
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      vm_count: 4
+"""
 
 LOADER_NODE = 'loader'
 DATA_NODE = 'cas'
 PROPAGATION_WAIT_TIME = 30
 SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
+
+DEFAULT_DISK_TYPE = disk.STANDARD
+DEFAULT_DISK_SIZE = 500
 
 # Stress test options.
 CONSISTENCY_LEVEL = 'quorum'
@@ -71,8 +77,8 @@ CASSANDRA_STRESS = posixpath.join(cassandra.CASSANDRA_DIR, 'tools', 'bin',
                                   'cassandra-stress')
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():
@@ -91,7 +97,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vm_dict = benchmark_spec.vm_dict
+  vm_dict = benchmark_spec.vm_groups
   logging.info('VM dictionary %s', vm_dict)
 
   if vm_dict['default']:
@@ -101,9 +107,9 @@ def Prepare(benchmark_spec):
     vm_dict[DATA_NODE] = vm_dict['default'][:3]
     mount_point = os.path.join(vm_util.VM_TMP_DIR, 'cassandra_data')
     disk_spec = disk.BaseDiskSpec(
-        FLAGS.scratch_disk_size,
-        FLAGS.scratch_disk_type,
-        mount_point)
+        disk_size=(FLAGS.scratch_disk_size or DEFAULT_DISK_SIZE),
+        disk_type=(FLAGS.scratch_disk_type or DEFAULT_DISK_TYPE),
+        mount_point=mount_point)
     for vm in vm_dict[DATA_NODE]:
       vm.CreateScratchDisk(disk_spec)
 
@@ -151,8 +157,8 @@ def RunCassandraStress(benchmark_spec):
   """
   logging.info('Creating Keyspace.')
   data_node_ips = [data_vm.internal_ip
-                   for data_vm in benchmark_spec.vm_dict[DATA_NODE]]
-  loader_vms = benchmark_spec.vm_dict[LOADER_NODE]
+                   for data_vm in benchmark_spec.vm_groups[DATA_NODE]]
+  loader_vms = benchmark_spec.vm_groups[LOADER_NODE]
   loader_vms[0].RemoteCommand(
       '%s '
       '--nodes %s --replication-factor %s '
@@ -164,13 +170,13 @@ def RunCassandraStress(benchmark_spec):
   time.sleep(PROPAGATION_WAIT_TIME)
 
   if not FLAGS.num_keys:
-    FLAGS.num_keys = NUM_KEYS_PER_CORE * benchmark_spec.vm_dict[
+    FLAGS.num_keys = NUM_KEYS_PER_CORE * benchmark_spec.vm_groups[
         DATA_NODE][0].num_cpus
     logging.info('Num keys not set, using %s in cassandra-stress test.',
                  FLAGS.num_keys)
   logging.info('Executing the benchmark.')
   args = [((loader_vm, data_node_ips), {})
-          for loader_vm in benchmark_spec.vm_dict[LOADER_NODE]]
+          for loader_vm in benchmark_spec.vm_groups[LOADER_NODE]]
   vm_util.RunThreaded(RunTestOnLoader, args)
 
 
@@ -238,7 +244,7 @@ def RunCassandraStressTest(benchmark_spec):
   finally:
     logging.info('Tests running. Watching progress.')
     vm_util.RunThreaded(WaitForLoaderToFinish,
-                        benchmark_spec.vm_dict[LOADER_NODE])
+                        benchmark_spec.vm_groups[LOADER_NODE])
 
 
 def CollectResults(benchmark_spec):
@@ -252,7 +258,7 @@ def CollectResults(benchmark_spec):
     A list of sample.Sample objects.
   """
   logging.info('Gathering results.')
-  vm_dict = benchmark_spec.vm_dict
+  vm_dict = benchmark_spec.vm_groups
   interval_op_rate_list = []
   interval_key_rate_list = []
   latency_median_list = []
@@ -312,7 +318,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data
         that is required to run the benchmark.
   """
-  vm_dict = benchmark_spec.vm_dict
+  vm_dict = benchmark_spec.vm_groups
 
   vm_util.RunThreaded(cassandra.Stop, vm_dict[DATA_NODE])
   vm_util.RunThreaded(cassandra.CleanNode, vm_dict[DATA_NODE])
