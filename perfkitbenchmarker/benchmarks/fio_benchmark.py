@@ -189,7 +189,7 @@ def FillDevice(vm, disk, fill_size):
   """Fill the given disk on the given vm up to fill_size.
 
   Args:
-    vm: a virtual_machine.VirtualMachine object.
+    vm: a linux_virtual_machine.BaseLinuxMixin object.
     disk: a disk.BaseDisk attached to the given vm.
     fill_size: amount of device to fill, in fio format.
   """
@@ -199,7 +199,7 @@ def FillDevice(vm, disk, fill_size):
               '--rw=write --direct=1 --size=%s') %
              (fio.FIO_PATH, disk.GetDevicePath(), fill_size))
 
-  vm.RemoteCommand(command)
+  vm.RobustRemoteCommand(command)
 
 
 BENCHMARK_NAME = 'fio'
@@ -486,7 +486,7 @@ def Run(benchmark_spec):
       logging.info('**** Repetition number %s of %s ****',
                    repeat_number, total_repeats)
 
-    stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
+    stdout, stderr = vm.RobustRemoteCommand(fio_command, should_log=True)
 
     if repeat_number:
       base_metadata = {

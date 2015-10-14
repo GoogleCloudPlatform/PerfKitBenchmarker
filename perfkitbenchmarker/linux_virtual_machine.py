@@ -103,7 +103,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                                             os.path.basename(f)))
         self._has_remote_command_script = True
 
-  def RobustRemoteCommand(self, command):
+  def RobustRemoteCommand(self, command, should_log=False):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     Executes a command via a pair of scripts on the VM:
@@ -115,6 +115,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     Temporary SSH failures (where ssh returns a 255) while waiting for the
     command to complete will be tolerated and safely retried.
+
+    If should_log is True, log the command's output at the info
+    level. If False, log the command's output at the debug level.
     """
     self._PushRobustCommandScripts()
 
@@ -148,7 +151,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--status', status_file,
                     '--delete']
     try:
-      return self.RemoteCommand(' '.join(wait_command), should_log=False)
+      return self.RemoteCommand(' '.join(wait_command), should_log=should_log)
     except:
       # In case the error was with the wrapper script itself, print the log.
       stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
