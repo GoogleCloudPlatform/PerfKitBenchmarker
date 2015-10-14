@@ -64,7 +64,8 @@ NUM_LOCAL_VOLUMES = {
     'm2.xlarge': 1, 'm2.2xlarge': 1, 'm2.4xlarge': 2,
     'm3.medium': 1, 'm3.large': 1, 'm3.xlarge': 2, 'm3.2xlarge': 2,
     'r3.large': 1, 'r3.xlarge': 1, 'r3.2xlarge': 1, 'r3.4xlarge': 1,
-    'r3.8xlarge': 2,
+    'r3.8xlarge': 2, 'd2.xlarge': 3, 'd2.2xlarge': 6, 'd2.4xlarge': 12,
+    'd2.8xlarge': 24,
 }
 DRIVE_START_LETTER = 'b'
 INSTANCE_EXISTS_STATUSES = frozenset(
