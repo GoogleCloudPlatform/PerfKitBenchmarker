@@ -33,7 +33,6 @@ import logging
 import os
 import re
 import tempfile
-import threading
 import time
 
 from perfkitbenchmarker import disk
@@ -83,10 +82,6 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 
-  count = 1
-  _lock = threading.Lock()
-  has_keypair = False
-
   "Object representing a Rackspace Virtual Machine"
   def __init__(self, vm_spec, network, firewall):
     """Initialize Rackspace virtual machine
@@ -96,18 +91,10 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       network: network.BaseNetwork object corresponding to the VM.
       firewall: network.BaseFirewall object corresponding to the VM.
     """
-
     super(RackspaceVirtualMachine, self).__init__(vm_spec, network, firewall)
-    with RackspaceVirtualMachine._lock:
-      self.name = 'perfkit-%s-%s' % (FLAGS.run_uri,
-                                     RackspaceVirtualMachine.count)
-      self.device_id = RackspaceVirtualMachine.count
-      RackspaceVirtualMachine.count += 1
-
     self.id = ''
     self.ip_address6 = ''
     self.mounted_disks = set()
-    self.key_name = 'perfkit-%s' % FLAGS.run_uri
     self.max_local_disks = 0
     self.flavor = self._GetFlavorDetails()
     self.flavor_class = None
@@ -123,44 +110,6 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
           'There was a problem while retrieving machine_type'
           ' information from the cloud provider.')
     self.image = self.image or self.DEFAULT_IMAGE
-
-  def CreateKeyPair(self):
-    """Imports the public keyfile to Rackspace."""
-    with open(self.ssh_public_key) as f:
-      public_key = f.read().rstrip('\n')
-
-    with tempfile.NamedTemporaryFile(dir=vm_util.GetTempDir(),
-                                     prefix='key-metadata') as tf:
-      tf.write('%s\n' % public_key)
-      tf.flush()
-      env = os.environ.copy()
-      env.update(util.GetDefaultRackspaceNovaEnv(self.zone))
-      key_cmd = [
-          FLAGS.nova_path, 'keypair-add',
-          '--pub-key', tf.name, self.key_name]
-
-      vm_util.IssueRetryableCommand(key_cmd, env=env)
-
-  def DeleteKeyPair(self):
-    """Deletes the imported keyfile for an account."""
-    env = os.environ.copy()
-    env.update(util.GetDefaultRackspaceNovaEnv(self.zone))
-    key_cmd = [FLAGS.nova_path, 'keypair-delete', self.key_name]
-    vm_util.IssueCommand(key_cmd, env=env)
-
-  def _CreateDependencies(self):
-    """Create VM dependencies."""
-    with RackspaceVirtualMachine._lock:
-        if not RackspaceVirtualMachine.has_keypair:
-            self.CreateKeyPair()
-            RackspaceVirtualMachine.has_keypair = True
-
-  def _DeleteDependencies(self):
-    """Delete VM dependencies."""
-    with RackspaceVirtualMachine._lock:
-        if RackspaceVirtualMachine.has_keypair:
-            self.DeleteKeyPair()
-            RackspaceVirtualMachine.has_keypair = False
 
   def _Create(self):
     """Create a Rackspace instance."""
@@ -210,8 +159,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _GetCreateCommand(self):
     create_cmd = [
         FLAGS.nova_path, 'boot',
-        '--flavor', self.machine_type,
-        '--key-name', self.key_name]
+        '--flavor', self.machine_type]
 
     boot_from_cbs = (
         self.flavor_class in (rax.COMPUTE1_CLASS, rax.MEMORY1_CLASS,) or
