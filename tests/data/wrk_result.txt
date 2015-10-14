@@ -1,0 +1,19 @@
+Running 1m test @ http://10.240.0.46/OK
+  2 threads and 2 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency   218.37us  284.24us  11.60ms   98.94%
+    Req/Sec     4.83k   470.08     5.55k    76.21%
+  577297 requests in 1.00m, 143.12MB read
+Requests/sec:   9605.69
+Transfer/sec:      2.38MB
+==CSV==
+variable,value,unit
+p5 latency,0.162,ms
+p50 latency,0.187,ms
+p90 latency,0.256,ms
+p99 latency,0.519,ms
+p99.9 latency,5.196,ms
+bytes transferred,1.50068e+08,bytes
+errors,0,n
+requests,577297,n
+throughput,9605.69,requests/sec
