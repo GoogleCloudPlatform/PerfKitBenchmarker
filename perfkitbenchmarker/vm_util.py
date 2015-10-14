@@ -17,6 +17,7 @@
 from collections import namedtuple
 from concurrent import futures
 import contextlib
+import functools
 import logging
 import os
 import Queue
@@ -181,9 +182,16 @@ def GetSshOptions(ssh_key_filename):
 def _GetCallString(target_arg_tuple):
   """Returns the string representation of a function call."""
   target, args, kwargs = target_arg_tuple
+  while isinstance(target, functools.partial):
+    args = target.args + args
+    inner_kwargs = target.keywords.copy()
+    inner_kwargs.update(kwargs)
+    kwargs = inner_kwargs
+    target = target.func
   arg_strings = [str(a) for a in args]
   arg_strings.extend(['{0}={1}'.format(k, v) for k, v in kwargs.iteritems()])
-  return '{0}({1})'.format(target.__name__, ', '.join(arg_strings))
+  return '{0}({1})'.format(getattr(target, '__name__', target),
+                           ', '.join(arg_strings))
 
 
 # Result of a call executed by RunParallelThreads.
