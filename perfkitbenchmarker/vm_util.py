@@ -183,7 +183,8 @@ def _GetCallString(target_arg_tuple):
   target, args, kwargs = target_arg_tuple
   arg_strings = [str(a) for a in args]
   arg_strings.extend(['{0}={1}'.format(k, v) for k, v in kwargs.iteritems()])
-  return '{0}({1})'.format(target.__name__, ', '.join(arg_strings))
+  return '{0}({1})'.format(getattr(target, '__name__', target),
+                           ', '.join(arg_strings))
 
 
 # Result of a call executed by RunParallelThreads.
