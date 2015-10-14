@@ -53,6 +53,7 @@ resources
      run_uri.
 """
 
+import collections
 import getpass
 import logging
 import sys
@@ -239,7 +240,7 @@ def DoCleanupPhase(benchmark, name, spec, timer):
 
 
 def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
-                 benchmark_config):
+                 benchmark_config, benchmark_uid):
   """Runs a single benchmark and adds the results to the collector.
 
   Args:
@@ -249,6 +250,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
       relative to the other benchmarks in the suite.
     total_benchmarks: The total number of benchmarks in the suite.
     benchmark_config: The config to run the benchmark with.
+    benchmark_uid: An identifier unique to this run of the benchmark even
+      if the same benchmark is run multiple times with different configs.
   """
   benchmark_name = benchmark.BENCHMARK_NAME
 
@@ -276,11 +279,11 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
           # because if DoPreparePhase raises an exception, we still need
           # a reference to the spec in order to delete it in the "finally"
           # section below.
-          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name)
+          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_uid)
           spec.ConstructVirtualMachines()
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
-          spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_name)
+          spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid)
 
         if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
           DoRunPhase(benchmark, benchmark_name, spec, collector, detailed_timer)
@@ -392,11 +395,17 @@ def RunBenchmarks(publish=True):
     benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     total_benchmarks = len(benchmark_tuple_list)
 
+    benchmark_counts = collections.Counter()
     args = []
     for i, benchmark_tuple in enumerate(benchmark_tuple_list):
       benchmark_module, user_config = benchmark_tuple
-      args.append(((benchmark_module, collector, i + 1, total_benchmarks,
-                    benchmark_module.GetConfig(user_config)), {}))
+      benchmark_uid = (benchmark_module.BENCHMARK_NAME +
+                       str(benchmark_counts[benchmark_module]))
+      benchmark_counts[benchmark_module] += 1
+      args.append(
+          ((benchmark_module, collector, i + 1, total_benchmarks,
+            benchmark_module.GetConfig(user_config), benchmark_uid), {}))
+
     if FLAGS.parallelism > 1:
       vm_util.RunThreaded(
           RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
