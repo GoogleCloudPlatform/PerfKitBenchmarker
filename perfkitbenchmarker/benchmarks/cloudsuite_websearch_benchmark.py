@@ -37,9 +37,9 @@ from perfkitbenchmarker.packages.ant import ANT_HOME_DIR
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'cloudsuite_web_search'
+BENCHMARK_NAME = 'cloudsuite_websearch'
 BENCHMARK_CONFIG = """
-cloudsuite_web_search:
+cloudsuite_websearch:
   description: Run CloudSuite Web Search
   vm_groups:
     default:
