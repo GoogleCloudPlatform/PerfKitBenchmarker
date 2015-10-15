@@ -392,8 +392,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     #     OpenMPI to operate correctly.
     remote_location = '%s@%s:%s' % (
         target.user_name, target.ip_address, remote_path)
-    self.RemoteHostCommand('scp -o StrictHostKeyChecking=no -i %s %s %s' %
-                           (REMOTE_KEY_PATH, source_path, remote_location))
+    self.RemoteHostCommand('scp -P %s -o StrictHostKeyChecking=no -i %s %s %s' %
+                           (target.ssh_port, REMOTE_KEY_PATH, source_path,
+                            remote_location))
 
   def AuthenticateVm(self):
     """Authenticate a remote machine to access all peers."""
