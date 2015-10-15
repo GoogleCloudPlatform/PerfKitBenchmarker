@@ -127,7 +127,6 @@ class CsClient(object):
 
         if networks and 'network' in networks:
             for network in networks['network']:
-                print network['name']
                 if network['name'] == network_name:
                     return network
 
@@ -359,8 +358,8 @@ class CsClient(object):
 
         res = self._cs.request(cs_args)
 
-        if res and 'staticnat' in res:
-            return res['staticnat']
+        if res and 'success' in res:
+            return res['success']
 
         return None
 
@@ -445,7 +444,6 @@ class CsClient(object):
         acllist = self._cs.request(cs_args)
 
         for acl in acllist['networkacllist']:
-            print acl['name']
             if acl['name'] == name:
                 return acl
 

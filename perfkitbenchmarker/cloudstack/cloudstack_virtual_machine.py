@@ -149,9 +149,8 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                                               self.id,
                                               self.network.id)
 
-        assert snat_rule, "Unable to create static NAT"
 
-        self.snat_rule_id = snat_rule['id']
+        assert snat_rule, "Unable to create static NAT"
 
 
   def _Delete(self):
