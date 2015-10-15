@@ -23,7 +23,6 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker.cloudstack import util
 
 import string
-import threading
 
 FLAGS = flags.FLAGS
 
@@ -31,7 +30,6 @@ FLAGS = flags.FLAGS
 class CloudStackDisk(disk.BaseDisk):
   """Object representing a Cloudstack Disk."""
 
-  _lock = threading.Lock()
 
   def __init__(self, disk_spec, name, zone_id, project_id=None):
     super(CloudStackDisk, self).__init__(disk_spec)
@@ -72,22 +70,20 @@ class CloudStackDisk(disk.BaseDisk):
 
   def _Delete(self):
     """Deletes the disk."""
-    with self._lock:
-
-        vol = self.cs.get_volume(self.name)
-        if vol:
-            self.cs.delete_volume(self.volume_id)
+    vol = self.cs.get_volume(self.name)
+    if vol:
+        self.cs.delete_volume(self.volume_id)
 
 
   def _Exists(self):
     """Returns true if the disk exists."""
-    with self._lock:
-        vol = self.cs.get_volume(self.name, self.project_id)
-        if vol:
-            return True
-        return False
+    vol = self.cs.get_volume(self.name, self.project_id)
+    if vol:
+        return True
+    return False
 
 
+  @vm_util.Retry(max_retries=3)
   def Attach(self, vm):
     """Attaches the disk to a VM.
 
@@ -97,23 +93,20 @@ class CloudStackDisk(disk.BaseDisk):
 
     """
 
-    with self._lock:
+    res = self.cs.attach_volume(self.volume_id, vm.id)
+    assert res, "Unable to attach volume"
 
-        res = self.cs.attach_volume(self.volume_id, vm.id)
-        assert res, "Unable to attach volume"
+    self.device_id = res['deviceid']
 
-        self.device_id = res['deviceid']
-
-        self.device_path = "/dev/xvd" + \
-            str(string.ascii_lowercase[self.device_id])
+    self.device_path = "/dev/xvd" + \
+        str(string.ascii_lowercase[self.device_id])
 
 
 
   def Detach(self):
     """Detaches the disk from a VM."""
 
-    with self._lock:
-        self.cs.detach_volume(self.volume_id)
+    self.cs.detach_volume(self.volume_id)
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
