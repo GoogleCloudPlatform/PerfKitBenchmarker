@@ -30,7 +30,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import ycsb
 
 # See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
-flags.DEFINE_string('mongodb_writeconcern', 'safe',
+flags.DEFINE_string('mongodb_writeconcern', 'acknowledged',
                     'MongoDB write concern.')
 
 FLAGS = flags.FLAGS
@@ -38,7 +38,7 @@ FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'mongodb_ycsb'
 BENCHMARK_CONFIG = """
 mongodb_ycsb:
-  description: Run YCSB against MongoDB.
+  description: Run YCSB against a single MongoDB node.
   vm_groups:
     default:
       vm_spec: *default_single_core
@@ -71,6 +71,11 @@ def _PrepareServer(vm):
 def _PrepareClient(vm):
   """Install YCSB on the client VM."""
   vm.Install('ycsb')
+  # Disable logging for MongoDB driver, which is otherwise quite verbose.
+  log_config = """<configuration><root level="WARN"/></configuration>"""
+
+  vm.RemoteCommand("echo '{0}' > {1}/logback.xml".format(
+      log_config, ycsb.YCSB_DIR))
 
 
 def Prepare(benchmark_spec):
@@ -101,9 +106,9 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[1]
 
-  executor = ycsb.YCSBExecutor('mongodb')
+  executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   kwargs = {
-      'mongodb.url': 'mongodb://%s:27017' % vms[0].internal_ip,
+      'mongodb.url': 'mongodb://%s:27017/' % vms[0].internal_ip,
       'mongodb.writeConcern': FLAGS.mongodb_writeconcern}
   samples = list(executor.LoadAndRun([vm], load_kwargs=kwargs,
                                      run_kwargs=kwargs))
