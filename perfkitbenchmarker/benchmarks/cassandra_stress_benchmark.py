@@ -19,6 +19,7 @@ cassandra-stress tool page:
 http://www.datastax.com/documentation/cassandra/2.0/cassandra/tools/toolsCStress_t.html
 """
 
+import collections
 import functools
 import logging
 import math
@@ -31,6 +32,7 @@ import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import cassandra
@@ -70,12 +72,18 @@ SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
 
 
 # Stress test options.
-CONSISTENCY_LEVEL = 'quorum'
+CONSISTENCY_LEVEL = 'QUORUM'
 REPLICATION_FACTOR = 3
 RETRIES = 1000
 
 CASSANDRA_STRESS = posixpath.join(cassandra.CASSANDRA_DIR, 'tools', 'bin',
                                   'cassandra-stress')
+RESULTS_METRICS = ['op rate', 'partition rate', 'row rate', 'latency mean',
+                   'latency median', 'latency 95th percentile',
+                   'latency 99th percentile', 'latency 99.9th percentile',
+                   'latency max', 'Total operation time']
+AGGREGATED_METRICS = ['op rate', 'partition rate', 'row rate']
+MAXIMUM_METRICS = ['latency max']
 
 
 def GetConfig(user_config):
@@ -126,15 +134,12 @@ def RunTestOnLoader(vm, data_node_ips):
     data_node_ips: List of IP addresses for all data nodes.
   """
   vm.RobustRemoteCommand(
-      '%s '
-      '--file "%s" --nodes %s '
-      '--replication-factor %s --consistency-level %s '
-      '--num-keys %s -K %s -t %s' % (
-          CASSANDRA_STRESS,
-          _ResultFilePath(vm),
-          ','.join(data_node_ips),
-          REPLICATION_FACTOR, CONSISTENCY_LEVEL, FLAGS.num_keys,
-          RETRIES, FLAGS.num_cassandra_stress_threads))
+      '%s write n=%s cl=%s '
+      '-node %s -schema replication\(factor=%s\) '
+      '-log file=%s -rate threads=%s -errors retries=%s' % (
+          CASSANDRA_STRESS, FLAGS.num_keys, CONSISTENCY_LEVEL,
+          ','.join(data_node_ips), REPLICATION_FACTOR,
+          _ResultFilePath(vm), RETRIES, FLAGS.num_cassandra_stress_threads))
 
 
 def RunCassandraStress(benchmark_spec):
@@ -150,12 +155,10 @@ def RunCassandraStress(benchmark_spec):
   data_node_ips = [vm.internal_ip for vm in cassandra_vms]
 
   loader_vms[0].RemoteCommand(
-      '%s '
-      '--nodes %s --replication-factor %s '
-      '--consistency-level %s --num-keys 1 > /dev/null' % (
-          CASSANDRA_STRESS,
-          ','.join(data_node_ips),
-          REPLICATION_FACTOR, CONSISTENCY_LEVEL))
+      '%s write n=1 cl=%s '
+      '-node %s -schema replication\(factor=%s\) > /dev/null' % (
+          CASSANDRA_STRESS, CONSISTENCY_LEVEL,
+          ','.join(data_node_ips), REPLICATION_FACTOR))
   logging.info('Waiting %s for keyspace to propagate.', PROPAGATION_WAIT_TIME)
   time.sleep(PROPAGATION_WAIT_TIME)
 
@@ -188,36 +191,29 @@ def WaitForLoaderToFinish(vm):
     time.sleep(SLEEP_BETWEEN_CHECK_IN_SECONDS)
 
 
-def CollectResultFile(vm, interval_op_rate_list, interval_key_rate_list,
-                      latency_median_list, latency_95th_list,
-                      latency_99_9th_list,
-                      total_operation_time_list):
+def CollectResultFile(vm, results):
   """Collect result file on vm.
 
   Args:
     vm: The target vm.
-    interval_op_rate_list: The list stores interval_op_rate.
-    interval_key_rate_list: The list stores interval_key_rate.
-    latency_median_list: The list stores latency median.
-    latency_95th_list: The list stores latency 95th percentile.
-    latency_99_9th_list: The list stores latency 99.9th percentile.
-    total_operation_time_list: The list stores total operation time.
+    results: A dictionary of lists. Each list contains results of a field defined in
+        RESULTS_METRICS collected from each loader machines.
   """
   result_path = _ResultFilePath(vm)
   vm.PullFile(vm_util.GetTempDir(), result_path)
-  resp, _ = vm.RemoteCommand('tail ' + result_path)
-  match = re.findall(r'[\w\t ]: +([\d\.:]+)', resp)
-  if len(match) < 6:
-    raise ValueError('Result not found in "%s"' % resp)
-  interval_op_rate_list.append(int(match[0]))
-  interval_key_rate_list.append(int(match[1]))
-  latency_median_list.append(float(match[2]))
-  latency_95th_list.append(float(match[3]))
-  latency_99_9th_list.append(float(match[4]))
-  raw_time_data = match[5].split(':')
-  total_operation_time_list.append(
-      int(raw_time_data[0]) * 3600 + int(raw_time_data[1]) * 60 + int(
-          raw_time_data[2]))
+  resp, _ = vm.RemoteCommand('tail -n 20 ' + result_path)
+  for metric in RESULTS_METRICS:
+
+    try:
+      value = regex_util.ExtractGroup(r'%s[\t ]+: ([\d\.:]+)' % metric, resp)
+      if metric == RESULTS_METRICS[-1]:  # Total operation time
+        value = value.split(':')
+        results[metric].append(
+            int(value[0]) * 3600 + int(value[1]) * 60 + int(value[2]))
+      else:
+        results[metric].append(float(value))
+    except regex_util.NoMatchError:
+      logging.exception('No value for %s', metric)
 
 
 def RunCassandraStressTest(benchmark_spec):
@@ -246,20 +242,12 @@ def CollectResults(benchmark_spec):
     A list of sample.Sample objects.
   """
   logging.info('Gathering results.')
-  vm_dict = benchmark_spec.vm_groups
+  vm_dict = benchmark_spec.vm_dict
   loader_vms = vm_dict[CLIENT_GROUP]
-  interval_op_rate_list = []
-  interval_key_rate_list = []
-  latency_median_list = []
-  latency_95th_list = []
-  latency_99_9th_list = []
-  total_operation_time_list = []
-  args = [((vm, interval_op_rate_list, interval_key_rate_list,
-            latency_median_list, latency_95th_list,
-            latency_99_9th_list,
-            total_operation_time_list), {}) for vm in loader_vms]
+  raw_results = collections.defaultdict(list)
+  args = [((vm, raw_results), {}) for vm in loader_vms]
   vm_util.RunThreaded(CollectResultFile, args)
-  results = []
+
   metadata = {'num_keys': FLAGS.num_keys,
               'num_data_nodes': len(vm_dict[CASSANDRA_GROUP]),
               'num_loader_nodes': len(loader_vms),
@@ -282,6 +270,21 @@ def CollectResults(benchmark_spec):
       sample.Sample('Total operation time',
                     math.fsum(total_operation_time_list) / len(
                         loader_vms), 'seconds', metadata)]
+  results = []
+  for metric in RESULTS_METRICS:
+    if metric in MAXIMUM_METRICS:
+      value = max(raw_results[metric])
+    else:
+      value = math.fsum(raw_results[metric])
+      if metric not in AGGREGATED_METRICS:
+        value = value / len(loader_vms)
+    if metric.startswith('latency'):
+      unit = 'ms'
+    elif metric.endswith('rate'):
+      unit = 'operations per second'
+    elif metric == 'Total operation time':
+      unit = 'seconds'
+    results.append(sample.Sample(metric, value, unit, metadata))
   logging.info('Cassandra results:\n%s', results)
   return results
 

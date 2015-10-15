@@ -30,7 +30,6 @@ concurrent_reads: 32
 concurrent_writes: {{ num_cpus * 8 }}
 commitlog_total_space_in_mb: 4096
 memtable_flush_writers: 4
-memtable_flush_queue_size: 4
 trickle_fsync: true
 trickle_fsync_interval_in_kb: 10240
 storage_port: 7000
@@ -48,10 +47,7 @@ incremental_backups: false
 snapshot_before_compaction: false
 auto_snapshot: true
 column_index_size_in_kb: 64
-in_memory_compaction_limit_in_mb: 64
-multithreaded_compaction: false
 compaction_throughput_mb_per_sec: 16
-compaction_preheat_key_cache: true
 read_request_timeout_in_ms: 10000
 range_request_timeout_in_ms: 10000
 write_request_timeout_in_ms: 10000
@@ -76,5 +72,4 @@ client_encryption_options:
     keystore_password: cassandra
 internode_compression: all
 inter_dc_tcp_nodelay: false
-preheat_kernel_page_cache: false
 

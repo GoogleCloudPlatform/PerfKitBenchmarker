@@ -31,8 +31,8 @@ from perfkitbenchmarker import vm_util
 
 JNA_JAR_URL = ('https://maven.java.net/content/repositories/releases/'
                'net/java/dev/jna/jna/4.1.0/jna-4.1.0.jar')
-CASSANDRA_TAR_URL = ('http://archive.apache.org/dist/cassandra/2.0.16/'
-                     'apache-cassandra-2.0.16-bin.tar.gz')
+CASSANDRA_TAR_URL = ('http://www.us.apache.org/dist/cassandra/2.1.10/'
+                     'apache-cassandra-2.1.10-bin.tar.gz')
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
 CASSANDRA_ENV_TEMPLATE = 'cassandra/cassandra-env.sh.j2'
 CASSANDRA_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'apache-cassandra')
@@ -105,11 +105,11 @@ def Configure(vm, seed_vms):
     vm.RenderTemplate(local_path, remote_path, context=context)
 
   # Set up logging in CASSANDRA_DIR/logs
-  vm.RemoteCommand(
-      'sed -i -e "s,log4j.appender.R.File=.*,'
-      'log4j.appender.R.File={0}/logs/system.log," {1}'.format(
-          CASSANDRA_DIR,
-          posixpath.join(CASSANDRA_DIR, 'conf', 'log4j-server.properties')))
+  #vm.RemoteCommand(
+  #    'sed -i -e "s,log4j.appender.R.File=.*,'
+  #    'log4j.appender.R.File={0}/logs/system.log," {1}'.format(
+  #        CASSANDRA_DIR,
+  #        posixpath.join(CASSANDRA_DIR, 'conf', 'log4j-server.properties')))
 
 
 def Start(vm):
