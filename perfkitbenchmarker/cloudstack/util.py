@@ -425,8 +425,8 @@ class CsClient(object):
 
         kps = self._cs.request(cs_args)
 
-        if kps and 'keypair' in kps:
-            for kp in kps['keypair']:
+        if kps and 'sshkeypair' in kps:
+            for kp in kps['sshkeypair']:
                 if kp['name'] == name:
                     return kp
 
