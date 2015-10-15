@@ -364,6 +364,28 @@ class CsClient(object):
 
         return None
 
+    def snat_rule_exists(self, ip_address_id, vm_id):
+
+        cs_args = {
+            'command': 'listPublicIpAddresses',
+            'id': ip_address_id
+        }
+
+        res = self._cs.request(cs_args)
+
+        assert 'publicipaddress' in res, "No public IP address found"
+        assert len(res['publicipaddress']) == 1, "More than One\
+                Public IP address"
+
+        res = res['publicipaddress'][0]
+
+        if res and 'virtualmachineid' in res and \
+           res['virtualmachineid'] == vm_id:
+            return True
+
+        return False
+
+
     def register_ssh_keypair(self, name, public_key, project_id=None):
 
         cs_args = {

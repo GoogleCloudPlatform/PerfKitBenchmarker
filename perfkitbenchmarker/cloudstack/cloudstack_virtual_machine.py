@@ -31,6 +31,7 @@ FLAGS = flags.FLAGS
 class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a CloudStack Virtual Machine."""
 
+  CLOUD = 'CloudStack'
   DEFAULT_ZONE = 'QC-1'
   DEFAULT_MACHINE_TYPE = '1vCPU.1GB'
   DEFAULT_IMAGE = 'Ubuntu 14.04.2 HVM base (64bit)'
@@ -142,13 +143,15 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.internal_ip = network_interface['ipaddress']
 
     # Create a Static NAT rule
-    snat_rule = self.cs.enable_static_nat(self.ip_address_id,
-                                          self.id,
-                                          self.network.id)
+    if not self.cs.snat_rule_exists(self.ip_address_id, self.id):
 
-    assert snat_rule, "Unable to create static NAT"
+        snat_rule = self.cs.enable_static_nat(self.ip_address_id,
+                                              self.id,
+                                              self.network.id)
 
-    self.snat_rule_id = snat_rule['id']
+        assert snat_rule, "Unable to create static NAT"
+
+        self.snat_rule_id = snat_rule['id']
 
 
   def _Delete(self):
