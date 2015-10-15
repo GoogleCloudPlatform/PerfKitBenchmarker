@@ -50,8 +50,12 @@ class CloudStackNetwork(network.BaseNetwork):
                             FLAGS.CS_API_KEY,
                             FLAGS.CS_API_SECRET)
 
+    self.zone = zone_name
     self.project_id = None
+    self.network_id = None
 
+
+  def _AcquireNetworkDetails(self):
 
     if FLAGS.project:
         project = self.cs.get_project(FLAGS.project)
@@ -60,10 +64,9 @@ class CloudStackNetwork(network.BaseNetwork):
 
     self.zone_id = None
 
-    zone = self.cs.get_zone(zone_name)
+    zone = self.cs.get_zone(self.zone)
     if zone:
         self.zone_id = zone['id']
-        self.zone = zone_name
 
     assert self.zone_id, "Zone required to create a network"
 
@@ -89,7 +92,6 @@ class CloudStackNetwork(network.BaseNetwork):
         self.vpc_offering_id = vpc_off['id']
         self.vpc_name = 'perfkit-vpc-%s' % FLAGS.run_uri
 
-    self.id = None
 
   @vm_util.Retry(max_retries=3)
   def Create(self):
@@ -97,6 +99,8 @@ class CloudStackNetwork(network.BaseNetwork):
 
     gateway = None
     netmask = None
+
+    self._AcquireNetworkDetails()
 
     if self.is_vpc:
         # Create a VPC first

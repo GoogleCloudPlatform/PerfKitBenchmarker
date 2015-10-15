@@ -247,7 +247,7 @@ Specify the network offering when running the benchmark. If using VPC
 (`--cs_use_vpc`), also specify the VPC offering (`--cs_vpc_offering`).
 
 ```bash
-./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetowrkOffering
+./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetworkOffering
 ```
 
 ## Install AWS CLI and setup authentication
@@ -439,7 +439,7 @@ $ ./pkb.py --cloud=Kubernetes --benchmarks=iperf --kubectl=/path/to/kubectl --ku
 
 ## Example run on CloudStack
 ```bash
-./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetowrkOffering
+./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetworkOffering
 ```
 
 ## Example run on Rackspace
