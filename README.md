@@ -230,6 +230,7 @@ Currently only Ceph volumes are supported. Running benchmarks which require scra
    You will have to pass the Secret name (using `--ceph_secret` flag) when running the benchmakrs. In this case it should be: `--ceph_secret=my-ceph-secret`.
 
 ## Cloudstack: Install `csapi` and set the API keys
+
 ```
 sudo pip install csapi
 ```
