@@ -17,11 +17,9 @@
 import logging
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 
-FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'bonnie++'
 BENCHMARK_CONFIG = """

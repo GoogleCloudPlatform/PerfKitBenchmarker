@@ -22,6 +22,8 @@ import os
 import thread
 import threading
 
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -205,6 +207,17 @@ class BenchmarkSpec(object):
     self.deleted = False
     self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
     self.always_call_cleanup = False
+    self._flags = None
+
+    # Set the current thread's BenchmarkSpec object to this one.
+    context.SetThreadBenchmarkSpec(self)
+
+  @property
+  def FLAGS(self):
+    """Returns the result of merging config flags with the global flags."""
+    if self._flags is None:
+      self._flags = configs.GetMergedFlags(self.config)
+    return self._flags
 
   def _GetCloudForGroup(self, group_name):
     """Gets the cloud for a VM group by looking at flags and the config.
@@ -397,8 +410,11 @@ class BenchmarkSpec(object):
 
   def PickleSpec(self):
     """Pickles the spec so that it can be unpickled on a subsequent run."""
+    # FlagValues objects can't be pickled without getting an error.
+    flags, self._flags = self._flags, None
     with open(self.file_name, 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)
+    self._flags = flags
 
   @classmethod
   def GetSpecFromFile(cls, name):
@@ -420,4 +436,5 @@ class BenchmarkSpec(object):
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.
     spec.deleted = False
+    context.SetThreadBenchmarkSpec(spec)
     return spec

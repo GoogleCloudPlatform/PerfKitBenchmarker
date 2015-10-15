@@ -27,8 +27,6 @@ from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
-FLAGS = flags.FLAGS
-
 flags.DEFINE_boolean('dstat', False,
                      'Run dstat (http://dag.wiee.rs/home-made/dstat/) '
                      'on each VM to collect system performance metrics during '
