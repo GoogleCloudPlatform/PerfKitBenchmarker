@@ -16,7 +16,6 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.cloudstack import cloudstack_network
 from perfkitbenchmarker.cloudstack import cloudstack_disk
 from perfkitbenchmarker.cloudstack import util
 
@@ -39,16 +38,13 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_PROJECT = 'cloudops-Engineering'
 
 
-  def __init__(self, vm_spec):
+  def __init__(self, vm_spec, network, firewall):
     """Initialize a CloudStack virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
-    super(CloudStackVirtualMachine, self).__init__(vm_spec)
-
-    self.network = \
-        cloudstack_network.CloudStackNetwork.GetNetwork(self.DEFAULT_ZONE)
+    super(CloudStackVirtualMachine, self).__init__(vm_spec, network, firewall)
 
     self.cs = util.CsClient(FLAGS.CS_API_URL,
                             FLAGS.CS_API_KEY,
@@ -64,20 +60,9 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     assert zone, "Zone not found"
 
     self.zone_id = zone['id']
-
-    # XXX: How do we genralize this?
     self.user_name = self.DEFAULT_USER_NAME
+    self.image = self.image or self.DEFAULT_IMAGE
 
-
-  @classmethod
-  def SetVmSpecDefaults(cls, vm_spec):
-    """Updates the VM spec with cloud specific defaults."""
-    if vm_spec.machine_type is None:
-      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
-    if vm_spec.zone is None:
-      vm_spec.zone = cls.DEFAULT_ZONE
-    if vm_spec.image is None:
-      vm_spec.image = cls.DEFAULT_IMAGE
 
   @vm_util.Retry(max_retries=3)
   def _CreateDependencies(self):

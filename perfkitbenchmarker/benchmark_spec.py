@@ -143,7 +143,7 @@ CLASSES = {
             DEBIAN: cs_vm.DebianBasedCloudStackVirtualMachine,
             RHEL: cs_vm.CloudStackVirtualMachine
         },
-        FIREWALL: cs_nw.CloudStackFirewall
+        NETWORK: cs_nw.CloudStackNetwork
     },
     RACKSPACE: {
         VIRTUAL_MACHINE: {

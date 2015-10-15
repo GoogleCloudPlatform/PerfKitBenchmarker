@@ -32,25 +32,17 @@ flags.DEFINE_boolean('cs_use_vpc', True,
 FLAGS = flags.FLAGS
 
 
-class CloudStackFirewall(network.BaseFirewall):
-  """An object representing the Cloudstack Firewall.
-  We use static NAT hence do not need explicit
-  firewall rules all ports are open by default
-  """
-
-
 class CloudStackNetwork(network.BaseNetwork):
   """Object representing a CloudStack Network."""
 
   def __init__(self, zone_name):
 
-    super(CloudStackNetwork, self).__init__()
+    super(CloudStackNetwork, self).__init__(zone_name)
 
     self.cs = util.CsClient(FLAGS.CS_API_URL,
                             FLAGS.CS_API_KEY,
                             FLAGS.CS_API_SECRET)
 
-    self.zone = zone_name
     self.project_id = None
     self.network_id = None
 
