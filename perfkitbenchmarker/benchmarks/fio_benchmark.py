@@ -30,6 +30,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import fio
 
@@ -94,10 +95,12 @@ flags.DEFINE_string('device_fill_size', '100%',
                     'of the device. A filesystem will be unmounted before '
                     'filling and remounted afterwards. Only valid when '
                     'used with --prefill_device.')
-flags.DEFINE_string('io_depths', '1',
-                    'IO queue depths to run on. Can specify a single number, '
-                    'like --io_depths=1, a range, like --io_depths=1-4, or a '
-                    'list, like --io_depths=1-4,6-8')
+flag_util.DEFINE_integerlist('io_depths', [1],
+                             'IO queue depths to run on. Can specify a single '
+                             'number, like --io_depths=1, a range, like '
+                             '--io_depths=1-4, or a list, like '
+                             '--io_depths=1-4,6-8',
+                             on_nonincreasing=flag_util.IntegerListParser.WARN)
 flags.DEFINE_integer('working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
                      'the full size of the device. If using '
@@ -115,74 +118,6 @@ flags.DEFINE_integer('run_for_minutes', 10,
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
     'generate_scenarios', 'io_depths', 'run_for_minutes'}
-
-
-IODEPTHS_REGEXP = re.compile(r'(\d+)(-(\d+))?$')
-
-
-def GetIODepths(io_depths):
-  """Parse the io_depths parameter.
-
-  Args:
-    io_depths: a string in the format of the --io_depths flag.
-
-  Returns:
-    A list of integers.
-
-  Raises:
-    ValueError if io_depths doesn't follow a format it recognizes.
-  """
-
-  groups = io_depths.split(',')
-  result = []
-
-  for group in groups:
-    match = IODEPTHS_REGEXP.match(group)
-    if match is None:
-      raise ValueError('Invalid io_depths expression %s', io_depths)
-    elif match.group(2) is None:
-      result.append(int(match.group(1)))
-    else:
-      result.extend(range(int(match.group(1)), int(match.group(3)) + 1))
-
-  return result
-
-
-def WarnIODepths(depths_list):
-  """Given a list of IO depths, log warnings if it seems "weird".
-
-  Args:
-    depths_list: a list of IO depths.
-  """
-
-  for i in range(len(depths_list) - 1):
-    if depths_list[i] >= depths_list[i + 1]:
-      logging.warning('IO depths list is not monotonically increasing: '
-                      '%s comes before %s.', depths_list[i], depths_list[i + 1])
-
-  values = set()
-  warned_on = set()
-  for val in depths_list:
-    if val in values and val not in warned_on:
-      logging.warning('IO depths list contains duplicate entry %s.', val)
-      warned_on.add(val)
-    else:
-      values.add(val)
-
-
-def IODepthsValidator(string):
-  try:
-    WarnIODepths(GetIODepths(string))
-    return True
-  except ValueError:
-    return False
-
-
-flags.RegisterValidator('io_depths',
-                        IODepthsValidator,
-                        message='--io_depths must be an integer, '
-                                'range of integers, or a list of '
-                                'integers and ranges, all > 0')
 
 
 def FillDevice(vm, disk, fill_size):
@@ -241,13 +176,13 @@ SECONDS_PER_MINUTE = 60
 
 
 def GenerateJobFileString(filename, scenario_strings,
-                          io_depths_string, working_set_size):
+                          io_depths, working_set_size):
   """Make a string with our fio job file.
 
   Args:
     filename: the file or disk we pre-filled, if any.
     scenario_strings: list of strings with names in SCENARIOS.
-    io_depths_string: string. The IO queue depths to test.
+    io_depths: iterable of integers. The IO queue depths to test.
     working_set_size: int or None. If int, the size of the working set in GB.
 
   Returns:
@@ -266,8 +201,6 @@ def GenerateJobFileString(filename, scenario_strings,
 
   job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
                                       undefined=jinja2.StrictUndefined)
-
-  io_depths = GetIODepths(io_depths_string)
 
   return str(job_file_template.render(
       minutes_per_job=MINUTES_PER_JOB,
@@ -315,7 +248,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
     against_device: bool. True if testing against a raw device, False
       if testing against a filesystem.
     disk: the disk.BaseDisk object to test against.
-    io_depths: string. The IO queue depths to test.
+    io_depths: iterable of integers. The IO queue depths to test.
     working_set_size: int or None. If int, the size of the working set
       in GB.
 
