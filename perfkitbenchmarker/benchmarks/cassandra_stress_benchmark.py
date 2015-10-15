@@ -29,7 +29,6 @@ import time
 
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -55,18 +54,20 @@ BENCHMARK_CONFIG = """
 cassandra_stress:
   description: Benchmark Cassandra using cassandra-stress
   vm_groups:
-    default:
+    cassandra_nodes:
       vm_spec: *default_single_core
-      vm_count: 4
+      disk_spec: *default_500_gb
+      vm_count: 3
+    stress_client:
+      vm_spec: *default_single_core
 """
 
-LOADER_NODE = 'loader'
-DATA_NODE = 'cas'
+CASSANDRA_GROUP = 'cassandra_nodes'
+CLIENT_GROUP = 'stress_client'
+
 PROPAGATION_WAIT_TIME = 30
 SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
 
-DEFAULT_DISK_TYPE = disk.STANDARD
-DEFAULT_DISK_SIZE = 500
 
 # Stress test options.
 CONSISTENCY_LEVEL = 'quorum'
@@ -98,30 +99,18 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vm_dict = benchmark_spec.vm_groups
+  cassandra_vms = vm_dict[CASSANDRA_GROUP]
   logging.info('VM dictionary %s', vm_dict)
 
-  if vm_dict['default']:
-    logging.info('No config file is provided, use default settings: '
-                 '1 loader node, 3 data nodes')
-    vm_dict[LOADER_NODE] = [vm_dict['default'][-1]]
-    vm_dict[DATA_NODE] = vm_dict['default'][:3]
-    mount_point = os.path.join(vm_util.VM_TMP_DIR, 'cassandra_data')
-    disk_spec = disk.BaseDiskSpec(
-        disk_size=(FLAGS.scratch_disk_size or DEFAULT_DISK_SIZE),
-        disk_type=(FLAGS.scratch_disk_type or DEFAULT_DISK_TYPE),
-        mount_point=mount_point)
-    for vm in vm_dict[DATA_NODE]:
-      vm.CreateScratchDisk(disk_spec)
-
   logging.info('Authorizing loader[0] permission to access all other vms.')
-  vm_dict[LOADER_NODE][0].AuthenticateVm()
+  vm_dict[CLIENT_GROUP][0].AuthenticateVm()
 
   logging.info('Preparing data files and Java on all vms.')
   vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
-  seed_vm = vm_dict[DATA_NODE][0]
+  seed_vm = cassandra_vms[0]
   configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
-  vm_util.RunThreaded(configure, vm_dict[DATA_NODE])
-  cassandra.StartCluster(seed_vm, vm_dict[DATA_NODE][1:])
+  vm_util.RunThreaded(configure, cassandra_vms)
+  cassandra.StartCluster(seed_vm, cassandra_vms[1:])
 
 
 def _ResultFilePath(vm):
@@ -156,9 +145,10 @@ def RunCassandraStress(benchmark_spec):
         that is required to run the benchmark.
   """
   logging.info('Creating Keyspace.')
-  data_node_ips = [data_vm.internal_ip
-                   for data_vm in benchmark_spec.vm_groups[DATA_NODE]]
-  loader_vms = benchmark_spec.vm_groups[LOADER_NODE]
+  loader_vms = benchmark_spec.vm_groups[CLIENT_GROUP]
+  cassandra_vms = benchmark_spec.vm_groups[CASSANDRA_GROUP]
+  data_node_ips = [vm.internal_ip for vm in cassandra_vms]
+
   loader_vms[0].RemoteCommand(
       '%s '
       '--nodes %s --replication-factor %s '
@@ -170,13 +160,11 @@ def RunCassandraStress(benchmark_spec):
   time.sleep(PROPAGATION_WAIT_TIME)
 
   if not FLAGS.num_keys:
-    FLAGS.num_keys = NUM_KEYS_PER_CORE * benchmark_spec.vm_groups[
-        DATA_NODE][0].num_cpus
+    FLAGS.num_keys = NUM_KEYS_PER_CORE * cassandra_vms[0].num_cpus
     logging.info('Num keys not set, using %s in cassandra-stress test.',
                  FLAGS.num_keys)
   logging.info('Executing the benchmark.')
-  args = [((loader_vm, data_node_ips), {})
-          for loader_vm in benchmark_spec.vm_groups[LOADER_NODE]]
+  args = [((loader_vm, data_node_ips), {}) for loader_vm in loader_vms]
   vm_util.RunThreaded(RunTestOnLoader, args)
 
 
@@ -244,7 +232,7 @@ def RunCassandraStressTest(benchmark_spec):
   finally:
     logging.info('Tests running. Watching progress.')
     vm_util.RunThreaded(WaitForLoaderToFinish,
-                        benchmark_spec.vm_groups[LOADER_NODE])
+                        benchmark_spec.vm_groups[CLIENT_GROUP])
 
 
 def CollectResults(benchmark_spec):
@@ -259,6 +247,7 @@ def CollectResults(benchmark_spec):
   """
   logging.info('Gathering results.')
   vm_dict = benchmark_spec.vm_groups
+  loader_vms = vm_dict[CLIENT_GROUP]
   interval_op_rate_list = []
   interval_key_rate_list = []
   latency_median_list = []
@@ -268,12 +257,12 @@ def CollectResults(benchmark_spec):
   args = [((vm, interval_op_rate_list, interval_key_rate_list,
             latency_median_list, latency_95th_list,
             latency_99_9th_list,
-            total_operation_time_list), {}) for vm in vm_dict[LOADER_NODE]]
+            total_operation_time_list), {}) for vm in loader_vms]
   vm_util.RunThreaded(CollectResultFile, args)
   results = []
   metadata = {'num_keys': FLAGS.num_keys,
-              'num_data_nodes': len(vm_dict[DATA_NODE]),
-              'num_loader_nodes': len(vm_dict[LOADER_NODE]),
+              'num_data_nodes': len(vm_dict[CASSANDRA_GROUP]),
+              'num_loader_nodes': len(loader_vms),
               'num_cassandra_stress_threads':
               FLAGS.num_cassandra_stress_threads}
   results = [
@@ -282,17 +271,17 @@ def CollectResults(benchmark_spec):
       sample.Sample('Interval_key_rate', math.fsum(interval_key_rate_list),
                     'operations per second', metadata),
       sample.Sample('Latency median',
-                    math.fsum(latency_median_list) / len(vm_dict[LOADER_NODE]),
+                    math.fsum(latency_median_list) / len(loader_vms),
                     'ms', metadata),
       sample.Sample('Latency 95th percentile',
-                    math.fsum(latency_95th_list) / len(vm_dict[LOADER_NODE]),
+                    math.fsum(latency_95th_list) / len(loader_vms),
                     'ms', metadata),
       sample.Sample('Latency 99.9th percentile',
-                    math.fsum(latency_99_9th_list) / len(vm_dict[LOADER_NODE]),
+                    math.fsum(latency_99_9th_list) / len(loader_vms),
                     'ms', metadata),
       sample.Sample('Total operation time',
                     math.fsum(total_operation_time_list) / len(
-                        vm_dict[LOADER_NODE]), 'seconds', metadata)]
+                        loader_vms), 'seconds', metadata)]
   logging.info('Cassandra results:\n%s', results)
   return results
 
@@ -319,6 +308,7 @@ def Cleanup(benchmark_spec):
         that is required to run the benchmark.
   """
   vm_dict = benchmark_spec.vm_groups
+  cassandra_vms = vm_dict[CASSANDRA_GROUP]
 
-  vm_util.RunThreaded(cassandra.Stop, vm_dict[DATA_NODE])
-  vm_util.RunThreaded(cassandra.CleanNode, vm_dict[DATA_NODE])
+  vm_util.RunThreaded(cassandra.Stop, cassandra_vms)
+  vm_util.RunThreaded(cassandra.CleanNode, cassandra_vms)
