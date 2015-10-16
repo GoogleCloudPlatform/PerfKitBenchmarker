@@ -157,7 +157,7 @@ flags.DEFINE_enum(
     'os_type is "rhel". In general if two OS\'s use the same package manager, '
     'and are otherwise very similar, the same os_type should work on both of '
     'them.')
-flags.DEFINE_string('scratch_dir', '/scratch',
+flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM.'
                     'Upon creation, these directories will have numbers'
                     'appended to them (for example /scratch0, /scratch1, etc).')
