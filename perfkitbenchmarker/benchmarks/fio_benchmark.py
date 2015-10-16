@@ -38,6 +38,7 @@ LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
 MINUTES_PER_JOB = 10
+MOUNT_POINT = '/scratch'
 
 
 # This dictionary maps scenario names to dictionaries of fio settings.
@@ -327,7 +328,12 @@ def RunForMinutes(proc, mins_to_run, mins_per_call):
 
 
 def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS.against_device or FLAGS.prefill_device:
+    disk_spec = config['vm_groups']['default']['disk_spec']
+    for cloud in disk_spec:
+      disk_spec[cloud]['mount_point'] = None
+  return config
 
 
 def Prepare(benchmark_spec):
@@ -352,20 +358,15 @@ def Prepare(benchmark_spec):
 
   # Choose a disk or file name and optionally fill it
   disk = vm.scratch_disks[0]
-  mount_point = disk.mount_point
-
-  logging.info('Umount scratch disk on %s at %s', vm, mount_point)
-  vm.RemoteCommand('sudo umount %s' % mount_point)
 
   if FLAGS.against_device or FLAGS.prefill_device:
     logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
     FillDevice(vm, disk, FLAGS.device_fill_size)
 
-  if not FLAGS.against_device:
+  if not FLAGS.against_device and FLAGS.prefill_device:
+    disk.mount_point = FLAGS.scratch_dir or MOUNT_POINT
     vm.FormatDisk(disk.GetDevicePath())
-    # Don't use vm.MountDisk() because that also creates the mount point
-    # and changes its permissions, which we have already done.
-    vm.RemoteCommand('sudo mount %s %s' % (disk.GetDevicePath(), mount_point))
+    vm.MountDisk(disk.GetDevicePath(), disk.mount_point)
 
 
 def Run(benchmark_spec):
