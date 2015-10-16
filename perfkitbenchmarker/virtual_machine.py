@@ -123,7 +123,9 @@ class BaseVirtualMachine(resource.BaseResource):
         self.ip_address, self.internal_ip)
 
   def __str__(self):
-    return self.ip_address
+    if self.ip_address:
+      return self.ip_address
+    return super(BaseVirtualMachine, self).__str__()
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
