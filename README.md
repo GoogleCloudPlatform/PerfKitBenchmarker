@@ -229,6 +229,27 @@ Currently only Ceph volumes are supported. Running benchmarks which require scra
    ```
    You will have to pass the Secret name (using `--ceph_secret` flag) when running the benchmakrs. In this case it should be: `--ceph_secret=my-ceph-secret`.
 
+## Cloudstack: Install `csapi` and set the API keys
+
+```
+sudo pip install csapi
+```
+
+Get the API key and SECRET from Cloudstack. Set the following environement variables.
+
+```bash
+export CS_API_URL=<insert API endpoint>
+export CS_API_KEY=<insert API key>
+export CS_API_SECRET=<insert API secret>
+```
+
+Specify the network offering when running the benchmark. If using VPC
+(`--cs_use_vpc`), also specify the VPC offering (`--cs_vpc_offering`).
+
+```bash
+./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetworkOffering
+```
+
 ## Install AWS CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
@@ -256,7 +277,7 @@ Go [here](https://nodejs.org/download/), and follow the setup instructions.
 Next, run the following (omit the `sudo` on Windows):
 
 ```
-$ sudo npm install azure-cli -g
+$ sudo npm install azure-cli@0.9.9 -g
 $ azure account download
 ```
 
@@ -416,6 +437,11 @@ $ ./pkb.py --cloud=OpenStack --benchmarks=iperf --os_auth_url=http://localhost:5
 $ ./pkb.py --cloud=Kubernetes --benchmarks=iperf --kubectl=/path/to/kubectl --kubeconfig=/path/to/kubeconfig --image=image-with-ssh-server  --ceph_monitors=10.20.30.40:6789,10.20.30.41:6789 --kubernetes_nodes=10.20.30.42,10.20.30.43
 ```
 
+## Example run on CloudStack
+```bash
+./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetworkOffering
+```
+
 ## Example run on Rackspace
 ```
 $ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
@@ -473,6 +499,7 @@ AWS | us-east-1a | |
 Azure | East US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
 OpenStack | nova | |
+CloudStack | QC-1 | |
 Rackspace | IAD | OnMetal machine-types are available only in IAD zone
 Kubernetes | k8s | |
 
@@ -498,6 +525,99 @@ Flag | Notes
 `--https_proxy`      | Needed for package manager or Ubuntu guest and for from github downloaded packages
 `--ftp_proxy`       | Needed for some Perfkit packages
 
+CONFIGURATIONS AND CONFIGURATION OVERRIDES
+==================
+Each benchmark now has an independent configuration which is written in YAML.
+Users may override this default configuration by providing a configuration.
+This allows for much more complex setups than previously possible,
+including running benchmarks across clouds.
+
+A benchmark configuration has a somewhat simple structure. It is essentially
+just a series of nested dictionaries. At the top level, it contains VM groups.
+VM groups are logical groups of homogenous machines. The VM groups hold both a
+`vm_spec` and a `disk_spec` which contain the parameters needed to
+create members of that group. Here is an example of an expanded configuration:
+```
+hbase_ycsb:
+  vm_groups:
+    loaders:
+      vm_count: 4
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-1
+          image: ubuntu-14-04
+          zone: us-central1-c
+        AWS:
+          machine_type: m3.medium
+          image: ami-######
+          zone: us-east-1a
+        # Other clouds here...
+      # This specifies the cloud to use for the group. This allows for
+      # benchmark configurations that span clouds.
+      cloud: AWS
+      # No disk_spec here since these are loaders.
+    master:
+      vm_count: 1
+      cloud: GCP
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-1
+          image: ubuntu-14-04
+          zone: us-central1-c
+        # Other clouds here...
+      disk_count: 1
+      disk_spec:
+        GCP:
+          disk_size: 100
+          disk_type: standard
+          mount_point: /scratch
+        # Other clouds here...
+    workers:
+      vm_count: 4
+      cloud: GCP
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+          image: ubuntu-14-04
+          zone: us-central1-c
+        # Other clouds here...
+      disk_count: 1
+      disk_spec:
+        GCP:
+          disk_size: 500
+          disk_type: remote_ssd
+          mount_point: /scratch
+        # Other clouds here...
+```
+
+For a complete list of keys for `vm_spec`s and `disk_spec`s see
+[virtual_machine.BaseVmSpec](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/virtual_machine.py)
+and
+[disk.BaseDiskSpec](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/disk.py)
+and their derived classes.
+
+User configs are applied on top of the existing default config and can be
+specified in two ways. The first is by supplying a config file via the
+`--benchmark_config_file` flag. The second is by specifying a single setting to
+override via the `--config_override` flag.
+
+A user config file only needs to specify the settings which it is intended to
+override. For example if the only thing you want to do is change the number of
+VMs for the `cluster_boot` benchmark, this config is sufficient:
+```
+cluster_boot:
+  vm_groups:
+    default:
+      vm_count: 100
+```
+You can achieve the same effect by specifying the `--config_override` flag.
+The value of the flag should be a path within the YAML (with keys delimited by
+periods), an equals sign, and finally the new value:
+```
+--config_override=cluster_boot.vm_groups.default.vm_count=100
+```
+See the section below for how to use static (i.e. pre-provisioned) machines in your config.
+
 ADVANCED: HOW TO RUN BENCHMARKS WITHOUT CLOUD PROVISIONING (eg: local workstation)
 ==================
 It is possible to run PerfKitBenchmarker without running the Cloud provioning steps.  This is useful if you want to run on a local machine, or have a benchmark like iperf run from an external point to a Cloud VM.
@@ -506,49 +626,66 @@ In order to do this you need to make sure:
 * The static (ie not provisioned by PerfKitBenchmarker) machine is ssh'able
 * The user PerfKitBenchmarker will login as has 'sudo' access.  (*** Note we hope to remove this restriction soon ***)
 
-Next you will want to create a JSON file describing how to connect to the machine as follows:
+Next you will want to create a YAML user config file describing how to connect to the machine as follows:
 ```
-[
- {"ip_address": "170.200.60.23",
-  "user_name": "voellm",
-  "keyfile_path": "/home/voellm/perfkitkeys/my_key_file.pem",
-  "scratch_disk_mountpoints": ["/scratch-disk"],
-  "zone": "Siberia"}
-]
+static_vms:
+  - &vm1 # Using the & character creates an anchor that we can
+         # reference later by using the same name and a * character.
+    ip_address: 170.200.60.23
+    user_name: voellm
+    ssh_private_key: /home/voellm/perfkitkeys/my_key_file.pem
+    zone: Siberia
+    disk_specs:
+      - mount_point: /data_dir
 ```
 
 
 * The `ip_address` is the address where you want benchmarks to run.
-* `keyfile_file` is where to find the private ssh key.
+* `ssh_private_key` is where to find the private ssh key.
 * `zone` can be anything you want.  It is used when publishing results.
-* `scratch_disk_mountpoints` is used by all benchmarks which use disk (i.e., `fio`, `bonnie++`, many others).
+* `disk_specs` is used by all benchmarks which use disk (i.e., `fio`, `bonnie++`, many others).
 
-I called my file Siberia.json and used it to run iperf from Siberia to a GCP VM in us-central1-f as follows:
+In the same file, configure any number of benchmarks (in this case just iperf),
+and reference the static VM as follows:
 ```
-./pkb.py --benchmarks=iperf --machine_type=f1-micro --static_vm_file=Siberia.json --zone=us-central1-f --ip_addresses=EXTERNAL
+iperf:
+  vm_groups:
+    iperf_vm_1:
+      static_vms:
+        - *vm1
+```
+
+I called my file iperf.yaml and used it to run iperf from Siberia to a GCP VM in us-central1-f as follows:
+```
+./pkb.py --benchmarks=iperf --machine_type=f1-micro --benchmark_config_file=iperf.yaml --zone=us-central1-f --ip_addresses=EXTERNAL
 ```
 * ip_addresses=EXTERNAL tells PerfKitBechmarker not to use 10.X (ie Internal) machine addresses that all Cloud VMs have.  Just use the external IP address.
 
-If a benchmark requires two machines like iperf you can have two both machines into the same json file as shown below.  This means you can indeed run between two machines and never provision any VM's in the Cloud.
+If a benchmark requires two machines like iperf, you can have two machines in the same YAML file as shown below.  This means you can indeed run between two machines and never provision any VM's in the Cloud.
 
 ```
-[
-  {
-    "ip_address": "<ip1>",
-    "user_name": "connormccoy",
-    "keyfile_path": "/home/connormccoy/.ssh/google_compute_engine",
-    "internal_ip": "10.240.223.37",
-    "install_packages", false
-  },
-  {
-    "ip_address": "<ip2>",
-    "user_name": "connormccoy",
-    "keyfile_path": "/home/connormccoy/.ssh/google_compute_engine",
-    "scratch_disk_mountpoints": ["/tmp/google-pkb"],
-    "internal_ip": "10.240.234.189",
-    "ssh_port": 2222
-  }
-]
+static_vms:
+  - &vm1
+    ip_address: <ip1>
+    user_name: connormccoy
+    ssh_private_key: /home/connormccoy/.ssh/google_compute_engine
+    internal_ip: 10.240.223.37
+    install_packages: false
+  - &vm2
+    ip_address: <ip2>
+    user_name: connormccoy
+    ssh_private_key: /home/connormccoy/.ssh/google_compute_engine
+    internal_ip: 10.240.234.189
+    ssh_port: 2222
+
+iperf:
+  vm_groups:
+    iperf_vm_1:
+      static_vms:
+        - *vm2
+    iperf_vm_2:
+      static_vms:
+        - *vm1
 ```
 
 HOW TO EXTEND PerfKitBenchmarker

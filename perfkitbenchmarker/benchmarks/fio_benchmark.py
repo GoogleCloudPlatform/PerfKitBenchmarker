@@ -26,6 +26,7 @@ import re
 
 import jinja2
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -76,15 +77,23 @@ flags.DEFINE_list('generate_scenarios', None,
                   '--fio_jobfile.')
 flags.DEFINE_boolean('against_device', False,
                      'Unmount the device\'s filesystem so we can test against '
-                     'the raw block device. If --generate-scenarios is given, '
+                     'the raw block device; will always prefill the device to '
+                     'device_fill_size. '
+                     'If --generate-scenarios is given, '
                      'will generate a job file that uses the block device.')
+flags.DEFINE_boolean('prefill_device', False,
+                     'Used when against_device is false: decides if it is '
+                     'required to prefill the device before the fio run. '
+                     'The amount to prefill is given by '
+                     '--device_fill_size.')
 flags.DEFINE_string('device_fill_size', '100%',
                     'The amount of device to fill in prepare stage. '
                     'The valid value can either be an integer, which '
                     'represents the number of bytes to fill or a '
                     'percentage, which represents the percentage '
                     'of the device. A filesystem will be unmounted before '
-                    'filling and remounted afterwards. Default is 100%')
+                    'filling and remounted afterwards. Only valid when '
+                    'used with --prefill_device.')
 flags.DEFINE_string('io_depths', '1',
                     'IO queue depths to run on. Can specify a single number, '
                     'like --io_depths=1, a range, like --io_depths=1-4, or a '
@@ -180,7 +189,7 @@ def FillDevice(vm, disk, fill_size):
   """Fill the given disk on the given vm up to fill_size.
 
   Args:
-    vm: a virtual_machine.VirtualMachine object.
+    vm: a linux_virtual_machine.BaseLinuxMixin object.
     disk: a disk.BaseDisk attached to the given vm.
     fill_size: amount of device to fill, in fio format.
   """
@@ -190,14 +199,18 @@ def FillDevice(vm, disk, fill_size):
               '--rw=write --direct=1 --size=%s') %
              (fio.FIO_PATH, disk.GetDevicePath(), fill_size))
 
-  vm.RemoteCommand(command)
+  vm.RobustRemoteCommand(command)
 
 
-BENCHMARK_INFO = {'name': 'fio',
-                  'description': 'Runs fio in sequential, random, read '
-                                 'and write modes.',
-                  'scratch_disk': True,
-                  'num_machines': 1}
+BENCHMARK_NAME = 'fio'
+BENCHMARK_CONFIG = """
+fio:
+  description: Runs fio in sequential, random, read and write modes.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+"""
 
 
 JOB_FILE_TEMPLATE = """
@@ -380,8 +393,8 @@ def RunForMinutes(proc, mins_to_run, mins_per_call):
          total_repeats=run_reps)
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):
@@ -411,7 +424,7 @@ def Prepare(benchmark_spec):
   logging.info('Umount scratch disk on %s at %s', vm, mount_point)
   vm.RemoteCommand('sudo umount %s' % mount_point)
 
-  if FLAGS.device_fill_size is not '0':
+  if FLAGS.against_device or FLAGS.prefill_device:
     logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
     FillDevice(vm, disk, FLAGS.device_fill_size)
 
@@ -473,7 +486,7 @@ def Run(benchmark_spec):
       logging.info('**** Repetition number %s of %s ****',
                    repeat_number, total_repeats)
 
-    stdout, stderr = vm.RemoteCommand(fio_command, should_log=True)
+    stdout, stderr = vm.RobustRemoteCommand(fio_command, should_log=True)
 
     if repeat_number:
       base_metadata = {

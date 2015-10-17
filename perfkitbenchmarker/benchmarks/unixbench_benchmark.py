@@ -22,6 +22,7 @@ some memory bandwidth, and disk.
 
 import logging
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -30,10 +31,16 @@ from perfkitbenchmarker.packages import unixbench
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'unixbench',
-                  'description': 'Runs UnixBench.',
-                  'scratch_disk': True,
-                  'num_machines': 1}
+
+BENCHMARK_NAME = 'unixbench'
+BENCHMARK_CONFIG = """
+unixbench:
+  description: Runs UnixBench.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+"""
 
 flags.DEFINE_boolean('unixbench_all_cores', default=False,
                      help='Setting this flag changes the default behavior of '
@@ -52,8 +59,8 @@ PARALLEL_COPIES_REGEX = r'running (\d+) parallel cop[yies]+ of tests'
 RESULT_START_STRING = 'Benchmark Run:'
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():

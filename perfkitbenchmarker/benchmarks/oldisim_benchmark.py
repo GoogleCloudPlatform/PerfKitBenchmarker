@@ -42,6 +42,7 @@ import posixpath
 import re
 import time
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -66,19 +67,24 @@ NUM_ROOTS = 1
 OLDISIM_DIR = 'oldisim'
 OLDISIM_VERSION = 'v0.1'
 BINARY_BASE = 'release/workloads/search'
-BENCHMARK_INFO = {'name': 'oldisim',
-                  'description': 'Run oldisim. Specify the number of leaf '
-                  'nodes with --oldisim_num_leaves',
-                  'scratch_disk': False,
-                  'num_machines': None}  # Set in GetInfo below
+BENCHMARK_NAME = 'oldisim'
+BENCHMARK_CONFIG = """
+oldisim:
+  description: >
+      Run oldisim. Specify the number of leaf
+      nodes with --oldisim_num_leaves
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+"""
 
 
-def GetInfo():
+def GetConfig(user_config):
   """Decide number of vms needed to run oldisim."""
-  benchmark_info = BENCHMARK_INFO.copy()
-  benchmark_info['num_machines'] = (FLAGS.oldisim_num_leaves
-                                    + NUM_DRIVERS + NUM_ROOTS)
-  return benchmark_info
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config['vm_groups']['default']['vm_count'] = (FLAGS.oldisim_num_leaves
+                                                + NUM_DRIVERS + NUM_ROOTS)
+  return config
 
 
 def InstallAndBuild(vm):

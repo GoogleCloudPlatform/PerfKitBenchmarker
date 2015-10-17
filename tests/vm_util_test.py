@@ -14,6 +14,7 @@
 
 """Tests for perfkitbenchmarker.vm_util."""
 
+import functools
 import multiprocessing
 import multiprocessing.managers
 import os
@@ -157,6 +158,21 @@ class GetCallStringTestCase(unittest.TestCase):
   def testArgsAndKwargs(self):
     result = vm_util._GetCallString((_ReturnArgs, ('blue', 5), {'x': 8}))
     self.assertEqual(result, '_ReturnArgs(blue, 5, x=8)')
+
+  def testSinglePartial(self):
+    _ReturnArgs2 = functools.partial(_ReturnArgs, 1, x=2)
+    result = vm_util._GetCallString((_ReturnArgs2, (), {}))
+    self.assertEqual(result, '_ReturnArgs(1, x=2)')
+    result = vm_util._GetCallString((_ReturnArgs2, ('blue', 5), {'x': 8}))
+    self.assertEqual(result, '_ReturnArgs(1, blue, 5, x=8)')
+
+  def testDoublePartial(self):
+    _ReturnArgs2 = functools.partial(_ReturnArgs, 1, x=2)
+    _ReturnArgs3 = functools.partial(_ReturnArgs2, 3, x=4)
+    result = vm_util._GetCallString((_ReturnArgs3, (), {}))
+    self.assertEqual(result, '_ReturnArgs(1, 3, x=4)')
+    result = vm_util._GetCallString((_ReturnArgs3, ('blue', 5), {'x': 8}))
+    self.assertEqual(result, '_ReturnArgs(1, 3, blue, 5, x=8)')
 
 
 class RunParallelThreadsTestCase(unittest.TestCase):

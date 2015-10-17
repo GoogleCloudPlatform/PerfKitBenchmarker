@@ -76,8 +76,7 @@ def GetErrorMessage(stdout):
 class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a DigitalOcean Virtual Machine (Droplet)."""
 
-  DEFAULT_ZONE = 'sfo1'
-  DEFAULT_MACHINE_TYPE = '2gb'
+  CLOUD = 'DigitalOcean'
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 
@@ -93,16 +92,7 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.droplet_id = None
     self.max_local_disks = 1
     self.local_disk_counter = 0
-
-  @classmethod
-  def SetVmSpecDefaults(cls, vm_spec):
-    """Updates the VM spec with cloud specific defaults."""
-    if vm_spec.machine_type is None:
-      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
-    if vm_spec.zone is None:
-      vm_spec.zone = cls.DEFAULT_ZONE
-    if vm_spec.image is None:
-      vm_spec.image = cls.DEFAULT_IMAGE
+    self.image = self.image or self.DEFAULT_IMAGE
 
   def _Create(self):
     """Create a DigitalOcean VM instance (droplet)."""

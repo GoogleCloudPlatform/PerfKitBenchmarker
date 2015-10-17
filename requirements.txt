@@ -17,3 +17,5 @@ setuptools
 colorlog[windows]==2.6.0
 blinker>=1.3
 futures>=3.0.3
+PyYAML==3.11
+csapi>=0.0.7

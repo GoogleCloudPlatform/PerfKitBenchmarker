@@ -29,7 +29,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # create set of valid benchmark names from the benchmark directory
     self.valid_benchmark_names = set()
     for benchmark_module in benchmarks.BENCHMARKS:
-        self.valid_benchmark_names.add(benchmark_module.GetInfo()['name'])
+        self.valid_benchmark_names.add(benchmark_module.BENCHMARK_NAME)
 
     self.valid_benchmark_set_names = set()
     # include the benchmark_set names since these can also appear
@@ -67,11 +67,11 @@ class BenchmarkSetsTestCase(unittest.TestCase):
             benchmark_sets.MESSAGE: 'test derived benchmark set.',
             benchmark_sets.BENCHMARK_LIST: [benchmark_sets.STANDARD_SET]}}):
       self.mock_flags.benchmarks = ['test_derived_set']
-      benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-      self.assertIsNotNone(benchmark_module_list)
-      self.assertGreater(len(benchmark_module_list), 0)
-      for benchmark_module in benchmark_module_list:
-        self.assertIn(benchmark_module.GetInfo()['name'],
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+      self.assertIsNotNone(benchmark_tuple_list)
+      self.assertGreater(len(benchmark_tuple_list), 0)
+      for benchmark_tuple in benchmark_tuple_list:
+        self.assertIn(benchmark_tuple[0].BENCHMARK_NAME,
                       self.valid_benchmark_names)
 
   def testBenchmarkNestedDerivedSets(self):
@@ -87,28 +87,28 @@ class BenchmarkSetsTestCase(unittest.TestCase):
             benchmark_sets.MESSAGE: 'test nested derived benchmark set.',
             benchmark_sets.BENCHMARK_LIST: ['test_derived_set']}}):
       # TODO(voellm): better check would be to make sure both lists are the same
-      benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-      self.assertIsNotNone(benchmark_module_list)
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+      self.assertIsNotNone(benchmark_tuple_list)
       self.assertIsNotNone(standard_module_list)
-      self.assertEqual(len(benchmark_module_list), len(standard_module_list))
-      for benchmark_module in benchmark_module_list:
-        self.assertIn(benchmark_module.GetInfo()['name'],
+      self.assertEqual(len(benchmark_tuple_list), len(standard_module_list))
+      for benchmark_tuple in benchmark_tuple_list:
+        self.assertIn(benchmark_tuple[0].BENCHMARK_NAME,
                       self.valid_benchmark_names)
 
   def testBenchmarkValidCommandLine1(self):
     # make sure the standard_set expands to a valid set of benchmarks
     self.mock_flags.benchmarks = ['standard_set']
-    benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    self.assertIsNotNone(benchmark_module_list)
-    self.assertGreater(len(benchmark_module_list), 0)
-    for benchmark_module in benchmark_module_list:
-      self.assertIn(benchmark_module.GetInfo()['name'],
+    benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertIsNotNone(benchmark_tuple_list)
+    self.assertGreater(len(benchmark_tuple_list), 0)
+    for benchmark_tuple in benchmark_tuple_list:
+      self.assertIn(benchmark_tuple[0].BENCHMARK_NAME,
                     self.valid_benchmark_names)
 
   @staticmethod
   def _ContainsModule(module_name, module_list):
-    for module in module_list:
-      if module.GetInfo()['name'] == module_name:
+    for module_tuple in module_list:
+      if module_tuple[0].BENCHMARK_NAME == module_name:
         return True
     return False
 
@@ -116,27 +116,27 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # make sure the standard_set plus a listed benchmark expands
     # to a valid set of benchmarks
     self.mock_flags.benchmarks = ['standard_set', 'bonnie++']
-    benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    self.assertIsNotNone(benchmark_module_list)
-    self.assertGreater(len(benchmark_module_list), 0)
-    for benchmark_module in benchmark_module_list:
-      self.assertIn(benchmark_module.GetInfo()['name'],
+    benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertIsNotNone(benchmark_tuple_list)
+    self.assertGreater(len(benchmark_tuple_list), 0)
+    for benchmark_tuple in benchmark_tuple_list:
+      self.assertIn(benchmark_tuple[0].BENCHMARK_NAME,
                     self.valid_benchmark_names)
     # make sure bonnie++ is a listed benchmark
-    self.assertTrue(self._ContainsModule('bonnie++', benchmark_module_list))
+    self.assertTrue(self._ContainsModule('bonnie++', benchmark_tuple_list))
 
   def testBenchmarkValidCommandLine3(self):
     # make sure the command with two benchmarks is processed correctly
     self.mock_flags.benchmarks = ['iperf', 'fio']
-    benchmark_module_list = benchmark_sets.GetBenchmarksFromFlags()
-    self.assertIsNotNone(benchmark_module_list)
-    self.assertEqual(len(benchmark_module_list), 2)
-    for benchmark_module in benchmark_module_list:
-      self.assertIn(benchmark_module.GetInfo()['name'],
+    benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertIsNotNone(benchmark_tuple_list)
+    self.assertEqual(len(benchmark_tuple_list), 2)
+    for benchmark_tuple in benchmark_tuple_list:
+      self.assertIn(benchmark_tuple[0].BENCHMARK_NAME,
                     self.valid_benchmark_names)
     # make sure listed benchmarks are present
-    self.assertTrue(self._ContainsModule('iperf', benchmark_module_list))
-    self.assertTrue(self._ContainsModule('fio', benchmark_module_list))
+    self.assertTrue(self._ContainsModule('iperf', benchmark_tuple_list))
+    self.assertTrue(self._ContainsModule('fio', benchmark_tuple_list))
 
   def testBenchmarkInvalidCommandLine1(self):
     # make sure invalid benchmark names and sets cause a failure

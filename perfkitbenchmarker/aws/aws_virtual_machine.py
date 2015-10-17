@@ -102,8 +102,7 @@ def IsPlacementGroupCompatible(machine_type):
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
 
-  DEFAULT_ZONE = 'us-east-1a'
-  DEFAULT_MACHINE_TYPE = 'm3.medium'
+  CLOUD = 'AWS'
   IMAGE_NAME_FILTER = None
   DEFAULT_ROOT_DISK_TYPE = 'standard'
 
@@ -125,17 +124,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
-
-  @classmethod
-  def SetVmSpecDefaults(cls, vm_spec):
-    """Updates the VM spec with cloud specific defaults."""
-    if vm_spec.machine_type is None:
-      vm_spec.machine_type = cls.DEFAULT_MACHINE_TYPE
-    if vm_spec.zone is None:
-      vm_spec.zone = cls.DEFAULT_ZONE
-    if vm_spec.image is None:
-      region = vm_spec.zone[:-1]
-      vm_spec.image = cls._GetDefaultImage(vm_spec.machine_type, region)
 
   @classmethod
   def _GetDefaultImage(cls, machine_type, region):
@@ -234,6 +222,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if IsPlacementGroupCompatible(self.machine_type):
       placement += ',GroupName=%s' % self.network.placement_group.name
     block_device_map = GetBlockDeviceMap(self.machine_type)
+
+    if self.image is None:
+      # This is here and not in the __init__ method bceauese _GetDefaultImage
+      # does a nontrivial amount of work (it calls the AWS CLI).
+      self.image = self._GetDefaultImage(self.machine_type, self.region)
 
     create_cmd = util.AWS_PREFIX + [
         'ec2',

@@ -26,6 +26,7 @@ import csv
 import io
 import logging
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -44,11 +45,16 @@ flags.DEFINE_integer('netperf_test_length', 60,
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'netperf',
-                  'description': 'Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM '
-                  'netperf benchmarks',
-                  'scratch_disk': False,
-                  'num_machines': 2}
+BENCHMARK_NAME = 'netperf'
+BENCHMARK_CONFIG = """
+netperf:
+  description: Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM
+  vm_groups:
+    netperf_vm_1:
+      vm_spec: *default_single_core
+    netperf_vm_2:
+      vm_spec: *default_single_core
+"""
 
 MBPS = 'Mbits/sec'
 TRANSACTIONS_PER_SECOND = 'transactions_per_second'
@@ -58,8 +64,8 @@ COMMAND_PORT = 20000
 DATA_PORT = 20001
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def PrepareNetperf(vm):

@@ -41,6 +41,7 @@ import logging
 import math
 import re
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -54,10 +55,15 @@ MACHINEFILE = 'machinefile'
 BLOCK_SIZE = 192
 STREAM_METRICS = ['Copy', 'Scale', 'Add', 'Triad']
 
-BENCHMARK_INFO = {'name': 'hpcc',
-                  'description': 'Runs HPCC. Specify the number of VMs with '
-                  '--num_vms',
-                  'scratch_disk': False}
+BENCHMARK_NAME = 'hpcc'
+BENCHMARK_CONFIG = """
+hpcc:
+  description: Runs HPCC. Specify the number of VMs with --num_vms
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      vm_count: null
+"""
 
 flags.DEFINE_integer('memory_size_mb',
                      None,
@@ -65,10 +71,8 @@ flags.DEFINE_integer('memory_size_mb',
                      'default it will use the entire system\'s memory.')
 
 
-def GetInfo():
-  info = BENCHMARK_INFO.copy()
-  info['num_machines'] = FLAGS.num_vms
-  return info
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():
@@ -98,7 +102,7 @@ def CreateMachineFile(vms):
 
 def CreateHpccinf(vm, benchmark_spec):
   """Creates the HPCC input file."""
-  num_vms = benchmark_spec.num_vms
+  num_vms = len(benchmark_spec.vms)
   if FLAGS.memory_size_mb:
     total_memory = FLAGS.memory_size_mb * 1024 * 1024 * num_vms
   else:
@@ -177,7 +181,7 @@ def ParseOutput(hpcc_output, benchmark_spec):
   metadata = dict()
   match = re.search('HPLMaxProcs=([0-9]*)', hpcc_output)
   metadata['num_cpus'] = match.group(1)
-  metadata['num_machines'] = benchmark_spec.num_vms
+  metadata['num_machines'] = len(benchmark_spec.vms)
   metadata['memory_size_mb'] = FLAGS.memory_size_mb
   value = regex_util.ExtractFloat('HPL_Tflops=([0-9]*\\.[0-9]*)', hpcc_output)
   results.append(sample.Sample('HPL Throughput', value, 'Tflops', metadata))

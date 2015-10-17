@@ -23,6 +23,7 @@ memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 
 import logging
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -38,17 +39,23 @@ flags.DEFINE_string('redis_setgetratio', '1:0', 'Ratio of reads to write '
 MEMTIER_COMMIT = '1.2.0'
 FIRST_PORT = 6379
 FLAGS = flags.FLAGS
-BENCHMARK_INFO = {'name': 'redis',
-                  'description': 'Run memtier_benchmark against Redis. '
-                  'Specify the number of client VMs with --redis_clients.',
-                  'scratch_disk': False,
-                  'num_machines': None}  # Set in GetInfo below
+
+BENCHMARK_NAME = 'redis'
+BENCHMARK_CONFIG = """
+redis:
+  description: >
+      Run memtier_benchmark against Redis.
+      Specify the number of client VMs with --redis_clients.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+"""
 
 
-def GetInfo():
-  benchmark_info = BENCHMARK_INFO.copy()
-  benchmark_info['num_machines'] = 1 + FLAGS.redis_clients
-  return benchmark_info
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config['vm_groups']['default']['vm_count'] = 1 + FLAGS.redis_clients
+  return config
 
 
 def PrepareLoadgen(load_vm):

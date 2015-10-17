@@ -38,6 +38,7 @@ import re
 import time
 
 from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -83,6 +84,19 @@ BENCHMARK_INFO = {'name': 'object_storage_service',
                   'to select a set of sub-benchmarks to run. default is all.',
                   'scratch_disk': True,
                   'num_machines': 1}
+
+BENCHMARK_NAME = 'object_storage_service'
+BENCHMARK_CONFIG = """
+object_storage_service:
+  description: >
+      Object/blob storage service benchmarks. Specify
+      --object_storage_scenario
+      to select a set of sub-benchmarks to run. default is all.
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+"""
 
 AWS_CREDENTIAL_LOCATION = '.aws'
 GCE_CREDENTIAL_LOCATION = '.config/gcloud/credentials'
@@ -146,8 +160,8 @@ RETRY_WAIT_INTERVAL_SECONDS = 30
 DEFAULT_GCS_REGION = 'US-CENTRAL1'
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 # Raised when we fail to remove a bucket or its content after many retries.
@@ -891,7 +905,7 @@ def Prepare(benchmark_spec):
   FLAGS.boto_file_location = os.path.expanduser(FLAGS.boto_file_location)
 
   if not os.path.isfile(FLAGS.boto_file_location):
-    if FLAGS.storage is not benchmark_spec_class.AZURE:
+    if FLAGS.storage != benchmark_spec_class.AZURE:
       raise errors.Benchmarks.MissingObjectCredentialException(
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)

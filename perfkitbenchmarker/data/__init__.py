@@ -32,7 +32,7 @@ from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_multistring('data_search_paths', ['.', 'data'],
+flags.DEFINE_multistring('data_search_paths', ['.'],
                          'Additional paths to search for data files. '
                          'These paths will be searched prior to using files '
                          'bundled with PerfKitBenchmarker')
@@ -127,8 +127,10 @@ class PackageResourceLoader(ResourceLoader):
 
 DATA_PACKAGE_NAME = 'perfkitbenchmarker.data'
 SCRIPT_PACKAGE_NAME = 'perfkitbenchmarker.scripts'
+CONFIG_PACKAGE_NAME = 'perfkitbenchmarker.configs'
 DEFAULT_RESOURCE_LOADERS = [PackageResourceLoader(DATA_PACKAGE_NAME),
-                            PackageResourceLoader(SCRIPT_PACKAGE_NAME)]
+                            PackageResourceLoader(SCRIPT_PACKAGE_NAME),
+                            PackageResourceLoader(CONFIG_PACKAGE_NAME)]
 
 
 def _GetResourceLoaders():
@@ -140,8 +142,17 @@ def _GetResourceLoaders():
     DEFAULT_RESOURCE_LOADERS.
   """
   loaders = []
-  for path in FLAGS.data_search_paths:
-    loaders.append(FileResourceLoader(path))
+
+  # Add all paths to list if they are specified on the command line (will warn
+  # if any are invalid).
+  # Otherwise add members of the default list iff they exist.
+  if FLAGS['data_search_paths'].present:
+    for path in FLAGS.data_search_paths:
+      loaders.append(FileResourceLoader(path))
+  else:
+    for path in FLAGS.data_search_paths:
+      if os.path.isdir(path):
+        loaders.append(FileResourceLoader(path))
   loaders.extend(DEFAULT_RESOURCE_LOADERS)
   return loaders
 

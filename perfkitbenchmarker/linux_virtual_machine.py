@@ -103,7 +103,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                                             os.path.basename(f)))
         self._has_remote_command_script = True
 
-  def RobustRemoteCommand(self, command):
+  def RobustRemoteCommand(self, command, should_log=False):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     Executes a command via a pair of scripts on the VM:
@@ -115,6 +115,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     Temporary SSH failures (where ssh returns a 255) while waiting for the
     command to complete will be tolerated and safely retried.
+
+    If should_log is True, log the command's output at the info
+    level. If False, log the command's output at the debug level.
     """
     self._PushRobustCommandScripts()
 
@@ -148,7 +151,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--status', status_file,
                     '--delete']
     try:
-      return self.RemoteCommand(' '.join(wait_command), should_log=False)
+      return self.RemoteCommand(' '.join(wait_command), should_log=should_log)
     except:
       # In case the error was with the wrapper script itself, print the log.
       stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
@@ -389,8 +392,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     #     OpenMPI to operate correctly.
     remote_location = '%s@%s:%s' % (
         target.user_name, target.ip_address, remote_path)
-    self.RemoteHostCommand('scp -o StrictHostKeyChecking=no -i %s %s %s' %
-                           (REMOTE_KEY_PATH, source_path, remote_location))
+    self.RemoteHostCommand('scp -P %s -o StrictHostKeyChecking=no -i %s %s %s' %
+                           (target.ssh_port, REMOTE_KEY_PATH, source_path,
+                            remote_location))
 
   def AuthenticateVm(self):
     """Authenticate a remote machine to access all peers."""
@@ -486,8 +490,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """
     if len(disks) > 1:
       # If the disk_spec called for a striped disk, create one.
-      device_path = '/dev/md%d' % len(self.scratch_disks)
-      data_disk = disk.StripedDisk(disk_spec, disks, device_path)
+      disk_spec.device_path = '/dev/md%d' % len(self.scratch_disks)
+      data_disk = disk.StripedDisk(disk_spec, disks)
     else:
       data_disk = disks[0]
 

@@ -28,11 +28,12 @@ LOCAL = 'local'
 
 
 class BaseDiskSpec(object):
-  """Storing type and size about a disk."""
+  """Stores the information needed to create a disk."""
 
-  def __init__(self, disk_size, disk_type,
-               mount_point, iops=None, num_striped_disks=1):
-    """Storing various data about a single disk.
+  def __init__(self, disk_size=None, disk_type=None,
+               mount_point=None, num_striped_disks=1,
+               disk_number=None, device_path=None):
+    """Initializes the DiskSpec object.
 
     Args:
       disk_size: Size of the disk in GB.
@@ -45,10 +46,16 @@ class BaseDiskSpec(object):
     self.disk_size = disk_size
     self.disk_type = disk_type
     self.mount_point = mount_point
-    self.iops = iops
-    assert num_striped_disks >= 1, ('Disk objects must correspond to at least '
-                                    '1 real disk.')
     self.num_striped_disks = num_striped_disks
+    self.disk_number = disk_number
+    self.device_path = device_path
+
+  def ApplyFlags(self, flags):
+    """Applies flags to the DiskSpec."""
+    self.disk_size = flags.scratch_disk_size or self.disk_size
+    self.disk_type = flags.scratch_disk_type or self.disk_type
+    self.num_striped_disks = flags.num_striped_disks or self.num_striped_disks
+    self.mount_point = flags.scratch_dir or self.mount_point
 
 
 class BaseDisk(resource.BaseResource):
@@ -61,7 +68,10 @@ class BaseDisk(resource.BaseResource):
     self.disk_size = disk_spec.disk_size
     self.disk_type = disk_spec.disk_type
     self.mount_point = disk_spec.mount_point
-    self.iops = disk_spec.iops
+    self.num_striped_disks = disk_spec.num_striped_disks
+
+    # Linux related attributes.
+    self.device_path = disk_spec.device_path
 
     # Windows related attributes.
 
@@ -72,7 +82,7 @@ class BaseDisk(resource.BaseResource):
     # disk numbers starting at the number of local disks + 1. These disk
     # numbers are used in diskpart scripts in order to identify the disks
     # that we want to operate on.
-    self.disk_number = None
+    self.disk_number = disk_spec.disk_number
 
   @abc.abstractmethod
   def Attach(self, vm):
@@ -90,7 +100,7 @@ class BaseDisk(resource.BaseResource):
 
   def GetDevicePath(self):
     """Returns the path to the device inside a Linux VM."""
-    pass
+    return self.device_path
 
 
 class StripedDisk(BaseDisk):
@@ -98,7 +108,7 @@ class StripedDisk(BaseDisk):
 
   is_striped = True
 
-  def __init__(self, disk_spec, disks, device_path=None):
+  def __init__(self, disk_spec, disks):
     """Initializes a StripedDisk object.
 
     Args:
@@ -108,7 +118,6 @@ class StripedDisk(BaseDisk):
     """
     super(StripedDisk, self).__init__(disk_spec)
     self.disks = disks
-    self.device_path = device_path
 
   def _Create(self):
     for disk in self.disks:
@@ -125,6 +134,3 @@ class StripedDisk(BaseDisk):
   def Detach(self):
     for disk in self.disks:
       disk.Detach()
-
-  def GetDevicePath(self):
-    return self.device_path
