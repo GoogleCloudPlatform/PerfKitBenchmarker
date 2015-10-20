@@ -68,6 +68,7 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.zone_id = zone['id']
     self.user_name = self.DEFAULT_USER_NAME
     self.image = self.image or self.DEFAULT_IMAGE
+    self.disk_counter = 0
 
 
   @vm_util.Retry(max_retries=3)
@@ -188,13 +189,14 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     for i in xrange(disk_spec.num_striped_disks):
 
-        name = 'disk-%s-%s' % (self.name, i + 1)
+        name = 'disk-%s-%d-%d' % (self.name, i + 1, self.disk_counter)
         scratch_disk = cloudstack_disk.CloudStackDisk(disk_spec,
                                                       name,
                                                       self.zone_id,
                                                       self.project_id)
 
         self.disks.append(scratch_disk)
+        self.disk_counter += 1
 
     self._CreateScratchDiskFromDisks(disk_spec, self.disks)
 
