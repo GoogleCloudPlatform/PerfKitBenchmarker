@@ -18,14 +18,11 @@ import re
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
     OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
 
 FLAGS = flags.FLAGS
-
-
-flags.DEFINE_boolean('use_ceph_volumes', True,
-                     'Use Ceph volumes for scratch disks')
 
 flags.DEFINE_string('ceph_secret', None,
                     'Name of the Ceph Secret used by Kubernetes in order to '
@@ -36,29 +33,104 @@ flags.DEFINE_string('rbd_pool', 'rbd',
 
 flags.DEFINE_list('ceph_monitors', [],
                   'IP addresses and ports of Ceph Monitors. '
-                  'Must be provided when scratch disk is required. '
+                  'Must be provided when Ceph scratch disk is required. '
                   'Example: "127.0.0.1:6789,192.168.1.1:6789"')
 
 
-class CephDisk(disk.BaseDisk):
+def CreateDisks(disk_specs, vm_name):
+  """
+  Creates instances of KubernetesDisk child classes depending on
+  scratch disk type.
+  """
+  scratch_disks = []
+  for disk_num, disk_spec in enumerate(disk_specs):
+    if disk_spec.disk_type == disk.LOCAL:
+      scratch_disk = LocalDisk(disk_num, disk_spec, vm_name)
+    else:
+      scratch_disk = CephDisk(disk_num, disk_spec, vm_name)
+    scratch_disk._Create()
+    scratch_disks.append(scratch_disk)
+  return scratch_disks
+
+
+class KubernetesDisk(disk.BaseDisk):
+  """
+  Base class for Kubernetes Disks.
+  """
+
+  def __init__(self, disk_spec):
+    super(KubernetesDisk, self).__init__(disk_spec)
+    self.mount_point = disk_spec.mount_point
+
+  def _Create(self):
+    return
+
+  def _Delete(self):
+    return
+
+  def Attach(self, vm):
+    return
+
+  def Detach(self):
+    return
+
+  def SetDevicePath(self, vm):
+    return
+
+  def AttachVolumeMountInfo(self, volume_mounts):
+    volume_mount = {
+        "mountPath": self.mount_point,
+        "name": self.name
+    }
+    volume_mounts.append(volume_mount)
+
+
+class LocalDisk(KubernetesDisk):
+  """
+  Implementation of Kubernetes 'emptyDir' type of volume.
+  """
+
+  def __init__(self, disk_num, disk_spec, name):
+    super(LocalDisk, self).__init__(disk_spec)
+    self.name = 'local-disk-%s-%s' % (name, disk_num)
+
+  def GetDevicePath(self):
+    """
+    In case of LocalDisk, host's disk is mounted (empty directory from the
+    host is mounted to the docker instance) and we intentionally
+    prevent from formatting the device.
+    """
+    raise errors.Error('GetDevicePath not supported for Kubernetes local disk')
+
+  def AttachVolumeInfo(self, volumes):
+    local_volume = {
+        "name": self.name,
+        "emptyDir": {}
+    }
+    volumes.append(local_volume)
+
+
+class CephDisk(KubernetesDisk):
+  """
+  Implementation of Kubernetes 'rbd' type of volume.
+  """
 
   def __init__(self, disk_num, disk_spec, name):
     super(CephDisk, self).__init__(disk_spec)
-    self.disk_num = disk_num
-    self.image_name = 'rbd-%s-%s' % (name, self.disk_num)
+    self.name = 'rbd-%s-%s' % (name, disk_num)
     self.ceph_secret = FLAGS.ceph_secret
 
   def _Create(self):
     """
     Creates Rados Block Device volumes and installs filesystem on them.
     """
-    cmd = ['rbd', 'create', self.image_name, '--size',
+    cmd = ['rbd', '-p', FLAGS.rbd_pool, 'create', self.name, '--size',
            str(1024 * self.disk_size)]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
       raise Exception("Creating RBD image failed: %s" % output[STDERR])
 
-    cmd = ['rbd', 'map', self.image_name]
+    cmd = ['rbd', 'map', FLAGS.rbd_pool + '/' + self.name]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
       raise Exception("Mapping RBD image failed: %s" % output[STDERR])
@@ -69,7 +141,7 @@ class CephDisk(disk.BaseDisk):
       cmd = ['rbd', 'showmapped']
       output = vm_util.IssueCommand(cmd)
       for image_device in output[STDOUT].split('\n'):
-        if self.image_name in image_device:
+        if self.name in image_device:
           pattern = re.compile("/dev/rbd.*")
           output = pattern.findall(image_device)
           rbd_device = output[STDOUT].rstrip()
@@ -86,20 +158,23 @@ class CephDisk(disk.BaseDisk):
       raise Exception("Unmapping block device failed: %s" % output[STDERR])
 
   def _Delete(self):
-    cmd = ['rbd', 'rm', self.image_name]
+    """
+    Deletes RBD image.
+    """
+    cmd = ['rbd', 'rm', FLAGS.rbd_pool + '/' + self.name]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
       msg = "Removing RBD image failed. Reattempting."
       logging.warning(msg)
       raise Exception(msg)
 
-  def BuildVolumeBody(self):
+  def AttachVolumeInfo(self, volumes):
     ceph_volume = {
-        "name": self.image_name,
+        "name": self.name,
         "rbd": {
             "monitors": FLAGS.ceph_monitors,
             "pool": FLAGS.rbd_pool,
-            "image": self.image_name,
+            "image": self.name,
             "secretRef": {
                 "name": FLAGS.ceph_secret
             },
@@ -107,13 +182,15 @@ class CephDisk(disk.BaseDisk):
             "readOnly": False
         }
     }
-    return ceph_volume
+    volumes.append(ceph_volume)
+
+  def SetDevicePath(self, vm):
+    """
+    Retrieves the path to scratch disk device.
+    """
+    cmd = "mount | grep %s | tr -s ' ' | cut -f 1 -d ' '" % self.mount_point
+    device, _ = vm.RemoteCommand(cmd)
+    self.device_path = device.rstrip()
 
   def GetDevicePath(self):
-    return self.mount_point
-
-  def Attach(self):
-    pass
-
-  def Detach(self):
-    pass
+    return self.device_path
