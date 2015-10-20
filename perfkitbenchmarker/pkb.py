@@ -65,6 +65,7 @@ from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
@@ -331,23 +332,17 @@ def _LogCommandLineFlags():
   logging.info('Flag values:\n%s', '\n'.join(result))
 
 
-def RunBenchmarks(publish=True):
-  """Runs all benchmarks in PerfKitBenchmarker.
+def SetUpPKB():
+  """Set globals and environment variables for PKB.
 
-  Args:
-    publish: A boolean indicating whether results should be published.
-
-  Returns:
-    Exit status for the process.
+  Having this function separate from functions that do any work lets
+  us call this to set up integration tests.
   """
-  if FLAGS.version:
-    print version.VERSION
-    return
 
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):
       logging.error('Could not find required executable "%s".' % executable)
-      return 1
+      raise errors.Error()
 
   if FLAGS.run_uri is None:
     if FLAGS.run_stage not in [STAGE_ALL, STAGE_PREPARE]:
@@ -361,13 +356,13 @@ def RunBenchmarks(publish=True):
       else:
         logging.error(
             'No run_uri specified. Could not run "%s".', FLAGS.run_stage)
-        return 1
+        raise errors.Error()
     else:
       FLAGS.run_uri = str(uuid.uuid4())[-8:]
   elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
     logging.error('run_uri must be alphanumeric and less than or equal '
                   'to 8 characters in length.')
-    return 1
+    raise errors.Error()
 
   vm_util.GenTempDir()
   log_util.ConfigureLogging(
@@ -375,6 +370,26 @@ def RunBenchmarks(publish=True):
       log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
       run_uri=FLAGS.run_uri)
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
+
+  vm_util.SSHKeyGen()
+
+  events.initialization_complete.send(parsed_flags=FLAGS)
+
+
+def RunBenchmarks(publish=True):
+
+  """Runs all benchmarks in PerfKitBenchmarker.
+
+  Args:
+    publish: A boolean indicating whether results should be published.
+
+  Returns:
+    Exit status for the process.
+  """
+  if FLAGS.version:
+    print version.VERSION
+    return
+
   _LogCommandLineFlags()
 
   if FLAGS.os_type == benchmark_spec.WINDOWS and not vm_util.RunningOnWindows():
@@ -382,9 +397,7 @@ def RunBenchmarks(publish=True):
                   'running on Windows.')
     return 1
 
-  vm_util.SSHKeyGen()
   collector = SampleCollector()
-  events.initialization_complete.send(parsed_flags=FLAGS)
 
   if FLAGS.static_vm_file:
     with open(FLAGS.static_vm_file) as fp:
@@ -489,6 +502,12 @@ def Main(argv=sys.argv):
   except flags.FlagsError as e:
     logging.error(
         '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
+    sys.exit(1)
+
+  try:
+    SetUpPKB()
+  except Exception as e:
+    logging.error('Got exception %s', e)
     sys.exit(1)
 
   return RunBenchmarks()

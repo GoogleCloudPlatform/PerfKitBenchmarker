@@ -13,6 +13,9 @@
 # limitations under the License.
 """Functions and classes to make testing easier."""
 
+import os
+
+from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 
 
@@ -66,3 +69,23 @@ class SamplesTestMixin(object):
         ex.message = ex.message + (' (was item %s in list)' % i)
         ex.args = (ex.message,)
         raise ex
+
+
+def testDiskMounts(benchmark_config, mount_point):
+  spec = benchmark_spec.BenchmarkSpec(benchmark_config, 'uid')
+
+  try:
+    spec.ConstructVirtualMachines()
+    spec.Prepare()
+
+    vm = spec.vms[0]
+
+    test_file_path = os.path.join(mount_point, 'test_file')
+    vm.RemoteCommand('touch %s' % test_file_path)
+
+    # This will raise RemoteCommandError if the test file does not
+    # exist.
+    vm.RemoteCommand('test -e %s' % test_file_path)
+
+  finally:
+    spec.Delete()
