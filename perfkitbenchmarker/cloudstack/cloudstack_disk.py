@@ -50,7 +50,7 @@ class CloudStackDisk(disk.BaseDisk):
     self.disk_offering_id = self._GetBestOfferingId(self.disk_size)
     assert self.disk_offering_id, "Unable get disk offering of given size"
 
-    if self.disk_spec.disk_type:
+    if disk_spec.disk_type:
         logging.warn("Cloudstack does not support disk types")
 
 
@@ -73,7 +73,7 @@ class CloudStackDisk(disk.BaseDisk):
 
   def _Delete(self):
     """Deletes the disk."""
-    vol = self.cs.get_volume(self.name)
+    vol = self.cs.get_volume(self.name, self.project_id)
     if vol:
         self.cs.delete_volume(self.volume_id)
 
