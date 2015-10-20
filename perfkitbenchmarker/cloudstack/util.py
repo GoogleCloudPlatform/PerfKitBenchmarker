@@ -18,8 +18,11 @@ import os
 from csapi import API
 from perfkitbenchmarker import flags
 
-from requests.packages import urllib3
-urllib3.disable_warnings()
+try:
+    from requests.packages import urllib3
+    urllib3.disable_warnings()
+except ImportError:
+    pass
 
 flags.DEFINE_string('CS_API_URL',
                     os.environ.get('CS_API_URL'),
