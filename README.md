@@ -91,7 +91,7 @@ Most Linux distributions and recent Mac OS X version already have Python 2.7
 installed.
 If Python is not installed, you can likely install it using your distribution's package manager, or see the [Python Download page](https://www.python.org/downloads/).
 
-If you need to install `pip`, see [these instructions](http://pip.readthedocs.org/en/latest/installing.html).
+If you need to install `pip`, see [these instructions](http://pip.readthedocs.org/en/stable/installing/).
 
 ## (*Windows Only*) Install GitHub Windows
 
