@@ -182,6 +182,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       if len(endpoint['subsets']) > 0:
         logging.info("Endpoint found. Service is successfully matched"
                      "with POD.")
+        return
 
     raise Exception("Endpoint %s not found. Retrying." % self.name)
 
