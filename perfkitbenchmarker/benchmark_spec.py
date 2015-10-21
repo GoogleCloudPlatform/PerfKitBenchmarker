@@ -365,7 +365,7 @@ class BenchmarkSpec(object):
     vm.AddMetadata(benchmark=self.uid)
     vm.WaitForBootCompletion()
     vm.OnStartup()
-    if FLAGS.scratch_disk_type == disk.LOCAL:
+    if any((d.disk_type == disk.LOCAL for d in vm.disk_specs)):
       vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
       vm.CreateScratchDisk(disk_spec)
