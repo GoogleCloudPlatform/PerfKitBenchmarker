@@ -138,7 +138,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Creates a Service (POD accessor).
     """
     create_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                  'create', '-f', '-']
+                  'create', '--validate=false', '-f', '-']
     create_svc_body = self._BuildServiceBody()
     output = vm_util.IssueCommand(create_cmd, input=create_svc_body)
     if output[EXIT_CODE]:
@@ -151,23 +151,20 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Need to wait for the PODs to get up  - PODs are created with a little delay.
     """
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-                  'pod', '-o=json', '-l', '%s=%s' % (SELECTOR_PREFIX,
-                                                     self.name)]
-    pod_selector = (SELECTOR_PREFIX, self.name)
-    logging.info("Waiting for POD %s=%s" % pod_selector)
+                  'pod', '-o=json', self.name]
+    logging.info("Waiting for POD %s" % self.name)
     pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
     pod_info = json.loads(pod_info)
+    containers = pod_info['spec']['containers']
 
-    if len(pod_info['items']) == 1:
-      containers = pod_info['items'][0]['spec']['containers']
-      if len(containers) == 1:
-        pod_status = pod_info['items'][0]['status']['phase']
-        if (containers[0]['name'].startswith(self.name)
-            and pod_status == "Running"):
-          logging.info("POD is up and running.")
-          return
-    raise Exception("POD %s=%s is not running. Retrying to check status." %
-                    pod_selector)
+    if len(containers) == 1:
+      pod_status = pod_info['status']['phase']
+      if (containers[0]['name'].startswith(self.name)
+          and pod_status == "Running"):
+        logging.info("POD is up and running.")
+        return
+    raise Exception("POD %s is not running. Retrying to check status." %
+                    self.name)
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
   def _WaitForEndpoint(self):
@@ -175,27 +172,25 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Waits till Service is matched with a POD. Only after this we will be able
     to connect to container via SSH.
     """
-    endpoint_selector = (SELECTOR_PREFIX, self.name)
-    logging.info("Waiting for endpoint %s=%s" % endpoint_selector)
+    logging.info("Waiting for endpoint %s" % self.name)
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-                  'endpoints', '-o=json', '-l', '%s=%s' % endpoint_selector]
+                  'endpoints', '-o=json', self.name]
 
     endpoint, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
-    endpoint = json.loads(endpoint)
+    if endpoint:
+      endpoint = json.loads(endpoint)
+      if len(endpoint['subsets']) > 0:
+        logging.info("Endpoint found. Service is successfully matched"
+                     "with POD.")
 
-    if len(endpoint['items']) == 1:
-      if len(endpoint['items'][0]['subsets']) > 0:
-        logging.info("Endpoint found. Service is successfully matched with "
-                     "POD.")
-        return
-    raise Exception("Endpoint %s=%s not found. Retrying." % endpoint_selector)
+    raise Exception("Endpoint %s not found. Retrying." % self.name)
 
   def _DeletePod(self):
     """
     Deletes a POD.
     """
     delete_pod = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                  'delete', 'pod', '-l', '%s=%s' % (SELECTOR_PREFIX, self.name)]
+                  'delete', 'pod', self.name]
     output = vm_util.IssueCommand(delete_pod)
     logging.info(output[STDOUT].rstrip())
 
@@ -204,8 +199,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Deletes a Service.
     """
     delete_service = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                      'delete', 'service', '-l', '%s=%s' % (SELECTOR_PREFIX,
-                                                            self.name)]
+                      'delete', 'service', self.name]
     output = vm_util.IssueCommand(delete_service)
     logging.info(output[STDOUT].rstrip())
 
@@ -215,14 +209,11 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     POD should have been already created but this is a double check.
     """
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-                  'pod', '-o=json', '-l', '%s=%s' % (SELECTOR_PREFIX,
-                                                     self.name)]
+                  'pod', '-o=json', self.name]
     pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
-    pod_info = json.loads(pod_info)
-
-    if len(pod_info['items']) == 0:
-      return False
-    return True
+    if pod_info:
+      return True
+    return False
 
   def _CreateVolumes(self):
     """
@@ -286,32 +277,27 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     - SSH port is assigned to Kubernetes Service matched with this container.
     """
 
-    get_port_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                    'get', 'service', '-l', '%s=%s' %
-                    (SELECTOR_PREFIX, self.name), '-o', 'jsonpath',
-                    '--template', '"{.items[0].spec.ports[0].nodePort}"']
+    get_service_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
+                       'get', 'service', self.name, '-o', 'json']
+    stdout, _, _ = vm_util.IssueCommand(get_service_cmd, suppress_warning=True)
+    service = json.loads(stdout)
+    ports = service.get('spec', {}).get('ports', [])
 
-    stdout, _, _ = vm_util.IssueCommand(get_port_cmd, suppress_warning=True)
-    if not stdout:
-      raise Exception("Port of service %s=%s not found. Exiting." %
-                      (SELECTOR_PREFIX, self.name))
-    port = stdout.replace('"', '')
-    self.ssh_port = port
+    if not ports:
+      raise Exception("Port of service %s not found. Retrying." % self.name)
+    self.ssh_port = ports[0]['nodePort']
+
+    get_pod_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
+                   'get', 'pod', self.name, '-o', 'json']
+    stdout, _, _ = vm_util.IssueCommand(get_pod_cmd, suppress_warning=True)
+    pod = json.loads(stdout)
+    pod_ip = pod.get('status', {}).get('podIP', None)
+
+    if not pod_ip:
+      raise Exception("Internal POD IP address not found. Retrying.")
+
+    self.internal_ip = pod_ip
     self.ip_address = random.choice(FLAGS.kubernetes_nodes)
-
-    get_internal_ip_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                           'get', 'pod', '-l', '%s=%s' %
-                           (SELECTOR_PREFIX, self.name), '-o', 'jsonpath',
-                           '--template', '"{.items[0].status.podIP}"']
-
-    stdout, _, _ = vm_util.IssueCommand(get_internal_ip_cmd,
-                                        suppress_warning=True)
-    if not stdout:
-      logging.warning("Internal POD IP address not found. External address"
-                      "will be used instead.")
-      self.internal_ip = self.ip_address
-    else:
-      self.internal_ip = stdout.replace('"', '')
 
   def _ConfigureProxy(self):
     """
@@ -429,10 +415,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         "kind": "Service",
         "apiVersion": "v1",
         "metadata": {
-            "name": self.name,
-            "labels": {
-                SELECTOR_PREFIX: self.name
-            }
+            "name": self.name
         },
         "spec": {
             "ports": [
