@@ -18,6 +18,8 @@ key_cache_size_in_mb:
 key_cache_save_period: 14400
 row_cache_size_in_mb: 0
 row_cache_save_period: 0
+counter_cache_size_in_mb:
+counter_cache_save_period: 7200
 saved_caches_directory: {{ data_path }}/saved_caches
 commitlog_sync: periodic
 commitlog_sync_period_in_ms: 10000
@@ -28,8 +30,12 @@ seed_provider:
           - seeds: "{{ seeds }}"
 concurrent_reads: 32
 concurrent_writes: {{ num_cpus * 8 }}
+concurrent_counter_writes: 32
+memtable_allocation_type: heap_buffers
 commitlog_total_space_in_mb: 4096
 memtable_flush_writers: 4
+index_summary_capacity_in_mb:
+index_summary_resize_interval_in_minutes: 60
 trickle_fsync: true
 trickle_fsync_interval_in_kb: 10240
 storage_port: 7000
@@ -48,6 +54,8 @@ snapshot_before_compaction: false
 auto_snapshot: true
 column_index_size_in_kb: 64
 compaction_throughput_mb_per_sec: 16
+compaction_large_partition_warning_threshold_mb: 100
+sstable_preemptive_open_interval_in_mb: 50
 read_request_timeout_in_ms: 10000
 range_request_timeout_in_ms: 10000
 write_request_timeout_in_ms: 10000
