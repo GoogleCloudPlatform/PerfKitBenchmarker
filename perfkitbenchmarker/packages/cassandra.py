@@ -32,8 +32,6 @@ from perfkitbenchmarker.packages.ant import ANT_HOME_DIR
 
 JNA_JAR_URL = ('https://maven.java.net/content/repositories/releases/'
                'net/java/dev/jna/jna/4.1.0/jna-4.1.0.jar')
-CASSANDRA_TAR_URL = ('http://archive.apache.org/dist/cassandra/2.1.10/'
-                     'apache-cassandra-2.1.10-bin.tar.gz')
 CASSANDRA_GIT_REPRO = 'https://github.com/apache/cassandra.git'
 CASSANDRA_VERSION = 'cassandra-2.1.10'
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
