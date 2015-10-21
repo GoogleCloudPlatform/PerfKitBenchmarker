@@ -242,7 +242,7 @@ def CollectResults(benchmark_spec):
     A list of sample.Sample objects.
   """
   logging.info('Gathering results.')
-  vm_dict = benchmark_spec.vm_dict
+  vm_dict = benchmark_spec.vm_groups
   loader_vms = vm_dict[CLIENT_GROUP]
   raw_results = collections.defaultdict(list)
   args = [((vm, raw_results), {}) for vm in loader_vms]
@@ -253,23 +253,6 @@ def CollectResults(benchmark_spec):
               'num_loader_nodes': len(loader_vms),
               'num_cassandra_stress_threads':
               FLAGS.num_cassandra_stress_threads}
-  results = [
-      sample.Sample('Interval_op_rate', math.fsum(interval_op_rate_list),
-                    'operations per second', metadata),
-      sample.Sample('Interval_key_rate', math.fsum(interval_key_rate_list),
-                    'operations per second', metadata),
-      sample.Sample('Latency median',
-                    math.fsum(latency_median_list) / len(loader_vms),
-                    'ms', metadata),
-      sample.Sample('Latency 95th percentile',
-                    math.fsum(latency_95th_list) / len(loader_vms),
-                    'ms', metadata),
-      sample.Sample('Latency 99.9th percentile',
-                    math.fsum(latency_99_9th_list) / len(loader_vms),
-                    'ms', metadata),
-      sample.Sample('Total operation time',
-                    math.fsum(total_operation_time_list) / len(
-                        loader_vms), 'seconds', metadata)]
   results = []
   for metric in RESULTS_METRICS:
     if metric in MAXIMUM_METRICS:
