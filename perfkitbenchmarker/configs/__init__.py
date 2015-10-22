@@ -210,6 +210,22 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
     return default_config
 
 
+def GetMergedFlags(config):
+  """Returns a copy of the flags.FLAGS merged with those in the config."""
+  config_flags = config.get('flags')
+  flags_values = copy.deepcopy(flags.GLOBAL_FLAGS)
+
+  if config_flags:
+    for key, value in config_flags.iteritems():
+      if key not in flags_values:
+        raise ValueError('Flag "%s" is not defined.' % key)
+      if not flags_values[key].present:
+        flags_values[key].value = value
+        flags_values[key].present += 1
+
+  return flags_values
+
+
 def LoadMinimalConfig(benchmark_config, benchmark_name):
   """Loads a benchmark config without using any flags in the process.
 

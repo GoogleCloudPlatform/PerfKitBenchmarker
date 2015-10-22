@@ -17,11 +17,9 @@
 import logging
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import sample
 
-FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'cluster_boot'
 BENCHMARK_CONFIG = """

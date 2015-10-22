@@ -179,8 +179,8 @@ class IntegerListSerializer(flags.ArgumentSerializer):
                      for val in il.groups])
 
 
-def DEFINE_integerlist(name, default, help,
-                       on_nonincreasing=None, flag_values=flags.FLAGS, **args):
+def DEFINE_integerlist(name, default, help, on_nonincreasing=None,
+                       flag_values=flags.GLOBAL_FLAGS, **args):
   """Register a flag whose value must be an integer list."""
 
   parser = IntegerListParser(on_nonincreasing=on_nonincreasing)

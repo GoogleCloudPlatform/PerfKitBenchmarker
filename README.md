@@ -687,6 +687,29 @@ iperf:
         - *vm1
 ```
 
+SPECIFYING FLAGS IN CONFIGURATION FILES
+=================
+You can now specify flags in configuration files by using the `flags` key at the
+top level in a benchmark config. The expected value is a dictionary mapping
+flag names to their new default values. The flags are only defaults; it's still
+possible to override them via the command line. It's even possible to specify
+conflicting values of the same flag in different benchmarks:
+
+```
+iperf:
+  flags:
+    machine_type: n1-standard-2
+    zone: us-central1-b
+    iperf_sending_thread_count: 2
+
+netperf:
+  flags:
+    machine_type: n1-standard-8
+```
+
+The new defaults will only apply to the benchmark in which they are specified.
+
+
 HOW TO EXTEND PerfKitBenchmarker
 =================
 First start with the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
