@@ -112,11 +112,6 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise Exception('Please provide path to kubeconfig using --kubeconfig '
                       'flag. Exiting.')
     if self.disk_specs and self.disk_specs[0].disk_type == disk.STANDARD:
-      # Verify Ceph prerequisites:
-      if not FLAGS.ceph_secret:
-        raise Exception('Please provide the name of Ceph Secret used by '
-                        'Kubernetes in order to authenticate with Ceph '
-                        '(--ceph_secret flag).')
       if not FLAGS.ceph_monitors:
         raise Exception('Please provide a list of Ceph Monitors using '
                         '--ceph_monitors flag.')
@@ -126,7 +121,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Creates a POD (Docker container with optional volumes).
     """
     create_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                  'create', '-f', '-']
+                  'create', '--validate=false', '-f', '-']
     create_rc_body = self._BuildPodBody()
     output = vm_util.IssueCommand(create_cmd, input=create_rc_body)
     if output[EXIT_CODE]:
