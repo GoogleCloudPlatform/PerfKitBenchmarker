@@ -188,7 +188,7 @@ class CephDisk(KubernetesDisk):
         }
     }
     if FLAGS.ceph_secret:
-      ceph_volume["rbd"]["secretRef"] = {"name" : FLAGS.ceph_secret}
+      ceph_volume["rbd"]["secretRef"] = {"name": FLAGS.ceph_secret}
     volumes.append(ceph_volume)
 
   def SetDevicePath(self, vm):
