@@ -136,7 +136,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         with self._floating_ip_lock:
             self.floating_ip = self.public_network.get_or_create()
             instance.add_floating_ip(self.floating_ip)
-            logging.info('floating-ip associated: {}'.format(self.floating_ip.ip))
+            logging.info('floating-ip associated: {}'.format(
+                self.floating_ip.ip))
 
         while not self.public_network.is_attached(self.floating_ip):
             time.sleep(1)
