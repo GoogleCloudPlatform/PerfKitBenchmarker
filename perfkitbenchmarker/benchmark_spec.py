@@ -21,6 +21,7 @@ import copy_reg
 import os
 import thread
 import threading
+import uuid
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -204,6 +205,7 @@ class BenchmarkSpec(object):
     self.vm_groups = {}
     self.deleted = False
     self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
+    self.uuid = str(uuid.uuid4())
     self.always_call_cleanup = False
 
   def _GetCloudForGroup(self, group_name):
@@ -372,7 +374,7 @@ class BenchmarkSpec(object):
     logging.info('Waiting for boot completion.')
     for port in vm.remote_access_ports:
       vm.AllowPort(port)
-    vm.AddMetadata(benchmark=self.uid)
+    vm.AddMetadata(benchmark=self.uid, perfkit_uuid=self.uuid)
     vm.WaitForBootCompletion()
     vm.OnStartup()
     if FLAGS.scratch_disk_type == disk.LOCAL:
