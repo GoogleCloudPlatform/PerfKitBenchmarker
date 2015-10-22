@@ -78,12 +78,31 @@ RETRIES = 1000
 
 CASSANDRA_STRESS = posixpath.join(cassandra.CASSANDRA_DIR, 'tools', 'bin',
                                   'cassandra-stress')
-RESULTS_METRICS = ['op rate', 'partition rate', 'row rate', 'latency mean',
-                   'latency median', 'latency 95th percentile',
-                   'latency 99th percentile', 'latency 99.9th percentile',
-                   'latency max', 'Total operation time']
-AGGREGATED_METRICS = ['op rate', 'partition rate', 'row rate']
-MAXIMUM_METRICS = ['latency max']
+
+# Results documentation:
+# http://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStressOutput_c.html
+RESULTS_METRICS = (
+    'op rate',  # Number of operations per second performed during the run.
+    'partition rate',  # Number of partition operations per second performed
+                       # during the run.
+    'row rate',  # Number of row operations per second performed during the run.
+    'latency mean',  # Average latency in milliseconds for each operation during
+                     # that run.
+    'latency median',  # Median latency in milliseconds for each operation
+                       # during that run.
+    'latency 95th percentile',  # 95% of the time the latency was less than
+                                # the number displayed in the column.
+    'latency 99th percentile',  # 99% of the time the latency was less than
+                                # the number displayed in the column.
+    'latency 99.9th percentile',  # 99.9% of the time the latency was less than
+                                  # the number displayed in the column.
+    'latency max',  # Maximum latency in milliseconds.
+    'Total partitions',  # Number of partitions.
+    'Total errors',  # Number of errors.
+    'Total operation time')  # Total operation time.
+AGGREGATED_METRICS = {'op rate', 'partition rate', 'row rate',
+                      'Total partitions', 'Total errors'}
+MAXIMUM_METRICS = {'latency max'}
 
 
 def GetConfig(user_config):
@@ -126,19 +145,22 @@ def _ResultFilePath(vm):
                         vm.hostname + '.stress_results.txt')
 
 
-def RunTestOnLoader(vm, data_node_ips):
+def RunTestOnLoader(vm, loader_index, keys_per_vm, data_node_ips):
   """Run Cassandra-stress test on loader node.
 
   Args:
     vm: The target vm.
+    loader_index: The index of target vm in loader vms.
+    keys_per_vm: The number of keys per loader vm need to insert.
     data_node_ips: List of IP addresses for all data nodes.
   """
   vm.RobustRemoteCommand(
-      '%s write n=%s cl=%s '
-      '-node %s -schema replication\(factor=%s\) '
+      '%s write cl=%s n=%s '
+      '-node %s -schema replication\(factor=%s\) -pop seq=%s..%s '
       '-log file=%s -rate threads=%s -errors retries=%s' % (
-          CASSANDRA_STRESS, FLAGS.num_keys, CONSISTENCY_LEVEL,
+          CASSANDRA_STRESS, CONSISTENCY_LEVEL, keys_per_vm,
           ','.join(data_node_ips), REPLICATION_FACTOR,
+          loader_index * keys_per_vm + 1, (loader_index + 1) * keys_per_vm,
           _ResultFilePath(vm), RETRIES, FLAGS.num_cassandra_stress_threads))
 
 
@@ -167,7 +189,9 @@ def RunCassandraStress(benchmark_spec):
     logging.info('Num keys not set, using %s in cassandra-stress test.',
                  FLAGS.num_keys)
   logging.info('Executing the benchmark.')
-  args = [((loader_vm, data_node_ips), {}) for loader_vm in loader_vms]
+  keys_per_vm = FLAGS.num_keys / len(loader_vms)
+  args = [((loader_vms[i], i, keys_per_vm, data_node_ips), {})
+          for i in xrange(0, len(loader_vms))]
   vm_util.RunThreaded(RunTestOnLoader, args)
 
 
@@ -196,8 +220,8 @@ def CollectResultFile(vm, results):
 
   Args:
     vm: The target vm.
-    results: A dictionary of lists. Each list contains results of a field defined in
-        RESULTS_METRICS collected from each loader machines.
+    results: A dictionary of lists. Each list contains results of a field
+       defined in RESULTS_METRICS collected from each loader machines.
   """
   result_path = _ResultFilePath(vm)
   vm.PullFile(vm_util.GetTempDir(), result_path)
