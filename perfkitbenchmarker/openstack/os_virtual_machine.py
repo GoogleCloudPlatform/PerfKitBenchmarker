@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import threading
 import time
 
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
@@ -49,6 +50,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     DEFAULT_USERNAME = 'ubuntu'
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None
+    _floating_ip_lock = threading.Lock()
 
     def __init__(self, vm_spec, network, firewall):
         """Initialize an OpenStack virtual machine.
@@ -131,8 +133,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             instance = self.client.servers.get(self.id)
             status = instance.status
 
-        self.floating_ip = self.public_network.get_or_create()
-        instance.add_floating_ip(self.floating_ip)
+        with self._floating_ip_lock:
+            self.floating_ip = self.public_network.get_or_create()
+            instance.add_floating_ip(self.floating_ip)
+            logging.info('floating-ip associated: {}'.format(self.floating_ip.ip))
 
         while not self.public_network.is_attached(self.floating_ip):
             time.sleep(1)
