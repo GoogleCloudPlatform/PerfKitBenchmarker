@@ -1,3 +1,9 @@
+# v0.23.0
+
+* Benchmark-specific changes:
+  * **BREAKING CHANGE** fio flags are prefixed with "fio", and new flag
+    --fio_target_mode replaces --against_device and --prefill_device.
+
 # v0.22.1
 
 * Update the default image used in Azure tests to Ubuntu 14.04.3 (runs failed
