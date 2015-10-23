@@ -238,7 +238,7 @@ def CollectResultFile(vm, results):
     if metric == RESULTS_METRICS[-1]:  # Total operation time
       value = value.split(':')
       results[metric].append(
-        int(value[0]) * 3600 + int(value[1]) * 60 + int(value[2]))
+          int(value[0]) * 3600 + int(value[1]) * 60 + int(value[2]))
     else:
       results[metric].append(float(value))
 
