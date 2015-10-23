@@ -90,7 +90,8 @@ flags.DEFINE_string('fio_fill_size', '100%',
                     'percentage, which represents the percentage '
                     'of the device. A filesystem will be unmounted before '
                     'filling and remounted afterwards. Only valid when '
-                    '--fio_target_mode specifies prefilling')
+                    '--fio_target_mode is against_device_with_fill or '
+                    'against_file_with_fill.')
 flag_util.DEFINE_integerlist('fio_io_depths', [1],
                              'IO queue depths to run on. Can specify a single '
                              'number, like --fio_io_depths=1, a range, like '
@@ -119,7 +120,26 @@ FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
 # Modes from --fio_target_mode
 AGAINST_DEVICE_MODES = {'against_device_with_fill',
                         'against_device_without_fill'}
-FILL_TARGET_MODES = {'against_device_with_fill', 'against_target_with_fill'}
+FILL_TARGET_MODES = {'against_device_with_fill', 'against_file_with_fill'}
+AGAINST_DEVICE_WITH_FILL_MODE = 'against_device_with_fill'
+
+
+def AgainstDevice():
+  """Check whether we're running against a device or a file.
+
+  Returns:
+    True if running against a device, False if running against a file.
+  """
+  return FLAGS.fio_target_mode in AGAINST_DEVICE_MODES
+
+
+def FillTarget():
+  """Check whether we should pre-fill our target or not.
+
+  Returns:
+    True if we should pre-fill our target, False if not.
+  """
+  return FLAGS.fio_target_mode in FILL_TARGET_MODES
 
 
 def FillDevice(vm, disk, fill_size):
@@ -299,7 +319,7 @@ def WarnOnBadFlags():
   if (FLAGS.fio_jobfile is None and
       FLAGS.fio_generate_scenarios and
       not FLAGS.fio_working_set_size and
-      not (FLAGS.fio_target_mode in AGAINST_DEVICE_MODES)):
+      not AgainstDevice()):
     logging.error(NEED_SIZE_MESSAGE)
     raise errors.Benchmarks.PrepareException(NEED_SIZE_MESSAGE)
 
@@ -360,11 +380,15 @@ def Prepare(benchmark_spec):
   # Choose a disk or file name and optionally fill it
   disk = vm.scratch_disks[0]
 
-  if FLAGS.fio_target_mode in FILL_TARGET_MODES:
+  if FillTarget():
     logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
     FillDevice(vm, disk, FLAGS.fio_fill_size)
 
-  if FLAGS.fio_target_mode == 'against_file_with_fill':
+  # We only need to format and mount if the target mode is against
+  # file with fill because 1) if we're running against the device, we
+  # don't want it mounted and 2) if we're running against a file
+  # without fill, it was never unmounted (see GetConfig()).
+  if FLAGS.fio_target_mode == AGAINST_DEVICE_WITH_FILL_MODE:
     disk.mount_point = FLAGS.scratch_dir or MOUNT_POINT
     vm.FormatDisk(disk.GetDevicePath())
     vm.MountDisk(disk.GetDevicePath(), disk.mount_point)
@@ -389,7 +413,7 @@ def Run(benchmark_spec):
   job_file_string = GetOrGenerateJobFileString(
       FLAGS.fio_jobfile,
       FLAGS.fio_generate_scenarios,
-      FLAGS.fio_target_mode in AGAINST_DEVICE_MODES,
+      AgainstDevice(),
       disk,
       FLAGS.fio_io_depths,
       FLAGS.fio_working_set_size)
@@ -400,7 +424,7 @@ def Run(benchmark_spec):
 
   vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
 
-  if FLAGS.fio_target_mode in AGAINST_DEVICE_MODES:
+  if AgainstDevice():
     fio_command = 'sudo %s --output-format=json --filename=%s %s' % (
         fio.FIO_PATH, disk.GetDevicePath(), REMOTE_JOB_FILE_PATH)
   else:
@@ -459,8 +483,7 @@ def Cleanup(benchmark_spec):
   vm = benchmark_spec.vms[0]
   logging.info('FIO Cleanup up on %s', vm)
   vm.RemoveFile(REMOTE_JOB_FILE_PATH)
-  if (FLAGS.fio_target_mode not in AGAINST_DEVICE_MODES
-      and not FLAGS.fio_jobfile):
+  if not AgainstDevice() and not FLAGS.fio_jobfile:
     # If the user supplies their own job file, then they have to clean
     # up after themselves, because we don't know their temp file name.
     vm.RemoveFile(posixpath.join(vm.GetScratchDir(), DEFAULT_TEMP_FILE_NAME))

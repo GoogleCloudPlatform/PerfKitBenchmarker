@@ -18,6 +18,7 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.benchmarks import fio_benchmark
 
 
@@ -151,6 +152,63 @@ class TestRunForMinutes(unittest.TestCase):
     proc = mock.Mock()
     fio_benchmark.RunForMinutes(proc, 0, 10)
     self.assertEquals(proc.call_count, 0)
+
+
+class TestFioTargetModeFlag(unittest.TestCase):
+  def doTargetModeTest(self, mode, fill_device=None, against_device=None,
+                       format_disk=None):
+    with mock.patch(fio_benchmark.__name__ + '.FillDevice') as fill_device, \
+            mock.patch(fio_benchmark.__name__ +
+                       '.GetOrGenerateJobFileString') as get_job_string, \
+            mock.patch('__builtin__.open'), \
+            mock.patch(vm_util.__name__ + '.GetTempDir'), \
+            mock.patch(fio_benchmark.__name__ + '.FLAGS') as fio_flags:
+      fio_flags.fio_target_mode = 'against_file_with_fill'
+      fio_flags.fio_run_for_minutes = 0
+      benchmark_spec = mock.MagicMock()
+      fio_benchmark.Prepare(benchmark_spec)
+      fio_benchmark.Run(benchmark_spec)
+
+      if fill_device is True:
+        self.assertEquals(fill_device.call_count, 1)
+      elif fill_device is False:
+        self.assertEquals(fill_device.call_count, 0)
+      # get_job_string.call_args[0][2] is a boolean saying whether or
+      # not we are testing against a device.
+      against_device_arg = get_job_string.call_args[0][2]
+      if against_device is True:
+        self.assertEquals(against_device_arg, True)
+      elif against_device is False:
+        self.assertEquals(against_device_arg, False)
+
+      if format_disk is True:
+        self.assertEquals(benchmark_spec.vms[0].FormatDisk.call_count, 1)
+      elif format_disk is False:
+        self.assertEquals(benchmark_spec.vms[0].FormatDisk.call_count, 0)
+
+    def testAgainstFileWithFill(self):
+      self.doTargetModeTest('against_file_with_fill',
+                            fill_device=True,
+                            against_device=False,
+                            format_disk=True)
+
+    def testAgainstFileWithoutFill(self):
+      self.doTargetModeTest('against_file_without_fill',
+                            fill_device=False,
+                            against_device=False,
+                            format_disk=False)
+
+    def testAgainstDeviceWithFill(self):
+      self.doTargetModeTest('against_device_with_fill',
+                            fill_device=True,
+                            against_device=True,
+                            format_disk=False)
+
+    def testAgainstDeviceWithoutFill(self):
+      self.doTargetModeTest('against_device_without_fill',
+                            fill_device=False,
+                            against_device=True,
+                            format_disk=False)
 
 
 if __name__ == '__main__':
