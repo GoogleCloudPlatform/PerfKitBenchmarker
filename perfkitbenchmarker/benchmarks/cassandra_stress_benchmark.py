@@ -16,7 +16,7 @@
 
 Cassandra homepage: http://cassandra.apache.org
 cassandra-stress tool page:
-http://www.datastax.com/documentation/cassandra/2.0/cassandra/tools/toolsCStress_t.html
+http://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStress_t.html
 """
 
 import collections
@@ -100,8 +100,11 @@ RESULTS_METRICS = (
     'Total partitions',  # Number of partitions.
     'Total errors',  # Number of errors.
     'Total operation time')  # Total operation time.
+
+# Metrics are aggregated between client vms.
 AGGREGATED_METRICS = {'op rate', 'partition rate', 'row rate',
                       'Total partitions', 'Total errors'}
+# Maximum value will be choisen between client vms.
 MAXIMUM_METRICS = {'latency max'}
 
 
@@ -155,9 +158,9 @@ def RunTestOnLoader(vm, loader_index, keys_per_vm, data_node_ips):
     data_node_ips: List of IP addresses for all data nodes.
   """
   vm.RobustRemoteCommand(
-      '%s write cl=%s n=%s '
-      '-node %s -schema replication\(factor=%s\) -pop seq=%s..%s '
-      '-log file=%s -rate threads=%s -errors retries=%s' % (
+      '{0} write cl={1} n={2} '
+      '-node {3} -schema replication\(factor={4}\) -pop seq={5}..{6} '
+      '-log file={7} -rate threads={8} -errors retries={9}'.format(
           CASSANDRA_STRESS, CONSISTENCY_LEVEL, keys_per_vm,
           ','.join(data_node_ips), REPLICATION_FACTOR,
           loader_index * keys_per_vm + 1, (loader_index + 1) * keys_per_vm,
@@ -177,8 +180,8 @@ def RunCassandraStress(benchmark_spec):
   data_node_ips = [vm.internal_ip for vm in cassandra_vms]
 
   loader_vms[0].RemoteCommand(
-      '%s write n=1 cl=%s '
-      '-node %s -schema replication\(factor=%s\) > /dev/null' % (
+      '{0} write n=1 cl={1} '
+      '-node {2} -schema replication\(factor={3}\) > /dev/null'.format(
           CASSANDRA_STRESS, CONSISTENCY_LEVEL,
           ','.join(data_node_ips), REPLICATION_FACTOR))
   logging.info('Waiting %s for keyspace to propagate.', PROPAGATION_WAIT_TIME)
@@ -189,9 +192,13 @@ def RunCassandraStress(benchmark_spec):
     logging.info('Num keys not set, using %s in cassandra-stress test.',
                  FLAGS.num_keys)
   logging.info('Executing the benchmark.')
-  keys_per_vm = FLAGS.num_keys / len(loader_vms)
+  num_loaders = len(loader_vms)
+  keys_per_vm = FLAGS.num_keys / num_loaders
+  if FLAGS.num_keys % num_loaders:
+    logging.warn('Total number of keys rounded to %s (%s keys per loader vm).',
+                 keys_per_vm * num_loaders, keys_per_vm)
   args = [((loader_vms[i], i, keys_per_vm, data_node_ips), {})
-          for i in xrange(0, len(loader_vms))]
+          for i in xrange(0, num_loaders)]
   vm_util.RunThreaded(RunTestOnLoader, args)
 
 
@@ -227,17 +234,13 @@ def CollectResultFile(vm, results):
   vm.PullFile(vm_util.GetTempDir(), result_path)
   resp, _ = vm.RemoteCommand('tail -n 20 ' + result_path)
   for metric in RESULTS_METRICS:
-
-    try:
-      value = regex_util.ExtractGroup(r'%s[\t ]+: ([\d\.:]+)' % metric, resp)
-      if metric == RESULTS_METRICS[-1]:  # Total operation time
-        value = value.split(':')
-        results[metric].append(
-            int(value[0]) * 3600 + int(value[1]) * 60 + int(value[2]))
-      else:
-        results[metric].append(float(value))
-    except regex_util.NoMatchError:
-      logging.exception('No value for %s', metric)
+    value = regex_util.ExtractGroup(r'%s[\t ]+: ([\d\.:]+)' % metric, resp)
+    if metric == RESULTS_METRICS[-1]:  # Total operation time
+      value = value.split(':')
+      results[metric].append(
+        int(value[0]) * 3600 + int(value[1]) * 60 + int(value[2]))
+    else:
+      results[metric].append(float(value))
 
 
 def RunCassandraStressTest(benchmark_spec):
