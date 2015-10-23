@@ -267,15 +267,17 @@ def Run(benchmark_spec):
   metadata = {'ycsb_client_vms': len(vms),
               'bigtable_nodes': cluster_info.get('serveNodes')}
 
-  kwargs = {'columnfamily': COLUMN_FAMILY}
   # By default YCSB uses a BufferedMutator for Puts / Deletes.
   # This leads to incorrect update latencies, since since the call returns
   # before the request is acked by the server.
   # Disable this behavior during the benchmark run.
-  run_kwargs = {'clientbuffering': 'false'}
-  run_kwargs.update(kwargs)
+  run_kwargs = {
+      'columnfamily': COLUMN_FAMILY,
+      'clientbuffering': 'false'}
+  load_kwargs = run_kwargs.copy()
+  load_kwargs['clientbuffering'] = 'true'
   samples = list(executor.LoadAndRun(vms,
-                                     load_kwargs=kwargs,
+                                     load_kwargs=load_kwargs,
                                      run_kwargs=run_kwargs))
   for sample in samples:
     sample.metadata.update(metadata)
