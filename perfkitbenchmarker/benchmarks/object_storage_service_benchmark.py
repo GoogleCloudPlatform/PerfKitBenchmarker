@@ -912,7 +912,7 @@ def Prepare(benchmark_spec):
 
   vms[0].Install('pip')
   vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
-  vms[0].RemoteCommand('sudo pip install azure==1.0.0')
+  vms[0].RemoteCommand('sudo pip install azure')
   vms[0].Install('gcs_boto_plugin')
 
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
