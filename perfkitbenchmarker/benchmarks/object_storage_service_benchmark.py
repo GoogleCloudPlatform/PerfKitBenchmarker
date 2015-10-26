@@ -185,13 +185,13 @@ def _JsonStringToPercentileResults(results, json_input, metric_name,
 
 
 def _GetAzureClientLibVersion(vm):
-  """ This function returns the version of azure client installed on a vm
+  """ This function returns the version of azure client installed on a vm.
 
   Args:
     vm: the VM to get the azure client version from.
 
   Returns:
-    version: The version string of the azure python client.
+    The version string of the azure python client.
   """
   version, _ = vm.RemoteCommand("pip show azure |grep Version")
   logging.info('Azure client lib version is: %s', version)
