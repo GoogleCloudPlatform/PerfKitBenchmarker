@@ -68,6 +68,17 @@ SCENARIOS = {
 
 FLAGS = flags.FLAGS
 
+# Modes for --fio_target_mode
+AGAINST_FILE_WITH_FILL_MODE = 'against_file_with_fill'
+AGAINST_FILE_WITHOUT_FILL_MODE = 'against_file_without_fill'
+AGAINST_DEVICE_WITH_FILL_MODE = 'against_device_with_fill'
+AGAINST_DEVICE_WITHOUT_FILL_MODE = 'against_device_without_fill'
+AGAINST_DEVICE_MODES = {AGAINST_DEVICE_WITH_FILL_MODE,
+                        AGAINST_DEVICE_WITHOUT_FILL_MODE}
+FILL_TARGET_MODES = {AGAINST_DEVICE_WITH_FILL_MODE,
+                     AGAINST_FILE_WITH_FILL_MODE}
+
+
 flags.DEFINE_string('fio_jobfile', None,
                     'Job file that fio will use. If not given, use a job file '
                     'bundled with PKB. Cannot use with '
@@ -78,9 +89,11 @@ flags.DEFINE_list('fio_generate_scenarios', None,
                   'scenarios are sequential_write, sequential_read, '
                   'random_write, and random_read. Cannot use with '
                   '--fio_jobfile.')
-flags.DEFINE_enum('fio_target_mode', 'against_file_without_fill',
-                  ['against_device_with_fill', 'against_device_without_fill',
-                   'against_file_with_fill', 'against_file_without_fill'],
+flags.DEFINE_enum('fio_target_mode', AGAINST_FILE_WITHOUT_FILL_MODE,
+                  [AGAINST_DEVICE_WITH_FILL_MODE,
+                   AGAINST_DEVICE_WITHOUT_FILL_MODE,
+                   AGAINST_FILE_WITH_FILL_MODE,
+                   AGAINST_FILE_WITHOUT_FILL_MODE],
                   'Whether to run against a raw device or a file, and whether '
                   'to prefill.')
 flags.DEFINE_string('fio_fill_size', '100%',
@@ -115,13 +128,6 @@ flags.DEFINE_integer('fio_run_for_minutes', 10,
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
     'fio_generate_scenarios', 'fio_io_depths', 'fio_run_for_minutes'}
-
-
-# Modes from --fio_target_mode
-AGAINST_DEVICE_MODES = {'against_device_with_fill',
-                        'against_device_without_fill'}
-FILL_TARGET_MODES = {'against_device_with_fill', 'against_file_with_fill'}
-AGAINST_DEVICE_WITH_FILL_MODE = 'against_device_with_fill'
 
 
 def AgainstDevice():
@@ -350,7 +356,7 @@ def RunForMinutes(proc, mins_to_run, mins_per_call):
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  if FLAGS.fio_target_mode != 'against_file_without_fill':
+  if FLAGS.fio_target_mode != AGAINST_FILE_WITHOUT_FILL_MODE:
     disk_spec = config['vm_groups']['default']['disk_spec']
     for cloud in disk_spec:
       disk_spec[cloud]['mount_point'] = None
@@ -388,7 +394,7 @@ def Prepare(benchmark_spec):
   # file with fill because 1) if we're running against the device, we
   # don't want it mounted and 2) if we're running against a file
   # without fill, it was never unmounted (see GetConfig()).
-  if FLAGS.fio_target_mode == AGAINST_DEVICE_WITH_FILL_MODE:
+  if FLAGS.fio_target_mode == AGAINST_FILE_WITH_FILL_MODE:
     disk.mount_point = FLAGS.scratch_dir or MOUNT_POINT
     vm.FormatDisk(disk.GetDevicePath())
     vm.MountDisk(disk.GetDevicePath(), disk.mount_point)

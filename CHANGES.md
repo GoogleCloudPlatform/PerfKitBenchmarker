@@ -1,4 +1,4 @@
-# v0.23.0
+# v0.24.0
 
 * Benchmark-specific changes:
   * **BREAKING CHANGE** fio flags are prefixed with "fio", and new flag
