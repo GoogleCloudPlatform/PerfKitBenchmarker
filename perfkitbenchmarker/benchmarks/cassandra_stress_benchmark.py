@@ -158,13 +158,19 @@ def RunTestOnLoader(vm, loader_index, keys_per_vm, data_node_ips):
     data_node_ips: List of IP addresses for all data nodes.
   """
   vm.RobustRemoteCommand(
-      '{0} write cl={1} n={2} '
-      '-node {3} -schema replication\(factor={4}\) -pop seq={5}..{6} '
-      '-log file={7} -rate threads={8} -errors retries={9}'.format(
-          CASSANDRA_STRESS, CONSISTENCY_LEVEL, keys_per_vm,
-          ','.join(data_node_ips), REPLICATION_FACTOR,
-          loader_index * keys_per_vm + 1, (loader_index + 1) * keys_per_vm,
-          _ResultFilePath(vm), RETRIES, FLAGS.num_cassandra_stress_threads))
+      '{cassandra} write cl={consistency_level} n={num_keys} '
+      '-node {nodes} -schema replication\(factor={replication_factor}\) '
+      '-pop seq={start_index}..{end_index} '
+      '-log file={result_file} -rate threads={threads} '
+      '-errors retries={retries}'.format(
+          cassandra=CASSANDRA_STRESS,
+          consistency_level=CONSISTENCY_LEVEL,
+          num_keys=keys_per_vm,
+          nodes=','.join(data_node_ips), replication_factor=REPLICATION_FACTOR,
+          start_index=loader_index * keys_per_vm + 1,
+          end_index=(loader_index + 1) * keys_per_vm,
+          result_file=_ResultFilePath(vm), retries=RETRIES,
+          threads=FLAGS.num_cassandra_stress_threads))
 
 
 def RunCassandraStress(benchmark_spec):
@@ -180,10 +186,10 @@ def RunCassandraStress(benchmark_spec):
   data_node_ips = [vm.internal_ip for vm in cassandra_vms]
 
   loader_vms[0].RemoteCommand(
-      '{0} write n=1 cl={1} '
-      '-node {2} -schema replication\(factor={3}\) > /dev/null'.format(
-          CASSANDRA_STRESS, CONSISTENCY_LEVEL,
-          ','.join(data_node_ips), REPLICATION_FACTOR))
+      '{cassandra} write n=1 cl={consistency_level} -node {nodes} '
+      '-schema replication\(factor={replication_factor}\) > /dev/null'.format(
+          cassandra=CASSANDRA_STRESS, consistency_level=CONSISTENCY_LEVEL,
+          nodes=','.join(data_node_ips), replication_factor=REPLICATION_FACTOR))
   logging.info('Waiting %s for keyspace to propagate.', PROPAGATION_WAIT_TIME)
   time.sleep(PROPAGATION_WAIT_TIME)
 
