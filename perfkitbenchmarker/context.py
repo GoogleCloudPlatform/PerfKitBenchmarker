@@ -63,23 +63,24 @@ class FlagValuesProxy(object):
     else:
       return flags.FLAGS
 
-  def __setattr__(self, name, value):
-    self._thread_flag_values.__setattr__(name, value)
 
-  def __getattr__(self, name):
-    return self._thread_flag_values.__getattr__(name)
+def _AddProxyMethod(f_name):
+  """Adds a method to FlagValuesProxy that forwards to _thread_flag_values."""
+  def f(self, *args, **kwargs):
+    return getattr(self._thread_flag_values, f_name)(*args, **kwargs)
+  f.__name__ = f_name
+  f.__doc__ = 'Proxied ' + f_name
+  setattr(FlagValuesProxy, f_name, f)
 
-  def __setitem__(self, key, value):
-    self._thread_flag_values.__setitem__(key, value)
 
-  def __getitem__(self, key):
-    return self._thread_flag_values.__getitem__(key)
-
-  def __call__(self, argv):
-    return self._thread_flag_values.__call__(argv)
-
-  def FlagDict(self):
-    return self._thread_flag_values.FlagDict()
+# TODO: introduce a more generic proxy.
+for _f_name in ['FlagDict', 'Reset', 'SetDefault', 'RegisteredFlags',
+                'FlagValuesDict', '__contains__', '__iter__', '__call__',
+                '__setattr__', '__getattr__', '__setitem__', '__getitem__',
+                '__str__']:
+  _AddProxyMethod(_f_name)
+del _f_name
+del _AddProxyMethod
 
 
 BENCHMARK_FLAGS = FlagValuesProxy()
