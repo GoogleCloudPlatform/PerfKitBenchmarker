@@ -21,7 +21,10 @@ import copy_reg
 import os
 import thread
 import threading
+import uuid
 
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -33,7 +36,10 @@ from perfkitbenchmarker.aws import aws_network
 from perfkitbenchmarker.aws import aws_virtual_machine
 from perfkitbenchmarker.azure import azure_network
 from perfkitbenchmarker.azure import azure_virtual_machine
-from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
+from perfkitbenchmarker.cloudstack import cloudstack_network as cs_nw
+from perfkitbenchmarker.cloudstack import cloudstack_virtual_machine as cs_vm
+from perfkitbenchmarker.digitalocean import (
+    digitalocean_virtual_machine as digitalocean_vm)
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.kubernetes import kubernetes_virtual_machine
@@ -74,6 +80,7 @@ AWS = 'AWS'
 KUBERNETES = 'Kubernetes'
 DIGITALOCEAN = 'DigitalOcean'
 OPENSTACK = 'OpenStack'
+CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 DEBIAN = 'debian'
 RHEL = 'rhel'
@@ -116,9 +123,11 @@ CLASSES = {
     DIGITALOCEAN: {
         VIRTUAL_MACHINE: {
             DEBIAN:
-            digitalocean_virtual_machine.DebianBasedDigitalOceanVirtualMachine,
+            digitalocean_vm.DebianBasedDigitalOceanVirtualMachine,
             RHEL:
-            digitalocean_virtual_machine.RhelBasedDigitalOceanVirtualMachine,
+            digitalocean_vm.RhelBasedDigitalOceanVirtualMachine,
+            UBUNTU_CONTAINER:
+            digitalocean_vm.ContainerizedDigitalOceanVirtualMachine,
         },
     },
     KUBERNETES: {
@@ -135,6 +144,13 @@ CLASSES = {
         },
         FIREWALL: openstack_network.OpenStackFirewall
     },
+    CLOUDSTACK: {
+        VIRTUAL_MACHINE: {
+            DEBIAN: cs_vm.DebianBasedCloudStackVirtualMachine,
+            RHEL: cs_vm.CloudStackVirtualMachine
+        },
+        NETWORK: cs_nw.CloudStackNetwork
+    },
     RACKSPACE: {
         VIRTUAL_MACHINE: {
             DEBIAN: rax_vm.DebianBasedRackspaceVirtualMachine,
@@ -148,7 +164,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP,
                   [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                   RACKSPACE],
+                   RACKSPACE, CLOUDSTACK],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
@@ -157,7 +173,7 @@ flags.DEFINE_enum(
     'os_type is "rhel". In general if two OS\'s use the same package manager, '
     'and are otherwise very similar, the same os_type should work on both of '
     'them.')
-flags.DEFINE_string('scratch_dir', '/scratch',
+flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM.'
                     'Upon creation, these directories will have numbers'
                     'appended to them (for example /scratch0, /scratch1, etc).')
@@ -194,7 +210,19 @@ class BenchmarkSpec(object):
     self.vm_groups = {}
     self.deleted = False
     self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
+    self.uuid = str(uuid.uuid4())
     self.always_call_cleanup = False
+    self._flags = None
+
+    # Set the current thread's BenchmarkSpec object to this one.
+    context.SetThreadBenchmarkSpec(self)
+
+  @property
+  def FLAGS(self):
+    """Returns the result of merging config flags with the global flags."""
+    if self._flags is None:
+      self._flags = configs.GetMergedFlags(self.config)
+    return self._flags
 
   def _GetCloudForGroup(self, group_name):
     """Gets the cloud for a VM group by looking at flags and the config.
@@ -251,7 +279,6 @@ class BenchmarkSpec(object):
         # use to create the remaining VMs.
         vm_spec_class = _GetVmSpecClass(cloud)
         vm_spec = vm_spec_class(**group_spec[VM_SPEC][cloud])
-        vm_spec.ApplyFlags(FLAGS)
 
         if DISK_SPEC in group_spec:
           disk_spec_class = _GetDiskSpecClass(cloud)
@@ -268,6 +295,7 @@ class BenchmarkSpec(object):
 
       # Create the remaining VMs using the specs we created earlier.
       for _ in xrange(vm_count - len(vms)):
+        vm_spec.ApplyFlags(FLAGS)
         vm = self._CreateVirtualMachine(vm_spec, os_type, cloud)
         if disk_spec:
           vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
@@ -362,7 +390,7 @@ class BenchmarkSpec(object):
     logging.info('Waiting for boot completion.')
     for port in vm.remote_access_ports:
       vm.AllowPort(port)
-    vm.AddMetadata(benchmark=self.uid)
+    vm.AddMetadata(benchmark=self.uid, perfkit_uuid=self.uuid)
     vm.WaitForBootCompletion()
     vm.OnStartup()
     if any((d.disk_type == disk.LOCAL for d in vm.disk_specs)):
@@ -387,8 +415,11 @@ class BenchmarkSpec(object):
 
   def PickleSpec(self):
     """Pickles the spec so that it can be unpickled on a subsequent run."""
+    # FlagValues objects can't be pickled without getting an error.
+    flags, self._flags = self._flags, None
     with open(self.file_name, 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)
+    self._flags = flags
 
   @classmethod
   def GetSpecFromFile(cls, name):
@@ -410,4 +441,5 @@ class BenchmarkSpec(object):
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.
     spec.deleted = False
+    context.SetThreadBenchmarkSpec(spec)
     return spec

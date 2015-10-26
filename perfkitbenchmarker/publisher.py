@@ -502,8 +502,6 @@ class SampleCollector(object):
 
     logging.debug('Using publishers: {0}'.format(self.publishers))
 
-    self.run_uri = str(uuid.uuid4())
-
   @classmethod
   def _DefaultPublishers(cls):
     """Gets a list of default publishers."""
@@ -546,7 +544,7 @@ class SampleCollector(object):
       sample['product_name'] = FLAGS.product_name
       sample['official'] = FLAGS.official
       sample['owner'] = FLAGS.owner
-      sample['run_uri'] = self.run_uri
+      sample['run_uri'] = benchmark_spec.uuid
       sample['sample_uri'] = str(uuid.uuid4())
       events.sample_created.send(benchmark_spec=benchmark_spec,
                                  sample=sample)

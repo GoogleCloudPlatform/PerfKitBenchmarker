@@ -22,12 +22,17 @@ default_single_core: &default_single_core
     machine_type: m1.small
     zone: nova
     image: null
+  CloudStack:
+    machine_type: 1vCPU.1GB
+    zone: QC-1
+    image: null
   Rackspace:
     machine_type: general1-1
     zone: IAD
     image: null
   Kubernetes:
     image: null
+
 
 default_500_gb: &default_500_gb
   GCP:
@@ -48,6 +53,9 @@ default_500_gb: &default_500_gb
     mount_point: /scratch
   OpenStack:
     disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  CloudStack:
     disk_size: 500
     mount_point: /scratch
   Rackspace:

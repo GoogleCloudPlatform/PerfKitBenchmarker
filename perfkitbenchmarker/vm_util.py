@@ -32,6 +32,7 @@ import traceback
 
 import jinja2
 
+from perfkitbenchmarker import context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -207,7 +208,8 @@ ThreadCallResult = namedtuple('ThreadCallResult', [
     'call_id', 'return_value', 'traceback'])
 
 
-def _ExecuteThreadCall(target_arg_tuple, call_id, queue, parent_log_context):
+def _ExecuteThreadCall(target_arg_tuple, call_id, queue, parent_log_context,
+                       parent_benchmark_spec):
   """Function invoked in another thread by RunParallelThreads.
 
   Executes a specified function call and captures the traceback upon exception.
@@ -219,11 +221,13 @@ def _ExecuteThreadCall(target_arg_tuple, call_id, queue, parent_log_context):
         of RunParallelThreads.
     queue: Queue. Receives a ThreadCallResult.
     parent_log_context: ThreadLogContext of the parent thread.
+    parent_benchmark_spec: BenchmarkSpec of the parent thread.
   """
   target, args, kwargs = target_arg_tuple
   try:
     log_context = log_util.ThreadLogContext(parent_log_context)
     log_util.SetThreadLogContext(log_context)
+    context.SetThreadBenchmarkSpec(parent_benchmark_spec)
     queue.put(ThreadCallResult(call_id, target(*args, **kwargs), None))
   except:
     queue.put(ThreadCallResult(call_id, None, traceback.format_exc()))
@@ -248,6 +252,7 @@ def RunParallelThreads(target_arg_tuples, max_concurrency):
   """
   queue = Queue.Queue()
   log_context = log_util.GetThreadLogContext()
+  benchmark_spec = context.GetThreadBenchmarkSpec()
   max_concurrency = min(max_concurrency, len(target_arg_tuples))
   results = [None] * len(target_arg_tuples)
   error_strings = []
@@ -255,7 +260,7 @@ def RunParallelThreads(target_arg_tuples, max_concurrency):
     target_arg_tuple = target_arg_tuples[call_id]
     thread = threading.Thread(
         target=_ExecuteThreadCall,
-        args=(target_arg_tuple, call_id, queue, log_context))
+        args=(target_arg_tuple, call_id, queue, log_context, benchmark_spec))
     thread.daemon = True
     thread.start()
   active_thread_count = max_concurrency
@@ -278,7 +283,8 @@ def RunParallelThreads(target_arg_tuples, max_concurrency):
       target_arg_tuple = target_arg_tuples[next_call_id]
       thread = threading.Thread(
           target=_ExecuteThreadCall,
-          args=(target_arg_tuple, next_call_id, queue, log_context))
+          args=(target_arg_tuple, next_call_id, queue, log_context,
+                benchmark_spec))
       thread.daemon = True
       thread.start()
       next_call_id += 1

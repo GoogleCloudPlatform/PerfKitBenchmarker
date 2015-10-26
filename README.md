@@ -91,7 +91,7 @@ Most Linux distributions and recent Mac OS X version already have Python 2.7
 installed.
 If Python is not installed, you can likely install it using your distribution's package manager, or see the [Python Download page](https://www.python.org/downloads/).
 
-If you need to install `pip`, see [these instructions](http://pip.readthedocs.org/en/latest/installing.html).
+If you need to install `pip`, see [these instructions](http://pip.readthedocs.org/en/stable/installing/).
 
 ## (*Windows Only*) Install GitHub Windows
 
@@ -228,6 +228,26 @@ Currently only Ceph volumes are supported. Running benchmarks which require scra
    kubectl create -f create_ceph_admin.yml
    ```
    You will have to pass the Secret name (using `--ceph_secret` flag) when running the benchmakrs. In this case it should be: `--ceph_secret=my-ceph-secret`.
+
+## Cloudstack: Install `csapi` and set the API keys
+```
+sudo pip install csapi
+```
+
+Get the API key and SECRET from Cloudstack. Set the following environement variables.
+
+```bash
+export CS_API_URL=<insert API endpoint>
+export CS_API_KEY=<insert API key>
+export CS_API_SECRET=<insert API secret>
+```
+
+Specify the network offering when running the benchmark. If using VPC
+(`--cs_use_vpc`), also specify the VPC offering (`--cs_vpc_offering`).
+
+```bash
+./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetworkOffering
+```
 
 ## Install AWS CLI and setup authentication
 Make sure you have installed pip (see the section above).
@@ -416,6 +436,11 @@ $ ./pkb.py --cloud=OpenStack --benchmarks=iperf --os_auth_url=http://localhost:5
 $ ./pkb.py --cloud=Kubernetes --benchmarks=iperf --kubectl=/path/to/kubectl --kubeconfig=/path/to/kubeconfig --image=image-with-ssh-server  --ceph_monitors=10.20.30.40:6789,10.20.30.41:6789 --kubernetes_nodes=10.20.30.42,10.20.30.43
 ```
 
+## Example run on CloudStack
+```bash
+./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetworkOffering
+```
+
 ## Example run on Rackspace
 ```
 $ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
@@ -473,6 +498,7 @@ AWS | us-east-1a | |
 Azure | East US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
 OpenStack | nova | |
+CloudStack | QC-1 | |
 Rackspace | IAD | OnMetal machine-types are available only in IAD zone
 Kubernetes | k8s | |
 
@@ -660,6 +686,29 @@ iperf:
       static_vms:
         - *vm1
 ```
+
+SPECIFYING FLAGS IN CONFIGURATION FILES
+=================
+You can now specify flags in configuration files by using the `flags` key at the
+top level in a benchmark config. The expected value is a dictionary mapping
+flag names to their new default values. The flags are only defaults; it's still
+possible to override them via the command line. It's even possible to specify
+conflicting values of the same flag in different benchmarks:
+
+```
+iperf:
+  flags:
+    machine_type: n1-standard-2
+    zone: us-central1-b
+    iperf_sending_thread_count: 2
+
+netperf:
+  flags:
+    machine_type: n1-standard-8
+```
+
+The new defaults will only apply to the benchmark in which they are specified.
+
 
 HOW TO EXTEND PerfKitBenchmarker
 =================

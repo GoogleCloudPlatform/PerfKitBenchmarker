@@ -38,6 +38,7 @@ LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
 MINUTES_PER_JOB = 10
+MOUNT_POINT = '/scratch'
 
 
 # This dictionary maps scenario names to dictionaries of fio settings.
@@ -67,49 +68,58 @@ SCENARIOS = {
 
 FLAGS = flags.FLAGS
 
+# Modes for --fio_target_mode
+AGAINST_FILE_WITH_FILL_MODE = 'against_file_with_fill'
+AGAINST_FILE_WITHOUT_FILL_MODE = 'against_file_without_fill'
+AGAINST_DEVICE_WITH_FILL_MODE = 'against_device_with_fill'
+AGAINST_DEVICE_WITHOUT_FILL_MODE = 'against_device_without_fill'
+AGAINST_DEVICE_MODES = {AGAINST_DEVICE_WITH_FILL_MODE,
+                        AGAINST_DEVICE_WITHOUT_FILL_MODE}
+FILL_TARGET_MODES = {AGAINST_DEVICE_WITH_FILL_MODE,
+                     AGAINST_FILE_WITH_FILL_MODE}
+
+
 flags.DEFINE_string('fio_jobfile', None,
                     'Job file that fio will use. If not given, use a job file '
-                    'bundled with PKB. Cannot use with --generate_scenarios.')
-flags.DEFINE_list('generate_scenarios', None,
+                    'bundled with PKB. Cannot use with '
+                    '--fio_generate_scenarios.')
+flags.DEFINE_list('fio_generate_scenarios', None,
                   'Generate a job file with the given scenarios. Special '
                   'scenario \'all\' generates all scenarios. Available '
                   'scenarios are sequential_write, sequential_read, '
                   'random_write, and random_read. Cannot use with '
                   '--fio_jobfile.')
-flags.DEFINE_boolean('against_device', False,
-                     'Unmount the device\'s filesystem so we can test against '
-                     'the raw block device; will always prefill the device to '
-                     'device_fill_size. '
-                     'If --generate-scenarios is given, '
-                     'will generate a job file that uses the block device.')
-flags.DEFINE_boolean('prefill_device', False,
-                     'Used when against_device is false: decides if it is '
-                     'required to prefill the device before the fio run. '
-                     'The amount to prefill is given by '
-                     '--device_fill_size.')
-flags.DEFINE_string('device_fill_size', '100%',
+flags.DEFINE_enum('fio_target_mode', AGAINST_FILE_WITHOUT_FILL_MODE,
+                  [AGAINST_DEVICE_WITH_FILL_MODE,
+                   AGAINST_DEVICE_WITHOUT_FILL_MODE,
+                   AGAINST_FILE_WITH_FILL_MODE,
+                   AGAINST_FILE_WITHOUT_FILL_MODE],
+                  'Whether to run against a raw device or a file, and whether '
+                  'to prefill.')
+flags.DEFINE_string('fio_fill_size', '100%',
                     'The amount of device to fill in prepare stage. '
                     'The valid value can either be an integer, which '
                     'represents the number of bytes to fill or a '
                     'percentage, which represents the percentage '
                     'of the device. A filesystem will be unmounted before '
                     'filling and remounted afterwards. Only valid when '
-                    'used with --prefill_device.')
-flag_util.DEFINE_integerlist('io_depths', [1],
+                    '--fio_target_mode is against_device_with_fill or '
+                    'against_file_with_fill.')
+flag_util.DEFINE_integerlist('fio_io_depths', [1],
                              'IO queue depths to run on. Can specify a single '
-                             'number, like --io_depths=1, a range, like '
-                             '--io_depths=1-4, or a list, like '
-                             '--io_depths=1-4,6-8',
+                             'number, like --fio_io_depths=1, a range, like '
+                             '--fio_io_depths=1-4, or a list, like '
+                             '--fio_io_depths=1-4,6-8',
                              on_nonincreasing=flag_util.IntegerListParser.WARN)
-flags.DEFINE_integer('working_set_size', None,
+flags.DEFINE_integer('fio_working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
                      'the full size of the device. If using '
-                     '--generate_scenarios and not --against_device, you must '
-                     'pass --working_set_size.',
+                     '--fio_generate_scenarios and not running against a raw '
+                     'device, you must pass --fio_working_set_size.',
                      lower_bound=0)
-flags.DEFINE_integer('run_for_minutes', 10,
+flags.DEFINE_integer('fio_run_for_minutes', 10,
                      'Repeat the job scenario(s) for the given number of '
-                     'minutes. Only valid when using --generate_scenarios. '
+                     'minutes. Only valid when using --fio_generate_scenarios. '
                      'When using multiple scenarios, each one is run for the '
                      'given number of minutes. Time will be rounded up to the '
                      'next multiple of %s minutes.' % MINUTES_PER_JOB,
@@ -117,7 +127,25 @@ flags.DEFINE_integer('run_for_minutes', 10,
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
-    'generate_scenarios', 'io_depths', 'run_for_minutes'}
+    'fio_generate_scenarios', 'fio_io_depths', 'fio_run_for_minutes'}
+
+
+def AgainstDevice():
+  """Check whether we're running against a device or a file.
+
+  Returns:
+    True if running against a device, False if running against a file.
+  """
+  return FLAGS.fio_target_mode in AGAINST_DEVICE_MODES
+
+
+def FillTarget():
+  """Check whether we should pre-fill our target or not.
+
+  Returns:
+    True if we should pre-fill our target, False if not.
+  """
+  return FLAGS.fio_target_mode in FILL_TARGET_MODES
 
 
 def FillDevice(vm, disk, fill_size):
@@ -290,14 +318,14 @@ def WarnOnBadFlags():
       logging.warning('Fio job file specified. Ignoring options "%s"',
                       ', '.join(ignored_flags))
 
-  if FLAGS.run_for_minutes % MINUTES_PER_JOB != 0:
+  if FLAGS.fio_run_for_minutes % MINUTES_PER_JOB != 0:
     logging.warning('Runtime %s will be rounded up to the next multiple of %s '
-                    'minutes.', FLAGS.run_for_minutes, MINUTES_PER_JOB)
+                    'minutes.', FLAGS.fio_run_for_minutes, MINUTES_PER_JOB)
 
   if (FLAGS.fio_jobfile is None and
-      FLAGS.generate_scenarios and
-      not FLAGS.working_set_size and
-      not FLAGS.against_device):
+      FLAGS.fio_generate_scenarios and
+      not FLAGS.fio_working_set_size and
+      not AgainstDevice()):
     logging.error(NEED_SIZE_MESSAGE)
     raise errors.Benchmarks.PrepareException(NEED_SIZE_MESSAGE)
 
@@ -327,7 +355,12 @@ def RunForMinutes(proc, mins_to_run, mins_per_call):
 
 
 def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS.fio_target_mode != AGAINST_FILE_WITHOUT_FILL_MODE:
+    disk_spec = config['vm_groups']['default']['disk_spec']
+    for cloud in disk_spec:
+      disk_spec[cloud]['mount_point'] = None
+  return config
 
 
 def Prepare(benchmark_spec):
@@ -352,20 +385,19 @@ def Prepare(benchmark_spec):
 
   # Choose a disk or file name and optionally fill it
   disk = vm.scratch_disks[0]
-  mount_point = disk.mount_point
 
-  logging.info('Umount scratch disk on %s at %s', vm, mount_point)
-  vm.RemoteCommand('sudo umount %s' % mount_point)
-
-  if FLAGS.against_device or FLAGS.prefill_device:
+  if FillTarget():
     logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
-    FillDevice(vm, disk, FLAGS.device_fill_size)
+    FillDevice(vm, disk, FLAGS.fio_fill_size)
 
-  if not FLAGS.against_device:
+  # We only need to format and mount if the target mode is against
+  # file with fill because 1) if we're running against the device, we
+  # don't want it mounted and 2) if we're running against a file
+  # without fill, it was never unmounted (see GetConfig()).
+  if FLAGS.fio_target_mode == AGAINST_FILE_WITH_FILL_MODE:
+    disk.mount_point = FLAGS.scratch_dir or MOUNT_POINT
     vm.FormatDisk(disk.GetDevicePath())
-    # Don't use vm.MountDisk() because that also creates the mount point
-    # and changes its permissions, which we have already done.
-    vm.RemoteCommand('sudo mount %s %s' % (disk.GetDevicePath(), mount_point))
+    vm.MountDisk(disk.GetDevicePath(), disk.mount_point)
 
 
 def Run(benchmark_spec):
@@ -384,12 +416,13 @@ def Run(benchmark_spec):
   disk = vm.scratch_disks[0]
   mount_point = disk.mount_point
 
-  job_file_string = GetOrGenerateJobFileString(FLAGS.fio_jobfile,
-                                               FLAGS.generate_scenarios,
-                                               FLAGS.against_device,
-                                               disk,
-                                               FLAGS.io_depths,
-                                               FLAGS.working_set_size)
+  job_file_string = GetOrGenerateJobFileString(
+      FLAGS.fio_jobfile,
+      FLAGS.fio_generate_scenarios,
+      AgainstDevice(),
+      disk,
+      FLAGS.fio_io_depths,
+      FLAGS.fio_working_set_size)
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
     job_file.write(job_file_string)
@@ -397,7 +430,7 @@ def Run(benchmark_spec):
 
   vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
 
-  if FLAGS.against_device:
+  if AgainstDevice():
     fio_command = 'sudo %s --output-format=json --filename=%s %s' % (
         fio.FIO_PATH, disk.GetDevicePath(), REMOTE_JOB_FILE_PATH)
   else:
@@ -438,10 +471,10 @@ def Run(benchmark_spec):
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
 
-  if not FLAGS['run_for_minutes'].present:
+  if not FLAGS['fio_run_for_minutes'].present:
     RunIt()
   else:
-    RunForMinutes(RunIt, FLAGS.run_for_minutes, MINUTES_PER_JOB)
+    RunForMinutes(RunIt, FLAGS.fio_run_for_minutes, MINUTES_PER_JOB)
 
   return samples
 
@@ -456,7 +489,7 @@ def Cleanup(benchmark_spec):
   vm = benchmark_spec.vms[0]
   logging.info('FIO Cleanup up on %s', vm)
   vm.RemoveFile(REMOTE_JOB_FILE_PATH)
-  if not FLAGS.against_device and not FLAGS.fio_jobfile:
+  if not AgainstDevice() and not FLAGS.fio_jobfile:
     # If the user supplies their own job file, then they have to clean
     # up after themselves, because we don't know their temp file name.
     vm.RemoveFile(posixpath.join(vm.GetScratchDir(), DEFAULT_TEMP_FILE_NAME))

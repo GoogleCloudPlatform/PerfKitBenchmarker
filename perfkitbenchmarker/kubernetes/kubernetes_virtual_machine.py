@@ -14,10 +14,11 @@
 
 import base64
 import json
+import kubernetes_disk
 import logging
 import random
 
-from kubernetes_disk import CephDisk
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
@@ -91,6 +92,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _PostCreate(self):
     self._SetSshDetails()
     self._ConfigureProxy()
+    self._SetupDevicesPaths()
 
   def _Delete(self):
     self._DeletePod()
@@ -109,13 +111,15 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not FLAGS.kubeconfig:
       raise Exception('Please provide path to kubeconfig using --kubeconfig '
                       'flag. Exiting.')
-    if self.disk_specs and not FLAGS.use_ceph_volumes:
-      raise NotImplementedError('Only Ceph volumes are supported right now. '
-                                'Exiting.')
-    if self.disk_specs and not FLAGS.ceph_secret:
-      raise Exception('Please provide the name of Ceph Secret used by '
-                      'Kubernetes in order to authenticate with Ceph.'
-                      '--ceph_secret flag')
+    if self.disk_specs and self.disk_specs[0].disk_type == disk.STANDARD:
+      # Verify Ceph prerequisites:
+      if not FLAGS.ceph_secret:
+        raise Exception('Please provide the name of Ceph Secret used by '
+                        'Kubernetes in order to authenticate with Ceph '
+                        '(--ceph_secret flag).')
+      if not FLAGS.ceph_monitors:
+        raise Exception('Please provide a list of Ceph Monitors using '
+                        '--ceph_monitors flag.')
 
   def _CreatePod(self):
     """
@@ -226,20 +230,16 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     BEFORE containers creation because Kubernetes doesn't allow to attach
     volume to currently running containers.
     """
-    for disk_num, disk_spec in enumerate(self.disk_specs):
-      # Currently only Ceph storage is supported
-      disk = CephDisk(disk_num, disk_spec, self.name)
-      disk._Create()
-      self.scratch_disks.append(disk)
+    self.scratch_disks = kubernetes_disk.CreateDisks(self.disk_specs, self.name)
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
   def _DeleteVolumes(self):
     """
     Deletes volumes.
     """
-    for disk in self.scratch_disks[:]:
-      disk._Delete()
-      self.scratch_disks.remove(disk)
+    for scratch_disk in self.scratch_disks[:]:
+      scratch_disk._Delete()
+      self.scratch_disks.remove(scratch_disk)
 
   def _CreateSecret(self):
     """
@@ -332,6 +332,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       ftp_proxy = "sed -i '1i export ftp_proxy=%s' /etc/bash.bashrc"
       self.RemoteCommand(ftp_proxy % FLAGS.ftp_proxy)
 
+  def _SetupDevicesPaths(self):
+    """
+    Sets the path to each scratch disk device.
+    """
+    for scratch_disk in self.scratch_disks:
+      scratch_disk.SetDevicePath(self)
+
   def _BuildPodBody(self):
     """
     Builds a JSON which will be passed as a body of POST request
@@ -371,9 +378,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     }
     volumes.append(secret_volume)
 
-    for disk in self.scratch_disks:
-      volume = disk.BuildVolumeBody()
-      volumes.append(volume)
+    for scratch_disk in self.scratch_disks:
+      scratch_disk.AttachVolumeInfo(volumes)
 
     return volumes
 
@@ -409,16 +415,16 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         ]
     }
 
-    for disk in self.scratch_disks:
-      volume_mount = {
-          "mountPath": disk.mount_point,
-          "name": disk.image_name
-      }
-      container['volumeMounts'].append(volume_mount)
+    for scratch_disk in self.scratch_disks:
+      scratch_disk.AttachVolumeMountInfo(container['volumeMounts'])
 
     return container
 
   def _BuildServiceBody(self):
+    """
+    Constructs body of a POST request to create a Service.
+    """
+
     service = {
         "kind": "Service",
         "apiVersion": "v1",

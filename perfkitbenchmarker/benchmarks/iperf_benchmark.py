@@ -43,9 +43,9 @@ BENCHMARK_CONFIG = """
 iperf:
   description: Run iperf
   vm_groups:
-    iperf_vm_1:
+    vm_1:
       vm_spec: *default_single_core
-    iperf_vm_2:
+    vm_2:
       vm_spec: *default_single_core
 """
 

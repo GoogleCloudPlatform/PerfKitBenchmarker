@@ -21,10 +21,7 @@ import logging
 import re
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
-
-FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'sysbench_oltp'
 BENCHMARK_CONFIG = """

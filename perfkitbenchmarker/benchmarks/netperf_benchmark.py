@@ -50,9 +50,9 @@ BENCHMARK_CONFIG = """
 netperf:
   description: Run TCP_RR, TCP_CRR, UDP_RR and TCP_STREAM
   vm_groups:
-    netperf_vm_1:
+    vm_1:
       vm_spec: *default_single_core
-    netperf_vm_2:
+    vm_2:
       vm_spec: *default_single_core
 """
 

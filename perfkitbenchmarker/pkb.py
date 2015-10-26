@@ -98,10 +98,14 @@ flags.DEFINE_string('archive_bucket', None,
                     'Archive results to the given S3/GCS bucket.')
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
-flags.DEFINE_string(
-    'zone', None,
-    'A zone within which to run PerfKitBenchmarker. '
-    'This is specific to the cloud provider you are running on.')
+flags.DEFINE_list(
+    'zones', None,
+    'A list of zones within which to run PerfKitBenchmarker. '
+    'This is specific to the cloud provider you are running o`n. '
+    'If multiple zones are given, PerfKitBenchmarker will create 1 VM in '
+    'zone, until enough VMs are created as specified in each '
+    'benchmark. The order in which this flag is applied to VMs is '
+    'undefined.')
 # TODO(user): note that this is currently very GCE specific. Need to create a
 #    module which can traslate from some generic types to provider specific
 #    nomenclature.
