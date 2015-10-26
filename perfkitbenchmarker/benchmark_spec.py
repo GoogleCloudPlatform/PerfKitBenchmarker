@@ -279,7 +279,6 @@ class BenchmarkSpec(object):
         # use to create the remaining VMs.
         vm_spec_class = _GetVmSpecClass(cloud)
         vm_spec = vm_spec_class(**group_spec[VM_SPEC][cloud])
-        vm_spec.ApplyFlags(FLAGS)
 
         if DISK_SPEC in group_spec:
           disk_spec_class = _GetDiskSpecClass(cloud)
@@ -296,6 +295,7 @@ class BenchmarkSpec(object):
 
       # Create the remaining VMs using the specs we created earlier.
       for _ in xrange(vm_count - len(vms)):
+        vm_spec.ApplyFlags(FLAGS)
         vm = self._CreateVirtualMachine(vm_spec, os_type, cloud)
         if disk_spec:
           vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
