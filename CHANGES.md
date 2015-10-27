@@ -1,8 +1,3 @@
-# v0.24.0
-
-* Enhancements:
-  * **Breaking Change** Update cassandra version to 2.1.10 (GH-577)
-
 # v0.22.1
 
 * Update the default image used in Azure tests to Ubuntu 14.04.3 (runs failed
