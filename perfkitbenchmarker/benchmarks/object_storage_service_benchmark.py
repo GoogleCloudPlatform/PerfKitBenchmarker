@@ -73,6 +73,9 @@ flags.DEFINE_string('object_storage_credential_file', None,
 flags.DEFINE_string('boto_file_location', None,
                     'The location of the boto file.')
 
+flags.DEFINE_string('azure_lib_version', None,
+                    'Specify a particular version of azure client lib.')
+
 FLAGS = flags.FLAGS
 
 # User a scratch disk here to simulate what most users would do when they
@@ -193,6 +196,20 @@ def _JsonStringToPercentileResults(results, json_input, metric_name,
         float(result[percentile]),
         metric_unit,
         metadata))
+
+
+def _GetAzureClientLibVersion(vm):
+  """ This function returns the version of azure client installed on a vm.
+
+  Args:
+    vm: the VM to get the azure client version from.
+
+  Returns:
+    The version string of the azure python client.
+  """
+  version, _ = vm.RemoteCommand("pip show azure |grep Version")
+  logging.info('Azure client lib version is: %s', version)
+  return version
 
 
 def _MakeAzureCommandSuffix(account_name, account_key, for_cli):
@@ -661,6 +678,7 @@ class AzureBlobStorageBenchmark(object):
       the results of all scenarios run here.
 
     """
+    metadata['azure_lib_version'] = _GetAzureClientLibVersion(vm)
     results = []
 
     # CLI tool based tests.
@@ -912,7 +930,10 @@ def Prepare(benchmark_spec):
 
   vms[0].Install('pip')
   vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
-  vms[0].RemoteCommand('sudo pip install azure==1.0.0')
+  azure_version_string = ''
+  if FLAGS.azure_lib_version is not None:
+    azure_version_string = '==%s' % FLAGS.azure_lib_version
+  vms[0].RemoteCommand('sudo pip install azure%s' % azure_version_string)
   vms[0].Install('gcs_boto_plugin')
 
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])

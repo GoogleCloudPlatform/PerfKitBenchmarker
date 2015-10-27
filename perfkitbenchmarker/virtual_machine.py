@@ -51,7 +51,9 @@ class BaseVmSpec(object):
 
   def ApplyFlags(self, flags):
     """Applies flags to the VmSpec."""
-    self.zone = flags.zone or self.zone
+    if flags.zones:
+      self.zone = flags.zones.pop(0)
+      flags.zones.append(self.zone)
     self.machine_type = flags.machine_type or self.machine_type
     self.image = flags.image or self.image
 

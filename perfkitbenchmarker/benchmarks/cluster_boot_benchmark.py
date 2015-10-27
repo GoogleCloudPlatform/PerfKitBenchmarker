@@ -17,11 +17,9 @@
 import logging
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import sample
 
-FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'cluster_boot'
 BENCHMARK_CONFIG = """
@@ -44,14 +42,28 @@ def Prepare(unused_benchmark_spec):
   pass
 
 
-def _GetTimeToBoot(vm, vm_index, result_list):
+def _GetTimeToBoot(vms, vm_index):
+  """Creates a Sample for the boot time of a single VM.
+
+  The boot time is the time difference from before the VM is created to when
+  the VM is responsive to SSH commands.
+
+  Args:
+    vms: list of BaseVirtualMachine subclasses.
+    vm_index: int. Index into vms that identifies the VM for which to calculate
+        the boot time.
+
+  Returns:
+    Sample containing the boot time.
+  """
+  vm = vms[vm_index]
   metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus,
-              'machine_instance': vm_index}
+              'machine_instance': vm_index, 'num_vms': len(vms)}
   assert vm.bootable_time
   assert vm.create_start_time
   assert vm.bootable_time >= vm.create_start_time
   value = vm.bootable_time - vm.create_start_time
-  result_list.append(sample.Sample('Boot Time', value, 'seconds', metadata))
+  return sample.Sample('Boot Time', value, 'seconds', metadata)
 
 
 def Run(benchmark_spec):
@@ -64,14 +76,12 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects with individual machine boot times.
   """
-
-  samples = []
   logging.info('Boot Results:')
   vms = benchmark_spec.vms
-  params = [((vm, i, samples), {}) for i, vm in enumerate(vms)]
-  vm_util.RunThreaded(_GetTimeToBoot, params)
+  params = [((vms, i), {}) for i in xrange(len(vms))]
+  samples = vm_util.RunThreaded(_GetTimeToBoot, params)
   logging.info(samples)
-  assert len(samples) == len(benchmark_spec.vms)
+  assert len(samples) == len(vms)
   return samples
 
 

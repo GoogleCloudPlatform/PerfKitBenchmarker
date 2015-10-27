@@ -17,6 +17,7 @@ import unittest
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import context
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
@@ -82,6 +83,10 @@ name:
 
 
 class ConstructVmsTestCase(unittest.TestCase):
+
+  def setUp(self):
+    # Reset the current benchmark spec.
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def testSimpleConfig(self):
     config = configs.LoadConfig(SIMPLE_CONFIG, {}, NAME)

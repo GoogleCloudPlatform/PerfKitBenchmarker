@@ -22,10 +22,6 @@ same project.
 
 import threading
 
-from perfkitbenchmarker import flags
-
-FLAGS = flags.FLAGS
-
 
 class BaseFirewall(object):
   """An object representing the Base Firewall."""

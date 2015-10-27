@@ -22,11 +22,8 @@ import os
 import posixpath
 
 from perfkitbenchmarker import data
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.packages import hadoop
-
-FLAGS = flags.FLAGS
 
 HBASE_VERSION = '1.0.2'
 HBASE_URL = ('http://www.us.apache.org/dist/hbase/hbase-{0}/'

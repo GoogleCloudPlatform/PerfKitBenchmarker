@@ -21,7 +21,10 @@ import copy_reg
 import os
 import thread
 import threading
+import uuid
 
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -35,7 +38,8 @@ from perfkitbenchmarker.azure import azure_network
 from perfkitbenchmarker.azure import azure_virtual_machine
 from perfkitbenchmarker.cloudstack import cloudstack_network as cs_nw
 from perfkitbenchmarker.cloudstack import cloudstack_virtual_machine as cs_vm
-from perfkitbenchmarker.digitalocean import digitalocean_virtual_machine
+from perfkitbenchmarker.digitalocean import (
+    digitalocean_virtual_machine as digitalocean_vm)
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.kubernetes import kubernetes_virtual_machine
@@ -119,9 +123,11 @@ CLASSES = {
     DIGITALOCEAN: {
         VIRTUAL_MACHINE: {
             DEBIAN:
-            digitalocean_virtual_machine.DebianBasedDigitalOceanVirtualMachine,
+            digitalocean_vm.DebianBasedDigitalOceanVirtualMachine,
             RHEL:
-            digitalocean_virtual_machine.RhelBasedDigitalOceanVirtualMachine,
+            digitalocean_vm.RhelBasedDigitalOceanVirtualMachine,
+            UBUNTU_CONTAINER:
+            digitalocean_vm.ContainerizedDigitalOceanVirtualMachine,
         },
     },
     KUBERNETES: {
@@ -204,7 +210,19 @@ class BenchmarkSpec(object):
     self.vm_groups = {}
     self.deleted = False
     self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
+    self.uuid = str(uuid.uuid4())
     self.always_call_cleanup = False
+    self._flags = None
+
+    # Set the current thread's BenchmarkSpec object to this one.
+    context.SetThreadBenchmarkSpec(self)
+
+  @property
+  def FLAGS(self):
+    """Returns the result of merging config flags with the global flags."""
+    if self._flags is None:
+      self._flags = configs.GetMergedFlags(self.config)
+    return self._flags
 
   def _GetCloudForGroup(self, group_name):
     """Gets the cloud for a VM group by looking at flags and the config.
@@ -261,7 +279,6 @@ class BenchmarkSpec(object):
         # use to create the remaining VMs.
         vm_spec_class = _GetVmSpecClass(cloud)
         vm_spec = vm_spec_class(**group_spec[VM_SPEC][cloud])
-        vm_spec.ApplyFlags(FLAGS)
 
         if DISK_SPEC in group_spec:
           disk_spec_class = _GetDiskSpecClass(cloud)
@@ -278,6 +295,7 @@ class BenchmarkSpec(object):
 
       # Create the remaining VMs using the specs we created earlier.
       for _ in xrange(vm_count - len(vms)):
+        vm_spec.ApplyFlags(FLAGS)
         vm = self._CreateVirtualMachine(vm_spec, os_type, cloud)
         if disk_spec:
           vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
@@ -372,7 +390,7 @@ class BenchmarkSpec(object):
     logging.info('Waiting for boot completion.')
     for port in vm.remote_access_ports:
       vm.AllowPort(port)
-    vm.AddMetadata(benchmark=self.uid)
+    vm.AddMetadata(benchmark=self.uid, perfkit_uuid=self.uuid)
     vm.WaitForBootCompletion()
     vm.OnStartup()
     if FLAGS.scratch_disk_type == disk.LOCAL:
@@ -397,8 +415,11 @@ class BenchmarkSpec(object):
 
   def PickleSpec(self):
     """Pickles the spec so that it can be unpickled on a subsequent run."""
+    # FlagValues objects can't be pickled without getting an error.
+    flags, self._flags = self._flags, None
     with open(self.file_name, 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)
+    self._flags = flags
 
   @classmethod
   def GetSpecFromFile(cls, name):
@@ -420,4 +441,5 @@ class BenchmarkSpec(object):
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.
     spec.deleted = False
+    context.SetThreadBenchmarkSpec(spec)
     return spec

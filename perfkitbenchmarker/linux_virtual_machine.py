@@ -56,8 +56,6 @@ REMOTE_KEY_PATH = '.ssh/id_rsa'
 CONTAINER_MOUNT_DIR = '/mnt'
 CONTAINER_WORK_DIR = '/root'
 
-FLAGS = flags.FLAGS
-
 # This pair of scripts used for executing long-running commands, which will be
 # resilient in the face of SSH connection errors.
 # EXECUTE_COMMAND runs a command, streaming stdout / stderr to a file, then
