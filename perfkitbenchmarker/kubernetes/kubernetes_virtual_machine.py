@@ -121,7 +121,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Creates a POD (Docker container with optional volumes).
     """
     create_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                  'create', '--validate=false', '-f', '-']
+                  'create', '-f', '-']
     create_rc_body = self._BuildPodBody()
     output = vm_util.IssueCommand(create_cmd, input=create_rc_body)
     if output[EXIT_CODE]:
@@ -132,6 +132,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     Creates a Service (POD accessor).
     """
+    # Intentionally setting validation flag to false as the kubectl binary
+    # drops the request if nodePort parameter is not provided. However, it
+    # is not needed - in such case nodePort will be automatically drawn
+    # from the pool of ports.
     create_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
                   'create', '--validate=false', '-f', '-']
     create_svc_body = self._BuildServiceBody()
@@ -149,15 +153,15 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
                   'pod', '-o=json', self.name]
     logging.info("Waiting for POD %s" % self.name)
     pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
-    pod_info = json.loads(pod_info)
-    containers = pod_info['spec']['containers']
-
-    if len(containers) == 1:
-      pod_status = pod_info['status']['phase']
-      if (containers[0]['name'].startswith(self.name)
-          and pod_status == "Running"):
-        logging.info("POD is up and running.")
-        return
+    if pod_info:
+      pod_info = json.loads(pod_info)
+      containers = pod_info['spec']['containers']
+      if len(containers) == 1:
+        pod_status = pod_info['status']['phase']
+        if (containers[0]['name'].startswith(self.name)
+            and pod_status == "Running"):
+          logging.info("POD is up and running.")
+          return
     raise Exception("POD %s is not running. Retrying to check status." %
                     self.name)
 
