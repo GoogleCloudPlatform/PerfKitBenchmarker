@@ -26,11 +26,16 @@ MOUNT_POINT = '/scratch'
 @unittest.skipUnless('PERFKIT_INTEGRATION' in os.environ,
                      'PERFKIT_INTEGRATION not in environment')
 class AwsScratchDiskIntegrationTest(unittest.TestCase):
+  """Integration tests for AWS disks.
+
+  Please see the section on integration testing in the README.
+  """
+
   def setUp(self):
     pkb.SetUpPKB()
 
   def testEBSStandard(self):
-    test_util.testDiskMounts({
+    test_util.assertDiskMounts({
         'vm_groups': {
             'vm_group_1': {
                 'cloud': 'AWS',
@@ -52,7 +57,7 @@ class AwsScratchDiskIntegrationTest(unittest.TestCase):
     }, MOUNT_POINT)
 
   def testEBSGP(self):
-    test_util.testDiskMounts({
+    test_util.assertDiskMounts({
         'vm_groups': {
             'vm_group_1': {
                 'cloud': 'AWS',
@@ -74,7 +79,7 @@ class AwsScratchDiskIntegrationTest(unittest.TestCase):
     }, MOUNT_POINT)
 
   def testLocalSSD(self):
-    test_util.testDiskMounts({
+    test_util.assertDiskMounts({
         'vm_groups': {
             'vm_group_1': {
                 'cloud': 'AWS',

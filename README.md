@@ -724,6 +724,22 @@ file we have added a lot of comments into the code to make it easy to;
 
 Even with lots of comments we make to support more detailed documention.  You will find the documatation we have on the [Wiki pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki).  Missing documentation you want?  Start a page and/or open an [issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) to get it added.
 
+INTEGRATION TESTING
+===================
+
+In addition to regular unit tests, which are run via `hooks/check-everything`,
+PerfKitBenchmarker has integration tests, which create actual cloud resources
+and take time and money to run. For this reason, they will only run when the
+variable PERFKIT_INTEGRATION is defined in the environment. For instance, the
+command
+
+  `PERFKIT_INTEGRATION=1 hooks/check-everything`
+
+will run the integration tests. The integration tests depend on having installed
+and configured all of the relevant cloud provider SDKs, and will fail if you
+have not done so.
+
+
 PLANNED IMPROVEMENTS
 =======================
 Many... please add new requests via GitHub issues.

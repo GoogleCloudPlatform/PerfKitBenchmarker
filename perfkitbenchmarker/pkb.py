@@ -339,14 +339,17 @@ def _LogCommandLineFlags():
 def SetUpPKB():
   """Set globals and environment variables for PKB.
 
-  Having this function separate from functions that do any work lets
-  us call this to set up integration tests.
+  After SetUpPKB() returns, it should be possible to call PKB
+  functions, like benchark_spec.Prepare() or benchmark_spec.Run().
+
+  SetUpPKB() also modifies the local file system by creating a temp
+  directory and storing new SSH keys.
   """
 
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):
-      logging.error('Could not find required executable "%s".' % executable)
-      raise errors.Error()
+      raise errors.Setup.MissingExecutableError(
+          'Could not find required executable "%s"', executable)
 
   if FLAGS.run_uri is None:
     if FLAGS.run_stage not in [STAGE_ALL, STAGE_PREPARE]:
@@ -358,15 +361,14 @@ def SetUpPKB():
             'No run_uri specified. Attempting to run "%s" with --run_uri=%s.',
             FLAGS.run_stage, FLAGS.run_uri)
       else:
-        logging.error(
-            'No run_uri specified. Could not run "%s".', FLAGS.run_stage)
-        raise errors.Error()
+        raise errors.Setup.NoRunURIError(
+            'No run_uri specified. Could not run "%s"', FLAGS.run_stage)
     else:
       FLAGS.run_uri = str(uuid.uuid4())[-8:]
   elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
-    logging.error('run_uri must be alphanumeric and less than or equal '
-                  'to 8 characters in length.')
-    raise errors.Error()
+    raise errors.Setup.BadRunURIError('run_uri must be alphanumeric and less '
+                                      'than or equal to 8 characters in '
+                                      'length.')
 
   vm_util.GenTempDir()
   log_util.ConfigureLogging(
@@ -381,7 +383,6 @@ def SetUpPKB():
 
 
 def RunBenchmarks(publish=True):
-
   """Runs all benchmarks in PerfKitBenchmarker.
 
   Args:
@@ -508,10 +509,6 @@ def Main(argv=sys.argv):
         '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
 
-  try:
-    SetUpPKB()
-  except Exception as e:
-    logging.error('Got exception %s', e)
-    sys.exit(1)
+  SetUpPKB()
 
   return RunBenchmarks()

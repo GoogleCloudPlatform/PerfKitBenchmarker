@@ -21,6 +21,22 @@ class Error(Exception):
   pass
 
 
+class Setup(object):
+  """Errors raised in setting up PKB."""
+
+  class MissingExecutableError(Error):
+    """Error raised when we cannot find an executable we need."""
+    pass
+
+  class NoRunURIError(Error):
+    """Error raised when we were not given a run_uri and cannot infer it."""
+    pass
+
+  class BadRunURIError(Error):
+    """Error raised when the given run_uri is invalid."""
+    pass
+
+
 class VirtualMachine(object):
   """Errors raised by virtual_machine.py."""
 

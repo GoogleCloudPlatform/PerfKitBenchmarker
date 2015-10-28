@@ -71,7 +71,23 @@ class SamplesTestMixin(object):
         raise ex
 
 
-def testDiskMounts(benchmark_config, mount_point):
+def assertDiskMounts(benchmark_config, mount_point):
+  """Test whether a disk mounts in a given configuration.
+
+  Sets up a virtual machine following benchmark_config and then tests
+  whether the path mount_point contains a working disk by trying to
+  create a file there. Returns nothing if file creation works;
+  otherwise raises an exception.
+
+  Args:
+    benchmark_config: a dict in the format of benchmark_spec.BenchmarkSpec.
+    mount_point: a path, represented as a string.
+
+  Raises:
+    RemoteCommandError if it cannot create a file at mount_point and
+    verify that the file exists.
+  """
+
   spec = benchmark_spec.BenchmarkSpec(benchmark_config, 'uid')
 
   try:
