@@ -340,7 +340,7 @@ def SetUpPKB():
   """Set globals and environment variables for PKB.
 
   After SetUpPKB() returns, it should be possible to call PKB
-  functions, like benchark_spec.Prepare() or benchmark_spec.Run().
+  functions, like benchmark_spec.Prepare() or benchmark_spec.Run().
 
   SetUpPKB() also modifies the local file system by creating a temp
   directory and storing new SSH keys.

@@ -80,13 +80,22 @@ def assertDiskMounts(benchmark_config, mount_point):
   otherwise raises an exception.
 
   Args:
-    benchmark_config: a dict in the format of benchmark_spec.BenchmarkSpec.
+    benchmark_config: a dict in the format of
+      benchmark_spec.BenchmarkSpec. The config must specify exactly
+      one virtual machine.
     mount_point: a path, represented as a string.
 
   Raises:
     RemoteCommandError if it cannot create a file at mount_point and
     verify that the file exists.
+
+    AssertionError if benchmark_config does not specify exactly one
+    virtual machine.
   """
+
+  assert len(benchmark_config['vm_groups']) == 1
+  vm_group = benchmark_config['vm_groups'].itervalues().next()
+  assert vm_group.get('num_vms', 1) == 1
 
   spec = benchmark_spec.BenchmarkSpec(benchmark_config, 'uid')
 
