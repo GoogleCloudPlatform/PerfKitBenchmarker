@@ -30,6 +30,7 @@ import time
 
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -40,14 +41,48 @@ from perfkitbenchmarker.packages import cassandra
 
 NUM_KEYS_PER_CORE = 2000000
 
+# TODO: Support read/counter_read/mixed command.
+# cassandra-stress command
+WRITE_COMMAND = 'write'
+COUNTER_WRITE_COMMAND = 'counter_write'
+USER_COMMAND = 'user'
+
+# cassandra-stress command [options]
+flags.DEFINE_enum('cassandra_stress_command', WRITE_COMMAND,
+                  [WRITE_COMMAND,
+                   COUNTER_WRITE_COMMAND,
+                   USER_COMMAND],
+                  'cassandra-stress command to use.')
+
+# Options for cassandra-stress
 flags.DEFINE_integer('num_keys', 0,
-                     'Number of keys used in cassandra-stress tool. '
-                     'If unset, this benchmark will use %s * num_cpus '
-                     'on data nodes as the value.' % NUM_KEYS_PER_CORE)
+                     'Number of keys used in cassandra-stress tool across '
+                     'all loader vms. If unset, this benchmark will use '
+                     '%s * num_cpus on data nodes as the value.'
+                     % NUM_KEYS_PER_CORE)
 
 flags.DEFINE_integer('num_cassandra_stress_threads', 50,
                      'Number of threads used in cassandra-stress tool '
                      'on each loader node.')
+
+flags.DEFINE_integer('cassandra_stress_replication_factor', 3,
+                     'Number of replicas.')
+
+flags.DEFINE_enum('cassandra_stress_consistency_level', 'QUORUM',
+                  ['ONE', 'QUORUM', 'LOCAL_ONE', 'LOCAL_QUORUM',
+                   'EACH_QUORUM', 'ALL', 'ANY'],
+                  'Set the consistency level to use during cassandra-stress.')
+
+flags.DEFINE_integer('cassandra_stress_retries', 1000,
+                     'Number of retries when error encountered during stress.')
+
+# Options to use with cassandra-stress user mode.
+# http://www.datastax.com/dev/blog/improved-cassandra-2-1-stress-tool-benchmark-any-schema
+flags.DEFINE_string('cassandra_stress_profile', '',
+                    'Path to cassandra-stress profile file.')
+flags.DEFINE_string('cassandra_stress_ops', 'insert=1',
+                    'Specify what operations (inserts and/or queries) to '
+                    'run and the number of each.')
 
 FLAGS = flags.FLAGS
 
@@ -67,18 +102,11 @@ cassandra_stress:
 CASSANDRA_GROUP = 'cassandra_nodes'
 CLIENT_GROUP = 'stress_client'
 
-PROPAGATION_WAIT_TIME = 30
 SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
-
-
-# Stress test options.
-CONSISTENCY_LEVEL = 'QUORUM'
-REPLICATION_FACTOR = 3
-RETRIES = 1000
+TEMP_PROFILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'profile.yaml')
 
 CASSANDRA_STRESS = posixpath.join(cassandra.CASSANDRA_DIR, 'tools', 'bin',
                                   'cassandra-stress')
-
 # Results documentation:
 # http://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStressOutput_c.html
 RESULTS_METRICS = (
@@ -119,6 +147,8 @@ def CheckPrerequisites():
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
   cassandra.CheckPrerequisites()
+  if FLAGS.cassandra_stress_command == USER_COMMAND:
+    data.ResourcePath(FLAGS.cassandra_stress_profile)
 
 
 def Prepare(benchmark_spec):
@@ -141,6 +171,10 @@ def Prepare(benchmark_spec):
   configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
   vm_util.RunThreaded(configure, cassandra_vms)
   cassandra.StartCluster(seed_vm, cassandra_vms[1:])
+  if FLAGS.cassandra_stress_command == USER_COMMAND:
+    for vm in vm_dict[CLIENT_GROUP]:
+      vm.PushFile(FLAGS.cassandra_stress_profile,
+                  TEMP_PROFILE_PATH)
 
 
 def _ResultFilePath(vm):
@@ -157,19 +191,31 @@ def RunTestOnLoader(vm, loader_index, keys_per_vm, data_node_ips):
     keys_per_vm: The number of keys per loader vm need to insert.
     data_node_ips: List of IP addresses for all data nodes.
   """
+  cassandra_stress_command = FLAGS.cassandra_stress_command
+
+  if FLAGS.cassandra_stress_command == USER_COMMAND:
+    cassandra_stress_command += ' profile={profile} ops\({ops}\)'.format(
+        profile=TEMP_PROFILE_PATH,
+        ops=FLAGS.cassandra_stress_ops)
+    schema_option = ''
+  else:
+    schema_option = '-schema replication\(factor={replication_factor}\)'.format(
+        replication_factor=FLAGS.cassandra_stress_replication_factor)
   vm.RobustRemoteCommand(
-      '{cassandra} write cl={consistency_level} n={num_keys} '
-      '-node {nodes} -schema replication\(factor={replication_factor}\) '
-      '-pop seq={start_index}..{end_index} '
+      '{cassandra} {command} cl={consistency_level} n={num_keys} '
+      '-node {nodes} {schema} -pop seq={start_index}..{end_index} '
       '-log file={result_file} -rate threads={threads} '
       '-errors retries={retries}'.format(
           cassandra=CASSANDRA_STRESS,
-          consistency_level=CONSISTENCY_LEVEL,
+          command=cassandra_stress_command,
+          consistency_level=FLAGS.cassandra_stress_consistency_level,
           num_keys=keys_per_vm,
-          nodes=','.join(data_node_ips), replication_factor=REPLICATION_FACTOR,
+          nodes=','.join(data_node_ips),
+          schema=schema_option,
           start_index=loader_index * keys_per_vm + 1,
           end_index=(loader_index + 1) * keys_per_vm,
-          result_file=_ResultFilePath(vm), retries=RETRIES,
+          result_file=_ResultFilePath(vm),
+          retries=FLAGS.cassandra_stress_retries,
           threads=FLAGS.num_cassandra_stress_threads))
 
 
@@ -180,29 +226,21 @@ def RunCassandraStress(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data
         that is required to run the benchmark.
   """
-  logging.info('Creating Keyspace.')
   loader_vms = benchmark_spec.vm_groups[CLIENT_GROUP]
+  num_loaders = len(loader_vms)
   cassandra_vms = benchmark_spec.vm_groups[CASSANDRA_GROUP]
   data_node_ips = [vm.internal_ip for vm in cassandra_vms]
-
-  loader_vms[0].RemoteCommand(
-      '{cassandra} write n=1 cl={consistency_level} -node {nodes} '
-      '-schema replication\(factor={replication_factor}\) > /dev/null'.format(
-          cassandra=CASSANDRA_STRESS, consistency_level=CONSISTENCY_LEVEL,
-          nodes=','.join(data_node_ips), replication_factor=REPLICATION_FACTOR))
-  logging.info('Waiting %s for keyspace to propagate.', PROPAGATION_WAIT_TIME)
-  time.sleep(PROPAGATION_WAIT_TIME)
-
   if not FLAGS.num_keys:
     FLAGS.num_keys = NUM_KEYS_PER_CORE * cassandra_vms[0].num_cpus
-    logging.info('Num keys not set, using %s in cassandra-stress test.',
-                 FLAGS.num_keys)
-  logging.info('Executing the benchmark.')
-  num_loaders = len(loader_vms)
+    logging.info(
+        'Num keys not set, using %s in cassandra-stress test.',
+        FLAGS.num_keys)
   keys_per_vm = FLAGS.num_keys / num_loaders
   if FLAGS.num_keys % num_loaders:
-    logging.warn('Total number of keys rounded to %s (%s keys per loader vm).',
-                 keys_per_vm * num_loaders, keys_per_vm)
+    logging.warn(
+        'Total number of keys rounded to %s (%s keys per loader vm).',
+        keys_per_vm * num_loaders, keys_per_vm)
+  logging.info('Executing the benchmark.')
   args = [((loader_vms[i], i, keys_per_vm, data_node_ips), {})
           for i in xrange(0, num_loaders)]
   vm_util.RunThreaded(RunTestOnLoader, args)
@@ -281,11 +319,20 @@ def CollectResults(benchmark_spec):
   args = [((vm, raw_results), {}) for vm in loader_vms]
   vm_util.RunThreaded(CollectResultFile, args)
 
-  metadata = {'num_keys': FLAGS.num_keys,
-              'num_data_nodes': len(vm_dict[CASSANDRA_GROUP]),
-              'num_loader_nodes': len(loader_vms),
-              'num_cassandra_stress_threads':
-              FLAGS.num_cassandra_stress_threads}
+  metadata = {
+      'num_keys': FLAGS.num_keys,
+      'num_data_nodes': len(vm_dict[CASSANDRA_GROUP]),
+      'num_loader_nodes': len(loader_vms),
+      'num_cassandra_stress_threads': FLAGS.num_cassandra_stress_threads,
+      'command': FLAGS.cassandra_stress_command,
+      'consistency_level': FLAGS.cassandra_stress_consistency_level,
+      'retries': FLAGS.cassandra_stress_retries}
+
+  if FLAGS.cassandra_stress_command == USER_COMMAND:
+    metadata['profile'] = FLAGS.cassandra_stress_profile
+    metadata['ops'] = FLAGS.cassandra_stress_ops
+  else:
+    metadata['replication_factor'] = FLAGS.cassandra_stress_replication_factor
   results = []
   for metric in RESULTS_METRICS:
     if metric in MAXIMUM_METRICS:
