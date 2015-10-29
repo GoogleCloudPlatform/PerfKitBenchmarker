@@ -54,8 +54,11 @@ resources
 """
 
 import collections
+import functools
 import getpass
 import logging
+import multiprocessing.managers
+import signal
 import sys
 import uuid
 
@@ -257,6 +260,9 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
     benchmark_config: The config to run the benchmark with.
     benchmark_uid: An identifier unique to this run of the benchmark even
       if the same benchmark is run multiple times with different configs.
+
+  Returns:
+    True.
   """
   benchmark_name = benchmark.BENCHMARK_NAME
 
@@ -326,6 +332,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
           spec.Delete()
         # Pickle spec to save final resource state.
         spec.PickleSpec()
+  return True
 
 
 def _LogCommandLineFlags():
@@ -402,41 +409,56 @@ def RunBenchmarks(publish=True):
                   'running on Windows.')
     return 1
 
-  collector = SampleCollector()
+  manager = multiprocessing.managers.SyncManager()
+  manager.start(initializer=functools.partial(
+      signal.signal, signal.SIGINT, signal.SIG_IGN))
+  samples = manager.list()
+  collector = SampleCollector(samples=samples)
 
   if FLAGS.static_vm_file:
     with open(FLAGS.static_vm_file) as fp:
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
-  try:
-    benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
-    total_benchmarks = len(benchmark_tuple_list)
+  benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+  total_benchmarks = len(benchmark_tuple_list)
 
-    benchmark_counts = collections.Counter()
-    args = []
-    for i, benchmark_tuple in enumerate(benchmark_tuple_list):
-      benchmark_module, user_config = benchmark_tuple
-      benchmark_uid = (benchmark_module.BENCHMARK_NAME +
-                       str(benchmark_counts[benchmark_module]))
-      benchmark_counts[benchmark_module] += 1
-      args.append(
-          ((benchmark_module, collector, i + 1, total_benchmarks,
-            benchmark_module.GetConfig(user_config), benchmark_uid), {}))
+  benchmark_counts = collections.Counter()
+  args = []
+  for i, benchmark_tuple in enumerate(benchmark_tuple_list):
+    benchmark_module, user_config = benchmark_tuple
+    benchmark_uid = (benchmark_module.BENCHMARK_NAME +
+                     str(benchmark_counts[benchmark_module]))
+    benchmark_counts[benchmark_module] += 1
+    args.append((
+        benchmark_module, collector, i + 1, total_benchmarks,
+        benchmark_module.GetConfig(user_config), benchmark_uid))
 
-    if FLAGS.parallelism > 1:
-      vm_util.RunThreaded(
-          RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
+  calls = tuple((RunBenchmark, a, {}) for a in args)
+  results = vm_util.RunParallelProcesses(
+      calls, max_concurrency=FLAGS.parallelism, suppress_exceptions=True)
+
+  if collector.samples:
+    collector.PublishSamples()
+
+  successful_benchmarks = []
+  failed_benchmarks = []
+  for run_benchmark_result, benchmark_tuple in zip(results,
+                                                   benchmark_tuple_list):
+    benchmark_module, _ = benchmark_tuple
+    if run_benchmark_result:
+      successful_benchmarks.append(benchmark_module.BENCHMARK_NAME)
     else:
-      for run_args, kwargs in args:
-        RunBenchmark(*run_args, **kwargs)
+      failed_benchmarks.append(benchmark_module.BENCHMARK_NAME)
+  if successful_benchmarks:
+    logging.info('The following benchmarks succeeded: %s',
+                 ', '.join(successful_benchmarks))
+  if failed_benchmarks:
+    logging.warning('The following benchmarks failed or were not executed: %s',
+                    ', '.join(failed_benchmarks))
 
-  finally:
-    if collector.samples:
-      collector.PublishSamples()
-
-    logging.info('Complete logs can be found at: %s',
-                 vm_util.PrependTempDir(LOG_FILE_NAME))
+  logging.info('Complete logs can be found at: %s',
+               vm_util.PrependTempDir(LOG_FILE_NAME))
 
   if FLAGS.run_stage not in [STAGE_ALL, STAGE_CLEANUP]:
     logging.info(
