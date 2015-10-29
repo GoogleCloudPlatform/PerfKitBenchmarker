@@ -456,6 +456,9 @@ def RunBenchmarks(publish=True):
   if failed_benchmarks:
     logging.warning('The following benchmarks failed or were not executed: %s',
                     ', '.join(failed_benchmarks))
+  if total_benchmarks:
+    logging.info('Benchmark success rate: %.2f%%',
+                 len(successful_benchmarks) / total_benchmarks * 100.)
 
   logging.info('Complete logs can be found at: %s',
                vm_util.PrependTempDir(LOG_FILE_NAME))
