@@ -488,10 +488,7 @@ class SampleCollector(object):
     run_uri: A unique tag for the run.
   """
   def __init__(self, samples=None, metadata_providers=None, publishers=None):
-    if samples is None:
-      self.samples = []
-    else:
-      self.samples = samples
+    self.samples = [] if samples is None else samples
 
     if metadata_providers is not None:
       self.metadata_providers = metadata_providers
