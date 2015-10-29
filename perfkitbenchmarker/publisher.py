@@ -487,8 +487,11 @@ class SampleCollector(object):
       SampleCollector._DefaultPublishers.
     run_uri: A unique tag for the run.
   """
-  def __init__(self, metadata_providers=None, publishers=None):
-    self.samples = []
+  def __init__(self, samples=None, metadata_providers=None, publishers=None):
+    if samples is None:
+      self.samples = []
+    else:
+      self.samples = samples
 
     if metadata_providers is not None:
       self.metadata_providers = metadata_providers
