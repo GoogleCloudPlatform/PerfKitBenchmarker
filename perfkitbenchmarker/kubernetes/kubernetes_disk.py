@@ -153,7 +153,7 @@ class CephDisk(KubernetesDisk):
           rbd_device = output[STDOUT].rstrip()
           break
 
-    cmd = ['mkfs.ext4', rbd_device]
+    cmd = ['/sbin/mkfs.ext4', rbd_device]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
       raise Exception("Formatting partition failed: %s" % output[STDERR])
