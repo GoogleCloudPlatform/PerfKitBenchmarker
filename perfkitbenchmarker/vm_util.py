@@ -20,6 +20,7 @@ import contextlib
 import functools
 import logging
 import multiprocessing
+import multiprocessing.managers
 import os
 import Queue
 import random
