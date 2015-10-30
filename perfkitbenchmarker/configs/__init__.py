@@ -241,7 +241,7 @@ def LoadMinimalConfig(benchmark_config, benchmark_name):
     dict. The loaded config.
   """
   yaml_config = []
-  with open(data.ResourcePath(CONFIG_CONSTANTS)) as fp:
+  with open(data.ResourcePath(CONFIG_CONSTANTS, False)) as fp:
     yaml_config.append(fp.read())
   yaml_config.append(benchmark_config)
 
