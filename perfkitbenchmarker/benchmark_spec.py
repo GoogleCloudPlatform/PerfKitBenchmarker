@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2015 Canonical, Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ from perfkitbenchmarker.openstack import os_network as openstack_network
 from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 from perfkitbenchmarker.rackspace import rackspace_network as rax_net
 from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
+from perfkitbenchmarker.juju import juju_virtual_machine
 
 
 def PickleLock(lock):
@@ -86,6 +87,7 @@ DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
 UBUNTU_CONTAINER = 'ubuntu_container'
+JUJU = 'Juju'
 VIRTUAL_MACHINE = 'virtual_machine'
 NETWORK = 'network'
 FIREWALL = 'firewall'
@@ -157,6 +159,11 @@ CLASSES = {
             RHEL: rax_vm.RhelBasedRackspaceVirtualMachine
         },
         FIREWALL: rax_net.RackspaceSecurityGroup
+    },
+    JUJU: {
+        VIRTUAL_MACHINE: {
+            DEBIAN: juju_virtual_machine.JujuVirtualMachine
+        },
     }
 }
 
@@ -164,7 +171,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP,
                   [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                   RACKSPACE, CLOUDSTACK],
+                   RACKSPACE, CLOUDSTACK, JUJU],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
