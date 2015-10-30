@@ -54,11 +54,8 @@ resources
 """
 
 import collections
-import functools
 import getpass
 import logging
-import multiprocessing.managers
-import signal
 import sys
 import uuid
 
@@ -247,13 +244,12 @@ def DoCleanupPhase(benchmark, name, spec, timer):
     spec.Delete()
 
 
-def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
-                 benchmark_config, benchmark_uid):
+def RunBenchmark(benchmark, sequence_number, total_benchmarks, benchmark_config,
+                 benchmark_uid):
   """Runs a single benchmark and adds the results to the collector.
 
   Args:
     benchmark: The benchmark module to be run.
-    collector: The SampleCollector object to add samples to.
     sequence_number: The sequence number of when the benchmark was started
       relative to the other benchmarks in the suite.
     total_benchmarks: The total number of benchmarks in the suite.
@@ -262,9 +258,10 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
       if the same benchmark is run multiple times with different configs.
 
   Returns:
-    True.
+    List of Samples.
   """
   benchmark_name = benchmark.BENCHMARK_NAME
+  collector = SampleCollector()
 
   # Modify the logger prompt for messages logged within this function.
   label_extension = '{}({}/{})'.format(
@@ -332,7 +329,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
           spec.Delete()
         # Pickle spec to save final resource state.
         spec.PickleSpec()
-  return True
+  return collector.samples
 
 
 def _LogCommandLineFlags():
@@ -409,12 +406,6 @@ def RunBenchmarks(publish=True):
                   'running on Windows.')
     return 1
 
-  manager = multiprocessing.managers.SyncManager()
-  manager.start(initializer=functools.partial(
-      signal.signal, signal.SIGINT, signal.SIG_IGN))
-  samples = manager.list()
-  collector = SampleCollector(samples=samples)
-
   if FLAGS.static_vm_file:
     with open(FLAGS.static_vm_file) as fp:
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
@@ -431,25 +422,28 @@ def RunBenchmarks(publish=True):
                      str(benchmark_counts[benchmark_module]))
     benchmark_counts[benchmark_module] += 1
     args.append((
-        benchmark_module, collector, i + 1, total_benchmarks,
+        benchmark_module, i + 1, total_benchmarks,
         benchmark_module.GetConfig(user_config), benchmark_uid))
 
   calls = tuple((RunBenchmark, a, {}) for a in args)
   results = vm_util.RunParallelProcesses(
       calls, max_concurrency=FLAGS.parallelism, suppress_exceptions=True)
 
-  if collector.samples:
-    collector.PublishSamples()
-
   successful_benchmarks = []
   failed_benchmarks = []
-  for run_benchmark_result, benchmark_tuple in zip(results,
-                                                   benchmark_tuple_list):
+  samples = []
+  for benchmark_samples, benchmark_tuple in zip(results, benchmark_tuple_list):
     benchmark_module, _ = benchmark_tuple
-    if run_benchmark_result:
+    if benchmark_samples is not None:
       successful_benchmarks.append(benchmark_module.BENCHMARK_NAME)
+      samples.extend(benchmark_samples)
     else:
       failed_benchmarks.append(benchmark_module.BENCHMARK_NAME)
+
+  if samples:
+    collector = SampleCollector(samples=samples)
+    collector.PublishSamples()
+
   if successful_benchmarks:
     logging.info('The following benchmarks succeeded: %s',
                  ', '.join(successful_benchmarks))

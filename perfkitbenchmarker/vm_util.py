@@ -20,7 +20,6 @@ import contextlib
 import functools
 import logging
 import multiprocessing
-import multiprocessing.managers
 import os
 import Queue
 import random
@@ -39,6 +38,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import interproc_objects
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import regex_util
 
@@ -374,7 +374,7 @@ def _ExecuteProcCall(target_arg_tuple, call_id, call_result, queue,
         call and the arguments to pass it.
     call_id: int. Index corresponding to the call in the target_arg_tuples
         argument of RunParallelProcesses.
-    call_result: multiprocessing.managers.Namespace. Contains these attributes.
+    call_result: interproc_objects.Namespace. Contains these attributes.
         return_value - Receives the return value of the call if it completes
             successfully.
         traceback - string. Receives the traceback string if the call raises
@@ -439,9 +439,6 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency=None,
   """
   max_concurrency = min(max_concurrency, len(target_arg_tuples))
   log_context = log_util.GetThreadLogContext()
-  manager = multiprocessing.managers.SyncManager()
-  manager.start(initializer=functools.partial(
-      signal.signal, signal.SIGINT, signal.SIG_IGN))
   queue = multiprocessing.Queue()
   active_processes = OrderedDict()
   call_results = [None] * len(target_arg_tuples)
@@ -462,7 +459,7 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency=None,
               not received_interrupt):
             call_id = next_call_id
             target_arg_tuple = target_arg_tuples[call_id]
-            call_result = manager.Namespace()
+            call_result = interproc_objects.Namespace()
             call_result.return_value = None
             call_result.traceback = None
             process = multiprocessing.Process(
