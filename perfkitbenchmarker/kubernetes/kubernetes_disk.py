@@ -26,10 +26,16 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('ceph_secret', None,
                     'Name of the Ceph Secret used by Kubernetes in order to '
-                    'authenticate with Ceph.')
+                    'authenticate with Ceph. If provided, overrides keyring.')
+
+flags.DEFINE_string('ceph_keyring', '/etc/ceph/keyring',
+                    'Path to the Ceph keyring file.')
 
 flags.DEFINE_string('rbd_pool', 'rbd',
                     'Name of RBD pool for Ceph volumes.')
+
+flags.DEFINE_string('rbd_user', 'admin',
+                    'Name of RADOS user.')
 
 flags.DEFINE_list('ceph_monitors', [],
                   'IP addresses and ports of Ceph Monitors. '
@@ -147,7 +153,7 @@ class CephDisk(KubernetesDisk):
           rbd_device = output[STDOUT].rstrip()
           break
 
-    cmd = ['mkfs.ext4', rbd_device]
+    cmd = ['/sbin/mkfs.ext4', rbd_device]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
       raise Exception("Formatting partition failed: %s" % output[STDERR])
@@ -175,13 +181,14 @@ class CephDisk(KubernetesDisk):
             "monitors": FLAGS.ceph_monitors,
             "pool": FLAGS.rbd_pool,
             "image": self.name,
-            "secretRef": {
-                "name": FLAGS.ceph_secret
-            },
+            "keyring": FLAGS.ceph_keyring,
+            "user": FLAGS.rbd_user,
             "fsType": "ext4",
             "readOnly": False
         }
     }
+    if FLAGS.ceph_secret:
+      ceph_volume["rbd"]["secretRef"] = {"name": FLAGS.ceph_secret}
     volumes.append(ceph_volume)
 
   def SetDevicePath(self, vm):

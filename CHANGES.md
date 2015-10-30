@@ -33,6 +33,8 @@ Enhancements:
 
 Bugfixes and maintenance updates:
 
+* Kubernetes: Adapt provider to work with different versions of `kubectl`
+  (Thanks @mateusz-blaszkowski; GH-574).
 * Eliminated a spurious resource warning (GH-522).
 * Fixed a string comparison bug in Object storage benchmark (GH-526).
 * Rackspace; Removed an extra parameter from firewall implementation (thanks @meteorfox, GH-531).
