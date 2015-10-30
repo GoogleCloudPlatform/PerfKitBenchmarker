@@ -76,14 +76,16 @@ flags.DEFINE_enum('cassandra_stress_consistency_level', 'QUORUM',
 flags.DEFINE_integer('cassandra_stress_retries', 1000,
                      'Number of retries when error encountered during stress.')
 
-# Options to use with cassandra-stress user mode, below flags only matter if 
+# Options to use with cassandra-stress user mode, below flags only matter if
 # --cassandra_stress_command is set to user mode.
 # http://www.datastax.com/dev/blog/improved-cassandra-2-1-stress-tool-benchmark-any-schema
 flags.DEFINE_string('cassandra_stress_profile', '',
-                    'Path to cassandra-stress profile file.')
+                    'Path to cassandra-stress profile file. '
+                    'Only valid if --cassandra_stress_command=user.')
 flags.DEFINE_string('cassandra_stress_ops', 'insert=1',
                     'Specify what operations (inserts and/or queries) to '
-                    'run and the number of each.')
+                    'run and the number of each. '
+                    'Only valid if --cassandra_stress_command=user.')
 
 FLAGS = flags.FLAGS
 
