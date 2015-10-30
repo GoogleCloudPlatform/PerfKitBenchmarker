@@ -27,15 +27,16 @@ import time
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.packages.ant import ANT_HOME_DIR
 
 
 JNA_JAR_URL = ('https://maven.java.net/content/repositories/releases/'
                'net/java/dev/jna/jna/4.1.0/jna-4.1.0.jar')
-CASSANDRA_TAR_URL = ('http://archive.apache.org/dist/cassandra/2.0.16/'
-                     'apache-cassandra-2.0.16-bin.tar.gz')
+CASSANDRA_GIT_REPRO = 'https://github.com/apache/cassandra.git'
+CASSANDRA_VERSION = 'cassandra-2.1.10'
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
 CASSANDRA_ENV_TEMPLATE = 'cassandra/cassandra-env.sh.j2'
-CASSANDRA_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'apache-cassandra')
+CASSANDRA_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'cassandra')
 CASSANDRA_PID = posixpath.join(CASSANDRA_DIR, 'cassandra.pid')
 CASSANDRA_OUT = posixpath.join(CASSANDRA_DIR, 'cassandra.out')
 CASSANDRA_ERR = posixpath.join(CASSANDRA_DIR, 'cassandra.err')
@@ -62,12 +63,17 @@ def CheckPrerequisites():
 
 def _Install(vm):
   """Installs Cassandra from a tarball."""
+  vm.Install('ant')
+  vm.Install('build_tools')
   vm.Install('openjdk7')
   vm.Install('curl')
-  vm.RemoteCommand('mkdir {0} && curl -L {1} | '
-                   'tar -C {0} -xzf - --strip-components=1'.format(
-                       CASSANDRA_DIR, CASSANDRA_TAR_URL))
-
+  vm.RemoteCommand(
+      'cd {0}; git clone {1}; cd {2}; git checkout {3}; {4}/bin/ant'.format(
+          vm_util.VM_TMP_DIR,
+          CASSANDRA_GIT_REPRO,
+          CASSANDRA_DIR,
+          CASSANDRA_VERSION,
+          ANT_HOME_DIR))
   # Add JNA
   vm.RemoteCommand('cd {0} && curl -LJO {1}'.format(
       posixpath.join(CASSANDRA_DIR, 'lib'),
@@ -103,13 +109,6 @@ def Configure(vm, seed_vms):
         CASSANDRA_DIR, 'conf',
         os.path.splitext(os.path.basename(config_file))[0])
     vm.RenderTemplate(local_path, remote_path, context=context)
-
-  # Set up logging in CASSANDRA_DIR/logs
-  vm.RemoteCommand(
-      'sed -i -e "s,log4j.appender.R.File=.*,'
-      'log4j.appender.R.File={0}/logs/system.log," {1}'.format(
-          CASSANDRA_DIR,
-          posixpath.join(CASSANDRA_DIR, 'conf', 'log4j-server.properties')))
 
 
 def Start(vm):

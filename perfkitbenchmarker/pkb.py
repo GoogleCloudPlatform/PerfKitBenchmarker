@@ -65,6 +65,7 @@ from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import log_util
@@ -335,6 +336,52 @@ def _LogCommandLineFlags():
   logging.info('Flag values:\n%s', '\n'.join(result))
 
 
+def SetUpPKB():
+  """Set globals and environment variables for PKB.
+
+  After SetUpPKB() returns, it should be possible to call PKB
+  functions, like benchmark_spec.Prepare() or benchmark_spec.Run().
+
+  SetUpPKB() also modifies the local file system by creating a temp
+  directory and storing new SSH keys.
+  """
+
+  for executable in REQUIRED_EXECUTABLES:
+    if not vm_util.ExecutableOnPath(executable):
+      raise errors.Setup.MissingExecutableError(
+          'Could not find required executable "%s"', executable)
+
+  if FLAGS.run_uri is None:
+    if FLAGS.run_stage not in [STAGE_ALL, STAGE_PREPARE]:
+      # Attempt to get the last modified run directory.
+      run_uri = vm_util.GetLastRunUri()
+      if run_uri:
+        FLAGS.run_uri = run_uri
+        logging.warning(
+            'No run_uri specified. Attempting to run "%s" with --run_uri=%s.',
+            FLAGS.run_stage, FLAGS.run_uri)
+      else:
+        raise errors.Setup.NoRunURIError(
+            'No run_uri specified. Could not run "%s"', FLAGS.run_stage)
+    else:
+      FLAGS.run_uri = str(uuid.uuid4())[-8:]
+  elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
+    raise errors.Setup.BadRunURIError('run_uri must be alphanumeric and less '
+                                      'than or equal to 8 characters in '
+                                      'length.')
+
+  vm_util.GenTempDir()
+  log_util.ConfigureLogging(
+      stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
+      log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
+      run_uri=FLAGS.run_uri)
+  logging.info('PerfKitBenchmarker version: %s', version.VERSION)
+
+  vm_util.SSHKeyGen()
+
+  events.initialization_complete.send(parsed_flags=FLAGS)
+
+
 def RunBenchmarks(publish=True):
   """Runs all benchmarks in PerfKitBenchmarker.
 
@@ -348,37 +395,6 @@ def RunBenchmarks(publish=True):
     print version.VERSION
     return
 
-  for executable in REQUIRED_EXECUTABLES:
-    if not vm_util.ExecutableOnPath(executable):
-      logging.error('Could not find required executable "%s".' % executable)
-      return 1
-
-  if FLAGS.run_uri is None:
-    if FLAGS.run_stage not in [STAGE_ALL, STAGE_PREPARE]:
-      # Attempt to get the last modified run directory.
-      run_uri = vm_util.GetLastRunUri()
-      if run_uri:
-        FLAGS.run_uri = run_uri
-        logging.warning(
-            'No run_uri specified. Attempting to run "%s" with --run_uri=%s.',
-            FLAGS.run_stage, FLAGS.run_uri)
-      else:
-        logging.error(
-            'No run_uri specified. Could not run "%s".', FLAGS.run_stage)
-        return 1
-    else:
-      FLAGS.run_uri = str(uuid.uuid4())[-8:]
-  elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
-    logging.error('run_uri must be alphanumeric and less than or equal '
-                  'to 8 characters in length.')
-    return 1
-
-  vm_util.GenTempDir()
-  log_util.ConfigureLogging(
-      stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
-      log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
-      run_uri=FLAGS.run_uri)
-  logging.info('PerfKitBenchmarker version: %s', version.VERSION)
   _LogCommandLineFlags()
 
   if FLAGS.os_type == benchmark_spec.WINDOWS and not vm_util.RunningOnWindows():
@@ -386,9 +402,7 @@ def RunBenchmarks(publish=True):
                   'running on Windows.')
     return 1
 
-  vm_util.SSHKeyGen()
   collector = SampleCollector()
-  events.initialization_complete.send(parsed_flags=FLAGS)
 
   if FLAGS.static_vm_file:
     with open(FLAGS.static_vm_file) as fp:
@@ -494,5 +508,7 @@ def Main(argv=sys.argv):
     logging.error(
         '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
+
+  SetUpPKB()
 
   return RunBenchmarks()

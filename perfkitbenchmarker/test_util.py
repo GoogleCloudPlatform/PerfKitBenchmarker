@@ -13,6 +13,9 @@
 # limitations under the License.
 """Functions and classes to make testing easier."""
 
+import os
+
+from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 
 
@@ -66,3 +69,48 @@ class SamplesTestMixin(object):
         ex.message = ex.message + (' (was item %s in list)' % i)
         ex.args = (ex.message,)
         raise ex
+
+
+def assertDiskMounts(benchmark_config, mount_point):
+  """Test whether a disk mounts in a given configuration.
+
+  Sets up a virtual machine following benchmark_config and then tests
+  whether the path mount_point contains a working disk by trying to
+  create a file there. Returns nothing if file creation works;
+  otherwise raises an exception.
+
+  Args:
+    benchmark_config: a dict in the format of
+      benchmark_spec.BenchmarkSpec. The config must specify exactly
+      one virtual machine.
+    mount_point: a path, represented as a string.
+
+  Raises:
+    RemoteCommandError if it cannot create a file at mount_point and
+    verify that the file exists.
+
+    AssertionError if benchmark_config does not specify exactly one
+    virtual machine.
+  """
+
+  assert len(benchmark_config['vm_groups']) == 1
+  vm_group = benchmark_config['vm_groups'].itervalues().next()
+  assert vm_group.get('num_vms', 1) == 1
+
+  spec = benchmark_spec.BenchmarkSpec(benchmark_config, 'uid')
+
+  try:
+    spec.ConstructVirtualMachines()
+    spec.Prepare()
+
+    vm = spec.vms[0]
+
+    test_file_path = os.path.join(mount_point, 'test_file')
+    vm.RemoteCommand('touch %s' % test_file_path)
+
+    # This will raise RemoteCommandError if the test file does not
+    # exist.
+    vm.RemoteCommand('test -e %s' % test_file_path)
+
+  finally:
+    spec.Delete()
