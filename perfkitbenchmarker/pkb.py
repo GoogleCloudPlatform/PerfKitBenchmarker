@@ -56,6 +56,8 @@ resources
 import collections
 import getpass
 import logging
+import os
+import pickle
 import sys
 import uuid
 
@@ -287,7 +289,8 @@ def RunBenchmark(benchmark, sequence_number, total_benchmarks, benchmark_config,
           # because if DoPreparePhase raises an exception, we still need
           # a reference to the spec in order to delete it in the "finally"
           # section below.
-          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_uid)
+          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
+                                              benchmark_uid)
           spec.ConstructVirtualMachines()
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
@@ -386,6 +389,36 @@ def SetUpPKB():
   events.initialization_complete.send(parsed_flags=FLAGS)
 
 
+def _GetBenchmarkUids(benchmark_names):
+  """Assigns each run of a benchmark its own unique ID.
+
+  During the PREPARE stage, UIDs are assigned arbitrarily. If running in stages,
+  UIDs are written to a file to be preserved for later stages.
+
+  During later stages, the UIDs are loaded from the previously written file.
+
+  Args:
+    benchmark_names: list of strings. Names of the benchmarks that will be run.
+
+  Returns:
+    dict mapping benchmark name string to a list of UIDs containing one UID
+    per time that benchmark is run.
+  """
+  file_path = os.path.join(vm_util.GetTempDir(), 'benchmark_uids')
+  if FLAGS.run_stage in (STAGE_ALL, STAGE_PREPARE):
+    uids = {}
+    for i, benchmark_name in enumerate(benchmark_names):
+      benchmark_uid_list = uids.setdefault(benchmark_name, [])
+      benchmark_uid_list.append(benchmark_spec.UidFromInt(i))
+    if FLAGS.run_stage == STAGE_PREPARE:
+      with open(file_path, 'wb') as pickle_file:
+        pickle.dump(uids, pickle_file, 2)
+  else:
+    with open(file_path, 'rb') as pickle_file:
+      uids = pickle.load(pickle_file)
+  return uids
+
+
 def RunBenchmarks(publish=True):
   """Runs all benchmarks in PerfKitBenchmarker.
 
@@ -412,14 +445,16 @@ def RunBenchmarks(publish=True):
           fp)
 
   benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+  benchmark_names = tuple(b[0].BENCHMARK_NAME for b in benchmark_tuple_list)
+  benchmark_uids = _GetBenchmarkUids(benchmark_names)
   total_benchmarks = len(benchmark_tuple_list)
 
   benchmark_counts = collections.Counter()
   args = []
   for i, benchmark_tuple in enumerate(benchmark_tuple_list):
     benchmark_module, user_config = benchmark_tuple
-    benchmark_uid = (benchmark_module.BENCHMARK_NAME +
-                     str(benchmark_counts[benchmark_module]))
+    benchmark_uid_list = benchmark_uids[benchmark_module.BENCHMARK_NAME]
+    benchmark_uid = benchmark_uid_list[benchmark_counts[benchmark_module]]
     benchmark_counts[benchmark_module] += 1
     args.append((
         benchmark_module, i + 1, total_benchmarks,
@@ -432,13 +467,12 @@ def RunBenchmarks(publish=True):
   successful_benchmarks = []
   failed_benchmarks = []
   samples = []
-  for benchmark_samples, benchmark_tuple in zip(results, benchmark_tuple_list):
-    benchmark_module, _ = benchmark_tuple
+  for benchmark_samples, benchmark_name in zip(results, benchmark_names):
     if benchmark_samples is not None:
-      successful_benchmarks.append(benchmark_module.BENCHMARK_NAME)
+      successful_benchmarks.append(benchmark_name)
       samples.extend(benchmark_samples)
     else:
-      failed_benchmarks.append(benchmark_module.BENCHMARK_NAME)
+      failed_benchmarks.append(benchmark_name)
 
   if samples:
     collector = SampleCollector(samples=samples)
