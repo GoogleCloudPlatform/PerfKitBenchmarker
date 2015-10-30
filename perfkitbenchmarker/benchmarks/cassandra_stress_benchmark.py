@@ -76,7 +76,8 @@ flags.DEFINE_enum('cassandra_stress_consistency_level', 'QUORUM',
 flags.DEFINE_integer('cassandra_stress_retries', 1000,
                      'Number of retries when error encountered during stress.')
 
-# Options to use with cassandra-stress user mode.
+# Options to use with cassandra-stress user mode, below flags only matter if 
+# --cassandra_stress_command is set to user mode.
 # http://www.datastax.com/dev/blog/improved-cassandra-2-1-stress-tool-benchmark-any-schema
 flags.DEFINE_string('cassandra_stress_profile', '',
                     'Path to cassandra-stress profile file.')
@@ -193,12 +194,13 @@ def RunTestOnLoader(vm, loader_index, keys_per_vm, data_node_ips):
   """
   cassandra_stress_command = FLAGS.cassandra_stress_command
 
-  if FLAGS.cassandra_stress_command == USER_COMMAND:
+  if cassandra_stress_command == USER_COMMAND:
     cassandra_stress_command += ' profile={profile} ops\({ops}\)'.format(
         profile=TEMP_PROFILE_PATH,
         ops=FLAGS.cassandra_stress_ops)
     schema_option = ''
   else:
+    # TODO: Support more complex replication strategy.
     schema_option = '-schema replication\(factor={replication_factor}\)'.format(
         replication_factor=FLAGS.cassandra_stress_replication_factor)
   vm.RobustRemoteCommand(
