@@ -18,6 +18,8 @@ import shutil
 import tempfile
 import unittest
 
+import mock
+
 from perfkitbenchmarker import data
 
 
@@ -78,3 +80,32 @@ class PackageResourceLoaderTestCase(unittest.TestCase):
   def testResourceExists_ExtantResource(self):
     file_name = '__init__.py'
     self.assertTrue(self.instance.ResourceExists(file_name))
+
+
+class ResourcePathTestCase(unittest.TestCase):
+
+  def setUp(self):
+    mock_found_loader = mock.MagicMock(spec=data.ResourceLoader)
+    mock_found_loader.ResourceExists.return_value = True
+    mock_found_loader.ResourcePath.return_value = '/found'
+
+    mock_not_found_loader = mock.MagicMock(spec=data.ResourceLoader)
+    mock_not_found_loader.ResourceExists.return_value = False
+
+    p = mock.patch(data.__name__ + '._GetResourceLoaders',
+                   return_value=[mock_found_loader])
+    self.mock_get_resource_loaders = p.start()
+    self.addCleanup(p.stop)
+
+    p = mock.patch(data.__name__ + '.DEFAULT_RESOURCE_LOADERS',
+                   [mock_not_found_loader])
+    p.start()
+    self.addCleanup(p.stop)
+
+  def testSearchUserPaths(self):
+    r = data.ResourcePath('resource', True)
+    self.assertEqual('/found', r)
+
+  def testDoNotSearchUserPaths(self):
+    with self.assertRaises(data.ResourceNotFound):
+      data.ResourcePath('resource', False)

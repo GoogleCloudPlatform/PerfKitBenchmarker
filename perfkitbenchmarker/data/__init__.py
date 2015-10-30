@@ -157,20 +157,28 @@ def _GetResourceLoaders():
   return loaders
 
 
-def ResourcePath(resource_name):
+def ResourcePath(resource_name, search_user_paths=True):
   """Gets the filename of a resource.
 
-  Loaders from '_GetResourceLoaders()' are searched in order until the resource
-  is found. If no loader provides 'resource_name', an exception is thrown.
+  Loaders are searched in order until the resource is found.
+  If no loader provides 'resource_name', an exception is thrown.
+
+  If 'search_user_paths' is true, the directories specified by
+  "--data_search_paths" are consulted before the default paths.
 
   Args:
     resource_name: string. Name of a resource.
+    search_user_paths: boolean. Whether paths from "--data_search_paths" should
+      be searched before the default paths.
   Returns:
     A path to the resource on the filesystem.
   Raises:
     ResourceNotFound: When resource was not found.
   """
-  loaders = _GetResourceLoaders()
+  if search_user_paths:
+    loaders = _GetResourceLoaders()
+  else:
+    loaders = DEFAULT_RESOURCE_LOADERS
   for loader in loaders:
     if loader.ResourceExists(resource_name):
       return loader.ResourcePath(resource_name)
