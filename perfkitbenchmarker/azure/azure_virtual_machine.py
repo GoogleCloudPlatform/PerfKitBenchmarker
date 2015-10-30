@@ -96,15 +96,18 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, unique_string_tuple, vm_spec, network, firewall):
     """Initialize a Azure virtual machine.
 
     Args:
+      unique_string_tuple: tuple of alphanumeric strings that together
+          uniquely identify a VM.
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
       network: network.BaseNetwork object corresponding to the VM.
       firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(AzureVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(AzureVirtualMachine, self).__init__(unique_string_tuple, vm_spec,
+                                              network, firewall)
     self.service = AzureService(self.name,
                                 self.network.affinity_group.name)
     disk_spec = disk.BaseDiskSpec()

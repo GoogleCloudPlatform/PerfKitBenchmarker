@@ -290,7 +290,7 @@ def RunBenchmark(benchmark, sequence_number, total_benchmarks, benchmark_config,
           # a reference to the spec in order to delete it in the "finally"
           # section below.
           spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
-                                              benchmark_uid)
+                                              FLAGS.run_uri, benchmark_uid)
           spec.ConstructVirtualMachines()
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:

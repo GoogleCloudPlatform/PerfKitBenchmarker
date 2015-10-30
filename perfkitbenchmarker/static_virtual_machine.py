@@ -111,7 +111,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec: A StaticVmSpec object containing arguments.
     """
-    super(StaticVirtualMachine, self).__init__(vm_spec, None, None)
+    super(StaticVirtualMachine, self).__init__(None, vm_spec, None, None)
     self.ip_address = vm_spec.ip_address
     self.user_name = vm_spec.user_name
     self.ssh_private_key = vm_spec.ssh_private_key

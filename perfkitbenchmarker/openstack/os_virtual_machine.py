@@ -52,19 +52,20 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     DEFAULT_IMAGE = None
     _floating_ip_lock = threading.Lock()
 
-    def __init__(self, vm_spec, network, firewall):
+    def __init__(self, unique_string_tuple, vm_spec, network, firewall):
         """Initialize an OpenStack virtual machine.
 
         Args:
+          unique_string_tuple: tuple of alphanumeric strings that together
+              uniquely identify a VM.
           vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
           network: network.BaseNetwork object corresponding to the VM.
           firewall: network.BaseFirewall object corresponding to the VM.
         """
         super(OpenStackVirtualMachine, self).__init__(
-            vm_spec, network, firewall)
-        self.name = 'perfkit_vm_%d_%s' % (self.instance_number, FLAGS.run_uri)
-        self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
-                                               FLAGS.run_uri)
+            unique_string_tuple, vm_spec, network, firewall)
+        self.name = 'perfkit_vm_{0}'.format('_'.join(unique_string_tuple))
+        self.key_name = 'perfkit_key_{0}'.format('_'.join(unique_string_tuple))
         self.client = os_utils.NovaClient()
         self.public_network = os_network.OpenStackPublicNetwork(
             FLAGS.openstack_public_network

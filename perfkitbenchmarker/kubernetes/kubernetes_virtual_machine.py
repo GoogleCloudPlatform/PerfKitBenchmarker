@@ -59,15 +59,18 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   """
   CLOUD = 'Kubernetes'
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, unique_string_tuple, vm_spec, network, firewall):
     """Initialize a Kubernetes virtual machine.
 
     Args:
+      unique_string_tuple: tuple of alphanumeric strings that together
+          uniquely identify a VM.
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
       network: network.BaseNetwork object corresponding to the VM.
       firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(KubernetesVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(KubernetesVirtualMachine, self).__init__(unique_string_tuple, vm_spec,
+                                                   network, firewall)
     self.num_scratch_disks = 0
     self.name = self.name.replace('_', '-')
     self.user_name = FLAGS.username

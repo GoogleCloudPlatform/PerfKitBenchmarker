@@ -20,7 +20,6 @@ operate on the VM: boot, shutdown, etc.
 
 import abc
 import os.path
-import threading
 
 import jinja2
 
@@ -87,22 +86,18 @@ class BaseVirtualMachine(resource.BaseResource):
   is_static = False
   CLOUD = None
 
-  _instance_counter_lock = threading.Lock()
-  _instance_counter = 0
-
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, unique_string_tuple, vm_spec, network, firewall):
     """Initialize BaseVirtualMachine class.
 
     Args:
+      unique_string_tuple: tuple of alphanumeric strings that together
+          uniquely identify a VM.
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
       network: network.BaseNetwork object corresponding to the VM.
       firewall: network.BaseFirewall object corresponding to the VM.
     """
     super(BaseVirtualMachine, self).__init__()
-    with self._instance_counter_lock:
-      self.instance_number = self._instance_counter
-      self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
-      BaseVirtualMachine._instance_counter += 1
+    self.name = 'pkb-{0}'.format('-'.join(unique_string_tuple or ()))
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.image = vm_spec.image

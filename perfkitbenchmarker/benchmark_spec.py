@@ -16,6 +16,7 @@
 
 from collections import deque
 import copy
+import itertools
 import logging
 import pickle
 import copy_reg
@@ -191,7 +192,7 @@ def _GetDiskSpecClass(cloud):
 
 
 def UidFromInt(i):
-  """Converts an integer to a string appropriate for a benchmark UID.
+  """Converts an integer to a string.
 
   The UID string may be included in the names of VMs and other resources.
 
@@ -221,7 +222,7 @@ def _GetFilePath(uid):
 class BenchmarkSpec(object):
   """Contains the various data required to make a benchmark run."""
 
-  def __init__(self, benchmark_config, benchmark_name, benchmark_uid):
+  def __init__(self, benchmark_config, benchmark_name, run_uri, benchmark_uid):
     """Initialize a BenchmarkSpec object.
 
     Args:
@@ -229,16 +230,19 @@ class BenchmarkSpec(object):
         for the benchmark. For a complete explanation, see
         perfkitbenchmarker/configs/__init__.py.
       benchmark_name: string. Name of the benchmark.
-      benchmark_uid: An identifier unique to this run of the benchmark even
-        if the same benchmark is run multiple times with different configs.
+      run_uri: string. Name of the PKB run.
+      benchmark_uid: string. An identifier unique to this run of the benchmark
+        even if the same benchmark is run multiple times with different configs.
     """
     self.config = benchmark_config
     self.name = benchmark_name
+    self.run_uri = run_uri
     self.uid = benchmark_uid
     self.vms = []
     self.networks = {}
     self.firewalls = {}
     self.vm_groups = {}
+    self.vm_instance_count = itertools.count()
     self.deleted = False
     self.file_path = _GetFilePath(self.uid)
     self.uuid = str(uuid.uuid4())
@@ -408,7 +412,9 @@ class BenchmarkSpec(object):
     else:
       firewall = None
 
-    return vm_class(vm_spec, network, firewall)
+    vm_unique_string_tuple = (self.run_uri, self.uid,
+                              UidFromInt(self.vm_instance_count.next()))
+    return vm_class(vm_unique_string_tuple, vm_spec, network, firewall)
 
   def PrepareVm(self, vm):
     """Creates a single VM and prepares a scratch disk if required.

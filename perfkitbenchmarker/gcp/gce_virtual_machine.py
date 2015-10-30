@@ -97,15 +97,18 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   BOOT_DISK_SIZE_GB = 10
   BOOT_DISK_TYPE = disk.STANDARD
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, unique_string_tuple, vm_spec, network, firewall):
     """Initialize a GCE virtual machine.
 
     Args:
+      unique_string_tuple: tuple of alphanumeric strings that together
+          uniquely identify a VM.
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
       network: network.BaseNetwork object corresponding to the VM.
       firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(GceVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(GceVirtualMachine, self).__init__(unique_string_tuple, vm_spec,
+                                            network, firewall)
     self.image = self.image or self.DEFAULT_IMAGE
     self.project = vm_spec.project
     disk_spec = disk.BaseDiskSpec(

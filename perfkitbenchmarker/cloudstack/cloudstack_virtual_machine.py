@@ -44,13 +44,18 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_PROJECT = 'cloudops-Engineering'
 
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, unique_string_tuple, vm_spec, network, firewall):
     """Initialize a CloudStack virtual machine.
 
     Args:
+      unique_string_tuple: tuple of alphanumeric strings that together
+          uniquely identify a VM.
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      network: network.BaseNetwork object corresponding to the VM.
+      firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(CloudStackVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(CloudStackVirtualMachine, self).__init__(unique_string_tuple, vm_spec,
+                                                   network, firewall)
 
     self.cs = util.CsClient(FLAGS.CS_API_URL,
                             FLAGS.CS_API_KEY,
