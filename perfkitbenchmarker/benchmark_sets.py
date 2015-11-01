@@ -82,6 +82,13 @@ BENCHMARK_SETS = {
                          'cluster_boot', 'redis', 'cassandra_stress',
                          'object_storage_service', 'sysbench_oltp']
     },
+    'kubernetes_set': {
+        MESSAGE: 'Kubernetes benchmark set.',
+        BENCHMARK_LIST: ['block_storage_workload', 'cassandra_ycsb',
+                         'cassandra_stress', 'cluster_boot', 'fio', 'iperf',
+                         'mesh_network', 'mongodb_ycsb', 'netperf', 'redis',
+                         'sysbench_oltp']
+    },
     'mellanox_set': {
         MESSAGE: 'Mellanox benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]

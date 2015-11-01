@@ -1,3 +1,50 @@
+# v0.23.0
+
+Known Issues:
+
+* Resources fail to be cleaned up when PerfKitBenchmarker receives SIGINT while
+  running with `--parallel` (GH-529).
+
+New Features:
+
+* Added [CloudStack](http://cloudstack.apache.org) provider support (thanks @syed; GH-558).
+* **❢ BREAKING CHANGE:** Added a more flexible benchmark configuration system
+  (GH-510, GH-546). This supports running the same benchmark multiple times,
+  and running a benchmark using heterogeneous machine types and clouds. See [the
+  wiki](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/PerfkitBenchmarker-Configurations)
+  for more information. This replaces the configuration system under
+  `perfkitbenchmarker/deployment`.
+* New benchmark: `redis_ycsb`, which runs YCSB against a single YCSB node (GH-511).
+
+Enhancements:
+
+* Added flag: `--archive_bucket`, to archive the results of a run to Google Cloud
+  Storage or S3 (GH-489).
+* Added `--prefill_device` option to fio benchmark. Note that the `fio` benchmark
+  now defaults to *not* pre-filling the device when testing against a filesystem (GH-515, FH-516).
+* Updated `cloud_bigtable_ycsb` benchmark to pre-split table, following HBase recommendions (GH-524).
+* Added additional logging to `LinuxVirtualMachine.RobustRemoteCommand` (GH-534).
+* Added support for local disks with EC2 `d2` types.
+* Kubernetes: Support `emptyDisk` disk types (thanks @mateusz-blaszkowski GH-565).
+* `cluster_boot`: Add `num_vms` metadata (GH-575).
+* Add published `run_uri` to VM metadata (GH-579).
+* Add a flag to specify the Azure Python library version in object storage benchmark,
+  default to the latest version (GH-585, GH-587).
+
+Bugfixes and maintenance updates:
+
+* Kubernetes: Adapt provider to work with different versions of `kubectl`
+  (Thanks @mateusz-blaszkowski; GH-574).
+* Eliminated a spurious resource warning (GH-522).
+* Fixed a string comparison bug in Object storage benchmark (GH-526).
+* Rackspace; Removed an extra parameter from firewall implementation (thanks @meteorfox, GH-531).
+* Rackspace: Fixed an SSH key upload bug (thanks @meteorfox, GH-539).
+* Fix an issue with loggin errors in `vm_util.RunThreaded` (GH-542; thanks @mateusz-blaszkowski for reporting).
+* `mongodb_ycsb`: Update default write concern to "Acknowledged" (equivalent to the previous deprecated option, safe) (GH-543).
+* Specify SSH port when using SCP (thanks @mateusz-blaszkowski GH-548).
+* Fix string conversion (thanks @mateusz-blaszkowski GH-556).
+* `hbase_ycsb`: Make load records use a BufferedMutator (GH-566).
+
 # v0.22.1
 
 * Update the default image used in Azure tests to Ubuntu 14.04.3 (runs failed
@@ -56,7 +103,7 @@
   * On exception, only cleanup if run stage is all/cleanup (GH-412)
   * Fix issue with using a flag before flags are parsed (GH-413)
   * Umount disk when running fio against raw device. (GH-417)
-  * Clarify warnings from ycsb._CombineResults. (GH-432)
+  * Clarify warnings from `ycsb._CombineResults`. (GH-432)
 
 # v0.19.0
 
@@ -193,7 +240,7 @@ which includes this change log with clickable GH-* links.)
 * Netperf: Parse CSV output; add p50, p90, p99. (GH-222)
 * Logging fixes and enhancements. (GH-68)
 * Fixes some apt-get update flakiness. (GH-250)
-* Updates AWS to use _Exists for resources. (GH-228)
+* Updates AWS to use `_Exists` for resources. (GH-228)
 * Fixes small bug wth GCP metadata. (GH-242)
 * Call benchmark specific cleanup() when there is exception. (GH-239)
 * Fix the command that creates a storage account for Azure. (GH-238)
