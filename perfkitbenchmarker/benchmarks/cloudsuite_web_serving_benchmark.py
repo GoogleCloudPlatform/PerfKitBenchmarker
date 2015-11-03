@@ -18,6 +18,7 @@
 import posixpath
 import re
 
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flags
@@ -49,10 +50,16 @@ flags.DEFINE_integer('cloudsuite_web_serving_load_scale', 100,
                      'that can be simulated.', lower_bound=2)
 FLAGS = flags.FLAGS
 
-BENCHMARK_INFO = {'name': 'cloudsuite_web_serving',
-                  'description': 'Runs Cloudsuite Web Serving benchmark',
-                  'scratch_disk': True,
-                  'num_machines': 3}
+BENCHMARK_NAME = 'cloudsuite_web_serving'
+BENCHMARK_CONFIG = """
+cloudsuite_web_serving:
+  description: Runs Cloudsuite Web Serving benchmark
+  vm_groups:
+    default:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+      vm_count: 3
+"""
 
 
 def _SetupFrontend(benchmark_spec):
@@ -118,7 +125,7 @@ def _SetupFrontend(benchmark_spec):
   frontend.RemoteCommand('sudo cp /usr/local/etc/php-fpm.conf.default '
                          '/usr/local/etc/php-fpm.conf && '
                          'sudo /usr/local/sbin/php-fpm')
-  nginx.Start(frontend, benchmark_spec.firewall)
+  nginx.Start(frontend, frontend.firewall)
 
 
 def _SetupBackend(benchmark_spec):
@@ -187,7 +194,7 @@ def _SetupClient(benchmark_spec):
   client = vms[CL]
   frontend = vms[FR]
   backend = vms[BK]
-  fw = benchmark_spec.firewall
+  fw = client.firewall
   fw.AllowPort(client, 9980)
   CLIENT_IP = client.ip_address
   BACKEND_IP = backend.ip_address
@@ -266,8 +273,8 @@ def _SetupClient(benchmark_spec):
                        '%s/run.xml' % (BACKEND_IP, FABAN_HOME))
 
 
-def GetInfo():
-  return BENCHMARK_INFO
+def GetConfig(user_config):
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites():
