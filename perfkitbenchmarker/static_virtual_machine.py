@@ -25,7 +25,7 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-
+import collections
 import json
 import logging
 import threading
@@ -102,7 +102,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Static Virtual Machine."""
 
   is_static = True
-  vm_pool = []
+  vm_pool = collections.deque()
   vm_pool_lock = threading.Lock()
 
   def __init__(self, vm_spec):
@@ -131,8 +131,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     pass
 
   def _Delete(self):
-    """StaticVirtualMachines do not implement _Delete()."""
-    pass
+    """Returns the virtual machine to the pool."""
+    with self.vm_pool_lock:
+      self.vm_pool.appendleft(self)
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
@@ -269,7 +270,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     with cls.vm_pool_lock:
       if cls.vm_pool:
-        return cls.vm_pool.pop(0)
+        return cls.vm_pool.popleft()
       else:
         return None
 
