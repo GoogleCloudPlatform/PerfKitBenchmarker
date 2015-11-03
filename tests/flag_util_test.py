@@ -100,3 +100,81 @@ class TestIntegerListSerializer(unittest.TestCase):
 
     self.assertEqual(ser.Serialize(il),
                      '1,2-5,9')
+
+
+class TestObjectSize(unittest.TestCase):
+  def testFioFormatPlain(self):
+    size = flag_util.ObjectSize(bytes=3)
+
+    self.assertEquals(size.fioFormat(), '3')
+
+  def testFioFormatMidrange(self):
+    size = flag_util.ObjectSize(bytes=3 * (1024 ** 2))
+
+    self.assertEquals(size.fioFormat(), '3m')
+
+  def testFioFormatOutOfRange(self):
+    size = flag_util.ObjectSize(bytes=3 * (1024 ** 6))
+
+    self.assertEquals(size.fioFormat(), '3072p')
+
+  def testStrSmall(self):
+    size = flag_util.ObjectSize(bytes=3)
+
+    self.assertEquals(str(size), '3B')
+
+  def testStrBase10(self):
+    size = flag_util.ObjectSize(bytes=3 * (1000 ** 2))
+
+    self.assertEquals(str(size), '3MB')
+
+  def testStrBase2(self):
+    size = flag_util.ObjectSize(bytes=3 * (1024 ** 2))
+
+    self.assertEquals(str(size), '3MiB')
+
+  def testEq(self):
+    self.assertEquals(
+        flag_util.ObjectSize(bytes=3),
+        flag_util.ObjectSize(bytes=3))
+
+  def testLessThan(self):
+    self.assertLess(
+        flag_util.ObjectSize(bytes=3), flag_util.ObjectSize(bytes=5))
+
+  def testGreaterThan(self):
+    self.assertGreater(
+        flag_util.ObjectSize(bytes=5), flag_util.ObjectSize(bytes=3))
+
+
+class TestObjectSizeParser(unittest.TestCase):
+  def setUp(self):
+    self.osp = flag_util.ObjectSizeParser()
+
+  def testNoInteger(self):
+    with self.assertRaises(ValueError):
+      self.osp.Parse('foo')
+
+  def testNoSuffix(self):
+    self.assertEquals(self.osp.Parse('12'),
+                      flag_util.ObjectSize(bytes=12))
+
+  def testGoodSuffix(self):
+    self.assertEquals(self.osp.Parse('12m'),
+                      flag_util.ObjectSize(bytes=12 * (1000 ** 2)))
+
+  def testBadSuffix(self):
+    with self.assertRaises(ValueError):
+      self.osp.Parse('12j')
+
+  def testBase2Suffix(self):
+    self.assertEquals(self.osp.Parse('12mi'),
+                      flag_util.ObjectSize(bytes=12 * (1024 ** 2)))
+
+  def testBadSuffixModifier(self):
+    with self.assertRaises(ValueError):
+      self.osp.Parse('12mj')
+
+  def testExtraCharacters(self):
+    with self.assertRaises(ValueError):
+      self.osp.Parse('12mikdj')

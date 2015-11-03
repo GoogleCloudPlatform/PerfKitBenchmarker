@@ -14,6 +14,7 @@
 
 """Utility functions for working with user-supplied flags."""
 
+import functools
 import logging
 import re
 
@@ -187,3 +188,144 @@ def DEFINE_integerlist(name, default, help,
   serializer = IntegerListSerializer()
 
   flags.DEFINE(parser, name, default, help, flag_values, serializer, **args)
+
+
+SI_SUFFIXES = ['', 'K', 'M', 'G', 'T', 'P']
+
+
+@functools.total_ordering
+class ObjectSize(object):
+  """Holds the size of data, i.e. numbers of bytes.
+
+  Knows how to format itself to be input to different tools.
+  """
+
+  def __init__(self, bytes=0):
+    self.bytes = bytes
+
+  def BytesInScientificNotation(self, base, max_exp):
+    """Write bytes in scientific notation.
+
+    Find mult and exp so that self.bytes = mult * base ^ exp,
+    where exp is as large as possible but <= max_exp.
+
+    Returns:
+      A tuple (mult, exp).
+    """
+
+    num = self.bytes
+    exp = 0
+
+    if (num == 0):
+      return (0, 0)
+
+    while num % base == 0 and exp < max_exp:
+      num = num // base
+      exp += 1
+
+    return (num, exp)
+
+  def fioFormat(self):
+    max_exp = len(SI_SUFFIXES) - 1
+    mult_ten, exp_ten = self.BytesInScientificNotation(1000, max_exp)
+    mult_two, exp_two = self.BytesInScientificNotation(1024, max_exp)
+
+    if exp_ten > exp_two:
+      mult = mult_ten
+      exp = exp_ten
+      base = 1000
+    else:
+      mult = mult_two
+      exp = exp_two
+      base = 1024
+
+    # fio reverses the usual meaning of the SI suffixes, so 'k' means
+    # 1024 and 'ki' means 1000.
+    return '%s%s%s' % (str(mult), SI_SUFFIXES[exp].lower(),
+                       'i' if base == 1000 else '')
+
+  def __str__(self):
+    max_exp = len(SI_SUFFIXES) - 1
+    mult_ten, exp_ten = self.BytesInScientificNotation(1000, max_exp)
+    mult_two, exp_two = self.BytesInScientificNotation(1024, max_exp)
+
+    if exp_ten >= exp_two:
+      mult = mult_ten
+      exp = exp_ten
+      base = 1000
+    else:
+      mult = mult_two
+      exp = exp_two
+      base = 1024
+
+    return '%s%s%sB' % (str(mult), SI_SUFFIXES[exp],
+                        'i' if base == 1024 else '')
+
+
+  def __eq__(self, other):
+    return isinstance(other, ObjectSize) and self.bytes == other.bytes
+
+  def __lt__(self, other):
+    if isinstance(other, ObjectSize):
+      return self.bytes < other.bytes
+    else:
+      raise NotImplemented()
+
+
+INTEGER_REGEXP = re.compile('\d+')
+
+
+class ObjectSizeParser(flags.ArgumentParser):
+  """Parse an object size.
+
+  The user writes a decimal followed by a suffix. Allowable base
+  suffixes are k,m,g,t, and p, meaning kilo, mega, giga, tera, and
+  peta. Each suffix may have an 'i' immediately after it, which means
+  to use the base-2 interpretation instead of base-10. All
+  measurements are bytes, not bits.
+  """
+
+  def Parse(self, inp):
+    integer_match = INTEGER_REGEXP.match(inp)
+    if integer_match is None:
+      raise ValueError('Object size must start with positive integer')
+
+    num = int(integer_match.group())
+    suffix = inp[integer_match.end():]
+
+    if len(suffix) == 0:
+      return ObjectSize(bytes=num)
+
+    base_suffix = suffix[0]
+    suffix_modifier = suffix[1] if len(suffix) > 1 else None
+
+    if len(suffix) >= 3:
+      raise ValueError('Suffix %s not valid in object size', suffix)
+
+    suffix_idx = None
+    for i in range(len(SI_SUFFIXES)):
+      if base_suffix.lower() == SI_SUFFIXES[i].lower():
+        suffix_idx = i
+        break
+
+    if suffix_idx is None:
+      raise ValueError('Suffix %s not valid in object size', suffix)
+
+    if suffix_modifier:
+      if suffix_modifier is not 'i':
+        raise ValueError('Suffix %s not valid in object size', suffix)
+      else:
+        multiplier = 1024 ** suffix_idx
+    else:
+      multiplier = 1000 ** suffix_idx
+
+    return ObjectSize(bytes=num * multiplier)
+
+
+  def Type(self):
+    return 'object size'
+
+
+class ObjectSizeSerializer(flags.ArgumentSerializer):
+  def Serialize(self, os):
+    return str(os)
