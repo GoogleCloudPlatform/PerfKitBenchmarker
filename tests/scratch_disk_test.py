@@ -34,6 +34,9 @@ from perfkitbenchmarker.gcp import gce_disk
 from perfkitbenchmarker.gcp import gce_virtual_machine
 
 
+_VM_UNIQUE_STRING_TUPLE = ('scratch', 'disk', 'test')
+
+
 class ScratchDiskTestMixin(object):
   """Sets up and tears down some of the mocks needed to test scratch disks."""
 
@@ -132,7 +135,7 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     vm_spec = virtual_machine.BaseVmSpec()
     net = azure_network.AzureNetwork('zone')
     return azure_virtual_machine.DebianBasedAzureVirtualMachine(
-        vm_spec, net, None)
+        _VM_UNIQUE_STRING_TUPLE, vm_spec, net, None)
 
   def _GetDiskClass(self):
     return azure_disk.AzureDisk
@@ -146,7 +149,7 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _CreateVm(self):
     vm_spec = gce_virtual_machine.GceVmSpec()
     return gce_virtual_machine.DebianBasedGceVirtualMachine(
-        vm_spec, None, None)
+        _VM_UNIQUE_STRING_TUPLE, vm_spec, None, None)
 
   def _GetDiskClass(self):
     return gce_disk.GceDisk
@@ -161,7 +164,7 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _CreateVm(self):
     vm_spec = virtual_machine.BaseVmSpec(zone='zone')
     return aws_virtual_machine.DebianBasedAwsVirtualMachine(
-        vm_spec, None, None)
+        _VM_UNIQUE_STRING_TUPLE, vm_spec, None, None)
 
   def _GetDiskClass(self):
     return aws_disk.AwsDisk

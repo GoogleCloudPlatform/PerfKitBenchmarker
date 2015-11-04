@@ -56,6 +56,8 @@ resources
 import collections
 import getpass
 import logging
+import os
+import pickle
 import sys
 import uuid
 
@@ -244,21 +246,24 @@ def DoCleanupPhase(benchmark, name, spec, timer):
     spec.Delete()
 
 
-def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
-                 benchmark_config, benchmark_uid):
+def RunBenchmark(benchmark, sequence_number, total_benchmarks, benchmark_config,
+                 benchmark_uid):
   """Runs a single benchmark and adds the results to the collector.
 
   Args:
     benchmark: The benchmark module to be run.
-    collector: The SampleCollector object to add samples to.
     sequence_number: The sequence number of when the benchmark was started
       relative to the other benchmarks in the suite.
     total_benchmarks: The total number of benchmarks in the suite.
     benchmark_config: The config to run the benchmark with.
     benchmark_uid: An identifier unique to this run of the benchmark even
       if the same benchmark is run multiple times with different configs.
+
+  Returns:
+    List of Samples.
   """
   benchmark_name = benchmark.BENCHMARK_NAME
+  collector = SampleCollector()
 
   # Modify the logger prompt for messages logged within this function.
   label_extension = '{}({}/{})'.format(
@@ -284,7 +289,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
           # because if DoPreparePhase raises an exception, we still need
           # a reference to the spec in order to delete it in the "finally"
           # section below.
-          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_uid)
+          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
+                                              FLAGS.run_uri, benchmark_uid)
           spec.ConstructVirtualMachines()
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
@@ -326,6 +332,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
           spec.Delete()
         # Pickle spec to save final resource state.
         spec.PickleSpec()
+  return collector.samples
 
 
 def _LogCommandLineFlags():
@@ -382,6 +389,36 @@ def SetUpPKB():
   events.initialization_complete.send(parsed_flags=FLAGS)
 
 
+def _GetBenchmarkUids(benchmark_names):
+  """Assigns each run of a benchmark its own unique ID.
+
+  During the PREPARE stage, UIDs are assigned arbitrarily. If running in stages,
+  UIDs are written to a file to be preserved for later stages.
+
+  During later stages, the UIDs are loaded from the previously written file.
+
+  Args:
+    benchmark_names: list of strings. Names of the benchmarks that will be run.
+
+  Returns:
+    dict mapping benchmark name string to a list of UIDs containing one UID
+    per time that benchmark is run.
+  """
+  file_path = os.path.join(vm_util.GetTempDir(), 'benchmark_uids')
+  if FLAGS.run_stage in (STAGE_ALL, STAGE_PREPARE):
+    uids = {}
+    for i, benchmark_name in enumerate(benchmark_names):
+      benchmark_uid_list = uids.setdefault(benchmark_name, [])
+      benchmark_uid_list.append(benchmark_spec.UidFromInt(i))
+    if FLAGS.run_stage == STAGE_PREPARE:
+      with open(file_path, 'wb') as pickle_file:
+        pickle.dump(uids, pickle_file, 2)
+  else:
+    with open(file_path, 'rb') as pickle_file:
+      uids = pickle.load(pickle_file)
+  return uids
+
+
 def RunBenchmarks(publish=True):
   """Runs all benchmarks in PerfKitBenchmarker.
 
@@ -402,41 +439,57 @@ def RunBenchmarks(publish=True):
                   'running on Windows.')
     return 1
 
-  collector = SampleCollector()
-
   if FLAGS.static_vm_file:
     with open(FLAGS.static_vm_file) as fp:
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
-  try:
-    benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
-    total_benchmarks = len(benchmark_tuple_list)
+  benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+  benchmark_names = tuple(b[0].BENCHMARK_NAME for b in benchmark_tuple_list)
+  benchmark_uids = _GetBenchmarkUids(benchmark_names)
+  total_benchmarks = len(benchmark_tuple_list)
 
-    benchmark_counts = collections.Counter()
-    args = []
-    for i, benchmark_tuple in enumerate(benchmark_tuple_list):
-      benchmark_module, user_config = benchmark_tuple
-      benchmark_uid = (benchmark_module.BENCHMARK_NAME +
-                       str(benchmark_counts[benchmark_module]))
-      benchmark_counts[benchmark_module] += 1
-      args.append(
-          ((benchmark_module, collector, i + 1, total_benchmarks,
-            benchmark_module.GetConfig(user_config), benchmark_uid), {}))
+  benchmark_counts = collections.Counter()
+  args = []
+  for i, benchmark_tuple in enumerate(benchmark_tuple_list):
+    benchmark_module, user_config = benchmark_tuple
+    benchmark_uid_list = benchmark_uids[benchmark_module.BENCHMARK_NAME]
+    benchmark_uid = benchmark_uid_list[benchmark_counts[benchmark_module]]
+    benchmark_counts[benchmark_module] += 1
+    args.append((
+        benchmark_module, i + 1, total_benchmarks,
+        benchmark_module.GetConfig(user_config), benchmark_uid))
 
-    if FLAGS.parallelism > 1:
-      vm_util.RunThreaded(
-          RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
+  calls = tuple((RunBenchmark, a, {}) for a in args)
+  results = vm_util.RunParallelProcesses(
+      calls, max_concurrency=FLAGS.parallelism, suppress_exceptions=True)
+
+  successful_benchmarks = []
+  failed_benchmarks = []
+  samples = []
+  for benchmark_samples, benchmark_name in zip(results, benchmark_names):
+    if benchmark_samples is not None:
+      successful_benchmarks.append(benchmark_name)
+      samples.extend(benchmark_samples)
     else:
-      for run_args, kwargs in args:
-        RunBenchmark(*run_args, **kwargs)
+      failed_benchmarks.append(benchmark_name)
 
-  finally:
-    if collector.samples:
-      collector.PublishSamples()
+  if samples:
+    collector = SampleCollector(samples=samples)
+    collector.PublishSamples()
 
-    logging.info('Complete logs can be found at: %s',
-                 vm_util.PrependTempDir(LOG_FILE_NAME))
+  if successful_benchmarks:
+    logging.info('The following benchmarks succeeded: %s',
+                 ', '.join(successful_benchmarks))
+  if failed_benchmarks:
+    logging.warning('The following benchmarks failed or were not executed: %s',
+                    ', '.join(failed_benchmarks))
+  if total_benchmarks:
+    logging.info('Benchmark success rate: %.2f%%',
+                 len(successful_benchmarks) / total_benchmarks * 100.)
+
+  logging.info('Complete logs can be found at: %s',
+               vm_util.PrependTempDir(LOG_FILE_NAME))
 
   if FLAGS.run_stage not in [STAGE_ALL, STAGE_CLEANUP]:
     logging.info(

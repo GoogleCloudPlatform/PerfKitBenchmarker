@@ -83,15 +83,18 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_IMAGE = None
 
   "Object representing a Rackspace Virtual Machine"
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, unique_string_tuple, vm_spec, network, firewall):
     """Initialize Rackspace virtual machine
 
     Args:
+      unique_string_tuple: tuple of alphanumeric strings that together
+          uniquely identify a VM.
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
       network: network.BaseNetwork object corresponding to the VM.
       firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(RackspaceVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(RackspaceVirtualMachine, self).__init__(unique_string_tuple, vm_spec,
+                                                  network, firewall)
     self.id = ''
     self.ip_address6 = ''
     self.mounted_disks = set()

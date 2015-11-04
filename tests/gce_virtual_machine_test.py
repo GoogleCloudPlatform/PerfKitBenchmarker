@@ -22,6 +22,9 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.gcp import gce_virtual_machine
 
 
+_VM_UNIQUE_STRING_TUPLE = ('gce', 'virtual', 'machine', 'test')
+
+
 class GCEPreemptibleVMFlagTestCase(unittest.TestCase):
   def testPreemptibleVMFlag(self):
     with mock.patch(vm_util.__name__ + '.IssueCommand') as issue_command, \
@@ -32,7 +35,8 @@ class GCEPreemptibleVMFlagTestCase(unittest.TestCase):
       gvm_flags.gcloud_scopes = None
       vm_spec = gce_virtual_machine.GceVmSpec(image='image')
       vm_spec.ApplyFlags(gvm_flags)
-      vm = gce_virtual_machine.GceVirtualMachine(vm_spec, None, None)
+      vm = gce_virtual_machine.GceVirtualMachine(_VM_UNIQUE_STRING_TUPLE,
+                                                 vm_spec, None, None)
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)
       self.assertIn('--preemptible', issue_command.call_args[0][0])

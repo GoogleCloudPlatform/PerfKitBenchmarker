@@ -14,7 +14,9 @@
 
 """Container for all data required for a benchmark to run."""
 
+from collections import deque
 import copy
+import itertools
 import logging
 import pickle
 import copy_reg
@@ -189,27 +191,60 @@ def _GetDiskSpecClass(cloud):
   return CLASSES[cloud].get(DISK_SPEC, disk.BaseDiskSpec)
 
 
+def UidFromInt(i):
+  """Converts an integer to a string.
+
+  The UID string may be included in the names of VMs and other resources.
+
+  Args:
+    i: Non-negative integer.
+
+  Returns:
+    string consisting of digits and lower-case letters.
+  """
+  assert i >= 0, i
+  characters = '0123456789abcdefghijklmnopqrstuvwxyz'
+  if not i:
+    return characters[0]
+  result = deque()
+  while i:
+    i, r = divmod(i, len(characters))
+    result.appendleft(characters[r])
+  return ''.join(result)
+
+
+def _GetFilePath(uid):
+  """Returns the path of a benchmark_spec file given its UID."""
+  file_name = 'benchmark_spec_{0}'.format(uid)
+  return os.path.join(vm_util.GetTempDir(), file_name)
+
+
 class BenchmarkSpec(object):
   """Contains the various data required to make a benchmark run."""
 
-  def __init__(self, benchmark_config, benchmark_uid):
+  def __init__(self, benchmark_config, benchmark_name, run_uri, benchmark_uid):
     """Initialize a BenchmarkSpec object.
 
     Args:
       benchmark_config: A Python dictionary representation of the configuration
         for the benchmark. For a complete explanation, see
         perfkitbenchmarker/configs/__init__.py.
-      benchmark_uid: An identifier unique to this run of the benchmark even
-        if the same benchmark is run multiple times with different configs.
+      benchmark_name: string. Name of the benchmark.
+      run_uri: string. Name of the PKB run.
+      benchmark_uid: string. An identifier unique to this run of the benchmark
+        even if the same benchmark is run multiple times with different configs.
     """
     self.config = benchmark_config
+    self.name = benchmark_name
+    self.run_uri = run_uri
     self.uid = benchmark_uid
     self.vms = []
     self.networks = {}
     self.firewalls = {}
     self.vm_groups = {}
+    self.vm_instance_count = itertools.count()
     self.deleted = False
-    self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
+    self.file_path = _GetFilePath(self.uid)
     self.uuid = str(uuid.uuid4())
     self.always_call_cleanup = False
     self._flags = None
@@ -377,7 +412,9 @@ class BenchmarkSpec(object):
     else:
       firewall = None
 
-    return vm_class(vm_spec, network, firewall)
+    vm_unique_string_tuple = (self.run_uri, self.uid,
+                              UidFromInt(self.vm_instance_count.next()))
+    return vm_class(vm_unique_string_tuple, vm_spec, network, firewall)
 
   def PrepareVm(self, vm):
     """Creates a single VM and prepares a scratch disk if required.
@@ -390,7 +427,8 @@ class BenchmarkSpec(object):
     logging.info('Waiting for boot completion.')
     for port in vm.remote_access_ports:
       vm.AllowPort(port)
-    vm.AddMetadata(benchmark=self.uid, perfkit_uuid=self.uuid)
+    vm.AddMetadata(benchmark=self.name, perfkit_uuid=self.uuid,
+                   benchmark_uid=self.uid)
     vm.WaitForBootCompletion()
     vm.OnStartup()
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
@@ -417,26 +455,26 @@ class BenchmarkSpec(object):
     """Pickles the spec so that it can be unpickled on a subsequent run."""
     # FlagValues objects can't be pickled without getting an error.
     flags, self._flags = self._flags, None
-    with open(self.file_name, 'wb') as pickle_file:
+    with open(self.file_path, 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)
     self._flags = flags
 
   @classmethod
-  def GetSpecFromFile(cls, name):
+  def GetSpecFromFile(cls, uid):
     """Unpickles the spec and returns it.
 
     Args:
-      name: The name of the benchmark (and the name of the pickled file).
+      uid: The benchmark UID.
 
     Returns:
       A BenchmarkSpec object.
     """
-    file_name = '%s/%s' % (vm_util.GetTempDir(), name)
+    file_path = _GetFilePath(uid)
     try:
-      with open(file_name, 'rb') as pickle_file:
+      with open(file_path, 'rb') as pickle_file:
         spec = pickle.load(pickle_file)
     except Exception as e:  # pylint: disable=broad-except
-      logging.error('Unable to unpickle spec file for benchmark %s.', name)
+      logging.error('Unable to unpickle spec file for benchmark "%s".', uid)
       raise e
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.

@@ -15,14 +15,16 @@
 """Set of utility functions for working with virtual machines."""
 
 from collections import namedtuple
-from concurrent import futures
+from collections import OrderedDict
 import contextlib
 import functools
 import logging
+import multiprocessing
 import os
 import Queue
 import random
 import re
+import signal
 import string
 import subprocess
 import tempfile
@@ -36,6 +38,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import interproc_objects
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import regex_util
 
@@ -350,33 +353,70 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
   return RunParallelThreads(target_arg_tuples, max_concurrent_threads)
 
 
-def _ExecuteProcCall(target_arg_tuple):
+if __debug__:
+  # Functions called throughout RunParallelProcesses while executing in tests.
+  RUN_PARALLEL_PROCESSES_TEST_HOOKS = (
+      'child_before_call', 'child_inside_call', 'child_before_queue',
+      'child_after_queue', 'parent_before_active', 'parent_after_active',
+      'parent_after_start', 'parent_wait_for_child', 'parent_after_join')
+  RunParallelProcessesTestHooks = namedtuple(
+      'RunParallelProcessesTestHooks', RUN_PARALLEL_PROCESSES_TEST_HOOKS)
+
+
+def _ExecuteProcCall(target_arg_tuple, call_id, call_result, queue,
+                     parent_log_context, test_hooks):
   """Function invoked in another process by RunParallelProcesses.
 
   Executes a specified function call and captures the traceback upon exception.
-  TODO(skschneider): Remove this helper function when moving to Python 3.5 or
-  when the backport of concurrent.futures.ProcessPoolExecutor is able to
-  preserve original traceback.
 
   Args:
     target_arg_tuple: (target, args, kwargs) tuple containing the function to
         call and the arguments to pass it.
-
-  Returns:
-    (result, traceback) tuple. The first element is the return value from the
-    called function, or None if the function raised an exception. The second
-    element is the exception traceback string, or None if the function
-    succeeded.
+    call_id: int. Index corresponding to the call in the target_arg_tuples
+        argument of RunParallelProcesses.
+    call_result: interproc_objects.Namespace. Contains these attributes.
+        return_value - Receives the return value of the call if it completes
+            successfully.
+        traceback - string. Receives the traceback string if the call raises
+            an exception.
+    queue: multiprocessing.Queue. Receives call_id upon call completion. May
+        not receive the call_id if a KeyboardInterrupt occurs.
+    parent_log_context: ThreadLogContext of the parent thread.
+    test_hooks: None or RunParallelProcessesTestHooks. Used in testing to
+        introduce artificial waits.
   """
   target, args, kwargs = target_arg_tuple
   try:
-    return target(*args, **kwargs), None
-  except:
-    return None, traceback.format_exc()
+    if __debug__ and test_hooks:
+      test_hooks.child_before_call()
+    try:
+      log_context = log_util.ThreadLogContext(parent_log_context)
+      log_util.SetThreadLogContext(log_context)
+      call_result.return_value = target(*args, **kwargs)
+    except BaseException:
+      call_result.traceback = traceback.format_exc()
+    if __debug__ and test_hooks:
+      test_hooks.child_before_queue()
+    queue.put(call_id)
+    if __debug__ and test_hooks:
+      test_hooks.child_after_queue()
+  except KeyboardInterrupt:
+    pass
 
 
-def RunParallelProcesses(target_arg_tuples, max_concurrency=None):
+def RunParallelProcesses(target_arg_tuples, max_concurrency=None,
+                         suppress_exceptions=False, test_hooks=None):
   """Executes function calls concurrently in separate processes.
+
+  Upon a first KeyboardInterrupt, stops launching new processes but waits for
+  existing child processes to complete (under normal circumstances, child
+  processes will have also received a SIGINT and may end in an exception).
+  Upon a second KeyboardInterrupt, child processes are forcefully killed, and
+  an exception is raised unless suppression was specified via params.
+
+  In absense of interrupts, child processes will continue to be launched, even
+  if some calls result in exceptions. Only a single exception summarizing call
+  failures is raised at the end unless suppression was specified via params.
 
   Args:
     target_arg_tuples: list of (target, args, kwargs) tuples. Each tuple
@@ -384,38 +424,136 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency=None):
     max_concurrency: int or None. The maximum number of concurrent new
         processes. If None, it will default to the number of processors on the
         machine.
-
+    suppress_exceptions: boolean. Suppress exceptions raised by this function.
+    test_hooks: None or list of RunParallelProcessesTestHooks. Used in testing
+        to introduce artificial waits.
   Returns:
     list of function return values in the order corresponding to the order of
-    target_arg_tuples.
+    target_arg_tuples. If suppress_exceptions is True, the values for calls that
+    failed or were not completed because of a KeyboardInterrupt will be None.
 
   Raises:
     errors.VmUtil.CalledProcessException: When an exception occurred in any
-        of the called functions.
+        of the called functions, and suppress_exceptions was False.
+    KeyboardInterrupt: Upon second SIGINT if suppress_exceptions was False.
   """
-  call_futures = []
-  results = []
-  error_strings = []
-  with futures.ProcessPoolExecutor(max_workers=max_concurrency) as executor:
-    for target_arg_tuple in target_arg_tuples:
-      call_futures.append(executor.submit(_ExecuteProcCall, target_arg_tuple))
-    for index, future in enumerate(call_futures):
+  max_concurrency = min(max_concurrency, len(target_arg_tuples))
+  log_context = log_util.GetThreadLogContext()
+  queue = multiprocessing.Queue()
+  active_processes = OrderedDict()
+  call_results = [None] * len(target_arg_tuples)
+  next_call_id = 0
+  received_interrupt = None
+  try:
+    # Outer loop to contain execution upon first KeyboardInterrupt.
+    while active_processes or (next_call_id < len(target_arg_tuples) and
+                               not received_interrupt):
       try:
-        result, stacktrace = future.result()
-      except:
-        result = None
-        stacktrace = traceback.format_exc()
-      results.append(result)
-      if stacktrace:
-        msg = ('Exception occurred while calling {0}:{1}{2}'.format(
-            _GetCallString(target_arg_tuples[index]), os.linesep, stacktrace))
-        logging.error(msg)
-        error_strings.append(msg)
+        # Inner loop to start new calls and wait on existing calls.
+        while active_processes or (next_call_id < len(target_arg_tuples) and
+                                   not received_interrupt):
+          # Dispatch new calls up to the concurrency limit as long as an
+          # interrupt has not yet been received.
+          if (next_call_id < len(target_arg_tuples) and
+              len(active_processes) < max_concurrency and
+              not received_interrupt):
+            call_id = next_call_id
+            target_arg_tuple = target_arg_tuples[call_id]
+            call_result = interproc_objects.Namespace()
+            call_result.return_value = None
+            call_result.traceback = None
+            process = multiprocessing.Process(
+                target=_ExecuteProcCall,
+                args=(target_arg_tuple, call_id, call_result, queue,
+                      log_context, test_hooks and test_hooks[call_id]))
+            process.daemon = True
+            call_results[call_id] = call_result
+            next_call_id += 1
+            if __debug__ and test_hooks:
+              test_hooks[call_id].parent_before_active()
+            active_processes[call_id] = process
+            if __debug__ and test_hooks:
+              test_hooks[call_id].parent_after_active()
+            process.start()
+            if __debug__ and test_hooks:
+              test_hooks[call_id].parent_after_start()
+            continue  # Inner loop. Check for more calls to start.
+          # Concurrency limit reached, or all calls started. Wait for a call to
+          # complete.
+          if received_interrupt:
+            try:
+              call_id = queue.get(block=False)
+            except Queue.Empty:
+              # An interrupted child may have stopped before writing to the
+              # queue, or the parent may have dropped the call_id after pulling
+              # it from the queue if an interrupt occurred near the
+              # parent_wait_for_child test hook below, so do not rely on a
+              # call_id from the queue itself. Just wait on remaining processes
+              # in launch order. Logged exceptions from calls that finish before
+              # this arbitrarily chosen one may be delayed, but we're already in
+              # a failure mode and just waiting for things to clean up.
+              call_id = active_processes.iterkeys().next()
+          else:
+            call_id = queue.get(block=True)
+          # Log call exceptions as they are received.
+          if __debug__ and test_hooks:
+            test_hooks[call_id].parent_wait_for_child()
+          process = active_processes.get(call_id)
+          if process:
+            if process.is_alive():
+              process.join()
+              if __debug__ and test_hooks:
+                test_hooks[call_id].parent_after_join()
+            call_result = call_results[call_id]
+            if call_result.traceback:
+              logging.error('Exception occurred while calling %s:%s%s',
+                            _GetCallString(target_arg_tuples[call_id]),
+                            os.linesep, call_result.traceback)
+            active_processes.pop(call_id)
+      except KeyboardInterrupt as e:
+        if received_interrupt:
+          raise
+        # This is the first interrupt, so handle it nicely by waiting for the
+        # child processes to complete.
+        # TODO(skschneider): In Windows, it may be necessary to forward the
+        # CTRL_C_EVENT (and launch the processes differently to begin with).
+        # In Linux, the child processes should already receive the SIGINT signal
+        # because they're in the same process group.
+        logging.exception(e)
+        received_interrupt = e
+  except KeyboardInterrupt:
+    # A prior interrupt was already handled nicely. Kill all child processes.
+    logging.exception(e)
+    received_interrupt = e
+    for process in active_processes.values():
+      if process.pid and process.exitcode is None:
+        # TODO(skschneider): In Windows, the process handle should be used.
+        # In Linux, the PID is not recycled because the process group is
+        # kept alive by the current process.
+        try:
+          os.kill(process.pid, signal.SIGKILL)
+        except OSError:
+          pass
+  # Gather results and raise exceptions.
+  return_values = [None] * len(target_arg_tuples)
+  error_strings = []
+  for call_id, call_result in enumerate(call_results):
+    if call_result:
+      return_values[call_id] = call_result.return_value
+      if call_result.traceback:
+        error_strings.append(
+            'Exception occurred while calling {0}:{1}{2}'.format(
+                _GetCallString(target_arg_tuples[call_id]), os.linesep,
+                call_result.traceback))
   if error_strings:
     msg = ('The following exceptions occurred during parallel execution:'
            '{0}{1}'.format(os.linesep, os.linesep.join(error_strings)))
-    raise errors.VmUtil.CalledProcessException(msg)
-  return results
+    logging.error(msg)
+    if not (received_interrupt or suppress_exceptions):
+      raise errors.VmUtil.CalledProcessException(msg)
+  if received_interrupt and not suppress_exceptions:
+    raise received_interrupt
+  return return_values
 
 
 def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
