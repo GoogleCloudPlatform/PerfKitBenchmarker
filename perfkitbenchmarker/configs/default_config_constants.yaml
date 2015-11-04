@@ -14,6 +14,10 @@ default_single_core: &default_single_core
     machine_type: m3.medium
     zone: us-east-1a
     image: null
+  AliCloud:
+    machine_type: ecs.s2.large
+    zone: us-west-1a
+    image: null
   DigitalOcean:
     machine_type: 2gb
     zone: sfo1
@@ -44,6 +48,10 @@ default_500_gb: &default_500_gb
     disk_size: 500
     mount_point: /scratch
   AWS:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  AliCloud:
     disk_type: standard
     disk_size: 500
     mount_point: /scratch

@@ -70,6 +70,7 @@ Before you can run the PerfKit Benchmaker on Cloud providers you need accounts a
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
 * Get an AWS account to run tests on AWS. Their site is http://aws.amazon.com/
 * Get an Azure account to run tests on Azure. Their site is http://azure.microsoft.com/
+* Get an AliCloud account to run tests on AliCloud. Their site is http://www.alicloud.com
 * Get a DigitalOcean account to run tests on DigitalOcean. Their site is https://www.digitalocean.com/
 * Get a Rackspace Cloud account to run tests on Rackspace. Their site is https://www.rackspace.com/
 
@@ -305,6 +306,66 @@ Test that azure is installed correctly
 $ azure vm list
 ```
 
+## Install AliCloud CLI and setup authentication
+Make sure you have installed pip (see the section above).
+
+Run the following command to install aliyuncli(omit the ‘sudo’ on Windows)
+
+1. Install python development tools:
+In Debian or Ubuntu:
+```
+$ sudo apt-get install -y python-dev
+```
+In CentOS:
+```
+$ sudo yum install python-devel
+```
+2. Install aliyuncli tool and python SDK for ECS:
+```
+$ sudo pip install aliyuncli
+```
+To check if AliCloud is installed:
+```
+$ aliyuncli --help
+```
+Install python SDK for ECS:
+```
+$ sudo pip install aliyun-python-sdk-ecs
+```
+Check if aliyuncli ecs command is ready:
+```
+$ aliyuncli ecs help
+```
+If you see the "usage" message, you should follow step 3.
+Otherwise, jump to step 4.
+
+3. Dealing with an exception when it runs on some specific version of Ubuntu
+Get the python lib path: `/usr/lib/python2.7/dist-packages`
+```
+$ python
+> from distutils.sysconfig import get_python_lib
+> get_python_lib()
+'/usr/lib/python2.7/dist-packages'
+```
+Copy to the right directory(for the python version 2.7.X):
+```
+$ sudo cp -r /usr/local/lib/python2.7/dist-packages/aliyun* /usr/lib/python2.7/dist-packages/
+```
+Check again:
+```
+$ aliyuncli ecs help
+```
+
+4. Navigate to the AliCloud console to create access credentials: https://home.console.aliyun.com/#/
+ * Login first
+ * Click on "AccessKeys" (top right)
+ * Click on "Create Access Key", copy and store the "Access Key ID" and "Access Key Secret" to a safe place.
+
+ Configure the CLI using the Access Key ID and Access Key Secret from the previous step
+```
+$ aliyuncli configure
+```
+
 ## DigitalOcean configuration and credentials
 
 PerfKitBenchmarker uses the *curl* tool to interact with
@@ -434,6 +495,11 @@ $ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro
 $ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
 ```
 
+## Example run on AliCloud
+```
+$ ./pkb.py --cloud=AliCloud --machine_type=ecs.s2.large --benchmarks=iperf
+```
+
 ## Example run on DigitalOcean
 ```
 $ ./pkb.py --cloud=DigitalOcean --machine_type=16gb --benchmarks=iperf
@@ -509,6 +575,7 @@ Cloud name | Default zone | Notes
 GCP | us-central1-a | |
 AWS | us-east-1a | |
 Azure | East US | |
+AliCloud | West US | |
 DigitalOcean | sfo1 | You must use a zone that supports the features 'metadata' (for cloud config) and 'private_networking'.
 OpenStack | nova | |
 CloudStack | QC-1 | |
