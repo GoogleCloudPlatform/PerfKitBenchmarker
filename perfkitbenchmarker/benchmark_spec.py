@@ -36,6 +36,9 @@ from perfkitbenchmarker.aws import aws_network
 from perfkitbenchmarker.aws import aws_virtual_machine
 from perfkitbenchmarker.azure import azure_network
 from perfkitbenchmarker.azure import azure_virtual_machine
+from perfkitbenchmarker.alicloud import ali_disk
+from perfkitbenchmarker.alicloud import ali_network
+from perfkitbenchmarker.alicloud import ali_virtual_machine
 from perfkitbenchmarker.cloudstack import cloudstack_network as cs_nw
 from perfkitbenchmarker.cloudstack import cloudstack_virtual_machine as cs_vm
 from perfkitbenchmarker.digitalocean import (
@@ -77,6 +80,7 @@ DISK_SPEC = 'disk_spec'
 GCP = 'GCP'
 AZURE = 'Azure'
 AWS = 'AWS'
+ALICLOUD = 'AliCloud'
 KUBERNETES = 'Kubernetes'
 DIGITALOCEAN = 'DigitalOcean'
 OPENSTACK = 'OpenStack'
@@ -119,6 +123,16 @@ CLASSES = {
         FIREWALL: aws_network.AwsFirewall,
         NETWORK: aws_network.AwsNetwork,
         DISK_SPEC: aws_disk.AwsDiskSpec
+    },
+    ALICLOUD: {
+       VIRTUAL_MACHINE: {
+           DEBIAN: ali_virtual_machine.DebianBasedAliVirtualMachine,
+           RHEL: ali_virtual_machine.RhelBasedAliVirtualMachine,
+           WINDOWS: ali_virtual_machine.WindowsAliVirtualMachine
+       },
+       FIREWALL: ali_network.AliFirewall,
+       NETWORK: ali_network.AliNetwork,
+       DISK_SPEC: ali_disk.AliDiskSpec
     },
     DIGITALOCEAN: {
         VIRTUAL_MACHINE: {
@@ -163,7 +177,7 @@ CLASSES = {
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP,
-                  [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                  [GCP, AZURE, AWS, ALICLOUD, DIGITALOCEAN, KUBERNETES, OPENSTACK,
                    RACKSPACE, CLOUDSTACK],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
