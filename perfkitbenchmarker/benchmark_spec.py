@@ -31,25 +31,25 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.aws import aws_disk
-from perfkitbenchmarker.aws import aws_network
-from perfkitbenchmarker.aws import aws_virtual_machine
-from perfkitbenchmarker.azure import azure_network
-from perfkitbenchmarker.azure import azure_virtual_machine
-from perfkitbenchmarker.alicloud import ali_disk
-from perfkitbenchmarker.alicloud import ali_network
-from perfkitbenchmarker.alicloud import ali_virtual_machine
-from perfkitbenchmarker.cloudstack import cloudstack_network as cs_nw
-from perfkitbenchmarker.cloudstack import cloudstack_virtual_machine as cs_vm
-from perfkitbenchmarker.digitalocean import (
+from perfkitbenchmarker.drivers.alicloud import ali_disk
+from perfkitbenchmarker.drivers.alicloud import ali_network
+from perfkitbenchmarker.drivers.alicloud import ali_virtual_machine
+from perfkitbenchmarker.drivers.aws import aws_disk
+from perfkitbenchmarker.drivers.aws import aws_network
+from perfkitbenchmarker.drivers.aws import aws_virtual_machine
+from perfkitbenchmarker.drivers.azure import azure_network
+from perfkitbenchmarker.drivers.azure import azure_virtual_machine
+from perfkitbenchmarker.drivers.cloudstack import cloudstack_network as cs_nw
+from perfkitbenchmarker.drivers.cloudstack import cloudstack_virtual_machine as cs_vm
+from perfkitbenchmarker.drivers.digitalocean import (
     digitalocean_virtual_machine as digitalocean_vm)
-from perfkitbenchmarker.gcp import gce_network
-from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
-from perfkitbenchmarker.kubernetes import kubernetes_virtual_machine
-from perfkitbenchmarker.openstack import os_network as openstack_network
-from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
-from perfkitbenchmarker.rackspace import rackspace_network as rax_net
-from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
+from perfkitbenchmarker.drivers.gcp import gce_network
+from perfkitbenchmarker.drivers.gcp import gce_virtual_machine as gce_vm
+from perfkitbenchmarker.drivers.kubernetes import kubernetes_virtual_machine
+from perfkitbenchmarker.drivers.openstack import os_network as openstack_network
+from perfkitbenchmarker.drivers.openstack import os_virtual_machine as openstack_vm
+from perfkitbenchmarker.drivers.rackspace import rackspace_network as rax_net
+from perfkitbenchmarker.drivers.rackspace import rackspace_virtual_machine as rax_vm
 
 
 def PickleLock(lock):
@@ -178,7 +178,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP,
                   [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                   RACKSPACE, CLOUDSTACK, ALICLOUD],
+                   RACKSPACE, CLOUDSTACK],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],

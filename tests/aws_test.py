@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for perfkitbenchmarker.aws."""
+"""Tests for perfkitbenchmarker.drivers.aws."""
 
 import json
 import os.path
 import unittest
 
 import mock
-
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker.aws import aws_disk
-from perfkitbenchmarker.aws import aws_network
-from perfkitbenchmarker.aws import aws_virtual_machine
-from perfkitbenchmarker.aws import util
+from perfkitbenchmarker.drivers.aws import aws_disk
+from perfkitbenchmarker.drivers.aws import aws_network
+from perfkitbenchmarker.drivers.aws import aws_virtual_machine
+from perfkitbenchmarker.drivers.aws import util
 
 
 class AwsVolumeExistsTestCase(unittest.TestCase):
@@ -56,7 +55,7 @@ class AwsVolumeExistsTestCase(unittest.TestCase):
 class AwsVpcExistsTestCase(unittest.TestCase):
 
   def setUp(self):
-    p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
+    p = mock.patch('perfkitbenchmarker.drivers.aws.util.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
     self.vpc = aws_network.AwsVpc('region')
@@ -81,12 +80,12 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
   def setUp(self):
     for module in ('perfkitbenchmarker.virtual_machine',
                    'perfkitbenchmarker.vm_util',
-                   'perfkitbenchmarker.aws.aws_network'):
+                   'perfkitbenchmarker.drivers.aws.aws_network'):
       p = mock.patch('{0}.FLAGS'.format(module))
       mock_flags = p.start()
       mock_flags.run_uri = 'aaaaaa'
       self.addCleanup(p.stop)
-    p = mock.patch('perfkitbenchmarker.aws.util.IssueRetryableCommand')
+    p = mock.patch('perfkitbenchmarker.drivers.aws.util.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
     self.vm = aws_virtual_machine.AwsVirtualMachine(
