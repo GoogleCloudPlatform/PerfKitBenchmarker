@@ -31,6 +31,7 @@ DISK_TYPE = {
     disk.LOCAL: 'ephemeral_ssd'
 }
 
+
 class AliDiskSpec(disk.BaseDiskSpec):
   """Object holding the information needed to create an AliDisk."""
 
@@ -64,12 +65,12 @@ class AliDisk(disk.BaseDisk):
   def _Create(self):
     """Creates the disk."""
     create_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'CreateDisk',
-                  '--RegionId %s' % self.region,
-                  '--ZoneId %s' % self.zone,
-                  '--Size %s' % self.disk_size,
-                  '--DiskCategory %s' % DISK_TYPE[self.disk_type]]
+        'ecs',
+        'CreateDisk',
+        '--RegionId %s' % self.region,
+        '--ZoneId %s' % self.zone,
+        '--Size %s' % self.disk_size,
+        '--DiskCategory %s' % DISK_TYPE[self.disk_type]]
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
@@ -78,12 +79,12 @@ class AliDisk(disk.BaseDisk):
   def _Delete(self):
     """Deletes the disk."""
     delete_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'DeleteDisk',
-                  '--RegionId %s' % self.region,
-                  '--DiskId %s' % self.id]
+        'ecs',
+        'DeleteDisk',
+        '--RegionId %s' % self.region,
+        '--DiskId %s' % self.id]
     logging.info('Deleting AliCloud disk %s. This may fail if the disk is not '
-             'yet detached, but will be retried.', self.id)
+                 'yet detached, but will be retried.', self.id)
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueCommand(delete_cmd)
 
@@ -102,23 +103,23 @@ class AliDisk(disk.BaseDisk):
       AliDisk.vm_devices[self.attached_vm_id].remove(self.device_letter)
 
     attach_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'AttachDisk',
-                  '--RegionId %s' % self.region,
-                  '--InstanceId %s' % self.attached_vm_id,
-                  '--DiskId %s' % self.id,
-                  '--Device %s' % self.GetDevicePath()]
+        'ecs',
+        'AttachDisk',
+        '--RegionId %s' % self.region,
+        '--InstanceId %s' % self.attached_vm_id,
+        '--DiskId %s' % self.id,
+        '--Device %s' % self.GetDevicePath()]
     attach_cmd = util.GetEncodedCmd(attach_cmd)
     vm_util.IssueRetryableCommand(attach_cmd)
 
   def Detach(self):
     """Detaches the disk from a VM."""
     detach_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'DetachDisk',
-                  '--RegionId %s' % self.region,
-                  '--InstanceId %s' % self.attached_vm_id,
-                  '--DiskId %s' % self.id]
+        'ecs',
+        'DetachDisk',
+        '--RegionId %s' % self.region,
+        '--InstanceId %s' % self.attached_vm_id,
+        '--DiskId %s' % self.id]
     detach_cmd = util.GetEncodedCmd(detach_cmd)
     vm_util.IssueRetryableCommand(detach_cmd)
 
@@ -130,4 +131,4 @@ class AliDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    return '/dev/xvd%s' % self.device_letter #TODO  IoOptimized
+    return '/dev/xvd%s' % self.device_letter

@@ -71,7 +71,8 @@ def AddTags(resource_id, resource_type, region, **kwargs):
       '--ResourceId %s' % resource_id,
       '--ResourceType %s' % resource_type]
   for index, (key, value) in enumerate(kwargs.iteritems()):
-    tag_cmd.append('--Tag{0}Key {1} --Tag{0}Value {2}'.format(index+1, key, value))
+    tag_cmd.append('--Tag{0}Key {1} --Tag{0}Value {2}'
+                   .format(index + 1, key, value))
   tag_cmd = GetEncodedCmd(tag_cmd)
   vm_util.IssueRetryableCommand(tag_cmd)
 
@@ -91,6 +92,7 @@ def AddDefaultTags(resource_id, resource_type, region):
   tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
   AddTags(resource_id, resource_type, region, **tags)
 
+
 @vm_util.Retry()
 def AddPubKeyToHost(host_ip, password, keyfile, username):
   public_key = str()
@@ -105,17 +107,21 @@ def AddPubKeyToHost(host_ip, password, keyfile, username):
   try:
     ssh.connect(
         host_ip,
-        username=ROOT, #We should use root to add pubkey to host
+        username=ROOT,  # We should use root to add pubkey to host
         password=password,
     )
     if username == ROOT:
-      command_list = ['mkdir .ssh; echo "%s" >> ~/.ssh/authorized_keys' % public_key]
+      command_list = [
+          'mkdir .ssh; echo "%s" >> ~/.ssh/authorized_keys' % public_key
+      ]
     else:
-      command_list = ['echo "{0} ALL = NOPASSWD: ALL" >> /etc/sudoers'.format(username),
-                      'useradd {0} --home /home/{0} --shell /bin/bash -m'.format(username),
-                      'mkdir /home/{0}/.ssh'.format(username),
-                      'echo "{0}" >> /home/{1}/.ssh/authorized_keys'.format(public_key, username),
-                      'chown -R {0}:{0} /home/{0}/.ssh'.format(username)]
+      command_list = [
+          'echo "{0} ALL = NOPASSWD: ALL" >> /etc/sudoers'.format(username),
+          'useradd {0} --home /home/{0} --shell /bin/bash -m'.format(username),
+          'mkdir /home/{0}/.ssh'.format(username),
+          'echo "{0}" >> /home/{1}/.ssh/authorized_keys'
+          .format(public_key, username),
+          'chown -R {0}:{0} /home/{0}/.ssh'.format(username)]
     command = ';'.join(command_list)
     ssh.exec_command(command)
 
@@ -125,6 +131,6 @@ def AddPubKeyToHost(host_ip, password, keyfile, username):
     raise IOError
 
 
-_password_chars = string.digits + string.letters
 def GeneratePassword(length=20):
-  return ''.join([random.choice(_password_chars) for i in xrange(length)])
+  password_chars = string.digits + string.letters
+  return ''.join([random.choice(password_chars) for i in xrange(length)])

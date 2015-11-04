@@ -22,7 +22,6 @@ more information about AliCloud VM networking.
 import threading
 import json
 import uuid
-import shlex
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
@@ -46,58 +45,58 @@ class AliSecurityGroup(resource.BaseResource):
   def _Create(self):
     """Creates the affinity group."""
     create_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'CreateSecurityGroup',
-                  '--SecurityGroupName %s' % self.name,
-                  '--RegionId %s' % self.region]
+        'ecs',
+        'CreateSecurityGroup',
+        '--SecurityGroupName %s' % self.name,
+        '--RegionId %s' % self.region]
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     self.group_id = json.loads(stdout)['SecurityGroupId']
 
     auth_sg_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'AuthorizeSecurityGroup',
-                  '--SecurityGroupId %s' % self.group_id,
-                  '--RegionId %s' % self.region,
-                  '--IpProtocol tcp',
-                  '--PortRange 22/22',
-                  '--SourceCidrIp 0.0.0.0/0']
+        'ecs',
+        'AuthorizeSecurityGroup',
+        '--SecurityGroupId %s' % self.group_id,
+        '--RegionId %s' % self.region,
+        '--IpProtocol tcp',
+        '--PortRange 22/22',
+        '--SourceCidrIp 0.0.0.0/0']
     auth_sg_cmd = util.GetEncodedCmd(auth_sg_cmd)
     vm_util.IssueRetryableCommand(auth_sg_cmd)
 
   def _Delete(self):
     """Deletes the affinity group."""
     delete_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'DeleteSecurityGroup',
-                  '--RegionId %s' % self.region,
-                  '--SecurityGroupId %s' % self.group_id]
+        'ecs',
+        'DeleteSecurityGroup',
+        '--RegionId %s' % self.region,
+        '--SecurityGroupId %s' % self.group_id]
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueRetryableCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the affinity group exists."""
     show_cmd = util.ALI_PREFIX + [
-                'ecs',
-                'DescribeSecurityGroupAttribute',
-                '--RegionId %s' % self.region,
-                '--SecurityGroupId %s' % self.group_id]
+        'ecs',
+        'DescribeSecurityGroupAttribute',
+        '--RegionId %s' % self.region,
+        '--SecurityGroupId %s' % self.group_id]
     show_cmd = util.GetEncodedCmd(show_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(show_cmd)
     return 'SecurityGroupId' in json.loads(stdout)
 
   def AllowPort(self, port):
     for proto in ('tcp', 'udp'):
-        allow_cmd = util.ALI_PREFIX + [
-                     'ecs',
-                     'AuthorizeSecurityGroup',
-                     '--IpProtocol %s' % proto,
-                     '--PortRange %s/%s' % (port, port),
-                     '--SourceCidrIp 0.0.0.0/0',
-                     '--RegionId %s' % self.region,
-                     '--SecurityGroupId %s' % self.group_id]
-        allow_cmd = util.GetEncodedCmd(allow_cmd)
-        vm_util.IssueRetryableCommand(allow_cmd)
+      allow_cmd = util.ALI_PREFIX + [
+          'ecs',
+          'AuthorizeSecurityGroup',
+          '--IpProtocol %s' % proto,
+          '--PortRange %s/%s' % (port, port),
+          '--SourceCidrIp 0.0.0.0/0',
+          '--RegionId %s' % self.region,
+          '--SecurityGroupId %s' % self.group_id]
+      allow_cmd = util.GetEncodedCmd(allow_cmd)
+      vm_util.IssueRetryableCommand(allow_cmd)
 
 
 class AliFirewall(network.BaseFirewall):

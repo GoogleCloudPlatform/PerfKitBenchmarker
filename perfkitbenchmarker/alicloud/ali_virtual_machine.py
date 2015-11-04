@@ -52,17 +52,17 @@ INSTANCE = 'instance'
 IMAGE = 'image'
 SNAPSHOT = 'snapshot'
 DISK = 'disk'
-NONE  = 'none'
+NONE = 'none'
 IO_OPTIMIZED = 'io_optimized'
 RESOURCE_TYPE = {
-  INSTANCE : 'instance',
-  IMAGE: 'image',
-  SNAPSHOT: 'snapshot',
-  DISK: 'disk',
+    INSTANCE: 'instance',
+    IMAGE: 'image',
+    SNAPSHOT: 'snapshot',
+    DISK: 'disk',
 }
 IO_STRATAGE = {
-  NONE : 'none',
-  IO_OPTIMIZED : 'optimized',
+    NONE: 'none',
+    IO_OPTIMIZED: 'optimized',
 }
 
 NUM_LOCAL_VOLUMES = {
@@ -138,11 +138,11 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     # the image with the 'largest' name.
     return max(images, key=lambda image: image['ImageName'])['ImageId']
 
-#TODO seemed to do nothing
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data and tag it."""
-    describe_cmd = util.ALI_PREFIX + ['ecs',
+    describe_cmd = util.ALI_PREFIX + [
+        'ecs',
         'DescribeInstances',
         '--RegionId %s' % self.region,
         '--InstanceIds \'["%s"]\'' % self.id]
@@ -157,7 +157,10 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.group_id = instance['SecurityGroupIds']['SecurityGroupId'][0]
 
     key_file = vm_util.GetPublicKeyPath()
-    util.AddPubKeyToHost(self.ip_address, self.password, key_file, self.user_name)
+    util.AddPubKeyToHost(self.ip_address,
+                         self.password,
+                         key_file,
+                         self.user_name)
     util.AddDefaultTags(self.id, RESOURCE_TYPE[INSTANCE], self.region)
 
   def _CreateDependencies(self):
@@ -179,24 +182,25 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.password = util.GeneratePassword()
 
     create_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'CreateInstance',
-                  '--InstanceName perfkit-%s' % FLAGS.run_uri,
-                  '--RegionId %s' % self.region,
-                  '--ZoneId %s' % self.zone,
-                  '--ImageId %s' % self.image,
-                  '--InstanceType %s' % self.machine_type,
-                  '--InternetChargeType PayByTraffic',
-                  '--InternetMaxBandwidthIn %s' % self.bandwidth_in,
-                  '--InternetMaxBandwidthOut %s' % self.bandwidth_out,
-                  '--SecurityGroupId %s' % self.network.security_group.group_id,
-                  '--Password %s' % self.password]
+        'ecs',
+        'CreateInstance',
+        '--InstanceName perfkit-%s' % FLAGS.run_uri,
+        '--RegionId %s' % self.region,
+        '--ZoneId %s' % self.zone,
+        '--ImageId %s' % self.image,
+        '--InstanceType %s' % self.machine_type,
+        '--InternetChargeType PayByTraffic',
+        '--InternetMaxBandwidthIn %s' % self.bandwidth_in,
+        '--InternetMaxBandwidthOut %s' % self.bandwidth_out,
+        '--SecurityGroupId %s' % self.network.security_group.group_id,
+        '--Password %s' % self.password]
 
     if FLAGS.scratch_disk_type == disk.LOCAL:
-      disk_cmd = ['--SystemDiskCategory ephemeral_ssd',
-                      '--DataDisk1Category ephemeral_ssd',
-                      '--DataDisk1Size %s' % self.scratch_disk_size,
-                      '--DataDisk1Device /dev/xvd%s' % DRIVE_START_LETTER]
+      disk_cmd = [
+          '--SystemDiskCategory ephemeral_ssd',
+          '--DataDisk1Category ephemeral_ssd',
+          '--DataDisk1Size %s' % self.scratch_disk_size,
+          '--DataDisk1Device /dev/xvd%s' % DRIVE_START_LETTER]
       create_cmd += disk_cmd
 
     if FLAGS.io_optimized == IO_STRATAGE[IO_OPTIMIZED]:
@@ -209,48 +213,48 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.id = response['InstanceId']
 
     allocateip_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'AllocatePublicIpAddress',
-                  '--RegionId %s' % self.region,
-                  '--InstanceId %s' % self.id]
+        'ecs',
+        'AllocatePublicIpAddress',
+        '--RegionId %s' % self.region,
+        '--InstanceId %s' % self.id]
     allocateip_cmd = util.GetEncodedCmd(allocateip_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(allocateip_cmd)
     response = json.loads(stdout)
     self.ip_address = response['IpAddress']
 
     start_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'StartInstance',
-                  '--RegionId %s' % self.region,
-                  '--InstanceId %s' % self.id]
+        'ecs',
+        'StartInstance',
+        '--RegionId %s' % self.region,
+        '--InstanceId %s' % self.id]
     start_cmd = util.GetEncodedCmd(start_cmd)
     vm_util.IssueRetryableCommand(start_cmd)
 
   def _Delete(self):
     """Delete a VM instance."""
     stop_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'StopInstance',
-                  '--RegionId %s' % self.region,
-                  '--InstanceId %s' % self.id]
+        'ecs',
+        'StopInstance',
+        '--RegionId %s' % self.region,
+        '--InstanceId %s' % self.id]
     stop_cmd = util.GetEncodedCmd(stop_cmd)
     vm_util.IssueRetryableCommand(stop_cmd)
 
     delete_cmd = util.ALI_PREFIX + [
-                  'ecs',
-                  'DeleteInstance',
-                  '--RegionId %s' % self.region,
-                  '--InstanceId %s' % self.id]
+        'ecs',
+        'DeleteInstance',
+        '--RegionId %s' % self.region,
+        '--InstanceId %s' % self.id]
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueRetryableCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the VM exists."""
     describe_cmd = util.ALI_PREFIX + [
-            'ecs',
-            'DescribeInstances',
-            '--RegionId %s' % self.region,
-            '--InstanceIds \'["%s"]\'' % str(self.id)]  #TODO what's the problem?
+        'ecs',
+        'DescribeInstances',
+        '--RegionId %s' % self.region,
+        '--InstanceIds \'["%s"]\'' % str(self.id)]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
@@ -295,15 +299,17 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Adds metadata to the VM."""
     util.AddTags(self.id, RESOURCE_TYPE[INSTANCE], self.region, **kwargs)
 
+
 class DebianBasedAliVirtualMachine(AliVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
   IMAGE_NAME_FILTER = 'ubuntu1404_64*aliaegis*.vhd'
+
 
 class RhelBasedAliVirtualMachine(AliVirtualMachine,
                                  linux_virtual_machine.RhelMixin):
   pass
 
-#TODO
+
 class WindowsAliVirtualMachine(AliVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
   pass

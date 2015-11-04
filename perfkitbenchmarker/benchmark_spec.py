@@ -125,14 +125,14 @@ CLASSES = {
         DISK_SPEC: aws_disk.AwsDiskSpec
     },
     ALICLOUD: {
-       VIRTUAL_MACHINE: {
-           DEBIAN: ali_virtual_machine.DebianBasedAliVirtualMachine,
-           RHEL: ali_virtual_machine.RhelBasedAliVirtualMachine,
-           WINDOWS: ali_virtual_machine.WindowsAliVirtualMachine
-       },
-       FIREWALL: ali_network.AliFirewall,
-       NETWORK: ali_network.AliNetwork,
-       DISK_SPEC: ali_disk.AliDiskSpec
+        VIRTUAL_MACHINE: {
+            DEBIAN: ali_virtual_machine.DebianBasedAliVirtualMachine,
+            RHEL: ali_virtual_machine.RhelBasedAliVirtualMachine,
+            WINDOWS: ali_virtual_machine.WindowsAliVirtualMachine
+        },
+        FIREWALL: ali_network.AliFirewall,
+        NETWORK: ali_network.AliNetwork,
+        DISK_SPEC: ali_disk.AliDiskSpec
     },
     DIGITALOCEAN: {
         VIRTUAL_MACHINE: {
@@ -177,8 +177,8 @@ CLASSES = {
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP,
-                  [GCP, AZURE, AWS, ALICLOUD, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                   RACKSPACE, CLOUDSTACK],
+                  [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                   RACKSPACE, CLOUDSTACK, ALICLOUD],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
