@@ -129,7 +129,7 @@ class NovaClient(object):
         self.password = self.GetPassword()
         self.__auth = KeystoneAuth(self.url, self.tenant,
                                    self.user, self.password)
-        self.__client = noclient.Client('1.1',
+        self.__client = noclient.Client('2',
                                         auth_url=self.url,
                                         username=self.user,
                                         auth_token=self.__auth.get_token(),
@@ -141,7 +141,7 @@ class NovaClient(object):
 
         self.__auth = KeystoneAuth(self.url, self.tenant, self.user,
                                    self.password)
-        self.__client = noclient.Client('1.1',
+        self.__client = noclient.Client('2',
                                         auth_url=self.url,
                                         username=self.user,
                                         auth_token=self.__auth.get_token(),
