@@ -416,8 +416,7 @@ def RunBenchmarks(publish=True):
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
-  successful_benchmarks = []
-  failed_benchmarks = []
+  benchmark_arg_succeeded_tuples = []
   try:
     benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     total_benchmarks = len(benchmark_tuple_list)
@@ -438,33 +437,45 @@ def RunBenchmarks(publish=True):
           RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
     else:
       while args:
-        run_args, kwargs = args.popleft()
-        benchmark_name = run_args[0].BENCHMARK_NAME
+        run_args, _ = args.popleft()
+        benchmark_module, _, sequence_number, _, _, benchmark_uid = run_args
+        benchmark_name = benchmark_module.BENCHMARK_NAME
         try:
-          RunBenchmark(*run_args, **kwargs)
-          successful_benchmarks.append(benchmark_name)
+          RunBenchmark(*run_args)
+          benchmark_arg_succeeded_tuples.append((run_args, True))
         except BaseException as e:
-          logging.exception(e)
-          failed_benchmarks.append(benchmark_name)
+          benchmark_arg_succeeded_tuples.append((run_args, False))
+          msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
+              sequence_number, total_benchmarks, benchmark_name, benchmark_uid)
           if (isinstance(e, KeyboardInterrupt) or
               FLAGS.stop_after_benchmark_failure):
+            logging.error('%s Execution will not continue.', msg)
             break
-      failed_benchmarks.extend(a[0].BENCHMARK_NAME for a, _ in args)
+          logging.error('%s Execution will continue.', msg)
+      benchmark_arg_succeeded_tuples.extend((a, False) for a, _ in args)
 
   finally:
     if collector.samples:
       collector.PublishSamples()
 
-    if successful_benchmarks:
+    if benchmark_arg_succeeded_tuples:
+      successful_benchmarks = tuple(
+          run_args[0].BENCHMARK_NAME
+          for run_args, succeeded in benchmark_arg_succeeded_tuples
+          if succeeded)
+      failed_benchmarks = tuple(
+          run_args[0].BENCHMARK_NAME
+          for run_args, succeeded in benchmark_arg_succeeded_tuples
+          if not succeeded)
       logging.info('The following benchmarks succeeded: %s',
                    ', '.join(successful_benchmarks))
-    if failed_benchmarks:
-      logging.warning('The following benchmarks failed or were not executed: '
-                      '%s', ', '.join(failed_benchmarks))
-    if total_benchmarks:
-      logging.info('Benchmark success rate: %.2f%% (%d/%d)',
-                   len(successful_benchmarks) / total_benchmarks * 100.,
-                   len(successful_benchmarks), total_benchmarks)
+      if failed_benchmarks:
+        logging.warning('The following benchmarks failed or were not executed: '
+                        '%s', ', '.join(failed_benchmarks))
+      if total_benchmarks:
+        logging.info('Benchmark success rate: %.2f%% (%d/%d)',
+                     len(successful_benchmarks) / total_benchmarks * 100.,
+                     len(successful_benchmarks), total_benchmarks)
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
 
