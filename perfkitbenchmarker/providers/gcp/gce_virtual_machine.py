@@ -35,8 +35,8 @@ from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
-from perfkitbenchmarker.drivers.gcp import gce_disk
-from perfkitbenchmarker.drivers.gcp import util
+from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import util
 
 flags.DEFINE_integer('gce_num_local_ssds', 0,
                      'The number of ssds that should be added to the VM. Note '

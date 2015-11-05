@@ -24,8 +24,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.digitalocean import digitalocean_disk
-from perfkitbenchmarker.drivers.digitalocean import util
+from perfkitbenchmarker.providers.digitalocean import digitalocean_disk
+from perfkitbenchmarker.providers.digitalocean import util
 
 FLAGS = flags.FLAGS
 

@@ -28,7 +28,7 @@ import threading
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.azure import azure_network
+from perfkitbenchmarker.providers.azure import azure_network
 
 AZURE_PATH = 'azure'
 

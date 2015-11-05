@@ -37,8 +37,8 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.aws import aws_network
-from perfkitbenchmarker.drivers.aws import util
+from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 flags.DEFINE_enum(

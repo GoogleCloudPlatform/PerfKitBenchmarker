@@ -15,7 +15,7 @@
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.cloudstack import util
+from perfkitbenchmarker.providers.cloudstack import util
 
 flags.DEFINE_string('cs_network_offering',
                     'DefaultIsolatedNetworkOfferingForVpcNetworksNoLB',

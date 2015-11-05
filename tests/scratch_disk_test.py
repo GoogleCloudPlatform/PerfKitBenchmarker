@@ -22,14 +22,14 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker.drivers.aws import aws_disk
-from perfkitbenchmarker.drivers.aws import aws_virtual_machine
-from perfkitbenchmarker.drivers.aws import util as aws_util
-from perfkitbenchmarker.drivers.azure import azure_disk
-from perfkitbenchmarker.drivers.azure import azure_network
-from perfkitbenchmarker.drivers.azure import azure_virtual_machine
-from perfkitbenchmarker.drivers.gcp import gce_disk
-from perfkitbenchmarker.drivers.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.aws import util as aws_util
+from perfkitbenchmarker.providers.azure import azure_disk
+from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import azure_virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 
 
 class ScratchDiskTestMixin(object):

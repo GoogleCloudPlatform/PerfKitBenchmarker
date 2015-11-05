@@ -22,7 +22,7 @@ import logging
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.drivers.cloudstack import util
+from perfkitbenchmarker.providers.cloudstack import util
 
 FLAGS = flags.FLAGS
 

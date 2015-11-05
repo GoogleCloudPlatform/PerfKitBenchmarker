@@ -19,8 +19,8 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import static_virtual_machine as static_vm
-from perfkitbenchmarker.drivers.aws import aws_virtual_machine as aws_vm
-from perfkitbenchmarker.drivers.gcp import gce_virtual_machine as gce_vm
+from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
 
 NAME = 'name'
 UID = 'name0'

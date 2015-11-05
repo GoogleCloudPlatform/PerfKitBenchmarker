@@ -19,9 +19,9 @@ import time
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.openstack import os_disk
-from perfkitbenchmarker.drivers.openstack import os_network
-from perfkitbenchmarker.drivers.openstack import utils as os_utils
+from perfkitbenchmarker.providers.openstack import os_disk
+from perfkitbenchmarker.providers.openstack import os_network
+from perfkitbenchmarker.providers.openstack import utils as os_utils
 
 UBUNTU_IMAGE = 'ubuntu-14.04'
 NONE = 'None'

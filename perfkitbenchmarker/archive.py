@@ -19,7 +19,7 @@ import posixpath
 import subprocess
 import tarfile
 
-from perfkitbenchmarker.drivers.aws.util import AWS_PATH
+from perfkitbenchmarker.providers.aws.util import AWS_PATH
 
 
 def ArchiveRun(run_temp_directory, target_bucket,

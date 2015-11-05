@@ -30,7 +30,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.aws import util
+from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 

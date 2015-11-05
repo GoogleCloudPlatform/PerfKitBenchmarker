@@ -35,7 +35,7 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
-from perfkitbenchmarker.drivers.azure import azure_disk
+from perfkitbenchmarker.providers.azure import azure_disk
 
 FLAGS = flags.FLAGS
 

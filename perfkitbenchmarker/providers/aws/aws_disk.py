@@ -28,7 +28,7 @@ import threading
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.aws import util
+from perfkitbenchmarker.providers.aws import util
 
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])

@@ -15,10 +15,10 @@
 import logging
 import time
 
-from perfkitbenchmarker.drivers.openstack import utils as os_utils
+from perfkitbenchmarker.providers.openstack import utils as os_utils
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker.drivers.openstack.utils import retry_authorization
+from perfkitbenchmarker.providers.openstack.utils import retry_authorization
 
 FLAGS = flags.FLAGS
 

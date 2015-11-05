@@ -23,8 +23,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.cloudstack import cloudstack_disk
-from perfkitbenchmarker.drivers.cloudstack import util
+from perfkitbenchmarker.providers.cloudstack import cloudstack_disk
+from perfkitbenchmarker.providers.cloudstack import util
 
 UBUNTU_IMAGE = 'Ubuntu 14.04.2 HVM base (64bit)'
 RHEL_IMAGE = 'CentOS 7 HVM base (64bit)'

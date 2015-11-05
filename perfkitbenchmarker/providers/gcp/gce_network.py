@@ -26,7 +26,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.gcp import util
+from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 

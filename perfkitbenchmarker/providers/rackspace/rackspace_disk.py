@@ -28,7 +28,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.rackspace import util
+from perfkitbenchmarker.providers.rackspace import util
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
