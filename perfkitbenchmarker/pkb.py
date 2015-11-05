@@ -157,6 +157,13 @@ flags.DEFINE_bool('install_packages', True,
                   'on any VMs. This option should probably only ever be used '
                   'if you have already created an image with all relevant '
                   'packages installed.')
+flags.DEFINE_bool(
+    'stop_after_benchmark_failure', False,
+    'Determines response when running multiple benchmarks serially and a '
+    'benchmark run fails. When True, no further benchmarks are scheduled, and '
+    'execution ends. When False, benchmarks continue to be scheduled. Does not '
+    'apply to keyboard interrupts, which will always prevent further '
+    'benchmarks from being scheduled.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -409,12 +416,14 @@ def RunBenchmarks(publish=True):
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
+  successful_benchmarks = []
+  failed_benchmarks = []
   try:
     benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     total_benchmarks = len(benchmark_tuple_list)
 
     benchmark_counts = collections.Counter()
-    args = []
+    args = collections.deque()
     for i, benchmark_tuple in enumerate(benchmark_tuple_list):
       benchmark_module, user_config = benchmark_tuple
       benchmark_uid = (benchmark_module.BENCHMARK_NAME +
@@ -428,13 +437,34 @@ def RunBenchmarks(publish=True):
       vm_util.RunThreaded(
           RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
     else:
-      for run_args, kwargs in args:
-        RunBenchmark(*run_args, **kwargs)
+      while args:
+        run_args, kwargs = args.popleft()
+        benchmark_name = run_args[0].BENCHMARK_NAME
+        try:
+          RunBenchmark(*run_args, **kwargs)
+          successful_benchmarks.append(benchmark_name)
+        except BaseException as e:
+          logging.exception(e)
+          failed_benchmarks.append(benchmark_name)
+          if (isinstance(e, KeyboardInterrupt) or
+              FLAGS.stop_after_benchmark_failure):
+            break
+      failed_benchmarks.extend(a[0].BENCHMARK_NAME for a, _ in args)
 
   finally:
     if collector.samples:
       collector.PublishSamples()
 
+    if successful_benchmarks:
+      logging.info('The following benchmarks succeeded: %s',
+                   ', '.join(successful_benchmarks))
+    if failed_benchmarks:
+      logging.warning('The following benchmarks failed or were not executed: '
+                      '%s', ', '.join(failed_benchmarks))
+    if total_benchmarks:
+      logging.info('Benchmark success rate: %.2f%% (%d/%d)',
+                   len(successful_benchmarks) / total_benchmarks * 100.,
+                   len(successful_benchmarks), total_benchmarks)
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
 
