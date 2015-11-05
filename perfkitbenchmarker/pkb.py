@@ -63,6 +63,7 @@ from perfkitbenchmarker import archive
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -417,13 +418,13 @@ def RunBenchmarks(publish=True):
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
-  benchmark_arg_succeeded_tuples = []
+  run_status_tuples = []
   try:
     benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     total_benchmarks = len(benchmark_tuple_list)
 
     benchmark_counts = collections.Counter()
-    args = collections.deque()
+    args = []
     for i, benchmark_tuple in enumerate(benchmark_tuple_list):
       benchmark_module, user_config = benchmark_tuple
       benchmark_uid = (benchmark_module.BENCHMARK_NAME +
@@ -437,46 +438,37 @@ def RunBenchmarks(publish=True):
       vm_util.RunThreaded(
           RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
     else:
-      while args:
-        run_args, _ = args.popleft()
+      stop_scheduling_benchmarks = False
+      for run_args, _ in args:
         benchmark_module, _, sequence_number, _, _, benchmark_uid = run_args
         benchmark_name = benchmark_module.BENCHMARK_NAME
-        try:
-          RunBenchmark(*run_args)
-          benchmark_arg_succeeded_tuples.append((run_args, True))
-        except BaseException as e:
-          benchmark_arg_succeeded_tuples.append((run_args, False))
-          msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
-              sequence_number, total_benchmarks, benchmark_name, benchmark_uid)
-          if (isinstance(e, KeyboardInterrupt) or
-              FLAGS.stop_after_benchmark_failure):
-            logging.error('%s Execution will not continue.', msg)
-            break
-          logging.error('%s Execution will continue.', msg)
-      benchmark_arg_succeeded_tuples.extend((a, False) for a, _ in args)
+        if stop_scheduling_benchmarks:
+          run_status_tuples.append((benchmark_name, benchmark_uid,
+                                    benchmark_status.SKIPPED))
+        else:
+          try:
+            RunBenchmark(*run_args)
+            run_status_tuples.append((benchmark_name, benchmark_uid,
+                                      benchmark_status.SUCCEEDED))
+          except BaseException as e:
+            run_status_tuples.append((benchmark_name, benchmark_uid,
+                                      benchmark_status.FAILED))
+            msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
+                sequence_number, total_benchmarks, benchmark_name,
+                benchmark_uid)
+            if (isinstance(e, KeyboardInterrupt) or
+                FLAGS.stop_after_benchmark_failure):
+              logging.error('%s Execution will not continue.', msg)
+              stop_scheduling_benchmarks = True
+            else:
+              logging.error('%s Execution will continue.', msg)
 
   finally:
     if collector.samples:
       collector.PublishSamples()
 
-    if benchmark_arg_succeeded_tuples:
-      successful_benchmarks = tuple(
-          run_args[0].BENCHMARK_NAME
-          for run_args, succeeded in benchmark_arg_succeeded_tuples
-          if succeeded)
-      failed_benchmarks = tuple(
-          run_args[0].BENCHMARK_NAME
-          for run_args, succeeded in benchmark_arg_succeeded_tuples
-          if not succeeded)
-      logging.info('The following benchmarks succeeded: %s',
-                   ', '.join(successful_benchmarks))
-      if failed_benchmarks:
-        logging.warning('The following benchmarks failed or were not executed: '
-                        '%s', ', '.join(failed_benchmarks))
-      if total_benchmarks:
-        logging.info('Benchmark success rate: %.2f%% (%d/%d)',
-                     len(successful_benchmarks) / total_benchmarks * 100.,
-                     len(successful_benchmarks), total_benchmarks)
+    if run_status_tuples:
+      logging.info(benchmark_status.CreateSummary(run_status_tuples))
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
 
