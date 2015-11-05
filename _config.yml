@@ -10,7 +10,7 @@ title: PerfKitBenchmarker
 email: connormccoy@google.com
 description: >
   PerfKitBenchmarker home page.
-baseurl: "" # the subpath of your site, e.g. /blog
+baseurl: "/pkb-web" # TODO(connormccoy): Update
 url: "http://www.perfkitbenchmarker.org" # the base hostname & protocol for your site
 
 # Build settings
