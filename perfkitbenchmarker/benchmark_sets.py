@@ -41,6 +41,10 @@ BENCHMARK_SETS = {
         MESSAGE: 'ARM benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
+    'alicloud_set': {
+        MESSAGE: 'AliCloud benchmark set.',
+        BENCHMARK_LIST: [STANDARD_SET]
+    },
     'broadcom_set': {
         MESSAGE: 'Broadcom benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
