@@ -284,7 +284,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
           # because if DoPreparePhase raises an exception, we still need
           # a reference to the spec in order to delete it in the "finally"
           # section below.
-          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_uid)
+          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
+                                              benchmark_uid)
           spec.ConstructVirtualMachines()
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
