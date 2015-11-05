@@ -47,9 +47,11 @@ from perfkitbenchmarker.drivers.gcp import gce_network
 from perfkitbenchmarker.drivers.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.drivers.kubernetes import kubernetes_virtual_machine
 from perfkitbenchmarker.drivers.openstack import os_network as openstack_network
-from perfkitbenchmarker.drivers.openstack import os_virtual_machine as openstack_vm
+from perfkitbenchmarker.drivers.openstack import \
+    os_virtual_machine as openstack_vm
 from perfkitbenchmarker.drivers.rackspace import rackspace_network as rax_net
-from perfkitbenchmarker.drivers.rackspace import rackspace_virtual_machine as rax_vm
+from perfkitbenchmarker.drivers.rackspace import \
+    rackspace_virtual_machine as rax_vm
 
 
 def PickleLock(lock):
