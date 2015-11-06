@@ -16,9 +16,8 @@
 import os
 import unittest
 
-import mock
-
 from perfkitbenchmarker import benchmark_status
+
 
 _STATUS_TUPLES = [('iperf', 'iperf0', benchmark_status.SUCCEEDED),
                   ('iperf', 'iperf1', benchmark_status.FAILED),
@@ -53,8 +52,5 @@ class CreateSummaryTableTestCase(unittest.TestCase):
 class CreateSummaryTestCase(unittest.TestCase):
 
   def testCreateSummary(self):
-    p = mock.patch(target=benchmark_status.__name__ + '._CreateSummaryTable',
-                   return_value=_STATUS_TABLE)
-    with p:
-      result = benchmark_status.CreateSummary(_STATUS_TUPLES)
+    result = benchmark_status.CreateSummary(_STATUS_TUPLES)
     self.assertEqual(result, _STATUS_SUMMARY)
