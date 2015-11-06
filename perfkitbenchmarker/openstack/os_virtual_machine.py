@@ -181,8 +181,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     def CreateScratchDisk(self, disk_spec):
         name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
-        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone,
-                                             self.project)
+        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone)
         self.scratch_disks.append(scratch_disk)
 
         scratch_disk.Create()
