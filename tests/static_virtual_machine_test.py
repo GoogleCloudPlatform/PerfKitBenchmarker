@@ -118,6 +118,7 @@ class StaticVirtualMachineTest(unittest.TestCase):
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
     self.assertEqual(2, len(StaticVirtualMachine.vm_pool))
     vm0 = StaticVirtualMachine.GetStaticVirtualMachine()
+    self.assertTrue(vm0.from_pool)
     self.assertEqual(1, len(StaticVirtualMachine.vm_pool))
     vm0.Delete()
     self.assertEqual(2, len(StaticVirtualMachine.vm_pool))

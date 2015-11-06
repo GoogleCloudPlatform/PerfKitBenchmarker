@@ -126,14 +126,17 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       for spec in vm_spec.disk_specs:
         self.disk_specs.append(disk.BaseDiskSpec(**spec))
 
+    self.from_pool = False
+
   def _Create(self):
     """StaticVirtualMachines do not implement _Create()."""
     pass
 
   def _Delete(self):
     """Returns the virtual machine to the pool."""
-    with self.vm_pool_lock:
-      self.vm_pool.appendleft(self)
+    if self.from_pool:
+      with self.vm_pool_lock:
+        self.vm_pool.appendleft(self)
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
@@ -270,7 +273,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     with cls.vm_pool_lock:
       if cls.vm_pool:
-        return cls.vm_pool.popleft()
+        vm = cls.vm_pool.popleft()
+        vm.from_pool = True
+        return vm
       else:
         return None
 
