@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-
+import collections
 import json
 import logging
 import threading
@@ -102,7 +102,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Static Virtual Machine."""
 
   is_static = True
-  vm_pool = []
+  vm_pool = collections.deque()
   vm_pool_lock = threading.Lock()
 
   def __init__(self, vm_spec):
@@ -126,13 +126,17 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       for spec in vm_spec.disk_specs:
         self.disk_specs.append(disk.BaseDiskSpec(**spec))
 
+    self.from_pool = False
+
   def _Create(self):
     """StaticVirtualMachines do not implement _Create()."""
     pass
 
   def _Delete(self):
-    """StaticVirtualMachines do not implement _Delete()."""
-    pass
+    """Returns the virtual machine to the pool."""
+    if self.from_pool:
+      with self.vm_pool_lock:
+        self.vm_pool.appendleft(self)
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
@@ -269,7 +273,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     with cls.vm_pool_lock:
       if cls.vm_pool:
-        return cls.vm_pool.pop(0)
+        vm = cls.vm_pool.popleft()
+        vm.from_pool = True
+        return vm
       else:
         return None
 

@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,6 +43,11 @@ flags.DEFINE_string('openstack_password_file',
                     'defaults to $OPENSTACK_PASSWORD_FILE. Alternatively, '
                     'setting the password itself in $OS_PASSWORD is also '
                     'supported.')
+
+flags.DEFINE_string('openstack_nova_endpoint_type',
+                    os.getenv('NOVA_ENDPOINT_TYPE', 'publicURL'),
+                    'OpenStack Nova endpoint type, '
+                    'defaults to $NOVA_ENDPOINT_TYPE.')
 
 
 class KeystoneAuth(object):
@@ -126,14 +131,16 @@ class NovaClient(object):
         self.url = FLAGS.openstack_auth_url
         self.user = FLAGS.openstack_username
         self.tenant = FLAGS.openstack_tenant
+        self.endpoint_type = FLAGS.openstack_nova_endpoint_type
         self.password = self.GetPassword()
         self.__auth = KeystoneAuth(self.url, self.tenant,
                                    self.user, self.password)
-        self.__client = noclient.Client('1.1',
+        self.__client = noclient.Client('2',
                                         auth_url=self.url,
                                         username=self.user,
                                         auth_token=self.__auth.get_token(),
                                         tenant_id=self.__auth.get_tenant_id(),
+                                        endpoint_type=self.endpoint_type,
                                         )
 
     def reconnect(self):
@@ -141,11 +148,12 @@ class NovaClient(object):
 
         self.__auth = KeystoneAuth(self.url, self.tenant, self.user,
                                    self.password)
-        self.__client = noclient.Client('1.1',
+        self.__client = noclient.Client('2',
                                         auth_url=self.url,
                                         username=self.user,
                                         auth_token=self.__auth.get_token(),
                                         tenant_id=self.__auth.get_tenant_id(),
+                                        endpoint_type=self.endpoint_type,
                                         )
 
 

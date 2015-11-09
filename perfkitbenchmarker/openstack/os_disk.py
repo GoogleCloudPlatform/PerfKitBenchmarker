@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ FLAGS = flags.FLAGS
 
 class OpenStackDisk(disk.BaseDisk):
 
-    def __init__(self, disk_spec, name, zone, project, image=None):
+    def __init__(self, disk_spec, name, zone, image=None):
         super(OpenStackDisk, self).__init__(disk_spec)
         self.__nclient = os_utils.NovaClient()
         self.attached_vm_name = None
@@ -34,7 +34,6 @@ class OpenStackDisk(disk.BaseDisk):
         self.image = image
         self.name = name
         self.zone = zone
-        self.project = project
         self.device = ""
         self.virtual_disks = (c for c in "cdefghijklmnopqrstuvwxyz")
 

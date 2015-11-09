@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -181,8 +181,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     def CreateScratchDisk(self, disk_spec):
         name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
-        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone,
-                                             self.project)
+        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone)
         self.scratch_disks.append(scratch_disk)
 
         scratch_disk.Create()

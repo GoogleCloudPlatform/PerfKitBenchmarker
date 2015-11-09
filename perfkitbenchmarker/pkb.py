@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ from perfkitbenchmarker import archive
 from perfkitbenchmarker import benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -157,6 +158,13 @@ flags.DEFINE_bool('install_packages', True,
                   'on any VMs. This option should probably only ever be used '
                   'if you have already created an image with all relevant '
                   'packages installed.')
+flags.DEFINE_bool(
+    'stop_after_benchmark_failure', False,
+    'Determines response when running multiple benchmarks serially and a '
+    'benchmark run fails. When True, no further benchmarks are scheduled, and '
+    'execution ends. When False, benchmarks continue to be scheduled. Does not '
+    'apply to keyboard interrupts, which will always prevent further '
+    'benchmarks from being scheduled.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -284,7 +292,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
           # because if DoPreparePhase raises an exception, we still need
           # a reference to the spec in order to delete it in the "finally"
           # section below.
-          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_uid)
+          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
+                                              benchmark_uid)
           spec.ConstructVirtualMachines()
           DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
         else:
@@ -409,6 +418,7 @@ def RunBenchmarks(publish=True):
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
+  run_status_tuples = []
   try:
     benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     total_benchmarks = len(benchmark_tuple_list)
@@ -428,13 +438,37 @@ def RunBenchmarks(publish=True):
       vm_util.RunThreaded(
           RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
     else:
-      for run_args, kwargs in args:
-        RunBenchmark(*run_args, **kwargs)
+      stop_scheduling_benchmarks = False
+      for run_args, _ in args:
+        benchmark_module, _, sequence_number, _, _, benchmark_uid = run_args
+        benchmark_name = benchmark_module.BENCHMARK_NAME
+        if stop_scheduling_benchmarks:
+          run_status_tuples.append((benchmark_name, benchmark_uid,
+                                    benchmark_status.SKIPPED))
+        else:
+          try:
+            RunBenchmark(*run_args)
+            run_status_tuples.append((benchmark_name, benchmark_uid,
+                                      benchmark_status.SUCCEEDED))
+          except BaseException as e:
+            run_status_tuples.append((benchmark_name, benchmark_uid,
+                                      benchmark_status.FAILED))
+            msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
+                sequence_number, total_benchmarks, benchmark_name,
+                benchmark_uid)
+            if (isinstance(e, KeyboardInterrupt) or
+                FLAGS.stop_after_benchmark_failure):
+              logging.error('%s Execution will not continue.', msg)
+              stop_scheduling_benchmarks = True
+            else:
+              logging.error('%s Execution will continue.', msg)
 
   finally:
     if collector.samples:
       collector.PublishSamples()
 
+    if run_status_tuples:
+      logging.info(benchmark_status.CreateSummary(run_status_tuples))
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
 

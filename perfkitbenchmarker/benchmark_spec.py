@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -206,17 +206,19 @@ def _GetDiskSpecClass(cloud):
 class BenchmarkSpec(object):
   """Contains the various data required to make a benchmark run."""
 
-  def __init__(self, benchmark_config, benchmark_uid):
+  def __init__(self, benchmark_config, benchmark_name, benchmark_uid):
     """Initialize a BenchmarkSpec object.
 
     Args:
       benchmark_config: A Python dictionary representation of the configuration
         for the benchmark. For a complete explanation, see
         perfkitbenchmarker/configs/__init__.py.
+      benchmark_name: string. Name of the benchmark.
       benchmark_uid: An identifier unique to this run of the benchmark even
         if the same benchmark is run multiple times with different configs.
     """
     self.config = benchmark_config
+    self.name = benchmark_name
     self.uid = benchmark_uid
     self.vms = []
     self.networks = {}
@@ -404,7 +406,8 @@ class BenchmarkSpec(object):
     logging.info('Waiting for boot completion.')
     for port in vm.remote_access_ports:
       vm.AllowPort(port)
-    vm.AddMetadata(benchmark=self.uid, perfkit_uuid=self.uuid)
+    vm.AddMetadata(benchmark=self.name, perfkit_uuid=self.uuid,
+                   benchmark_uid=self.uid)
     vm.WaitForBootCompletion()
     vm.OnStartup()
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,10 +48,11 @@ for file in "$@"; do
     # Header differs by one line. Check if only copyright date differs. If so,
     # the contents of "${differ}" should resemble:
     #     1c1
-    #     < # Copyright 2015 Google Inc. All rights reserved.
+    #     < # Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
     #     ---
-    #     > # Copyright 2014 Google Inc. All rights reserved.
-    header_line='# Copyright [0-9]+ Google Inc[.] All rights reserved[.]'
+    #     > # Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+    header_line='# Copyright [0-9]+ PerfKitBenchmarker Authors[.]'
+    header_line+=' All rights reserved[.]'
     diff_prefix='[[:alnum:]]+[[:space:]]*< '
     diff_middle='[[:space:]]*---[[:space:]]*> '
     diff_pattern="^${diff_prefix}${header_line}${diff_middle}${header_line}\$"

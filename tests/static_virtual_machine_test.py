@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ class StaticVirtualMachineTest(unittest.TestCase):
 
   def setUp(self):
     self._initial_pool = StaticVirtualMachine.vm_pool
-    StaticVirtualMachine.vm_pool = []
+    StaticVirtualMachine.vm_pool.clear()
     p = mock.patch(vm_util.__name__ + '.GetTempDir')
     p.start()
     self.addCleanup(p.stop)
@@ -58,7 +58,7 @@ class StaticVirtualMachineTest(unittest.TestCase):
   def testReadFromFile_Empty(self):
     fp = BytesIO('[]')
     StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
-    self.assertEqual([], StaticVirtualMachine.vm_pool)
+    self.assertEqual([], list(StaticVirtualMachine.vm_pool))
 
   def testReadFromFile_NoErr(self):
     s = ('[{'
@@ -100,6 +100,31 @@ class StaticVirtualMachineTest(unittest.TestCase):
     self.assertRaises(ValueError,
                       StaticVirtualMachine.ReadStaticVirtualMachineFile,
                       fp)
+
+  def testCreateReturn(self):
+    s = ('[{'
+         '  "ip_address": "174.12.14.1", '
+         '  "user_name": "perfkitbenchmarker", '
+         '  "keyfile_path": "perfkitbenchmarker.pem" '
+         '}, '
+         '{ '
+         '   "ip_address": "174.12.14.121", '
+         '   "user_name": "ubuntu", '
+         '   "keyfile_path": "rackspace.pem", '
+         '   "internal_ip": "10.10.10.2", '
+         '   "zone": "rackspace_dallas" '
+         '}] ')
+    fp = BytesIO(s)
+    StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
+    self.assertEqual(2, len(StaticVirtualMachine.vm_pool))
+    vm0 = StaticVirtualMachine.GetStaticVirtualMachine()
+    self.assertTrue(vm0.from_pool)
+    self.assertEqual(1, len(StaticVirtualMachine.vm_pool))
+    vm0.Delete()
+    self.assertEqual(2, len(StaticVirtualMachine.vm_pool))
+    vm1 = StaticVirtualMachine.GetStaticVirtualMachine()
+    self.assertIs(vm0, vm1)
+
 
 if __name__ == '__main__':
   unittest.main()
