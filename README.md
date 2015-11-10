@@ -1,8 +1,5 @@
 
----
-title:  Getting Started
-layout: page
----
+
 
 ## Getting Started
 
