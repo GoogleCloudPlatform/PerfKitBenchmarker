@@ -46,6 +46,8 @@ from perfkitbenchmarker.digitalocean import (
 from perfkitbenchmarker.gcp import gce_network
 from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.kubernetes import kubernetes_virtual_machine
+from perfkitbenchmarker.mesos import mesos_virtual_machine
+from perfkitbenchmarker.mesos import mesos_network
 from perfkitbenchmarker.openstack import os_network as openstack_network
 from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
 from perfkitbenchmarker.rackspace import rackspace_network as rax_net
@@ -86,6 +88,7 @@ DIGITALOCEAN = 'DigitalOcean'
 OPENSTACK = 'OpenStack'
 CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
+MESOS = 'Mesos'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
@@ -171,13 +174,20 @@ CLASSES = {
             RHEL: rax_vm.RhelBasedRackspaceVirtualMachine
         },
         FIREWALL: rax_net.RackspaceSecurityGroup
+    },
+    MESOS: {
+        VIRTUAL_MACHINE: {
+            DEBIAN: mesos_virtual_machine.DebianBasedMesosVirtualMachine,
+            RHEL: mesos_virtual_machine.MesosVirtualMachine
+        },
+        FIREWALL: mesos_network.MesosFirewall
     }
 }
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP,
-                  [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                  [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, MESOS, OPENSTACK,
                    RACKSPACE, CLOUDSTACK, ALICLOUD],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(

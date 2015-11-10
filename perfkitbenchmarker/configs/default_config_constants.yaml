@@ -36,6 +36,8 @@ default_single_core: &default_single_core
     image: null
   Kubernetes:
     image: null
+  Mesos:
+    image: null
 
 
 default_500_gb: &default_500_gb
@@ -71,6 +73,10 @@ default_500_gb: &default_500_gb
     disk_size: 500
     mount_point: /scratch
   Kubernetes:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  Mesos:
     disk_type: standard
     disk_size: 500
     mount_point: /scratch
