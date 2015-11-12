@@ -93,7 +93,7 @@ def AddDefaultTags(resource_id, resource_type, region):
   AddTags(resource_id, resource_type, region, **tags)
 
 
-@vm_util.Retry()
+@vm_util.Retry(log_errors=False)
 def AddPubKeyToHost(host_ip, password, keyfile, username):
   public_key = str()
   if keyfile:

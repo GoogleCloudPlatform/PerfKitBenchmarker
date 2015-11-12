@@ -22,6 +22,7 @@ more information about AliCloud VM networking.
 import threading
 import json
 import uuid
+import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
@@ -29,18 +30,139 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.alicloud import util
 from perfkitbenchmarker import resource
 
+flags.DEFINE_boolean('ali_use_vpc', True,
+                     'Use VPC to create networks')
 
 FLAGS = flags.FLAGS
 MAX_NAME_LENGTH = 128
 
 
+class AliVpc(resource.BaseResource):
+  """An object representing an Aws VPC."""
+
+  def __init__(self, name, region):
+    super(AliVpc, self).__init__()
+    self.region = region
+    self.id = None
+    self.name = name
+
+  def _Create(self):
+    """Creates the VPC."""
+    create_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'CreateVpc',
+        '--VpcName %s' % self.name,
+        '--RegionId %s' % self.region,
+        '--CidrBlock 10.0.0.0/16']
+    create_cmd = util.GetEncodedCmd(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    response = json.loads(stdout)
+    self.id = response['VpcId']
+
+  def _Exists(self):
+    """Returns true if the VPC exists."""
+    describe_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'DescribeVpcs',
+        '--RegionId %s' % self.region,
+        '--VpcId %s' % self.id]
+    describe_cmd = util.GetEncodedCmd(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    vpcs = response['Vpcs']['Vpc']
+    assert len(vpcs) < 2, 'Too many VPCs.'
+    return len(vpcs) > 0
+
+  @vm_util.Retry(poll_interval=1, max_retries=30, log_errors=False)
+  def _WaitForVpcStatus(self, status_list):
+    """Waits until VPC's status is in status_list"""
+    logging.info('Waits until the status of VPC is in status_list: %s',
+                 status_list)
+    describe_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'DescribeVpcs',
+        '--RegionId %s' % self.region,
+        '--VpcId %s' % self.id]
+    describe_cmd = util.GetEncodedCmd(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    vpcs = response['Vpcs']['Vpc']
+    assert len(vpcs) == 1
+    vpc_status = response['Vpcs']['Vpc'][0]['Status']
+    assert vpc_status in status_list
+
+  def _Delete(self):
+    """Delete's the VPC."""
+    delete_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'DeleteVpc',
+        '--RegionId %s' % self.region,
+        '--VpcId %s' % self.id]
+    delete_cmd = util.GetEncodedCmd(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
+
+
+class AliVSwitch(resource.BaseResource):
+  """An object representing an AliCloud VSwitch."""
+
+  def __init__(self, name, zone, vpc_id):
+    super(AliVSwitch, self).__init__()
+    self.region = util.GetRegionByZone(zone)
+    self.id = None
+    self.vpc_id = vpc_id
+    self.zone = zone
+    self.name = name
+
+  def _Create(self):
+    """Creates the VSwitch."""
+    create_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'CreateVSwitch',
+        '--VSwitchName %s' % self.name,
+        '--ZoneId %s' % self.zone,
+        '--CidrBlock 10.0.0.0/24',
+        '--VpcId %s' % self.vpc_id,
+    ]
+    create_cmd = util.GetEncodedCmd(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    response = json.loads(stdout)
+    self.id = response['VSwitchId']
+
+  def _Delete(self):
+    """Deletes the vswitch."""
+    delete_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'DeleteVSwitch',
+        '--RegionId %s' % self.region,
+        '--VSwitchId %s' % self.id]
+    delete_cmd = util.GetEncodedCmd(delete_cmd)
+    vm_util.IssueCommand(delete_cmd)
+
+  def _Exists(self):
+    """Returns true if the vswitch exists."""
+    describe_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'DescribeVSwitches',
+        '--RegionId %s' % self.region,
+        '--VpcId %s' % self.vpc_id,
+        '--ZoneId %s' % self.zone]
+    describe_cmd = util.GetEncodedCmd(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    vswitches = response['VSwitches']['VSwitch']
+    assert len(vswitches) < 2, 'Too many VSwitches.'
+    return len(vswitches) > 0
+
+
 class AliSecurityGroup(resource.BaseResource):
   """Object representing an Azure Affinity Group."""
 
-  def __init__(self, name, region):
+  def __init__(self, name, region, use_vpc=True, vpc_id=None):
     super(AliSecurityGroup, self).__init__()
     self.name = name
     self.region = region
+    self.use_vpc = use_vpc
+    self.vpc_id = vpc_id
 
   def _Create(self):
     """Creates the affinity group."""
@@ -49,20 +171,23 @@ class AliSecurityGroup(resource.BaseResource):
         'CreateSecurityGroup',
         '--SecurityGroupName %s' % self.name,
         '--RegionId %s' % self.region]
+    if self.use_vpc:
+      create_cmd.append('--VpcId %s' % self.vpc_id)
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     self.group_id = json.loads(stdout)['SecurityGroupId']
 
-    auth_sg_cmd = util.ALI_PREFIX + [
-        'ecs',
-        'AuthorizeSecurityGroup',
-        '--SecurityGroupId %s' % self.group_id,
-        '--RegionId %s' % self.region,
-        '--IpProtocol tcp',
-        '--PortRange 22/22',
-        '--SourceCidrIp 0.0.0.0/0']
-    auth_sg_cmd = util.GetEncodedCmd(auth_sg_cmd)
-    vm_util.IssueRetryableCommand(auth_sg_cmd)
+    for protocol in ('tcp', 'udp'):
+        auth_sg_cmd = util.ALI_PREFIX + [
+            'ecs',
+            'AuthorizeSecurityGroup',
+            '--IpProtocol %s' % protocol,
+            '--PortRange 22/22',
+            '--SourceCidrIp 0.0.0.0/0',
+            '--RegionId %s' % self.region,
+            '--SecurityGroupId %s' % self.group_id]
+        auth_sg_cmd = util.GetEncodedCmd(auth_sg_cmd)
+        vm_util.IssueRetryableCommand(auth_sg_cmd)
 
   def _Delete(self):
     """Deletes the affinity group."""
@@ -85,41 +210,13 @@ class AliSecurityGroup(resource.BaseResource):
     stdout, _ = vm_util.IssueRetryableCommand(show_cmd)
     return 'SecurityGroupId' in json.loads(stdout)
 
-  def AllowPort(self, port):
-    for proto in ('tcp', 'udp'):
-      allow_cmd = util.ALI_PREFIX + [
-          'ecs',
-          'AuthorizeSecurityGroup',
-          '--IpProtocol %s' % proto,
-          '--PortRange %s/%s' % (port, port),
-          '--SourceCidrIp 0.0.0.0/0',
-          '--RegionId %s' % self.region,
-          '--SecurityGroupId %s' % self.group_id]
-      allow_cmd = util.GetEncodedCmd(allow_cmd)
-      vm_util.IssueRetryableCommand(allow_cmd)
 
 
 class AliFirewall(network.BaseFirewall):
   """An object representing the AliCloud Firewall."""
 
   def __init__(self):
-    """Initialize AliCloud firewall class.
-
-    Args:
-      project: The Ali project name under which firewall is created.
-    """
-    self._lock = threading.Lock()
-    self.firewall_names = []
-
-  def __getstate__(self):
-    """Implements getstate to allow pickling (since locks can't be pickled)."""
-    d = self.__dict__.copy()
-    del d['_lock']
-    return d
-
-  def __setstate__(self, state):
-    """Restores the lock after the object is unpickled."""
-    self.__dict__ = state
+    self.firewall_set = set()
     self._lock = threading.Lock()
 
   def AllowPort(self, vm, port):
@@ -129,7 +226,15 @@ class AliFirewall(network.BaseFirewall):
       vm: The BaseVirtualMachine object to open the port for.
       port: The local port to open.
     """
-    vm.network.security_group.AllowPort(port)
+    if vm.is_static:
+      return
+    entry = (port, vm.group_id)
+    if entry in self.firewall_set:
+      return
+    with self._lock:
+      if entry in self.firewall_set:
+        return
+      self.firewall_set.add(entry)
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
@@ -141,16 +246,43 @@ class AliNetwork(network.BaseNetwork):
 
   def __init__(self, zone):
     super(AliNetwork, self).__init__(zone)
-    name = ('perfkit%s%s' %
-            (FLAGS.run_uri, str(uuid.uuid4())[-12:])).lower()[:MAX_NAME_LENGTH]
-    region = util.GetRegionByZone(zone)
-    self.security_group = AliSecurityGroup(name, region)
+    self.name = (
+        'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:]))
+    self.region = util.GetRegionByZone(zone)
+    self.use_vpc = FLAGS.ali_use_vpc
+    if self.use_vpc:
+      self.vpc = AliVpc(self.name, self.region)
+      self.vswitch = None
+      self.security_group = None
+    else:
+      self.security_group = \
+          AliSecurityGroup(self.name, self.region, use_vpc=False)
 
   @vm_util.Retry()
   def Create(self):
-    """Creates the actual network."""
-    self.security_group.Create()
+    """Creates the network."""
+    if self.use_vpc:
+      self.vpc.Create()
+      self.vpc._WaitForVpcStatus(['Available'])
+      if self.vswitch is None:
+        self.vswitch = AliVSwitch(self.name, self.zone, self.vpc.id)
+      self.vswitch.Create()
+
+      if self.security_group is None:
+        self.security_group = AliSecurityGroup(self.name,
+                                               self.region,
+                                               use_vpc=True,
+                                               vpc_id=self.vpc.id)
+      self.security_group.Create()
+    else:
+      self.security_group.Create()
 
   def Delete(self):
-    """Deletes the actual network."""
-    self.security_group.Delete()
+    """Deletes the network."""
+    if self.use_vpc:
+      self.security_group.Delete()
+      self.vswitch.Delete()
+      self.security_group.Delete()
+      self.vpc.Delete()
+    else:
+      self.security_group.Delete()

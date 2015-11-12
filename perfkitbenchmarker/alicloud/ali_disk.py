@@ -20,9 +20,12 @@ import string
 import threading
 import logging
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.alicloud import util
+
+FLAGS = flags.FLAGS
 
 DISK_TYPE = {
     disk.STANDARD: 'cloud',
@@ -108,7 +111,7 @@ class AliDisk(disk.BaseDisk):
         '--RegionId %s' % self.region,
         '--InstanceId %s' % self.attached_vm_id,
         '--DiskId %s' % self.id,
-        '--Device %s' % self.GetDevicePath()]
+        '--Device /dev/xvdb']
     attach_cmd = util.GetEncodedCmd(attach_cmd)
     vm_util.IssueRetryableCommand(attach_cmd)
 
@@ -131,4 +134,27 @@ class AliDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    return '/dev/xvd%s' % self.device_letter
+    if FLAGS.ali_io_optimized == 'none':
+      return '/dev/xvd%s' % self.device_letter
+    else:
+      return '/dev/vd%s' % self.device_letter
+
+  @vm_util.Retry(poll_interval=1, log_errors=False)
+  def WartForDiskStatus(self, status_list):
+    """Waits until disk is attach to the instance"""
+    logging.info('Waits until the disk\'s stastus is one of statuses: %s',
+                 status_list)
+    attach_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'DescribeDisks',
+        '--RegionId %s' % self.region,
+        '--ZoneId %s' % self.zone,
+        '--DiskIds \'["%s"]\'' % self.id,
+        '--Device /dev/xvdb']
+    attach_cmd = util.GetEncodedCmd(attach_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(attach_cmd)
+    response = json.loads(stdout)
+    disk = response['Disks']['Disk'][0]
+    assert len(disk) == 1
+    status = disk['Status']
+    assert status in status_list
