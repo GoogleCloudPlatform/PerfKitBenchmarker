@@ -182,7 +182,7 @@ class AliSecurityGroup(resource.BaseResource):
             'ecs',
             'AuthorizeSecurityGroup',
             '--IpProtocol %s' % protocol,
-            '--PortRange 22/22',
+            '--PortRange 1/65535',
             '--SourceCidrIp 0.0.0.0/0',
             '--RegionId %s' % self.region,
             '--SecurityGroupId %s' % self.group_id]
