@@ -41,16 +41,16 @@ flags.DEFINE_string('ali_user_name', 'ubuntu',
                     'use any image other than ubuntu.')
 flags.DEFINE_integer('ali_bandwidth_in', 100, 'Inbound Bandwidth')
 flags.DEFINE_integer('ali_bandwidth_out', 100, 'Outbound Bandwidth')
-flags.DEFINE_string('ali_io_optimized', 'none',
+flags.DEFINE_string('ali_io_optimized', None,
                     'IO optimized for disk in AliCloud. The default is '
-                    '"none" which means no IO optimized '
+                    'None which means no IO optimized '
                     '"optimized" means use IO optimized. If you '
-                    'choose optimized, you should specify a disk type')
+                    'choose optimized, you must specify the system disk type')
 flags.DEFINE_string('ali_system_disk_type', 'cloud',
                     'System disk catogory for AliCloud. The default is '
-                    '"cloud" for General cloud disk,'
+                    '"cloud" for General cloud disk, '
                     '"cloud_ssd" for cloud ssd disk, '
-                    '"cloud_efficiency" for efficiency cloud disk,'
+                    '"cloud_efficiency" for efficiency cloud disk, '
                     '"ephemeral_ssd" for local ssd disk')
 
 DEFAULT_DISK_SIZE = 500
@@ -66,14 +66,11 @@ RESOURCE_TYPE = {
     SNAPSHOT: 'snapshot',
     DISK: 'disk',
 }
-IO_STRATAGE = {
-    NONE: 'none',
-    IO_OPTIMIZED: 'optimized',
-}
+
 DRIVE_START_LETTER = 'b'
-if FLAGS.ali_io_optimized == IO_STRATAGE[NONE]:
+if FLAGS.ali_io_optimized is None:
   DRIVE_PREFIX = '/dev/xvd'
-elif FLAGS.ali_io_optimized == IO_STRATAGE[IO_OPTIMIZED]:
+elif FLAGS.ali_io_optimized:
   DRIVE_PREFIX = '/dev/vd'
 
 NUM_LOCAL_VOLUMES = {
@@ -294,7 +291,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--DataDisk1Device %s%s' % (DRIVE_PREFIX, DRIVE_START_LETTER)]
       create_cmd.extend(disk_cmd)
 
-    if FLAGS.ali_io_optimized == IO_STRATAGE[IO_OPTIMIZED]:
+    if FLAGS.ali_io_optimized is not None:
       create_cmd.extend(['--IoOptimized optimized',
                          '--SystemDiskCategory %s' % self.system_disk_type])
 
@@ -342,14 +339,14 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueRetryableCommand(delete_cmd)
 
-    self._WaitForEipStatus(['Available'])
-
-    release_eip_cmd = util.ALI_PREFIX + [
-        'ecs',
-        'ReleaseEipAddress',
-        '--AllocationId %s' % self.eip_id]
-    release_eip_cmd = util.GetEncodedCmd(release_eip_cmd)
-    vm_util.IssueRetryableCommand(release_eip_cmd)
+    if FLAGS.ali_use_vpc:
+      self._WaitForEipStatus(['Available'])
+      release_eip_cmd = util.ALI_PREFIX + [
+          'ecs',
+          'ReleaseEipAddress',
+          '--AllocationId %s' % self.eip_id]
+      release_eip_cmd = util.GetEncodedCmd(release_eip_cmd)
+      vm_util.IssueRetryableCommand(release_eip_cmd)
 
   def _Exists(self):
     """Returns true if the VM exists."""
@@ -385,7 +382,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       data_disk.device_letter = DRIVE_START_LETTER
 
-    data_disk.WartForDiskStatus(['In_use'])
+    data_disk.WaitForDiskStatus(['In_use'])
 
     self.FormatDisk(data_disk.GetDevicePath())
     self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point)
