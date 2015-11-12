@@ -87,6 +87,7 @@ DEFAULT_IMAGE = "ubuntu1404_64_20G_aliaegis_20150325.vhd",
 class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AliCloud Virtual Machine."""
 
+  CLOUD = 'AliCloud'
   DEFAULT_ZONE = 'cn-hangzhou-d'
   DEFAULT_MACHINE_TYPE = 'ecs.s3.large'
   IMAGE_NAME_FILTER = 'ubuntu1404_64_20G_aliaegis*'

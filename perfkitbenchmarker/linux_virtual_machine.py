@@ -543,6 +543,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
+  OS_TYPE = 'rhel'
+
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
     self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
@@ -642,6 +644,8 @@ class RhelMixin(BaseLinuxMixin):
 
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
+
+  OS_TYPE = 'debian'
 
   def SetupPackageManager(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""
@@ -755,6 +759,8 @@ class ContainerizedDebianMixin(DebianMixin):
   Any call to RemoteCommand() will be run within the container
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
+
+  OS_TYPE = 'ubuntu_container'
 
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
