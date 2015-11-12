@@ -19,12 +19,12 @@ import mock
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker.aws import aws_disk
-from perfkitbenchmarker.aws import aws_virtual_machine
-from perfkitbenchmarker.azure import azure_disk
-from perfkitbenchmarker.azure import azure_network
-from perfkitbenchmarker.azure import azure_virtual_machine
-from perfkitbenchmarker.gcp import gce_disk
+from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.azure import azure_disk
+from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import azure_virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_disk
 
 
 class GcpDiskMetadataTest(unittest.TestCase):
