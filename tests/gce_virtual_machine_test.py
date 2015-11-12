@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for perfkitbenchmarker.gcp.gce_virtual_machine"""
+"""Tests for perfkitbenchmarker.providers.gcp.gce_virtual_machine"""
 
 import unittest
-import mock
 
-from perfkitbenchmarker import pkb  # noqa. Imported to create needed flags.
+import mock
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 
 
 class GCEPreemptibleVMFlagTestCase(unittest.TestCase):
