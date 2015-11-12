@@ -182,7 +182,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum('cloud', GCP,
                   [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                   RACKSPACE, CLOUDSTACK],
+                   RACKSPACE, CLOUDSTACK, ALICLOUD],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],

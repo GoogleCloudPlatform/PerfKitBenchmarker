@@ -15,8 +15,8 @@
 """Tests for perfkitbenchmarker.providers.gcp.gce_virtual_machine"""
 
 import unittest
-
 import mock
+
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 
