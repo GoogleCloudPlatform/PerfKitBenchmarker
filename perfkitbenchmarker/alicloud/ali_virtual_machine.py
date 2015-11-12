@@ -141,7 +141,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     status = instances[0]['Status']
     assert status in status_list
 
-  @vm_util.Retry(poll_interval=1, max_retries=30, log_errors=False)
+  @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def _WaitForEipStatus(self, status_list):
     """Waits until the instance's status is in status_list"""
     logging.info('Waits until the eip\'s stastus is one of statuses: %s',

@@ -73,7 +73,7 @@ class AliVpc(resource.BaseResource):
     assert len(vpcs) < 2, 'Too many VPCs.'
     return len(vpcs) > 0
 
-  @vm_util.Retry(poll_interval=1, max_retries=30, log_errors=False)
+  @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def _WaitForVpcStatus(self, status_list):
     """Waits until VPC's status is in status_list"""
     logging.info('Waits until the status of VPC is in status_list: %s',
