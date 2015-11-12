@@ -26,7 +26,7 @@ import uuid
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.alicloud import util
+from perfkitbenchmarker.providers.alicloud import util
 from perfkitbenchmarker import resource
 
 FLAGS = flags.FLAGS

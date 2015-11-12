@@ -22,7 +22,7 @@ import logging
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.drivers.alicloud import util
+from perfkitbenchmarker.providers.alicloud import util
 
 DISK_TYPE = {
     disk.STANDARD: 'cloud',

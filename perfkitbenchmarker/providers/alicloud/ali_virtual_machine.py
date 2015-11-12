@@ -28,8 +28,8 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import disk
-from perfkitbenchmarker.alicloud import ali_disk
-from perfkitbenchmarker.drivers.alicloud import util
+from perfkitbenchmarker.providers.alicloud import ali_disk
+from perfkitbenchmarker.providers.alicloud import util
 
 FLAGS = flags.FLAGS
 NON_HVM_PREFIXES = ['t1', 's1', 's2', 's3', 'm1']
