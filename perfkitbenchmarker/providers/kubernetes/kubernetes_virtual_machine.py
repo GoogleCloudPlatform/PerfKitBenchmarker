@@ -17,11 +17,11 @@ import json
 import logging
 import random
 
-import kubernetes_disk
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
     OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
 

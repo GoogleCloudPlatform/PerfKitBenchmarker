@@ -16,8 +16,8 @@
 
 import abc
 import unittest
-
 import mock
+
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
