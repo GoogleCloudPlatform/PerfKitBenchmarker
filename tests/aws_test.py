@@ -32,7 +32,8 @@ class AwsVolumeExistsTestCase(unittest.TestCase):
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
-    self.disk = aws_disk.AwsDisk(aws_disk.AwsDiskSpec(), 'zone-a')
+    self.disk = aws_disk.AwsDisk(aws_disk.AwsDiskSpec(disk_type='standard'),
+                                 'zone-a', 'm4.2xlarge')
     self.disk.id = 'vol-foo'
 
   def testVolumePresent(self):

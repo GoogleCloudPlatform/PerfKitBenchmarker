@@ -108,7 +108,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.service = AzureService(self.name,
                                 self.network.affinity_group.name)
     disk_spec = disk.BaseDiskSpec()
-    self.os_disk = azure_disk.AzureDisk(disk_spec, self.name)
+    self.os_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type)
     self.max_local_disks = 1
     self.image = self.image or self.DEFAULT_IMAGE
 
@@ -186,7 +186,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     disks = []
 
     for _ in xrange(disk_spec.num_striped_disks):
-      data_disk = azure_disk.AzureDisk(disk_spec, self.name)
+      data_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type)
       if disk_spec.disk_type == disk.LOCAL:
         # Local disk numbers start at 1 (0 is the system disk).
         data_disk.disk_number = self.local_disk_counter + 1

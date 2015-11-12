@@ -284,7 +284,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Instantiate the disk(s) that we want to create.
     disks = []
     for _ in range(disk_spec.num_striped_disks):
-      data_disk = aws_disk.AwsDisk(disk_spec, self.zone)
+      data_disk = aws_disk.AwsDisk(disk_spec, self.zone, self.machine_type)
       if disk_spec.disk_type == disk.LOCAL:
         data_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
                                       self.local_disk_counter)

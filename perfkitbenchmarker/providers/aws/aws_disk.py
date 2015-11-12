@@ -33,11 +33,48 @@ from perfkitbenchmarker.providers.aws import util
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
 VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
+
+STANDARD = 'standard'
+GP2 = 'gp2'
+IO1 = 'io1'
+
 DISK_TYPE = {
-    disk.STANDARD: 'standard',
-    disk.REMOTE_SSD: 'gp2',
-    disk.PIOPS: 'io1'
+    # no need to translate 'standard' because the old and new names
+    # are the same
+    disk.REMOTE_SSD: GP2,
+    disk.PIOPS: IO1
 }
+
+DISK_METADATA = {
+    STANDARD: {
+        disk.MEDIA: disk.HDD,
+        disk.REPLICATION: disk.ZONE
+    },
+    GP2: {
+        disk.MEDIA: disk.SSD,
+        disk.REPLICATION: disk.ZONE
+    },
+    IO1: {
+        disk.MEDIA: disk.SSD,
+        disk.REPLICATION: disk.ZONE
+    },
+    disk.LOCAL: None
+}
+
+LOCAL_SSD_METADATA = {
+    disk.MEDIA: disk.SSD,
+    disk.REPLICATION: disk.NONE
+}
+
+LOCAL_HDD_METADATA = {
+    disk.MEDIA: disk.HDD,
+    disk.REPLICATION: disk.NONE
+}
+
+LOCAL_HDD_PREFIXES = ['d2']
+
+AWS = 'AWS'
+disk.RegisterDiskTypeMap(AWS, DISK_TYPE)
 
 
 class AwsDiskSpec(disk.BaseDiskSpec):
@@ -58,7 +95,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
   def ApplyFlags(self, flags):
     """Apply flags to the DiskSpec."""
     super(AwsDiskSpec, self).ApplyFlags(flags)
-    self.iops = flags.scratch_disk_iops or self.iops
+    self.iops = flags.aws_provisioned_iops or self.iops
 
 
 class AwsDisk(disk.BaseDisk):
@@ -67,7 +104,7 @@ class AwsDisk(disk.BaseDisk):
   _lock = threading.Lock()
   vm_devices = {}
 
-  def __init__(self, disk_spec, zone):
+  def __init__(self, disk_spec, zone, machine_type):
     super(AwsDisk, self).__init__(disk_spec)
     self.iops = disk_spec.iops
     self.id = None
@@ -75,6 +112,14 @@ class AwsDisk(disk.BaseDisk):
     self.region = zone[:-1]
     self.device_letter = None
     self.attached_vm_id = None
+
+    if self.disk_type != disk.LOCAL:
+      self.metadata = DISK_METADATA[self.disk_type]
+    else:
+      if machine_type[:2].lower() in LOCAL_HDD_PREFIXES:
+        self.metadata = LOCAL_HDD_METADATA
+      else:
+        self.metadata = LOCAL_SSD_METADATA
 
   def _Create(self):
     """Creates the disk."""
@@ -84,8 +129,8 @@ class AwsDisk(disk.BaseDisk):
         '--region=%s' % self.region,
         '--size=%s' % self.disk_size,
         '--availability-zone=%s' % self.zone,
-        '--volume-type=%s' % DISK_TYPE[self.disk_type]]
-    if self.disk_type == 'io1':
+        '--volume-type=%s' % self.disk_type]
+    if self.disk_type == IO1:
       create_cmd.append('--iops=%s' % self.iops)
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)

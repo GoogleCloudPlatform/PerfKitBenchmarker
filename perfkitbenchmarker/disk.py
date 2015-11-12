@@ -18,13 +18,44 @@ Disks can be created, deleted, attached to VMs, and detached from VMs.
 """
 
 import abc
+import logging
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
+FLAGS = flags.FLAGS
+
+
+# These are the (deprecated) old disk type names
 STANDARD = 'standard'
 REMOTE_SSD = 'remote_ssd'
 PIOPS = 'piops'  # Provisioned IOPS (SSD) in AWS
+
+# 'local' refers to disks that come attached to VMs. It is the only
+# "universal" disk type that is not associated with a provider. It
+# exists because we can provision a local disk without creating a disk
+# spec. The Aerospike benchmarks use this fact in their config
+# methods, and they need to be able to tell when a disk is local. So
+# until that changes, 'local' is a special disk type.
 LOCAL = 'local'
+
+# Map old disk type names to new disk type names
+DISK_TYPE_MAPS = dict()
+
+# Standard metadata keys relating to disks
+MEDIA = 'media'
+REPLICATION = 'replication'
+# And some possible values
+HDD = 'hdd'
+SSD = 'ssd'
+NONE = 'none'
+ZONE = 'zone'
+REGION = 'region'
+
+
+def RegisterDiskTypeMap(provider_name, map):
+  DISK_TYPE_MAPS[provider_name] = map
+
 
 _DISK_SPEC_REGISTRY = {}
 
@@ -43,6 +74,64 @@ class AutoRegisterDiskSpecMeta(type):
     else:
       _DISK_SPEC_REGISTRY[cls.CLOUD] = cls
     super(AutoRegisterDiskSpecMeta, cls).__init__(name, bases, dct)
+
+
+def WarnAndTranslateDiskTypes(name, cloud):
+  """Translate old disk types to new disk types, printing warnings if needed.
+
+  Args:
+    name: a string specifying a disk type, either new or old.
+    cloud: the cloud we're running on.
+
+  Returns:
+    The new-style disk type name (i.e. the provider's name for the type).
+
+  Raises:
+    ValueError, if name is not a disk type name.
+  """
+
+  if cloud in DISK_TYPE_MAPS:
+    disk_type_map = DISK_TYPE_MAPS[cloud]
+    if name in disk_type_map:
+      new_name = disk_type_map[name]
+      logging.warning('Disk type name %s is deprecated and will be removed. '
+                      'Translating to %s for now.', name, new_name)
+      return new_name
+    else:
+      return name
+  else:
+    logging.warning('No disk type map for provider %s', cloud)
+    # The provider has not been updated to use new-style names. We
+    # need to keep benchmarks working, so we pass through the name.
+    return name
+
+
+def WarnAndCopyFlag(old_name, new_name):
+  """Copy a value from an old flag to a new one, warning the user.
+  """
+
+  if FLAGS[old_name].present:
+    logging.warning('Flag --%s is deprecated and will be removed. Please '
+                    'switch to --%s.' % (old_name, new_name))
+    if not FLAGS[new_name].present:
+      FLAGS[new_name].value = FLAGS[old_name].value
+
+      # Mark the new flag as present so we'll print it out in our list
+      # of flag values.
+      FLAGS[new_name].present = True
+  # We keep the old flag around so that providers that haven't been
+  # updated yet will continue to work.
+
+
+def WarnAndTranslateDiskFlags():
+  """Translate old disk-related flags to new disk-related flags.
+  """
+
+  WarnAndCopyFlag('scratch_disk_type', 'data_disk_type')
+
+  WarnAndCopyFlag('scratch_disk_iops', 'aws_provisioned_iops')
+
+  WarnAndCopyFlag('scratch_disk_size', 'data_disk_size')
 
 
 class BaseDiskSpec(object):
@@ -73,8 +162,8 @@ class BaseDiskSpec(object):
 
   def ApplyFlags(self, flags):
     """Applies flags to the DiskSpec."""
-    self.disk_size = flags.scratch_disk_size or self.disk_size
-    self.disk_type = flags.scratch_disk_type or self.disk_type
+    self.disk_size = flags.data_disk_size or self.disk_size
+    self.disk_type = flags.data_disk_type or self.disk_type
     self.num_striped_disks = flags.num_striped_disks or self.num_striped_disks
     self.mount_point = flags.scratch_dir or self.mount_point
 
