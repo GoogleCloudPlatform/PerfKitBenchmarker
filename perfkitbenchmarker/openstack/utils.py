@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import functools
+import logging
 import os
 
 from perfkitbenchmarker import flags
@@ -142,6 +143,11 @@ class NovaClient(object):
                                         tenant_id=self.__auth.get_tenant_id(),
                                         endpoint_type=self.endpoint_type,
                                         )
+        # Set requests library logging level to WARNING
+        # so it doesn't spam logs with unhelpful messages,
+        # such as 'Starting new HTTP Connection'.
+        rq_logger = logging.getLogger('requests')
+        rq_logger.setLevel(logging.WARNING)
 
     def reconnect(self):
         from novaclient import client as noclient
