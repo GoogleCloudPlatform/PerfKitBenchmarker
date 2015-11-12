@@ -26,9 +26,30 @@ REMOTE_SSD = 'remote_ssd'
 PIOPS = 'piops'  # Provisioned IOPS (SSD) in AWS
 LOCAL = 'local'
 
+_DISK_SPEC_REGISTRY = {}
+
+
+def GetDiskSpecClass(cloud):
+  """Get the DiskSpec class corresponding to 'cloud'."""
+  return _DISK_SPEC_REGISTRY.get(cloud, BaseDiskSpec)
+
+
+class AutoRegisterDiskSpecMeta(type):
+  """Metaclass which automatically registers DiskSpecs."""
+
+  def __init__(cls, name, bases, dct):
+    if cls.CLOUD in _DISK_SPEC_REGISTRY:
+      raise Exception('BaseDiskSpec subclasses must have a CLOUD attribute.')
+    else:
+      _DISK_SPEC_REGISTRY[cls.CLOUD] = cls
+    super(AutoRegisterDiskSpecMeta, cls).__init__(name, bases, dct)
+
 
 class BaseDiskSpec(object):
   """Stores the information needed to create a disk."""
+
+  __metaclass__ = AutoRegisterDiskSpecMeta
+  CLOUD = None
 
   def __init__(self, disk_size=None, disk_type=None,
                mount_point=None, num_striped_disks=1,

@@ -61,6 +61,8 @@ WINDOWS_IMAGE = 'windows-2012-r2'
 class GceVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a GceVirtualMachine."""
 
+  CLOUD = 'GCP'
+
   def __init__(self, project=None, num_local_ssds=0,
                preemptible=False, **kwargs):
     """Initializes the VmSpec.

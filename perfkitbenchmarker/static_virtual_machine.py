@@ -46,6 +46,8 @@ FLAGS = flags.FLAGS
 class StaticVmSpec(virtual_machine.BaseVmSpec):
   """Object containing all info needed to create a Static VM."""
 
+  CLOUD = 'Static'
+
   def __init__(self, ip_address=None, user_name=None, ssh_private_key=None,
                internal_ip=None, ssh_port=22, install_packages=True,
                password=None, disk_specs=None, os_type=None, **kwargs):
@@ -101,6 +103,7 @@ class StaticDisk(disk.BaseDisk):
 class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Static Virtual Machine."""
 
+  CLOUD = 'Static'
   is_static = True
   vm_pool = collections.deque()
   vm_pool_lock = threading.Lock()

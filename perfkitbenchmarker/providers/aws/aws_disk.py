@@ -43,6 +43,8 @@ DISK_TYPE = {
 class AwsDiskSpec(disk.BaseDiskSpec):
   """Object holding the information needed to create an AwsDisk."""
 
+  CLOUD = 'AWS'
+
   def __init__(self, iops=None, **kwargs):
     """Initializes the Disk Spec.
 

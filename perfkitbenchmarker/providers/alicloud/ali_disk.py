@@ -32,23 +32,6 @@ DISK_TYPE = {
 }
 
 
-class AliDiskSpec(disk.BaseDiskSpec):
-  """Object holding the information needed to create an AliDisk."""
-
-  def __init__(self, **kwargs):
-    """Initializes the Disk Spec.
-
-    Args:
-      iops: The number of provisioned IOPS for a PIOPS disk type.
-      kwargs: The key word arguments to disk.BaseDiskSpec's __init__ method.
-    """
-    super(AliDiskSpec, self).__init__(**kwargs)
-
-  def ApplyFlags(self, flags):
-    """Apply flags to the DiskSpec."""
-    super(AliDiskSpec, self).ApplyFlags(flags)
-
-
 class AliDisk(disk.BaseDisk):
   """Object representing an Ali Disk."""
 
