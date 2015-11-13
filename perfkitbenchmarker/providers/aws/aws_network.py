@@ -33,10 +33,13 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
+AWS = 'AWS'
 
 
 class AwsFirewall(network.BaseFirewall):
   """An object representing the AWS Firewall."""
+
+  CLOUD = AWS
 
   def __init__(self):
     self.firewall_set = set()
@@ -367,14 +370,16 @@ class AwsNetwork(network.BaseNetwork):
     route_table_id: The id of the Route Table of the Networks's VPC.
   """
 
-  def __init__(self, zone):
+  CLOUD = AWS
+
+  def __init__(self, spec):
     """Initializes AwsNetwork instances.
 
     Args:
-      zone: The Availability Zone that the Network corresponds to.
+      spec: A BaseNetworkSpec object.
     """
-    super(AwsNetwork, self).__init__(zone)
-    self.region = zone[:-1]
+    super(AwsNetwork, self).__init__(spec)
+    self.region = spec.zone[:-1]
     self.vpc = AwsVpc(self.region)
     self.internet_gateway = AwsInternetGateway(self.region)
     self.subnet = None

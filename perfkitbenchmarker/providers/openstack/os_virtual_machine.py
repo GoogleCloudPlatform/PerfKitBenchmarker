@@ -52,16 +52,14 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     DEFAULT_IMAGE = None
     _floating_ip_lock = threading.Lock()
 
-    def __init__(self, vm_spec, network, firewall):
+    def __init__(self, vm_spec):
         """Initialize an OpenStack virtual machine.
 
         Args:
           vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-          network: network.BaseNetwork object corresponding to the VM.
-          firewall: network.BaseFirewall object corresponding to the VM.
         """
-        super(OpenStackVirtualMachine, self).__init__(
-            vm_spec, network, firewall)
+        super(OpenStackVirtualMachine, self).__init__(vm_spec)
+        self.firewall = os_network.OpenStackFirewall.GetFirewall()
         self.name = 'perfkit_vm_%d_%s' % (self.instance_number, FLAGS.run_uri)
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
                                                FLAGS.run_uri)

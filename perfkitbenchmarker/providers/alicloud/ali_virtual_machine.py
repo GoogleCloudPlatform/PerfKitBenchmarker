@@ -29,6 +29,7 @@ from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import disk
 from perfkitbenchmarker.providers.alicloud import ali_disk
+from perfkitbenchmarker.providers.alicloud import ali_network
 from perfkitbenchmarker.providers.alicloud import util
 
 FLAGS = flags.FLAGS
@@ -96,21 +97,21 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   imported_keyfile_set = set()
   deleted_keyfile_set = set()
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize a AliCloud virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the VM.
-      network: network.BaseNetwork object corresponding to the VM.
-      firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(AliVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(AliVirtualMachine, self).__init__(vm_spec)
     self.image = self.image or DEFAULT_IMAGE
     self.user_name = FLAGS.ali_user_name
     self.region = util.GetRegionByZone(self.zone)
     self.bandwidth_in = FLAGS.ali_bandwidth_in
     self.bandwidth_out = FLAGS.ali_bandwidth_out
     self.scratch_disk_size = FLAGS.scratch_disk_size or DEFAULT_DISK_SIZE
+    self.network = ali_network.AliNetwork.GetNetwork(self)
+    self.firewall = ali_network.AliFirewall.GetFirewall()
 
 
   @classmethod

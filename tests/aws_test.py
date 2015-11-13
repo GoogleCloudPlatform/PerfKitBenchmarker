@@ -19,6 +19,9 @@ import os.path
 import unittest
 
 import mock
+
+from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import context
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
@@ -90,9 +93,14 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
                    'util.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
+
+    # VM Creation depends on there being a BenchmarkSpec.
+    self.spec = benchmark_spec.BenchmarkSpec({}, 'name', 'benchmark_uid')
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
+
     self.vm = aws_virtual_machine.AwsVirtualMachine(
         virtual_machine.BaseVmSpec(
-            zone='us-east-1a', machine_type='c3.large'), None, None)
+            zone='us-east-1a', machine_type='c3.large'))
     self.vm.id = 'i-foo'
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'aws-describe-instance.json')

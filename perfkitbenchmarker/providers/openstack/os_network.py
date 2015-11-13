@@ -34,6 +34,8 @@ class OpenStackFirewall(network.BaseFirewall):
     An object representing OpenStack Firewall based on Secure Groups.
     """
 
+    CLOUD = 'OpenStack'
+
     def __init__(self):
         super(OpenStackFirewall, self).__init__()
         self.__nclient = utils.NovaClient()

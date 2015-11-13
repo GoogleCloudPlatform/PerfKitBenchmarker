@@ -31,6 +31,7 @@ from perfkitbenchmarker import resource
 
 FLAGS = flags.FLAGS
 MAX_NAME_LENGTH = 128
+ALICLOUD = 'AliCloud'
 
 
 class AliSecurityGroup(resource.BaseResource):
@@ -101,6 +102,8 @@ class AliSecurityGroup(resource.BaseResource):
 class AliFirewall(network.BaseFirewall):
   """An object representing the AliCloud Firewall."""
 
+  CLOUD = ALICLOUD
+
   def __init__(self):
     """Initialize AliCloud firewall class.
 
@@ -138,11 +141,13 @@ class AliFirewall(network.BaseFirewall):
 class AliNetwork(network.BaseNetwork):
   """Object representing a AliCloud Network."""
 
-  def __init__(self, zone):
-    super(AliNetwork, self).__init__(zone)
+  CLOUD = ALICLOUD
+
+  def __init__(self, spec):
+    super(AliNetwork, self).__init__(spec)
     name = ('perfkit%s%s' %
             (FLAGS.run_uri, str(uuid.uuid4())[-12:])).lower()[:MAX_NAME_LENGTH]
-    region = util.GetRegionByZone(zone)
+    region = util.GetRegionByZone(spec.zone)
     self.security_group = AliSecurityGroup(name, region)
 
   @vm_util.Retry()

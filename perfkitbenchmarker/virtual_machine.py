@@ -134,13 +134,11 @@ class BaseVirtualMachine(resource.BaseResource):
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize BaseVirtualMachine class.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-      network: network.BaseNetwork object corresponding to the VM.
-      firewall: network.BaseFirewall object corresponding to the VM.
     """
     super(BaseVirtualMachine, self).__init__()
     with self._instance_counter_lock:
@@ -161,8 +159,9 @@ class BaseVirtualMachine(resource.BaseResource):
     self.max_local_disks = 0
     self.local_disk_counter = 0
     self.remote_disk_counter = 0
-    self.network = network
-    self.firewall = firewall
+
+    self.network = None
+    self.firewall = None
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
