@@ -106,6 +106,7 @@ GCE_CREDENTIAL_LOCATION = '.config/gcloud/credentials'
 AZURE_CREDENTIAL_LOCATION = '.azure'
 
 DEFAULT_BOTO_LOCATION = '~/.boto'
+BOTO_LIB_VERSION = 'boto_lib_version'
 
 OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
     benchmark_spec_class.GCP: '~/' + GCE_CREDENTIAL_LOCATION,
@@ -198,17 +199,18 @@ def _JsonStringToPercentileResults(results, json_input, metric_name,
         metadata))
 
 
-def _GetAzureClientLibVersion(vm):
-  """ This function returns the version of azure client installed on a vm.
+def _GetClientLibVersion(vm, library_name):
+  """ This function returns the version of client lib installed on a vm.
 
   Args:
-    vm: the VM to get the azure client version from.
+    vm: the VM to get the client lib version from.
+    library_name: the name of the client lib.
 
   Returns:
-    The version string of the azure python client.
+    The version string of the client.
   """
-  version, _ = vm.RemoteCommand("pip show azure |grep Version")
-  logging.info('Azure client lib version is: %s', version)
+  version, _ = vm.RemoteCommand('pip show %s |grep Version' % library_name)
+  logging.info('%s client lib version is: %s', library_name, version)
   return version
 
 
@@ -580,6 +582,7 @@ class S3StorageBenchmark(object):
       Then the final return value is the list of the above list that reflect
       the results of all scenarios run here.
     """
+    metadata[BOTO_LIB_VERSION] = _GetClientLibVersion(vm, 'boto')
     results = []
     scratch_dir = vm.GetScratchDir()
 
@@ -678,7 +681,7 @@ class AzureBlobStorageBenchmark(object):
       the results of all scenarios run here.
 
     """
-    metadata['azure_lib_version'] = _GetAzureClientLibVersion(vm)
+    metadata['azure_lib_version'] = _GetClientLibVersion(vm, 'azure')
     results = []
 
     # CLI tool based tests.
@@ -849,6 +852,7 @@ class GoogleCloudStorageBenchmark(object):
     """
     results = []
     metadata['pkb_installed_crcmod'] = vm.installed_crcmod
+    metadata[BOTO_LIB_VERSION] = _GetClientLibVersion(vm, 'boto')
     # CLI tool based tests.
     scratch_dir = vm.GetScratchDir()
     clean_up_bucket_cmd = '%s rm gs://%s/*' % (vm.gsutil_path, self.bucket_name)
