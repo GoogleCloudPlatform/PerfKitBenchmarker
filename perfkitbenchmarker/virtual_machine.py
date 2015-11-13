@@ -34,6 +34,46 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
 
+_VM_SPEC_REGISTRY = {}
+_VM_REGISTRY = {}
+
+
+def GetVmSpecClass(cloud):
+  """Returns the VmSpec class corresponding to 'cloud'."""
+  return _VM_SPEC_REGISTRY.get(cloud, BaseVmSpec)
+
+
+def GetVmClass(cloud, os_type):
+  """Returns the VM class corresponding to 'cloud' and 'os_type'."""
+  return _VM_REGISTRY.get((cloud, os_type))
+
+
+class AutoRegisterVmSpecMeta(type):
+  """Metaclass which allows VmSpecs to automatically be registered."""
+
+  def __init__(cls, name, bases, dct):
+    if cls.CLOUD in _VM_SPEC_REGISTRY:
+      raise Exception('BaseVmSpec subclasses must have a CLOUD attribute.')
+    else:
+      _VM_SPEC_REGISTRY[cls.CLOUD] = cls
+    super(AutoRegisterVmSpecMeta, cls).__init__(name, bases, dct)
+
+
+class AutoRegisterVmMeta(abc.ABCMeta):
+  """Metaclass which allows VMs to automatically be registered."""
+
+  def __init__(cls, name, bases, dct):
+    if hasattr(cls, 'CLOUD') and hasattr(cls, 'OS_TYPE'):
+      if cls.CLOUD is None:
+        raise Exception('BaseVirtualMachine subclasses must have a CLOUD '
+                        'attribute.')
+      elif cls.OS_TYPE is None:
+        raise Exception('BaseOsMixin subclasses must have an OS_TYPE '
+                        'attribute.')
+      else:
+        _VM_REGISTRY[(cls.CLOUD, cls.OS_TYPE)] = cls
+    super(AutoRegisterVmMeta, cls).__init__(name, bases, dct)
+
 
 class BaseVmSpec(object):
   """Storing various data about a single vm.
@@ -43,6 +83,9 @@ class BaseVmSpec(object):
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     image: The disk image to boot from.
   """
+
+  __metaclass__ = AutoRegisterVmSpecMeta
+  CLOUD = None
 
   def __init__(self, zone=None, machine_type=None, image=None):
     self.zone = zone
@@ -84,6 +127,7 @@ class BaseVirtualMachine(resource.BaseResource):
       scratch disks or that can be striped together.
   """
 
+  __metaclass__ = AutoRegisterVmMeta
   is_static = False
   CLOUD = None
 
@@ -201,6 +245,7 @@ class BaseOsMixin(object):
   """
 
   __metaclass__ = abc.ABCMeta
+  OS_TYPE = None
 
   def __init__(self):
     super(BaseOsMixin, self).__init__()

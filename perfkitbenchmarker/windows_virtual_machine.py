@@ -36,6 +36,8 @@ STARTUP_SCRIPT = ('powershell -Command "Enable-PSRemoting -force; '
 
 class WindowsMixin(virtual_machine.BaseOsMixin):
 
+  OS_TYPE = 'windows'
+
   def __init__(self):
     super(WindowsMixin, self).__init__()
     self.winrm_port = WINRM_PORT
