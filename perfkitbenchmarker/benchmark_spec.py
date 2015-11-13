@@ -229,7 +229,6 @@ class BenchmarkSpec(object):
 
         if DISK_SPEC in group_spec:
           disk_spec_class = disk.GetDiskSpecClass(cloud)
-          disk_spec_class = _GetDiskSpecClass(cloud)
           disk_spec_dict = group_spec[DISK_SPEC][cloud]
           # We have to translate the data_disk_type flag here because
           # this is where we know for sure what cloud we're using, and
