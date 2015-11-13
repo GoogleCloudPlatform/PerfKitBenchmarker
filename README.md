@@ -312,59 +312,58 @@ Make sure you have installed pip (see the section above).
 Run the following command to install aliyuncli(omit the ‘sudo’ on Windows)
 
 1. Install python development tools:
-In Debian or Ubuntu:
-```
-$ sudo apt-get install -y python-dev
-```
-In CentOS:
-```
-$ sudo yum install python-devel
-```
+   In Debian or Ubuntu:
+   ```
+   $ sudo apt-get install -y python-dev
+   ```
+   In CentOS:
+   ```
+   $ sudo yum install python-devel
+   ```
 2. Install aliyuncli tool and python SDK for ECS:
-```
-$ sudo pip install aliyuncli
-```
-To check if AliCloud is installed:
-```
-$ aliyuncli --help
-```
-Install python SDK for ECS:
-```
-$ sudo pip install aliyun-python-sdk-ecs
-```
-Check if aliyuncli ecs command is ready:
-```
-$ aliyuncli ecs help
-```
-If you see the "usage" message, you should follow step 3.
-Otherwise, jump to step 4.
+   ```
+   $ sudo pip install aliyuncli
+   ```
+   To check if AliCloud is installed:
+   ```
+   $ aliyuncli --help
+   ```
+   Install python SDK for ECS:
+   ```
+   $ sudo pip install aliyun-python-sdk-ecs
+   ```
+   Check if aliyuncli ecs command is ready:
+   ```
+   $ aliyuncli ecs help
+   ```
+   If you see the "usage" message, you should follow step 3.
+   Otherwise, jump to step 4.
 
 3. Dealing with an exception when it runs on some specific version of Ubuntu
-Get the python lib path: `/usr/lib/python2.7/dist-packages`
-```
-$ python
-> from distutils.sysconfig import get_python_lib
-> get_python_lib()
-'/usr/lib/python2.7/dist-packages'
-```
-Copy to the right directory(for the python version 2.7.X):
-```
-$ sudo cp -r /usr/local/lib/python2.7/dist-packages/aliyun* /usr/lib/python2.7/dist-packages/
-```
-Check again:
-```
-$ aliyuncli ecs help
-```
+   Get the python lib path: `/usr/lib/python2.7/dist-packages`
+   ```
+   $ python
+   > from distutils.sysconfig import get_python_lib
+   > get_python_lib()
+   '/usr/lib/python2.7/dist-packages'
+   ```
+   Copy to the right directory(for the python version 2.7.X):
+   ```
+   $ sudo cp -r /usr/local/lib/python2.7/dist-packages/aliyun* /usr/lib/python2.7/dist-packages/
+   ```
+   Check again:
+   ```
+   $ aliyuncli ecs help
+   ```
 
-4. Navigate to the AliCloud console to create access credentials: https://home.console.aliyun.com/#/
- * Login first
- * Click on "AccessKeys" (top right)
- * Click on "Create Access Key", copy and store the "Access Key ID" and "Access Key Secret" to a safe place.
-
- Configure the CLI using the Access Key ID and Access Key Secret from the previous step
-```
-$ aliyuncli configure
-```
+4. Navigate to the AliCloud console to create access credentials: https://home.console.alicloud.com/#/
+   * Login first
+   * Click on "AccessKeys" (top right)
+   * Click on "Create Access Key", copy and store the "Access Key ID" and "Access Key Secret" to a safe place.
+   * Configure the CLI using the Access Key ID and Access Key Secret from the previous step
+   ```
+   $ aliyuncli configure
+   ```
 
 ## DigitalOcean configuration and credentials
 
