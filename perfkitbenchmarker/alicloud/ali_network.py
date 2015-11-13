@@ -38,7 +38,7 @@ MAX_NAME_LENGTH = 128
 
 
 class AliVpc(resource.BaseResource):
-  """An object representing an Aws VPC."""
+  """An object representing an AliCloud VPC."""
 
   def __init__(self, name, region):
     super(AliVpc, self).__init__()
@@ -129,7 +129,7 @@ class AliVSwitch(resource.BaseResource):
     self.id = response['VSwitchId']
 
   def _Delete(self):
-    """Deletes the vswitch."""
+    """Deletes the VSwitch."""
     delete_cmd = util.ALI_PREFIX + [
         'ecs',
         'DeleteVSwitch',
@@ -139,7 +139,7 @@ class AliVSwitch(resource.BaseResource):
     vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
-    """Returns true if the vswitch exists."""
+    """Returns true if the VSwitch exists."""
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
         'DescribeVSwitches',
@@ -155,7 +155,7 @@ class AliVSwitch(resource.BaseResource):
 
 
 class AliSecurityGroup(resource.BaseResource):
-  """Object representing an Azure Affinity Group."""
+  """Object representing an AliCloud Security Group."""
 
   def __init__(self, name, region, use_vpc=True, vpc_id=None):
     super(AliSecurityGroup, self).__init__()
@@ -165,7 +165,7 @@ class AliSecurityGroup(resource.BaseResource):
     self.vpc_id = vpc_id
 
   def _Create(self):
-    """Creates the affinity group."""
+    """Creates the security group."""
     create_cmd = util.ALI_PREFIX + [
         'ecs',
         'CreateSecurityGroup',
@@ -177,20 +177,8 @@ class AliSecurityGroup(resource.BaseResource):
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     self.group_id = json.loads(stdout)['SecurityGroupId']
 
-    for protocol in ('tcp', 'udp'):
-        auth_sg_cmd = util.ALI_PREFIX + [
-            'ecs',
-            'AuthorizeSecurityGroup',
-            '--IpProtocol %s' % protocol,
-            '--PortRange 1/65535',
-            '--SourceCidrIp 0.0.0.0/0',
-            '--RegionId %s' % self.region,
-            '--SecurityGroupId %s' % self.group_id]
-        auth_sg_cmd = util.GetEncodedCmd(auth_sg_cmd)
-        vm_util.IssueRetryableCommand(auth_sg_cmd)
-
   def _Delete(self):
-    """Deletes the affinity group."""
+    """Deletes the security group."""
     delete_cmd = util.ALI_PREFIX + [
         'ecs',
         'DeleteSecurityGroup',
@@ -200,7 +188,7 @@ class AliSecurityGroup(resource.BaseResource):
     vm_util.IssueRetryableCommand(delete_cmd)
 
   def _Exists(self):
-    """Returns true if the affinity group exists."""
+    """Returns true if the security group exists."""
     show_cmd = util.ALI_PREFIX + [
         'ecs',
         'DescribeSecurityGroupAttribute',
@@ -234,6 +222,17 @@ class AliFirewall(network.BaseFirewall):
     with self._lock:
       if entry in self.firewall_set:
         return
+      for protocol in ('tcp', 'udp'):
+        authorize_cmd = util.ALI_PREFIX + [
+            'ecs',
+            'AuthorizeSecurityGroup',
+            '--IpProtocol %s' % protocol,
+            '--PortRange %s/%s' % (port, port),
+            '--SourceCidrIp 0.0.0.0/0',
+            '--RegionId %s' % vm.region,
+            '--SecurityGroupId %s' % vm.group_id]
+        authorize_cmd = util.GetEncodedCmd(authorize_cmd)
+        vm_util.IssueRetryableCommand(authorize_cmd)
       self.firewall_set.add(entry)
 
   def DisallowAllPorts(self):

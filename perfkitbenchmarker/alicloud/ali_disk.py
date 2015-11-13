@@ -42,7 +42,6 @@ class AliDiskSpec(disk.BaseDiskSpec):
     """Initializes the Disk Spec.
 
     Args:
-      iops: The number of provisioned IOPS for a PIOPS disk type.
       kwargs: The key word arguments to disk.BaseDiskSpec's __init__ method.
     """
     super(AliDiskSpec, self).__init__(**kwargs)
@@ -53,7 +52,7 @@ class AliDiskSpec(disk.BaseDiskSpec):
 
 
 class AliDisk(disk.BaseDisk):
-  """Object representing an Ali Disk."""
+  """Object representing an AliCloud Disk."""
 
   _lock = threading.Lock()
   vm_devices = {}

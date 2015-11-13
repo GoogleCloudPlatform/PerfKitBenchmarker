@@ -66,7 +66,7 @@ RESOURCE_TYPE = {
     SNAPSHOT: 'snapshot',
     DISK: 'disk',
 }
-
+SSH_PORT = 22
 DRIVE_START_LETTER = 'b'
 if FLAGS.ali_io_optimized is None:
   DRIVE_PREFIX = '/dev/xvd'
@@ -245,8 +245,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.group_id = instance['SecurityGroupIds']['SecurityGroupId'][0]
 
     self._WaitForInstanceStatus(['Running'])
-    self.bootable_time = time.time()
 
+    self.firewall.AllowPort(self, SSH_PORT)
     key_file = vm_util.GetPublicKeyPath()
     util.AddPubKeyToHost(self.ip_address,
                          self.password,
