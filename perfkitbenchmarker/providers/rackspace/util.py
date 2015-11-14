@@ -19,23 +19,6 @@ import re
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 
-flags.DEFINE_boolean('boot_from_cbs_volume', 'False',
-                     'When flag is included the instance will use a remote disk'
-                     'as its boot disk, if machine_type supports it.')
-
-flags.DEFINE_string('nova_path',
-                    'nova',
-                    'The path for the rackspace-novaclient tool.')
-
-flags.DEFINE_string('neutron_path',
-                    'neutron',
-                    'The path for the rackspace-neutronclient tool.')
-
-
-flags.DEFINE_list('additional_rackspace_flags',
-                  [],
-                  'Additional flags to pass to Rackspace.')
-
 FLAGS = flags.FLAGS
 
 PROPERTY_VALUE_ROW_REGEX = r'\|\s+(:?\S+\s\S+|\S+)\s+\|\s+(.*?)\s+\|'

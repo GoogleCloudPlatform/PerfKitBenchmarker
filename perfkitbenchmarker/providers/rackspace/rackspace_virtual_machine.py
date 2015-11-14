@@ -48,12 +48,6 @@ from perfkitbenchmarker.providers.rackspace import rackspace_network
 from perfkitbenchmarker.providers.rackspace import util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_boolean(
-    'rackspace_apply_onmetal_ssd_tuning', default=False,
-    help='Apply Rackspace recommended tuning to PCIe-based flash storage '
-         'included with OnMetal IO instances. See: '
-         'http://www.rackspace.com/knowledge_center/article/'
-         'configure-flash-drives-in-high-io-instances-as-data-drives')
 
 CLOUD_CONFIG_TEMPLATE = '''#cloud-config
 users:

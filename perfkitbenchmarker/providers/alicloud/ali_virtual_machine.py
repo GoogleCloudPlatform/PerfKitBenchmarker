@@ -35,18 +35,6 @@ from perfkitbenchmarker.providers.alicloud import util
 FLAGS = flags.FLAGS
 NON_HVM_PREFIXES = ['t1', 's1', 's2', 's3', 'm1']
 
-flags.DEFINE_string('ali_user_name', 'ubuntu',
-                    'This determines the user name that Perfkit will '
-                    'attempt to use. This must be changed in order to '
-                    'use any image other than ubuntu.')
-flags.DEFINE_integer('ali_bandwidth_in', 100, 'Inbound Bandwidth')
-flags.DEFINE_integer('ali_bandwidth_out', 100, 'Outbound Bandwidth')
-flags.DEFINE_string('io_optimized', 'none',
-                    'IO optimized for disk in AliCloud. The default is '
-                    'none which means no IO optimized'
-                    '"optimized" means use IO optimized.')
-
-
 DRIVE_START_LETTER = 'b'
 DEFAULT_DISK_SIZE = 500
 INSTANCE = 'instance'

@@ -20,12 +20,6 @@ from perfkitbenchmarker.providers.openstack import utils
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('openstack_public_network', None,
-                    'Name of OpenStack public network')
-
-flags.DEFINE_string('openstack_private_network', 'private',
-                    'Name of OpenStack private network')
-
 MAX_PORT = 65535
 
 

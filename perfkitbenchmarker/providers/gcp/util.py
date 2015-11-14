@@ -15,14 +15,6 @@
 
 from perfkitbenchmarker import flags
 
-flags.DEFINE_string('gcloud_path',
-                    'gcloud',
-                    'The path for the gcloud utility.')
-
-flags.DEFINE_list('additional_gcloud_flags',
-                  [],
-                  'Additional flags to pass to gcloud.')
-
 FLAGS = flags.FLAGS
 
 
