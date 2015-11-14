@@ -32,15 +32,6 @@ from perfkitbenchmarker.providers.azure import azure_network
 
 AZURE_PATH = 'azure'
 
-NONE = 'None'
-READ_ONLY = 'ReadOnly'
-READ_WRITE = 'ReadWrite'
-flags.DEFINE_enum(
-    'azure_host_caching', NONE,
-    [NONE, READ_ONLY, READ_WRITE],
-    'The type of host caching to use on Azure data disks.')
-
-
 FLAGS = flags.FLAGS
 
 DRIVE_START_LETTER = 'c'

@@ -28,20 +28,6 @@ NONE = 'None'
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_boolean('openstack_config_drive', False,
-                     'Add possibilities to get metadata from external drive')
-
-flags.DEFINE_boolean('openstack_boot_from_volume', False,
-                     'Boot from volume instead of an image')
-
-flags.DEFINE_integer('openstack_volume_size', None,
-                     'Size of the volume (GB)')
-
-flags.DEFINE_enum('openstack_scheduler_policy', NONE,
-                  [NONE, 'affinity', 'anti-affinity'],
-                  'Add possibility to use affinity or anti-affinity '
-                  'policy in scheduling process')
-
 
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""

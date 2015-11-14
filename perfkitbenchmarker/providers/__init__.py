@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from perfkitbenchmarker import import_util
+
 from perfkitbenchmarker.providers.alicloud import ali_virtual_machine  # NOQA
 from perfkitbenchmarker.providers.aws import aws_virtual_machine  # NOQA
 from perfkitbenchmarker.providers.azure import azure_virtual_machine  # NOQA
@@ -21,3 +23,6 @@ from perfkitbenchmarker.providers.gcp import gce_virtual_machine  # NOQA
 from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine  # NOQA
 from perfkitbenchmarker.providers.openstack import os_virtual_machine  # NOQA
 from perfkitbenchmarker.providers.rackspace import rackspace_virtual_machine  # NOQA
+
+
+import_util.LoadModulesWithName(__path__, __name__, 'flags')

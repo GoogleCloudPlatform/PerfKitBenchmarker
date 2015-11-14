@@ -31,9 +31,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.rackspace import util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string(
-    'image_id', None, 'The ID of the image from which you want to'
-    ' create the volume.')
 
 DISK_TYPE = {
     disk.STANDARD: 'SATA',
