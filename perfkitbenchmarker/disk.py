@@ -54,6 +54,14 @@ REGION = 'region'
 
 
 def RegisterDiskTypeMap(provider_name, map):
+  """Register a map from legacy disk type names to modern ones.
+
+  The translation machinery looks here to find the map corresponding
+  to the chosen provider and translates the user's flags and configs
+  to the new naming system. This function should be removed once the
+  (deprecated) legacy flags are removed.
+  """
+
   DISK_TYPE_MAPS[provider_name] = map
 
 
@@ -100,7 +108,7 @@ def WarnAndTranslateDiskTypes(name, cloud):
     else:
       return name
   else:
-    logging.warning('No disk type map for provider %s', cloud)
+    logging.info('No legacy->new disk type map for provider %s', cloud)
     # The provider has not been updated to use new-style names. We
     # need to keep benchmarks working, so we pass through the name.
     return name
@@ -112,13 +120,16 @@ def WarnAndCopyFlag(old_name, new_name):
 
   if FLAGS[old_name].present:
     logging.warning('Flag --%s is deprecated and will be removed. Please '
-                    'switch to --%s.' % (old_name, new_name))
+                    'switch to --%s.', old_name, new_name)
     if not FLAGS[new_name].present:
       FLAGS[new_name].value = FLAGS[old_name].value
 
       # Mark the new flag as present so we'll print it out in our list
       # of flag values.
       FLAGS[new_name].present = True
+    else:
+      logging.warning('Ignoring legacy flag %s because new flag %s is present.',
+                      old_name, new_name)
   # We keep the old flag around so that providers that haven't been
   # updated yet will continue to work.
 

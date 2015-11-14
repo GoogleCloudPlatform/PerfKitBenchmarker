@@ -73,6 +73,13 @@ LOCAL_HDD_METADATA = {
 
 LOCAL_HDD_PREFIXES = ['d2']
 
+
+def LocalDiskIsHDD(machine_type):
+  """Check whether the local disks use spinning magnetic storage."""
+
+  return machine_type[:2].lower() in LOCAL_HDD_PREFIXES
+
+
 AWS = 'AWS'
 disk.RegisterDiskTypeMap(AWS, DISK_TYPE)
 
@@ -116,10 +123,9 @@ class AwsDisk(disk.BaseDisk):
     if self.disk_type != disk.LOCAL:
       self.metadata = DISK_METADATA[self.disk_type]
     else:
-      if machine_type[:2].lower() in LOCAL_HDD_PREFIXES:
-        self.metadata = LOCAL_HDD_METADATA
-      else:
-        self.metadata = LOCAL_SSD_METADATA
+      self.metadata = (LOCAL_HDD_METADATA
+                       if LocalDiskIsHDD(machine_type)
+                       else LOCAL_SSD_METADATA)
 
   def _Create(self):
     """Creates the disk."""

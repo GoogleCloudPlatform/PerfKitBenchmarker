@@ -143,7 +143,10 @@ flags.DEFINE_enum(
     'Type for all scratch disks. The default is standard')
 flags.DEFINE_string(
     'data_disk_type', None,
-    'Type for all benchmark disks.')
+    'Type for all data disks. If a provider keeps the operating system and '
+    'user data on separate disks, this only affects the user data disk(s).'
+    'If the provider has OS and user data on the same disk, this flag affects'
+    'that disk.')
 flags.DEFINE_integer('scratch_disk_size', None, 'Size, in gb, for all scratch '
                      'disks.')
 flags.DEFINE_integer('data_disk_size', None, 'Size, in gb, for all disks.')
@@ -152,11 +155,12 @@ flags.DEFINE_integer('scratch_disk_iops', None,
 flags.DEFINE_integer('aws_provisioned_iops', None,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
 flags.DEFINE_integer('num_striped_disks', None,
-                     'The number of disks to stripe together to form one '
-                     '"logical" scratch disk. This defaults to 1 '
+                     'The number of data disks to stripe together to form one '
+                     '"logical" data disk. This defaults to 1 '
                      '(except with local disks), which means no striping. '
                      'When using local disks, they default to striping '
-                     'all disks together.',
+                     'all disks together. The striped disks will appear as '
+                     'one disk (data_disk_0) in the metadata.',
                      lower_bound=1)
 flags.DEFINE_bool('install_packages', True,
                   'Override for determining whether packages should be '

@@ -150,14 +150,13 @@ class DefaultMetadataProvider(MetadataProvider):
             data_disk.num_striped_disks)
         if getattr(data_disk, 'iops', None) is not None:
           metadata[name_prefix + 'scratch_disk_iops'] = data_disk.iops
+          metadata[name_prefix + 'aws_provisioned_iops'] = data_disk.iops
         # Modern metadata keys
         metadata[name_prefix + 'data_disk_0_type'] = data_disk.disk_type
         metadata[name_prefix + 'data_disk_0_size'] = (
             data_disk.disk_size * data_disk.num_striped_disks)
         metadata[name_prefix + 'data_disk_0_num_stripes'] = (
             data_disk.num_striped_disks)
-        if getattr(data_disk, 'iops', None) is not None:
-          metadata[name_prefix + 'aws_provisioned_iops'] = data_disk.iops
         if getattr(data_disk, 'metadata', None) is not None:
           for key, value in data_disk.metadata.iteritems():
             metadata[name_prefix + 'data_disk_0_' + key] = value

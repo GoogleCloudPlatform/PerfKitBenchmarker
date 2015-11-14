@@ -68,9 +68,16 @@ AZURE_REPLICATION_MAP = {
 }
 
 LOCAL_SSD_PREFIXES = {
-    'Standard_DS',
+    'Standard_D',
     'Standard_G'
 }
+
+
+def LocalDiskIsSSD(machine_type):
+  """Check whether the local disk is an SSD drive."""
+
+  return any((machine_type.startswith(prefix)
+              for prefix in LOCAL_SSD_PREFIXES))
 
 
 class AzureDisk(disk.BaseDisk):
@@ -94,11 +101,7 @@ class AzureDisk(disk.BaseDisk):
           disk.REPLICATION: AZURE_REPLICATION_MAP[FLAGS.azure_storage_type]
       }
     elif self.disk_type == disk.LOCAL:
-      if any((machine_type.startswith(prefix)
-              for prefix in LOCAL_SSD_PREFIXES)):
-        media = disk.SSD
-      else:
-        media = disk.HDD
+      media = disk.SSD if LocalDiskIsSSD(machine_type) else disk.HDD
 
       self.metadata = {
           disk.MEDIA: media,

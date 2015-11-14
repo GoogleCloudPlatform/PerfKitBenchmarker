@@ -125,7 +125,7 @@ class AzureDiskMetadataTest(unittest.TestCase):
   def testLocalHDD(self):
     self.doAzureDiskTest(azure_network.LRS,
                          disk.LOCAL,
-                         'Standard_D1',
+                         'Standard_A1',
                          disk.HDD,
                          disk.NONE)
 
