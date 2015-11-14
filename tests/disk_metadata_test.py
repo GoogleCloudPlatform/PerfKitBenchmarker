@@ -17,6 +17,8 @@
 import unittest
 import mock
 
+from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.aws import aws_disk
@@ -46,41 +48,41 @@ class GcpDiskMetadataTest(unittest.TestCase):
 
 
 class AwsDiskMetadataTest(unittest.TestCase):
-  def testLocalSSD(self):
+  def doAwsDiskTest(self, disk_type, machine_type,
+                    goal_media, goal_replication):
     disk_spec = aws_disk.AwsDiskSpec(
         disk_size=2,
-        disk_type=disk.LOCAL,
+        disk_type=disk_type,
         mount_point=None)
+
+    context.SetThreadBenchmarkSpec(benchmark_spec.BenchmarkSpec(
+        {}, 'name', 'uid'))
 
     vm_spec = virtual_machine.BaseVmSpec(
         zone='us-east-1a',
-        machine_type='c3.2xlarge')
+        machine_type=machine_type)
     vm = aws_virtual_machine.DebianBasedAwsVirtualMachine(
-        vm_spec, 'network', 'firewall')
+        vm_spec)
 
     vm.CreateScratchDisk(disk_spec)
 
     self.assertEqual(vm.scratch_disks[0].metadata,
-                     {disk.MEDIA: disk.SSD,
-                      disk.REPLICATION: disk.NONE})
+                     {disk.MEDIA: goal_media,
+                      disk.REPLICATION: goal_replication})
+
+  def testLocalSSD(self):
+    self.doAwsDiskTest(
+        disk.LOCAL,
+        'c3.2xlarge',
+        disk.SSD,
+        disk.NONE)
 
   def testLocalHDD(self):
-    disk_spec = aws_disk.AwsDiskSpec(
-        disk_size=2,
-        disk_type=disk.LOCAL,
-        mount_point=None)
-
-    vm_spec = virtual_machine.BaseVmSpec(
-        zone='us-east-1a',
-        machine_type='d2.2xlarge')
-    vm = aws_virtual_machine.DebianBasedAwsVirtualMachine(
-        vm_spec, 'network', 'firewall')
-
-    vm.CreateScratchDisk(disk_spec)
-
-    self.assertEqual(vm.scratch_disks[0].metadata,
-                     {disk.MEDIA: disk.HDD,
-                      disk.REPLICATION: disk.NONE})
+    self.doAwsDiskTest(
+        disk.LOCAL,
+        'd2.2xlarge',
+        disk.HDD,
+        disk.NONE)
 
 
 class AzureDiskMetadataTest(unittest.TestCase):
@@ -93,12 +95,14 @@ class AzureDiskMetadataTest(unittest.TestCase):
           disk_type=disk_type,
           mount_point=None)
 
+      context.SetThreadBenchmarkSpec(benchmark_spec.BenchmarkSpec(
+          {}, 'name', 'uid'))
+
       vm_spec = virtual_machine.BaseVmSpec(
           zone='East US 2',
           machine_type=machine_type)
-      network = azure_network.AzureNetwork('East US 2')
       vm = azure_virtual_machine.DebianBasedAzureVirtualMachine(
-          vm_spec, network, 'firewall')
+          vm_spec)
 
       azure_disk.AzureDisk.Create = mock.Mock()
       azure_disk.AzureDisk.Attach = mock.Mock()
