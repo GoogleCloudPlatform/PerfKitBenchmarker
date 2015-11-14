@@ -231,6 +231,8 @@ class AliFirewall(network.BaseFirewall):
             '--SourceCidrIp 0.0.0.0/0',
             '--RegionId %s' % vm.region,
             '--SecurityGroupId %s' % vm.group_id]
+        if FLAGS.ali_use_vpc:
+          authorize_cmd.append('--NicType intranet')
         authorize_cmd = util.GetEncodedCmd(authorize_cmd)
         vm_util.IssueRetryableCommand(authorize_cmd)
       self.firewall_set.add(entry)
