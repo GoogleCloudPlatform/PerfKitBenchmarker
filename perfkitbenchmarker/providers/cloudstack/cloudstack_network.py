@@ -35,15 +35,16 @@ FLAGS = flags.FLAGS
 class CloudStackNetwork(network.BaseNetwork):
   """Object representing a CloudStack Network."""
 
-  def __init__(self, zone_name):
+  CLOUD = 'CloudStack'
 
-    super(CloudStackNetwork, self).__init__(zone_name)
+  def __init__(self, spec):
+
+    super(CloudStackNetwork, self).__init__(spec)
 
     self.cs = util.CsClient(FLAGS.CS_API_URL,
                             FLAGS.CS_API_KEY,
                             FLAGS.CS_API_SECRET)
 
-    self.zone = zone_name
     self.project_id = None
     self.network_id = None
 

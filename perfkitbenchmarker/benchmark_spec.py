@@ -32,14 +32,6 @@ from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import providers  # NOQA
-from perfkitbenchmarker.providers.alicloud import ali_network
-from perfkitbenchmarker.providers.aws import aws_network
-from perfkitbenchmarker.providers.azure import azure_network
-from perfkitbenchmarker.providers.cloudstack import cloudstack_network as cs_nw
-from perfkitbenchmarker.providers.gcp import gce_network
-from perfkitbenchmarker.providers.openstack import \
-    os_network as openstack_network
-from perfkitbenchmarker.providers.rackspace import rackspace_network as rax_net
 
 
 def PickleLock(lock):
@@ -80,40 +72,6 @@ DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
 UBUNTU_CONTAINER = 'ubuntu_container'
-VIRTUAL_MACHINE = 'virtual_machine'
-NETWORK = 'network'
-FIREWALL = 'firewall'
-CLASSES = {
-    GCP: {
-        FIREWALL: gce_network.GceFirewall,
-        NETWORK: gce_network.GceNetwork,
-    },
-    AZURE: {
-        NETWORK: azure_network.AzureNetwork,
-        FIREWALL: azure_network.AzureFirewall,
-    },
-    AWS: {
-        FIREWALL: aws_network.AwsFirewall,
-        NETWORK: aws_network.AwsNetwork,
-    },
-    ALICLOUD: {
-        FIREWALL: ali_network.AliFirewall,
-        NETWORK: ali_network.AliNetwork,
-    },
-    DIGITALOCEAN: {
-    },
-    KUBERNETES: {
-    },
-    OPENSTACK: {
-        FIREWALL: openstack_network.OpenStackFirewall
-    },
-    CLOUDSTACK: {
-        NETWORK: cs_nw.CloudStackNetwork
-    },
-    RACKSPACE: {
-        FIREWALL: rax_net.RackspaceSecurityGroup
-    }
-}
 
 FLAGS = flags.FLAGS
 
@@ -154,6 +112,8 @@ class BenchmarkSpec(object):
     self.vms = []
     self.networks = {}
     self.firewalls = {}
+    self.networks_lock = threading.Lock()
+    self.firewalls_lock = threading.Lock()
     self.vm_groups = {}
     self.deleted = False
     self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
@@ -283,12 +243,14 @@ class BenchmarkSpec(object):
       except Exception:
         logging.exception('Got an exception deleting VMs. '
                           'Attempting to continue tearing down.')
+
     for firewall in self.firewalls.itervalues():
       try:
         firewall.DisallowAllPorts()
       except Exception:
         logging.exception('Got an exception disabling firewalls. '
                           'Attempting to continue tearing down.')
+
     for net in self.networks.itervalues():
       try:
         net.Delete()
@@ -319,19 +281,7 @@ class BenchmarkSpec(object):
           'VMs of type %s" are not currently supported on cloud "%s".' %
           (os_type, cloud))
 
-    if NETWORK in CLASSES[cloud]:
-      net_class = CLASSES[cloud][NETWORK]
-      network = net_class.GetNetwork(vm_spec.zone, self.networks)
-    else:
-      network = None
-
-    if FIREWALL in CLASSES[cloud]:
-      firewall_class = CLASSES[cloud][FIREWALL]
-      firewall = firewall_class.GetFirewall(self.firewalls)
-    else:
-      firewall = None
-
-    return vm_class(vm_spec, network, firewall)
+    return vm_class(vm_spec)
 
   def PrepareVm(self, vm):
     """Creates a single VM and prepares a scratch disk if required.

@@ -24,6 +24,7 @@ from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.cloudstack import cloudstack_disk
+from perfkitbenchmarker.providers.cloudstack import cloudstack_network
 from perfkitbenchmarker.providers.cloudstack import util
 
 UBUNTU_IMAGE = 'Ubuntu 14.04.2 HVM base (64bit)'
@@ -43,13 +44,14 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_PROJECT = 'cloudops-Engineering'
 
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize a CloudStack virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
-    super(CloudStackVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(CloudStackVirtualMachine, self).__init__(vm_spec)
+    self.network = cloudstack_network.CloudStackNetwork.GetNetwork(self)
 
     self.cs = util.CsClient(FLAGS.CS_API_URL,
                             FLAGS.CS_API_KEY,
