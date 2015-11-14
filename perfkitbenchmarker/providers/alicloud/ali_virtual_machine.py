@@ -29,29 +29,13 @@ from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import disk
 from perfkitbenchmarker.providers.alicloud import ali_disk
+from perfkitbenchmarker.providers.alicloud import ali_network
 from perfkitbenchmarker.providers.alicloud import util
 
 FLAGS = flags.FLAGS
 NON_HVM_PREFIXES = ['t1', 's1', 's2', 's3', 'm1']
 
-flags.DEFINE_string('ali_user_name', 'ubuntu',
-                    'This determines the user name that Perfkit will '
-                    'attempt to use. This must be changed in order to '
-                    'use any image other than ubuntu.')
-flags.DEFINE_integer('ali_bandwidth_in', 100, 'Inbound Bandwidth')
-flags.DEFINE_integer('ali_bandwidth_out', 100, 'Outbound Bandwidth')
-flags.DEFINE_string('ali_io_optimized', None,
-                    'IO optimized for disk in AliCloud. The default is '
-                    'None which means no IO optimized '
-                    '"optimized" means use IO optimized. If you '
-                    'choose optimized, you must specify the system disk type')
-flags.DEFINE_string('ali_system_disk_type', 'cloud',
-                    'System disk catogory for AliCloud. The default is '
-                    '"cloud" for General cloud disk, '
-                    '"cloud_ssd" for cloud ssd disk, '
-                    '"cloud_efficiency" for efficiency cloud disk, '
-                    '"ephemeral_ssd" for local ssd disk')
-
+DRIVE_START_LETTER = 'b'
 DEFAULT_DISK_SIZE = 500
 INSTANCE = 'instance'
 IMAGE = 'image'
@@ -66,11 +50,7 @@ RESOURCE_TYPE = {
     DISK: 'disk',
 }
 SSH_PORT = 22
-DRIVE_START_LETTER = 'b'
-if FLAGS.ali_io_optimized is None:
-  DRIVE_PREFIX = '/dev/xvd'
-elif FLAGS.ali_io_optimized:
-  DRIVE_PREFIX = '/dev/vd'
+
 
 NUM_LOCAL_VOLUMES = {
     'ecs.t1.small': 4,
@@ -103,15 +83,13 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   imported_keyfile_set = set()
   deleted_keyfile_set = set()
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize a AliCloud virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the VM.
-      network: network.BaseNetwork object corresponding to the VM.
-      firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(AliVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(AliVirtualMachine, self).__init__(vm_spec)
     self.image = self.image or DEFAULT_IMAGE
     self.user_name = FLAGS.ali_user_name
     self.region = util.GetRegionByZone(self.zone)
@@ -119,6 +97,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.bandwidth_out = FLAGS.ali_bandwidth_out
     self.scratch_disk_size = FLAGS.scratch_disk_size or DEFAULT_DISK_SIZE
     self.system_disk_type = FLAGS.ali_system_disk_type
+    self.network = ali_network.AliNetwork.GetNetwork(self)
+    self.firewall = ali_network.AliFirewall.GetFirewall()
 
   @vm_util.Retry(poll_interval=1, log_errors=False)
   def _WaitForInstanceStatus(self, status_list):
@@ -288,7 +268,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--SystemDiskCategory ephemeral_ssd',
           '--DataDisk1Category ephemeral_ssd',
           '--DataDisk1Size %s' % self.scratch_disk_size,
-          '--DataDisk1Device %s%s' % (DRIVE_PREFIX, DRIVE_START_LETTER)]
+          '--DataDisk1Device %s%s' % (util.GetDrivePathPrefix(),
+                                      DRIVE_START_LETTER)]
       create_cmd.extend(disk_cmd)
 
     if FLAGS.ali_io_optimized is not None:
@@ -394,7 +375,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       A list of strings, where each string is the absolute path to the local
           disks on the VM (e.g. '/dev/xvdb').
     """
-    return ['%s%s' % (DRIVE_PREFIX, chr(ord(DRIVE_START_LETTER) + i))
+    return ['%s%s' % (util.GetDrivePathPrefix(),
+                      chr(ord(DRIVE_START_LETTER) + i))
             for i in xrange(NUM_LOCAL_VOLUMES[self.machine_type])]
 
   def AddMetadata(self, **kwargs):

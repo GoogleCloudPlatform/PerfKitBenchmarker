@@ -36,18 +36,8 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
-
-flags.DEFINE_integer('gce_num_local_ssds', 0,
-                     'The number of ssds that should be added to the VM. Note '
-                     'that this is currently only supported in certain zones '
-                     '(see https://cloud.google.com/compute/docs/local-ssd).')
-flags.DEFINE_string('gcloud_scopes', None, 'If set, space-separated list of '
-                    'scopes to apply to every created machine')
-flags.DEFINE_boolean('gce_migrate_on_maintenance', False, 'If true, allow VM '
-                     'migration on GCE host maintenance.')
-flags.DEFINE_boolean('gce_preemptible_vms', False, 'If true, use preemptible '
-                     'VMs on GCE.')
 
 FLAGS = flags.FLAGS
 
@@ -98,15 +88,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   BOOT_DISK_SIZE_GB = 10
   BOOT_DISK_TYPE = disk.STANDARD
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-      network: network.BaseNetwork object corresponding to the VM.
-      firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(GceVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(GceVirtualMachine, self).__init__(vm_spec)
+    self.network = gce_network.GceNetwork.GetNetwork(self)
+    self.firewall = gce_network.GceFirewall.GetFirewall()
     self.image = self.image or self.DEFAULT_IMAGE
     self.project = vm_spec.project
     disk_spec = disk.BaseDiskSpec(
@@ -281,15 +271,13 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
   BOOT_DISK_SIZE_GB = 50
   BOOT_DISK_TYPE = disk.REMOTE_SSD
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize a Windows GCE virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-      network: network.BaseNetwork object corresponding to the VM.
-      firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(WindowsGceVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(WindowsGceVirtualMachine, self).__init__(vm_spec)
     self.boot_metadata[
         'windows-startup-script-ps1'] = windows_virtual_machine.STARTUP_SCRIPT
 

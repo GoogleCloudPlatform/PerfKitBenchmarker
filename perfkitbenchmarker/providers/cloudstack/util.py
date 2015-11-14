@@ -14,7 +14,6 @@
 """Cloudstack utils"""
 
 import urllib
-import os
 from csapi import API
 from perfkitbenchmarker import flags
 
@@ -23,18 +22,6 @@ try:
     urllib3.disable_warnings()
 except ImportError:
     pass
-
-flags.DEFINE_string('CS_API_URL',
-                    os.environ.get('CS_API_URL'),
-                    'API endpoint for Cloudstack.')
-
-flags.DEFINE_string('CS_API_KEY',
-                    os.environ.get('CS_API_KEY'),
-                    'Key for API authentication')
-
-flags.DEFINE_string('CS_API_SECRET',
-                    os.environ.get('CS_API_SECRET'),
-                    'Secret for API authentication')
 
 FLAGS = flags.FLAGS
 

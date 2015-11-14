@@ -31,29 +31,13 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 AZURE_PATH = 'azure'
+AZURE = 'Azure'
 MAX_NAME_LENGTH = 24
 SSH_PORT = 22
 # We need to prefix storage account names so that VMs won't create their own
 # account upon creation.
 # See https://github.com/MSOpenTech/azure-xplat-cli/pull/349
 STORAGE_ACCOUNT_PREFIX = 'portalvhds'
-# Azure Storage Account types. See
-# http://azure.microsoft.com/en-us/pricing/details/storage/ for more information
-# about the different types.
-LRS = 'LRS'
-PLRS = 'PLRS'
-ZRS = 'ZRS'
-GRS = 'GRS'
-RAGRS = 'RAGRS'
-
-flags.DEFINE_enum(
-    'azure_storage_type', LRS,
-    [LRS, PLRS, ZRS, GRS, RAGRS],
-    'The type of storage account to create. See '
-    'http://azure.microsoft.com/en-us/pricing/details/storage/ for more '
-    'information. To use remote ssd scratch disks, you must use PLRS. If you '
-    'use PLRS, you must use the DS series of machines, or else VM creation '
-    'will fail.')
 
 
 class AzureFirewall(network.BaseFirewall):
@@ -61,6 +45,8 @@ class AzureFirewall(network.BaseFirewall):
 
   On Azure, endpoints are used to open ports instead of firewalls.
   """
+
+  CLOUD = AZURE
 
   def AllowPort(self, vm, port):
     """Opens a port on the firewall.
@@ -223,11 +209,13 @@ class AzureVirtualNetwork(resource.BaseResource):
 class AzureNetwork(network.BaseNetwork):
   """Object representing an Azure Network."""
 
-  def __init__(self, zone):
-    super(AzureNetwork, self).__init__(zone)
+  CLOUD = AZURE
+
+  def __init__(self, spec):
+    super(AzureNetwork, self).__init__(spec)
     name = ('pkb%s%s' %
             (FLAGS.run_uri, str(uuid.uuid4())[-12:])).lower()[:MAX_NAME_LENGTH]
-    self.affinity_group = AzureAffinityGroup(name, zone)
+    self.affinity_group = AzureAffinityGroup(name, spec.zone)
     storage_account_name = (STORAGE_ACCOUNT_PREFIX + name)[:MAX_NAME_LENGTH]
     self.storage_account = AzureStorageAccount(
         storage_account_name, FLAGS.azure_storage_type, name)

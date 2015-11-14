@@ -27,26 +27,6 @@ from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('kubeconfig', '',
-                    'Path to kubeconfig to be used by kubectl')
-
-flags.DEFINE_string('kubectl', 'kubectl',
-                    'Path to kubectl tool')
-
-flags.DEFINE_string('username', 'root',
-                    'User name that Perfkit will attempt to use in order to '
-                    'SSH into Docker instance.')
-
-flags.DEFINE_boolean('docker_in_privileged_mode', True,
-                     'If set to True, will attempt to create Docker containers '
-                     'in a privileged mode. Note that some benchmarks execute '
-                     'commands which are only allowed in privileged mode.')
-
-flags.DEFINE_list('kubernetes_nodes', [],
-                  'IP addresses of Kubernetes Nodes. These need to be '
-                  'accessible from the machine running Perfkit '
-                  'benchmarker. Example: "10.20.30.40,10.20.30.41"')
-
 DEFAULT_ZONE = 'k8s'
 SECRET_PREFIX = 'public-key-'
 UBUNTU_IMAGE = 'ubuntu-upstart'
@@ -59,15 +39,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   """
   CLOUD = 'Kubernetes'
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize a Kubernetes virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-      network: network.BaseNetwork object corresponding to the VM.
-      firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(KubernetesVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(KubernetesVirtualMachine, self).__init__(vm_spec)
     self.num_scratch_disks = 0
     self.name = self.name.replace('_', '-')
     self.user_name = FLAGS.username

@@ -28,20 +28,6 @@ NONE = 'None'
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_boolean('openstack_config_drive', False,
-                     'Add possibilities to get metadata from external drive')
-
-flags.DEFINE_boolean('openstack_boot_from_volume', False,
-                     'Boot from volume instead of an image')
-
-flags.DEFINE_integer('openstack_volume_size', None,
-                     'Size of the volume (GB)')
-
-flags.DEFINE_enum('openstack_scheduler_policy', NONE,
-                  [NONE, 'affinity', 'anti-affinity'],
-                  'Add possibility to use affinity or anti-affinity '
-                  'policy in scheduling process')
-
 
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
@@ -52,16 +38,14 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     DEFAULT_IMAGE = None
     _floating_ip_lock = threading.Lock()
 
-    def __init__(self, vm_spec, network, firewall):
+    def __init__(self, vm_spec):
         """Initialize an OpenStack virtual machine.
 
         Args:
           vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-          network: network.BaseNetwork object corresponding to the VM.
-          firewall: network.BaseFirewall object corresponding to the VM.
         """
-        super(OpenStackVirtualMachine, self).__init__(
-            vm_spec, network, firewall)
+        super(OpenStackVirtualMachine, self).__init__(vm_spec)
+        self.firewall = os_network.OpenStackFirewall.GetFirewall()
         self.name = 'perfkit_vm_%d_%s' % (self.instance_number, FLAGS.run_uri)
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
                                                FLAGS.run_uri)

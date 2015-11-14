@@ -22,23 +22,6 @@ from perfkitbenchmarker import vm_util
 
 DIGITALOCEAN_API = 'https://api.digitalocean.com/v2/'
 
-flags.DEFINE_string('digitalocean_curl_config',
-                    os.getenv('DIGITALOCEAN_CURL_CONFIG',
-                              '~/.config/digitalocean-oauth.curl'),
-                    ('Path to Curl config file containing oauth header, '
-                     'also settable via $DIGITALOCEAN_CURL_CONFIG env var.\n'
-                     '\n'
-                     'File format:\n'
-                     '  header = "Authorization: Bearer 9876...ba98"'))
-
-flags.DEFINE_string('curl_path',
-                    'curl',
-                    'The path for the curl utility.')
-
-flags.DEFINE_list('additional_curl_flags',
-                  [],
-                  'Additional flags to pass to curl such as proxy settings.')
-
 FLAGS = flags.FLAGS
 
 

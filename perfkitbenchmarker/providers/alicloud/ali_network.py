@@ -30,11 +30,10 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.alicloud import util
 from perfkitbenchmarker import resource
 
-flags.DEFINE_boolean('ali_use_vpc', True,
-                     'Use VPC to create networks')
 
 FLAGS = flags.FLAGS
 MAX_NAME_LENGTH = 128
+ALICLOUD = 'AliCloud'
 
 
 class AliVpc(resource.BaseResource):
@@ -203,6 +202,8 @@ class AliSecurityGroup(resource.BaseResource):
 class AliFirewall(network.BaseFirewall):
   """An object representing the AliCloud Firewall."""
 
+  CLOUD = ALICLOUD
+
   def __init__(self):
     self.firewall_set = set()
     self._lock = threading.Lock()
@@ -245,11 +246,13 @@ class AliFirewall(network.BaseFirewall):
 class AliNetwork(network.BaseNetwork):
   """Object representing a AliCloud Network."""
 
-  def __init__(self, zone):
-    super(AliNetwork, self).__init__(zone)
+  CLOUD = ALICLOUD
+
+  def __init__(self, spec):
+    super(AliNetwork, self).__init__(spec)
     self.name = (
         'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:]))
-    self.region = util.GetRegionByZone(zone)
+    self.region = util.GetRegionByZone(spec.zone)
     self.use_vpc = FLAGS.ali_use_vpc
     if self.use_vpc:
       self.vpc = AliVpc(self.name, self.region)

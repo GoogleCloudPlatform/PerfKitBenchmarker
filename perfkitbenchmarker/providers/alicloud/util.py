@@ -133,5 +133,14 @@ def AddPubKeyToHost(host_ip, password, keyfile, username):
 
 
 def GeneratePassword(length=PASSWD_LEN):
-  password_chars = string.digits + string.letters
-  return ''.join(random.sample(password_chars, length))
+  digit_len = length / 2
+  letter_len = length - digit_len
+  return ''.join(random.sample(string.letters, digit_len)) + \
+         ''.join(random.sample(string.digits, letter_len))
+
+
+def GetDrivePathPrefix():
+  if FLAGS.ali_io_optimized is None:
+    return '/dev/xvd'
+  elif FLAGS.ali_io_optimized:
+    return '/dev/vd'

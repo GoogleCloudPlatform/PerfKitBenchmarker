@@ -17,33 +17,22 @@ from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.cloudstack import util
 
-flags.DEFINE_string('cs_network_offering',
-                    'DefaultIsolatedNetworkOfferingForVpcNetworksNoLB',
-                    'Name of the network offering')
-
-flags.DEFINE_string('cs_vpc_offering',
-                    'Default VPC offering',
-                    'Name of the VPC offering')
-
-flags.DEFINE_boolean('cs_use_vpc', True,
-                     'Use VPC to create networks')
-
-
 FLAGS = flags.FLAGS
 
 
 class CloudStackNetwork(network.BaseNetwork):
   """Object representing a CloudStack Network."""
 
-  def __init__(self, zone_name):
+  CLOUD = 'CloudStack'
 
-    super(CloudStackNetwork, self).__init__(zone_name)
+  def __init__(self, spec):
+
+    super(CloudStackNetwork, self).__init__(spec)
 
     self.cs = util.CsClient(FLAGS.CS_API_URL,
                             FLAGS.CS_API_KEY,
                             FLAGS.CS_API_SECRET)
 
-    self.zone = zone_name
     self.project_id = None
     self.network_id = None
 

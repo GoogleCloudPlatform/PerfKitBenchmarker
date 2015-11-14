@@ -44,15 +44,10 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.rackspace import rackspace_disk
 from perfkitbenchmarker.providers.rackspace import \
     rackspace_machine_types as rax
+from perfkitbenchmarker.providers.rackspace import rackspace_network
 from perfkitbenchmarker.providers.rackspace import util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_boolean(
-    'rackspace_apply_onmetal_ssd_tuning', default=False,
-    help='Apply Rackspace recommended tuning to PCIe-based flash storage '
-         'included with OnMetal IO instances. See: '
-         'http://www.rackspace.com/knowledge_center/article/'
-         'configure-flash-drives-in-high-io-instances-as-data-drives')
 
 CLOUD_CONFIG_TEMPLATE = '''#cloud-config
 users:
@@ -84,15 +79,14 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_IMAGE = None
 
   "Object representing a Rackspace Virtual Machine"
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize Rackspace virtual machine
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-      network: network.BaseNetwork object corresponding to the VM.
-      firewall: network.BaseFirewall object corresponding to the VM.
     """
-    super(RackspaceVirtualMachine, self).__init__(vm_spec, network, firewall)
+    super(RackspaceVirtualMachine, self).__init__(vm_spec)
+    self.firewall = rackspace_network.RackspaceSecurityGroup.GetFirewall()
     self.id = ''
     self.ip_address6 = ''
     self.mounted_disks = set()
