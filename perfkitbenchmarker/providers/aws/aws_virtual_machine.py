@@ -36,11 +36,6 @@ from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('aws_user_name', 'ubuntu',
-                    'This determines the user name that Perfkit will '
-                    'attempt to use. This must be changed in order to '
-                    'use any image other than ubuntu.')
-
 HVM = 'HVM'
 PV = 'PV'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']

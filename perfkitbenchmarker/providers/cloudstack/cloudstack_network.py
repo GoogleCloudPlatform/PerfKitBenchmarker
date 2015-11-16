@@ -17,18 +17,6 @@ from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.cloudstack import util
 
-flags.DEFINE_string('cs_network_offering',
-                    'DefaultIsolatedNetworkOfferingForVpcNetworksNoLB',
-                    'Name of the network offering')
-
-flags.DEFINE_string('cs_vpc_offering',
-                    'Default VPC offering',
-                    'Name of the VPC offering')
-
-flags.DEFINE_boolean('cs_use_vpc', True,
-                     'Use VPC to create networks')
-
-
 FLAGS = flags.FLAGS
 
 

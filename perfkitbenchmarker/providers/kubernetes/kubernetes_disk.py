@@ -24,24 +24,6 @@ from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('ceph_secret', None,
-                    'Name of the Ceph Secret used by Kubernetes in order to '
-                    'authenticate with Ceph. If provided, overrides keyring.')
-
-flags.DEFINE_string('ceph_keyring', '/etc/ceph/keyring',
-                    'Path to the Ceph keyring file.')
-
-flags.DEFINE_string('rbd_pool', 'rbd',
-                    'Name of RBD pool for Ceph volumes.')
-
-flags.DEFINE_string('rbd_user', 'admin',
-                    'Name of RADOS user.')
-
-flags.DEFINE_list('ceph_monitors', [],
-                  'IP addresses and ports of Ceph Monitors. '
-                  'Must be provided when Ceph scratch disk is required. '
-                  'Example: "127.0.0.1:6789,192.168.1.1:6789"')
-
 
 def CreateDisks(disk_specs, vm_name):
   """

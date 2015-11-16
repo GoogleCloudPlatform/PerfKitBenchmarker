@@ -55,6 +55,7 @@ resources
 
 import collections
 import getpass
+import itertools
 import logging
 import sys
 import uuid
@@ -88,8 +89,6 @@ REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
-flags.DEFINE_integer('parallelism', 1,
-                     'The number of benchmarks to run in parallel.')
 flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
                   'Benchmarks and/or benchmark sets that should be run. The '
                   'default is the standard set. For more information about '
@@ -428,57 +427,44 @@ def RunBenchmarks(publish=True):
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
-  run_status_tuples = []
+  run_status_lists = []
+  benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+  total_benchmarks = len(benchmark_tuple_list)
+  benchmark_counts = collections.defaultdict(itertools.count)
+  args = []
+  for i, benchmark_tuple in enumerate(benchmark_tuple_list):
+    benchmark_module, user_config = benchmark_tuple
+    benchmark_name = benchmark_module.BENCHMARK_NAME
+    benchmark_uid = benchmark_name + str(
+        benchmark_counts[benchmark_name].next())
+    run_status_lists.append([benchmark_name, benchmark_uid,
+                             benchmark_status.SKIPPED])
+    args.append((benchmark_module, collector, i + 1, total_benchmarks,
+                 benchmark_module.GetConfig(user_config), benchmark_uid))
+
   try:
-    benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
-    total_benchmarks = len(benchmark_tuple_list)
-
-    benchmark_counts = collections.Counter()
-    args = []
-    for i, benchmark_tuple in enumerate(benchmark_tuple_list):
-      benchmark_module, user_config = benchmark_tuple
-      benchmark_uid = (benchmark_module.BENCHMARK_NAME +
-                       str(benchmark_counts[benchmark_module]))
-      benchmark_counts[benchmark_module] += 1
-      args.append(
-          ((benchmark_module, collector, i + 1, total_benchmarks,
-            benchmark_module.GetConfig(user_config), benchmark_uid), {}))
-
-    if FLAGS.parallelism > 1:
-      vm_util.RunThreaded(
-          RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
-    else:
-      stop_scheduling_benchmarks = False
-      for run_args, _ in args:
-        benchmark_module, _, sequence_number, _, _, benchmark_uid = run_args
-        benchmark_name = benchmark_module.BENCHMARK_NAME
-        if stop_scheduling_benchmarks:
-          run_status_tuples.append((benchmark_name, benchmark_uid,
-                                    benchmark_status.SKIPPED))
+    for run_args, run_status_list in zip(args, run_status_lists):
+      benchmark_module, _, sequence_number, _, _, benchmark_uid = run_args
+      benchmark_name = benchmark_module.BENCHMARK_NAME
+      try:
+        run_status_list[2] = benchmark_status.FAILED
+        RunBenchmark(*run_args)
+        run_status_list[2] = benchmark_status.SUCCEEDED
+      except BaseException as e:
+        msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
+            sequence_number, total_benchmarks, benchmark_name, benchmark_uid)
+        if (isinstance(e, KeyboardInterrupt) or
+            FLAGS.stop_after_benchmark_failure):
+          logging.error('%s Execution will not continue.', msg)
+          break
         else:
-          try:
-            RunBenchmark(*run_args)
-            run_status_tuples.append((benchmark_name, benchmark_uid,
-                                      benchmark_status.SUCCEEDED))
-          except BaseException as e:
-            run_status_tuples.append((benchmark_name, benchmark_uid,
-                                      benchmark_status.FAILED))
-            msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
-                sequence_number, total_benchmarks, benchmark_name,
-                benchmark_uid)
-            if (isinstance(e, KeyboardInterrupt) or
-                FLAGS.stop_after_benchmark_failure):
-              logging.error('%s Execution will not continue.', msg)
-              stop_scheduling_benchmarks = True
-            else:
-              logging.error('%s Execution will continue.', msg)
-
+          logging.error('%s Execution will continue.', msg)
   finally:
     if collector.samples:
       collector.PublishSamples()
 
-    if run_status_tuples:
-      logging.info(benchmark_status.CreateSummary(run_status_tuples))
+    if run_status_lists:
+      logging.info(benchmark_status.CreateSummary(run_status_lists))
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
 

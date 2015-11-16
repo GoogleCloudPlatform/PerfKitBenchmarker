@@ -25,10 +25,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string(
-    'image_project', None, 'The project against which all image references will'
-    ' be resolved. See: '
-    'https://cloud.google.com/sdk/gcloud/reference/compute/disks/create')
 
 PD_STANDARD = 'pd-standard'
 PD_SSD = 'pd-ssd'
