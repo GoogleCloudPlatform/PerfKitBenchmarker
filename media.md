@@ -4,6 +4,11 @@ layout: page
 ---
 
 Presentations:
+
+SIJP 2015 Lecture - “PerfKit: Benchmarking the Cloud” by Anthony Voellm
+
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/9D1fVFpx57o/0.jpg)](https://www.youtube.com/watch?v=9D1fVFpx57o "Video Title")
+
  SIJP 2015 Lecture - “PerfKit: Benchmarking the Cloud” by Anthony Voellm
 
 CouchBase Connect 2015 in San Francisco.  Ivansmf@ co-presented this talk with CouchBase.
