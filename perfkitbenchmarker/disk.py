@@ -53,7 +53,7 @@ ZONE = 'zone'
 REGION = 'region'
 
 
-def RegisterDiskTypeMap(provider_name, map):
+def RegisterDiskTypeMap(provider_name, type_map):
   """Register a map from legacy disk type names to modern ones.
 
   The translation machinery looks here to find the map corresponding
@@ -62,7 +62,7 @@ def RegisterDiskTypeMap(provider_name, map):
   (deprecated) legacy flags are removed.
   """
 
-  DISK_TYPE_MAPS[provider_name] = map
+  DISK_TYPE_MAPS[provider_name] = type_map
 
 
 _DISK_SPEC_REGISTRY = {}
@@ -100,7 +100,7 @@ def WarnAndTranslateDiskTypes(name, cloud):
 
   if cloud in DISK_TYPE_MAPS:
     disk_type_map = DISK_TYPE_MAPS[cloud]
-    if name in disk_type_map:
+    if name in disk_type_map and disk_type_map[name] != name:
       new_name = disk_type_map[name]
       logging.warning('Disk type name %s is deprecated and will be removed. '
                       'Translating to %s for now.', name, new_name)

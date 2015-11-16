@@ -39,8 +39,7 @@ GP2 = 'gp2'
 IO1 = 'io1'
 
 DISK_TYPE = {
-    # no need to translate 'standard' because the old and new names
-    # are the same
+    disk.STANDARD: STANDARD,
     disk.REMOTE_SSD: GP2,
     disk.PIOPS: IO1
 }
