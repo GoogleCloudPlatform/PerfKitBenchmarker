@@ -60,6 +60,15 @@ def RegisterDiskTypeMap(provider_name, type_map):
   to the chosen provider and translates the user's flags and configs
   to the new naming system. This function should be removed once the
   (deprecated) legacy flags are removed.
+
+  Args:
+    provider_name: a string. The name of the provider. Must match
+      the names we give to providers in benchmark_spec.py.
+    type_map: a dict. Maps generic disk type names (STANDARD,
+      REMOTE_SSD, PIOPS) to provider-specific names.
+
+  TODO(nlavine): remove this function when we remove the deprecated
+  flags and disk type names.
   """
 
   DISK_TYPE_MAPS[provider_name] = type_map
