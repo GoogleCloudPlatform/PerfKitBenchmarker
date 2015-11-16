@@ -28,7 +28,7 @@ import threading
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 
 AZURE_PATH = 'azure'
 
@@ -51,8 +51,8 @@ PREMIUM_STORAGE_METADATA = {
 }
 
 AZURE_REPLICATION_MAP = {
-    azure_network.LRS: disk.ZONE,
-    azure_network.ZRS: disk.REGION,
+    azure_flags.LRS: disk.ZONE,
+    azure_flags.ZRS: disk.REGION,
     # Deliberately omitting PLRS, because that is handled by
     # PREMIUM_STORAGE_METADATA, and (RA)GRS, because those are
     # asynchronously replicated.
@@ -103,9 +103,9 @@ class AzureDisk(disk.BaseDisk):
     """Creates the disk."""
 
     if self.disk_type == PREMIUM_STORAGE:
-      assert FLAGS.azure_storage_type == azure_network.PLRS
+      assert FLAGS.azure_storage_type == azure_flags.PLRS
     else:
-      assert FLAGS.azure_storage_type != azure_network.PLRS
+      assert FLAGS.azure_storage_type != azure_flags.PLRS
 
     with self._lock:
       create_cmd = [AZURE_PATH,

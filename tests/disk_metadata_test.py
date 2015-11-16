@@ -24,7 +24,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_disk
-from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_disk
 
@@ -113,28 +113,28 @@ class AzureDiskMetadataTest(unittest.TestCase):
                         disk.REPLICATION: goal_replication})
 
   def testPremiumStorage(self):
-    self.doAzureDiskTest(azure_network.PLRS,
+    self.doAzureDiskTest(azure_flags.PLRS,
                          azure_disk.PREMIUM_STORAGE,
                          'Standard_D1',
                          disk.SSD,
                          disk.ZONE)
 
   def testStandardDisk(self):
-    self.doAzureDiskTest(azure_network.ZRS,
+    self.doAzureDiskTest(azure_flags.ZRS,
                          azure_disk.STANDARD_DISK,
                          'Standard_D1',
                          disk.HDD,
                          disk.REGION)
 
   def testLocalHDD(self):
-    self.doAzureDiskTest(azure_network.LRS,
+    self.doAzureDiskTest(azure_flags.LRS,
                          disk.LOCAL,
                          'Standard_A1',
                          disk.HDD,
                          disk.NONE)
 
   def testLocalSSD(self):
-    self.doAzureDiskTest(azure_network.LRS,
+    self.doAzureDiskTest(azure_flags.LRS,
                          disk.LOCAL,
                          'Standard_DS2',
                          disk.SSD,
