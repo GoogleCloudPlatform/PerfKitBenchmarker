@@ -28,10 +28,10 @@ layout: page
 ## Academia:
 <img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/epfl.png" height="60" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 
-<img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/mit.png" height="60" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
+<img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/mit.png" height="50" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 
 <img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/stanford.png" height="60" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 
 ## GitHub developers:
 
-Link to https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/graphs/contributors
+[Contributors](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/graphs/contributors)
