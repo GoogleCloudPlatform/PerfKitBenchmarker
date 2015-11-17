@@ -10,7 +10,8 @@ layout: page
 
 <img src="{{ '/img/stanford.png' | prepend: site.baseurl }}" height="60" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 
-
+<br>
+<br>
 
 ## Industry Partners:
 <img src="{{ '/img/arm.png' | prepend:site.baseurl }}" height="50" style="padding:20px;" style="PADDING-BOTTOM:10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
@@ -29,15 +30,16 @@ layout: page
 <img src="{{ '/img/RedHat.png' | prepend: site.baseurl }}" height="80" style="padding:20px;" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 <img src="{{ '/img/thesystech.png' | prepend: site.baseurl }}" height="80" style="padding:20px;"  style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 
-
+<br>
+<br>
 
 ## Cloud Technology Partners:
 <img src="{{ '/img/cloudharmony.png' | prepend: site.baseurl }}" height="80" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 
 <img src="{{ '/img/CloudSpectator.png' | prepend: site.baseurl }}" height="80" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 
-
-
+<br>
+<br>
 
 ## GitHub developers:
 
