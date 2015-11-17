@@ -44,8 +44,8 @@ def _CreateSummaryTable(run_status_tuples):
         cluster_boot  cluster_boot0  SKIPPED
         --------------------------------------
   """
-  assert (run_status_tuples,
-          'run_status_tuples must contain at least one element.')
+  assert run_status_tuples, ('run_status_tuples must contain at least one '
+                             'element.')
   col_headers = 'Name', 'UID', 'Status'
   col_lengths = []
   for col_header, col_entries in zip(col_headers, zip(*run_status_tuples)):
@@ -84,8 +84,8 @@ def CreateSummary(run_status_tuples):
         --------------------------------------
         Success rate: 33.33% (1/3)
   """
-  assert (run_status_tuples,
-          'run_status_tuples must contain at least one element.')
+  assert run_status_tuples, ('run_status_tuples must contain at least one '
+                             'element.')
   benchmark_count = len(run_status_tuples)
   successful_benchmark_count = sum(1 for _, _, status in run_status_tuples
                                    if status == SUCCEEDED)
