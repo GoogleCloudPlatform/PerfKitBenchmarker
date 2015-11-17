@@ -102,9 +102,6 @@ def WarnAndTranslateDiskTypes(name, cloud):
 
   Returns:
     The new-style disk type name (i.e. the provider's name for the type).
-
-  Raises:
-    ValueError, if name is not a disk type name.
   """
 
   if cloud in DISK_TYPE_MAPS:

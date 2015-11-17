@@ -148,10 +148,8 @@ flags.DEFINE_string(
     'that disk.')
 flags.DEFINE_integer('scratch_disk_size', None, 'Size, in gb, for all scratch '
                      'disks.')
-flags.DEFINE_integer('data_disk_size', None, 'Size, in gb, for all disks.')
+flags.DEFINE_integer('data_disk_size', None, 'Size, in gb, for all data disks.')
 flags.DEFINE_integer('scratch_disk_iops', None,
-                     'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
-flags.DEFINE_integer('aws_provisioned_iops', None,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
 flags.DEFINE_integer('num_striped_disks', None,
                      'The number of data disks to stripe together to form one '
