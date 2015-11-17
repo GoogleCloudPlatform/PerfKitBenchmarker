@@ -47,7 +47,7 @@ class GcpScratchDiskIntegrationTest(unittest.TestCase):
                 },
                 'disk_spec': {
                     'GCP': {
-                        'disk_type': 'standard',
+                        'disk_type': 'pd-standard',
                         'disk_size': 2,
                         'mount_point': MOUNT_POINT
                     }
@@ -69,7 +69,7 @@ class GcpScratchDiskIntegrationTest(unittest.TestCase):
                 },
                 'disk_spec': {
                     'GCP': {
-                        'disk_type': 'remote_ssd',
+                        'disk_type': 'pd-ssd',
                         'disk_size': 2,
                         'mount_point': MOUNT_POINT
                     }

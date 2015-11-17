@@ -19,7 +19,7 @@ load test with varying numbers of client threads against an Aerospike server.
 
 This test can be run in a variety of configurations including memory only,
 remote/persistent ssd, and local ssd. The Aerospike configuration is controlled
-by the "aerospike_storage_type" and "scratch_disk_type" flags.
+by the "aerospike_storage_type" and "data_disk_type" flags.
 """
 
 import re
@@ -69,7 +69,7 @@ PATCH_FILE = 'aerospike.patch'
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if (FLAGS.aerospike_storage_type == aerospike_server.DISK and
-      FLAGS.scratch_disk_type != disk.LOCAL):
+      FLAGS.data_disk_type != disk.LOCAL):
     config['vm_groups']['default']['disk_count'] = 1
   else:
     config['vm_groups']['default']['disk_count'] = 0

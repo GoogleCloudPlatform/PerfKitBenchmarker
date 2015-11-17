@@ -18,3 +18,5 @@ flags.DEFINE_string('aws_user_name', 'ubuntu',
                     'This determines the user name that Perfkit will '
                     'attempt to use. This must be changed in order to '
                     'use any image other than ubuntu.')
+flags.DEFINE_integer('aws_provisioned_iops', None,
+                     'IOPS for Provisioned IOPS (SSD) volumes in AWS.')

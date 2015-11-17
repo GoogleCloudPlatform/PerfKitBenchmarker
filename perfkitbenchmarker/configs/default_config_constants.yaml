@@ -38,13 +38,15 @@ default_single_core: &default_single_core
     image: null
 
 
+# TODO(nlavine): update the disk types below as more providers are
+# updated for the disk types refactor.
 default_500_gb: &default_500_gb
   GCP:
-    disk_type: standard
+    disk_type: pd-standard
     disk_size: 500
     mount_point: /scratch
   Azure:
-    disk_type: standard
+    disk_type: standard-disk
     disk_size: 500
     mount_point: /scratch
   AWS:

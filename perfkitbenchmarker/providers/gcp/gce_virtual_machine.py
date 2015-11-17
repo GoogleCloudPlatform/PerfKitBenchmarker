@@ -86,7 +86,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
   BOOT_DISK_SIZE_GB = 10
-  BOOT_DISK_TYPE = disk.STANDARD
+  BOOT_DISK_TYPE = gce_disk.PD_STANDARD
 
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
@@ -120,7 +120,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     'create', self.name,
                     '--image', self.image,
                     '--boot-disk-size', str(self.BOOT_DISK_SIZE_GB),
-                    '--boot-disk-type', gce_disk.DISK_TYPE[self.BOOT_DISK_TYPE],
+                    '--boot-disk-type', self.BOOT_DISK_TYPE,
                     '--machine-type', self.machine_type,
                     '--tags=perfkitbenchmarker',
                     '--no-restart-on-failure',

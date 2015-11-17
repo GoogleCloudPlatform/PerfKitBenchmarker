@@ -28,14 +28,48 @@ import threading
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 
 AZURE_PATH = 'azure'
 
 FLAGS = flags.FLAGS
 
 DRIVE_START_LETTER = 'c'
-DISK_TYPE = {disk.STANDARD: None, disk.REMOTE_SSD: None}
+
+PREMIUM_STORAGE = 'premium-storage'
+STANDARD_DISK = 'standard-disk'
+
+DISK_TYPE = {disk.STANDARD: STANDARD_DISK,
+             disk.REMOTE_SSD: PREMIUM_STORAGE}
+
+AZURE = 'Azure'
+disk.RegisterDiskTypeMap(AZURE, DISK_TYPE)
+
+PREMIUM_STORAGE_METADATA = {
+    disk.MEDIA: disk.SSD,
+    disk.REPLICATION: disk.ZONE,
+    disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD
+}
+
+AZURE_REPLICATION_MAP = {
+    azure_flags.LRS: disk.ZONE,
+    azure_flags.ZRS: disk.REGION,
+    # Deliberately omitting PLRS, because that is handled by
+    # PREMIUM_STORAGE_METADATA, and (RA)GRS, because those are
+    # asynchronously replicated.
+}
+
+LOCAL_SSD_PREFIXES = {
+    'Standard_D',
+    'Standard_G'
+}
+
+
+def LocalDiskIsSSD(machine_type):
+  """Check whether the local disk is an SSD drive."""
+
+  return any((machine_type.startswith(prefix)
+              for prefix in LOCAL_SSD_PREFIXES))
 
 
 class AzureDisk(disk.BaseDisk):
@@ -44,21 +78,37 @@ class AzureDisk(disk.BaseDisk):
   _lock = threading.Lock()
   num_disks = {}
 
-  def __init__(self, disk_spec, vm_name):
+  def __init__(self, disk_spec, vm_name, machine_type):
     super(AzureDisk, self).__init__(disk_spec)
     self.host_caching = FLAGS.azure_host_caching
     self.name = None
     self.vm_name = vm_name
     self.lun = None
 
+    if self.disk_type == PREMIUM_STORAGE:
+      self.metadata = PREMIUM_STORAGE_METADATA
+    elif self.disk_type == STANDARD_DISK:
+      self.metadata = {
+          disk.MEDIA: disk.HDD,
+          disk.REPLICATION: AZURE_REPLICATION_MAP[FLAGS.azure_storage_type],
+          disk.LEGACY_DISK_TYPE: disk.STANDARD
+      }
+    elif self.disk_type == disk.LOCAL:
+      media = disk.SSD if LocalDiskIsSSD(machine_type) else disk.HDD
+
+      self.metadata = {
+          disk.MEDIA: media,
+          disk.REPLICATION: disk.NONE,
+          disk.LEGACY_DISK_TYPE: disk.LOCAL
+      }
+
   def _Create(self):
     """Creates the disk."""
-    assert self.disk_type in DISK_TYPE, self.disk_type
 
-    if self.disk_type == disk.REMOTE_SSD:
-      assert FLAGS.azure_storage_type == azure_network.PLRS
+    if self.disk_type == PREMIUM_STORAGE:
+      assert FLAGS.azure_storage_type == azure_flags.PLRS
     else:
-      assert FLAGS.azure_storage_type != azure_network.PLRS
+      assert FLAGS.azure_storage_type != azure_flags.PLRS
 
     with self._lock:
       create_cmd = [AZURE_PATH,
