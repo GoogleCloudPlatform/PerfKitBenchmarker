@@ -165,8 +165,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_packages):
+    if not self.install_packages:
       return
     if package_name not in self._installed_packages:
       package = windows_packages.PACKAGES[package_name]

@@ -192,10 +192,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
-    if self.is_static and self.install_packages:
-      self.SnapshotPackages()
+    if self.install_packages:
+      if self.is_static:
+        self.SnapshotPackages()
+      self.SetupPackageManager()
     self.BurnCpu()
-    self.SetupPackageManager()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
@@ -598,8 +599,7 @@ class RhelMixin(BaseLinuxMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_packages):
+    if not self.install_packages:
       return
     if package_name not in self._installed_packages:
       package = linux_packages.PACKAGES[package_name]
@@ -699,8 +699,7 @@ class DebianMixin(BaseLinuxMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_packages):
+    if not self.install_packages:
       return
     if package_name not in self._installed_packages:
       package = linux_packages.PACKAGES[package_name]
