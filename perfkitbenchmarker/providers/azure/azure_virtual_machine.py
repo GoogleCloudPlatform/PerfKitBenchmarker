@@ -152,8 +152,9 @@ class AzureVirtualMachineMetaClass(virtual_machine.AutoRegisterVmMeta):
   def __init__(cls, name, bases, dct):
     super(AzureVirtualMachineMetaClass, cls).__init__(name, bases, dct)
     if hasattr(cls, 'OS_TYPE'):
-      assert cls.OS_TYPE, cls
-      assert cls.DEFAULT_IMAGE_PATTERN, cls
+      assert cls.OS_TYPE, '{0} did not override OS_TYPE'.format(cls.__name__)
+      assert cls.DEFAULT_IMAGE_PATTERN, (
+          '{0} did not override DEFAULT_IMAGE_PATTERN'.format(cls.__name__))
       _default_image_patterns[cls.OS_TYPE] = cls.DEFAULT_IMAGE_PATTERN
 
 
