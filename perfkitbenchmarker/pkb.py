@@ -61,7 +61,7 @@ import sys
 import uuid
 
 from perfkitbenchmarker import archive
-from perfkitbenchmarker import benchmarks
+from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import benchmark_status
@@ -471,7 +471,7 @@ def RunBenchmarks(publish=True):
 def _GenerateBenchmarkDocumentation():
   """Generates benchmark documentation to show in --help."""
   benchmark_docs = []
-  for benchmark_module in (benchmarks.BENCHMARKS +
+  for benchmark_module in (linux_benchmarks.BENCHMARKS +
                            windows_benchmarks.BENCHMARKS):
     benchmark_config = configs.LoadMinimalConfig(
         benchmark_module.BENCHMARK_CONFIG, benchmark_module.BENCHMARK_NAME)

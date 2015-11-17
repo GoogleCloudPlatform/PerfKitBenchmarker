@@ -14,7 +14,7 @@
 
 """Benchmark set specific functions and definitions."""
 
-from perfkitbenchmarker import benchmarks
+from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -140,7 +140,7 @@ def _GetValidBenchmarks():
   """Returns a dict mapping valid benchmark names to their modules."""
   if FLAGS.os_type == benchmark_spec.WINDOWS:
     return windows_benchmarks.VALID_BENCHMARKS
-  return benchmarks.VALID_BENCHMARKS
+  return linux_benchmarks.VALID_BENCHMARKS
 
 
 def _GetBenchmarksFromUserConfig(user_config):

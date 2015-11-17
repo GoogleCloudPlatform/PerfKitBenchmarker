@@ -18,7 +18,7 @@ import unittest
 
 import mock
 
-from perfkitbenchmarker.benchmarks import hpcc_benchmark
+from perfkitbenchmarker.linux_benchmarks import hpcc_benchmark
 
 
 class HPCCTestCase(unittest.TestCase):
