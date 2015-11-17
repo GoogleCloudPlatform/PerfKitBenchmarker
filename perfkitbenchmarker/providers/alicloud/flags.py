@@ -20,7 +20,16 @@ flags.DEFINE_string('ali_user_name', 'ubuntu',
                     'use any image other than ubuntu.')
 flags.DEFINE_integer('ali_bandwidth_in', 100, 'Inbound Bandwidth')
 flags.DEFINE_integer('ali_bandwidth_out', 100, 'Outbound Bandwidth')
-flags.DEFINE_string('io_optimized', 'none',
+flags.DEFINE_string('ali_io_optimized', None,
                     'IO optimized for disk in AliCloud. The default is '
-                    'none which means no IO optimized'
-                    '"optimized" means use IO optimized.')
+                    'None which means no IO optimized '
+                    '"optimized" means use IO optimized. If you '
+                    'choose optimized, you must specify the system disk type')
+flags.DEFINE_string('ali_system_disk_type', 'cloud',
+                    'System disk catogory for AliCloud. The default is '
+                    '"cloud" for General cloud disk, '
+                    '"cloud_ssd" for cloud ssd disk, '
+                    '"cloud_efficiency" for efficiency cloud disk, '
+                    '"ephemeral_ssd" for local ssd disk')
+flags.DEFINE_boolean('ali_use_vpc', True,
+                     'Use VPC to create networks')

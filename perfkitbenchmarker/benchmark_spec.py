@@ -74,10 +74,10 @@ WINDOWS = 'windows'
 UBUNTU_CONTAINER = 'ubuntu_container'
 
 FLAGS = flags.FLAGS
-
+VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                RACKSPACE, CLOUDSTACK, ALICLOUD]
 flags.DEFINE_enum('cloud', GCP,
-                  [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                   RACKSPACE, CLOUDSTACK, ALICLOUD],
+                  VALID_CLOUDS,
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
@@ -181,6 +181,7 @@ class BenchmarkSpec(object):
 
         os_type = self._GetOsTypeForGroup(group_name)
         cloud = self._GetCloudForGroup(group_name)
+        providers.LoadProvider(cloud.lower())
 
         # Then create a VmSpec and possibly a DiskSpec which we can
         # use to create the remaining VMs.

@@ -30,6 +30,7 @@ from perfkitbenchmarker import vm_util
 ALI_PREFIX = ['aliyuncli']
 ROOT = 'root'
 FLAGS = flags.FLAGS
+PASSWD_LEN = 20
 
 
 REGION_HZ = 'cn-hangzhou'
@@ -93,7 +94,7 @@ def AddDefaultTags(resource_id, resource_type, region):
   AddTags(resource_id, resource_type, region, **tags)
 
 
-@vm_util.Retry()
+@vm_util.Retry(max_retries=10)
 def AddPubKeyToHost(host_ip, password, keyfile, username):
   public_key = str()
   if keyfile:
@@ -131,6 +132,15 @@ def AddPubKeyToHost(host_ip, password, keyfile, username):
     raise IOError
 
 
-def GeneratePassword(length=20):
-  password_chars = string.digits + string.letters
-  return ''.join([random.choice(password_chars) for i in xrange(length)])
+def GeneratePassword(length=PASSWD_LEN):
+  digit_len = length / 2
+  letter_len = length - digit_len
+  return ''.join(random.sample(string.letters, digit_len)) + \
+         ''.join(random.sample(string.digits, letter_len))
+
+
+def GetDrivePathPrefix():
+  if FLAGS.ali_io_optimized is None:
+    return '/dev/xvd'
+  elif FLAGS.ali_io_optimized:
+    return '/dev/vd'

@@ -99,24 +99,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.image = self.image or self.DEFAULT_IMAGE
     self.project = vm_spec.project
-    disk_spec = disk.BaseDiskSpec(
-        disk_size=self.BOOT_DISK_SIZE_GB, disk_type=self.BOOT_DISK_TYPE)
-    self.boot_disk = gce_disk.GceDisk(
-        disk_spec, self.name, self.zone, self.project, self.image)
     self.max_local_disks = vm_spec.num_local_ssds
     self.boot_metadata = {}
 
     self.preemptible = vm_spec.preemptible
 
     events.sample_created.connect(self.AnnotateSample, weak=False)
-
-  def _CreateDependencies(self):
-    """Create VM dependencies."""
-    self.boot_disk.Create()
-
-  def _DeleteDependencies(self):
-    """Delete VM dependencies."""
-    self.boot_disk.Delete()
 
   def _Create(self):
     """Create a GCE VM instance."""
@@ -130,10 +118,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     'compute',
                     'instances',
                     'create', self.name,
-                    '--disk',
-                    'name=%s' % self.boot_disk.name,
-                    'boot=yes',
-                    'mode=rw',
+                    '--image', self.image,
+                    '--boot-disk-size', str(self.BOOT_DISK_SIZE_GB),
+                    '--boot-disk-type', gce_disk.DISK_TYPE[self.BOOT_DISK_TYPE],
                     '--machine-type', self.machine_type,
                     '--tags=perfkitbenchmarker',
                     '--no-restart-on-failure',
