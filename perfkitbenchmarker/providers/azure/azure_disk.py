@@ -47,7 +47,8 @@ disk.RegisterDiskTypeMap(AZURE, DISK_TYPE)
 
 PREMIUM_STORAGE_METADATA = {
     disk.MEDIA: disk.SSD,
-    disk.REPLICATION: disk.ZONE
+    disk.REPLICATION: disk.ZONE,
+    disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD
 }
 
 AZURE_REPLICATION_MAP = {
@@ -89,14 +90,16 @@ class AzureDisk(disk.BaseDisk):
     elif self.disk_type == STANDARD_DISK:
       self.metadata = {
           disk.MEDIA: disk.HDD,
-          disk.REPLICATION: AZURE_REPLICATION_MAP[FLAGS.azure_storage_type]
+          disk.REPLICATION: AZURE_REPLICATION_MAP[FLAGS.azure_storage_type],
+          disk.LEGACY_DISK_TYPE: disk.STANDARD
       }
     elif self.disk_type == disk.LOCAL:
       media = disk.SSD if LocalDiskIsSSD(machine_type) else disk.HDD
 
       self.metadata = {
           disk.MEDIA: media,
-          disk.REPLICATION: disk.NONE
+          disk.REPLICATION: disk.NONE,
+          disk.LEGACY_DISK_TYPE: disk.LOCAL
       }
 
   def _Create(self):

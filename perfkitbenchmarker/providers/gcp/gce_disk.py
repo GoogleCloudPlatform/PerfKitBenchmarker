@@ -34,15 +34,18 @@ DISK_TYPE = {disk.STANDARD: PD_STANDARD, disk.REMOTE_SSD: PD_SSD}
 DISK_METADATA = {
     PD_STANDARD: {
         disk.MEDIA: disk.HDD,
-        disk.REPLICATION: disk.ZONE
+        disk.REPLICATION: disk.ZONE,
+        disk.LEGACY_DISK_TYPE: disk.STANDARD
     },
     PD_SSD: {
         disk.MEDIA: disk.SSD,
-        disk.REPLICATION: disk.ZONE
+        disk.REPLICATION: disk.ZONE,
+        disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD
     },
     disk.LOCAL: {
         disk.MEDIA: disk.SSD,
-        disk.REPLICATION: disk.NONE
+        disk.REPLICATION: disk.NONE,
+        disk.LEGACY_DISK_TYPE: disk.LOCAL
     }
 }
 

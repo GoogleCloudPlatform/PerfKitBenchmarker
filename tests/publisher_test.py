@@ -317,3 +317,18 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                     data_disk_0_num_stripes=1,
                     data_disk_0_foo='bar')
     self._RunTest(self.mock_spec, expected)
+
+  def testDiskLegacyDiskType(self):
+    self.mock_disk.configure_mock(disk_type='disk-type',
+                                  metadata={'foo': 'bar',
+                                            'legacy_disk_type': 'remote_ssd'})
+    self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
+    expected = self.default_meta.copy()
+    expected.update(scratch_disk_size=20,
+                    scratch_disk_type='remote_ssd',
+                    data_disk_0_size=20,
+                    data_disk_0_type='disk-type',
+                    data_disk_0_num_stripes=1,
+                    data_disk_0_foo='bar',
+                    data_disk_0_legacy_disk_type='remote_ssd')
+    self._RunTest(self.mock_spec, expected)

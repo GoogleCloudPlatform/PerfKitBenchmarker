@@ -47,27 +47,31 @@ DISK_TYPE = {
 DISK_METADATA = {
     STANDARD: {
         disk.MEDIA: disk.HDD,
-        disk.REPLICATION: disk.ZONE
+        disk.REPLICATION: disk.ZONE,
+        disk.LEGACY_DISK_TYPE: disk.STANDARD
     },
     GP2: {
         disk.MEDIA: disk.SSD,
-        disk.REPLICATION: disk.ZONE
+        disk.REPLICATION: disk.ZONE,
+        disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD
     },
     IO1: {
         disk.MEDIA: disk.SSD,
-        disk.REPLICATION: disk.ZONE
-    },
-    disk.LOCAL: None
+        disk.REPLICATION: disk.ZONE,
+        disk.LEGACY_DISK_TYPE: disk.PIOPS
+    }
 }
 
 LOCAL_SSD_METADATA = {
     disk.MEDIA: disk.SSD,
-    disk.REPLICATION: disk.NONE
+    disk.REPLICATION: disk.NONE,
+    disk.LEGACY_DISK_TYPE: disk.LOCAL
 }
 
 LOCAL_HDD_METADATA = {
     disk.MEDIA: disk.HDD,
-    disk.REPLICATION: disk.NONE
+    disk.REPLICATION: disk.NONE,
+    disk.LEGACY_DISK_TYPE: disk.LOCAL
 }
 
 LOCAL_HDD_PREFIXES = ['d2', 'hs']

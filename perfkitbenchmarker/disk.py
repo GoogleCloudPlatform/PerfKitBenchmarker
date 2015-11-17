@@ -51,6 +51,7 @@ SSD = 'ssd'
 NONE = 'none'
 ZONE = 'zone'
 REGION = 'region'
+LEGACY_DISK_TYPE = 'legacy_disk_type'
 
 
 def RegisterDiskTypeMap(provider_name, type_map):

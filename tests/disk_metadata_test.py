@@ -44,12 +44,13 @@ class GcpDiskMetadataTest(unittest.TestCase):
 
     self.assertEquals(disk_obj.metadata,
                       {disk.MEDIA: disk.HDD,
-                       disk.REPLICATION: disk.ZONE})
+                       disk.REPLICATION: disk.ZONE,
+                       disk.LEGACY_DISK_TYPE: disk.STANDARD})
 
 
 class AwsDiskMetadataTest(unittest.TestCase):
   def doAwsDiskTest(self, disk_type, machine_type,
-                    goal_media, goal_replication):
+                    goal_media, goal_replication, goal_legacy_disk_type):
     disk_spec = aws_disk.AwsDiskSpec(
         disk_size=2,
         disk_type=disk_type,
@@ -68,26 +69,29 @@ class AwsDiskMetadataTest(unittest.TestCase):
 
     self.assertEqual(vm.scratch_disks[0].metadata,
                      {disk.MEDIA: goal_media,
-                      disk.REPLICATION: goal_replication})
+                      disk.REPLICATION: goal_replication,
+                      disk.LEGACY_DISK_TYPE: goal_legacy_disk_type})
 
   def testLocalSSD(self):
     self.doAwsDiskTest(
         disk.LOCAL,
         'c3.2xlarge',
         disk.SSD,
-        disk.NONE)
+        disk.NONE,
+        disk.LOCAL)
 
   def testLocalHDD(self):
     self.doAwsDiskTest(
         disk.LOCAL,
         'd2.2xlarge',
         disk.HDD,
-        disk.NONE)
+        disk.NONE,
+        disk.LOCAL)
 
 
 class AzureDiskMetadataTest(unittest.TestCase):
   def doAzureDiskTest(self, storage_type, disk_type, machine_type,
-                      goal_media, goal_replication):
+                      goal_media, goal_replication, goal_legacy_disk_type):
     with mock.patch(azure_disk.__name__ + '.FLAGS') as disk_flags:
       disk_flags.azure_storage_type = storage_type
       disk_spec = disk.BaseDiskSpec(
@@ -110,32 +114,37 @@ class AzureDiskMetadataTest(unittest.TestCase):
 
       self.assertEqual(vm.scratch_disks[0].metadata,
                        {disk.MEDIA: goal_media,
-                        disk.REPLICATION: goal_replication})
+                        disk.REPLICATION: goal_replication,
+                        disk.LEGACY_DISK_TYPE: goal_legacy_disk_type})
 
   def testPremiumStorage(self):
     self.doAzureDiskTest(azure_flags.PLRS,
                          azure_disk.PREMIUM_STORAGE,
                          'Standard_D1',
                          disk.SSD,
-                         disk.ZONE)
+                         disk.ZONE,
+                         disk.REMOTE_SSD)
 
   def testStandardDisk(self):
     self.doAzureDiskTest(azure_flags.ZRS,
                          azure_disk.STANDARD_DISK,
                          'Standard_D1',
                          disk.HDD,
-                         disk.REGION)
+                         disk.REGION,
+                         disk.STANDARD)
 
   def testLocalHDD(self):
     self.doAzureDiskTest(azure_flags.LRS,
                          disk.LOCAL,
                          'Standard_A1',
                          disk.HDD,
-                         disk.NONE)
+                         disk.NONE,
+                         disk.LOCAL)
 
   def testLocalSSD(self):
     self.doAzureDiskTest(azure_flags.LRS,
                          disk.LOCAL,
                          'Standard_DS2',
                          disk.SSD,
-                         disk.NONE)
+                         disk.NONE,
+                         disk.LOCAL)
