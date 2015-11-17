@@ -20,9 +20,12 @@ import string
 import threading
 import logging
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.alicloud import util
+
+FLAGS = flags.FLAGS
 
 DISK_TYPE = {
     disk.STANDARD: 'cloud',
@@ -33,7 +36,7 @@ DISK_TYPE = {
 
 
 class AliDisk(disk.BaseDisk):
-  """Object representing an Ali Disk."""
+  """Object representing an AliCloud Disk."""
 
   _lock = threading.Lock()
   vm_devices = {}
@@ -91,7 +94,7 @@ class AliDisk(disk.BaseDisk):
         '--RegionId %s' % self.region,
         '--InstanceId %s' % self.attached_vm_id,
         '--DiskId %s' % self.id,
-        '--Device %s' % self.GetDevicePath()]
+        '--Device %s' % self.GetVirtualDevicePath()]
     attach_cmd = util.GetEncodedCmd(attach_cmd)
     vm_util.IssueRetryableCommand(attach_cmd)
 
@@ -114,4 +117,31 @@ class AliDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
+    if FLAGS.ali_io_optimized is None:
+      return '/dev/xvd%s' % self.device_letter
+    else:
+      return '/dev/vd%s' % self.device_letter
+
+  def GetVirtualDevicePath(self):
+    """Returns the path to the device visible to console users."""
     return '/dev/xvd%s' % self.device_letter
+
+  @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
+  def WaitForDiskStatus(self, status_list):
+    """Waits until disk is attach to the instance"""
+    logging.info('Waits until the disk\'s stastus is one of statuses: %s',
+                 status_list)
+    describe_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'DescribeDisks',
+        '--RegionId %s' % self.region,
+        '--ZoneId %s' % self.zone,
+        '--DiskIds \'["%s"]\'' % self.id,
+        '--Device %s' % self.GetVirtualDevicePath()]
+    attach_cmd = util.GetEncodedCmd(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(attach_cmd)
+    response = json.loads(stdout)
+    disk = response['Disks']['Disk']
+    assert len(disk) == 1
+    status = disk[0]['Status']
+    assert status in status_list
