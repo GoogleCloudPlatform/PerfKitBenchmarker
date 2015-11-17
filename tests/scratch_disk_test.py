@@ -130,6 +130,9 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _PatchCloudSpecific(self):
     self.patches.append(mock.patch(azure_disk.__name__ + '.AzureDisk'))
+    self.patches.append(mock.patch(
+        azure_virtual_machine.__name__ + '._GetDefaultImage',
+        return_value='test_image'))
 
   def _CreateVm(self):
     vm_spec = virtual_machine.BaseVmSpec()
