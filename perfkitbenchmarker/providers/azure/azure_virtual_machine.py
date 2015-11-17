@@ -62,20 +62,26 @@ def _GetDefaultImagesFromAzure():
   Raises:
     errors.Error: If unable to get the default image for an OS_TYPE.
   """
-  list_images_cmd = [AZURE_PATH, 'vm', 'image', 'list']
+  list_images_cmd = [AZURE_PATH, 'vm', 'image', 'list', '--json']
   stdout, _ = vm_util.IssueRetryableCommand(list_images_cmd)
+  azure_vm_image_list = json.loads(stdout)
+  images_by_os_type = {}
+  for image in azure_vm_image_list:
+    for os_type, pattern in _default_image_patterns.iteritems():
+      match = pattern.match(image['name'])
+      if match:
+        image_name_fields = tuple(None if g is None else int(g)
+                                  for g in match.groups())
+        os_images = images_by_os_type.setdefault(os_type, {})
+        os_images[image_name_fields] = match.group(0)
   default_images = {}
   for os_type, pattern in _default_image_patterns.iteritems():
-    images = {}
-    for match in pattern.finditer(stdout):
-      image_name_fields = tuple(None if g is None else int(g)
-                                for g in match.groups())
-      images[image_name_fields] = match.group(0)
-    if not images:
+    os_images = images_by_os_type.get(os_type)
+    if not os_images:
       raise errors.Error(
           'Unable to get Azure default {0} image. No image names match '
           '{1}'.format(os_type, pattern.pattern))
-    default_images[os_type] = images[max(images)]
+    default_images[os_type] = os_images[max(os_images)]
   return default_images
 
 
@@ -282,9 +288,8 @@ class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
   # Example: ('b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-'
   #           '14_04_3-LTS-amd64-server-20150908-en-us-30GB')
   DEFAULT_IMAGE_PATTERN = re.compile(
-      r'b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-'
-      r'([0-9]+)_([0-9]+)(?:_([0-9]+))?'
-      r'-LTS-amd64-server-([0-9]+)(?:[.]([0-9]+))?-en-us-30GB')
+      r'b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04'
+      r'(?:_([0-9]+))?-LTS-amd64-server-([0-9]+)(?:[.]([0-9]+))?-en-us-30GB')
 
 
 class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
@@ -293,8 +298,7 @@ class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
   # Example: ('0b11de9248dd4d87b18621318e037d37__RightImage-'
   #           'CentOS-7.0-x64-v14.2.1')
   DEFAULT_IMAGE_PATTERN = re.compile(
-      r'0b11de9248dd4d87b18621318e037d37__RightImage-'
-      r'CentOS-([0-9]+)[.]([0-9]+)-x64-'
+      r'0b11de9248dd4d87b18621318e037d37__RightImage-CentOS-7[.]([0-9]+)-x64-'
       r'v([0-9]+)(?:[.]([0-9]+))?(?:[.]([0-9]+))?(?:[.]([0-9]+))?')
 
 
