@@ -29,7 +29,7 @@ FLAGS = flags.FLAGS
 # These are the (deprecated) old disk type names
 STANDARD = 'standard'
 REMOTE_SSD = 'remote_ssd'
-PIOPS = 'piops'  # Provisioned IOPS (SSD) in AWS
+PIOPS = 'piops'  # Provisioned IOPS (SSD) in AWS and Alicloud
 
 # 'local' refers to disks that come attached to VMs. It is the only
 # "universal" disk type that is not associated with a provider. It
@@ -54,6 +54,8 @@ REGION = 'region'
 LEGACY_DISK_TYPE = 'legacy_disk_type'
 
 
+# TODO(nlavine): remove this function when we remove the deprecated
+# flags and disk type names.
 def RegisterDiskTypeMap(provider_name, type_map):
   """Register a map from legacy disk type names to modern ones.
 
@@ -67,9 +69,6 @@ def RegisterDiskTypeMap(provider_name, type_map):
       the names we give to providers in benchmark_spec.py.
     type_map: a dict. Maps generic disk type names (STANDARD,
       REMOTE_SSD, PIOPS) to provider-specific names.
-
-  TODO(nlavine): remove this function when we remove the deprecated
-  flags and disk type names.
   """
 
   DISK_TYPE_MAPS[provider_name] = type_map
