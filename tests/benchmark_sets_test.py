@@ -19,7 +19,7 @@ from mock import patch
 
 # This import to ensure required FLAGS are defined.
 from perfkitbenchmarker import pkb  # NOQA
-from perfkitbenchmarker import benchmarks
+from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import benchmark_sets
 
 
@@ -28,7 +28,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def setUp(self):
     # create set of valid benchmark names from the benchmark directory
     self.valid_benchmark_names = set()
-    for benchmark_module in benchmarks.BENCHMARKS:
+    for benchmark_module in linux_benchmarks.BENCHMARKS:
         self.valid_benchmark_names.add(benchmark_module.BENCHMARK_NAME)
 
     self.valid_benchmark_set_names = set()
