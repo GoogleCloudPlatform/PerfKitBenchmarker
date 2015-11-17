@@ -224,7 +224,7 @@ class BenchmarkSpec(object):
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
       if FLAGS.os_type != WINDOWS:
-        vm_util.GenerateSSHConfig(self.vms)
+        vm_util.GenerateSSHConfig(self)
 
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
