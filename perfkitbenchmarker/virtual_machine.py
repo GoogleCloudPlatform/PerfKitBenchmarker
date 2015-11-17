@@ -82,15 +82,19 @@ class BaseVmSpec(object):
     zone: The region / zone the in which to launch the VM.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     image: The disk image to boot from.
+    install_packages: If false, no packages will be installed. This is
+        useful if benchmark dependencies have already been installed.
   """
 
   __metaclass__ = AutoRegisterVmSpecMeta
   CLOUD = None
 
-  def __init__(self, zone=None, machine_type=None, image=None):
+  def __init__(self, zone=None, machine_type=None, image=None,
+               install_packages=True):
     self.zone = zone
     self.machine_type = machine_type
     self.image = image
+    self.install_packages = install_packages
 
   def ApplyFlags(self, flags):
     """Applies flags to the VmSpec."""
@@ -99,6 +103,8 @@ class BaseVmSpec(object):
       flags.zones.append(self.zone)
     self.machine_type = flags.machine_type or self.machine_type
     self.image = flags.image or self.image
+    if flags.install_packages is not None:
+      self.install_packages = flags.install_packages
 
 
 class BaseVirtualMachine(resource.BaseResource):
@@ -148,6 +154,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.image = vm_spec.image
+    self.install_packages = vm_spec.install_packages
     self.ip_address = None
     self.internal_ip = None
     self.user_name = DEFAULT_USERNAME

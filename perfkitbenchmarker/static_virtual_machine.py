@@ -49,8 +49,8 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
   CLOUD = 'Static'
 
   def __init__(self, ip_address=None, user_name=None, ssh_private_key=None,
-               internal_ip=None, ssh_port=22, install_packages=True,
-               password=None, disk_specs=None, os_type=None, **kwargs):
+               internal_ip=None, ssh_port=22, password=None, disk_specs=None,
+               os_type=None, **kwargs):
     """Initialize the StaticVmSpec object.
 
     Args:
@@ -60,8 +60,6 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
           to the VM.
       internal_ip: The internal ip address of the VM.
       ssh_port: The port number to use for SSH and SCP commands.
-      install_packages: If false, no packages will be installed. This is
-          useful if benchmark dependencies have already been installed.
       password: The password used to log into the VM (Windows Only).
       disk_specs: A list of dictionaries containing kwargs used to create
           disk.BaseDiskSpecs.
@@ -74,7 +72,6 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
     self.ssh_private_key = ssh_private_key
     self.internal_ip = internal_ip
     self.ssh_port = ssh_port
-    self.install_packages = install_packages
     self.password = password
     self.os_type = os_type
     self.disk_specs = disk_specs
@@ -122,7 +119,6 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.zone = self.zone or ('Static - %s@%s' % (self.user_name,
                                                   self.ip_address))
     self.ssh_port = vm_spec.ssh_port
-    self.install_packages = vm_spec.install_packages
     self.password = vm_spec.password
 
     if vm_spec.disk_specs:

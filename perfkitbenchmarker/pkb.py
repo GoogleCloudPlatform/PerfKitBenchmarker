@@ -151,7 +151,7 @@ flags.DEFINE_integer('num_striped_disks', None,
                      'When using local disks, they default to striping '
                      'all disks together.',
                      lower_bound=1)
-flags.DEFINE_bool('install_packages', True,
+flags.DEFINE_bool('install_packages', None,
                   'Override for determining whether packages should be '
                   'installed. If this is false, no packages will be installed '
                   'on any VMs. This option should probably only ever be used '
