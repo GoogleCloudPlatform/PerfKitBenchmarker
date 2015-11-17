@@ -180,11 +180,12 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     disk_spec = disk.BaseDiskSpec()
     self.os_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type)
     self.max_local_disks = 1
-    self.image = self.image or _GetDefaultImage(self.OS_TYPE)
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
     self.service.Create()
+    # _GetDefaultImage may call the Azure CLI.
+    self.image = self.image or _GetDefaultImage(self.OS_TYPE)
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
