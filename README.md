@@ -312,10 +312,12 @@ Make sure you have installed pip (see the section above).
 Run the following command to install aliyuncli(omit the ‘sudo’ on Windows)
 
 1. Install python development tools:
+   
    In Debian or Ubuntu:
    ```
    $ sudo apt-get install -y python-dev
    ```
+   
    In CentOS:
    ```
    $ sudo yum install python-devel
