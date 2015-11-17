@@ -74,7 +74,7 @@ flags.DEFINE_string('boto_file_location', None,
                     'The location of the boto file.')
 
 flags.DEFINE_string('azure_lib_version', None,
-                    'Specify a particular version of azure client lib.')
+                    'Use a particular version of azure client lib, e.g.: 1.0.2')
 
 FLAGS = flags.FLAGS
 
