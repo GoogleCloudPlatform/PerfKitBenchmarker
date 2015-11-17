@@ -70,7 +70,7 @@ LOCAL_HDD_METADATA = {
     disk.REPLICATION: disk.NONE
 }
 
-LOCAL_HDD_PREFIXES = ['d2']
+LOCAL_HDD_PREFIXES = ['d2', 'hs']
 
 
 def LocalDiskIsHDD(machine_type):

@@ -140,15 +140,19 @@ def WarnAndCopyFlag(old_name, new_name):
   # updated yet will continue to work.
 
 
+DISK_FLAGS_TO_TRANSLATE = {
+    'scratch_disk_type': 'data_disk_type',
+    'scratch_disk_iops': 'aws_provisioned_iops',
+    'scratch_disk_size': 'data_disk_size'
+}
+
+
 def WarnAndTranslateDiskFlags():
   """Translate old disk-related flags to new disk-related flags.
   """
 
-  WarnAndCopyFlag('scratch_disk_type', 'data_disk_type')
-
-  WarnAndCopyFlag('scratch_disk_iops', 'aws_provisioned_iops')
-
-  WarnAndCopyFlag('scratch_disk_size', 'data_disk_size')
+  for old, new in DISK_FLAGS_TO_TRANSLATE.iteritems():
+    WarnAndCopyFlag(old, new)
 
 
 class BaseDiskSpec(object):
