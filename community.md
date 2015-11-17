@@ -12,12 +12,10 @@ layout: page
 <img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/Intel.png" height="100" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 <img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/Mellanox.png" height="60" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 <img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/Microsoft.png" height="60" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
-<img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/Qualcomm.png" height="60" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px"/ style="PADDING-TOP: 10px">
+<img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/Qualcomm.png" height="60" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px"/ style="PADDING-TOP: 10px"/>
 <img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/Rackspace.png" height="80" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 <img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/RedHat.png" height="80" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
 <img src="https://github.com/cmccoy/pkb-web/blob/gh-pages/img/thesystech.png" height="80" style="PADDING-BOTTOM: 10px" style="PADDING-RIGHT: 5px" style="PADDING-TOP: 10px"/>
-
-Logos for: ARM, Broadcom, Canonical, CenturyLink, Cisco, EcoCloud/EPFL, Intel, Mellanox, Microsoft, Qualcomm Technologies, Rackspace, Red Hat, Tradeworx, and Thesys Technologies
 
 ## Cloud Technology Partners:
 Logos for: CloudHarmony,Cloud Spectator,
