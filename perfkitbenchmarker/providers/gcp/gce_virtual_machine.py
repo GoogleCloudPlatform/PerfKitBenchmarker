@@ -120,7 +120,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                     'create', self.name,
                     '--image', self.image,
                     '--boot-disk-size', str(self.BOOT_DISK_SIZE_GB),
-                    '--boot-disk-type', gce_disk.DISK_TYPE[self.BOOT_DISK_TYPE],
+                    '--boot-disk-type', self.BOOT_DISK_TYPE,
                     '--machine-type', self.machine_type,
                     '--tags=perfkitbenchmarker',
                     '--no-restart-on-failure',
