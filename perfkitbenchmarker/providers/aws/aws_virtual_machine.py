@@ -208,6 +208,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _CreateDependencies(self):
     """Create VM dependencies."""
     self.ImportKeyfile()
+    # _GetDefaultImage calls the AWS CLI.
+    self.image = self.image or self._GetDefaultImage(self.machine_type,
+                                                     self.region)
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
@@ -219,11 +222,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if IsPlacementGroupCompatible(self.machine_type):
       placement += ',GroupName=%s' % self.network.placement_group.name
     block_device_map = GetBlockDeviceMap(self.machine_type)
-
-    if self.image is None:
-      # This is here and not in the __init__ method bceauese _GetDefaultImage
-      # does a nontrivial amount of work (it calls the AWS CLI).
-      self.image = self._GetDefaultImage(self.machine_type, self.region)
 
     create_cmd = util.AWS_PREFIX + [
         'ec2',
