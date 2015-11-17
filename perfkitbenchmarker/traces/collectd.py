@@ -23,7 +23,7 @@ import posixpath
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.packages import collectd
+from perfkitbenchmarker.linux_packages import collectd
 
 flags.DEFINE_boolean('collectd', False,
                      'Install and run collectd on the guest.')

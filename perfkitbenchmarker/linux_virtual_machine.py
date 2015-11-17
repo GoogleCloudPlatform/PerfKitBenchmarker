@@ -38,7 +38,7 @@ import uuid
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import packages
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -602,13 +602,13 @@ class RhelMixin(BaseLinuxMixin):
         not FLAGS.install_packages):
       return
     if package_name not in self._installed_packages:
-      package = packages.PACKAGES[package_name]
+      package = linux_packages.PACKAGES[package_name]
       package.YumInstall(self)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
     """Uninstalls a PerfKit package on the VM."""
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     if hasattr(package, 'YumUninstall'):
       package.YumUninstall(self)
 
@@ -619,7 +619,7 @@ class RhelMixin(BaseLinuxMixin):
     don't match across distributions (such as mysql). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.YumGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
@@ -629,7 +629,7 @@ class RhelMixin(BaseLinuxMixin):
     match across distributions (such as mongodb). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.YumGetServiceName(self)
 
   def SetupProxy(self):
@@ -703,13 +703,13 @@ class DebianMixin(BaseLinuxMixin):
         not FLAGS.install_packages):
       return
     if package_name not in self._installed_packages:
-      package = packages.PACKAGES[package_name]
+      package = linux_packages.PACKAGES[package_name]
       package.AptInstall(self)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
     """Uninstalls a PerfKit package on the VM."""
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     if hasattr(package, 'AptUninstall'):
       package.AptUninstall(self)
 
@@ -720,7 +720,7 @@ class DebianMixin(BaseLinuxMixin):
     don't match across distributions (such as mysql). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.AptGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
@@ -730,7 +730,7 @@ class DebianMixin(BaseLinuxMixin):
     match across distributions (such as mongodb). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.AptGetServiceName(self)
 
   def SetupProxy(self):
