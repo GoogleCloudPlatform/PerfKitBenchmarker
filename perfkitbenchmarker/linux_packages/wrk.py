@@ -35,6 +35,9 @@ WRK_PATH = posixpath.join(WRK_DIR, 'wrk')
 # CSV report
 _LUA_SCRIPT_NAME = 'wrk_latency.lua'
 _LUA_SCRIPT_PATH = posixpath.join(WRK_DIR, _LUA_SCRIPT_NAME)
+
+# Default socket / request timeout.
+_TIMEOUT = '10s'
 # WRK always outputs a free text report. _LUA_SCRIPT_NAME (above)
 # writes this prefix before the CSV output begins.
 _CSV_PREFIX = '==CSV==\n'
@@ -94,10 +97,11 @@ def Run(vm, target, connections=1, duration=60):
   threads = min(connections, vm.num_cpus)
   cmd = ('{wrk} --connections={connections} --threads={threads} '
          '--duration={duration} '
+         '--timeout={timeout} '
          '--script={script} {target}').format(
              wrk=WRK_PATH, connections=connections, threads=threads,
              script=_LUA_SCRIPT_PATH, target=target,
-             duration=duration)
+             duration=duration, timeout=_TIMEOUT)
   stdout, _ = vm.RemoteCommand(cmd)
   for variable, value, unit in _ParseOutput(stdout):
     yield sample.Sample(variable, value, unit,
