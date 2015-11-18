@@ -66,10 +66,9 @@ class GceDisk(disk.BaseDisk):
 
   def _Create(self):
     """Creates the disk."""
-    cmd = util.GcloudCommand('compute', 'disks', 'create', self.name)
+    cmd = util.GcloudCommand(self, 'compute', 'disks', 'create', self.name)
     cmd.flags['size'] = self.disk_size
     cmd.flags['type'] = self.disk_type
-    cmd.AddCommonFlags(self)
     if self.image:
       cmd.flags['image'] = self.image
       if FLAGS.image_project:
@@ -78,14 +77,12 @@ class GceDisk(disk.BaseDisk):
 
   def _Delete(self):
     """Deletes the disk."""
-    cmd = util.GcloudCommand('compute', 'disks', 'delete', self.name)
-    cmd.AddCommonFlags(self)
+    cmd = util.GcloudCommand(self, 'compute', 'disks', 'delete', self.name)
     cmd.Issue()
 
   def _Exists(self):
     """Returns true if the disk exists."""
-    cmd = util.GcloudCommand('compute', 'disks', 'describe', self.name)
-    cmd.AddCommonFlags(self)
+    cmd = util.GcloudCommand(self, 'compute', 'disks', 'describe', self.name)
     stdout, _, _ = cmd.Issue(suppress_warning=True)
     try:
       json.loads(stdout)
@@ -100,19 +97,17 @@ class GceDisk(disk.BaseDisk):
       vm: The GceVirtualMachine instance to which the disk will be attached.
     """
     self.attached_vm_name = vm.name
-    cmd = util.GcloudCommand('compute', 'instances', 'attach-disk',
+    cmd = util.GcloudCommand(self, 'compute', 'instances', 'attach-disk',
                              self.attached_vm_name)
     cmd.flags['device-name'] = self.name
     cmd.flags['disk'] = self.name
-    cmd.AddCommonFlags(self)
     cmd.IssueRetryable()
 
   def Detach(self):
     """Detaches the disk from a VM."""
-    cmd = util.GcloudCommand('compute', 'instances', 'detach-disk',
+    cmd = util.GcloudCommand(self, 'compute', 'instances', 'detach-disk',
                              self.attached_vm_name)
     cmd.flags['device-name'] = self.name
-    cmd.AddCommonFlags(self)
     cmd.IssueRetryable()
     self.attached_vm_name = None
 

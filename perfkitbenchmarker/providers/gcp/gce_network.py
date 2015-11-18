@@ -48,22 +48,22 @@ class GceFirewallRule(resource.BaseResource):
 
   def _Create(self):
     """Creates the Firewall Rule."""
-    cmd = util.GcloudCommand('compute', 'firewall-rules', 'create', self.name)
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'create',
+                             self.name)
     cmd.flags['allow'] = ','.join('{0}:{1}'.format(protocol, self.port)
                                   for protocol in ('tcp', 'udp'))
-    cmd.AddCommonFlags(self)
     cmd.Issue()
 
   def _Delete(self):
     """Deletes the Firewall Rule."""
-    cmd = util.GcloudCommand('compute', 'firewall-rules', 'delete', self.name)
-    cmd.AddCommonFlags(self)
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'delete',
+                             self.name)
     cmd.Issue()
 
   def _Exists(self):
     """Returns True if the Firewall Rule exists."""
-    cmd = util.GcloudCommand('compute', 'firewall-rules', 'describe', self.name)
-    cmd.AddCommonFlags(self)
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'describe',
+                             self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True)
     if retcode:
       return False

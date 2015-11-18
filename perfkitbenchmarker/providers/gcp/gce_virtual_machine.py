@@ -115,7 +115,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
-    cmd = util.GcloudCommand('compute', 'instances', 'create', self.name)
+    cmd = util.GcloudCommand(self, 'compute', 'instances', 'create', self.name)
     cmd.flags['image'] = self.image
     cmd.flags['boot-disk-size'] = self.BOOT_DISK_SIZE_GB
     cmd.flags['boot-disk-type'] = self.BOOT_DISK_TYPE
@@ -136,7 +136,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
     if self.preemptible:
       cmd.flags['preemptible'] = True
-    cmd.AddCommonFlags(self)
     return cmd
 
   def _GenerateDescribeCommand(self):
@@ -146,9 +145,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to describe the VM
       instance.
     """
-    cmd = util.GcloudCommand('compute', 'instances', 'describe', self.name)
-    cmd.AddCommonFlags(self)
-    return cmd
+    return util.GcloudCommand(self, 'compute', 'instances', 'describe',
+                              self.name)
 
   def _GenerateDeleteCommand(self):
     """Generates a command to delete the VM instance.
@@ -156,9 +154,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to delete the VM instance.
     """
-    cmd = util.GcloudCommand('compute', 'instances', 'delete', self.name)
-    cmd.AddCommonFlags(self)
-    return cmd
+    return util.GcloudCommand(self, 'compute', 'instances', 'delete', self.name)
 
   def _GenerateAddMetadataCommand(self, **kwargs):
     """Generates a command to add metadata to the VM instance.
@@ -170,8 +166,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to add the provided
       metadata to the VM instance.
     """
-    cmd = util.GcloudCommand('compute', 'instances', 'add-metadata', self.name)
-    cmd.AddCommonFlags(self)
+    cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
+                             self.name)
     cmd.flags['metadata'] = ','.join('{0}={1}'.format(key, value)
                                      for key, value in kwargs.iteritems())
     return cmd
@@ -301,9 +297,9 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
       GcloudCommand. gcloud command to issue in order to reset the VM user's
       password.
     """
-    cmd = util.GcloudCommand('compute', 'reset-windows-password', self.name)
+    cmd = util.GcloudCommand(self, 'compute', 'reset-windows-password',
+                             self.name)
     cmd.flags['user'] = self.user_name
-    cmd.AddCommonFlags(self)
     return cmd
 
   def _PostCreate(self):

@@ -37,10 +37,19 @@ class GcloudCommand(object):
         the end of the gcloud command (e.g. ['--metadata', 'color=red']).
   """
 
-  def __init__(self, *args):
+  def __init__(self, resource, *args):
+    """Initializes a GcloudCommand with the provided args and common flags.
+
+    Args:
+      resource: A GCE resource of type BaseResource.
+      *args: sequence of strings. Non-flag args to pass to gcloud, typically
+          specifying an operation to perform (e.g. ['compute', 'images', 'list']
+          to list available images).
+    """
     self.args = list(args)
     self.flags = OrderedDict()
     self.additional_flags = []
+    self._AddCommonFlags(resource)
 
   def _GetCommand(self):
     """Generates the gcloud command.
@@ -87,7 +96,7 @@ class GcloudCommand(object):
     """
     return vm_util.IssueRetryableCommand(self._GetCommand())
 
-  def AddCommonFlags(self, resource):
+  def _AddCommonFlags(self, resource):
     """Adds common flags to the command.
 
     Adds common gcloud flags derived from the PKB flags and provided resource.
