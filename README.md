@@ -7,6 +7,14 @@ tuned (ie the defaults) because this is what most users will use.  This should h
 Only in the rare cause where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
+This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [Wiki Pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contain more detailed informaiton, 
+* [FAQ] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
+* [Tech Talks] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
+* [Governing rules] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
+* [Community meeting decks and notes] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
+* [Design documents] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
+* You are always welcome to [open an issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) as well to contact us.
+
 
 KNOWN ISSUES
 ============
