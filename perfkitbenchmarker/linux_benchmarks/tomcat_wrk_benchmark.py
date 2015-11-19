@@ -44,6 +44,11 @@ flags.DEFINE_integer('tomcat_wrk_test_length', 120,
 flags.DEFINE_integer('tomcat_wrk_max_connections', 128,
                      'Maximum number of simultaneous connections to attempt',
                      lower_bound=1)
+flags.DEFINE_boolean('tomcat_wrk_report_all_samples', False,
+                     'If true, report throughput/latency at all connection '
+                     'counts. If false (the default), report only the '
+                     'connection counts with lowest p50 latency and highest '
+                     'throughput.')
 
 # Stop when >= 1% of requests have errors
 MAX_ERROR_RATE = 0.01
@@ -139,7 +144,8 @@ def Run(benchmark_spec):
   logging.info('Warming up for %ds', WARM_UP_DURATION)
   list(wrk.Run(wrk_vm, connections=1, target=target, duration=WARM_UP_DURATION))
 
-  max_throughput = None
+  all_by_metric = []
+
   while connections <= max_connections:
     run_samples = list(wrk.Run(wrk_vm, connections=connections, target=target,
                                duration=duration))
@@ -147,7 +153,7 @@ def Run(benchmark_spec):
     by_metric = {i.metric: i for i in run_samples}
     errors = by_metric['errors'].value
     requests = by_metric['requests'].value
-    throughput = by_metric['throughput']
+    throughput = by_metric['throughput'].value
     if requests < 1:
       logging.warn('No requests issued for %d connections.',
                    connections)
@@ -155,25 +161,38 @@ def Run(benchmark_spec):
     else:
       error_rate = float(errors) / requests
 
-    # Single connection latency
-    if connections == 1:
-      samples.extend(s for s in run_samples if 'latency' in s.metric)
-      max_throughput = throughput
-
     if error_rate <= MAX_ERROR_RATE:
-      max_throughput = max((max_throughput, throughput),
-                           key=operator.attrgetter('value'))
+      all_by_metric.append(by_metric)
     else:
       logging.warn('Error rate exceeded maximum (%g > %g)', error_rate,
                    MAX_ERROR_RATE)
 
     logging.info('Ran with %d connections; %.2f%% errors, %.2f req/s',
-                 connections, error_rate, throughput.value)
+                 connections, error_rate, throughput)
 
     # Retry with double the connections
     connections *= 2
 
-  samples.append(max_throughput)
+  if not all_by_metric:
+    raise ValueError('No requests succeeded.')
+
+  # Annotate the sample with the best throughput
+  max_throughput = max(all_by_metric, key=lambda x: x['throughput'].value)
+  for sample in max_throughput.itervalues():
+    sample.metadata.update(best_throughput=True)
+
+  # ...and best 50th percentile latency
+  min_p50 = min(all_by_metric, key=lambda x: x['p50 latency'].value)
+  for sample in min_p50.itervalues():
+    sample.metadata.update(best_p50=True)
+
+  sort_key = operator.attrgetter('metric')
+  if FLAGS.tomcat_wrk_report_all_samples:
+    samples = [sample for d in all_by_metric
+               for sample in sorted(d.itervalues(), key=sort_key)]
+  else:
+    samples = (sorted(min_p50.itervalues(), key=sort_key) +
+               sorted(max_throughput.itervalues(), key=sort_key))
 
   for sample in samples:
     sample.metadata.update(ip_type='external', runtime_in_seconds=duration)
