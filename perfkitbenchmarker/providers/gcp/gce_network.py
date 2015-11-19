@@ -25,7 +25,6 @@ import threading
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -49,34 +48,23 @@ class GceFirewallRule(resource.BaseResource):
 
   def _Create(self):
     """Creates the Firewall Rule."""
-    create_cmd = [FLAGS.gcloud_path,
-                  'compute',
-                  'firewall-rules',
-                  'create',
-                  self.name,
-                  '--allow', 'tcp:%d' % self.port, 'udp:%d' % self.port]
-    create_cmd.extend(util.GetDefaultGcloudFlags(self))
-    vm_util.IssueCommand(create_cmd)
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'create',
+                             self.name)
+    cmd.flags['allow'] = ','.join('{0}:{1}'.format(protocol, self.port)
+                                  for protocol in ('tcp', 'udp'))
+    cmd.Issue()
 
   def _Delete(self):
     """Deletes the Firewall Rule."""
-    delete_cmd = [FLAGS.gcloud_path,
-                  'compute',
-                  'firewall-rules',
-                  'delete',
-                  self.name]
-    delete_cmd.extend(util.GetDefaultGcloudFlags(self))
-    vm_util.IssueCommand(delete_cmd)
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'delete',
+                             self.name)
+    cmd.Issue()
 
   def _Exists(self):
     """Returns True if the Firewall Rule exists."""
-    describe_cmd = [FLAGS.gcloud_path,
-                    'compute',
-                    'firewall-rules',
-                    'describe',
-                    self.name]
-    describe_cmd.extend(util.GetDefaultGcloudFlags(self))
-    _, _, retcode = vm_util.IssueCommand(describe_cmd, suppress_warning=True)
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'describe',
+                             self.name)
+    _, _, retcode = cmd.Issue(suppress_warning=True)
     if retcode:
       return False
     return True
