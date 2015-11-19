@@ -114,7 +114,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(AwsVirtualMachine, self).__init__(vm_spec)
-    self.region = self.zone[:-1]
+    self.region = util.GetRegionFromZone(self.zone)
     self.user_name = FLAGS.aws_user_name
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
@@ -203,6 +203,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.ip_address = instance['PublicIpAddress']
     self.internal_ip = instance['PrivateIpAddress']
     self.group_id = instance['SecurityGroups'][0]['GroupId']
+    if util.IsRegion(self.zone):
+      self.zone = str(instance['Placement']['AvailabilityZone'])
     util.AddDefaultTags(self.id, self.region)
 
   def _CreateDependencies(self):
@@ -218,9 +220,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a VM instance."""
-    placement = 'AvailabilityZone=%s' % self.zone
+    placement = []
+    if not util.IsRegion(self.zone):
+      placement.append('AvailabilityZone=%s' % self.zone)
     if IsPlacementGroupCompatible(self.machine_type):
-      placement += ',GroupName=%s' % self.network.placement_group.name
+      placement.append('GroupName=%s' % self.network.placement_group.name)
+    placement = ','.join(placement)
     block_device_map = GetBlockDeviceMap(self.machine_type)
 
     create_cmd = util.AWS_PREFIX + [
@@ -231,10 +236,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--associate-public-ip-address',
         '--image-id=%s' % self.image,
         '--instance-type=%s' % self.machine_type,
-        '--placement=%s' % placement,
         '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
+    if placement:
+      create_cmd.append('--placement=%s' % placement)
     if self.user_data:
       create_cmd.append('--user-data=%s' % self.user_data)
     stdout, _, _ = vm_util.IssueCommand(create_cmd)

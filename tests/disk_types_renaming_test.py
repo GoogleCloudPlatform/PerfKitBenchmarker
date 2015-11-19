@@ -82,7 +82,7 @@ class AwsDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'AWS',
                 'vm_spec': {
                     'AWS': {
-                        'zone': 'us-east1-a'
+                        'zone': 'us-east-1a'
                     }
                 },
                 'disk_spec': {
@@ -108,7 +108,7 @@ class AwsDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'AWS',
                 'vm_spec': {
                     'AWS': {
-                        'zone': 'us-east1-a'
+                        'zone': 'us-east-1a'
                     }
                 },
                 'disk_spec': {
@@ -134,7 +134,7 @@ class AwsDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'AWS',
                 'vm_spec': {
                     'AWS': {
-                        'zone': 'us-east1-a'
+                        'zone': 'us-east-1a'
                     }
                 },
                 'disk_spec': {

@@ -146,7 +146,7 @@ class AwsSubnet(resource.BaseResource):
   def __init__(self, zone, vpc_id, cidr_block='10.0.0.0/24'):
     super(AwsSubnet, self).__init__()
     self.zone = zone
-    self.region = zone[:-1]
+    self.region = util.GetRegionFromZone(zone)
     self.vpc_id = vpc_id
     self.id = None
     self.cidr_block = cidr_block
@@ -159,8 +159,10 @@ class AwsSubnet(resource.BaseResource):
         'create-subnet',
         '--region=%s' % self.region,
         '--vpc-id=%s' % self.vpc_id,
-        '--cidr-block=%s' % self.cidr_block,
-        '--availability-zone=%s' % self.zone]
+        '--cidr-block=%s' % self.cidr_block]
+    if not util.IsRegion(self.zone):
+      create_cmd.append('--availability-zone=%s' % self.zone)
+
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['Subnet']['SubnetId']
@@ -379,7 +381,7 @@ class AwsNetwork(network.BaseNetwork):
       spec: A BaseNetworkSpec object.
     """
     super(AwsNetwork, self).__init__(spec)
-    self.region = spec.zone[:-1]
+    self.region = util.GetRegionFromZone(spec.zone)
     self.vpc = AwsVpc(self.region)
     self.internet_gateway = AwsInternetGateway(self.region)
     self.subnet = None

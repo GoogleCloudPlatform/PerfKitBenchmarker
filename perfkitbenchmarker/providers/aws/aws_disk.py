@@ -119,7 +119,7 @@ class AwsDisk(disk.BaseDisk):
     self.iops = disk_spec.iops
     self.id = None
     self.zone = zone
-    self.region = zone[:-1]
+    self.region = util.GetRegionFromZone(zone)
     self.device_letter = None
     self.attached_vm_id = None
 
@@ -137,8 +137,9 @@ class AwsDisk(disk.BaseDisk):
         'create-volume',
         '--region=%s' % self.region,
         '--size=%s' % self.disk_size,
-        '--availability-zone=%s' % self.zone,
         '--volume-type=%s' % self.disk_type]
+    if not util.IsRegion(self.zone):
+      create_cmd.append('--availability-zone=%s' % self.zone)
     if self.disk_type == IO1:
       create_cmd.append('--iops=%s' % self.iops)
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
