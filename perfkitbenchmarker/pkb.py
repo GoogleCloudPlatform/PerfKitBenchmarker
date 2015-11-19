@@ -126,6 +126,9 @@ flags.DEFINE_enum(
     [log_util.DEBUG, log_util.INFO],
     'The log level to run at.')
 flags.DEFINE_enum(
+    'file_log_level', log_util.DEBUG, [log_util.DEBUG, log_util.INFO],
+    'Anything logged at this level or higher will be written to the log file.')
+flags.DEFINE_enum(
     'run_stage', STAGE_ALL,
     [STAGE_ALL, STAGE_PREPARE, STAGE_RUN, STAGE_CLEANUP],
     'The stage of perfkitbenchmarker to run. By default it runs all stages.')
@@ -390,7 +393,8 @@ def SetUpPKB():
   log_util.ConfigureLogging(
       stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
       log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
-      run_uri=FLAGS.run_uri)
+      run_uri=FLAGS.run_uri,
+      file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
 
   vm_util.SSHKeyGen()
