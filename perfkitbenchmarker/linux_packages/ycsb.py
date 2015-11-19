@@ -79,7 +79,7 @@ AGGREGATE_OPERATORS = {
     'MaxLatency(ms)': max}
 
 
-flags.DEFINE_boolean('ycsb_histogram', True, 'Include individual '
+flags.DEFINE_boolean('ycsb_histogram', False, 'Include individual '
                      'histogram results from YCSB (will increase sample '
                      'count).')
 flags.DEFINE_boolean('ycsb_load_samples', True, 'Include samples '
