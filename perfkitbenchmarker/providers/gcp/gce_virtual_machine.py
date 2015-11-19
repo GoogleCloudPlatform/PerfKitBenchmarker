@@ -138,40 +138,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['preemptible'] = True
     return cmd
 
-  def _GenerateDescribeCommand(self):
-    """Generates a command to describe the VM instance.
-
-    Returns:
-      GcloudCommand. gcloud command to issue in order to describe the VM
-      instance.
-    """
-    return util.GcloudCommand(self, 'compute', 'instances', 'describe',
-                              self.name)
-
-  def _GenerateDeleteCommand(self):
-    """Generates a command to delete the VM instance.
-
-    Returns:
-      GcloudCommand. gcloud command to issue in order to delete the VM instance.
-    """
-    return util.GcloudCommand(self, 'compute', 'instances', 'delete', self.name)
-
-  def _GenerateAddMetadataCommand(self, **kwargs):
-    """Generates a command to add metadata to the VM instance.
-
-    Args:
-      **kwargs: dict mapping metadata name string to metadata value string.
-
-    Returns:
-      GcloudCommand. gcloud command to issue in order to add the provided
-      metadata to the VM instance.
-    """
-    cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
-                             self.name)
-    cmd.flags['metadata'] = ','.join('{0}={1}'.format(key, value)
-                                     for key, value in kwargs.iteritems())
-    return cmd
-
   def _Create(self):
     """Create a GCE VM instance."""
     with open(self.ssh_public_key) as f:
@@ -186,7 +152,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data."""
-    getinstance_cmd = self._GenerateDescribeCommand()
+    getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
+                                         'describe', self.name)
     stdout, _, _ = getinstance_cmd.Issue()
     response = json.loads(stdout)
     network_interface = response['networkInterfaces'][0]
@@ -195,12 +162,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Delete(self):
     """Delete a GCE VM instance."""
-    delete_cmd = self._GenerateDeleteCommand()
+    delete_cmd = util.GcloudCommand(self, 'compute', 'instances', 'delete',
+                                    self.name)
     delete_cmd.Issue()
 
   def _Exists(self):
     """Returns true if the VM exists."""
-    getinstance_cmd = self._GenerateDescribeCommand()
+    getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
+                                         'describe', self.name)
     stdout, _, _ = getinstance_cmd.Issue(suppress_warning=True)
     try:
       json.loads(stdout)
@@ -251,7 +220,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Adds metadata to the VM via 'gcloud compute instances add-metadata'."""
     if not kwargs:
       return
-    cmd = self._GenerateAddMetadataCommand(**kwargs)
+    cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
+                             self.name)
+    cmd.flags['metadata'] = ','.join('{0}={1}'.format(key, value)
+                                     for key, value in kwargs.iteritems())
     cmd.Issue()
 
   def AnnotateSample(self, unused_sender, benchmark_spec, sample):

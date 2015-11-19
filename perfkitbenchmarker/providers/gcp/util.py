@@ -74,27 +74,29 @@ class GcloudCommand(object):
   def __repr__(self):
     return '{0}({1})'.format(type(self).__name__, ' '.join(self._GetCommand()))
 
-  def Issue(self, suppress_warning=False):
+  def Issue(self, **kwargs):
     """Tries running the gcloud command once.
 
     Args:
-      suppress_warning: boolean. Controls the log level of the command result
-          log message when the command fails. If True, the message is logged as
-          info. If False, the message is logged as debug.
+      **kwargs: Keyword arguments to forward to vm_util.IssueCommand when
+          issuing the gcloud command.
 
     Returns:
       A tuple of stdout, stderr, and retcode from running the gcloud command.
     """
-    return vm_util.IssueCommand(self._GetCommand(),
-                                suppress_warning=suppress_warning)
+    return vm_util.IssueCommand(self._GetCommand(), **kwargs)
 
-  def IssueRetryable(self):
+  def IssueRetryable(self, **kwargs):
     """Tries running the gcloud command until it succeeds or times out.
 
+    Args:
+      **kwargs: Keyword arguments to forward to vm_util.IssueRetryableCommand
+          when issuing the gcloud command.
+
     Returns:
-      A tuple of stdout, stderr, and retcode from running the gcloud command.
+      (stdout, stderr) pair of strings from running the gcloud command.
     """
-    return vm_util.IssueRetryableCommand(self._GetCommand())
+    return vm_util.IssueRetryableCommand(self._GetCommand(), **kwargs)
 
   def _AddCommonFlags(self, resource):
     """Adds common flags to the command.

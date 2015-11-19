@@ -76,10 +76,8 @@ class GcloudCommandTestCase(unittest.TestCase):
                    return_value=mock_issue_return_value)
     with p as mock_issue:
       return_value = cmd.Issue()
-      mock_issue.assert_called_with(
-          ['path/gcloud', 'compute', 'images', 'list', '--format', 'json',
-           '--quiet'],
-          suppress_warning=False)
+      mock_issue.assert_called_with(['path/gcloud', 'compute', 'images', 'list',
+                                     '--format', 'json', '--quiet'])
     self.assertEqual(return_value, mock_issue_return_value)
 
   def testIssueWarningSuppressed(self):
