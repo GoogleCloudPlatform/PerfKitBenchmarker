@@ -218,9 +218,12 @@ EXPECTED_RESULT_BAD2 = [
 
 
 class DummyVM(object):
+
   def __init__(self):
-    self.machine_type = 'big'
     self.num_cpus = 256
+
+  def GetMachineTypeDict(self):
+    return {'machine_type': 'big'}
 
 
 class Speccpu2006BenchmarkTestCase(unittest.TestCase,

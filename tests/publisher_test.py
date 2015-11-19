@@ -251,6 +251,8 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                                   machine_type='n1-standard-1',
                                   image='ubuntu-14-04',
                                   scratch_disks=[])
+    self.mock_vm.GetMachineTypeDict.return_value = {
+        'machine_type': self.mock_vm.machine_type}
     self.mock_spec = mock.MagicMock(vm_groups={'default': [self.mock_vm]})
 
     self.default_meta = {'perfkitbenchmarker_version': 'v1',
