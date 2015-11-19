@@ -5,7 +5,7 @@ layout: page
 
 Installing Prerequisites
 ========================
-Before you can run the PerfKit Benchmaker on Cloud providers you need accounts and access:
+Before you can run the PerfKit Benchmaker, you need account(s) on the Cloud provider(s) you want to benchmark:
 
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
 * Get an AWS account to run tests on AWS. Their site is http://aws.amazon.com/
