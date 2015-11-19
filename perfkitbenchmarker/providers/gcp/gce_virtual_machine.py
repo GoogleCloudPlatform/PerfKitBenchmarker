@@ -95,10 +95,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
-    self.network = gce_network.GceNetwork.GetNetwork(self)
-    self.firewall = gce_network.GceFirewall.GetFirewall()
     self.image = self.image or self.DEFAULT_IMAGE
     self.project = vm_spec.project
+    self.network = gce_network.GceNetwork.GetNetwork(self)
+    self.firewall = gce_network.GceFirewall.GetFirewall()
     self.max_local_disks = vm_spec.num_local_ssds
     self.boot_metadata = {}
 
@@ -116,6 +116,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
     cmd = util.GcloudCommand(self, 'compute', 'instances', 'create', self.name)
+    cmd.flags['network'] = self.network.network_resource.name
     cmd.flags['image'] = self.image
     cmd.flags['boot-disk-size'] = self.BOOT_DISK_SIZE_GB
     cmd.flags['boot-disk-type'] = self.BOOT_DISK_TYPE
