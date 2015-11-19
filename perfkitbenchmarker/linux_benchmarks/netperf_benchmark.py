@@ -178,30 +178,27 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
-  vm = vms[0]
+  client_vm = vms[0]
   server_vm = vms[1]
-  logging.info('netperf running on %s', vm)
+  logging.info('netperf running on %s', client_vm)
   results = []
-  metadata = {
-      'ip_type': 'external',
-      'server_machine_type': server_vm.machine_type,
-      'server_zone': server_vm.zone,
-      'receiving_zone': server_vm.zone,
-      'client_machine_type': vm.machine_type,
-      'client_zone': vm.zone,
-      'sending_zone': vm.zone
-  }
+  metadata = {'ip_type': 'external'}
+  for vm_specifier, vm in ('receiving', server_vm), ('sending', client_vm):
+    metadata['{0}_zone'.format(vm_specifier)] = vm.zone
+    for k, v in vm.GetMachineTypeDict().iteritems():
+      metadata['{0}_{1}'.format(vm_specifier, k)] = v
+
   for netperf_benchmark in NETPERF_BENCHMARKS:
 
     if vm_util.ShouldRunOnExternalIpAddress():
-      external_ip_results = RunNetperf(vm, netperf_benchmark,
+      external_ip_results = RunNetperf(client_vm, netperf_benchmark,
                                        server_vm.ip_address)
       for external_ip_result in external_ip_results:
         external_ip_result.metadata.update(metadata)
       results.extend(external_ip_results)
 
-    if vm_util.ShouldRunOnInternalIpAddress(vm, server_vm):
-      internal_ip_results = RunNetperf(vm, netperf_benchmark,
+    if vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm):
+      internal_ip_results = RunNetperf(client_vm, netperf_benchmark,
                                        server_vm.internal_ip)
       for internal_ip_result in internal_ip_results:
         internal_ip_result.metadata.update(metadata)

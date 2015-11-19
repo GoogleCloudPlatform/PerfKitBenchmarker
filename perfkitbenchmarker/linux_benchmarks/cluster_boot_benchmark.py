@@ -57,8 +57,9 @@ def _GetTimeToBoot(vms, vm_index):
     Sample containing the boot time.
   """
   vm = vms[vm_index]
-  metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus,
-              'machine_instance': vm_index, 'num_vms': len(vms)}
+  metadata = {'num_cpus': vm.num_cpus, 'machine_instance': vm_index,
+              'num_vms': len(vms)}
+  metadata.update(vm.GetMachineTypeDict())
   assert vm.bootable_time
   assert vm.create_start_time
   assert vm.bootable_time >= vm.create_start_time

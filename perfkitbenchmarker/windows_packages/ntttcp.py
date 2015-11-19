@@ -88,13 +88,11 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
       ntttcp_exe_dir=ntttcp_exe_dir)
   stdout, _ = sending_vm.RemoteCommand(cat_command)
 
-  metadata = {
-      'receiving_machine_type': receiving_vm.machine_type,
-      'receiving_zone': receiving_vm.zone,
-      'sending_machine_type': sending_vm.machine_type,
-      'sending_zone': sending_vm.zone,
-      'ip_type': ip_type
-  }
+  metadata = {'ip_type': ip_type}
+  for vm_specifier, vm in ('receiving', receiving_vm), ('sending', sending_vm):
+    metadata['{0}_zone'.format(vm_specifier)] = vm.zone
+    for k, v in vm.GetMachineTypeDict().iteritems():
+      metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
   return ParseNtttcpResults(stdout, metadata)
 

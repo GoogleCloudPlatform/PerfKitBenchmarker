@@ -235,6 +235,17 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     pass
 
+  def GetMachineTypeDict(self):
+    """Returns a dict containing properties that specify the machine type.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = {}
+    if self.machine_type is not None:
+      result['machine_type'] = self.machine_type
+    return result
+
 
 class BaseOsMixin(object):
   """The base class for OS Mixin classes.
