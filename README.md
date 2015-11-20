@@ -73,7 +73,7 @@ Benchmarker users must manually download the CoreMark tarball from their website
 PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
 the `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
 
-Installing Prerequisites
+Installing PerfKitExplorer and Prerequisites
 ========================
 Before you can run the PerfKit Benchmaker, you need account(s) on the Cloud provider(s) you want to benchmark:
 
@@ -112,6 +112,30 @@ Make sure that `openssl`/`ssh`/`scp`/`ssh-keygen` are on your path (you will nee
 The path to these commands should be
 
 `C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin`
+
+## Install PerfKit
+
+[Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
+
+## Install PerfKit Benchmakrer dependencies
+```
+$ cd /path/to/PerfKitBenchmarker
+$ sudo pip install -r requirements.txt
+```
+
+Cloud account setup
+===================
+
+This section describes the setup steps needed for each cloud system.  
+* [Google Cloud](#install-gcloud-and-setup-authentication)
+* [OpenStack](#install-openstack-nova-client-and-setup-authentication)
+* [Kubernetes](#kubernetes-configuration-and-credentials)
+* [Cloudstack](#cloudstack-install-csapi-and-set-the-api-keys)
+* [AWS](#install-aws-cli-and-setup-authentication)
+* [Azure](#windows-azure-cli-and-credentials)
+* [AliCloud](#install-alicloud-cli-and-setup-authentication)
+* [DigitalOcean](#digitalocean-configuration-and-credentials)
+* [RackSpace](#installing-clis-and-credentials-for-rackspace)
 
 ## Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using OS X or Linux you can run the command below.
@@ -446,9 +470,11 @@ export OS_TENANT_NAME=<your_rackspace_uk_account_number>
 **Note:** Not all flavors are supported on every region. Always check first
 if the flavor is supported in the region.
 
-## Create and Configure a `.boto` file for object storage benchmarks
 
-In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.
+Create and Configure a `.boto` file for object storage benchmarks
+=================================================================
+
+In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.  The directions require that you have installed `google-cloud-sdk`.  The directions for doing that are in the [gcloud installation section](#install-gcloud-and-setup-authentication).
 
 Here is how:
 
@@ -474,16 +500,6 @@ As a result, a `.boto` file is created under your home directory.
 3. In the [OAuth2] section:
 `client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials`), which was setup as part of the 'gcloud auth login' step.
 
-
-## Install PerfKit
-
-[Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
-
-## Install PerfKit Benchmakrer dependencies
-```
-$ cd /path/to/PerfKitBenchmarker
-$ sudo pip install -r requirements.txt
-```
 
 RUNNING A SINGLE BENCHMARK
 ==========================
