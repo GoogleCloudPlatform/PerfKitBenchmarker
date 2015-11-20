@@ -178,12 +178,11 @@ def RunScpSingleDirection(sending_vm, receiving_vm):
     A list of sample.Sample objects.
   """
   results = []
-  metadata = {
-      'sending_zone': sending_vm.zone,
-      'receiving_zone': receiving_vm.zone,
-      'server_machine_type': receiving_vm.machine_type,
-      'client_machine_type': sending_vm.machine_type,
-  }
+  metadata = {}
+  for vm_specifier, vm in ('receiving', receiving_vm), ('sending', sending_vm):
+    metadata['{0}_zone'.format(vm_specifier)] = vm.zone
+    for k, v in vm.GetMachineTypeDict().iteritems():
+      metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
   cmd_template = ('sudo sync; sudo sysctl vm.drop_caches=3; '
                   'time /usr/bin/scp -o StrictHostKeyChecking=no -i %s -c %s '
