@@ -74,7 +74,7 @@ PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their 
 the `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
 
 Installing PerfKitExplorer and Prerequisites
-========================
+============================================
 Before you can run the PerfKit Benchmaker, you need account(s) on the Cloud provider(s) you want to benchmark:
 
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
@@ -117,14 +117,13 @@ The path to these commands should be
 
 [Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
 
-## Install PerfKit Benchmakrer dependencies
+## Install PerfKit Benchmarker dependencies
 ```
 $ cd /path/to/PerfKitBenchmarker
 $ sudo pip install -r requirements.txt
 ```
 
-Cloud account setup
-===================
+##Cloud account setup
 
 This section describes the setup steps needed for each cloud system.  
 * [Google Cloud](#install-gcloud-and-setup-authentication)
@@ -137,7 +136,9 @@ This section describes the setup steps needed for each cloud system.
 * [DigitalOcean](#digitalocean-configuration-and-credentials)
 * [RackSpace](#installing-clis-and-credentials-for-rackspace)
 
-## Install `gcloud` and setup authentication
+After that, you can skip to  [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to  [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks). 
+
+### Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using OS X or Linux you can run the command below.
 
 When prompted pick the local folder, then Python project, then the defaults for all the rest
@@ -159,7 +160,7 @@ You will need a project ID before you can run. Please navigate to https://consol
 create one.
 
 
-## Install OpenStack Nova client and setup authentication
+### Install OpenStack Nova client and setup authentication
 Make sure you have installed pip (see the section above).
 
 Install python-novaclient by following command:
@@ -194,7 +195,7 @@ echo topsecretpassword > ~/.config/openstack-password.txt
 ./pkb.py --cloud=OpenStack --benchmarks=ping
 ```
 
-## Kubernetes configuration and credentials
+### Kubernetes configuration and credentials
 Perfkit uses `kubectl` binary in order to communicate with Kubernetes cluster - you need to pass the path to `kubectl` binary using `--kubectl` flag. It's recommended to use version 1.0.1 (available to download here: https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl).
 Authentication to Kubernetes cluster is done via `kubeconfig` file (https://github.com/kubernetes/kubernetes/blob/release-1.0/docs/user-guide/kubeconfig-file.md). Its path is passed using `--kubeconfig` flag.
 
@@ -277,7 +278,7 @@ You have two Ceph authentication options available (http://kubernetes.io/v1.0/ex
    ```
    You will have to pass the Secret name (using `--ceph_secret` flag) when running the benchmakrs. In this case it should be: `--ceph_secret=my-ceph-secret`.
 
-## Cloudstack: Install `csapi` and set the API keys
+### Cloudstack: Install `csapi` and set the API keys
 ```
 sudo pip install csapi
 ```
@@ -297,7 +298,7 @@ Specify the network offering when running the benchmark. If using VPC
 ./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetworkOffering
 ```
 
-## Install AWS CLI and setup authentication
+### Install AWS CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
 Follow instructions at http://aws.amazon.com/cli/ or run the following command (omit the 'sudo' on Windows)
@@ -315,7 +316,7 @@ Configure the CLI using the keys from the previous step
 $ aws configure
 ```
 
-## Windows Azure CLI and credentials
+### Windows Azure CLI and credentials
 You first need to install node.js and NPM.
 This version of Perfkit Benchmarker is compatible with azure version 0.9.9.
 
@@ -340,7 +341,7 @@ Test that azure is installed correctly
 $ azure vm list
 ```
 
-## Install AliCloud CLI and setup authentication
+### Install AliCloud CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
 Run the following command to install aliyuncli(omit the ‘sudo’ on Windows)
@@ -401,7 +402,7 @@ Run the following command to install aliyuncli(omit the ‘sudo’ on Windows)
    $ aliyuncli configure
    ```
 
-## DigitalOcean configuration and credentials
+### DigitalOcean configuration and credentials
 
 PerfKitBenchmarker uses the *curl* tool to interact with
 DigitalOcean's REST API. This API uses oauth for authentication.
@@ -435,7 +436,7 @@ by default, you can use the `--digitalocean_curl_config` flag to
 override the path.
 
 
-## Installing CLIs and credentials for Rackspace
+### Installing CLIs and credentials for Rackspace
 
 In order to interact with the Rackspace Public Cloud, PerfKitBenchmarker makes
 use of the Nova, and the Neutron CLI clients with the Rackspace extensions.
@@ -471,8 +472,7 @@ export OS_TENANT_NAME=<your_rackspace_uk_account_number>
 if the flavor is supported in the region.
 
 
-Create and Configure a `.boto` file for object storage benchmarks
-=================================================================
+## Create and Configure a `.boto` file for object storage benchmarks
 
 In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.  The directions require that you have installed `google-cloud-sdk`.  The directions for doing that are in the [gcloud installation section](#install-gcloud-and-setup-authentication).
 
