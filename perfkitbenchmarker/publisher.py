@@ -141,6 +141,7 @@ class DefaultMetadataProvider(MetadataProvider):
       metadata[name_prefix + 'zone'] = vm.zone
       metadata[name_prefix + 'machine_type'] = vm.machine_type
       metadata[name_prefix + 'image'] = vm.image
+      metadata[name_prefix + 'vm_count'] = len(vms)
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
