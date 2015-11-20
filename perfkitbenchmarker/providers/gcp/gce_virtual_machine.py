@@ -95,16 +95,49 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
-    self.network = gce_network.GceNetwork.GetNetwork(self)
-    self.firewall = gce_network.GceFirewall.GetFirewall()
     self.image = self.image or self.DEFAULT_IMAGE
     self.project = vm_spec.project
+    self.network = gce_network.GceNetwork.GetNetwork(self)
+    self.firewall = gce_network.GceFirewall.GetFirewall()
     self.max_local_disks = vm_spec.num_local_ssds
     self.boot_metadata = {}
 
     self.preemptible = vm_spec.preemptible
 
     events.sample_created.connect(self.AnnotateSample, weak=False)
+
+  def _GenerateCreateCommand(self, ssh_keys_path):
+    """Generates a command to create the VM instance.
+
+    Args:
+      ssh_keys_path: string. Path to a file containing the sshKeys metadata.
+
+    Returns:
+      GcloudCommand. gcloud command to issue in order to create the VM instance.
+    """
+    cmd = util.GcloudCommand(self, 'compute', 'instances', 'create', self.name)
+    cmd.flags['network'] = self.network.network_resource.name
+    cmd.flags['image'] = self.image
+    cmd.flags['boot-disk-size'] = self.BOOT_DISK_SIZE_GB
+    cmd.flags['boot-disk-type'] = self.BOOT_DISK_TYPE
+    cmd.flags['machine-type'] = self.machine_type
+    cmd.flags['tags'] = 'perfkitbenchmarker'
+    cmd.flags['no-restart-on-failure'] = True
+    cmd.flags['metadata-from-file'] = 'sshKeys=%s' % ssh_keys_path
+    metadata = ['owner=%s' % FLAGS.owner]
+    for key, value in self.boot_metadata.iteritems():
+      metadata.append('%s=%s' % (key, value))
+    cmd.flags['metadata'] = ','.join(metadata)
+    if not FLAGS.gce_migrate_on_maintenance:
+      cmd.flags['maintenance-policy'] = 'TERMINATE'
+    ssd_interface_option = NVME if NVME in self.image else SCSI
+    cmd.flags['local-ssd'] = (['interface={0}'.format(ssd_interface_option)] *
+                              self.max_local_disks)
+    if FLAGS.gcloud_scopes:
+      cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
+    if self.preemptible:
+      cmd.flags['preemptible'] = True
+    return cmd
 
   def _Create(self):
     """Create a GCE VM instance."""
@@ -114,46 +147,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                                     prefix='key-metadata') as tf:
       tf.write('%s:%s\n' % (self.user_name, public_key))
       tf.close()
-      create_cmd = [FLAGS.gcloud_path,
-                    'compute',
-                    'instances',
-                    'create', self.name,
-                    '--image', self.image,
-                    '--boot-disk-size', str(self.BOOT_DISK_SIZE_GB),
-                    '--boot-disk-type', self.BOOT_DISK_TYPE,
-                    '--machine-type', self.machine_type,
-                    '--tags=perfkitbenchmarker',
-                    '--no-restart-on-failure',
-                    '--metadata-from-file',
-                    'sshKeys=%s' % tf.name,
-                    '--metadata',
-                    'owner=%s' % FLAGS.owner]
-      for key, value in self.boot_metadata.iteritems():
-        create_cmd.append('%s=%s' % (key, value))
-      if not FLAGS.gce_migrate_on_maintenance:
-        create_cmd.extend(['--maintenance-policy', 'TERMINATE'])
-
-      ssd_interface_option = NVME if NVME in self.image else SCSI
-      for _ in range(self.max_local_disks):
-        create_cmd.append('--local-ssd')
-        create_cmd.append('interface=%s' % ssd_interface_option)
-      if FLAGS.gcloud_scopes:
-        create_cmd.extend(['--scopes'] +
-                          re.split(r'[,; ]', FLAGS.gcloud_scopes))
-      if self.preemptible:
-        create_cmd.append('--preemptible')
-      create_cmd.extend(util.GetDefaultGcloudFlags(self))
-      vm_util.IssueCommand(create_cmd)
+      create_cmd = self._GenerateCreateCommand(tf.name)
+      create_cmd.Issue()
 
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data."""
-    getinstance_cmd = [FLAGS.gcloud_path,
-                       'compute',
-                       'instances',
-                       'describe', self.name]
-    getinstance_cmd.extend(util.GetDefaultGcloudFlags(self))
-    stdout, _, _ = vm_util.IssueCommand(getinstance_cmd)
+    getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
+                                         'describe', self.name)
+    stdout, _, _ = getinstance_cmd.Issue()
     response = json.loads(stdout)
     network_interface = response['networkInterfaces'][0]
     self.internal_ip = network_interface['networkIP']
@@ -161,21 +163,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Delete(self):
     """Delete a GCE VM instance."""
-    delete_cmd = [FLAGS.gcloud_path,
-                  'compute',
-                  'instances',
-                  'delete', self.name]
-    delete_cmd.extend(util.GetDefaultGcloudFlags(self))
-    vm_util.IssueCommand(delete_cmd)
+    delete_cmd = util.GcloudCommand(self, 'compute', 'instances', 'delete',
+                                    self.name)
+    delete_cmd.Issue()
 
   def _Exists(self):
     """Returns true if the VM exists."""
-    getinstance_cmd = [FLAGS.gcloud_path,
-                       'compute',
-                       'instances',
-                       'describe', self.name]
-    getinstance_cmd.extend(util.GetDefaultGcloudFlags(self))
-    stdout, _, _ = vm_util.IssueCommand(getinstance_cmd, suppress_warning=True)
+    getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
+                                         'describe', self.name)
+    stdout, _, _ = getinstance_cmd.Issue(suppress_warning=True)
     try:
       json.loads(stdout)
     except ValueError:
@@ -225,12 +221,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Adds metadata to the VM via 'gcloud compute instances add-metadata'."""
     if not kwargs:
       return
-    cmd = [FLAGS.gcloud_path, 'compute', 'instances', 'add-metadata',
-           self.name, '--metadata']
-    for key, value in kwargs.iteritems():
-      cmd.append('{0}={1}'.format(key, value))
-    cmd.extend(util.GetDefaultGcloudFlags(self))
-    vm_util.IssueCommand(cmd)
+    cmd = util.GcloudCommand(self, 'compute', 'instances', 'add-metadata',
+                             self.name)
+    cmd.flags['metadata'] = ','.join('{0}={1}'.format(key, value)
+                                     for key, value in kwargs.iteritems())
+    cmd.Issue()
 
   def AnnotateSample(self, unused_sender, benchmark_spec, sample):
     sample['metadata']['preemptible'] = self.preemptible
@@ -268,15 +263,21 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     self.boot_metadata[
         'windows-startup-script-ps1'] = windows_virtual_machine.STARTUP_SCRIPT
 
+  def _GenerateResetPasswordCommand(self):
+    """Generates a command to reset a VM user's password.
+
+    Returns:
+      GcloudCommand. gcloud command to issue in order to reset the VM user's
+      password.
+    """
+    cmd = util.GcloudCommand(self, 'compute', 'reset-windows-password',
+                             self.name)
+    cmd.flags['user'] = self.user_name
+    return cmd
+
   def _PostCreate(self):
     super(WindowsGceVirtualMachine, self)._PostCreate()
-    reset_password_cmd = [FLAGS.gcloud_path,
-                          'compute',
-                          'reset-windows-password',
-                          '--user',
-                          self.user_name,
-                          self.name]
-    reset_password_cmd.extend(util.GetDefaultGcloudFlags(self))
-    stdout, _ = vm_util.IssueRetryableCommand(reset_password_cmd)
+    reset_password_cmd = self._GenerateResetPasswordCommand()
+    stdout, _ = reset_password_cmd.IssueRetryable()
     response = json.loads(stdout)
     self.password = response['password']

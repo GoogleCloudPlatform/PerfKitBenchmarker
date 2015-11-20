@@ -25,7 +25,6 @@ import threading
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -35,51 +34,41 @@ GCP = 'GCP'
 class GceFirewallRule(resource.BaseResource):
   """An object representing a GCE Firewall Rule."""
 
-  def __init__(self, name, project, port):
+  def __init__(self, name, project, port, network):
     super(GceFirewallRule, self).__init__()
     self.name = name
     self.project = project
     self.port = port
+    self.network_name = network.network_resource.name
 
   def __eq__(self, other):
     """Defines equality to make comparison easy."""
     return (self.name == other.name and
             self.port == other.port and
-            self.project == other.project)
+            self.project == other.project and
+            self.network_name == other.network_name)
 
   def _Create(self):
     """Creates the Firewall Rule."""
-    create_cmd = [FLAGS.gcloud_path,
-                  'compute',
-                  'firewall-rules',
-                  'create',
-                  self.name,
-                  '--allow', 'tcp:%d' % self.port, 'udp:%d' % self.port]
-    create_cmd.extend(util.GetDefaultGcloudFlags(self))
-    vm_util.IssueCommand(create_cmd)
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'create',
+                             self.name)
+    cmd.flags['allow'] = ','.join('{0}:{1}'.format(protocol, self.port)
+                                  for protocol in ('tcp', 'udp'))
+    cmd.flags['network'] = self.network_name
+    cmd.Issue()
 
   def _Delete(self):
     """Deletes the Firewall Rule."""
-    delete_cmd = [FLAGS.gcloud_path,
-                  'compute',
-                  'firewall-rules',
-                  'delete',
-                  self.name]
-    delete_cmd.extend(util.GetDefaultGcloudFlags(self))
-    vm_util.IssueCommand(delete_cmd)
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'delete',
+                             self.name)
+    cmd.Issue()
 
   def _Exists(self):
     """Returns True if the Firewall Rule exists."""
-    describe_cmd = [FLAGS.gcloud_path,
-                    'compute',
-                    'firewall-rules',
-                    'describe',
-                    self.name]
-    describe_cmd.extend(util.GetDefaultGcloudFlags(self))
-    _, _, retcode = vm_util.IssueCommand(describe_cmd, suppress_warning=True)
-    if retcode:
-      return False
-    return True
+    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'describe',
+                             self.name)
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
 
 
 class GceFirewall(network.BaseFirewall):
@@ -111,7 +100,8 @@ class GceFirewall(network.BaseFirewall):
       key = (vm.project, port)
       if key in self.firewall_rules:
         return
-      firewall_rule = GceFirewallRule(firewall_name, vm.project, port)
+      firewall_rule = GceFirewallRule(
+          firewall_name, vm.project, port, vm.network)
       self.firewall_rules[key] = firewall_rule
       firewall_rule.Create()
 
@@ -121,15 +111,70 @@ class GceFirewall(network.BaseFirewall):
       firewall_rule.Delete()
 
 
+class GceNetworkSpec(network.BaseNetworkSpec):
+
+  def __init__(self, project=None, **kwargs):
+    """Initializes the GceNetworkSpec.
+
+    Args:
+      project: The project for which the Network should be created.
+      kwargs: Additional key word arguments passed to BaseNetworkSpec.
+    """
+    super(GceNetworkSpec, self).__init__(**kwargs)
+    self.project = project
+
+
+class GceNetworkResource(resource.BaseResource):
+  """Object representing a GCE Network resource."""
+
+  def __init__(self, name, project):
+    super(GceNetworkResource, self).__init__()
+    self.name = name
+    self.project = project
+
+  def _Create(self):
+    """Creates the Network resource."""
+    cmd = util.GcloudCommand(self, 'compute', 'networks', 'create', self.name)
+    cmd.flags['range'] = '10.0.0.0/16'
+    cmd.Issue()
+
+  def _Delete(self):
+    """Deletes the Network resource."""
+    cmd = util.GcloudCommand(self, 'compute', 'networks', 'delete', self.name)
+    cmd.Issue()
+
+  def _Exists(self):
+    """Returns True if the Network resource exists."""
+    cmd = util.GcloudCommand(self, 'compute', 'networks', 'describe', self.name)
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
+
+
 class GceNetwork(network.BaseNetwork):
   """Object representing a GCE Network."""
 
   CLOUD = GCP
 
+  def __init__(self, network_spec):
+    super(GceNetwork, self).__init__(network_spec)
+    self.project = network_spec.project
+    name = 'pkb-network-%s' % FLAGS.run_uri
+    self.network_resource = GceNetworkResource(name, self.project)
+
+  @staticmethod
+  def _GetNetworkSpecFromVm(vm):
+    """Returns a BaseNetworkSpec created from VM attributes."""
+    return GceNetworkSpec(project=vm.project)
+
+  @classmethod
+  def _GetKeyFromNetworkSpec(cls, spec):
+    """Returns a key used to register Network instances."""
+    return (cls.CLOUD, spec.project)
+
   def Create(self):
     """Creates the actual network."""
-    pass
+    self.network_resource.Create()
 
   def Delete(self):
     """Deletes the actual network."""
-    pass
+    self.network_resource.Delete()

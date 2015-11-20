@@ -260,6 +260,7 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                          'zone': 'us-central1-a',
                          'machine_type': self.mock_vm.machine_type,
                          'image': self.mock_vm.image,
+                         'vm_count': 1,
                          'num_striped_disks': 1}
 
   def _RunTest(self, spec, expected, input_metadata=None):

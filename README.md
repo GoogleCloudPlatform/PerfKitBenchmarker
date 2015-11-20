@@ -7,6 +7,14 @@ tuned (ie the defaults) because this is what most users will use.  This should h
 Only in the rare cause where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
+This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [Wiki Pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contain more detailed informaiton, 
+* [FAQ] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
+* [Tech Talks] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
+* [Governing rules] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
+* [Community meeting decks and notes] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
+* [Design documents] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
+* You are always welcome to [open an issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) as well to contact us.
+
 
 KNOWN ISSUES
 ============
@@ -48,7 +56,9 @@ In its current release these are the benchmarks that are executed:
   - `scimark2`: public domain (http://math.nist.gov/scimark2/credits.html)
   - `speccpu2006`: Spec CPU2006 (http://www.spec.org/cpu2006/)
   - `sysbench_oltp`: GPL v2 (https://github.com/akopytov/sysbench)
+  * `tomcat`: Apache v2. (http://tomcat.apache.org)
   - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
+  * `wrk`: Apache v2 (https://github.com/wg/wrk)
   - `ycsb` (used by `mongodb`, `hbase_ycsb`, and others): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:

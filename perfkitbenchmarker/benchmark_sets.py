@@ -78,7 +78,7 @@ BENCHMARK_SETS = {
     'google_set': {
         MESSAGE: ('This benchmark set is maintained by Google Cloud Platform '
                   'Performance Team.'),
-        BENCHMARK_LIST: [STANDARD_SET, 'oldisim']
+        BENCHMARK_LIST: [STANDARD_SET, 'oldisim', 'tomcat_wrk']
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',

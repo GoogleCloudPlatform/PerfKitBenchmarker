@@ -142,6 +142,7 @@ class DefaultMetadataProvider(MetadataProvider):
       metadata[name_prefix + 'image'] = vm.image
       for k, v in vm.GetMachineTypeDict().iteritems():
         metadata[name_prefix + k] = v
+      metadata[name_prefix + 'vm_count'] = len(vms)
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]

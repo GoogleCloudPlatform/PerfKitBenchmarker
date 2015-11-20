@@ -80,9 +80,11 @@ from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.publisher import SampleCollector
 
 STAGE_ALL = 'all'
+STAGE_PROVISION = 'provision'
 STAGE_PREPARE = 'prepare'
 STAGE_RUN = 'run'
 STAGE_CLEANUP = 'cleanup'
+STAGE_TEARDOWN = 'teardown'
 LOG_FILE_NAME = 'pkb.log'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
@@ -126,8 +128,12 @@ flags.DEFINE_enum(
     [log_util.DEBUG, log_util.INFO],
     'The log level to run at.')
 flags.DEFINE_enum(
+    'file_log_level', log_util.DEBUG, [log_util.DEBUG, log_util.INFO],
+    'Anything logged at this level or higher will be written to the log file.')
+flags.DEFINE_enum(
     'run_stage', STAGE_ALL,
-    [STAGE_ALL, STAGE_PREPARE, STAGE_RUN, STAGE_CLEANUP],
+    [STAGE_ALL, STAGE_PROVISION, STAGE_PREPARE,
+     STAGE_RUN, STAGE_CLEANUP, STAGE_TEARDOWN],
     'The stage of perfkitbenchmarker to run. By default it runs all stages.')
 flags.DEFINE_integer('duration_in_seconds', None,
                      'duration of benchmarks. '
@@ -190,20 +196,16 @@ MAX_RUN_URI_LENGTH = 8
 events.initialization_complete.connect(traces.RegisterAll)
 
 
-def DoPreparePhase(benchmark, name, spec, timer):
-  """Performs the Prepare phase of benchmark execution.
+def DoProvisionPhase(name, spec, timer):
+  """Performs the Provision phase of benchmark execution.
 
   Args:
-    benchmark: The benchmark module.
     name: A string containing the benchmark name.
     spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of resource
-      provisioning and the benchmark module's Prepare function.
-
-  Returns:
-    The BenchmarkSpec created for the benchmark.
+      provisioning.
   """
-  logging.info('Preparing benchmark %s', name)
+  logging.info('Provisioning resources for benchmark %s', name)
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.PickleSpec()
@@ -215,6 +217,19 @@ def DoPreparePhase(benchmark, name, spec, timer):
     # we have a record of things like AWS ids. Otherwise we won't
     # be able to clean them up on a subsequent run.
     spec.PickleSpec()
+
+
+def DoPreparePhase(benchmark, name, spec, timer):
+  """Performs the Prepare phase of benchmark execution.
+
+  Args:
+    benchmark: The benchmark module.
+    name: A string containing the benchmark name.
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of the
+      benchmark module's Prepare function.
+  """
+  logging.info('Preparing benchmark %s', name)
   with timer.Measure('Benchmark Prepare'):
     benchmark.Prepare(spec)
 
@@ -248,13 +263,26 @@ def DoCleanupPhase(benchmark, name, spec, timer):
     name: A string containing the benchmark name.
     spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of the
-      benchmark module's Cleanup function and resource teardown.
+      benchmark module's Cleanup function.
   """
   logging.info('Cleaning up benchmark %s', name)
 
   if spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]):
     with timer.Measure('Benchmark Cleanup'):
       benchmark.Cleanup(spec)
+
+
+def DoTeardownPhase(name, spec, timer):
+  """Performs the Teardown phase of benchmark execution.
+
+  Args:
+    name: A string containing the benchmark name.
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of
+      resource teardown.
+  """
+  logging.info('Tearing down resources for benchmark %s', name)
+
   with timer.Measure('Resource Teardown'):
     spec.Delete()
 
@@ -294,23 +322,39 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
     spec = None
     try:
       with end_to_end_timer.Measure('End to End'):
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
-          # It is important to create the spec outside of DoPreparePhase
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_PROVISION]:
+          # It is important to create the spec outside of DoProvisionPhase
           # because if DoPreparePhase raises an exception, we still need
           # a reference to the spec in order to delete it in the "finally"
           # section below.
           spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
                                               benchmark_uid)
           spec.ConstructVirtualMachines()
-          DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
+          DoProvisionPhase(benchmark_name, spec, detailed_timer)
         else:
-          spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid)
+          try:
+            spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid)
+          except IOError:
+            if FLAGS.run_stage == STAGE_PREPARE:
+              logging.error(
+                  'We were unable to load the BenchmarkSpec. This may be '
+                  'related to two additional run stages which have recently '
+                  'been added. Please make sure to run the stage "provision" '
+                  'before "prepare". Similarly, make sure to run "teardown" '
+                  'after "cleanup".')
+            raise
+
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
+          DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
 
         if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
           DoRunPhase(benchmark, benchmark_name, spec, collector, detailed_timer)
 
         if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
           DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
+
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_TEARDOWN]:
+          DoTeardownPhase(benchmark_name, spec, detailed_timer)
 
       # Add samples for any timed interval that was measured.
       include_end_to_end = timing_util.EndToEndRuntimeMeasurementEnabled()
@@ -338,7 +382,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
       raise
     finally:
       if spec:
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_TEARDOWN]:
           spec.Delete()
         # Pickle spec to save final resource state.
         spec.PickleSpec()
@@ -390,7 +434,8 @@ def SetUpPKB():
   log_util.ConfigureLogging(
       stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
       log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
-      run_uri=FLAGS.run_uri)
+      run_uri=FLAGS.run_uri,
+      file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
 
   vm_util.SSHKeyGen()
