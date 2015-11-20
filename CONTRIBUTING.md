@@ -54,25 +54,25 @@ $ hooks/install.sh
 ```
 
 ### Create a branch
-- Start from the `dev` branch in your forked repository.
-```
-$ git checkout dev
-```
+
+Start from the master branch of the repository.  This is the default. 
+
 - Create a branch to contain your changes.
 ```
 $ git checkout -b <your-branch-name>
 ```
+
 - Make your modifications to the code in one or more commits [(guidelines for useful git commit messages)](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
 - Push your changes to GitHub
 ```
-$ git push origin
+$ git push origin <your-branch-name>
 ```
-- Create a pull request to integrate your change into the `dev` branch.
+- Create a pull request to integrate your change into the `master` branch.
 This can be done on github.com, or by installing and using the command line tool [`hub`](https://github.com/github/hub).
 ```
-$ hub pull-request -h <your-branch-name> -b dev
+$ hub pull-request -h <your-branch-name>
 ```
-**When making a pull request on GitHub, please set the base branch of the Pull Request to `dev`.**
+When making a pull request on GitHub, please the base branch of the Pull Request should be `master`.  This is usually the default.  
 
 ### Developer documentation
 We have added a lot of comments into the code to make it easy to;
