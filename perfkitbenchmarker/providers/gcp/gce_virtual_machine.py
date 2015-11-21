@@ -194,6 +194,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['network'] = self.network.network_resource.name
     cmd.flags['image'] = self.image
     cmd.flags['boot-disk-auto-delete'] = True
+    if FLAGS.image_project:
+      cmd.flags['image-project'] = FLAGS.image_project
     cmd.flags['boot-disk-size'] = self.BOOT_DISK_SIZE_GB
     cmd.flags['boot-disk-type'] = self.BOOT_DISK_TYPE
     if self.machine_type is None:
