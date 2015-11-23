@@ -7,6 +7,14 @@ tuned (ie the defaults) because this is what most users will use.  This should h
 Only in the rare cause where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
+This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [Wiki Pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contain more detailed informaiton, 
+* [FAQ] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
+* [Tech Talks] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
+* [Governing rules] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
+* [Community meeting decks and notes] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
+* [Design documents] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
+* You are always welcome to [open an issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) as well to contact us.
+
 
 KNOWN ISSUES
 ============
@@ -48,7 +56,9 @@ In its current release these are the benchmarks that are executed:
   - `scimark2`: public domain (http://math.nist.gov/scimark2/credits.html)
   - `speccpu2006`: Spec CPU2006 (http://www.spec.org/cpu2006/)
   - `sysbench_oltp`: GPL v2 (https://github.com/akopytov/sysbench)
+  * `tomcat`: Apache v2. (http://tomcat.apache.org)
   - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
+  * `wrk`: Apache v2 (https://github.com/wg/wrk)
   - `ycsb` (used by `mongodb`, `hbase_ycsb`, and others): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
@@ -65,7 +75,7 @@ the `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmar
 
 Installing Prerequisites
 ========================
-Before you can run the PerfKit Benchmaker on Cloud providers you need accounts and access:
+Before you can run the PerfKit Benchmaker, you need account(s) on the Cloud provider(s) you want to benchmark:
 
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
 * Get an AWS account to run tests on AWS. Their site is http://aws.amazon.com/
@@ -312,59 +322,60 @@ Make sure you have installed pip (see the section above).
 Run the following command to install aliyuncli(omit the ‘sudo’ on Windows)
 
 1. Install python development tools:
-In Debian or Ubuntu:
-```
-$ sudo apt-get install -y python-dev
-```
-In CentOS:
-```
-$ sudo yum install python-devel
-```
+   
+   In Debian or Ubuntu:
+   ```
+   $ sudo apt-get install -y python-dev
+   ```
+   
+   In CentOS:
+   ```
+   $ sudo yum install python-devel
+   ```
 2. Install aliyuncli tool and python SDK for ECS:
-```
-$ sudo pip install aliyuncli
-```
-To check if AliCloud is installed:
-```
-$ aliyuncli --help
-```
-Install python SDK for ECS:
-```
-$ sudo pip install aliyun-python-sdk-ecs
-```
-Check if aliyuncli ecs command is ready:
-```
-$ aliyuncli ecs help
-```
-If you see the "usage" message, you should follow step 3.
-Otherwise, jump to step 4.
+   ```
+   $ sudo pip install aliyuncli
+   ```
+   To check if AliCloud is installed:
+   ```
+   $ aliyuncli --help
+   ```
+   Install python SDK for ECS:
+   ```
+   $ sudo pip install aliyun-python-sdk-ecs
+   ```
+   Check if aliyuncli ecs command is ready:
+   ```
+   $ aliyuncli ecs help
+   ```
+   If you see the "usage" message, you should follow step 3.
+   Otherwise, jump to step 4.
 
 3. Dealing with an exception when it runs on some specific version of Ubuntu
-Get the python lib path: `/usr/lib/python2.7/dist-packages`
-```
-$ python
-> from distutils.sysconfig import get_python_lib
-> get_python_lib()
-'/usr/lib/python2.7/dist-packages'
-```
-Copy to the right directory(for the python version 2.7.X):
-```
-$ sudo cp -r /usr/local/lib/python2.7/dist-packages/aliyun* /usr/lib/python2.7/dist-packages/
-```
-Check again:
-```
-$ aliyuncli ecs help
-```
+   Get the python lib path: `/usr/lib/python2.7/dist-packages`
+   ```
+   $ python
+   > from distutils.sysconfig import get_python_lib
+   > get_python_lib()
+   '/usr/lib/python2.7/dist-packages'
+   ```
+   Copy to the right directory(for the python version 2.7.X):
+   ```
+   $ sudo cp -r /usr/local/lib/python2.7/dist-packages/aliyun* /usr/lib/python2.7/dist-packages/
+   ```
+   Check again:
+   ```
+   $ aliyuncli ecs help
+   ```
 
-4. Navigate to the AliCloud console to create access credentials: https://home.console.aliyun.com/#/
- * Login first
- * Click on "AccessKeys" (top right)
- * Click on "Create Access Key", copy and store the "Access Key ID" and "Access Key Secret" to a safe place.
-
- Configure the CLI using the Access Key ID and Access Key Secret from the previous step
-```
-$ aliyuncli configure
-```
+4. Navigate to the AliCloud console to create access credentials: https://home.console.alicloud.com/#/
+   * Login first
+   * Click on "AccessKeys" (top right)
+   * Click on "Create Access Key", copy and store the "Access Key ID" and "Access Key Secret" to a safe place.
+   * Configure the CLI using the Access Key ID and Access Key Secret from the previous step
+   ```
+   $ aliyuncli configure
+   ```
 
 ## DigitalOcean configuration and credentials
 

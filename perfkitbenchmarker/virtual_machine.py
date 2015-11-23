@@ -34,6 +34,46 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
 
+_VM_SPEC_REGISTRY = {}
+_VM_REGISTRY = {}
+
+
+def GetVmSpecClass(cloud):
+  """Returns the VmSpec class corresponding to 'cloud'."""
+  return _VM_SPEC_REGISTRY.get(cloud, BaseVmSpec)
+
+
+def GetVmClass(cloud, os_type):
+  """Returns the VM class corresponding to 'cloud' and 'os_type'."""
+  return _VM_REGISTRY.get((cloud, os_type))
+
+
+class AutoRegisterVmSpecMeta(type):
+  """Metaclass which allows VmSpecs to automatically be registered."""
+
+  def __init__(cls, name, bases, dct):
+    if cls.CLOUD in _VM_SPEC_REGISTRY:
+      raise Exception('BaseVmSpec subclasses must have a CLOUD attribute.')
+    else:
+      _VM_SPEC_REGISTRY[cls.CLOUD] = cls
+    super(AutoRegisterVmSpecMeta, cls).__init__(name, bases, dct)
+
+
+class AutoRegisterVmMeta(abc.ABCMeta):
+  """Metaclass which allows VMs to automatically be registered."""
+
+  def __init__(cls, name, bases, dct):
+    if hasattr(cls, 'CLOUD') and hasattr(cls, 'OS_TYPE'):
+      if cls.CLOUD is None:
+        raise Exception('BaseVirtualMachine subclasses must have a CLOUD '
+                        'attribute.')
+      elif cls.OS_TYPE is None:
+        raise Exception('BaseOsMixin subclasses must have an OS_TYPE '
+                        'attribute.')
+      else:
+        _VM_REGISTRY[(cls.CLOUD, cls.OS_TYPE)] = cls
+    super(AutoRegisterVmMeta, cls).__init__(name, bases, dct)
+
 
 class BaseVmSpec(object):
   """Storing various data about a single vm.
@@ -42,12 +82,19 @@ class BaseVmSpec(object):
     zone: The region / zone the in which to launch the VM.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     image: The disk image to boot from.
+    install_packages: If false, no packages will be installed. This is
+        useful if benchmark dependencies have already been installed.
   """
 
-  def __init__(self, zone=None, machine_type=None, image=None):
+  __metaclass__ = AutoRegisterVmSpecMeta
+  CLOUD = None
+
+  def __init__(self, zone=None, machine_type=None, image=None,
+               install_packages=True):
     self.zone = zone
     self.machine_type = machine_type
     self.image = image
+    self.install_packages = install_packages
 
   def ApplyFlags(self, flags):
     """Applies flags to the VmSpec."""
@@ -56,6 +103,8 @@ class BaseVmSpec(object):
       flags.zones.append(self.zone)
     self.machine_type = flags.machine_type or self.machine_type
     self.image = flags.image or self.image
+    if flags.install_packages is not None:
+      self.install_packages = flags.install_packages
 
 
 class BaseVirtualMachine(resource.BaseResource):
@@ -84,19 +133,18 @@ class BaseVirtualMachine(resource.BaseResource):
       scratch disks or that can be striped together.
   """
 
+  __metaclass__ = AutoRegisterVmMeta
   is_static = False
   CLOUD = None
 
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize BaseVirtualMachine class.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-      network: network.BaseNetwork object corresponding to the VM.
-      firewall: network.BaseFirewall object corresponding to the VM.
     """
     super(BaseVirtualMachine, self).__init__()
     with self._instance_counter_lock:
@@ -106,6 +154,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.image = vm_spec.image
+    self.install_packages = vm_spec.install_packages
     self.ip_address = None
     self.internal_ip = None
     self.user_name = DEFAULT_USERNAME
@@ -117,8 +166,9 @@ class BaseVirtualMachine(resource.BaseResource):
     self.max_local_disks = 0
     self.local_disk_counter = 0
     self.remote_disk_counter = 0
-    self.network = network
-    self.firewall = firewall
+
+    self.network = None
+    self.firewall = None
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -201,6 +251,7 @@ class BaseOsMixin(object):
   """
 
   __metaclass__ = abc.ABCMeta
+  OS_TYPE = None
 
   def __init__(self):
     super(BaseOsMixin, self).__init__()

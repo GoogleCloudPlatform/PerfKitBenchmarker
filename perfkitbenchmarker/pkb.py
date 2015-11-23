@@ -55,12 +55,13 @@ resources
 
 import collections
 import getpass
+import itertools
 import logging
 import sys
 import uuid
 
 from perfkitbenchmarker import archive
-from perfkitbenchmarker import benchmarks
+from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import benchmark_status
@@ -79,17 +80,17 @@ from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.publisher import SampleCollector
 
 STAGE_ALL = 'all'
+STAGE_PROVISION = 'provision'
 STAGE_PREPARE = 'prepare'
 STAGE_RUN = 'run'
 STAGE_CLEANUP = 'cleanup'
+STAGE_TEARDOWN = 'teardown'
 LOG_FILE_NAME = 'pkb.log'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
-flags.DEFINE_integer('parallelism', 1,
-                     'The number of benchmarks to run in parallel.')
 flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
                   'Benchmarks and/or benchmark sets that should be run. The '
                   'default is the standard set. For more information about '
@@ -117,8 +118,6 @@ flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
                      'variable number of machines, the number of VMs to use.')
 flags.DEFINE_string('image', None, 'Default image that will be '
                     'linked to the VM')
-flags.DEFINE_integer('scratch_disk_size', None, 'Size, in gb, for all scratch '
-                     'disks.')
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
                     'should be alphanumeric and less than or equal to 10 '
                     'characters in length.')
@@ -129,8 +128,12 @@ flags.DEFINE_enum(
     [log_util.DEBUG, log_util.INFO],
     'The log level to run at.')
 flags.DEFINE_enum(
+    'file_log_level', log_util.DEBUG, [log_util.DEBUG, log_util.INFO],
+    'Anything logged at this level or higher will be written to the log file.')
+flags.DEFINE_enum(
     'run_stage', STAGE_ALL,
-    [STAGE_ALL, STAGE_PREPARE, STAGE_RUN, STAGE_CLEANUP],
+    [STAGE_ALL, STAGE_PROVISION, STAGE_PREPARE,
+     STAGE_RUN, STAGE_CLEANUP, STAGE_TEARDOWN],
     'The stage of perfkitbenchmarker to run. By default it runs all stages.')
 flags.DEFINE_integer('duration_in_seconds', None,
                      'duration of benchmarks. '
@@ -143,16 +146,26 @@ flags.DEFINE_enum(
     'scratch_disk_type', None,
     [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
     'Type for all scratch disks. The default is standard')
+flags.DEFINE_string(
+    'data_disk_type', None,
+    'Type for all data disks. If a provider keeps the operating system and '
+    'user data on separate disks, this only affects the user data disk(s).'
+    'If the provider has OS and user data on the same disk, this flag affects'
+    'that disk.')
+flags.DEFINE_integer('scratch_disk_size', None, 'Size, in gb, for all scratch '
+                     'disks.')
+flags.DEFINE_integer('data_disk_size', None, 'Size, in gb, for all data disks.')
 flags.DEFINE_integer('scratch_disk_iops', None,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
 flags.DEFINE_integer('num_striped_disks', None,
-                     'The number of disks to stripe together to form one '
-                     '"logical" scratch disk. This defaults to 1 '
+                     'The number of data disks to stripe together to form one '
+                     '"logical" data disk. This defaults to 1 '
                      '(except with local disks), which means no striping. '
                      'When using local disks, they default to striping '
-                     'all disks together.',
+                     'all disks together. The striped disks will appear as '
+                     'one disk (data_disk_0) in the metadata.',
                      lower_bound=1)
-flags.DEFINE_bool('install_packages', True,
+flags.DEFINE_bool('install_packages', None,
                   'Override for determining whether packages should be '
                   'installed. If this is false, no packages will be installed '
                   'on any VMs. This option should probably only ever be used '
@@ -183,20 +196,16 @@ MAX_RUN_URI_LENGTH = 8
 events.initialization_complete.connect(traces.RegisterAll)
 
 
-def DoPreparePhase(benchmark, name, spec, timer):
-  """Performs the Prepare phase of benchmark execution.
+def DoProvisionPhase(name, spec, timer):
+  """Performs the Provision phase of benchmark execution.
 
   Args:
-    benchmark: The benchmark module.
     name: A string containing the benchmark name.
     spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of resource
-      provisioning and the benchmark module's Prepare function.
-
-  Returns:
-    The BenchmarkSpec created for the benchmark.
+      provisioning.
   """
-  logging.info('Preparing benchmark %s', name)
+  logging.info('Provisioning resources for benchmark %s', name)
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.PickleSpec()
@@ -208,6 +217,19 @@ def DoPreparePhase(benchmark, name, spec, timer):
     # we have a record of things like AWS ids. Otherwise we won't
     # be able to clean them up on a subsequent run.
     spec.PickleSpec()
+
+
+def DoPreparePhase(benchmark, name, spec, timer):
+  """Performs the Prepare phase of benchmark execution.
+
+  Args:
+    benchmark: The benchmark module.
+    name: A string containing the benchmark name.
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of the
+      benchmark module's Prepare function.
+  """
+  logging.info('Preparing benchmark %s', name)
   with timer.Measure('Benchmark Prepare'):
     benchmark.Prepare(spec)
 
@@ -241,13 +263,26 @@ def DoCleanupPhase(benchmark, name, spec, timer):
     name: A string containing the benchmark name.
     spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of the
-      benchmark module's Cleanup function and resource teardown.
+      benchmark module's Cleanup function.
   """
   logging.info('Cleaning up benchmark %s', name)
 
   if spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]):
     with timer.Measure('Benchmark Cleanup'):
       benchmark.Cleanup(spec)
+
+
+def DoTeardownPhase(name, spec, timer):
+  """Performs the Teardown phase of benchmark execution.
+
+  Args:
+    name: A string containing the benchmark name.
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of
+      resource teardown.
+  """
+  logging.info('Tearing down resources for benchmark %s', name)
+
   with timer.Measure('Resource Teardown'):
     spec.Delete()
 
@@ -287,23 +322,39 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
     spec = None
     try:
       with end_to_end_timer.Measure('End to End'):
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
-          # It is important to create the spec outside of DoPreparePhase
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_PROVISION]:
+          # It is important to create the spec outside of DoProvisionPhase
           # because if DoPreparePhase raises an exception, we still need
           # a reference to the spec in order to delete it in the "finally"
           # section below.
           spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
                                               benchmark_uid)
           spec.ConstructVirtualMachines()
-          DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
+          DoProvisionPhase(benchmark_name, spec, detailed_timer)
         else:
-          spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid)
+          try:
+            spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid)
+          except IOError:
+            if FLAGS.run_stage == STAGE_PREPARE:
+              logging.error(
+                  'We were unable to load the BenchmarkSpec. This may be '
+                  'related to two additional run stages which have recently '
+                  'been added. Please make sure to run the stage "provision" '
+                  'before "prepare". Similarly, make sure to run "teardown" '
+                  'after "cleanup".')
+            raise
+
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
+          DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
 
         if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
           DoRunPhase(benchmark, benchmark_name, spec, collector, detailed_timer)
 
         if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
           DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
+
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_TEARDOWN]:
+          DoTeardownPhase(benchmark_name, spec, detailed_timer)
 
       # Add samples for any timed interval that was measured.
       include_end_to_end = timing_util.EndToEndRuntimeMeasurementEnabled()
@@ -331,7 +382,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
       raise
     finally:
       if spec:
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
+        if FLAGS.run_stage in [STAGE_ALL, STAGE_TEARDOWN]:
           spec.Delete()
         # Pickle spec to save final resource state.
         spec.PickleSpec()
@@ -383,7 +434,8 @@ def SetUpPKB():
   log_util.ConfigureLogging(
       stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
       log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
-      run_uri=FLAGS.run_uri)
+      run_uri=FLAGS.run_uri,
+      file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
 
   vm_util.SSHKeyGen()
@@ -418,57 +470,44 @@ def RunBenchmarks(publish=True):
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
-  run_status_tuples = []
+  run_status_lists = []
+  benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+  total_benchmarks = len(benchmark_tuple_list)
+  benchmark_counts = collections.defaultdict(itertools.count)
+  args = []
+  for i, benchmark_tuple in enumerate(benchmark_tuple_list):
+    benchmark_module, user_config = benchmark_tuple
+    benchmark_name = benchmark_module.BENCHMARK_NAME
+    benchmark_uid = benchmark_name + str(
+        benchmark_counts[benchmark_name].next())
+    run_status_lists.append([benchmark_name, benchmark_uid,
+                             benchmark_status.SKIPPED])
+    args.append((benchmark_module, collector, i + 1, total_benchmarks,
+                 benchmark_module.GetConfig(user_config), benchmark_uid))
+
   try:
-    benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
-    total_benchmarks = len(benchmark_tuple_list)
-
-    benchmark_counts = collections.Counter()
-    args = []
-    for i, benchmark_tuple in enumerate(benchmark_tuple_list):
-      benchmark_module, user_config = benchmark_tuple
-      benchmark_uid = (benchmark_module.BENCHMARK_NAME +
-                       str(benchmark_counts[benchmark_module]))
-      benchmark_counts[benchmark_module] += 1
-      args.append(
-          ((benchmark_module, collector, i + 1, total_benchmarks,
-            benchmark_module.GetConfig(user_config), benchmark_uid), {}))
-
-    if FLAGS.parallelism > 1:
-      vm_util.RunThreaded(
-          RunBenchmark, args, max_concurrent_threads=FLAGS.parallelism)
-    else:
-      stop_scheduling_benchmarks = False
-      for run_args, _ in args:
-        benchmark_module, _, sequence_number, _, _, benchmark_uid = run_args
-        benchmark_name = benchmark_module.BENCHMARK_NAME
-        if stop_scheduling_benchmarks:
-          run_status_tuples.append((benchmark_name, benchmark_uid,
-                                    benchmark_status.SKIPPED))
+    for run_args, run_status_list in zip(args, run_status_lists):
+      benchmark_module, _, sequence_number, _, _, benchmark_uid = run_args
+      benchmark_name = benchmark_module.BENCHMARK_NAME
+      try:
+        run_status_list[2] = benchmark_status.FAILED
+        RunBenchmark(*run_args)
+        run_status_list[2] = benchmark_status.SUCCEEDED
+      except BaseException as e:
+        msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
+            sequence_number, total_benchmarks, benchmark_name, benchmark_uid)
+        if (isinstance(e, KeyboardInterrupt) or
+            FLAGS.stop_after_benchmark_failure):
+          logging.error('%s Execution will not continue.', msg)
+          break
         else:
-          try:
-            RunBenchmark(*run_args)
-            run_status_tuples.append((benchmark_name, benchmark_uid,
-                                      benchmark_status.SUCCEEDED))
-          except BaseException as e:
-            run_status_tuples.append((benchmark_name, benchmark_uid,
-                                      benchmark_status.FAILED))
-            msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
-                sequence_number, total_benchmarks, benchmark_name,
-                benchmark_uid)
-            if (isinstance(e, KeyboardInterrupt) or
-                FLAGS.stop_after_benchmark_failure):
-              logging.error('%s Execution will not continue.', msg)
-              stop_scheduling_benchmarks = True
-            else:
-              logging.error('%s Execution will continue.', msg)
-
+          logging.error('%s Execution will continue.', msg)
   finally:
     if collector.samples:
       collector.PublishSamples()
 
-    if run_status_tuples:
-      logging.info(benchmark_status.CreateSummary(run_status_tuples))
+    if run_status_lists:
+      logging.info(benchmark_status.CreateSummary(run_status_lists))
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
 
@@ -485,7 +524,7 @@ def RunBenchmarks(publish=True):
 def _GenerateBenchmarkDocumentation():
   """Generates benchmark documentation to show in --help."""
   benchmark_docs = []
-  for benchmark_module in (benchmarks.BENCHMARKS +
+  for benchmark_module in (linux_benchmarks.BENCHMARKS +
                            windows_benchmarks.BENCHMARKS):
     benchmark_config = configs.LoadMinimalConfig(
         benchmark_module.BENCHMARK_CONFIG, benchmark_module.BENCHMARK_NAME)
@@ -542,6 +581,8 @@ def Main(argv=sys.argv):
     logging.error(
         '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
+
+  disk.WarnAndTranslateDiskFlags()
 
   SetUpPKB()
 

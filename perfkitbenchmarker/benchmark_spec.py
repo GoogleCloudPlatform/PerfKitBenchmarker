@@ -31,27 +31,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.aws import aws_disk
-from perfkitbenchmarker.aws import aws_network
-from perfkitbenchmarker.aws import aws_virtual_machine
-from perfkitbenchmarker.azure import azure_network
-from perfkitbenchmarker.azure import azure_virtual_machine
-from perfkitbenchmarker.alicloud import ali_disk
-from perfkitbenchmarker.alicloud import ali_network
-from perfkitbenchmarker.alicloud import ali_virtual_machine
-from perfkitbenchmarker.cloudstack import cloudstack_network as cs_nw
-from perfkitbenchmarker.cloudstack import cloudstack_virtual_machine as cs_vm
-from perfkitbenchmarker.digitalocean import (
-    digitalocean_virtual_machine as digitalocean_vm)
-from perfkitbenchmarker.gcp import gce_network
-from perfkitbenchmarker.gcp import gce_virtual_machine as gce_vm
-from perfkitbenchmarker.kubernetes import kubernetes_virtual_machine
-from perfkitbenchmarker.mesos import mesos_virtual_machine
-from perfkitbenchmarker.mesos import mesos_network
-from perfkitbenchmarker.openstack import os_network as openstack_network
-from perfkitbenchmarker.openstack import os_virtual_machine as openstack_vm
-from perfkitbenchmarker.rackspace import rackspace_network as rax_net
-from perfkitbenchmarker.rackspace import rackspace_virtual_machine as rax_vm
+
+from perfkitbenchmarker import providers  # NOQA
 
 
 def PickleLock(lock):
@@ -93,102 +74,12 @@ DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
 UBUNTU_CONTAINER = 'ubuntu_container'
-VIRTUAL_MACHINE = 'virtual_machine'
-NETWORK = 'network'
-FIREWALL = 'firewall'
-CLASSES = {
-    GCP: {
-        VIRTUAL_MACHINE: {
-            DEBIAN: gce_vm.DebianBasedGceVirtualMachine,
-            RHEL: gce_vm.RhelBasedGceVirtualMachine,
-            UBUNTU_CONTAINER: gce_vm.ContainerizedGceVirtualMachine,
-            WINDOWS: gce_vm.WindowsGceVirtualMachine
-        },
-        FIREWALL: gce_network.GceFirewall,
-        NETWORK: gce_network.GceNetwork,
-        VM_SPEC: gce_vm.GceVmSpec
-    },
-    AZURE: {
-        VIRTUAL_MACHINE: {
-            DEBIAN: azure_virtual_machine.DebianBasedAzureVirtualMachine,
-            RHEL: azure_virtual_machine.RhelBasedAzureVirtualMachine,
-            WINDOWS: azure_virtual_machine.WindowsAzureVirtualMachine
-        },
-        NETWORK: azure_network.AzureNetwork,
-        FIREWALL: azure_network.AzureFirewall,
-    },
-    AWS: {
-        VIRTUAL_MACHINE: {
-            DEBIAN: aws_virtual_machine.DebianBasedAwsVirtualMachine,
-            RHEL: aws_virtual_machine.RhelBasedAwsVirtualMachine,
-            WINDOWS: aws_virtual_machine.WindowsAwsVirtualMachine
-        },
-        FIREWALL: aws_network.AwsFirewall,
-        NETWORK: aws_network.AwsNetwork,
-        DISK_SPEC: aws_disk.AwsDiskSpec
-    },
-    ALICLOUD: {
-        VIRTUAL_MACHINE: {
-            DEBIAN: ali_virtual_machine.DebianBasedAliVirtualMachine,
-            RHEL: ali_virtual_machine.RhelBasedAliVirtualMachine,
-            WINDOWS: ali_virtual_machine.WindowsAliVirtualMachine
-        },
-        FIREWALL: ali_network.AliFirewall,
-        NETWORK: ali_network.AliNetwork,
-        DISK_SPEC: ali_disk.AliDiskSpec
-    },
-    DIGITALOCEAN: {
-        VIRTUAL_MACHINE: {
-            DEBIAN:
-            digitalocean_vm.DebianBasedDigitalOceanVirtualMachine,
-            RHEL:
-            digitalocean_vm.RhelBasedDigitalOceanVirtualMachine,
-            UBUNTU_CONTAINER:
-            digitalocean_vm.ContainerizedDigitalOceanVirtualMachine,
-        },
-    },
-    KUBERNETES: {
-        VIRTUAL_MACHINE: {
-            DEBIAN:
-                kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine,
-            RHEL: kubernetes_virtual_machine.KubernetesVirtualMachine
-        },
-    },
-    OPENSTACK: {
-        VIRTUAL_MACHINE: {
-            DEBIAN: openstack_vm.DebianBasedOpenStackVirtualMachine,
-            RHEL: openstack_vm.OpenStackVirtualMachine
-        },
-        FIREWALL: openstack_network.OpenStackFirewall
-    },
-    CLOUDSTACK: {
-        VIRTUAL_MACHINE: {
-            DEBIAN: cs_vm.DebianBasedCloudStackVirtualMachine,
-            RHEL: cs_vm.CloudStackVirtualMachine
-        },
-        NETWORK: cs_nw.CloudStackNetwork
-    },
-    RACKSPACE: {
-        VIRTUAL_MACHINE: {
-            DEBIAN: rax_vm.DebianBasedRackspaceVirtualMachine,
-            RHEL: rax_vm.RhelBasedRackspaceVirtualMachine
-        },
-        FIREWALL: rax_net.RackspaceSecurityGroup
-    },
-    MESOS: {
-        VIRTUAL_MACHINE: {
-            DEBIAN: mesos_virtual_machine.DebianBasedMesosVirtualMachine,
-            RHEL: mesos_virtual_machine.MesosVirtualMachine
-        },
-        FIREWALL: mesos_network.MesosFirewall
-    }
-}
 
 FLAGS = flags.FLAGS
-
+VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS]
 flags.DEFINE_enum('cloud', GCP,
-                  [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, MESOS, OPENSTACK,
-                   RACKSPACE, CLOUDSTACK, ALICLOUD],
+                  VALID_CLOUDS,
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
@@ -201,16 +92,6 @@ flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM.'
                     'Upon creation, these directories will have numbers'
                     'appended to them (for example /scratch0, /scratch1, etc).')
-
-
-def _GetVmSpecClass(cloud):
-  """Gets the VmSpec class corresponding to the cloud."""
-  return CLASSES[cloud].get(VM_SPEC, virtual_machine.BaseVmSpec)
-
-
-def _GetDiskSpecClass(cloud):
-  """Gets the DiskSpec class corresponding to the cloud."""
-  return CLASSES[cloud].get(DISK_SPEC, disk.BaseDiskSpec)
 
 
 class BenchmarkSpec(object):
@@ -233,6 +114,8 @@ class BenchmarkSpec(object):
     self.vms = []
     self.networks = {}
     self.firewalls = {}
+    self.networks_lock = threading.Lock()
+    self.firewalls_lock = threading.Lock()
     self.vm_groups = {}
     self.deleted = False
     self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
@@ -300,16 +183,25 @@ class BenchmarkSpec(object):
 
         os_type = self._GetOsTypeForGroup(group_name)
         cloud = self._GetCloudForGroup(group_name)
+        providers.LoadProvider(cloud.lower())
 
         # Then create a VmSpec and possibly a DiskSpec which we can
         # use to create the remaining VMs.
-        vm_spec_class = _GetVmSpecClass(cloud)
+        vm_spec_class = virtual_machine.GetVmSpecClass(cloud)
         vm_spec = vm_spec_class(**group_spec[VM_SPEC][cloud])
 
         if DISK_SPEC in group_spec:
-          disk_spec_class = _GetDiskSpecClass(cloud)
+          disk_spec_class = disk.GetDiskSpecClass(cloud)
           disk_spec = disk_spec_class(**group_spec[DISK_SPEC][cloud])
           disk_spec.ApplyFlags(FLAGS)
+          # disk_spec.disk_type may contain legacy values that were
+          # copied from FLAGS.scratch_disk_type into
+          # FLAGS.data_disk_type at the beginning of the run. We
+          # translate them here, rather than earlier, because here is
+          # where we know what cloud we're using and therefore we're
+          # able to pick the right translation table.
+          disk_spec.disk_type = disk.WarnAndTranslateDiskTypes(
+              disk_spec.disk_type, cloud)
         else:
           disk_spec = None
 
@@ -342,7 +234,7 @@ class BenchmarkSpec(object):
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
       if FLAGS.os_type != WINDOWS:
-        vm_util.GenerateSSHConfig(self.vms)
+        vm_util.GenerateSSHConfig(self)
 
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
@@ -354,12 +246,14 @@ class BenchmarkSpec(object):
       except Exception:
         logging.exception('Got an exception deleting VMs. '
                           'Attempting to continue tearing down.')
+
     for firewall in self.firewalls.itervalues():
       try:
         firewall.DisallowAllPorts()
       except Exception:
         logging.exception('Got an exception disabling firewalls. '
                           'Attempting to continue tearing down.')
+
     for net in self.networks.itervalues():
       try:
         net.Delete()
@@ -384,26 +278,13 @@ class BenchmarkSpec(object):
     if vm:
       return vm
 
-    vm_classes = CLASSES[cloud][VIRTUAL_MACHINE]
-    if os_type not in vm_classes:
+    vm_class = virtual_machine.GetVmClass(cloud, os_type)
+    if vm_class is None:
       raise errors.Error(
           'VMs of type %s" are not currently supported on cloud "%s".' %
           (os_type, cloud))
-    vm_class = vm_classes[os_type]
 
-    if NETWORK in CLASSES[cloud]:
-      net_class = CLASSES[cloud][NETWORK]
-      network = net_class.GetNetwork(vm_spec.zone, self.networks)
-    else:
-      network = None
-
-    if FIREWALL in CLASSES[cloud]:
-      firewall_class = CLASSES[cloud][FIREWALL]
-      firewall = firewall_class.GetFirewall(self.firewalls)
-    else:
-      firewall = None
-
-    return vm_class(vm_spec, network, firewall)
+    return vm_class(vm_spec)
 
   def PrepareVm(self, vm):
     """Creates a single VM and prepares a scratch disk if required.

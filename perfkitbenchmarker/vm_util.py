@@ -661,14 +661,18 @@ def NamedTemporaryFile(prefix='tmp', suffix='', dir=None, delete=True):
       os.unlink(f.name)
 
 
-def GenerateSSHConfig(vms):
+def GenerateSSHConfig(benchmark_spec):
   """Generates an SSH config file to simplify connecting to "vms".
 
   Writes a file to GetTempDir()/ssh_config with SSH configuration for each VM in
-  'vms'.  Users can then SSH with 'ssh -F <ssh_config_path> <vm_name>'.
+  'vms'.  Users can then SSH with any of the following:
+
+      ssh -F <ssh_config_path> <vm_name>
+      ssh -F <ssh_config_path> vm<vm_index>
+      ssh -F <ssh_config_path> <group_name>-<index>
 
   Args:
-    vms: List of virtual machines.
+    benchmark_spec: Benchmark specification.
   """
   target_file = os.path.join(GetTempDir(), 'ssh_config')
   template_path = data.ResourcePath('ssh_config.j2')
@@ -676,9 +680,14 @@ def GenerateSSHConfig(vms):
   with open(template_path) as fp:
     template = environment.from_string(fp.read())
   with open(target_file, 'w') as ofp:
-    ofp.write(template.render({'vms': vms}))
-  logging.info('ssh to VMs in this benchmark by name with: '
-               'ssh -F {0} <vm name>'.format(target_file))
+    ofp.write(template.render({'vms': benchmark_spec.vms,
+                               'vm_groups': benchmark_spec.vm_groups}))
+
+  ssh_options = ['  ssh -F {0} {1}'.format(target_file, pattern)
+                 for pattern in ('<vm_name>', 'vm<index>',
+                                 '<group_name>-<index>')]
+  logging.info('ssh to VMs in this benchmark by name with:\n%s',
+               '\n'.join(ssh_options))
 
 
 def RunningOnWindows():

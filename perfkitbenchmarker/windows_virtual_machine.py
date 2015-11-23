@@ -36,6 +36,8 @@ STARTUP_SCRIPT = ('powershell -Command "Enable-PSRemoting -force; '
 
 class WindowsMixin(virtual_machine.BaseOsMixin):
 
+  OS_TYPE = 'windows'
+
   def __init__(self):
     super(WindowsMixin, self).__init__()
     self.winrm_port = WINRM_PORT
@@ -163,8 +165,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_packages):
+    if not self.install_packages:
       return
     if package_name not in self._installed_packages:
       package = windows_packages.PACKAGES[package_name]

@@ -16,22 +16,21 @@
 
 import abc
 import unittest
-
 import mock
 
-from perfkitbenchmarker import pkb  # NOQA
+from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker.aws import aws_disk
-from perfkitbenchmarker.aws import aws_virtual_machine
-from perfkitbenchmarker.aws import util as aws_util
-from perfkitbenchmarker.azure import azure_disk
-from perfkitbenchmarker.azure import azure_network
-from perfkitbenchmarker.azure import azure_virtual_machine
-from perfkitbenchmarker.gcp import gce_disk
-from perfkitbenchmarker.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.aws import util as aws_util
+from perfkitbenchmarker.providers.azure import azure_disk
+from perfkitbenchmarker.providers.azure import azure_virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 
 
 class ScratchDiskTestMixin(object):
@@ -75,6 +74,10 @@ class ScratchDiskTestMixin(object):
     # called. Otherwise all "disks" instantiated will be the same object.
     self._GetDiskClass().side_effect = (
         lambda *args, **kwargs: mock.MagicMock(is_striped=False))
+
+    # VM Creation depends on there being a BenchmarkSpec.
+    self.spec = benchmark_spec.BenchmarkSpec({}, 'name', 'uid')
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def testScratchDisks(self):
     """Test for creating and deleting scratch disks.
@@ -130,9 +133,7 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _CreateVm(self):
     vm_spec = virtual_machine.BaseVmSpec()
-    net = azure_network.AzureNetwork('zone')
-    return azure_virtual_machine.DebianBasedAzureVirtualMachine(
-        vm_spec, net, None)
+    return azure_virtual_machine.DebianBasedAzureVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return azure_disk.AzureDisk
@@ -145,8 +146,7 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _CreateVm(self):
     vm_spec = gce_virtual_machine.GceVmSpec()
-    return gce_virtual_machine.DebianBasedGceVirtualMachine(
-        vm_spec, None, None)
+    return gce_virtual_machine.DebianBasedGceVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return gce_disk.GceDisk
@@ -160,8 +160,7 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _CreateVm(self):
     vm_spec = virtual_machine.BaseVmSpec(zone='zone')
-    return aws_virtual_machine.DebianBasedAwsVirtualMachine(
-        vm_spec, None, None)
+    return aws_virtual_machine.DebianBasedAwsVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return aws_disk.AwsDisk

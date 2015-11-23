@@ -23,7 +23,6 @@ import unittest
 
 import mock
 
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -240,7 +239,12 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     p.start()
     self.addCleanup(p.stop)
 
-    self.mock_disk = mock.MagicMock(disk_size=20, num_striped_disks=1)
+    # Need iops=None in self.mock_disk because otherwise doing
+    # mock_disk.iops returns a mock.MagicMock, which is not None,
+    # which defeats the getattr check in
+    # publisher.DefaultMetadataProvider.
+    self.mock_disk = mock.MagicMock(disk_size=20, num_striped_disks=1,
+                                    iops=None)
 
     self.mock_vm = mock.MagicMock(CLOUD='GCP',
                                   zone='us-central1-a',
@@ -277,18 +281,54 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     self._RunTest(self.mock_spec, meta)
 
   def testAddMetadata_WithScratchDisk(self):
-    self.mock_disk.configure_mock(disk_type=disk.REMOTE_SSD)
+    self.mock_disk.configure_mock(disk_type='disk-type')
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
     expected.update(scratch_disk_size=20,
-                    scratch_disk_type=disk.REMOTE_SSD)
+                    scratch_disk_type='disk-type',
+                    data_disk_0_size=20,
+                    data_disk_0_type='disk-type',
+                    data_disk_0_num_stripes=1)
     self._RunTest(self.mock_spec, expected)
 
   def testAddMetadata_PIOPS(self):
-    self.mock_disk.configure_mock(disk_type=disk.PIOPS, iops=1000)
+    self.mock_disk.configure_mock(disk_type='disk-type',
+                                  iops=1000)
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
     expected.update(scratch_disk_size=20,
-                    scratch_disk_type=disk.PIOPS,
-                    scratch_disk_iops=1000)
+                    scratch_disk_type='disk-type',
+                    scratch_disk_iops=1000,
+                    data_disk_0_size=20,
+                    data_disk_0_type='disk-type',
+                    data_disk_0_num_stripes=1,
+                    aws_provisioned_iops=1000)
+    self._RunTest(self.mock_spec, expected)
+
+  def testDiskMetadata(self):
+    self.mock_disk.configure_mock(disk_type='disk-type',
+                                  metadata={'foo': 'bar'})
+    self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
+    expected = self.default_meta.copy()
+    expected.update(scratch_disk_size=20,
+                    scratch_disk_type='disk-type',
+                    data_disk_0_size=20,
+                    data_disk_0_type='disk-type',
+                    data_disk_0_num_stripes=1,
+                    data_disk_0_foo='bar')
+    self._RunTest(self.mock_spec, expected)
+
+  def testDiskLegacyDiskType(self):
+    self.mock_disk.configure_mock(disk_type='disk-type',
+                                  metadata={'foo': 'bar',
+                                            'legacy_disk_type': 'remote_ssd'})
+    self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
+    expected = self.default_meta.copy()
+    expected.update(scratch_disk_size=20,
+                    scratch_disk_type='remote_ssd',
+                    data_disk_0_size=20,
+                    data_disk_0_type='disk-type',
+                    data_disk_0_num_stripes=1,
+                    data_disk_0_foo='bar',
+                    data_disk_0_legacy_disk_type='remote_ssd')
     self._RunTest(self.mock_spec, expected)

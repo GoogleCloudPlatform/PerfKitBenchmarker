@@ -38,7 +38,7 @@ import uuid
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import packages
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -192,10 +192,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
-    if self.is_static and self.install_packages:
-      self.SnapshotPackages()
+    if self.install_packages:
+      if self.is_static:
+        self.SnapshotPackages()
+      self.SetupPackageManager()
     self.BurnCpu()
-    self.SetupPackageManager()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
@@ -543,6 +544,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
+  OS_TYPE = 'rhel'
+
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
     self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
@@ -596,17 +599,16 @@ class RhelMixin(BaseLinuxMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_packages):
+    if not self.install_packages:
       return
     if package_name not in self._installed_packages:
-      package = packages.PACKAGES[package_name]
+      package = linux_packages.PACKAGES[package_name]
       package.YumInstall(self)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
     """Uninstalls a PerfKit package on the VM."""
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     if hasattr(package, 'YumUninstall'):
       package.YumUninstall(self)
 
@@ -617,7 +619,7 @@ class RhelMixin(BaseLinuxMixin):
     don't match across distributions (such as mysql). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.YumGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
@@ -627,7 +629,7 @@ class RhelMixin(BaseLinuxMixin):
     match across distributions (such as mongodb). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.YumGetServiceName(self)
 
   def SetupProxy(self):
@@ -642,6 +644,8 @@ class RhelMixin(BaseLinuxMixin):
 
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
+
+  OS_TYPE = 'debian'
 
   def SetupPackageManager(self):
     """Runs apt-get update so InstallPackages shouldn't need to."""
@@ -695,17 +699,16 @@ class DebianMixin(BaseLinuxMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_packages):
+    if not self.install_packages:
       return
     if package_name not in self._installed_packages:
-      package = packages.PACKAGES[package_name]
+      package = linux_packages.PACKAGES[package_name]
       package.AptInstall(self)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
     """Uninstalls a PerfKit package on the VM."""
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     if hasattr(package, 'AptUninstall'):
       package.AptUninstall(self)
 
@@ -716,7 +719,7 @@ class DebianMixin(BaseLinuxMixin):
     don't match across distributions (such as mysql). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.AptGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
@@ -726,7 +729,7 @@ class DebianMixin(BaseLinuxMixin):
     match across distributions (such as mongodb). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.AptGetServiceName(self)
 
   def SetupProxy(self):
@@ -755,6 +758,8 @@ class ContainerizedDebianMixin(DebianMixin):
   Any call to RemoteCommand() will be run within the container
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
+
+  OS_TYPE = 'ubuntu_container'
 
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
