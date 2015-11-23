@@ -1,4 +1,4 @@
-PerfKitBenchmarker
+PerfKit Benchmarker
 ==================
 
 PerfKit Benchmarker is an open effort to define a canonical set of benchmarks to measure and compare cloud
@@ -23,13 +23,13 @@ KNOWN ISSUES
 LICENSING
 =========
 
-PerfKitBenchmarker provides wrappers and workload definitions around popular benchmark tools. We made it very simple
+PerfKit Benchmarker provides wrappers and workload definitions around popular benchmark tools. We made it very simple
 to use and automate everything we can.  It instantiates VMs on the Cloud provider of your choice, automatically
 installs benchmarks, and run the workloads without user interaction.
 
 Due to the level of automation you will not see prompts for software installed as part of a benchmark run.
 Therefore you must accept the license of each benchmarks individually, and take responsibility for using them
-before you use the PerfKitBenchmarker.
+before you use the PerfKit Benchmarker.
 
 In its current release these are the benchmarks that are executed:
 
@@ -73,9 +73,9 @@ Benchmarker users must manually download the CoreMark tarball from their website
 PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
 the `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
 
-Installing Prerequisites
-========================
-Before you can run the PerfKit Benchmaker, you need account(s) on the Cloud provider(s) you want to benchmark:
+Installing PerfKit Benchmarker and Prerequisites
+================================================
+Before you can run the PerfKit Benchmarker, you need account(s) on the Cloud provider(s) you want to benchmark:
 
 * Get a GCE account to run tests on GCE. Our site is https://cloud.google.com
 * Get an AWS account to run tests on AWS. Their site is http://aws.amazon.com/
@@ -113,7 +113,32 @@ The path to these commands should be
 
 `C:\\Users\\\<user\>\\AppData\\Local\\GitHub\\PortableGit\_\<guid\>\\bin`
 
-## Install `gcloud` and setup authentication
+## Install PerfKit
+
+[Download PerfKit Benchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
+
+## Install PerfKit Benchmarker dependencies
+```
+$ cd /path/to/PerfKitBenchmarker
+$ sudo pip install -r requirements.txt
+```
+
+##Cloud account setup
+
+This section describes the setup steps needed for each cloud system.  
+* [Google Cloud](#install-gcloud-and-setup-authentication)
+* [OpenStack](#install-openstack-nova-client-and-setup-authentication)
+* [Kubernetes](#kubernetes-configuration-and-credentials)
+* [Cloudstack](#cloudstack-install-csapi-and-set-the-api-keys)
+* [AWS](#install-aws-cli-and-setup-authentication)
+* [Azure](#windows-azure-cli-and-credentials)
+* [AliCloud](#install-alicloud-cli-and-setup-authentication)
+* [DigitalOcean](#digitalocean-configuration-and-credentials)
+* [RackSpace](#installing-clis-and-credentials-for-rackspace)
+
+After configuring the clouds you intend to use, skip to  [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks). 
+
+### Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using OS X or Linux you can run the command below.
 
 When prompted pick the local folder, then Python project, then the defaults for all the rest
@@ -135,7 +160,7 @@ You will need a project ID before you can run. Please navigate to https://consol
 create one.
 
 
-## Install OpenStack Nova client and setup authentication
+### Install OpenStack Nova client and setup authentication
 Make sure you have installed pip (see the section above).
 
 Install python-novaclient by following command:
@@ -170,7 +195,7 @@ echo topsecretpassword > ~/.config/openstack-password.txt
 ./pkb.py --cloud=OpenStack --benchmarks=ping
 ```
 
-## Kubernetes configuration and credentials
+### Kubernetes configuration and credentials
 Perfkit uses `kubectl` binary in order to communicate with Kubernetes cluster - you need to pass the path to `kubectl` binary using `--kubectl` flag. It's recommended to use version 1.0.1 (available to download here: https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl).
 Authentication to Kubernetes cluster is done via `kubeconfig` file (https://github.com/kubernetes/kubernetes/blob/release-1.0/docs/user-guide/kubeconfig-file.md). Its path is passed using `--kubeconfig` flag.
 
@@ -253,7 +278,7 @@ You have two Ceph authentication options available (http://kubernetes.io/v1.0/ex
    ```
    You will have to pass the Secret name (using `--ceph_secret` flag) when running the benchmakrs. In this case it should be: `--ceph_secret=my-ceph-secret`.
 
-## Cloudstack: Install `csapi` and set the API keys
+### Cloudstack: Install `csapi` and set the API keys
 ```
 sudo pip install csapi
 ```
@@ -273,7 +298,7 @@ Specify the network offering when running the benchmark. If using VPC
 ./pkb.py --cloud=CloudStack --benchmarks=ping --cs_network_offering=DefaultNetworkOffering
 ```
 
-## Install AWS CLI and setup authentication
+### Install AWS CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
 Follow instructions at http://aws.amazon.com/cli/ or run the following command (omit the 'sudo' on Windows)
@@ -291,7 +316,7 @@ Configure the CLI using the keys from the previous step
 $ aws configure
 ```
 
-## Windows Azure CLI and credentials
+### Windows Azure CLI and credentials
 You first need to install node.js and NPM.
 This version of Perfkit Benchmarker is compatible with azure version 0.9.9.
 
@@ -316,7 +341,7 @@ Test that azure is installed correctly
 $ azure vm list
 ```
 
-## Install AliCloud CLI and setup authentication
+### Install AliCloud CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
 Run the following command to install aliyuncli(omit the ‘sudo’ on Windows)
@@ -377,14 +402,14 @@ Run the following command to install aliyuncli(omit the ‘sudo’ on Windows)
    $ aliyuncli configure
    ```
 
-## DigitalOcean configuration and credentials
+### DigitalOcean configuration and credentials
 
-PerfKitBenchmarker uses the *curl* tool to interact with
+PerfKit Benchmarker uses the *curl* tool to interact with
 DigitalOcean's REST API. This API uses oauth for authentication.
 Please set this up as follows:
 
 Log in to your DigitalOcean account and create a Personal Access Token
-for use by PerfKitBenchmarker with read/write access in Settings /
+for use by PerfKit Benchmarker with read/write access in Settings /
 API: https://cloud.digitalocean.com/settings/applications
 
 Save a copy of the authentication token it shows, this is a
@@ -406,17 +431,17 @@ $ curl --config ~/.config/digitalocean-oauth.curl https://api.digitalocean.com/v
 {"sizes":[{"slug":"512mb","memory":512,"vcpus":1,...
 ```
 
-PerfKitBenchmarker uses the file location `~/.config/digitalocean-oauth.curl`
+PerfKit Benchmarker uses the file location `~/.config/digitalocean-oauth.curl`
 by default, you can use the `--digitalocean_curl_config` flag to
 override the path.
 
 
-## Installing CLIs and credentials for Rackspace
+### Installing CLIs and credentials for Rackspace
 
-In order to interact with the Rackspace Public Cloud, PerfKitBenchmarker makes
+In order to interact with the Rackspace Public Cloud, PerfKit Benchmarker makes
 use of the Nova, and the Neutron CLI clients with the Rackspace extensions.
 
-To run PerfKitBenchmarker against Rackspace is very easy. First, install the
+To run PerfKit Benchmarker against Rackspace is very easy. First, install the
 CLI clients as follows:
 ```bash
 pip install -U rackspace-neutronclient
@@ -448,7 +473,7 @@ if the flavor is supported in the region.
 
 ## Create and Configure a `.boto` file for object storage benchmarks
 
-In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.
+In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.  The directions require that you have installed `google-cloud-sdk`.  The directions for doing that are in the [gcloud installation section](#install-gcloud-and-setup-authentication).
 
 Here is how:
 
@@ -475,19 +500,9 @@ As a result, a `.boto` file is created under your home directory.
 `client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials`), which was setup as part of the 'gcloud auth login' step.
 
 
-## Install PerfKit
-
-[Download PerfKitBenchmarker](http://github.com/GoogleCloudPlatform/PerfKitBenchmarker/releases) from GitHub.
-
-## Install PerfKit Benchmakrer dependencies
-```
-$ cd /path/to/PerfKitBenchmarker
-$ sudo pip install -r requirements.txt
-```
-
 RUNNING A SINGLE BENCHMARK
 ==========================
-PerfKitBenchmarks can run benchmarks both on Cloud Providers (GCP,
+PerfKit Benchmarker can run benchmarks both on Cloud Providers (GCP,
 AWS, Azure, DigitalOcean) as well as any "machine" you can SSH into.
 
 ## Example run on GCP
@@ -568,7 +583,7 @@ USEFUL GLOBAL FLAGS
 ==================
 
 The following are some common flags used when configuring
-PerfKitBenchmaker.
+PerfKit Benchmaker.
 
 Flag | Notes
 -----|------
@@ -710,10 +725,10 @@ See the section below for how to use static (i.e. pre-provisioned) machines in y
 
 ADVANCED: HOW TO RUN BENCHMARKS WITHOUT CLOUD PROVISIONING (eg: local workstation)
 ==================
-It is possible to run PerfKitBenchmarker without running the Cloud provioning steps.  This is useful if you want to run on a local machine, or have a benchmark like iperf run from an external point to a Cloud VM.
+It is possible to run PerfKit Benchmarker without running the Cloud provioning steps.  This is useful if you want to run on a local machine, or have a benchmark like iperf run from an external point to a Cloud VM.
 
 In order to do this you need to make sure:
-* The static (ie not provisioned by PerfKitBenchmarker) machine is ssh'able
+* The static (ie not provisioned by PerfKit Benchmarker) machine is ssh'able
 * The user PerfKitBenchmarker will login as has 'sudo' access.  (*** Note we hope to remove this restriction soon ***)
 
 Next you will want to create a YAML user config file describing how to connect to the machine as follows:
@@ -749,7 +764,7 @@ I called my file iperf.yaml and used it to run iperf from Siberia to a GCP VM in
 ```
 ./pkb.py --benchmarks=iperf --machine_type=f1-micro --benchmark_config_file=iperf.yaml --zone=us-central1-f --ip_addresses=EXTERNAL
 ```
-* ip_addresses=EXTERNAL tells PerfKitBechmarker not to use 10.X (ie Internal) machine addresses that all Cloud VMs have.  Just use the external IP address.
+* ip_addresses=EXTERNAL tells PerfKit Bechmarker not to use 10.X (ie Internal) machine addresses that all Cloud VMs have.  Just use the external IP address.
 
 If a benchmark requires two machines like iperf, you can have two machines in the same YAML file as shown below.  This means you can indeed run between two machines and never provision any VM's in the Cloud.
 
@@ -801,7 +816,7 @@ netperf:
 The new defaults will only apply to the benchmark in which they are specified.
 
 
-HOW TO EXTEND PerfKitBenchmarker
+HOW TO EXTEND PerfKit Benchmarker
 =================
 First start with the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
 file.  It has the basics on how to work with PerfKitBenchmarker, and how to submit your pull requests.
@@ -819,7 +834,7 @@ INTEGRATION TESTING
 ===================
 
 In addition to regular unit tests, which are run via `hooks/check-everything`,
-PerfKitBenchmarker has integration tests, which create actual cloud resources
+PerfKit Benchmarker has integration tests, which create actual cloud resources
 and take time and money to run. For this reason, they will only run when the
 variable PERFKIT_INTEGRATION is defined in the environment. For instance, the
 command
