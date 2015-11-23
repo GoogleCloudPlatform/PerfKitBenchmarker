@@ -145,7 +145,7 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(gce_disk.__name__ + '.GceDisk'))
 
   def _CreateVm(self):
-    vm_spec = gce_virtual_machine.GceVmSpec()
+    vm_spec = gce_virtual_machine.GceVmSpec(machine_type='test_machine_type')
     return gce_virtual_machine.DebianBasedGceVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):

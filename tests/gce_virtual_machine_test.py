@@ -19,8 +19,96 @@ import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+
+
+class MemoryDecoderTestCase(unittest.TestCase):
+
+  def setUp(self):
+    super(MemoryDecoderTestCase, self).setUp()
+    self.decoder = gce_virtual_machine.MemoryDecoder('GCP VM', 'memory')
+
+  def testValidStrings(self):
+    self.assertEqual(self.decoder.Decode('1280MB'), 1280)
+    self.assertEqual(self.decoder.Decode('7.5GB'), 7680)
+
+  def testImproperPattern(self):
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      self.decoder.Decode('1280')
+    self.assertEqual(str(cm.exception), (
+        'Invalid GCP VM "memory" value: "1280". Examples of valid values: '
+        '"1280MB", "7.5GB".'))
+
+  def testInvalidFloat(self):
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      self.decoder.Decode('1280.9.8MB')
+    self.assertEqual(str(cm.exception), (
+        'Invalid GCP VM "memory" value: "1280.9.8MB". "1280.9.8" is not a '
+        'valid float.'))
+
+  def testNonIntegerMB(self):
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      self.decoder.Decode('7.6GB')
+    self.assertEqual(str(cm.exception), (
+        'Invalid GCP VM "memory" value: "7.6GB". The specified size must be an '
+        'integer number of MB.'))
+
+
+class GceVirtualMachineTestCase(unittest.TestCase):
+
+  def setUp(self):
+    p = mock.patch(gce_virtual_machine.__name__ +
+                   '.gce_network.GceNetwork.GetNetwork')
+    self.mock_get_network = p.start()
+    self.addCleanup(p.stop)
+    p = mock.patch(gce_virtual_machine.__name__ +
+                   '.gce_network.GceFirewall.GetFirewall')
+    self.mock_get_firewall = p.start()
+    self.addCleanup(p.stop)
+
+  def testConstructorNoMachineTypeNoCpus(self):
+    spec = gce_virtual_machine.GceVmSpec()
+    with self.assertRaises(errors.Config.MissingOption) as cm:
+      gce_virtual_machine.GceVirtualMachine(spec)
+    self.assertEqual(str(cm.exception), (
+        'A GCP VM must have either a "machine_type" or both "cpus" and '
+        '"memory" configured.'))
+
+  def testConstructorBothMachineTypeAndCpus(self):
+    spec = gce_virtual_machine.GceVmSpec(machine_type='test_machine_type',
+                                         cpus=1)
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      gce_virtual_machine.GceVirtualMachine(spec)
+    self.assertEqual(str(cm.exception), (
+        'A GCP VM cannot have both a "machine_type" and either "cpus" or '
+        '"memory" configured.'))
+
+  def testVmWithMachineTypeNonPreemptible(self):
+    spec = gce_virtual_machine.GceVmSpec(machine_type='test_machine_type')
+    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    self.assertEqual(vm.GetMachineTypeDict(), {
+        'machine_type': 'test_machine_type'})
+
+  def testVmWithMachineTypePreemptible(self):
+    spec = gce_virtual_machine.GceVmSpec(machine_type='test_machine_type',
+                                         preemptible=True)
+    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    self.assertEqual(vm.GetMachineTypeDict(), {
+        'machine_type': 'test_machine_type', 'preemptible': True})
+
+  def testCustomVmNonPreemptible(self):
+    spec = gce_virtual_machine.GceVmSpec(cpus=1, memory='1.0GB')
+    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mb': 1024})
+
+  def testCustomVmPreemptible(self):
+    spec = gce_virtual_machine.GceVmSpec(cpus=1, memory='1.0GB',
+                                         preemptible=True)
+    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mb': 1024,
+                                               'preemptible': True})
 
 
 class GCEPreemptibleVMFlagTestCase(unittest.TestCase):

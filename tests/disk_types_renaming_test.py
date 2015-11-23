@@ -30,6 +30,7 @@ class GcpDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'GCP',
                 'vm_spec': {
                     'GCP': {
+                        'machine_type': 'test_machine_type',
                     }
                 },
                 'disk_spec': {
@@ -55,6 +56,7 @@ class GcpDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'GCP',
                 'vm_spec': {
                     'GCP': {
+                        'machine_type': 'test_machine_type',
                     }
                 },
                 'disk_spec': {
