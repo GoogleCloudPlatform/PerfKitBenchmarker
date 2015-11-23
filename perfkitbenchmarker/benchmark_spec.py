@@ -235,7 +235,7 @@ class BenchmarkSpec(object):
         vm_util.GenerateSSHConfig(self)
 
   def Delete(self):
-    if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
+    if self.deleted:
       return
 
     if self.vms:
