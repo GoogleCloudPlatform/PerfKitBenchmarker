@@ -35,6 +35,7 @@ from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
@@ -48,26 +49,83 @@ RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
 
 
+class MemoryDecoder(option_decoders.StringDecoder):
+  """Verifies and decodes a config option value specifying a memory size."""
+
+  _CONFIG_MEMORY_PATTERN = re.compile(r'([0-9.]+)([GM]iB)')
+
+  def Decode(self, value):
+    """Decodes memory size in MiB from a string.
+
+    The value specified in the config must be a string representation of the
+    memory size expressed in MiB or GiB. It must be an integer number of MiB
+    Examples: "1280MiB", "7.5GiB".
+
+    Args:
+      value: The value specified in the config.
+
+    Returns:
+      int. Memory size in MiB.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    string = super(MemoryDecoder, self).Decode(value)
+    match = self._CONFIG_MEMORY_PATTERN.match(string)
+    if not match:
+      raise errors.Config.InvalidValue(
+          'Invalid {0} "{1}" value: "{2}". Examples of valid values: '
+          '"1280MiB", "7.5GiB".'.format(self.component, self.option, string))
+    try:
+      memory_value = float(match.group(1))
+    except ValueError:
+      raise errors.Config.InvalidValue(
+          'Invalid {0} "{1}" value: "{2}". "{3}" is not a valid '
+          'float.'.format(self.component, self.option, string, match.group(1)))
+    memory_units = match.group(2)
+    if memory_units == 'GiB':
+      memory_value *= 1024
+    memory_mib_int = int(memory_value)
+    if memory_value != memory_mib_int:
+      raise errors.Config.InvalidValue(
+          'Invalid {0} "{1}" value: "{2}". The specified size must be an '
+          'integer number of MiB.'.format(self.component, self.option, string))
+    return memory_mib_int
+
+
 class GceVmSpec(virtual_machine.BaseVmSpec):
-  """Object containing the information needed to create a GceVirtualMachine."""
+  """Object containing the information needed to create a GceVirtualMachine.
+
+  Attributes:
+    cpus: None or int. Number of vCPUs for custom VMs.
+    memory: None or string. For custom VMs, a string representation of the size
+        of memory, expressed in MiB or GiB. Must be an integer number of MiB
+        (e.g. "1280MiB", "7.5GiB").
+    num_local_ssds: int. The number of local SSDs to attach to the instance.
+    preemptible: boolean. True if the VM should be preemptible, False otherwise.
+    project: string or None. The project to create the VM in.
+  """
 
   CLOUD = 'GCP'
 
-  def __init__(self, project=None, num_local_ssds=0,
-               preemptible=False, **kwargs):
-    """Initializes the VmSpec.
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
 
-    Args:
-      num_local_ssds: The number of local ssds to attach to the instance.
-      project: The project to create the VM in.
-      preemptible: True if the VM should be preemptible and False otherwise.
-      kwargs: The key word arguments to virtual_machine.BaseVmSpec's __init__
-        method.
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
     """
-    super(GceVmSpec, self).__init__(**kwargs)
-    self.project = project
-    self.num_local_ssds = num_local_ssds
-    self.preemptible = preemptible
+    result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'cpus': (option_decoders.IntDecoder, {'default': None, 'min': 1}),
+        'memory': (MemoryDecoder, {'default': None}),
+        'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
+                                                        'min': 0}),
+        'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
+        'project': (option_decoders.StringDecoder, {'default': None})})
+    return result
 
   def ApplyFlags(self, flags):
     """Apply flags to the VmSpec."""
@@ -93,17 +151,34 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+
+    Raises:
+      errors.Config.MissingOption: If the spec does not include a "machine_type"
+          or both "cpus" and "memory".
+      errors.Config.InvalidValue: If the spec contains both "machine_type" and
+          at least one of "cpus" or "memory".
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
+    self.boot_metadata = {}
+    self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
+    self.max_local_disks = vm_spec.num_local_ssds
+    self.memory_mib = vm_spec.memory
+    self.preemptible = vm_spec.preemptible
     self.project = vm_spec.project
+    # TODO(skschneider): This can be moved into the VM spec if the ApplyFlags
+    # behavior is moved into BaseVmSpec.__init__.
+    if self.machine_type is None:
+      if self.cpus is None or self.memory_mib is None:
+        raise errors.Config.MissingOption(
+            'A GCP VM must have either a "machine_type" or both "cpus" and '
+            '"memory" configured.')
+    elif self.cpus is not None or self.memory_mib is not None:
+      raise errors.Config.InvalidValue(
+          'A GCP VM cannot have both a "machine_type" and either "cpus" or '
+          '"memory" configured.')
     self.network = gce_network.GceNetwork.GetNetwork(self)
     self.firewall = gce_network.GceFirewall.GetFirewall()
-    self.max_local_disks = vm_spec.num_local_ssds
-    self.boot_metadata = {}
-
-    self.preemptible = vm_spec.preemptible
-
     events.sample_created.connect(self.AnnotateSample, weak=False)
 
   def _GenerateCreateCommand(self, ssh_keys_path):
@@ -120,7 +195,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['image'] = self.image
     cmd.flags['boot-disk-size'] = self.BOOT_DISK_SIZE_GB
     cmd.flags['boot-disk-type'] = self.BOOT_DISK_TYPE
-    cmd.flags['machine-type'] = self.machine_type
+    if self.machine_type is None:
+      cmd.flags['custom-cpu'] = self.cpus
+      cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
+    else:
+      cmd.flags['machine-type'] = self.machine_type
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
     cmd.flags['metadata-from-file'] = 'sshKeys=%s' % ssh_keys_path
@@ -229,6 +308,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def AnnotateSample(self, unused_sender, benchmark_spec, sample):
     sample['metadata']['preemptible'] = self.preemptible
+
+  def GetMachineTypeDict(self):
+    """Returns a dict containing properties that specify the machine type.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = super(GceVirtualMachine, self).GetMachineTypeDict()
+    for attr_name in 'cpus', 'memory_mib', 'preemptible':
+      attr_value = getattr(self, attr_name)
+      if attr_value:
+        result[attr_name] = attr_value
+    return result
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
