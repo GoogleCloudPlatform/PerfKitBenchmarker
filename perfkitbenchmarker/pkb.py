@@ -367,7 +367,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
           detailed_timer.GenerateSamples(include_runtimes, include_timestamps),
           benchmark_name, spec)
 
-    except Exception:
+    except:
       # Resource cleanup (below) can take a long time. Log the error to give
       # immediate feedback, then re-throw.
       logging.exception('Error during benchmark %s', benchmark_name)
