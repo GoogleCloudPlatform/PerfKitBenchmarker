@@ -37,7 +37,7 @@ class ConfigOptionDecoderTestCase(unittest.TestCase):
 
   def testNoDefault(self):
     decoder = _PassThroughDecoder(_COMPONENT, _OPTION)
-    self.assertTrue(decoder.required)
+    self.assertIs(decoder.required, True)
     with self.assertRaises(AssertionError) as cm:
       decoder.default
     self.assertEqual(str(cm.exception), (
@@ -46,13 +46,13 @@ class ConfigOptionDecoderTestCase(unittest.TestCase):
 
   def testDefaultValue(self):
     decoder = _PassThroughDecoder(_COMPONENT, _OPTION, default=None)
-    self.assertFalse(decoder.required)
-    self.assertEqual(decoder.default, None)
+    self.assertIs(decoder.required, False)
+    self.assertIsNone(decoder.default)
 
   def testDefaultCallable(self):
     decoder = _PassThroughDecoder(_COMPONENT, _OPTION, default=_ReturnFive)
-    self.assertFalse(decoder.required)
-    self.assertEqual(decoder.default, 5)
+    self.assertIs(decoder.required, False)
+    self.assertIs(decoder.default, 5)
 
   def testIncompleteDerivedClass(self):
     class IncompleteDerivedClass(option_decoders.ConfigOptionDecoder):
@@ -61,12 +61,54 @@ class ConfigOptionDecoderTestCase(unittest.TestCase):
       IncompleteDerivedClass(_COMPONENT, _OPTION)
 
 
+class TypeVerifierTestCase(unittest.TestCase):
+
+  def testRejectNone(self):
+    decoder = option_decoders.TypeVerifier(_COMPONENT, _OPTION, (int, float),
+                                           default=None)
+    self.assertIs(decoder.required, False)
+    self.assertIsNone(decoder.default)
+    self.assertIs(decoder.Decode(5), 5)
+    self.assertIs(decoder.Decode(5.5), 5.5)
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      decoder.Decode(None)
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component "test_option" value: "None" (of type '
+        '"NoneType"). Value must be one of the following types: int, float.'))
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      decoder.Decode('red')
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component "test_option" value: "red" (of type "str"). '
+        'Value must be one of the following types: int, float.'))
+
+  def testAcceptNone(self):
+    decoder = option_decoders.TypeVerifier(_COMPONENT, _OPTION, (int, float),
+                                           none_ok=True, default=None)
+    self.assertIs(decoder.required, False)
+    self.assertIsNone(decoder.default)
+    self.assertIs(decoder.Decode(5), 5)
+    self.assertIs(decoder.Decode(5.5), 5.5)
+    self.assertIsNone(decoder.Decode(None))
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      decoder.Decode('red')
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component "test_option" value: "red" (of type "str"). '
+        'Value must be one of the following types: NoneType, int, float.'))
+
+
 class BooleanDecoderTestCase(unittest.TestCase):
 
   def testDefault(self):
     decoder = option_decoders.BooleanDecoder(_COMPONENT, _OPTION, default=None)
-    self.assertFalse(decoder.required)
-    self.assertEqual(decoder.default, None)
+    self.assertIs(decoder.required, False)
+    self.assertIsNone(decoder.default)
+
+  def testNone(self):
+    decoder = option_decoders.BooleanDecoder(_COMPONENT, _OPTION, none_ok=True)
+    self.assertIsNone(decoder.Decode(None))
+    decoder = option_decoders.BooleanDecoder(_COMPONENT, _OPTION)
+    with self.assertRaises(errors.Config.InvalidValue):
+      decoder.Decode(None)
 
   def testNonBoolean(self):
     decoder = option_decoders.BooleanDecoder(_COMPONENT, _OPTION)
@@ -74,19 +116,26 @@ class BooleanDecoderTestCase(unittest.TestCase):
       decoder.Decode(5)
     self.assertEqual(str(cm.exception), (
         'Invalid test_component "test_option" value: "5" (of type "int"). '
-        'Value must be a boolean.'))
+        'Value must be one of the following types: bool.'))
 
   def testValidBoolean(self):
     decoder = option_decoders.BooleanDecoder(_COMPONENT, _OPTION)
-    self.assertEqual(decoder.Decode(True), True)
+    self.assertIs(decoder.Decode(True), True)
 
 
 class IntDecoderTestCase(unittest.TestCase):
 
   def testDefault(self):
     decoder = option_decoders.IntDecoder(_COMPONENT, _OPTION, default=5)
-    self.assertFalse(decoder.required)
-    self.assertEqual(decoder.default, 5)
+    self.assertIs(decoder.required, False)
+    self.assertIs(decoder.default, 5)
+
+  def testNone(self):
+    decoder = option_decoders.IntDecoder(_COMPONENT, _OPTION, none_ok=True)
+    self.assertIsNone(decoder.Decode(None))
+    decoder = option_decoders.IntDecoder(_COMPONENT, _OPTION)
+    with self.assertRaises(errors.Config.InvalidValue):
+      decoder.Decode(None)
 
   def testNonInt(self):
     decoder = option_decoders.IntDecoder(_COMPONENT, _OPTION)
@@ -94,7 +143,7 @@ class IntDecoderTestCase(unittest.TestCase):
       decoder.Decode('5')
     self.assertEqual(str(cm.exception), (
         'Invalid test_component "test_option" value: "5" (of type "str"). '
-        'Value must be an integer.'))
+        'Value must be one of the following types: int.'))
 
   def testValidInt(self):
     decoder = option_decoders.IntDecoder(_COMPONENT, _OPTION)
@@ -107,8 +156,8 @@ class IntDecoderTestCase(unittest.TestCase):
     self.assertEqual(str(cm.exception), (
         'Invalid test_component "test_option" value: "5". Value must be at '
         'most 2.'))
-    self.assertEqual(decoder.Decode(2), 2)
-    self.assertEqual(decoder.Decode(1), 1)
+    self.assertIs(decoder.Decode(2), 2)
+    self.assertIs(decoder.Decode(1), 1)
 
   def testMin(self):
     decoder = option_decoders.IntDecoder(_COMPONENT, _OPTION, min=10)
@@ -117,8 +166,8 @@ class IntDecoderTestCase(unittest.TestCase):
     self.assertEqual(str(cm.exception), (
         'Invalid test_component "test_option" value: "5". Value must be at '
         'least 10.'))
-    self.assertEqual(decoder.Decode(10), 10)
-    self.assertEqual(decoder.Decode(15), 15)
+    self.assertIs(decoder.Decode(10), 10)
+    self.assertIs(decoder.Decode(15), 15)
 
 
 class StringDecoderTestCase(unittest.TestCase):
@@ -126,7 +175,14 @@ class StringDecoderTestCase(unittest.TestCase):
   def testDefault(self):
     decoder = option_decoders.StringDecoder(_COMPONENT, _OPTION, default=None)
     self.assertFalse(decoder.required)
-    self.assertEqual(decoder.default, None)
+    self.assertIsNone(decoder.default)
+
+  def testNone(self):
+    decoder = option_decoders.IntDecoder(_COMPONENT, _OPTION, none_ok=True)
+    self.assertIsNone(decoder.Decode(None))
+    decoder = option_decoders.IntDecoder(_COMPONENT, _OPTION)
+    with self.assertRaises(errors.Config.InvalidValue):
+      decoder.Decode(None)
 
   def testNonString(self):
     decoder = option_decoders.StringDecoder(_COMPONENT, _OPTION)
@@ -134,7 +190,7 @@ class StringDecoderTestCase(unittest.TestCase):
       decoder.Decode(5)
     self.assertEqual(str(cm.exception), (
         'Invalid test_component "test_option" value: "5" (of type "int"). '
-        'Value must be a string.'))
+        'Value must be one of the following types: basestring.'))
 
   def testValidString(self):
     decoder = option_decoders.StringDecoder(_COMPONENT, _OPTION)
