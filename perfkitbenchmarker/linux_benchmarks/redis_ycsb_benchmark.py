@@ -33,9 +33,10 @@ redis_ycsb:
       Run YCSB against a single Redis server.
       Specify the number of client VMs with --ycsb_client_vms.
   vm_groups:
-    default:
+    workers:
       vm_spec: *default_single_core
-      vm_count: null
+    clients:
+      vm_spec: *default_single_core
 """
 
 
@@ -44,7 +45,7 @@ REDIS_PID_FILE = posixpath.join(redis_server.REDIS_DIR, 'redis.pid')
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  config['vm_groups']['default']['vm_count'] = 1 + FLAGS.ycsb_client_vms
+  config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   return config
 
 
@@ -74,9 +75,9 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  redis_vm = vms[0]
-  ycsb_vms = vms[1:]
+  groups = benchmark_spec.vm_groups
+  redis_vm = groups['workers'][0]
+  ycsb_vms = groups['clients']
 
   prepare_fns = ([functools.partial(PrepareServer, redis_vm)] +
                  [functools.partial(vm.Install, 'ycsb') for vm in ycsb_vms])
@@ -85,7 +86,7 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
-  """Run memtier_benchmark against Redis.
+  """Run YCSB against Redis.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -94,8 +95,9 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  redis_vm = benchmark_spec.vms[0]
-  ycsb_vms = benchmark_spec.vms[1:]
+  groups = benchmark_spec.vm_groups
+  redis_vm = groups['workers'][0]
+  ycsb_vms = groups['clients']
   executor = ycsb.YCSBExecutor('redis', **{'redis.host': redis_vm.internal_ip})
 
   metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms}
@@ -116,5 +118,6 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  benchmark_spec.vms[0].RemoteCommand('kill $(cat {0})'.format(REDIS_PID_FILE),
-                                      ignore_failure=True)
+  (benchmark_spec.vm_groups['workers'][0]
+   .RemoteCommand('kill $(cat {0})'.format(REDIS_PID_FILE),
+                  ignore_failure=True))
