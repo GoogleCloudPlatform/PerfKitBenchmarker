@@ -42,10 +42,11 @@ BENCHMARK_CONFIG = """
 cloudsuite_websearch:
   description: Run CloudSuite Web Search
   vm_groups:
-    default:
+    workers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
-      vm_count: null
+    clients:
+      vm_spec: *default_single_core
 """
 
 CLOUDSUITE_WEB_SEARCH_DIR = posixpath.join(vm_util.VM_TMP_DIR,
@@ -61,7 +62,6 @@ SEARCH_DRIVER_URL = posixpath.join(PACKAGES_URL, 'search.tar.gz')
 
 SOLR_PORT = 8983
 
-NUM_SERVERS = 1
 CLASSPATH = ('$FABAN_HOME/lib/fabanagents.jar:$FABAN_HOME/lib/fabancommon.jar:'
              '$FABAN_HOME/lib/fabandriver.jar:$JAVA_HOME/lib/tools.jar:'
              '$FABAN_HOME/search/build/lib/search.jar')
@@ -107,7 +107,7 @@ def CheckPrerequisites():
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   num_clients = FLAGS.cs_websearch_num_clients
-  config['vm_groups']['default']['vm_count'] = num_clients + NUM_SERVERS
+  config['vm_groups']['clients']['vm_count'] = num_clients
   return config
 
 
@@ -118,21 +118,16 @@ def _PrepareSolr(solr_nodes):
   server_heap_size = FLAGS.cs_websearch_server_heap_size
   for vm in solr_nodes:
     vm.Install('solr')
-    solr_nodes[0].RemoteCommand('cd {0} && '
-                                'wget {1}'
-                                .format(
-                                    basic_configs_dir,
-                                    SCHEMA_URL))
-    solr_nodes[0].RemoteCommand('cd {0} && '
-                                'wget {1}'
-                                .format(
-                                    basic_configs_dir,
-                                    SOLR_CONFIG_URL))
+    vm.RemoteCommand('cd {0} && wget {1}'.format(
+        basic_configs_dir,
+        SCHEMA_URL))
+    vm.RemoteCommand('cd {0} && wget {1}'.format(
+        basic_configs_dir,
+        SOLR_CONFIG_URL))
     if vm == solr_nodes[0]:
       solr.StartWithZookeeper(vm, SOLR_PORT, server_heap_size)
     else:
-      solr.Start(vm, SOLR_PORT, solr_nodes[0], SOLR_PORT + 1000,
-                 server_heap_size)
+      solr.Start(vm, SOLR_PORT, vm, SOLR_PORT + 1000, server_heap_size)
   solr.CreateCollection(solr_nodes[0], 'cloudsuite_web_search',
                         len(solr_nodes), SOLR_PORT)
 
@@ -191,6 +186,8 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
+  servers = benchmark_spec.vm_groups['workers']
+  clients = benchmark_spec.vm_groups['clients']
 
   def PrepareVM(vm):
     vm.Install('wget')
@@ -199,9 +196,9 @@ def Prepare(benchmark_spec):
 
   vm_util.RunThreaded(PrepareVM, vms)
 
-  _PrepareSolr(vms[:NUM_SERVERS])
-  _PrepareClient(vms[NUM_SERVERS:])
-  _BuildIndex(vms[:NUM_SERVERS])
+  _PrepareSolr(servers)
+  _PrepareClient(clients)
+  _BuildIndex(servers)
 
 
 def Run(benchmark_spec):
@@ -214,7 +211,7 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  clients = benchmark_spec.vms[NUM_SERVERS:]
+  clients = benchmark_spec.vm_groups['clients']
   client_master = clients[0]
   distribution = FLAGS.cs_websearch_query_distr
   terms_file = None
@@ -325,8 +322,9 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  client_master = vms[NUM_SERVERS]
+  servers = benchmark_spec.vm_groups['workers']
+  clients = benchmark_spec.vm_groups['clients']
+  client_master = clients[0]
   faban.Stop(client_master)
-  for vm in vms[:NUM_SERVERS]:
+  for vm in servers:
     solr.Stop(vm, SOLR_PORT)
