@@ -14,6 +14,9 @@
 
 """Utilities for working with Amazon Web Services resources."""
 
+import re
+import string
+
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -21,6 +24,21 @@ from perfkitbenchmarker import vm_util
 AWS_PATH = 'aws'
 AWS_PREFIX = [AWS_PATH, '--output', 'json']
 FLAGS = flags.FLAGS
+
+
+def IsRegion(zone_or_region):
+  """Returns whether "zone_or_region" is a region."""
+  if not re.match(r'[a-z]{2}-[a-z]+-[0-9][a-z]?$', zone_or_region):
+    raise ValueError(
+        '%s is not a valid AWS zone or region name' % zone_or_region)
+  return zone_or_region[-1] in string.digits
+
+
+def GetRegionFromZone(zone_or_region):
+  """Returns the region a zone is in (or "zone_or_region" if it's a region)."""
+  if IsRegion(zone_or_region):
+    return zone_or_region
+  return zone_or_region[:-1]
 
 
 def AddTags(resource_id, region, **kwargs):

@@ -159,7 +159,7 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(aws_util.__name__ + '.AddDefaultTags'))
 
   def _CreateVm(self):
-    vm_spec = virtual_machine.BaseVmSpec(zone='zone')
+    vm_spec = virtual_machine.BaseVmSpec(zone='us-east-1a')
     return aws_virtual_machine.DebianBasedAwsVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):

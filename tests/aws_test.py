@@ -36,7 +36,7 @@ class AwsVolumeExistsTestCase(unittest.TestCase):
     p.start()
     self.addCleanup(p.stop)
     self.disk = aws_disk.AwsDisk(aws_disk.AwsDiskSpec(disk_type='standard'),
-                                 'zone-a', 'm4.2xlarge')
+                                 'us-east-1', 'm4.2xlarge')
     self.disk.id = 'vol-foo'
 
   def testVolumePresent(self):
@@ -119,5 +119,28 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
     util.IssueRetryableCommand.side_effect = [(json.dumps(response), None)]
     self.assertFalse(self.vm._Exists())
 
-if __name__ == '__main__':
-  unittest.main()
+
+class AwsIsRegionTestCase(unittest.TestCase):
+
+  def testBadFormat(self):
+    with self.assertRaises(ValueError):
+      util.IsRegion('us-east')
+
+  def testZone(self):
+    self.assertFalse(util.IsRegion('us-east-1a'))
+
+  def testRegion(self):
+    self.assertTrue(util.IsRegion('eu-central-1'))
+
+
+class AwsGetRegionFromZoneTestCase(unittest.TestCase):
+
+  def testBadFormat(self):
+    with self.assertRaises(ValueError):
+      util.GetRegionFromZone('invalid')
+
+  def testZone(self):
+    self.assertEqual(util.GetRegionFromZone('us-east-1a'), 'us-east-1')
+
+  def testRegion(self):
+    self.assertEqual(util.GetRegionFromZone('eu-central-1'), 'eu-central-1')
