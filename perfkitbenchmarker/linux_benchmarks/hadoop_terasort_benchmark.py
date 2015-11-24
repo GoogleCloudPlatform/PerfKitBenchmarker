@@ -39,12 +39,15 @@ FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'hadoop_terasort'
 BENCHMARK_CONFIG = """
 hadoop_terasort:
-  description: Runs Terasort. Control the number of VMs with --num_vms.
+  description: Runs Terasort. Control the number of worker VMs with --num_vms.
   vm_groups:
-    default:
+    master:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
-      vm_count: 9
+    workers:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+      vm_count: 8
 """
 
 NUM_BYTES_PER_ROW = 100
@@ -54,7 +57,7 @@ NUM_MB_PER_ROW = NUM_BYTES_PER_ROW / (1024.0 ** 2)
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['num_vms'].present:
-    config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
+    config['vm_groups']['workers']['vm_count'] = FLAGS.num_vms
   return config
 
 
@@ -74,9 +77,9 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
+  master = benchmark_spec.vm_groups['master'][0]
+  workers = benchmark_spec.vm_groups['workers']
   vms = benchmark_spec.vms
-  master = vms[0]
-  workers = vms[1:]
 
   def InstallHadoop(vm):
     vm.Install('hadoop')
@@ -95,7 +98,7 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   vms = benchmark_spec.vms
-  master = vms[0]
+  master = benchmark_spec.vm_groups['master'][0]
 
   mapreduce_example_jar = posixpath.join(
       hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
@@ -137,10 +140,8 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  master = vms[0]
-  workers = vms[1:]
-
+  master = benchmark_spec.vm_groups['master'][0]
+  workers = benchmark_spec.vm_groups['workers']
   logging.info('Stopping Hadoop.')
   hadoop.StopAll(master)
   vm_util.RunThreaded(hadoop.CleanDatanode, workers)
