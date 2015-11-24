@@ -14,12 +14,14 @@
 
 """Tests for perfkitbenchmarker.providers.gcp.gce_virtual_machine"""
 
-import unittest
+import contextlib
 import mock
+import unittest
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import pkb
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 
@@ -111,18 +113,27 @@ class GceVirtualMachineTestCase(unittest.TestCase):
                                                'preemptible': True})
 
 
-class GCEPreemptibleVMFlagTestCase(unittest.TestCase):
+class GCEVMFlagsTestCase(unittest.TestCase):
 
   def setUp(self):
     # VM Creation depends on there being a BenchmarkSpec.
     self.spec = benchmark_spec.BenchmarkSpec({}, 'name', 'benchmark_uid')
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
-  def testPreemptibleVMFlag(self):
+  @contextlib.contextmanager
+  def _PatchCriticalObjects(self):
+    """A context manager that patches a few critical objects with mocks."""
     with mock.patch(vm_util.__name__ + '.IssueCommand') as issue_command, \
             mock.patch('__builtin__.open'), \
             mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
+            mock.patch(pkb.__name__ + '.FLAGS') as pkb_flags, \
             mock.patch(gce_virtual_machine.__name__ + '.FLAGS') as gvm_flags:
+              yield issue_command, pkb_flags, gvm_flags
+
+  def testPreemptibleVMFlag(self):
+    with self._PatchCriticalObjects() as mocked_env:
+      issue_command, pkb_flags, gvm_flags = mocked_env
+      pkb_flags.run_uri = 'foo'
       gvm_flags.gce_preemptible_vms = True
       gvm_flags.gcloud_scopes = None
       vm_spec = gce_virtual_machine.GceVmSpec(image='image')
@@ -131,6 +142,22 @@ class GCEPreemptibleVMFlagTestCase(unittest.TestCase):
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)
       self.assertIn('--preemptible', issue_command.call_args[0][0])
+
+  def testImageProjectFlag(self):
+    """Tests that custom image_project flag is supported."""
+    with self._PatchCriticalObjects() as mocked_env:
+      issue_command, pkb_flags, gvm_flags = mocked_env
+      pkb_flags.run_uri = 'foo'
+      gvm_flags.gcloud_scopes = None
+      gvm_flags.image_project = 'bar'
+      vm_spec = gce_virtual_machine.GceVmSpec(image='image')
+      vm_spec.ApplyFlags(gvm_flags)
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      self.assertIn('--image-project bar',
+                    ' '.join(issue_command.call_args[0][0]))
+
 
 if __name__ == '__main__':
   unittest.main()
