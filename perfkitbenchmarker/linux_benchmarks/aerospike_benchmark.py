@@ -54,10 +54,12 @@ BENCHMARK_CONFIG = """
 aerospike:
   description: Runs Aerospike.
   vm_groups:
-    default:
+    workers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
-      vm_count: 2
+      vm_count: null
+    client:
+      vm_spec: *default_single_core
 """
 
 AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
@@ -70,9 +72,9 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if (FLAGS.aerospike_storage_type == aerospike_server.DISK and
       FLAGS.data_disk_type != disk.LOCAL):
-    config['vm_groups']['default']['disk_count'] = 1
+    config['vm_groups']['workers']['disk_count'] = 1
   else:
-    config['vm_groups']['default']['disk_count'] = 0
+    config['vm_groups']['workers']['disk_count'] = 0
   return config
 
 
@@ -116,13 +118,14 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
 
   """
-  server, client = benchmark_spec.vms
+  client = benchmark_spec.vm_groups['client'][0]
+  workers = benchmark_spec.vm_groups['workers']
 
   def _Prepare(vm):
     if vm == client:
       _PrepareClient(vm)
     else:
-      aerospike_server.ConfigureAndStart(vm)
+      aerospike_server.ConfigureAndStart(vm, [workers[0].internal_ip])
 
   vm_util.RunThreaded(_Prepare, benchmark_spec.vms)
 
@@ -137,7 +140,8 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  server, client = benchmark_spec.vms
+  client = benchmark_spec.vm_groups['client'][0]
+  servers = benchmark_spec.vm_groups['workers']
   samples = []
 
   def ParseOutput(output):
@@ -159,7 +163,7 @@ def Run(benchmark_spec):
 
   load_command = ('./%s/benchmarks/target/benchmarks -z 32 -n test -w I '
                   '-o B:1000 -k 1000000 -h %s' %
-                  (CLIENT_DIR, server.internal_ip))
+                  (CLIENT_DIR, ','.join(s.internal_ip for s in servers)))
   client.RemoteCommand(load_command, should_log=True)
 
   max_throughput_for_completion_latency_under_1ms = 0.0
@@ -170,7 +174,7 @@ def Run(benchmark_spec):
                     '-z %s -n test -w RU,%s -o B:1000 -k 1000000 '
                     '--latency 5,1 -h %s;:' %
                     (CLIENT_DIR, threads, FLAGS.aerospike_read_percent,
-                     server.internal_ip))
+                     ','.join(s.internal_ip for s in servers)))
     stdout, _ = client.RemoteCommand(load_command, should_log=True)
     tps, latency = ParseOutput(stdout)
 
@@ -201,9 +205,13 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  server, client = benchmark_spec.vms
+  servers = benchmark_spec.vm_groups['workers']
+  client = benchmark_spec.vm_groups['client'][0]
 
   client.RemoteCommand('sudo rm -rf aerospike*')
-  server.RemoteCommand('cd %s && nohup sudo make stop' %
-                       aerospike_server.AEROSPIKE_DIR)
-  server.RemoteCommand('sudo rm -rf aerospike*')
+
+  def StopServer(server):
+    server.RemoteCommand('cd %s && nohup sudo make stop' %
+                         aerospike_server.AEROSPIKE_DIR)
+    server.RemoteCommand('sudo rm -rf aerospike*')
+  vm_util.RunThreaded(StopServer, servers)
