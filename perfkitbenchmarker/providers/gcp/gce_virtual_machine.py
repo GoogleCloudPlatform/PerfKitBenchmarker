@@ -193,6 +193,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd = util.GcloudCommand(self, 'compute', 'instances', 'create', self.name)
     cmd.flags['network'] = self.network.network_resource.name
     cmd.flags['image'] = self.image
+    cmd.flags['boot-disk-auto-delete'] = True
     cmd.flags['boot-disk-size'] = self.BOOT_DISK_SIZE_GB
     cmd.flags['boot-disk-type'] = self.BOOT_DISK_TYPE
     if self.machine_type is None:
