@@ -152,16 +152,16 @@ BENCHMARK_CONFIG = """
 cassandra_stress:
   description: Benchmark Cassandra using cassandra-stress
   vm_groups:
-    cassandra_nodes:
+    workers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
       vm_count: 3
-    stress_client:
+    client:
       vm_spec: *default_single_core
 """
 
-CASSANDRA_GROUP = 'cassandra_nodes'
-CLIENT_GROUP = 'stress_client'
+CASSANDRA_GROUP = 'workers'
+CLIENT_GROUP = 'client'
 
 SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
 TEMP_PROFILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'profile.yaml')

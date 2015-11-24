@@ -67,7 +67,7 @@ hbase_ycsb:
       cluster size with --num_vms. Specify the number of YCSB VMs
       with --ycsb_client_vms.
   vm_groups:
-    loaders:
+    clients:
       vm_spec: *default_single_core
     master:
       vm_spec: *default_single_core
@@ -90,7 +90,7 @@ def GetConfig(user_config):
   num_vms = max(FLAGS.num_vms, 2)
   if FLAGS['num_vms'].present and FLAGS.num_vms < 2:
     raise ValueError('hbase_ycsb requires at least 2 HBase VMs.')
-  config['vm_groups']['loaders']['vm_count'] = FLAGS.ycsb_client_vms
+  config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   if FLAGS['num_vms'].present:
     config['vm_groups']['workers']['vm_count'] = num_vms - 1
   return config
@@ -148,16 +148,16 @@ def _GetVMsByRole(vm_groups):
 
   Returns:
     A dictionary with keys 'vms', 'hbase_vms', 'master', 'zk_quorum', 'workers',
-    and 'loaders'.
+    and 'clients'.
   """
   hbase_vms = vm_groups['master'] + vm_groups['workers']
-  vms = hbase_vms + vm_groups['loaders']
+  vms = hbase_vms + vm_groups['clients']
   return {'vms': vms,
           'hbase_vms': hbase_vms,
           'master': vm_groups['master'][0],
           'zk_quorum': hbase_vms[:FLAGS.hbase_zookeeper_nodes],
           'workers': vm_groups['workers'],
-          'loaders': vm_groups['loaders']}
+          'clients': vm_groups['clients']}
 
 
 def Prepare(benchmark_spec):
@@ -169,7 +169,7 @@ def Prepare(benchmark_spec):
   """
   by_role = _GetVMsByRole(benchmark_spec.vm_groups)
 
-  loaders = by_role['loaders']
+  loaders = by_role['clients']
   assert loaders, 'No loader VMs: {0}'.format(by_role)
 
   # HBase cluster
@@ -219,7 +219,7 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   by_role = _GetVMsByRole(benchmark_spec.vm_groups)
-  loaders = by_role['loaders']
+  loaders = by_role['clients']
   logging.info('Loaders: %s', loaders)
 
   executor = ycsb.YCSBExecutor('hbase-10')
