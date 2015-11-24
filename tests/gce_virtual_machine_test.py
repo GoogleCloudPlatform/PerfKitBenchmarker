@@ -31,29 +31,29 @@ class MemoryDecoderTestCase(unittest.TestCase):
     self.decoder = gce_virtual_machine.MemoryDecoder('GCP VM', 'memory')
 
   def testValidStrings(self):
-    self.assertEqual(self.decoder.Decode('1280MB'), 1280)
-    self.assertEqual(self.decoder.Decode('7.5GB'), 7680)
+    self.assertEqual(self.decoder.Decode('1280MiB'), 1280)
+    self.assertEqual(self.decoder.Decode('7.5GiB'), 7680)
 
   def testImproperPattern(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self.decoder.Decode('1280')
     self.assertEqual(str(cm.exception), (
         'Invalid GCP VM "memory" value: "1280". Examples of valid values: '
-        '"1280MB", "7.5GB".'))
+        '"1280MiB", "7.5GiB".'))
 
   def testInvalidFloat(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self.decoder.Decode('1280.9.8MB')
+      self.decoder.Decode('1280.9.8MiB')
     self.assertEqual(str(cm.exception), (
-        'Invalid GCP VM "memory" value: "1280.9.8MB". "1280.9.8" is not a '
+        'Invalid GCP VM "memory" value: "1280.9.8MiB". "1280.9.8" is not a '
         'valid float.'))
 
-  def testNonIntegerMB(self):
+  def testNonIntegerMiB(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self.decoder.Decode('7.6GB')
+      self.decoder.Decode('7.6GiB')
     self.assertEqual(str(cm.exception), (
-        'Invalid GCP VM "memory" value: "7.6GB". The specified size must be an '
-        'integer number of MB.'))
+        'Invalid GCP VM "memory" value: "7.6GiB". The specified size must be '
+        'an integer number of MiB.'))
 
 
 class GceVirtualMachineTestCase(unittest.TestCase):
@@ -99,15 +99,15 @@ class GceVirtualMachineTestCase(unittest.TestCase):
         'machine_type': 'test_machine_type', 'preemptible': True})
 
   def testCustomVmNonPreemptible(self):
-    spec = gce_virtual_machine.GceVmSpec(cpus=1, memory='1.0GB')
+    spec = gce_virtual_machine.GceVmSpec(cpus=1, memory='1.0GiB')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mb': 1024})
+    self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mib': 1024})
 
   def testCustomVmPreemptible(self):
-    spec = gce_virtual_machine.GceVmSpec(cpus=1, memory='1.0GB',
+    spec = gce_virtual_machine.GceVmSpec(cpus=1, memory='1.0GiB',
                                          preemptible=True)
     vm = gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mb': 1024,
+    self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mib': 1024,
                                                'preemptible': True})
 
 

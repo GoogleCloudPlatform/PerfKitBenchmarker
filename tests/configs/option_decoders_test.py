@@ -54,6 +54,12 @@ class ConfigOptionDecoderTestCase(unittest.TestCase):
     self.assertFalse(decoder.required)
     self.assertEqual(decoder.default, 5)
 
+  def testIncompleteDerivedClass(self):
+    class IncompleteDerivedClass(option_decoders.ConfigOptionDecoder):
+      pass
+    with self.assertRaises(TypeError):
+      IncompleteDerivedClass(_COMPONENT, _OPTION)
+
 
 class BooleanDecoderTestCase(unittest.TestCase):
 

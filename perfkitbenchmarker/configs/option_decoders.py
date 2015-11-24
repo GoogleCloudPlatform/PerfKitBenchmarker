@@ -27,6 +27,8 @@ class ConfigOptionDecoder(object):
     required: boolean. True if the config option is required. False if not.
   """
 
+  __metaclass__ = abc.ABCMeta
+
   def __init__(self, component, option, **kwargs):
     """Initializes a ConfigOptionDecoder.
 
@@ -81,13 +83,7 @@ class ConfigOptionDecoder(object):
 
 
 class BooleanDecoder(ConfigOptionDecoder):
-  """Verifies and decodes a config option value when a boolean is expected.
-
-  Attributes:
-    component: string. Description of the component to which the option applies.
-    option: string. Name of the config option.
-    required: boolean. True if the config option is required. False if not.
-  """
+  """Verifies and decodes a config option value when a boolean is expected."""
 
   def Decode(self, value):
     """Verifies that the provided value is a boolean.
@@ -113,9 +109,6 @@ class IntDecoder(ConfigOptionDecoder):
   """Verifies and decodes a config option value when an integer is expected.
 
   Attributes:
-    component: string. Description of the component to which the option applies.
-    option: string. Name of the config option.
-    required: boolean. True if the config option is required. False if not.
     max: None or int. If provided, it specifies the maximum accepted value.
     min: None or int. If provided, it specifies the minimum accepted value.
   """
@@ -154,13 +147,7 @@ class IntDecoder(ConfigOptionDecoder):
 
 
 class StringDecoder(ConfigOptionDecoder):
-  """Verifies and decodes a config option value when a string is expected.
-
-  Attributes:
-    component: string. Description of the component to which the option applies.
-    option: string. Name of the config option.
-    required: boolean. True if the config option is required. False if not.
-  """
+  """Verifies and decodes a config option value when a string is expected."""
 
   def Decode(self, value):
     """Verifies that the provided value is a string.
