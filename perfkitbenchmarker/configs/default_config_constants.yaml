@@ -26,6 +26,10 @@ default_single_core: &default_single_core
     machine_type: m1.small
     zone: nova
     image: null
+  Acloud:
+    machine_type: m1.small
+    zone: nova
+    image: null
   CloudStack:
     machine_type: 1vCPU.1GB
     zone: QC-1
@@ -62,6 +66,10 @@ default_500_gb: &default_500_gb
     disk_size: 500
     mount_point: /scratch
   OpenStack:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  Acloud:
     disk_type: standard
     disk_size: 500
     mount_point: /scratch
