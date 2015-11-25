@@ -1,0 +1,19 @@
+# ./pkb.py --cloud=Acloud --benchmarks=ping --benchmark_config_file=acloud.yaml
+ping: 
+  vm_groups:
+    default:
+      vm_count: 2
+      cloud: Acloud
+      vm_spec:
+        Acloud:
+          machine_type: m1.small
+          image: ubuntu-pkb
+          zone: nova
+  flags:
+    machine_type: m1.small
+    acloud_auth_url: http://200.200.178.40:5000/v2.0
+    acloud_username: admin
+    acloud_tenant: admin
+    acloud_password: '1'
+    acloud_public_network: external_network
+    acloud_private_network: internal_network

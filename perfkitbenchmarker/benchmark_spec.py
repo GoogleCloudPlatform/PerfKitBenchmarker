@@ -66,6 +66,7 @@ ALICLOUD = 'AliCloud'
 KUBERNETES = 'Kubernetes'
 DIGITALOCEAN = 'DigitalOcean'
 OPENSTACK = 'OpenStack'
+ACLOUD = 'Acloud'
 CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 DEBIAN = 'debian'
@@ -75,7 +76,7 @@ UBUNTU_CONTAINER = 'ubuntu_container'
 
 FLAGS = flags.FLAGS
 VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD]
+                RACKSPACE, CLOUDSTACK, ALICLOUD, ACLOUD]
 flags.DEFINE_enum('cloud', GCP,
                   VALID_CLOUDS,
                   'Name of the cloud to use.')

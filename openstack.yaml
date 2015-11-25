@@ -1,0 +1,18 @@
+ping: 
+  vm_groups:
+    default:
+      vm_count: 2
+      cloud: OpenStack
+      vm_spec:
+        OpenStack:
+          machine_type: m1.medium
+          image: CentOS7
+          zone: nova
+      disk_spec:
+        OpenStack:
+          disk_type: local
+          num_striped_disks: 1
+  flags:
+    machine_type: m1.tiny
+    openstack_public_network: external_network
+    openstack_private_network: internal_network
