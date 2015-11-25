@@ -409,7 +409,7 @@ def SetUpPKB():
           'Could not find required executable "%s"', executable)
 
   if FLAGS.run_uri is None:
-    if FLAGS.run_stage not in [STAGE_ALL, STAGE_PREPARE]:
+    if FLAGS.run_stage not in [STAGE_ALL, STAGE_PROVISION]:
       # Attempt to get the last modified run directory.
       run_uri = vm_util.GetLastRunUri()
       if run_uri:
