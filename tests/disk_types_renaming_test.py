@@ -30,6 +30,7 @@ class GcpDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'GCP',
                 'vm_spec': {
                     'GCP': {
+                        'machine_type': 'test_machine_type',
                     }
                 },
                 'disk_spec': {
@@ -55,6 +56,7 @@ class GcpDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'GCP',
                 'vm_spec': {
                     'GCP': {
+                        'machine_type': 'test_machine_type',
                     }
                 },
                 'disk_spec': {
@@ -82,7 +84,7 @@ class AwsDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'AWS',
                 'vm_spec': {
                     'AWS': {
-                        'zone': 'us-east1-a'
+                        'zone': 'us-east-1a'
                     }
                 },
                 'disk_spec': {
@@ -108,7 +110,7 @@ class AwsDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'AWS',
                 'vm_spec': {
                     'AWS': {
-                        'zone': 'us-east1-a'
+                        'zone': 'us-east-1a'
                     }
                 },
                 'disk_spec': {
@@ -134,7 +136,7 @@ class AwsDiskTypeRenamingTest(unittest.TestCase):
                 'cloud': 'AWS',
                 'vm_spec': {
                     'AWS': {
-                        'zone': 'us-east1-a'
+                        'zone': 'us-east-1a'
                     }
                 },
                 'disk_spec': {

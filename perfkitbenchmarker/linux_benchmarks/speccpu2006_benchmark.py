@@ -205,7 +205,8 @@ def ExtractScore(stdout, vm, keep_partial_results):
       # remove the final SPEC(int|fp) score, which has only 2 columns.
       result_section.pop()
 
-  metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus}
+  metadata = {'num_cpus': vm.num_cpus}
+  metadata.update(vm.GetMachineTypeDict())
 
   missing_results = []
 

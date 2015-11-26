@@ -235,7 +235,8 @@ def Run(benchmark_spec):
     if fanout > 1 and fanout < FLAGS.oldisim_num_leaves:
       fanout_list.add(fanout)
 
-  metadata = {'machine_type': vm.machine_type, 'num_cpus': vm.num_cpus}
+  metadata = {'num_cpus': vm.num_cpus}
+  metadata.update(vm.GetMachineTypeDict())
   for fanout in sorted(fanout_list):
     qps = RunLoadTest(benchmark_spec, fanout)[2]
     qps_dict[fanout] = qps

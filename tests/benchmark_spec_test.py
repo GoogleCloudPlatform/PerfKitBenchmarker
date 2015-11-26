@@ -18,6 +18,7 @@ import unittest
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
@@ -129,5 +130,5 @@ class ConstructVmsTestCase(unittest.TestCase):
   def testBadParameter(self):
     config = configs.LoadConfig(BAD_VM_PARAMETER_CONFIG, {}, NAME)
     spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
-    with self.assertRaises(ValueError):
+    with self.assertRaises(errors.Config.UnrecognizedOption):
       spec.ConstructVirtualMachines()

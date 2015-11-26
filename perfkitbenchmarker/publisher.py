@@ -139,8 +139,10 @@ class DefaultMetadataProvider(MetadataProvider):
       name_prefix = '' if name == 'default' else name + '_'
       metadata[name_prefix + 'cloud'] = vm.CLOUD
       metadata[name_prefix + 'zone'] = vm.zone
-      metadata[name_prefix + 'machine_type'] = vm.machine_type
       metadata[name_prefix + 'image'] = vm.image
+      for k, v in vm.GetMachineTypeDict().iteritems():
+        metadata[name_prefix + k] = v
+      metadata[name_prefix + 'vm_count'] = len(vms)
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]

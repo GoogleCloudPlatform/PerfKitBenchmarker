@@ -29,32 +29,37 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 GCP = 'GCP'
+NETWORK_RANGE = '10.0.0.0/16'
+ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 
 class GceFirewallRule(resource.BaseResource):
   """An object representing a GCE Firewall Rule."""
 
-  def __init__(self, name, project, port, network):
+  def __init__(self, name, project, allow, network, source_range=None):
     super(GceFirewallRule, self).__init__()
     self.name = name
     self.project = project
-    self.port = port
+    self.allow = allow
     self.network_name = network.network_resource.name
+    self.source_range = source_range
 
   def __eq__(self, other):
     """Defines equality to make comparison easy."""
     return (self.name == other.name and
-            self.port == other.port and
+            self.allow == other.allow and
             self.project == other.project and
-            self.network_name == other.network_name)
+            self.network_name == other.network_name and
+            self.source_range == other.source_range)
 
   def _Create(self):
     """Creates the Firewall Rule."""
     cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'create',
                              self.name)
-    cmd.flags['allow'] = ','.join('{0}:{1}'.format(protocol, self.port)
-                                  for protocol in ('tcp', 'udp'))
+    cmd.flags['allow'] = self.allow
     cmd.flags['network'] = self.network_name
+    if self.source_range:
+      cmd.flags['source-ranges'] = self.source_range
     cmd.Issue()
 
   def _Delete(self):
@@ -85,12 +90,13 @@ class GceFirewall(network.BaseFirewall):
     self._lock = threading.Lock()
     self.firewall_rules = {}
 
-  def AllowPort(self, vm, port):
+  def AllowPort(self, vm, port, source_range=None):
     """Opens a port on the firewall.
 
     Args:
       vm: The BaseVirtualMachine object to open the port for.
       port: The local port to open.
+      source_range: The source ip range to allow for this port.
     """
     if vm.is_static:
       return
@@ -100,8 +106,10 @@ class GceFirewall(network.BaseFirewall):
       key = (vm.project, port)
       if key in self.firewall_rules:
         return
+      allow = ','.join('{0}:{1}'.format(protocol, port)
+                       for protocol in ('tcp', 'udp'))
       firewall_rule = GceFirewallRule(
-          firewall_name, vm.project, port, vm.network)
+          firewall_name, vm.project, allow, vm.network, source_range)
       self.firewall_rules[key] = firewall_rule
       firewall_rule.Create()
 
@@ -135,7 +143,7 @@ class GceNetworkResource(resource.BaseResource):
   def _Create(self):
     """Creates the Network resource."""
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'create', self.name)
-    cmd.flags['range'] = '10.0.0.0/16'
+    cmd.flags['range'] = NETWORK_RANGE
     cmd.Issue()
 
   def _Delete(self):
@@ -160,6 +168,9 @@ class GceNetwork(network.BaseNetwork):
     self.project = network_spec.project
     name = 'pkb-network-%s' % FLAGS.run_uri
     self.network_resource = GceNetworkResource(name, self.project)
+    firewall_name = 'default-internal-%s' % FLAGS.run_uri
+    self.default_firewall_rule = GceFirewallRule(
+        firewall_name, self.project, ALLOW_ALL, self, NETWORK_RANGE)
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
@@ -174,7 +185,9 @@ class GceNetwork(network.BaseNetwork):
   def Create(self):
     """Creates the actual network."""
     self.network_resource.Create()
+    self.default_firewall_rule.Create()
 
   def Delete(self):
     """Deletes the actual network."""
+    self.default_firewall_rule.Delete()
     self.network_resource.Delete()
