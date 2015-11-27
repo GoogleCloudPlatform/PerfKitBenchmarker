@@ -232,6 +232,7 @@ def _SetupClient(benchmark_spec):
                        '%s/benchmarks' % (OLIO_HOME, FABAN_HOME))
   set_java = ('export JAVA_HOME=%s && %s/master/bin/startup.sh')
   client.RemoteCommand(set_java % (JAVA_HOME, FABAN_HOME))
+  client.Install('curl')
   client.RemoteCommand('curl http://%s:9980/' % CLIENT_IP)
   client.RemoteCommand('cd %s '
                        '&& wget parsa.epfl.ch/cloudsuite/software/perfkit/'

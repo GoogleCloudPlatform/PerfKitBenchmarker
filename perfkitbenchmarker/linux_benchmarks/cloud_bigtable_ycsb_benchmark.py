@@ -186,6 +186,7 @@ def _Install(vm):
   """Install YCSB and HBase on 'vm'."""
   vm.Install('hbase')
   vm.Install('ycsb')
+  vm.Install('curl')
 
   hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
   for url in [FLAGS.google_bigtable_hbase_jar_url]:
