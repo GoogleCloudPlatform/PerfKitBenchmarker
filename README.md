@@ -129,6 +129,7 @@ This section describes the setup steps needed for each cloud system.
 * [Google Cloud](#install-gcloud-and-setup-authentication)
 * [OpenStack](#install-openstack-nova-client-and-setup-authentication)
 * [Kubernetes](#kubernetes-configuration-and-credentials)
+* [Mesos](#mesos-configuration)
 * [Cloudstack](#cloudstack-install-csapi-and-set-the-api-keys)
 * [AWS](#install-aws-cli-and-setup-authentication)
 * [Azure](#windows-azure-cli-and-credentials)
@@ -200,7 +201,7 @@ Perfkit uses `kubectl` binary in order to communicate with Kubernetes cluster - 
 Authentication to Kubernetes cluster is done via `kubeconfig` file (https://github.com/kubernetes/kubernetes/blob/release-1.0/docs/user-guide/kubeconfig-file.md). Its path is passed using `--kubeconfig` flag.
 
 **Image prerequisites**  
-Docker instances by default don't allow to SSH into them. Thus it is important to configure your Docker image so that it has SSH server installed. You can use your own image or build a new one based on a Dockerfile placed in tools/docker_images directory - in this case please refer to https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tools/docker_images document.
+Please refer to the [Image prerequisites for Docker based clouds](#image-prerequisites-for-docker-based-clouds).
 
 **Kubernetes cluster configuration**  
 If your Kubernetes cluster is running on CoreOS:
@@ -278,6 +279,20 @@ You have two Ceph authentication options available (http://kubernetes.io/v1.0/ex
    ```
    You will have to pass the Secret name (using `--ceph_secret` flag) when running the benchmakrs. In this case it should be: `--ceph_secret=my-ceph-secret`.
 
+### Mesos configuration
+Mesos provider communicates with Marathon framework in order to manage Docker instances. Thus it is required to setup Marathon framework along with the Mesos cluster. In order to connect to Mesos you need to provide IP address and port to Marathon framework using `--marathon_address` flag.
+
+Currently only local disks are supported so you need to execute Perfkit with `--scratch_disk_type=LOCAL` flag.
+
+**Overlay network**  
+Mesos on its own doesn't provide any solution for overlay networking. You need to configure your cluster so that the instances will live in the same network. For this purpose you may use Flannel, Calico, Weave, etc.
+
+**Mesos cluster configuration**  
+Make sure your Mesos-slave nodes are reachable (by hostname) from the machine which is used to run the benchmarks. In case they are not, edit the `/etc/hosts` file appropriately.
+
+**Image prerequisites**  
+Please refer to the [Image prerequisites for Docker based clouds](#image-prerequisites-for-docker-based-clouds).
+
 ### Cloudstack: Install `csapi` and set the API keys
 ```
 sudo pip install csapi
@@ -344,7 +359,7 @@ $ azure vm list
 ### Install AliCloud CLI and setup authentication
 Make sure you have installed pip (see the section above).
 
-Run the following command to install aliyuncli(omit the ‘sudo’ on Windows)
+Run the following command to install aliyuncli(omit the sudo on Windows)
 
 1. Install python development tools:
    
@@ -471,6 +486,11 @@ export OS_TENANT_NAME=<your_rackspace_uk_account_number>
 **Note:** Not all flavors are supported on every region. Always check first
 if the flavor is supported in the region.
 
+
+## Image prerequisites for Docker based clouds
+Docker instances by default don't allow to SSH into them. Thus it is important to configure your Docker image so that it has SSH server installed. You can use your own image or build a new one based on a Dockerfile placed in tools/docker_images directory - in this case please refer to [Docker images document](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tools/docker_images).
+
+
 ## Create and Configure a `.boto` file for object storage benchmarks
 
 In order to run object storage benchmark tests, you need to have a properly configured `~/.boto` file.  The directions require that you have installed `google-cloud-sdk`.  The directions for doing that are in the [gcloud installation section](#install-gcloud-and-setup-authentication).
@@ -539,6 +559,11 @@ $ ./pkb.py --cloud=OpenStack --benchmarks=iperf --os_auth_url=http://localhost:5
 ## Example run on Kubernetes
 ```
 $ ./pkb.py --cloud=Kubernetes --benchmarks=iperf --kubectl=/path/to/kubectl --kubeconfig=/path/to/kubeconfig --image=image-with-ssh-server  --ceph_monitors=10.20.30.40:6789,10.20.30.41:6789 --kubernetes_nodes=10.20.30.42,10.20.30.43
+```
+
+## Example run on Mesos
+```
+$ ./pkb.py --cloud=Mesos --benchmarks=iperf --marathon_address=localhost:8080 --image=image-with-ssh-server
 ```
 
 ## Example run on CloudStack
