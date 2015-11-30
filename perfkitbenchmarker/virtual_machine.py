@@ -119,23 +119,20 @@ class BaseVmSpec(object):
       self._InitDecoders()
     # TODO(skschneider): Remove ApplyFlags from the benchmark spec. Call it
     # here to modify kwargs prior to these decoder verifications.
-    provided_options = frozenset(k for k, v in kwargs.iteritems()
-                                 if v is not None)
-    missing_options = self._required_options.difference(provided_options)
+    missing_options = self._required_options.difference(kwargs)
     if missing_options:
       raise errors.Config.MissingOption(
           'Required options were missing from a {0} config: {1}.'.format(
               self._GetComponentDescription(),
               ', '.join(sorted(missing_options))))
-    unrecognized_options = frozenset(provided_options).difference(
-        self._decoders)
+    unrecognized_options = frozenset(kwargs).difference(self._decoders)
     if unrecognized_options:
       raise errors.Config.UnrecognizedOption(
           'Unrecognized options were found in a {0} config: {1}.'.format(
               self._GetComponentDescription(),
               ', '.join(sorted(unrecognized_options))))
     for option, decoder in self._decoders.iteritems():
-      if option in provided_options:
+      if option in kwargs:
         value = decoder.Decode(kwargs[option])
       else:
         value = decoder.default
@@ -163,10 +160,13 @@ class BaseVmSpec(object):
           arguments to construct in order to decode the named option.
     """
     return {
-        'image': (option_decoders.StringDecoder, {'default': None}),
+        'image': (option_decoders.StringDecoder, {'none_ok': True,
+                                                  'default': None}),
         'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
-        'machine_type': (option_decoders.StringDecoder, {'default': None}),
-        'zone': (option_decoders.StringDecoder, {'default': None})}
+        'machine_type': (option_decoders.StringDecoder, {'none_ok': True,
+                                                         'default': None}),
+        'zone': (option_decoders.StringDecoder, {'none_ok': True,
+                                                 'default': None})}
 
   @classmethod
   def _InitDecoders(cls):
