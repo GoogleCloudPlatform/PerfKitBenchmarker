@@ -40,15 +40,20 @@ BENCHMARK_CONFIG = """
 mongodb_ycsb:
   description: Run YCSB against a single MongoDB node.
   vm_groups:
-    default:
+    workers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
-      vm_count: 2
+      vm_count: null
+    clients:
+      vm_spec: *default_single_core
 """
 
 
 def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  return config
 
 
 def _GetDataDir(vm):
@@ -85,12 +90,12 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  mongo_vm, ycsb_vm = vms[:2]
+  server_partials = [functools.partial(_PrepareServer, mongo_vm)
+                     for mongo_vm in benchmark_spec.vm_groups['workers']]
+  client_partials = [functools.partial(_PrepareClient, client)
+                     for client in benchmark_spec.vm_groups['clients']]
 
-  vm_util.RunThreaded((lambda f: f()),
-                      [functools.partial(_PrepareServer, mongo_vm),
-                       functools.partial(_PrepareClient, ycsb_vm)])
+  vm_util.RunThreaded((lambda f: f()), server_partials + client_partials)
 
 
 def Run(benchmark_spec):
@@ -103,15 +108,14 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  vms = benchmark_spec.vms
-  vm = vms[1]
 
   executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
+  server = benchmark_spec.vm_groups['workers'][0]
   kwargs = {
-      'mongodb.url': 'mongodb://%s:27017/' % vms[0].internal_ip,
+      'mongodb.url': 'mongodb://%s:27017/' % server.internal_ip,
       'mongodb.writeConcern': FLAGS.mongodb_writeconcern}
-  samples = list(executor.LoadAndRun([vm], load_kwargs=kwargs,
-                                     run_kwargs=kwargs))
+  samples = list(executor.LoadAndRun(benchmark_spec.vm_groups['clients'],
+                                     load_kwargs=kwargs, run_kwargs=kwargs))
   return samples
 
 
@@ -122,8 +126,9 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  mongo_vm = vms[0]
-  mongo_vm.RemoteCommand('sudo service %s stop' %
-                         mongo_vm.GetServiceName('mongodb_server'))
-  mongo_vm.RemoteCommand('rm -rf %s' % _GetDataDir(mongo_vm))
+  def CleanupServer(server):
+    server.RemoteCommand('sudo service %s stop' %
+                         server.GetServiceName('mongodb_server'))
+    server.RemoteCommand('rm -rf %s' % _GetDataDir(server))
+
+  vm_util.RunThreaded(CleanupServer, benchmark_spec.vm_groups['workers'][0])

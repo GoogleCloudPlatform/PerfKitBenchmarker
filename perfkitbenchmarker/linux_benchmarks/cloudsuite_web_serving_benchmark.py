@@ -15,8 +15,10 @@
 """Runs Cloudsuite2.0 Web Serving benchmark
    More info: http://parsa.epfl.ch/cloudsuite/web.html
 """
+import logging
 import posixpath
 import re
+import time
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -41,9 +43,6 @@ OLIO_BUILD = '%s/apache-olio-php-src-0.2/workload/php/trunk/' % BASE_DIR
 # File names
 MY_CNF = '/etc/my.cnf'
 NGINX_CONF = '%s/nginx.conf' % BASE_DIR
-CL = 0
-BK = 1
-FR = 2
 
 flags.DEFINE_integer('cloudsuite_web_serving_load_scale', 100,
                      'The maximum number of concurrent users '
@@ -55,16 +54,20 @@ BENCHMARK_CONFIG = """
 cloudsuite_web_serving:
   description: Runs Cloudsuite Web Serving benchmark
   vm_groups:
-    default:
+    backend:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
-      vm_count: 3
+    frontend:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
+    client:
+      vm_spec: *default_single_core
 """
 
 
 def _SetupFrontend(benchmark_spec):
-  frontend = benchmark_spec.vms[FR]
-  backend = benchmark_spec.vms[BK]
+  frontend = benchmark_spec.vm_groups['frontend'][0]
+  backend = benchmark_spec.vm_groups['backend'][0]
   frontend.Install('nginx')
   frontend.RemoteCommand('perl -pi -e "s/%s/%s/g" %s'
                          % ('APP_DIR', re.escape(APP_DIR), NGINX_CONF))
@@ -129,11 +132,10 @@ def _SetupFrontend(benchmark_spec):
 
 
 def _SetupBackend(benchmark_spec):
-  vms = benchmark_spec.vms
-  backend = vms[BK]
-  frontend = vms[FR]
-  CLIENT_IP = vms[CL].ip_address
-  FRONTEND_IP = frontend.ip_address
+  frontend = benchmark_spec.vm_groups['frontend'][0]
+  backend = benchmark_spec.vm_groups['backend'][0]
+  client_ip = benchmark_spec.vm_groups['client'][0].ip_address
+  frontend_ip = frontend.ip_address
   backend.Install('libaio')
   untar_command = ('cd %s && tar xzf %s')
   backend.RemoteCommand(untar_command %
@@ -143,6 +145,10 @@ def _SetupBackend(benchmark_spec):
   db_install_command = ('cd %s && scripts/mysql_install_db')
   backend.RemoteCommand(db_install_command % (MYSQL_HOME))
   backend.RobustRemoteCommand('cd %s && ./bin/mysqld_safe &' % MYSQL_HOME)
+
+  # Wait for mysql to start
+  logging.info('Sleeping 30s for mysql to come up')
+  time.sleep(30)
   sql_cmd = 'create user \'olio\'@\'%\' identified by \'olio\';'
   backend.RemoteCommand('cd %s && '
                         './bin/mysql -uroot -e "%s"' % (MYSQL_HOME, sql_cmd))
@@ -151,7 +157,7 @@ def _SetupBackend(benchmark_spec):
                         'identified by \'olio\' with grant option; '
                         'grant all privileges on *.* to '
                         '\'olio\'@\'%s\' identified by \'olio\' with grant '
-                        'option;"' % (MYSQL_HOME, FRONTEND_IP))
+                        'option;"' % (MYSQL_HOME, frontend_ip))
   backend.RemoteCommand('cd %s && ./bin/mysql -uroot -e "create database olio;'
                         'use olio; \. %s/benchmarks/OlioDriver/bin/schema.sql"'
                         % (MYSQL_HOME, FABAN_HOME))
@@ -173,7 +179,7 @@ def _SetupBackend(benchmark_spec):
   backend.RemoteCommand(build_tomcat % (JAVA_HOME, CATALINA_HOME))
   backend.RemoteCommand('mkdir %s' % GEOCODER_HOME)
   backend.RemoteCommand('scp -r -o StrictHostKeyChecking=no %s:%s/geocoder %s' %
-                        (CLIENT_IP, OLIO_HOME, GEOCODER_HOME))
+                        (client_ip, OLIO_HOME, GEOCODER_HOME))
   backend.RemoteCommand('cd %s/geocoder && cp build.properties.template '
                         'build.properties' % GEOCODER_HOME)
   editor_command = ('perl -pi -e '
@@ -190,10 +196,9 @@ def _SetupBackend(benchmark_spec):
 
 
 def _SetupClient(benchmark_spec):
-  vms = benchmark_spec.vms
-  client = vms[CL]
-  frontend = vms[FR]
-  backend = vms[BK]
+  frontend = benchmark_spec.vm_groups['frontend'][0]
+  backend = benchmark_spec.vm_groups['backend'][0]
+  client = benchmark_spec.vm_groups['client'][0]
   fw = client.firewall
   fw.AllowPort(client, 9980)
   CLIENT_IP = client.ip_address
@@ -300,16 +305,6 @@ def _PrepareVms(vm):
                    'tar xzf web.tar.gz' % vm_util.VM_TMP_DIR)
 
 
-def _SetupVM(benchmark_spec, thread_id):
-  """Passes the vm to either the backend or frontend setup functions.
-     Used to run frontend and backend threaded.
-  """
-  if thread_id == BK:
-    _SetupBackend(benchmark_spec)
-  if thread_id == FR:
-    _SetupFrontend(benchmark_spec)
-
-
 def Prepare(benchmark_spec):
   """Install Java, apache ant, authenticate vms
      Set up the client machine, backend machine, and frontend
@@ -318,11 +313,11 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
+  frontend = benchmark_spec.vm_groups['frontend'][0]
+  backend = benchmark_spec.vm_groups['backend'][0]
+  client = benchmark_spec.vm_groups['client'][0]
   vms = benchmark_spec.vms
   vm_util.RunThreaded(PreparePrivateKey, vms)
-  client = vms[CL]
-  backend = vms[BK]
-  frontend = vms[FR]
   vm_util.RunThreaded(_PrepareVms, vms)
   frontend.RemoteCommand('cd %s && '
                          'wget parsa.epfl.ch/cloudsuite/software/perfkit/'
@@ -333,8 +328,8 @@ def Prepare(benchmark_spec):
                          (client.ip_address, FABAN_HOME, BASE_DIR))
   backend.RemoteCommand('scp -r -o StrictHostKeyChecking=no %s:%s %s' %
                         (client.ip_address, FABAN_HOME, BASE_DIR))
-  args = [((benchmark_spec, BK), {}), ((benchmark_spec, FR), {})]
-  vm_util.RunThreaded(_SetupVM, args)
+  setup_functions = [_SetupBackend, _SetupFrontend]
+  vm_util.RunThreaded(lambda f: f(benchmark_spec), setup_functions)
 
 
 def ParseOutput(client):
@@ -351,7 +346,7 @@ def ParseOutput(client):
 
 
 def Run(benchmark_spec):
-  client = benchmark_spec.vms[CL]
+  client = benchmark_spec.vm_groups['client'][0]
   set_faban_home = ('export FABAN_HOME=%s && cd %s && ./run.sh')
   client.RobustRemoteCommand(set_faban_home % (FABAN_HOME, FABAN_HOME))
   results = []
@@ -372,15 +367,16 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data
         that is required to run the benchmark.
   """
-  vms = benchmark_spec.vms
+  backend = benchmark_spec.vm_groups['backend'][0]
+  client = benchmark_spec.vm_groups['client'][0]
   set_java = ('export JAVA_HOME=%s && %s/master/bin/shutdown.sh')
-  vms[CL].RemoteCommand(set_java % (JAVA_HOME, FABAN_HOME))
-  vms[BK].RemoteCommand('cd %s && sudo ./bin/mysqladmin shutdown' % MYSQL_HOME)
-  cleanupFrontend(benchmark_spec)
+  client.RemoteCommand(set_java % (JAVA_HOME, FABAN_HOME))
+  backend.RemoteCommand('cd %s && sudo ./bin/mysqladmin shutdown' % MYSQL_HOME)
+  _CleanupFrontend(benchmark_spec)
 
 
-def cleanupFrontend(benchmark_spec):
-  frontend = benchmark_spec.vms[FR]
+def _CleanupFrontend(benchmark_spec):
+  frontend = benchmark_spec.vm_groups['frontend'][0]
   frontend.RemoteCommand('sudo killall -9 php-fpm')
   nginx.Stop(frontend)
   filestore = posixpath.join(frontend.GetScratchDir(), 'filestore')
