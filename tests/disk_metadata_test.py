@@ -60,8 +60,7 @@ class AwsDiskMetadataTest(unittest.TestCase):
         {}, 'name', 'uid'))
 
     vm_spec = virtual_machine.BaseVmSpec(
-        zone='us-east-1a',
-        machine_type=machine_type)
+        'test_vm_spec.AWS', zone='us-east-1a', machine_type=machine_type)
     vm = aws_virtual_machine.DebianBasedAwsVirtualMachine(
         vm_spec)
 
@@ -103,8 +102,7 @@ class AzureDiskMetadataTest(unittest.TestCase):
           {}, 'name', 'uid'))
 
       vm_spec = virtual_machine.BaseVmSpec(
-          zone='East US 2',
-          machine_type=machine_type)
+          'test_vm_spec.AZURE', zone='East US 2', machine_type=machine_type)
       vm = azure_virtual_machine.DebianBasedAzureVirtualMachine(
           vm_spec)
 

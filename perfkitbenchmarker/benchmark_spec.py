@@ -163,6 +163,7 @@ class BenchmarkSpec(object):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
     vm_group_specs = self.config[VM_GROUPS]
 
+    zone_index = 0
     for group_name, group_spec in vm_group_specs.iteritems():
       vms = []
       vm_count = group_spec.get(VM_COUNT, DEFAULT_COUNT)
@@ -174,8 +175,11 @@ class BenchmarkSpec(object):
         # First create the Static VMs.
         if STATIC_VMS in group_spec:
           static_vm_specs = group_spec[STATIC_VMS][:vm_count]
-          for spec_kwargs in static_vm_specs:
-            vm_spec = static_vm.StaticVmSpec(**spec_kwargs)
+          for static_vm_spec_index, spec_kwargs in enumerate(static_vm_specs):
+            vm_spec = static_vm.StaticVmSpec(
+                '{0}.{1}.{2}.{3}[{4}]'.format(self.name, VM_GROUPS, group_name,
+                                              STATIC_VMS, static_vm_spec_index),
+                **spec_kwargs)
             static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
             vms.append(static_vm_class(vm_spec))
 
@@ -186,7 +190,9 @@ class BenchmarkSpec(object):
         # Then create a VmSpec and possibly a DiskSpec which we can
         # use to create the remaining VMs.
         vm_spec_class = virtual_machine.GetVmSpecClass(cloud)
-        vm_spec = vm_spec_class(**group_spec[VM_SPEC][cloud])
+        vm_spec = vm_spec_class(
+            '.'.join((self.name, VM_GROUPS, group_name, VM_SPEC, cloud)),
+            FLAGS, **group_spec[VM_SPEC][cloud])
 
         if DISK_SPEC in group_spec:
           disk_spec_class = disk.GetDiskSpecClass(cloud)
@@ -211,7 +217,11 @@ class BenchmarkSpec(object):
 
       # Create the remaining VMs using the specs we created earlier.
       for _ in xrange(vm_count - len(vms)):
-        vm_spec.ApplyFlags(FLAGS)
+        # Assign a zone to each VM sequentially from the --zones flag.
+        if FLAGS.zones:
+          vm_spec.zone = FLAGS.zones[zone_index]
+          zone_index = (zone_index + 1 if zone_index < len(FLAGS.zones) - 1
+                        else 0)
         vm = self._CreateVirtualMachine(vm_spec, os_type, cloud)
         if disk_spec:
           vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]

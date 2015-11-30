@@ -31,6 +31,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.configs import spec
 
 FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
@@ -49,7 +50,7 @@ def GetVmClass(cloud, os_type):
   return _VM_REGISTRY.get((cloud, os_type))
 
 
-class AutoRegisterVmSpecMeta(type):
+class AutoRegisterVmSpecMeta(spec.BaseSpecMetaClass):
   """Metaclass which allows VmSpecs to automatically be registered."""
 
   def __init__(cls, name, bases, dct):
@@ -57,9 +58,6 @@ class AutoRegisterVmSpecMeta(type):
     if cls.CLOUD in _VM_SPEC_REGISTRY:
       raise Exception('BaseVmSpec subclasses must have a CLOUD attribute.')
     _VM_SPEC_REGISTRY[cls.CLOUD] = cls
-    cls._init_decoders_lock = threading.Lock()
-    cls._decoders = {}
-    cls._required_options = set()
 
 
 class AutoRegisterVmMeta(abc.ABCMeta):
@@ -78,7 +76,7 @@ class AutoRegisterVmMeta(abc.ABCMeta):
     super(AutoRegisterVmMeta, cls).__init__(name, bases, dct)
 
 
-class BaseVmSpec(object):
+class BaseVmSpec(spec.BaseSpec):
   """Storing various data about a single vm.
 
   Attributes:
@@ -92,108 +90,52 @@ class BaseVmSpec(object):
   __metaclass__ = AutoRegisterVmSpecMeta
   CLOUD = None
 
-  # Each subclass has its own copy of the following three variables. They are
-  # initialized by AutoRegisterVmSpecMeta.__init__ and later populated by
-  # _InitDecoders when the first instance of the subclass is created.
-  _init_decoders_lock = None  # threading.Lock that protects the next two vars.
-  _decoders = None  # dict mapping config option name to ConfigOptionDecoder.
-  _required_options = None  # set of strings. Required config options.
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Overrides config values with flag values.
 
-  def __init__(self, **kwargs):
-    """Initializes a BaseVmSpec.
-
-    Translates keyword arguments via the class's decoders and assigns the
-    corresponding instance attribute. Derived classes can register decoders
-    for additional attributes by overriding _GetOptionDecoderConstructions.
+    Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      **kwargs: Dict mapping config option names to provided values.
-
-    Raises:
-      errors.Config.MissingOption: If a config option is required, but a value
-          was not provided in kwargs.
-      errors.Config.UnrecognizedOption: If an unrecognized config option is
-          provided with a value in kwargs.
-    """
-    if not self._decoders:
-      self._InitDecoders()
-    # TODO(skschneider): Remove ApplyFlags from the benchmark spec. Call it
-    # here to modify kwargs prior to these decoder verifications.
-    missing_options = self._required_options.difference(kwargs)
-    if missing_options:
-      raise errors.Config.MissingOption(
-          'Required options were missing from a {0} config: {1}.'.format(
-              self._GetComponentDescription(),
-              ', '.join(sorted(missing_options))))
-    unrecognized_options = frozenset(kwargs).difference(self._decoders)
-    if unrecognized_options:
-      raise errors.Config.UnrecognizedOption(
-          'Unrecognized options were found in a {0} config: {1}.'.format(
-              self._GetComponentDescription(),
-              ', '.join(sorted(unrecognized_options))))
-    for option, decoder in self._decoders.iteritems():
-      if option in kwargs:
-        value = decoder.Decode(kwargs[option])
-      else:
-        value = decoder.default
-      setattr(self, option, value)
-
-  @classmethod
-  def _GetComponentDescription(cls):
-    """Describes the type of component that this spec configures.
+      config_values: dict mapping config option names to provided values. Is
+          modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
 
     Returns:
-      string. Description of the type of component that this spec configures.
+      dict mapping config option names to values derived from the config
+      values or flag values.
     """
-    return 'VM' if cls.CLOUD is None else cls.CLOUD + ' VM'
+    super(BaseVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['image'].present:
+      config_values['image'] = flag_values.image
+    if flag_values['install_packages'].present:
+      config_values['install_packages'] = flag_values.install_packages
+    if flag_values['machine_type'].present:
+      config_values['machine_type'] = flag_values.machine_type
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     """Gets decoder classes and constructor args for each configurable option.
 
-    Can be overridden to add options or impose additional requirements on
-    existing options.
+    Can be overridden by derived classes to add options or impose additional
+    requirements on existing options.
 
     Returns:
       dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    return {
+    result = super(BaseVmSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
         'image': (option_decoders.StringDecoder, {'none_ok': True,
                                                   'default': None}),
         'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
         'machine_type': (option_decoders.StringDecoder, {'none_ok': True,
                                                          'default': None}),
         'zone': (option_decoders.StringDecoder, {'none_ok': True,
-                                                 'default': None})}
-
-  @classmethod
-  def _InitDecoders(cls):
-    """Creates a ConfigOptionDecoder for each config option.
-
-    Populates cls._decoders and cls._required_options.
-    """
-    with cls._init_decoders_lock:
-      if not cls._decoders:
-        component = cls._GetComponentDescription()
-        decoder_constructions = cls._GetOptionDecoderConstructions()
-        for option, decoder_construction in decoder_constructions.iteritems():
-          decoder_class, init_args = decoder_construction
-          decoder = decoder_class(component, option, **init_args)
-          cls._decoders[option] = decoder
-          if decoder.required:
-            cls._required_options.add(option)
-
-  def ApplyFlags(self, flags):
-    """Applies flags to the VmSpec."""
-    if flags.zones:
-      self.zone = flags.zones.pop(0)
-      flags.zones.append(self.zone)
-    self.machine_type = flags.machine_type or self.machine_type
-    self.image = flags.image or self.image
-    if flags.install_packages is not None:
-      self.install_packages = flags.install_packages
+                                                 'default': None})})
+    return result
 
 
 class BaseVirtualMachine(resource.BaseResource):

@@ -132,7 +132,7 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(azure_disk.__name__ + '.AzureDisk'))
 
   def _CreateVm(self):
-    vm_spec = virtual_machine.BaseVmSpec()
+    vm_spec = virtual_machine.BaseVmSpec('test_vm_spec.Azure')
     return azure_virtual_machine.DebianBasedAzureVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
@@ -145,7 +145,8 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(gce_disk.__name__ + '.GceDisk'))
 
   def _CreateVm(self):
-    vm_spec = gce_virtual_machine.GceVmSpec(machine_type='test_machine_type')
+    vm_spec = gce_virtual_machine.GceVmSpec('test_vm_spec.GCP',
+                                            machine_type='test_machine_type')
     return gce_virtual_machine.DebianBasedGceVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
@@ -159,7 +160,7 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(aws_util.__name__ + '.AddDefaultTags'))
 
   def _CreateVm(self):
-    vm_spec = virtual_machine.BaseVmSpec(zone='us-east-1a')
+    vm_spec = virtual_machine.BaseVmSpec('test_vm_spec.AWS', zone='us-east-1a')
     return aws_virtual_machine.DebianBasedAwsVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
