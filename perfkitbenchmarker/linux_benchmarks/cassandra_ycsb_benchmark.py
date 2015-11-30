@@ -62,7 +62,8 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   num_vms = max(FLAGS.num_vms, 3)
   config['vm_groups']['workers']['vm_count'] = num_vms
-  config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   return config
 
 

@@ -90,7 +90,8 @@ def GetConfig(user_config):
   num_vms = max(FLAGS.num_vms, 2)
   if FLAGS['num_vms'].present and FLAGS.num_vms < 2:
     raise ValueError('hbase_ycsb requires at least 2 HBase VMs.')
-  config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   if FLAGS['num_vms'].present:
     config['vm_groups']['workers']['vm_count'] = num_vms - 1
   return config

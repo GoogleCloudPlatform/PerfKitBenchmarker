@@ -45,7 +45,8 @@ REDIS_PID_FILE = posixpath.join(redis_server.REDIS_DIR, 'redis.pid')
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   return config
 
 

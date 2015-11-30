@@ -57,7 +57,8 @@ def GetConfig(user_config):
       FLAGS.data_disk_type != disk.LOCAL):
     config['vm_groups']['workers']['disk_count'] = 1
 
-  config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
 
   return config
 
