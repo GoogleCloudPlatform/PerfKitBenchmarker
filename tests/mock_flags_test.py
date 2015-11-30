@@ -31,13 +31,13 @@ class MockFlagsTestCase(unittest.TestCase):
     self.flags = mock_flags.MockFlags()
 
   def testGetUnsetFlag(self):
-    self.assertIs(self.flags['test_flag'].present, False)
+    self.assertFalse(self.flags['test_flag'].present)
 
   def testSetAndGetFlag(self):
     self.flags.test_flag = 5
-    self.assertIs(self.flags.test_flag, 5)
-    self.assertIs(self.flags['test_flag'].present, True)
-    self.assertIs(self.flags['test_flag'].value, 5)
+    self.assertEqual(self.flags.test_flag, 5)
+    self.assertTrue(self.flags['test_flag'].present)
+    self.assertEqual(self.flags['test_flag'].value, 5)
 
 
 class PatchFlagsTestCase(unittest.TestCase):
@@ -49,25 +49,25 @@ class PatchFlagsTestCase(unittest.TestCase):
   def testGetFlag(self):
     self.flags.test_flag = 5
     with mock_flags.PatchFlags(self.flags):
-      self.assertIs(FLAGS.test_flag, 5)
+      self.assertEqual(FLAGS.test_flag, 5)
       self.assertTrue(FLAGS['test_flag'].present)
-      self.assertIs(FLAGS['test_flag'].value, 5)
-    self.assertIs(FLAGS.test_flag, 0)
+      self.assertEqual(FLAGS['test_flag'].value, 5)
+    self.assertEqual(FLAGS.test_flag, 0)
     self.assertFalse(FLAGS['test_flag'].present)
-    self.assertIs(FLAGS['test_flag'].value, 0)
+    self.assertEqual(FLAGS['test_flag'].value, 0)
 
   def testSetFlag(self):
     with mock_flags.PatchFlags(self.flags):
       FLAGS.test_flag = 5
-      self.assertIs(FLAGS.test_flag, 5)
+      self.assertEqual(FLAGS.test_flag, 5)
       self.assertTrue(FLAGS['test_flag'].present)
-      self.assertIs(FLAGS['test_flag'].value, 5)
-    self.assertIs(self.flags.test_flag, 5)
+      self.assertEqual(FLAGS['test_flag'].value, 5)
+    self.assertEqual(self.flags.test_flag, 5)
     self.assertTrue(self.flags['test_flag'].present)
-    self.assertIs(self.flags['test_flag'].value, 5)
-    self.assertIs(FLAGS.test_flag, 0)
+    self.assertEqual(self.flags['test_flag'].value, 5)
+    self.assertEqual(FLAGS.test_flag, 0)
     self.assertFalse(FLAGS['test_flag'].present)
-    self.assertIs(FLAGS['test_flag'].value, 0)
+    self.assertEqual(FLAGS['test_flag'].value, 0)
 
 
 if __name__ == '__main__':
