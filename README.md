@@ -284,6 +284,8 @@ Mesos provider communicates with Marathon framework in order to manage Docker in
 
 Currently only local disks are supported so you need to execute Perfkit with `--scratch_disk_type=LOCAL` flag.
 
+Provider has been tested with Mesos v0.24.1 and Marathon v0.11.1.
+
 **Overlay network**  
 Mesos on its own doesn't provide any solution for overlay networking. You need to configure your cluster so that the instances will live in the same network. For this purpose you may use Flannel, Calico, Weave, etc.
 

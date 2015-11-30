@@ -87,7 +87,8 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     """
     logging.info("Attempting to create App: %s" % self.name)
     body = self._BuildAppBody()
-    output = requests.post(self.api_url, data=body)
+    headers = {'content-type': 'application/json'}
+    output = requests.post(self.api_url, data=body, headers=headers)
     if output.status_code != requests.codes.CREATED:
       raise Exception("Unable to create App: %s" % output.text)
     logging.info("App %s created successfully." % self.name)
@@ -152,6 +153,9 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     """
     logging.info('Attempting to delete App: %s' % self.name)
     output = requests.delete(self.app_url)
+    if output.status_code == requests.codes.NOT_FOUND:
+      logging.info('App %s has been already deleted.')
+      return
     if output.status_code != requests.codes.OK:
       raise Exception("Deleting App: %s failed. Reattempting." % self.name)
 
