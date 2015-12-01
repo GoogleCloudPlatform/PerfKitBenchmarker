@@ -76,12 +76,13 @@ flags.DEFINE_string(
     None,
     'GCS bucket to upload records to. Bucket must exist.')
 
-flags.DEFINE_list(
+flags.DEFINE_multistring(
     'metadata',
     [],
-    'A list of key-value pairs that will be added to the labels field of all '
-    'samples as metadata. Each key-value pair in the list should be colon '
-    'separated.')
+    'A colon separated key-value pair that will be added to the labels field '
+    'of all samples as metadata. Multiple key-value pairs may be specified '
+    'by separating each pair by commas. This option can be repeated multiple '
+    'times.')
 
 DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
@@ -167,8 +168,10 @@ class DefaultMetadataProvider(MetadataProvider):
           for key, value in data_disk.metadata.iteritems():
             metadata[name_prefix + 'data_disk_0_' + key] = value
 
-    # User specified metadata
-    for pair in FLAGS.metadata:
+    # Flatten all user metadata into a single list (since each string in the
+    # FLAGS.metadata can actually be several key-value pairs) and then iterate
+    # over it.
+    for pair in [kv for item in FLAGS.metadata for kv in item.split(',')]:
       try:
         key, value = pair.split(':')
         metadata[key] = value
