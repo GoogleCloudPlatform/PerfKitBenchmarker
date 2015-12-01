@@ -66,9 +66,9 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   if len(vms) != 2:
-        raise ValueError(
-            'iperf benchmark requires exactly two machines, found {0}'
-            .format(len(vms)))
+    raise ValueError(
+        'iperf benchmark requires exactly two machines, found {0}'.format(len(
+            vms)))
 
   for vm in vms:
     vm.Install('iperf')
@@ -162,7 +162,7 @@ def Run(benchmark_spec):
   logging.info('Iperf Results:')
 
   # Send traffic in both directions
-  for (sending_vm, receiving_vm) in vms, reversed(vms):
+  for sending_vm, receiving_vm in vms, reversed(vms):
     # Send using external IP addresses
     if vm_util.ShouldRunOnExternalIpAddress():
       results.append(_RunIperf(sending_vm,

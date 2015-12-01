@@ -34,11 +34,12 @@ class TestGenerateJobFileString(unittest.TestCase):
     for vm in vm_spec.vms:
       vm.RemoteCommand.side_effect = [(pingstdout, ' ')]
     ping_benchmark.Prepare(vm_spec)
-    ping_benchmark.Run(vm_spec)
+    samples = ping_benchmark.Run(vm_spec)
     ping_benchmark.Cleanup(vm_spec)
 
     self.assertEquals(vm_spec.vms[0].RemoteCommand.call_count, 1)
     self.assertEquals(vm_spec.vms[1].RemoteCommand.call_count, 1)
+    self.assertEquals(len(samples), 8)
 
 if __name__ == '__main__':
   unittest.main()

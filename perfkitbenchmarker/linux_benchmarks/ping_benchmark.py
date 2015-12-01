@@ -66,7 +66,7 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vms
   results = []
-  for (sending_vm, receiving_vm) in vms, reversed(vms):
+  for sending_vm, receiving_vm in vms, reversed(vms):
     results = results + _RunPing(sending_vm,
                                  receiving_vm,
                                  receiving_vm.internal_ip,
