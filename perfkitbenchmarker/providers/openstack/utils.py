@@ -106,6 +106,7 @@ class NovaClient(object):
         self.user = FLAGS.openstack_username
         self.tenant = FLAGS.openstack_tenant
         self.endpoint_type = FLAGS.openstack_nova_endpoint_type
+        self.http_log_debug = FLAGS.log_level == 'debug'
         self.password = self.GetPassword()
         self.__auth = KeystoneAuth(self.url, self.tenant,
                                    self.user, self.password)
@@ -115,6 +116,7 @@ class NovaClient(object):
                                         auth_token=self.__auth.get_token(),
                                         tenant_id=self.__auth.get_tenant_id(),
                                         endpoint_type=self.endpoint_type,
+                                        http_log_debug=self.http_log_debug,
                                         )
         # Set requests library logging level to WARNING
         # so it doesn't spam logs with unhelpful messages,

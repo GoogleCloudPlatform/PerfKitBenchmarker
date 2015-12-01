@@ -135,7 +135,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         try:
             self.client.servers.delete(self.id)
             time.sleep(5)
-        except os_utils.NotFound:
+        except Exception:
             logging.info('Instance already deleted')
 
         self.public_network.release(self.floating_ip)
@@ -147,7 +147,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                 return True
             else:
                 return False
-        except os_utils.NotFound:
+        except Exception:
             return False
 
     @vm_util.Retry(log_errors=False, poll_interval=1)
@@ -164,15 +164,13 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.hostname = resp[:-1]
 
     def CreateScratchDisk(self, disk_spec):
-        name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
-        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone)
-        self.scratch_disks.append(scratch_disk)
+        disks_names = ('%s-data-%d-%d'
+                       % (self.name, len(self.scratch_disks), i)
+                       for i in range(disk_spec.num_striped_disks))
+        disks = [os_disk.OpenStackDisk(disk_spec, name, self.zone)
+                 for name in disks_names]
 
-        scratch_disk.Create()
-        scratch_disk.Attach(self)
-
-        self.FormatDisk(scratch_disk.GetDevicePath())
-        self.MountDisk(scratch_disk.GetDevicePath(), disk_spec.mount_point)
+        self._CreateScratchDiskFromDisks(disk_spec, disks)
 
     def _CreateDependencies(self):
         self.ImportKeyfile()
@@ -195,7 +193,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     def DeleteKeyfile(self):
         try:
             self.client.keypairs.delete(self.pk)
-        except os_utils.NotFound:
+        except Exception:
             logging.info("Deleting key doesn't exists")
 
 
