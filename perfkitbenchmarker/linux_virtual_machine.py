@@ -248,13 +248,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry()
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
-    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0 -O '
+    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0,discard -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteHostCommand(fmt_cmd)
 
   def MountDisk(self, device_path, mount_path):
     """Mounts a formatted disk in the VM."""
-    mnt_cmd = ('sudo mkdir -p {1};sudo mount {0} {1};'
+    mnt_cmd = ('sudo mkdir -p {1};sudo mount -o discard {0} {1};'
                'sudo chown -R $USER:$USER {1};').format(device_path, mount_path)
     self.RemoteHostCommand(mnt_cmd)
 
