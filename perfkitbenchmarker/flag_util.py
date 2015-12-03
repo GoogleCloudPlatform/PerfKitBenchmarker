@@ -307,6 +307,71 @@ def DEFINE_units(name, default, help, convertible_to=None,
   flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)
 
 
+def StringToBytes(string):
+  """Convert an object size, represented as a string, to bytes.
+
+  Args:
+    string: the object size, as a string with a quantity and a unit.
+
+  Returns:
+    an integer. The number of bytes in the size.
+
+  Raises:
+    ValueError, if either the string does not represent an object size
+    or if the size does not contain an integer number of bytes.
+  """
+
+  try:
+    quantity = perfkitbenchmarker.UNIT_REGISTRY.parse_expression(string)
+  except Exception:
+    # Catching all exceptions is ugly, but we don't know what sort of
+    # exception pint might throw, and we want to turn any of them into
+    # ValueError.
+    raise ValueError("Couldn't parse size %s" % string)
+
+  try:
+    bytes = quantity.m_as(perfkitbenchmarker.UNIT_REGISTRY.bytes)
+  except pint.DimensionalityError:
+    raise ValueError("Quantity %s is not a size" % string)
+
+  if bytes != int(bytes):
+    raise ValueError("Size %s has a non-integer number (%s) of bytes!" %
+                     (string, bytes))
+
+  if bytes < 0:
+    raise ValueError("Size %s has a negative number of bytes!" % string)
+
+  return int(bytes)
+
+
+def StringToRawPercent(string):
+  """Convert a string to a raw percentage value.
+
+  Args:
+    string: the percentage, with '%' on the end.
+
+  Returns:
+    A floating-point number, holding the percentage value.
+
+  Raises:
+    ValueError, if the string can't be read as a percentage.
+  """
+
+  if len(string) <= 1:
+    raise ValueError("String '%s' too short to be percentage." % string)
+
+  if string[-1] != '%':
+    raise ValueError("Percentage '%s' must end with '%%'" % string)
+
+  # This will raise a ValueError if it can't convert the string to a float.
+  val = float(string[:-1])
+
+  if val < 0.0 or val > 100.0:
+    raise ValueError('Quantity %s is not a valid percentage' % val)
+
+  return val
+
+
 # The YAML flag type is necessary because flags can be read either via
 # the command line or from a config file. If they come from a config
 # file, they will already be parsed as YAML, but if they come from the
