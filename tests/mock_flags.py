@@ -32,7 +32,8 @@ class MockFlags(object):
   Flag-like object supports the 'present' and 'value' attributes.
 
   Attempting to get a Flag that does not exist will generate a new MagicMock
-  with the 'present' attribute initialized to False.
+  with the 'present' attribute initialized to False and the 'value' attribute
+  initialized to None.
   """
 
   def __init__(self):
@@ -50,6 +51,7 @@ class MockFlags(object):
     if key not in self._dict:
       mock_flag = mock.MagicMock()
       mock_flag.present = False
+      mock_flag.value = None
       self._dict[key] = mock_flag
     return self._dict[key]
 
