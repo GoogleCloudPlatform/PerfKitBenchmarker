@@ -51,10 +51,11 @@ class OpenStackDisk(disk.BaseDisk):
             volume = self.__nclient.volumes.get(self._disk.id)
             if volume:
                 is_unavailable = not (volume.status == "available")
-        self._disk = volume
+                self._disk = volume
 
     @retry_authorization(max_retries=4)
     def _Delete(self):
+        from novaclient.exceptions import NotFound
         sleep = 1
         sleep_count = 0
         try:
@@ -67,15 +68,17 @@ class OpenStackDisk(disk.BaseDisk):
                 sleep_count += 1
                 if sleep_count == 10:
                     sleep = 5
-        except Exception:
-            logging.info('Volume already deleted')
+        except NotFound:
+            logging.info('Volume %s not found, might have been already deleted'
+                         % self._disk.id)
 
     def _Exists(self):
+        from novaclient.exceptions import NotFound
         try:
             volume = self.__nclient.volumes.get(self._disk.id)
             return volume and volume.status in ('available', 'in-use',
                                                 'deleting',)
-        except Exception:
+        except NotFound:
             return False
 
     def Attach(self, vm):
