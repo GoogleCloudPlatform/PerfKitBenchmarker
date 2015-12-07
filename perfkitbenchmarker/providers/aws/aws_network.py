@@ -86,6 +86,12 @@ class AwsVpc(resource.BaseResource):
     self.region = region
     self.id = None
 
+    # Subnets are assigned per-AZ.
+    # _subnet_index tracks the next unused 10.0.x.0/24 block.
+    self._subnet_index = 0
+    # Lock protecting _subnet_index
+    self._subnet_index_lock = threading.Lock()
+
   def _Create(self):
     """Creates the VPC."""
     create_cmd = util.AWS_PREFIX + [
@@ -131,13 +137,33 @@ class AwsVpc(resource.BaseResource):
     util.IssueRetryableCommand(enable_hostnames_command)
 
   def _Delete(self):
-    """Delete's the VPC."""
+    """Deletes the VPC."""
     delete_cmd = util.AWS_PREFIX + [
         'ec2',
         'delete-vpc',
         '--region=%s' % self.region,
         '--vpc-id=%s' % self.id]
     vm_util.IssueCommand(delete_cmd)
+
+  def NextSubnetCidrBlock(self):
+    """Returns the next available /24 CIDR block in this VPC.
+
+    Each VPC has a 10.0.0.0/16 CIDR block.
+    Each subnet is assigned a /24 within this allocation.
+    Calls to this method return the next unused /24.
+
+    Returns:
+      A string representing the next available /24 block, in CIDR notation.
+    Raises:
+      ValueError: when no additional subnets can be created.
+    """
+    with self._subnet_index_lock:
+      if self._subnet_index >= (1 << 8) - 1:
+        raise ValueError('Exceeded subnet limit ({0}).'.format(
+            self._subnet_index))
+      cidr = '10.0.{0}.0/24'.format(self._subnet_index)
+      self._subnet_index += 1
+    return cidr
 
 
 class AwsSubnet(resource.BaseResource):
@@ -361,15 +387,103 @@ class AwsPlacementGroup(resource.BaseResource):
     return len(placement_groups) > 0
 
 
+class AwsRegionalNetwork(network.BaseNetwork):
+  """Object representing regional components of an AWS network.
+
+  This class maintains a singleton-per-region; acquire instances via
+  AwsRegionalNetwork.GetForRegion.
+
+  Attributes:
+    region: string. The AWS region.
+    vpc: an AwsVpc instance.
+    internet_gateway: an AwsInternetGateway instance.
+    route_table: an AwsRouteTable instance. The default route table.
+    placement_group: An AwsPlacementGroup instance.
+  """
+  # Map from region to AwsRegionalNetwork
+  _network_pool = {}
+  # Lock protecting _network_pool
+  _network_pool_lock = threading.Lock()
+
+  def __init__(self, region):
+    self.region = region
+    self.vpc = AwsVpc(self.region)
+    self.internet_gateway = AwsInternetGateway(region)
+    self.route_table = None
+    self.placement_group = AwsPlacementGroup(self.region)
+    self.created = False
+
+    # Locks to ensure that a single thread creates / deletes the instance.
+    self._create_lock = threading.Lock()
+
+    # Tracks the number of AwsNetworks using this AwsRegionalNetwork.
+    # Incremented by Create(); decremented by Delete();
+    # When a Delete() call decrements _reference_count to 0, the RegionalNetwork
+    # is destroyed.
+    self._reference_count = 0
+    self._reference_count_lock = threading.Lock()
+
+  @classmethod
+  def GetForRegion(cls, region):
+    """Gets the AwsRegionalNetwork for a given AWS region.
+
+    Args:
+      region: str. A Region name.
+    Returns:
+      The AwsRegionalNetwork for 'region'.
+    """
+    with cls._network_pool_lock:
+      return cls._network_pool.setdefault(region, cls(region))
+
+  def Create(self):
+    """Creates the network."""
+    with self._reference_count_lock:
+      assert self._reference_count >= 0, self._reference_count
+      self._reference_count += 1
+
+    # Access here must be synchronized. The first time the block is executed,
+    # the network will be created. Subsequent attempts to create the
+    # network block until the initial attempt completes, then return.
+    with self._create_lock:
+      if self.created:
+        return
+
+      self.vpc.Create()
+
+      self.internet_gateway.Create()
+      self.internet_gateway.Attach(self.vpc.id)
+
+      if self.route_table is None:
+        self.route_table = AwsRouteTable(self.region, self.vpc.id)
+      self.route_table.Create()
+      self.route_table.CreateRoute(self.internet_gateway.id)
+
+      self.placement_group.Create()
+
+      self.created = True
+
+  def Delete(self):
+    """Deletes the network."""
+    # Only actually delete if there are no more references.
+    with self._reference_count_lock:
+      assert self._reference_count >= 1, self._reference_count
+      self._reference_count -= 1
+      if self._reference_count:
+        return
+
+    self.placement_group.Delete()
+    self.internet_gateway.Detach()
+    self.internet_gateway.Delete()
+    self.vpc.Delete()
+
+
 class AwsNetwork(network.BaseNetwork):
   """Object representing an AWS Network.
 
   Attributes:
     region: The AWS region the Network is in.
-    vpc_id: The id of the Network's Virtual Private Cloud (VPC).
-    subnet_id: The id of the Subnet of the Network's VPC.
-    internet_gateway_id: The id of the Network's Internet Gateway.
-    route_table_id: The id of the Route Table of the Networks's VPC.
+    regional_network: The AwsRegionalNetwor for 'region'.
+    subnet: the AwsSubnet for this zone.
   """
 
   CLOUD = AWS
@@ -382,38 +496,21 @@ class AwsNetwork(network.BaseNetwork):
     """
     super(AwsNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
-    self.vpc = AwsVpc(self.region)
-    self.internet_gateway = AwsInternetGateway(self.region)
+    self.regional_network = AwsRegionalNetwork.GetForRegion(self.region)
     self.subnet = None
-    self.route_table = None
-    self.placement_group = AwsPlacementGroup(self.region)
 
   def Create(self):
     """Creates the network."""
-    self.vpc.Create()
-
-    self.internet_gateway.Create()
-    self.internet_gateway.Attach(self.vpc.id)
-
-    if self.route_table is None:
-      self.route_table = AwsRouteTable(self.region, self.vpc.id)
-    self.route_table.Create()
-    self.route_table.CreateRoute(self.internet_gateway.id)
+    self.regional_network.Create()
 
     if self.subnet is None:
-      self.subnet = AwsSubnet(self.zone, self.vpc.id)
-    self.subnet.Create()
-
-    self.placement_group.Create()
+      cidr = self.regional_network.vpc.NextSubnetCidrBlock()
+      self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
+                              cidr_block=cidr)
+      self.subnet.Create()
 
   def Delete(self):
     """Deletes the network."""
-    self.placement_group.Delete()
-
     if self.subnet:
       self.subnet.Delete()
-
-    self.internet_gateway.Detach()
-    self.internet_gateway.Delete()
-
-    self.vpc.Delete()
+    self.regional_network.Delete()
