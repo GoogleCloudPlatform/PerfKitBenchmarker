@@ -31,7 +31,9 @@ class MockFlagsTestCase(unittest.TestCase):
     self.flags = mock_flags.MockFlags()
 
   def testGetUnsetFlag(self):
-    self.assertFalse(self.flags['test_flag'].present)
+    flag = self.flags['test_flag']
+    self.assertFalse(flag.present)
+    self.assertIsNone(flag.value)
 
   def testSetAndGetFlag(self):
     self.flags.test_flag = 5
