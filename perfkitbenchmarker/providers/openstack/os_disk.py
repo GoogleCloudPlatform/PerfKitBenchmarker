@@ -56,6 +56,12 @@ class OpenStackDisk(disk.BaseDisk):
     @retry_authorization(max_retries=4)
     def _Delete(self):
         from novaclient.exceptions import NotFound
+
+        if self._disk is None:
+            logging.info('Volume %s was not created. Skipping deletion.'
+                         % self.name)
+            return
+
         sleep = 1
         sleep_count = 0
         try:
