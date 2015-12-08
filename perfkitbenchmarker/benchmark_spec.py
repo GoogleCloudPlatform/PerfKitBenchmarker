@@ -273,6 +273,10 @@ class BenchmarkSpec(object):
       self.vms.extend(vms)
 
   def Prepare(self):
+    targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
+    vm_util.RunParallelThreads(targets, len(targets))
+
+  def Provision(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
     vm_util.RunThreaded(lambda net: net.Create(), self.networks.values())
 
@@ -306,6 +310,14 @@ class BenchmarkSpec(object):
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
     self.deleted = True
+
+  def StartBackgroundWorkload(self):
+    targets = [(vm.StartBackgroundWorkload, (), {}) for vm in self.vms]
+    vm_util.RunParallelThreads(targets, len(targets))
+
+  def StopBackgroundWorkload(self):
+    targets = [(vm.StopBackgroundWorkload, (), {}) for vm in self.vms]
+    vm_util.RunParallelThreads(targets, len(targets))
 
   def _CreateVirtualMachine(self, vm_spec, os_type, cloud):
     """Create a vm in zone.

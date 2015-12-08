@@ -213,7 +213,7 @@ def DoProvisionPhase(name, spec, timer):
   spec.PickleSpec()
   try:
     with timer.Measure('Resource Provisioning'):
-      spec.Prepare()
+      spec.Provision()
   finally:
     # Also pickle the spec after the resources are created so that
     # we have a record of things like AWS ids. Otherwise we won't
@@ -232,6 +232,8 @@ def DoPreparePhase(benchmark, name, spec, timer):
       benchmark module's Prepare function.
   """
   logging.info('Preparing benchmark %s', name)
+  with timer.Measure('BenchmarkSpec Prepare'):
+    spec.Prepare()
   with timer.Measure('Benchmark Prepare'):
     benchmark.Prepare(spec)
 
@@ -249,11 +251,13 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
   """
   logging.info('Running benchmark %s', name)
   events.before_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+  spec.StartBackgroundWorkload()
   try:
     with timer.Measure('Benchmark Run'):
       samples = benchmark.Run(spec)
   finally:
     events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+    spec.StopBackgroundWorkload()
   collector.AddSamples(samples, name, spec)
 
 

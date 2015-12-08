@@ -85,6 +85,8 @@ class BaseVmSpec(spec.BaseSpec):
     image: The disk image to boot from.
     install_packages: If false, no packages will be installed. This is
         useful if benchmark dependencies have already been installed.
+    background_cpu_threads: The number of threads of background CPU usage
+        while running the benchmark.
   """
 
   __metaclass__ = AutoRegisterVmSpecMeta
@@ -113,6 +115,9 @@ class BaseVmSpec(spec.BaseSpec):
       config_values['install_packages'] = flag_values.install_packages
     if flag_values['machine_type'].present:
       config_values['machine_type'] = flag_values.machine_type
+    if flag_values['background_cpu_threads'].present:
+      config_values['background_cpu_threads'] = (
+          flag_values.background_cpu_threads)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -134,7 +139,9 @@ class BaseVmSpec(spec.BaseSpec):
         'machine_type': (option_decoders.StringDecoder, {'none_ok': True,
                                                          'default': None}),
         'zone': (option_decoders.StringDecoder, {'none_ok': True,
-                                                 'default': None})})
+                                                 'default': None}),
+        'background_cpu_threads': (option_decoders.IntDecoder, {
+            'none_ok': True, 'default': None})})
     return result
 
 
@@ -162,6 +169,8 @@ class BaseVirtualMachine(resource.BaseResource):
     scratch_disks: list of BaseDisk objects. Scratch disks attached to the VM.
     max_local_disks: The number of local disks on the VM that can be used as
       scratch disks or that can be striped together.
+    background_cpu_threads: The number of threads of background CPU usage
+      while running the benchmark.
   """
 
   __metaclass__ = AutoRegisterVmMeta
@@ -197,6 +206,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.max_local_disks = 0
     self.local_disk_counter = 0
     self.remote_disk_counter = 0
+    self.background_cpu_threads = vm_spec.background_cpu_threads
 
     self.network = None
     self.firewall = None

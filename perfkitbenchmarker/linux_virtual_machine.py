@@ -524,7 +524,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Burns vm cpu for some amount of time and dirty cache.
 
     Args:
-      vm: The target vm.
       burn_cpu_threads: Number of threads to burn cpu.
       burn_cpu_seconds: Amount of time in seconds to burn cpu.
     """
@@ -538,6 +537,23 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           'run 1> /dev/null 2> /dev/null &' % burn_cpu_threads)
       if time.time() < end_time:
         time.sleep(end_time - time.time())
+      self.RemoteCommand('pkill -9 sysbench')
+
+  def PrepareBackgroundWorkload(self):
+    """Install packages needed for the background workload """
+    if self.background_cpu_threads:
+      self.Install('sysbench')
+
+  def StartBackgroundWorkload(self):
+    """Starts the blackground workload."""
+    if self.background_cpu_threads:
+      self.RemoteCommand(
+          'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
+          'run 1> /dev/null 2> /dev/null &' % self.background_cpu_threads)
+
+  def StopBackgroundWorkload(self):
+    """Stops the background workload."""
+    if self.background_cpu_threads:
       self.RemoteCommand('pkill -9 sysbench')
 
 
