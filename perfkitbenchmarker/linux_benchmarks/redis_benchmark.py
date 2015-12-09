@@ -24,6 +24,7 @@ memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 import logging
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -94,7 +95,7 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(PrepareLoadgen, args)
 
 
-def RunLoad(redis_vm, load_vm, threads, port, test_id, results):
+def RunLoad(redis_vm, load_vm, threads, port, test_id):
   """Spawn a memteir_benchmark on the load_vm against the redis_vm:port.
 
   Args:
@@ -102,13 +103,11 @@ def RunLoad(redis_vm, load_vm, threads, port, test_id, results):
     load_vm: The vm that will run the memtier_benchmark.
     threads: The number of threads to run in this memtier_benchmark process.
     port: the port to target on the redis_vm.
-    test_id: a number unique run this iteration load_vm
-    results: a dictonary within which the results of the run will be stored.
-        The format of the results will be id : a tuple containing
-        throughput acheived and average latency.
+  Returns:
+    A throughput, latency tuple, or None if threads was 0.
   """
   if threads == 0:
-    return
+    return None
   base_cmd = ('memtier_benchmark -s %s  -p %d  -d 128 '
               '--ratio %s --key-pattern S:S -x 1 -c 1 -t %d '
               '--test-time=%d --random-data > %s ;')
@@ -133,7 +132,7 @@ def RunLoad(redis_vm, load_vm, threads, port, test_id, results):
   output, _ = load_vm.RemoteCommand('cat outfile-%d' % test_id)
   logging.info(output)
 
-  results[test_id] = (throughput, latency)
+  return throughput, latency
 
 
 def Run(benchmark_spec):
@@ -157,22 +156,26 @@ def Run(benchmark_spec):
   max_throughput_for_completion_latency_under_1ms = 0.0
 
   while latency < latency_threshold:
-    iteration_results = {}
     threads += max(1, int(threads * .15))
     num_loaders = len(load_vms) * num_servers
     args = [((redis_vm, load_vms[i % len(load_vms)], threads / num_loaders +
               (0 if (i + 1) > threads % num_loaders else 1),
-              FIRST_PORT + i % num_servers, i, iteration_results),
+              FIRST_PORT + i % num_servers, i),
              {}) for i in range(num_loaders)]
-    logging.error('BEFORE: %s', args)
-    vm_util.RunThreaded(RunLoad, args)
-    throughput = 0.0
-    latency = 0.0
-    logging.error('%s', iteration_results)
-    for result in iteration_results.values():
-      throughput += result[0]
-    for result in iteration_results.values():
-      latency += result[1] * result[0] / throughput
+    client_results = [i for i in vm_util.RunThreaded(RunLoad, args)
+                      if i is not None]
+    logging.info('Redis results by client: %s', client_results)
+    throughput = sum(
+        client_throughput for client_throughput, _ in client_results)
+
+    if not throughput:
+      raise errors.Benchmarks.RunError(
+          'Zero throughput for {} threads: {}'.format(threads, client_results))
+
+    # Average latency across clients
+    latency = (sum(client_latency * client_throughput
+                   for client_latency, client_throughput in client_results) /
+               throughput)
 
     if latency < 1.0:
         max_throughput_for_completion_latency_under_1ms = max(
