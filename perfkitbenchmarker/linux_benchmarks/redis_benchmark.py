@@ -21,6 +21,7 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
+import collections
 import logging
 
 from perfkitbenchmarker import configs
@@ -95,6 +96,10 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(PrepareLoadgen, args)
 
 
+RedisResult = collections.namedtuple('RedisResult',
+                                     ['throughput', 'average_latency'])
+
+
 def RunLoad(redis_vm, load_vm, threads, port, test_id):
   """Spawn a memteir_benchmark on the load_vm against the redis_vm:port.
 
@@ -132,7 +137,7 @@ def RunLoad(redis_vm, load_vm, threads, port, test_id):
   output, _ = load_vm.RemoteCommand('cat outfile-%d' % test_id)
   logging.info(output)
 
-  return throughput, latency
+  return RedisResult(throughput, latency)
 
 
 def Run(benchmark_spec):
@@ -165,8 +170,7 @@ def Run(benchmark_spec):
     client_results = [i for i in vm_util.RunThreaded(RunLoad, args)
                       if i is not None]
     logging.info('Redis results by client: %s', client_results)
-    throughput = sum(
-        client_throughput for client_throughput, _ in client_results)
+    throughput = sum(r.throughput for r in client_results)
 
     if not throughput:
       raise errors.Benchmarks.RunError(
