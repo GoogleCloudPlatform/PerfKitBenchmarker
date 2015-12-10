@@ -146,6 +146,47 @@ class IntDecoder(ConfigOptionDecoder):
     return value
 
 
+class FloatDecoder(ConfigOptionDecoder):
+  """Verifies and decodes a config option value when a float is expected.
+
+  Attributes:
+    max: None or float. If provided, it specifies the maximum accepted value.
+    min: None or float. If provided, it specifies the minimum accepted value.
+  """
+
+  def __init__(self, component, option, max=None, min=None, **kwargs):
+    super(FloatDecoder, self).__init__(component, option, **kwargs)
+    self.max = max
+    self.min = min
+
+  def Decode(self, value):
+    """Verifies that the provided value is a float.
+
+    Args:
+      value: The value specified in the config.
+
+    Returns:
+      float. The valid value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    if not isinstance(value, float):
+      raise errors.Config.InvalidValue(
+          'Invalid {0} "{1}" value: "{2}" (of type "{3}"). Value must be a '
+          'float.'.format(self.component, self.option, value,
+                          value.__class__.__name__))
+    elif self.max and value > self.max:
+      raise errors.Config.InvalidValue(
+          'Invalid {0} "{1}" value: "{2}". Value must be at most {3}.'.format(
+              self.component, self.option, value, self.max))
+    elif self.min and value < self.min:
+      raise errors.Config.InvalidValue(
+          'Invalid {0} "{1}" value: "{2}". Value must be at least {3}.'.format(
+              self.component, self.option, value, self.min))
+    return value
+
+
 class StringDecoder(ConfigOptionDecoder):
   """Verifies and decodes a config option value when a string is expected."""
 

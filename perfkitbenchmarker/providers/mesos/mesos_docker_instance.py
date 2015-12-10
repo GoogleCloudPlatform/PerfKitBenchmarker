@@ -21,12 +21,43 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.mesos.mesos_disk import LocalDisk
 
 FLAGS = flags.FLAGS
 
 MARATHON_API_PREFIX = '/v2/apps/'
 USERNAME = 'root'
+
+
+class MesosDockerSpec(virtual_machine.BaseVmSpec):
+  """Object containing the information needed to create a MesosDockerInstance.
+
+  Attributes:
+    docker_cpus: None or float. Number of CPUs for Docker instances.
+    docker_memory_mb: None or int. Memory limit (in MB) for Docker instances.
+  """
+
+  CLOUD = 'Mesos'
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    result = super(MesosDockerSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'docker_cpus': (option_decoders.FloatDecoder, {'default': 1}),
+        'docker_memory_mb': (option_decoders.IntDecoder, {'default': 2048}),
+        'mesos_privileged_docker': (option_decoders.BooleanDecoder,
+                                    {'default': False})})
+    return result
+
+  def ApplyFlags(self, flags):
+    super(MesosDockerSpec, self).ApplyFlags(flags)
+    if flags['docker_cpus'].present:
+      self.docker_cpus = flags.docker_cpus
+    if flags['docker_memory_mb'].present:
+      self.docker_memory_mb = flags.docker_memory_mb
+    if flags['mesos_privileged_docker'].present:
+      self.mesos_privileged_docker = flags.mesos_privileged_docker
 
 
 class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
@@ -39,6 +70,9 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
   def __init__(self, vm_spec):
     super(MesosDockerInstance, self).__init__(vm_spec)
     self.user_name = USERNAME
+    self.cpus = vm_spec.docker_cpus
+    self.memory_mb = vm_spec.docker_memory_mb
+    self.privileged = vm_spec.mesos_privileged_docker
     self.api_url = urlparse.urljoin(FLAGS.marathon_address, MARATHON_API_PREFIX)
     self.app_url = urlparse.urljoin(self.api_url, self.name)
 
@@ -76,8 +110,8 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
       if disk_spec.disk_type == disk.LOCAL:
         scratch_disk = LocalDisk(disk_num, disk_spec, self.name)
       else:
-        # TODO: support for Ceph
-        pass
+        raise Exception('Currently only local disks are supported. Please '
+                        're-run the benchmark with "--scratch_disk_type=local"')
       scratch_disk._Create()
       self.scratch_disks.append(scratch_disk)
 
@@ -170,8 +204,8 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
           "/usr/sbin/sshd -D" % key_file
     body = {
         'id': self.name,
-        'mem': FLAGS.docker_memory_mb,
-        'cpus': FLAGS.docker_cpus,
+        'mem': self.memory_mb,
+        'cpus': self.cpus,
         'cmd': cmd,
         'container': {
             'type': 'DOCKER',
@@ -185,8 +219,8 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
                         'protocol': 'tcp'
                     }
                 ],
-                'privileged': FLAGS.mesos_docker_in_privileged_mode,
-                'parameters': []
+                'privileged': self.privileged,
+                'parameters': [{'key': 'hostname', 'value': self.name}]
             }
         }
     }

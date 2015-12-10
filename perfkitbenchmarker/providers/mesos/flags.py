@@ -14,9 +14,8 @@
 
 from perfkitbenchmarker import flags
 
-# TODO: determine how to define flags like 'docker_in_privileged_mode'
-# which are common for more than 1 provider (K8S and Mesos in this case).
-flags.DEFINE_boolean('mesos_docker_in_privileged_mode', True,
+
+flags.DEFINE_boolean('mesos_privileged_docker', True,
                      'If set to True, will attempt to create Docker containers '
                      'in a privileged mode. Note that some benchmarks execute '
                      'commands which are only allowed in privileged mode.')
