@@ -1,3 +1,8 @@
+# 1.0.1
+
+* Fix for benchmark_compatibility_checking flag. (thanks @mateusz-blaszkowski;
+  GH-707)
+
 # 1.0.0
 
 New features:
