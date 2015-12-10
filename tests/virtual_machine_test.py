@@ -52,9 +52,10 @@ class BaseVmSpecTestCase(unittest.TestCase):
 
   def testUnrecognizedOptions(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      virtual_machine.BaseVmSpec(color='red', flavor='cherry')
+      virtual_machine.BaseVmSpec(color='red', flavor='cherry', texture=None)
     self.assertEqual(str(cm.exception), (
-        'Unrecognized options were found in a VM config: color, flavor.'))
+        'Unrecognized options were found in a VM config: color, flavor, '
+        'texture.'))
 
   def testMissingOptions(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:

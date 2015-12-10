@@ -14,6 +14,7 @@
 """Classes for verifying and decoding config option values."""
 
 import abc
+import types
 
 from perfkitbenchmarker import errors
 
@@ -82,30 +83,58 @@ class ConfigOptionDecoder(object):
     raise NotImplementedError()
 
 
-class BooleanDecoder(ConfigOptionDecoder):
-  """Verifies and decodes a config option value when a boolean is expected."""
+class TypeVerifier(ConfigOptionDecoder):
+  """Verifies that a config option value's type belongs to an allowed set.
+
+  Passes value through unmodified.
+  """
+
+  def __init__(self, component, option, valid_types, none_ok=False, **kwargs):
+    """Initializes a TypeVerifier.
+
+    Args:
+      component: string. Description of the component to which the option
+          applies.
+      option: string. Name of the config option.
+      valid_types: tuple of allowed types.
+      none_ok: boolean. If True, None is also an allowed option value.
+      **kwargs: Keyword arguments to pass to the base class.
+    """
+    super(TypeVerifier, self).__init__(component, option, **kwargs)
+    if none_ok:
+      self._valid_types = (types.NoneType,) + valid_types
+    else:
+      self._valid_types = valid_types
 
   def Decode(self, value):
-    """Verifies that the provided value is a boolean.
+    """Verifies that the provided value is of an allowed type.
 
     Args:
       value: The value specified in the config.
 
     Returns:
-      boolean. The valid value.
+      The valid value.
 
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    if not isinstance(value, bool):
+    if not isinstance(value, self._valid_types):
       raise errors.Config.InvalidValue(
-          'Invalid {0} "{1}" value: "{2}" (of type "{3}"). Value must be a '
-          'boolean.'.format(self.component, self.option, value,
-                            value.__class__.__name__))
+          'Invalid {0} "{1}" value: "{2}" (of type "{3}"). Value must be one '
+          'of the following types: {4}.'.format(
+              self.component, self.option, value, value.__class__.__name__,
+              ', '.join(t.__name__ for t in self._valid_types)))
     return value
 
 
-class IntDecoder(ConfigOptionDecoder):
+class BooleanDecoder(TypeVerifier):
+  """Verifies and decodes a config option value when a boolean is expected."""
+
+  def __init__(self, component, option, **kwargs):
+    super(BooleanDecoder, self).__init__(component, option, (bool,), **kwargs)
+
+
+class IntDecoder(TypeVerifier):
   """Verifies and decodes a config option value when an integer is expected.
 
   Attributes:
@@ -114,7 +143,7 @@ class IntDecoder(ConfigOptionDecoder):
   """
 
   def __init__(self, component, option, max=None, min=None, **kwargs):
-    super(IntDecoder, self).__init__(component, option, **kwargs)
+    super(IntDecoder, self).__init__(component, option, (int,), **kwargs)
     self.max = max
     self.min = min
 
@@ -130,23 +159,20 @@ class IntDecoder(ConfigOptionDecoder):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    if not isinstance(value, int):
-      raise errors.Config.InvalidValue(
-          'Invalid {0} "{1}" value: "{2}" (of type "{3}"). Value must be an '
-          'integer.'.format(self.component, self.option, value,
-                            value.__class__.__name__))
-    elif self.max and value > self.max:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} "{1}" value: "{2}". Value must be at most {3}.'.format(
-              self.component, self.option, value, self.max))
-    elif self.min and value < self.min:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} "{1}" value: "{2}". Value must be at least {3}.'.format(
-              self.component, self.option, value, self.min))
+    value = super(IntDecoder, self).Decode(value)
+    if value is not None:
+      if self.max and value > self.max:
+        raise errors.Config.InvalidValue(
+            'Invalid {0} "{1}" value: "{2}". Value must be at most '
+            '{3}.'.format(self.component, self.option, value, self.max))
+      if self.min and value < self.min:
+        raise errors.Config.InvalidValue(
+            'Invalid {0} "{1}" value: "{2}". Value must be at least '
+            '{3}.'.format(self.component, self.option, value, self.min))
     return value
 
 
-class FloatDecoder(ConfigOptionDecoder):
+class FloatDecoder(TypeVerifier):
   """Verifies and decodes a config option value when a float is expected.
 
   Attributes:
@@ -155,56 +181,38 @@ class FloatDecoder(ConfigOptionDecoder):
   """
 
   def __init__(self, component, option, max=None, min=None, **kwargs):
-    super(FloatDecoder, self).__init__(component, option, **kwargs)
+    super(FloatDecoder, self).__init__(component, option, (float,), **kwargs)
     self.max = max
     self.min = min
 
   def Decode(self, value):
-    """Verifies that the provided value is a float.
+    """Verifies that the provided value is an int.
 
     Args:
       value: The value specified in the config.
 
     Returns:
-      float. The valid value.
+      int. The valid value.
 
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    if not isinstance(value, float):
-      raise errors.Config.InvalidValue(
-          'Invalid {0} "{1}" value: "{2}" (of type "{3}"). Value must be a '
-          'float.'.format(self.component, self.option, value,
-                          value.__class__.__name__))
-    elif self.max and value > self.max:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} "{1}" value: "{2}". Value must be at most {3}.'.format(
-              self.component, self.option, value, self.max))
-    elif self.min and value < self.min:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} "{1}" value: "{2}". Value must be at least {3}.'.format(
-              self.component, self.option, value, self.min))
+    value = super(FloatDecoder, self).Decode(value)
+    if value is not None:
+      if self.max and value > self.max:
+        raise errors.Config.InvalidValue(
+            'Invalid {0} "{1}" value: "{2}". Value must be at most '
+            '{3}.'.format(self.component, self.option, value, self.max))
+      if self.min and value < self.min:
+        raise errors.Config.InvalidValue(
+            'Invalid {0} "{1}" value: "{2}". Value must be at least '
+            '{3}.'.format(self.component, self.option, value, self.min))
     return value
 
 
-class StringDecoder(ConfigOptionDecoder):
+class StringDecoder(TypeVerifier):
   """Verifies and decodes a config option value when a string is expected."""
 
-  def Decode(self, value):
-    """Verifies that the provided value is a string.
-
-    Args:
-      value: The value specified in the config.
-
-    Returns:
-      string. The valid value.
-
-    Raises:
-      errors.Config.InvalidValue upon invalid input value.
-    """
-    if not isinstance(value, basestring):
-      raise errors.Config.InvalidValue(
-          'Invalid {0} "{1}" value: "{2}" (of type "{3}"). Value must be a '
-          'string.'.format(self.component, self.option, value,
-                           value.__class__.__name__))
-    return value
+  def __init__(self, component, option, **kwargs):
+    super(StringDecoder, self).__init__(component, option, (basestring,),
+                                        **kwargs)

@@ -41,10 +41,11 @@ cassandra_ycsb:
       Cassandra cluster size with --num_vms. Specify the number
       of YCSB VMs with --ycsb_client_vms.
   vm_groups:
-    default:
+    workers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
-      vm_count: null
+    clients:
+      vm_spec: *default_single_core
 """
 
 # TODO: Add flags.
@@ -60,7 +61,9 @@ CREATE_TABLE_SCRIPT = 'cassandra/create-ycsb-table.cql.j2'
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   num_vms = max(FLAGS.num_vms, 3)
-  config['vm_groups']['default']['vm_count'] = num_vms + FLAGS.ycsb_client_vms
+  config['vm_groups']['workers']['vm_count'] = num_vms
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   return config
 
 
@@ -101,14 +104,15 @@ def _CreateYCSBTable(vm, keyspace=KEYSPACE_NAME, column_family=COLUMN_FAMILY,
   vm.RemoteCommand(command, should_log=True)
 
 
-def _GetVMsByRole(vms):
+def _GetVMsByRole(benchmark_spec):
   """Gets a dictionary mapping role to a list of VMs."""
-  cassandra_vms = vms[:-FLAGS.ycsb_client_vms]
-  return {'vms': vms,
+  cassandra_vms = benchmark_spec.vm_groups['workers']
+  clients = benchmark_spec.vm_groups['clients']
+  return {'vms': benchmark_spec.vms,
           'cassandra_vms': cassandra_vms,
           'seed_vm': cassandra_vms[0],
           'non_seed_cassandra_vms': cassandra_vms[1:],
-          'loaders': vms[-FLAGS.ycsb_client_vms:]}
+          'clients': clients}
 
 
 def Prepare(benchmark_spec):
@@ -119,9 +123,9 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  by_role = _GetVMsByRole(benchmark_spec.vms)
+  by_role = _GetVMsByRole(benchmark_spec)
 
-  loaders = by_role['loaders']
+  loaders = by_role['clients']
   assert loaders, vms
 
   # Cassandra cluster
@@ -153,11 +157,9 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample instances.
   """
-  vms = benchmark_spec.vms
-  loaders = _GetVMsByRole(vms)['loaders']
-  cassandra_vms = _GetVMsByRole(vms)['cassandra_vms']
+  loaders = _GetVMsByRole(benchmark_spec)['clients']
+  cassandra_vms = _GetVMsByRole(benchmark_spec)['cassandra_vms']
   logging.debug('Loaders: %s', loaders)
-  vms = benchmark_spec.vms
 
   executor = ycsb.YCSBExecutor(
       'cassandra-10',
@@ -190,6 +192,6 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  cassandra_vms = _GetVMsByRole(benchmark_spec.vms)['cassandra_vms']
+  cassandra_vms = _GetVMsByRole(benchmark_spec)['cassandra_vms']
   vm_util.RunThreaded(cassandra.Stop, cassandra_vms)
   vm_util.RunThreaded(cassandra.CleanNode, cassandra_vms)

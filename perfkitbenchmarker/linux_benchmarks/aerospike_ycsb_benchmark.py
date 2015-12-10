@@ -21,7 +21,6 @@ YCSB and workloads described in perfkitbenchmarker.linux_packages.ycsb.
 """
 
 import functools
-import logging
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
@@ -41,7 +40,9 @@ aerospike_ycsb:
     installation. Specify the number of YCSB VMs with
     --ycsb_client_vms.
   vm_groups:
-    default:
+    clients:
+      vm_spec: *default_single_core
+    workers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
       vm_count: null
@@ -54,10 +55,10 @@ def GetConfig(user_config):
 
   if (FLAGS.aerospike_storage_type == aerospike_server.DISK and
       FLAGS.data_disk_type != disk.LOCAL):
-    config['vm_groups']['default']['disk_count'] = 1
+    config['vm_groups']['workers']['disk_count'] = 1
 
-  config['vm_groups']['default']['vm_count'] = (FLAGS.ycsb_client_vms +
-                                                FLAGS.num_vms)
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
 
   return config
 
@@ -71,14 +72,6 @@ def CheckPrerequisites():
   ycsb.CheckPrerequisites()
 
 
-def _GetVMsByRole(vms):
-  """Gets a dictionary mapping role to a list of VMs."""
-  aerospike_vms = vms[:-FLAGS.ycsb_client_vms]
-  return {'vms': vms,
-          'aerospike_vms': aerospike_vms,
-          'loaders': vms[-FLAGS.ycsb_client_vms:]}
-
-
 def Prepare(benchmark_spec):
   """Prepare the virtual machines to run YCSB against Aerospike.
 
@@ -86,15 +79,13 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  by_role = _GetVMsByRole(benchmark_spec.vms)
-
-  loaders = by_role['loaders']
-  assert loaders, vms
+  loaders = benchmark_spec.vm_groups['clients']
+  assert loaders, benchmark_spec.vm_groups
 
   # Aerospike cluster
-  aerospike_vms = by_role['aerospike_vms']
-  assert aerospike_vms, 'No aerospike VMs: {0}'.format(by_role)
+  aerospike_vms = benchmark_spec.vm_groups['workers']
+  assert aerospike_vms, 'No aerospike VMs: {0}'.format(
+      benchmark_spec.vm_groups)
 
   seed_ips = [vm.internal_ip for vm in aerospike_vms]
   aerospike_install_fns = [functools.partial(aerospike_server.ConfigureAndStart,
@@ -116,11 +107,8 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample instances.
   """
-  vms = benchmark_spec.vms
-  loaders = _GetVMsByRole(vms)['loaders']
-  aerospike_vms = _GetVMsByRole(vms)['aerospike_vms']
-  logging.debug('Loaders: %s', loaders)
-  vms = benchmark_spec.vms
+  loaders = benchmark_spec.vm_groups['clients']
+  aerospike_vms = benchmark_spec.vm_groups['workers']
 
   executor = ycsb.YCSBExecutor('aerospike',
                                **{'as.host': aerospike_vms[0].internal_ip,
@@ -149,6 +137,5 @@ def Cleanup(benchmark_spec):
                          aerospike_server.AEROSPIKE_DIR)
     server.RemoteCommand('sudo rm -rf aerospike*')
 
-  vms = benchmark_spec.vms
-  aerospike_vms = _GetVMsByRole(vms)['aerospike_vms']
+  aerospike_vms = benchmark_spec.vm_groups['workers']
   vm_util.RunThreaded(StopAerospike, aerospike_vms)

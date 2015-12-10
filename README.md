@@ -150,16 +150,17 @@ Restart your shell window (or logout/ssh again if running on a VM)
 
 On Windows, visit the same page and follow the Windows installation instructions on the page.
 
-Set your credentials up: https://developers.google.com/cloud/sdk/gcloud/#gcloud.auth. Run the command below.
-It will print a web page URL. Navigate there, authorize the gcloud instance you just installed to use the services
-it lists, copy the access token and give it to the shell prompt.
+Next, create a project by visiting [Google Cloud Console](https://console.developers.google.com).  After that, run
+```
+$ gcloud init
+```
+which helps you authenticate, set your project, and set some defaults.
+
+Alternatively, if that is already set up, and you just need to authenticate, you can use:
 ```
 $ gcloud auth login
 ```
-
-You will need a project ID before you can run. Please navigate to https://console.developers.google.com and
-create one.
-
+For help, see [here](https://cloud.google.com/sdk/gcloud/)
 
 ### Install OpenStack Nova client and setup authentication
 Make sure you have installed pip (see the section above).

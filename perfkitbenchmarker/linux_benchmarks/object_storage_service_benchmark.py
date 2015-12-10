@@ -561,9 +561,10 @@ class S3StorageBenchmark(object):
     vm.PushFile(FLAGS.object_storage_credential_file, AWS_CREDENTIAL_LOCATION)
     vm.PushFile(FLAGS.boto_file_location, DEFAULT_BOTO_LOCATION)
 
-    self.bucket_name = 'pkb%s' % FLAGS.run_uri
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
+
     vm.RemoteCommand(
-        'aws s3 mb s3://%s --region=us-east-1' % self.bucket_name)
+        'aws s3 mb s3://%s --region=us-east-1' % vm.bucket_name)
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with s3 tool.
@@ -588,12 +589,12 @@ class S3StorageBenchmark(object):
 
     # CLI tool based tests.
 
-    clean_up_bucket_cmd = 'aws s3 rm s3://%s --recursive' % self.bucket_name
+    clean_up_bucket_cmd = 'aws s3 rm s3://%s --recursive' % vm.bucket_name
     upload_cmd = 'time aws s3 sync %s/run/data/ s3://%s/' % (scratch_dir,
-                                                             self.bucket_name)
+                                                             vm.bucket_name)
     cleanup_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
     download_cmd = 'time aws s3 sync s3://%s/ %s/run/temp/' % (
-                   self.bucket_name, scratch_dir)
+                   vm.bucket_name, scratch_dir)
 
     if FLAGS.cli_test_size == 'normal':
       iteration_count = CLI_TEST_ITERATION_COUNT
@@ -607,7 +608,7 @@ class S3StorageBenchmark(object):
     # Now tests the storage provider via APIs
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
     ApiBasedBenchmarks(results, metadata, vm, 'S3', test_script_path,
-                       self.bucket_name)
+                       vm.bucket_name)
 
     return results
 
@@ -617,8 +618,8 @@ class S3StorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    remove_content_cmd = 'aws s3 rm s3://%s --recursive' % self.bucket_name
-    remove_bucket_cmd = 'aws s3 rb s3://%s' % self.bucket_name
+    remove_content_cmd = 'aws s3 rm s3://%s --recursive' % vm.bucket_name
+    remove_bucket_cmd = 'aws s3 rb s3://%s' % vm.bucket_name
     DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
@@ -658,10 +659,10 @@ class AzureBlobStorageBenchmark(object):
 
     vm.RemoteCommand('azure storage container create pkb%s %s' % (
         FLAGS.run_uri, azure_command_suffix))
-    self.bucket_name = 'pkb%s' % FLAGS.run_uri
 
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
     vm.RemoteCommand('azure storage blob list %s %s' % (
-        self.bucket_name, azure_command_suffix))
+        vm.bucket_name, azure_command_suffix))
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with Azure CLI tool.
@@ -690,7 +691,7 @@ class AzureBlobStorageBenchmark(object):
     cleanup_bucket_cmd = ('%s --bucket=%s --storage_provider=AZURE '
                           ' --scenario=CleanupBucket %s' %
                           (test_script_path,
-                           self.bucket_name,
+                           vm.bucket_name,
                            _MakeAzureCommandSuffix(vm.azure_account,
                                                    vm.azure_key,
                                                    False)))
@@ -698,7 +699,7 @@ class AzureBlobStorageBenchmark(object):
       upload_cmd = ('time for i in {0..99}; do azure storage blob upload '
                     '%s/run/data/file-$i.dat %s %s; done' %
                     (scratch_dir,
-                     self.bucket_name,
+                     vm.bucket_name,
                      _MakeAzureCommandSuffix(vm.azure_account,
                                              vm.azure_key,
                                              True)))
@@ -706,7 +707,7 @@ class AzureBlobStorageBenchmark(object):
       upload_cmd = ('time azure storage blob upload '
                     '%s/run/data/file_large_3gib.dat %s %s' %
                     (scratch_dir,
-                     self.bucket_name,
+                     vm.bucket_name,
                      _MakeAzureCommandSuffix(vm.azure_account,
                                              vm.azure_key,
                                              True)))
@@ -716,7 +717,7 @@ class AzureBlobStorageBenchmark(object):
     if FLAGS.cli_test_size == 'normal':
       download_cmd = ('time for i in {0..99}; do azure storage blob download '
                       '%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
-                          self.bucket_name,
+                          vm.bucket_name,
                           scratch_dir,
                           _MakeAzureCommandSuffix(vm.azure_account,
                                                   vm.azure_key,
@@ -725,7 +726,7 @@ class AzureBlobStorageBenchmark(object):
       download_cmd = ('time azure storage blob download %s '
                       'file_large_3gib.dat '
                       '%s/run/temp/file_large_3gib.dat %s' % (
-                          self.bucket_name,
+                          vm.bucket_name,
                           scratch_dir,
                           _MakeAzureCommandSuffix(vm.azure_account,
                                                   vm.azure_key,
@@ -736,7 +737,7 @@ class AzureBlobStorageBenchmark(object):
                    download_cmd)
 
     ApiBasedBenchmarks(results, metadata, vm, 'AZURE', test_script_path,
-                       self.bucket_name, regional_bucket_name=None,
+                       vm.bucket_name, regional_bucket_name=None,
                        azure_command_suffix=_MakeAzureCommandSuffix(
                            vm.azure_account, vm.azure_key, False))
 
@@ -751,13 +752,13 @@ class AzureBlobStorageBenchmark(object):
     test_script_path = '%s/run/%s' % (vm.GetScratchDir(), API_TEST_SCRIPT)
     remove_content_cmd = ('%s --bucket=%s --storage_provider=AZURE '
                           ' --scenario=CleanupBucket %s' %
-                          (test_script_path, self.bucket_name,
+                          (test_script_path, vm.bucket_name,
                            _MakeAzureCommandSuffix(vm.azure_account,
                                                    vm.azure_key,
                                                    False)))
 
     remove_bucket_cmd = ('azure storage container delete -q %s %s' % (
-                         self.bucket_name,
+                         vm.bucket_name,
                          _MakeAzureCommandSuffix(vm.azure_account,
                                                  vm.azure_key,
                                                  True)))
@@ -799,14 +800,15 @@ class GoogleCloudStorageBenchmark(object):
     vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)
     vm.gsutil_path = vm.gsutil_path.split()[0]
 
-    self.bucket_name = 'pkb%s' % FLAGS.run_uri
-    vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, self.bucket_name))
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
 
-    self.regional_bucket_name = '%s-%s' % (self.bucket_name,
-                                           DEFAULT_GCS_REGION.lower())
+    vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, vm.bucket_name))
+
+    vm.regional_bucket_name = '%s-%s' % (vm.bucket_name,
+                                         DEFAULT_GCS_REGION.lower())
     vm.RemoteCommand('%s mb -c DRA -l %s gs://%s' % (vm.gsutil_path,
                                                      DEFAULT_GCS_REGION,
-                                                     self.regional_bucket_name))
+                                                     vm.regional_bucket_name))
 
     # Detect if we need to install crcmod for gcp.
     # See "gsutil help crc" for details.
@@ -855,13 +857,13 @@ class GoogleCloudStorageBenchmark(object):
     metadata[BOTO_LIB_VERSION] = _GetClientLibVersion(vm, 'boto')
     # CLI tool based tests.
     scratch_dir = vm.GetScratchDir()
-    clean_up_bucket_cmd = '%s rm gs://%s/*' % (vm.gsutil_path, self.bucket_name)
+    clean_up_bucket_cmd = '%s rm gs://%s/*' % (vm.gsutil_path, vm.bucket_name)
     upload_cmd = 'time %s -m cp %s/run/data/* gs://%s/' % (vm.gsutil_path,
                                                            scratch_dir,
-                                                           self.bucket_name)
+                                                           vm.bucket_name)
     cleanup_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
     download_cmd = 'time %s -m cp gs://%s/* %s/run/temp/' % (vm.gsutil_path,
-                                                             self.bucket_name,
+                                                             vm.bucket_name,
                                                              scratch_dir)
     if FLAGS.cli_test_size == 'normal':
       iteration_count = CLI_TEST_ITERATION_COUNT
@@ -875,7 +877,7 @@ class GoogleCloudStorageBenchmark(object):
     # API-based benchmarking of GCS
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
     ApiBasedBenchmarks(results, metadata, vm, 'GCS', test_script_path,
-                       self.bucket_name, self.regional_bucket_name)
+                       vm.bucket_name, vm.regional_bucket_name)
 
     return results
 
@@ -886,7 +888,7 @@ class GoogleCloudStorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    for bucket in [self.bucket_name, self.regional_bucket_name]:
+    for bucket in [vm.bucket_name, vm.regional_bucket_name]:
       remove_content_cmd = '%s -m rm -r gs://%s/*' % (vm.gsutil_path,
                                                       bucket)
       remove_bucket_cmd = '%s rb gs://%s' % (vm.gsutil_path, bucket)

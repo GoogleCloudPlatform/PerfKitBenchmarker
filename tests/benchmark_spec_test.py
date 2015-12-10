@@ -14,6 +14,7 @@
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
 import unittest
+import mock_flags
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -22,6 +23,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
+from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
 
 NAME = 'name'
 UID = 'name0'
@@ -81,6 +83,9 @@ name:
         GCP:
           not_a_vm_parameter: 4
 """
+ALWAYS_SUPPORTED = 'iperf'
+NEVER_SUPPORTED = 'mysql_service'
+NO_SUPPORT_INFO = 'this_is_not_a_benchmark'
 
 
 class ConstructVmsTestCase(unittest.TestCase):
@@ -132,3 +137,48 @@ class ConstructVmsTestCase(unittest.TestCase):
     spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
     with self.assertRaises(errors.Config.UnrecognizedOption):
       spec.ConstructVirtualMachines()
+
+
+class BenchmarkSupportTestCase(unittest.TestCase):
+
+  def setUp(self):
+    # Reset the current benchmark spec.
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
+
+  def createBenchmarkSpec(self, config, benchmark):
+    spec = benchmark_spec.BenchmarkSpec(config, benchmark, UID)
+    spec.ConstructVirtualMachines()
+    return True
+
+  def testBenchmarkSupportFlag(self):
+    """ Test the benchmark_compatibility_checking flag
+
+    We use Kubernetes as our test cloud platform because it has
+    supported benchmarks (IsBenchmarkSupported returns true)
+    unsupported benchmarks (IsBenchmarkSupported returns false)
+    and returns None if the benchmark isn't in either list.
+    """
+
+    with mock_flags.PatchFlags() as mocked_flags:
+      mocked_flags.cloud = 'Kubernetes'
+      mocked_flags.os_type = 'debian'
+      mocked_flags.machine_type = None
+      config = configs.LoadConfig(iperf_benchmark.BENCHMARK_CONFIG,
+                                  {}, ALWAYS_SUPPORTED)
+      self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
+      with self.assertRaises(ValueError):
+        self.createBenchmarkSpec(config, NEVER_SUPPORTED)
+      with self.assertRaises(ValueError):
+        self.createBenchmarkSpec(config, NO_SUPPORT_INFO)
+
+      mocked_flags.benchmark_compatibility_checking = 'permissive'
+      self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED),
+                      'benchmark is supported, mode is permissive')
+      with self.assertRaises(ValueError):
+        self.createBenchmarkSpec(config, NEVER_SUPPORTED)
+      self.assertTrue(self.createBenchmarkSpec(config, NO_SUPPORT_INFO))
+
+      mocked_flags.benchmark_compatibility_checking = 'none'
+      self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
+      self.assertTrue(self.createBenchmarkSpec(config, NEVER_SUPPORTED))
+      self.assertTrue(self.createBenchmarkSpec(config, NO_SUPPORT_INFO))
