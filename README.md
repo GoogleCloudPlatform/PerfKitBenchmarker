@@ -283,8 +283,6 @@ You have two Ceph authentication options available (http://kubernetes.io/v1.0/ex
 ### Mesos configuration
 Mesos provider communicates with Marathon framework in order to manage Docker instances. Thus it is required to setup Marathon framework along with the Mesos cluster. In order to connect to Mesos you need to provide IP address and port to Marathon framework using `--marathon_address` flag.
 
-Currently only local disks are supported so you need to execute Perfkit with `--scratch_disk_type=LOCAL` flag.
-
 Provider has been tested with Mesos v0.24.1 and Marathon v0.11.1.
 
 **Overlay network**  
