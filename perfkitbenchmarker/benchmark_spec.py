@@ -174,12 +174,12 @@ class BenchmarkSpec(object):
   def _CheckBenchmarkSupport(self, cloud):
     """ Throw an exception if the benchmark isn't supported."""
 
-    if FLAGS.benchmark_compatibility_checking is SKIP_CHECK:
+    if FLAGS.benchmark_compatibility_checking == SKIP_CHECK:
       return
 
     provider_info_class = provider_info.GetProviderInfoClass(cloud)
     benchmark_ok = provider_info_class.IsBenchmarkSupported(self.name)
-    if FLAGS.benchmark_compatibility_checking is NOT_EXCLUDED:
+    if FLAGS.benchmark_compatibility_checking == NOT_EXCLUDED:
       if benchmark_ok is None:
         benchmark_ok = True
 
