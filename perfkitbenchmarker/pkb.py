@@ -521,6 +521,9 @@ def RunBenchmarks(publish=True):
     archive.ArchiveRun(vm_util.GetTempDir(), FLAGS.archive_bucket,
                        gsutil_path=FLAGS.gsutil_path,
                        prefix=FLAGS.run_uri + '_')
+  all_benchmarks_succeeded = all(r[2] == benchmark_status.SUCCEEDED
+                                 for r in run_status_lists)
+  return 0 if all_benchmarks_succeeded else 1
 
 
 def _GenerateBenchmarkDocumentation():
