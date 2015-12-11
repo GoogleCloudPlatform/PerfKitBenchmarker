@@ -513,7 +513,7 @@ def RunBenchmarks(publish=True):
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
 
-  if FLAGS.run_stage not in [STAGE_ALL, STAGE_CLEANUP]:
+  if FLAGS.run_stage not in [STAGE_ALL, STAGE_TEARDOWN]:
     logging.info(
         'To run again with this setup, please use --run_uri=%s', FLAGS.run_uri)
 
