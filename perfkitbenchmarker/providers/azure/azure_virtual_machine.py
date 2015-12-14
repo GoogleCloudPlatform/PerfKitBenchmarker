@@ -26,6 +26,7 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import json
+import logging
 import re
 import threading
 
@@ -181,6 +182,12 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.os_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type)
     self.max_local_disks = 1
 
+    # Calls to 'AllowPort' will be deferred until the VM is created.
+    # _endpoints_to_create is a set of ports to open on the VM.
+    # Protected by _endpoints_to_create_lock.
+    self._endpoints_to_create = set()
+    self._endpoints_to_create_lock = threading.Lock()
+
   def _CreateDependencies(self):
     """Create VM dependencies."""
     self.service.Create()
@@ -247,6 +254,22 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.os_disk.created = True
     self.internal_ip = response['IPAddress']
     self.ip_address = response['VirtualIPAddresses'][0]['address']
+
+    # Create any endpoints requested prior to VM creation.
+    with self._endpoints_to_create_lock:
+      for port in self._endpoints_to_create:
+        self.AllowPort(port)
+      self._endpoints_to_create.clear()
+
+  def AllowPort(self, port):
+    # Endpoints can't be created until the VM exists. Defer to _PostCreate.
+    if not self.created:
+      with self._endpoints_to_create_lock:
+        logging.info('Deferring allowing port %s until VM %s is created.',
+                     port, self.name)
+        self._endpoints_to_create.add(port)
+    else:
+      super(AzureVirtualMachine, self).AllowPort(port)
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
