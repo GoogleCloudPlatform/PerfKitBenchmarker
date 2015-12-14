@@ -641,6 +641,91 @@ class RhelMixin(BaseLinuxMixin):
       self.RemoteCommand("echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (
           FLAGS.http_proxy, yum_proxy_file))
 
+class SUSEMixin(BaseLinuxMixin):
+  """Class holding SUSE specific VM methods and attributes."""
+
+  OS_TYPE = 'suse'
+
+  def PrepareVMEnvironment(self):
+    super(SUSEMixin, self).PrepareVMEnvironment()
+
+  def GetSUSEVersion(self):
+    stdout, _ = self.RemoteCommand('lsb_release -sr')
+    major_version = int(stdout)
+    return major_version
+
+  def SnapshotPackages(self):
+    """Grabs a snapshot of the currently installed packages."""
+    self.RemoteCommand('rpm -qa > %s/rpm_package_list' % vm_util.VM_TMP_DIR)
+    """Using Zypper (a bit slower)"""
+    #self.RemoteCommand('zypper search --installed-only | cut -d \ | -f 2 | tr -s \'\\n\''
+    #                   '> %s/installed_package_list' % vm_util.VM_TMP_DIR)
+    self.SnapshotRepositories(self)
+
+  def RestorePackages(self):
+    """Restores the currently installed packages to those snapshotted."""
+    self.RemoteCommand(
+        'rpm -qa | grep --fixed-strings --line-regexp --invert-match --file '
+        '%s/rpm_package_list | xargs --no-run-if-empty sudo zypper --non-interactive remove' %
+        vm_util.VM_TMP_DIR, ignore_failure=True)
+    self.RestoreRepositories(self)
+
+  def AddRepository(self, Repo):
+    """Adding a repository"""
+    self.RemoteCommand('sudo zypper addrepo %s' % Repo)
+    self.RemoteCommand('sudo zypper --no-gpg-checks refresh')
+
+  def SnapshotRepositories(self):
+    """Take an initial snapshot of the currently installed repositories"""
+    self.RemoteCommand('sudo zypper repos | awk \'{if (NR>=3) print $1}\' > %s/zypper_repos_init_snapshot' %
+                       vm_util.VM_TMP_DIR)
+
+  def RestoreRepositories(self):
+    """Remove all repositories that are not into the initial snapshot"""
+    self.RemoteCommand('sudo zypper repos | awk \'{if (NR>=3) print $1}\' > %s/zypper_repos_snapshot' %
+                       vm_util.VM_TMP_DIR)
+    self.RemoteCommand('cat %s/zypper_repos_snapshot | grep --fixed-strings --line-regexp --invert-match'
+                       '--file zypper %s/zypper_repos_init_snapshot | xargs sudo zypper removerepo' % vm_util.VM_TMP_DIR)
+    self.RemoteCommand('sudo zypper --no-gpg-checks refresh')
+    self.RemoteCommand('rm %s/zypper_repos_init_snapshot' % vm_util.VM_TMP_DIR)
+    self.RemoteCommand('rm %s/zypper_repos_snapshot' % vm_util.VM_TMP_DIR)
+
+  def InstallPackages(self, packages):
+    """Installs packages using the zypper package manager."""
+    self.RemoteCommand('sudo zypper --non-interactive install %s' % packages)
+
+  def InstallSourcePackages(self, packages):
+    """Installs packages using the zypper package manager."""
+    self.RemoteCommand('sudo zypper --non-interactive source-install %s' % packages)
+
+  def InstallPatterns(self, patterns):
+    """Installs packages using the zypper package manager."""
+    self.RemoteCommand('sudo zypper --non-interactive install --type pattern %s' % patterns)    
+
+  def Install(self, package_name):
+    """Installs a package on the VM."""
+    if ((self.is_static and not self.install_packages) or
+        not FLAGS.install_packages):
+      return
+    if package_name not in self._installed_packages:
+      package = packages.PACKAGES[package_name]
+      package.ZypperInstall(self)
+      self._installed_packages.add(package_name)
+
+  def Uninstall(self, package_name):
+    """Uninstalls a package on the VM."""
+    package = packages.PACKAGES[package_name]
+    if hasattr(package, 'ZypperUninstall'):
+      package.ZypperUninstall(self)
+
+  def SetupProxy(self):
+    """Sets up proxy configuration variables for the cloud environment."""
+    super(SUSEMixin, self).SetupProxy()
+    suse_proxy_file = "/etc/sysconfig/proxy"
+
+    if FLAGS.http_proxy:
+      self.RemoteCommand("echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (
+          FLAGS.http_proxy, suse_proxy_file))
 
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
@@ -854,6 +939,9 @@ class ContainerizedDebianMixin(DebianMixin):
       command = 'cp %s %s' % (container_path, destination_path)
       self.RemoteCommand(command)
 
+  @vm_util.Retry(
+      poll_interval=1, max_retries=3,
+      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,))
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the container in the remote VM.
 
