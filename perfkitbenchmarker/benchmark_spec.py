@@ -80,20 +80,17 @@ VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
 flags.DEFINE_enum('cloud', GCP,
                   VALID_CLOUDS,
                   'Name of the cloud to use.')
-
+flags.DEFINE_enum(
+    'os_type', DEBIAN, [DEBIAN, RHEL, SUSE, UBUNTU_CONTAINER, WINDOWS],
+    'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
+    'built on Debian and uses the same package manager. Likewise, CentOS\'s '
+    'os_type is "rhel". In general if two OS\'s use the same package manager, '
+    'and are otherwise very similar, the same os_type should work on both of '
+    'them.')
 flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM.'
                     'Upon creation, these directories will have numbers'
                     'appended to them (for example /scratch0, /scratch1, etc).')
-flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
-                  [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
-                  'Method used to check compatibility between the benchmark '
-                  ' and the cloud.  ' + SUPPORTED + ' runs the benchmark only'
-                  ' if the cloud provider has declared it supported. ' +
-                  NOT_EXCLUDED + ' runs the benchmark unless it has been '
-                  ' declared not supported by the could provider. ' +
-                  SKIP_CHECK + ' does not do the compatibility'
-                  ' check. The default is ' + SUPPORTED)
 
 
 class BenchmarkSpec(object):
@@ -137,6 +134,7 @@ class BenchmarkSpec(object):
 
   def _GetCloudForGroup(self, group_name):
     """Gets the cloud for a VM group by looking at flags and the config.
+
     The precedence is as follows (in decreasing order):
       * FLAGS.cloud (if specified on the command line)
       * The "cloud" key in the group config (set by a config override)
@@ -150,6 +148,7 @@ class BenchmarkSpec(object):
 
   def _GetOsTypeForGroup(self, group_name):
     """Gets the OS type for a VM group by looking at flags and the config.
+
     The precedence is as follows (in decreasing order):
       * FLAGS.os_type (if specified on the command line)
       * The "os_type" key in the group config (set by a config override)
@@ -165,6 +164,7 @@ class BenchmarkSpec(object):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
     vm_group_specs = self.config[VM_GROUPS]
 
+    zone_index = 0
     for group_name, group_spec in vm_group_specs.iteritems():
       vms = []
       vm_count = group_spec.get(VM_COUNT, DEFAULT_COUNT)
@@ -176,8 +176,11 @@ class BenchmarkSpec(object):
         # First create the Static VMs.
         if STATIC_VMS in group_spec:
           static_vm_specs = group_spec[STATIC_VMS][:vm_count]
-          for spec_kwargs in static_vm_specs:
-            vm_spec = static_vm.StaticVmSpec(**spec_kwargs)
+          for static_vm_spec_index, spec_kwargs in enumerate(static_vm_specs):
+            vm_spec = static_vm.StaticVmSpec(
+                '{0}.{1}.{2}.{3}[{4}]'.format(self.name, VM_GROUPS, group_name,
+                                              STATIC_VMS, static_vm_spec_index),
+                **spec_kwargs)
             static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
             vms.append(static_vm_class(vm_spec))
 
@@ -188,7 +191,9 @@ class BenchmarkSpec(object):
         # Then create a VmSpec and possibly a DiskSpec which we can
         # use to create the remaining VMs.
         vm_spec_class = virtual_machine.GetVmSpecClass(cloud)
-        vm_spec = vm_spec_class(**group_spec[VM_SPEC][cloud])
+        vm_spec = vm_spec_class(
+            '.'.join((self.name, VM_GROUPS, group_name, VM_SPEC, cloud)),
+            FLAGS, **group_spec[VM_SPEC][cloud])
 
         if DISK_SPEC in group_spec:
           disk_spec_class = disk.GetDiskSpecClass(cloud)
@@ -213,7 +218,11 @@ class BenchmarkSpec(object):
 
       # Create the remaining VMs using the specs we created earlier.
       for _ in xrange(vm_count - len(vms)):
-        vm_spec.ApplyFlags(FLAGS)
+        # Assign a zone to each VM sequentially from the --zones flag.
+        if FLAGS.zones:
+          vm_spec.zone = FLAGS.zones[zone_index]
+          zone_index = (zone_index + 1 if zone_index < len(FLAGS.zones) - 1
+                        else 0)
         vm = self._CreateVirtualMachine(vm_spec, os_type, cloud)
         if disk_spec:
           vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
@@ -237,7 +246,7 @@ class BenchmarkSpec(object):
         vm_util.GenerateSSHConfig(self)
 
   def Delete(self):
-    if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
+    if self.deleted:
       return
 
     if self.vms:
