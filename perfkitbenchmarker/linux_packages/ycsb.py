@@ -515,7 +515,7 @@ class YCSBExecutor(object):
     for parameter, value in parameters.iteritems():
       command.extend(('-p', '{0}={1}'.format(parameter, value)))
 
-    return 'cd %s; %s' % (YCSB_DIR, ' '.join(command))
+    return ' '.join(command)
 
   def _Load(self, vm, **kwargs):
     """Execute 'ycsb load' on 'vm'."""
