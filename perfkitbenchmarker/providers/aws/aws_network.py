@@ -514,3 +514,7 @@ class AwsNetwork(network.BaseNetwork):
     if self.subnet:
       self.subnet.Delete()
     self.regional_network.Delete()
+
+  @property
+  def placement_group(self):
+    return self.regional_network.placement_group
