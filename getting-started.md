@@ -757,4 +757,5 @@ command
 
 will run the integration tests. The integration tests depend on having installed
 and configured all of the relevant cloud provider SDKs, and will fail if you
+have not done so.
 
