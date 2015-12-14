@@ -939,9 +939,6 @@ class ContainerizedDebianMixin(DebianMixin):
       command = 'cp %s %s' % (container_path, destination_path)
       self.RemoteCommand(command)
 
-  @vm_util.Retry(
-      poll_interval=1, max_retries=3,
-      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,))
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the container in the remote VM.
 

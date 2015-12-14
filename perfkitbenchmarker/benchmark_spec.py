@@ -22,7 +22,6 @@ import os
 import thread
 import threading
 import uuid
-import provider_info
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
@@ -74,9 +73,6 @@ RHEL = 'rhel'
 SUSE = 'suse'
 WINDOWS = 'windows'
 UBUNTU_CONTAINER = 'ubuntu_container'
-SUPPORTED = 'strict'
-NOT_EXCLUDED = 'permissive'
-SKIP_CHECK = 'none'
 
 FLAGS = flags.FLAGS
 VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
@@ -84,13 +80,7 @@ VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
 flags.DEFINE_enum('cloud', GCP,
                   VALID_CLOUDS,
                   'Name of the cloud to use.')
-flags.DEFINE_enum(
-    'os_type', DEBIAN, [DEBIAN, RHEL, SUSE, UBUNTU_CONTAINER, WINDOWS],
-    'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
-    'built on Debian and uses the same package manager. Likewise, CentOS\'s '
-    'os_type is "rhel". In general if two OS\'s use the same package manager, '
-    'and are otherwise very similar, the same os_type should work on both of '
-    'them.')
+
 flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM.'
                     'Upon creation, these directories will have numbers'
@@ -160,7 +150,6 @@ class BenchmarkSpec(object):
 
   def _GetOsTypeForGroup(self, group_name):
     """Gets the OS type for a VM group by looking at flags and the config.
-
     The precedence is as follows (in decreasing order):
       * FLAGS.os_type (if specified on the command line)
       * The "os_type" key in the group config (set by a config override)
@@ -171,25 +160,6 @@ class BenchmarkSpec(object):
     if not FLAGS[OS_TYPE].present and OS_TYPE in group_spec:
       return group_spec[OS_TYPE]
     return FLAGS.os_type
-
-  def _CheckBenchmarkSupport(self, cloud):
-    """ Throw an exception if the benchmark isn't supported."""
-
-    if FLAGS.benchmark_compatibility_checking == SKIP_CHECK:
-      return
-
-    provider_info_class = provider_info.GetProviderInfoClass(cloud)
-    benchmark_ok = provider_info_class.IsBenchmarkSupported(self.name)
-    if FLAGS.benchmark_compatibility_checking == NOT_EXCLUDED:
-      if benchmark_ok is None:
-        benchmark_ok = True
-
-    if not benchmark_ok:
-      raise ValueError('Provider {0} does not support {1}.  Use '
-                       '--benchmark_compatibility_checking=none '
-                       'to override this check.'.format(
-                           provider_info_class.CLOUD,
-                           self.name))
 
   def ConstructVirtualMachines(self):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
@@ -214,10 +184,6 @@ class BenchmarkSpec(object):
         os_type = self._GetOsTypeForGroup(group_name)
         cloud = self._GetCloudForGroup(group_name)
         providers.LoadProvider(cloud.lower())
-
-        # This throws an exception if the benchmark is not
-        # supported.
-        self._CheckBenchmarkSupport(cloud)
 
         # Then create a VmSpec and possibly a DiskSpec which we can
         # use to create the remaining VMs.
@@ -271,7 +237,7 @@ class BenchmarkSpec(object):
         vm_util.GenerateSSHConfig(self)
 
   def Delete(self):
-    if self.deleted:
+    if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
       return
 
     if self.vms:
