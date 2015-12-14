@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,10 @@ def _Install(vm):
       NETPERF_URL, vm_util.VM_TMP_DIR, NETPERF_TAR))
   vm.RemoteCommand('cd %s && tar xvzf %s' % (vm_util.VM_TMP_DIR, NETPERF_TAR))
   vm.RemoteCommand('cd %s && ./configure && make' % NETPERF_DIR)
+
+
+def ZypperInstall(vm):
+    _Install(vm)
 
 
 def YumInstall(vm):

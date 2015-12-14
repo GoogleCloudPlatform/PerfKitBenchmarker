@@ -15,6 +15,8 @@
 
 """Module containing sysbench installation and cleanup functions."""
 
+SUSE12_BENCHMARK_REPO = 'http://download.opensuse.org/repositories/benchmark/SLE_12/benchmark.repo'
+
 
 def _Install(vm):
   """Installs the sysbench package on the VM."""
@@ -29,4 +31,11 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the sysbench package on the VM."""
+  _Install(vm)
+
+
+def ZypperInstall(vm):
+  """Installs the sysbench package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.AddRepository(SUSE12_BENCHMARK_REPO)
   _Install(vm)

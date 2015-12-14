@@ -38,3 +38,10 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the docker package on the VM."""
   vm.RemoteHostCommand('curl -sSL https://get.docker.com/ | sh')
+
+
+def ZypperInstall(vm):
+  """Installs the docker package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.InstallPackages('docker')
+    vm.RemoteHostCommand('sudo service docker start')

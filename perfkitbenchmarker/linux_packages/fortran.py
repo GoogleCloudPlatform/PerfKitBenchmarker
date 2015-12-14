@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+zyp# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,11 @@
 def YumInstall(vm):
   """Installs the fortran package on the VM."""
   vm.InstallPackages('gcc-gfortran libgfortran')
+
+
+def ZypperInstall(vm):
+  """Installs the fortran package on the VM."""
+  vm.InstallPackages('gcc-fortran libgfortran3')
 
 
 def AptInstall(vm):

@@ -21,6 +21,11 @@ def YumInstall(vm):
   vm.InstallPackages('zlib zlib-devel')
 
 
+def ZypperYumInstall(vm):
+  """Installs the zlib package on the VM."""
+  vm.InstallPackages('zlib zlib-devel')
+
+
 def AptInstall(vm):
   """Installs the zlib package on the VM."""
   vm.InstallPackages('zlib1g zlib1g-dev')

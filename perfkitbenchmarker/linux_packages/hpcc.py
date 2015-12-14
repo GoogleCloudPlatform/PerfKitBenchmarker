@@ -60,3 +60,8 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the HPCC package on the VM."""
   _Install(vm)
+
+
+def ZypperInstall(vm):
+  """Installs the HPCC package on the VM."""
+  _Install(vm)

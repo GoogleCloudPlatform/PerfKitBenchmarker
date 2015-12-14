@@ -22,6 +22,12 @@ def YumInstall(vm):
   vm.InstallPackages('libcurl-devel')
 
 
+def ZypperInstall(vm):
+  """Installs the libcurl package on the VM."""
+  vm.InstallPackages('libcurl4')
+  vm.InstallPackages('libcurl-devel')
+
+
 def AptInstall(vm):
   """Installs the libcurl package on the VM."""
   vm.InstallPackages('libcurl3 libcurl3-dev')

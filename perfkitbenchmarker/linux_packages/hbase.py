@@ -65,6 +65,11 @@ def AptInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs HBase on the VM."""
+  _Install(vm)
+
+
 def _RenderConfig(vm, master_ip, zk_ips, regionserver_ips):
   # Use the same heap configuration as Cassandra
   memory_mb = vm.total_memory_kb // 1024

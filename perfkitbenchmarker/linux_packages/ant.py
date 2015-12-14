@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +34,10 @@ def _Install(vm):
                    'tar -zxf apache-ant-1.9.6-bin.tar.gz && '
                    'ln -s {0}/apache-ant-1.9.6/ {2}'.format(
                        vm_util.VM_TMP_DIR, ANT_TAR_URL, ANT_HOME_DIR))
+
+def ZypperInstall(vm):
+  """Installs the Ant package on the VM."""
+  _Install(vm)
 
 
 def YumInstall(vm):

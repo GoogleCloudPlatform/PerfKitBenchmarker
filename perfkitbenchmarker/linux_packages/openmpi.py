@@ -41,6 +41,11 @@ def YumInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs the OpenMPI package on the VM."""
+  _Install(vm)
+
+
 def AptInstall(vm):
   """Installs the OpenMPI package on the VM."""
   _Install(vm)
@@ -52,6 +57,11 @@ def _Uninstall(vm):
 
 
 def YumUninstall(vm):
+  """Uninstalls the OpenMPI package on the VM."""
+  _Uninstall(vm)
+
+
+def ZypperUninstall(vm):
   """Uninstalls the OpenMPI package on the VM."""
   _Uninstall(vm)
 

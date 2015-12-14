@@ -36,6 +36,11 @@ def YumInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs the node.js package on the VM."""
+  _Install(vm)
+
+
 def AptInstall(vm):
   """Installs the node.js package on the VM."""
   _Install(vm)
@@ -44,6 +49,11 @@ def AptInstall(vm):
 def _Uninstall(vm):
   """Uninstalls the node.js package on the VM."""
   vm.RemoteCommand('cd {0} && sudo make uninstall'.format(NODE_DIR))
+
+
+def ZypperUninstall(vm):
+  """Uninstalls the node.js package on the VM."""
+  _Uninstall(vm)
 
 
 def YumUninstall(vm):

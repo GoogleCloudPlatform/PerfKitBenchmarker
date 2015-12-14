@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,11 @@
 def _Install(vm):
   """Installs the numactl package on the VM."""
   vm.InstallPackages('numactl')
+
+
+def ZypperInstall(vm):
+  """Installs the numactl package on the VM."""
+  _Install(vm)
 
 
 def YumInstall(vm):

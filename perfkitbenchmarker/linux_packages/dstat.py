@@ -15,6 +15,9 @@
 
 """Module containing dstat installation and cleanup functions."""
 
+SUSE11_MONITORING_REPO_URL = 'http://download.opensuse.org/repositories/server:/monitoring/SLE_11_SP3/server:monitoring.repo'
+SUSE12_MONITORING_REPO_URL = 'http://download.opensuse.org/repositories/server:/monitoring/SLE_12/server:monitoring.repo'
+
 
 def _Install(vm):
   """Installs the dstat package on the VM."""
@@ -29,3 +32,13 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the dstat package on the VM."""
   _Install(vm)
+
+
+def ZypperInstall(vm):
+  """Installs the dstat package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.AddRepository(SUSE12_MONITORING_REPO)
+    _Install(vm)
+  elif vm.GetSUSEVersion() == 11:
+    vm.AddRepository(SUSE11_MONITORING_REPO)
+    _Install(vm)

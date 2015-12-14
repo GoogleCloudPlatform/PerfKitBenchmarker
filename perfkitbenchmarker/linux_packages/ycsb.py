@@ -151,6 +151,11 @@ def YumInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs the YCSB package on the VM."""
+  _Install(vm)
+
+
 def AptInstall(vm):
   """Installs the YCSB package on the VM."""
   _Install(vm)
@@ -510,7 +515,7 @@ class YCSBExecutor(object):
     for parameter, value in parameters.iteritems():
       command.extend(('-p', '{0}={1}'.format(parameter, value)))
 
-    return ' '.join(command)
+    return 'cd %s; %s' % (YCSB_DIR, ' '.join(command))
 
   def _Load(self, vm, **kwargs):
     """Execute 'ycsb load' on 'vm'."""

@@ -14,6 +14,7 @@
 
 
 """Module containing mongodb installation and cleanup functions."""
+SUSE12_MONGODB_REPO_URL = 'http://download.opensuse.org/repositories/server:/database/SLE_12/server:database.repo'
 
 
 def YumInstall(vm):
@@ -32,6 +33,15 @@ def AptInstall(vm):
   vm.InstallPackages('mongodb-server')
 
 
+def ZypperInstall(vm):
+  """Installs the mongodb package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.AddRepository(SUSE12_MONGODB_REPO_URL)
+    vm.InstallPackages('mongodb')
+  elif vm.GetSUSEVersion() == 11:
+    vm.InstallPackages('mongodb')
+
+
 def YumUninstall(vm):
   """Uninstalls the mongodb package on the VM."""
   vm.RemoteCommand('sudo rm /etc/yum.repos.d/mongodb.repo')
@@ -47,11 +57,21 @@ def AptGetServiceName(vm):
   return 'mongodb'
 
 
+def ZypperGetServiceName(vm):
+  """Returns the name of the mongodb service."""
+  return 'mongodb'
+
+
 def YumGetPathToConfig(vm):
   """Returns the path to the mongodb config file."""
   return '/etc/mongod.conf'
 
 
 def AptGetPathToConfig(vm):
+  """Returns the path to the mongodb config file."""
+  return '/etc/mongodb.conf'
+
+
+def ZypperGetPathToConfig(vm):
   """Returns the path to the mongodb config file."""
   return '/etc/mongodb.conf'

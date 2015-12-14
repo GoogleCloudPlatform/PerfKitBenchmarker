@@ -37,6 +37,12 @@ def YumInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs the redis package on the VM."""
+  vm.InstallPackages('tcl-devel')
+  _Install(vm)
+
+
 def AptInstall(vm):
   """Installs the redis package on the VM."""
   vm.InstallPackages('tcl-dev')

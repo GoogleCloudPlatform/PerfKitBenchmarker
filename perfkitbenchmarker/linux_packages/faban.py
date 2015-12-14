@@ -48,6 +48,11 @@ def AptInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs the Faban on the VM."""
+  _Install(vm)
+
+
 def Start(vm):
   """Allows the port on the VM, and starts the Faban using that port"""
   vm.AllowPort(FABAN_PORT)

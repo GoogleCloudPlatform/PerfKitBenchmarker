@@ -22,6 +22,16 @@ def YumInstall(vm):
   vm.InstallPackages('libpng-devel')
 
 
+def ZypperInstall(vm):
+  """Installs the libpng package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.InstallPackages('libpng12-0')
+    vm.InstallPackages('libpng12-devel')
+  elif vm.GetSUSEVersion() >= 11:
+    vm.InstallPackages('libpng12-0')
+    vm.InstallPackages('libpng-devel')
+
+
 def AptInstall(vm):
   """Installs the libpng package on the VM."""
   vm.InstallPackages('libpng3 libpng12-dev')

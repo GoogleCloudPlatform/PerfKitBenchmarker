@@ -24,3 +24,11 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs lua on the VM."""
   vm.InstallPackages('lua5.1 liblua5.1-dev')
+
+
+def ZypperInstall(vm):
+  """Installs lua on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.InstallPackages('lua51 lua51-devel')
+  elif vm.GetSUSEVersion() == 11:
+    vm.InstallPackages('lua lua-devel')

@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ MEMORY = 'memory'
 DISK = 'disk'
 flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
                   'The type of storage to use for Aerospike data. The type of '
-                  'disk is controlled by the "data_disk_type" flag.')
+                  'disk is controlled by the "scratch_disk_type" flag.')
 
 
 def _Install(vm):
@@ -44,6 +44,10 @@ def _Install(vm):
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, AEROSPIKE_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1} && git submodule update --init '
                    '&& make'.format(AEROSPIKE_DIR, GIT_TAG))
+
+def ZypperInstall(vm):
+  """Installs the memtier package on the VM."""
+  _Install(vm)
 
 
 def YumInstall(vm):
@@ -68,7 +72,7 @@ def ConfigureAndStart(server, seed_node_ips=None):
   seed_node_ips = seed_node_ips or [server.internal_ip]
 
   if FLAGS.aerospike_storage_type == DISK:
-    if FLAGS.data_disk_type == disk.LOCAL:
+    if FLAGS.scratch_disk_type == disk.LOCAL:
       devices = server.GetLocalDisks()
     else:
       devices = [scratch_disk.GetDevicePath()

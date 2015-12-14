@@ -24,6 +24,11 @@ def YumInstall(vm):
   vm.InstallPackages('libxml2-devel')
 
 
+def ZypperInstall(vm):
+  """Installs the libxml2 package on the VM."""
+  vm.InstallPackages('libxml2 libxml2-devel')
+
+
 def AptInstall(vm):
   """Installs the libxml2 package-version 2.7.6 on the VM."""
   vm.InstallPackages('gcc build-essential')

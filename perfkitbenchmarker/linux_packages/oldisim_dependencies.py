@@ -18,7 +18,12 @@ YUM_PACKAGES = ('bc gengetopt libevent-devel '
                 'google-perftools-devel scons')
 APT_PACKAGES = ('bc gengetopt libevent-dev '
                 'libgoogle-perftools-dev scons')
+ZYP_PACKAGES = ('bc gengetopt libevent-dev '
+                'gperftools-dev scons')
 
+SUSE11_TOOLS_REPO = 'http://download.opensuse.org/repositories/devel:/tools/SLE_11_SP4/devel:tools.repo'
+SUSE12_TOOLS_REPO = 'http://download.opensuse.org/repositories/devel:/tools/SLE_12/devel:tools.repo'
+SUSE11_PATRICKFREY_REPO = 'http://download.opensuse.org/repositories/home:/PatrickFrey/SLE_11_SP4/home:PatrickFrey.repo'
 
 def YumInstall(vm):
   """Installs oldisim dependencies on the VM."""
@@ -31,3 +36,14 @@ def AptInstall(vm):
   """Installs oldisim dependencies on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(APT_PACKAGES)
+
+
+def ZypperInstall(vm):
+  """Installs oldisim dependencies on the VM."""
+  vm.Install('build_tools')
+  if vm.GetSUSEVersion() >= 12:
+    vm.AddRepository(SUSE12_TOOLS_REPO)
+  elif vm.GetSUSEVersion() == 11:
+    vm.AddRepository(SUSE11_TOOLS_REPO)
+    vm.AddRepository(SUSE11_PATRICKFREY_REPO)
+  vm.InstallPackages(ZYP_PACKAGES)
