@@ -186,4 +186,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
+  vms[0].RemoteCommand('pkill -9 iperf')
   vms[1].RemoteCommand('pkill -9 iperf')
