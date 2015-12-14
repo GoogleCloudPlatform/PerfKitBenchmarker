@@ -23,18 +23,13 @@ Installing Tomcat via this module makes some changes to the default settings:
 https://tomcat.apache.org/
 """
 import posixpath
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 
-TOMCAT_URL = ('https://archive.apache.org/dist/tomcat/tomcat-8/v8.0.28/bin/'
+TOMCAT_URL = ('https://www.us.apache.org/dist/tomcat/tomcat-8/v8.0.28/bin/'
               'apache-tomcat-8.0.28.tar.gz')
 TOMCAT_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'tomcat')
 TOMCAT_HTTP_PORT = 8080
-
-flags.DEFINE_string('tomcat_url', TOMCAT_URL, 'Tomcat 8 download URL.')
-
-FLAGS = flags.FLAGS
 
 # Start / stop scripts
 _TOMCAT_START = posixpath.join(TOMCAT_DIR, 'bin', 'startup.sh')
@@ -51,8 +46,7 @@ def _Install(vm):
   vm.Install('curl')
   vm.RemoteCommand(
       ('mkdir -p {0} && curl -L {1} | '
-       'tar -C {0} --strip-components 1 -xzf -').format(TOMCAT_DIR,
-                                                        FLAGS.tomcat_url))
+       'tar -C {0} --strip-components 1 -xzf -').format(TOMCAT_DIR, TOMCAT_URL))
 
   # Use a non-blocking protocool, and disable access logging (which isn't very
   # helpful during load tests).

@@ -25,6 +25,7 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the bonnie++ package on the VM."""
+  vm.InstallEpelRepo()
   _Install(vm)
 
 
