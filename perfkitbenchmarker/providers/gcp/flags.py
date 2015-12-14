@@ -17,8 +17,7 @@ from perfkitbenchmarker import flags
 flags.DEFINE_string('gcloud_path',
                     'gcloud',
                     'The path for the gcloud utility.')
-flags.DEFINE_list('additional_gcloud_flags',
-                  [],
+flags.DEFINE_list('additional_gcloud_flags', None,
                   'Additional flags to pass to gcloud.')
 flags.DEFINE_integer('gce_num_local_ssds', 0,
                      'The number of ssds that should be added to the VM. Note '
