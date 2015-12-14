@@ -24,6 +24,9 @@ from perfkitbenchmarker.static_virtual_machine import StaticVirtualMachine
 from perfkitbenchmarker.static_virtual_machine import StaticVmSpec
 
 
+_COMPONENT = 'test_static_vm_spec'
+
+
 class StaticVirtualMachineTest(unittest.TestCase):
 
   def setUp(self):
@@ -80,12 +83,13 @@ class StaticVirtualMachineTest(unittest.TestCase):
     self.assertEqual(2, len(vm_pool))
     self._AssertStaticVMsEqual(
         StaticVirtualMachine(StaticVmSpec(
-            ip_address='174.12.14.1', user_name='perfkitbenchmarker',
+            _COMPONENT, ip_address='174.12.14.1',
+            user_name='perfkitbenchmarker',
             ssh_private_key='perfkitbenchmarker.pem')), vm_pool[0])
     self._AssertStaticVMsEqual(
         StaticVirtualMachine(
-            StaticVmSpec(ip_address='174.12.14.121', user_name='ubuntu',
-                         ssh_private_key='rackspace.pem',
+            StaticVmSpec(_COMPONENT, ip_address='174.12.14.121',
+                         user_name='ubuntu', ssh_private_key='rackspace.pem',
                          internal_ip='10.10.10.2', zone='rackspace_dallas')),
         vm_pool[1])
 

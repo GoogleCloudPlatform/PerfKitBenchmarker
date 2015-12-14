@@ -21,41 +21,45 @@ import unittest
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import pkb
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from tests import mock_flags
+
+
+_COMPONENT = 'test_component'
+_FLAGS = None
 
 
 class MemoryDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
     super(MemoryDecoderTestCase, self).setUp()
-    self.decoder = gce_virtual_machine.MemoryDecoder('GCP VM', 'memory')
+    self.decoder = gce_virtual_machine.MemoryDecoder('memory')
 
   def testValidStrings(self):
-    self.assertEqual(self.decoder.Decode('1280MiB'), 1280)
-    self.assertEqual(self.decoder.Decode('7.5GiB'), 7680)
+    self.assertEqual(self.decoder.Decode('1280MiB', _COMPONENT, _FLAGS), 1280)
+    self.assertEqual(self.decoder.Decode('7.5GiB', _COMPONENT, _FLAGS), 7680)
 
   def testImproperPattern(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self.decoder.Decode('1280')
+      self.decoder.Decode('1280', _COMPONENT, _FLAGS)
     self.assertEqual(str(cm.exception), (
-        'Invalid GCP VM "memory" value: "1280". Examples of valid values: '
-        '"1280MiB", "7.5GiB".'))
+        'Invalid test_component.memory value: "1280". Examples of valid '
+        'values: "1280MiB", "7.5GiB".'))
 
   def testInvalidFloat(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self.decoder.Decode('1280.9.8MiB')
+      self.decoder.Decode('1280.9.8MiB', _COMPONENT, _FLAGS)
     self.assertEqual(str(cm.exception), (
-        'Invalid GCP VM "memory" value: "1280.9.8MiB". "1280.9.8" is not a '
-        'valid float.'))
+        'Invalid test_component.memory value: "1280.9.8MiB". "1280.9.8" is not '
+        'a valid float.'))
 
   def testNonIntegerMiB(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self.decoder.Decode('7.6GiB')
+      self.decoder.Decode('7.6GiB', _COMPONENT, _FLAGS)
     self.assertEqual(str(cm.exception), (
-        'Invalid GCP VM "memory" value: "7.6GiB". The specified size must be '
-        'an integer number of MiB.'))
+        'Invalid test_component.memory value: "7.6GiB". The specified size '
+        'must be an integer number of MiB.'))
 
 
 class GceVirtualMachineTestCase(unittest.TestCase):
@@ -71,7 +75,7 @@ class GceVirtualMachineTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
 
   def testConstructorNoMachineTypeNoCpus(self):
-    spec = gce_virtual_machine.GceVmSpec()
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT)
     with self.assertRaises(errors.Config.MissingOption) as cm:
       gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(str(cm.exception), (
@@ -79,8 +83,8 @@ class GceVirtualMachineTestCase(unittest.TestCase):
         '"memory" configured.'))
 
   def testConstructorBothMachineTypeAndCpus(self):
-    spec = gce_virtual_machine.GceVmSpec(machine_type='test_machine_type',
-                                         cpus=1)
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='test_machine_type', cpus=1)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(str(cm.exception), (
@@ -88,25 +92,26 @@ class GceVirtualMachineTestCase(unittest.TestCase):
         '"memory" configured.'))
 
   def testVmWithMachineTypeNonPreemptible(self):
-    spec = gce_virtual_machine.GceVmSpec(machine_type='test_machine_type')
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='test_machine_type')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(vm.GetMachineTypeDict(), {
         'machine_type': 'test_machine_type'})
 
   def testVmWithMachineTypePreemptible(self):
-    spec = gce_virtual_machine.GceVmSpec(machine_type='test_machine_type',
-                                         preemptible=True)
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='test_machine_type', preemptible=True)
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(vm.GetMachineTypeDict(), {
         'machine_type': 'test_machine_type', 'preemptible': True})
 
   def testCustomVmNonPreemptible(self):
-    spec = gce_virtual_machine.GceVmSpec(cpus=1, memory='1.0GiB')
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT, cpus=1, memory='1.0GiB')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mib': 1024})
 
   def testCustomVmPreemptible(self):
-    spec = gce_virtual_machine.GceVmSpec(cpus=1, memory='1.0GiB',
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT, cpus=1, memory='1.0GiB',
                                          preemptible=True)
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mib': 1024,
@@ -126,18 +131,19 @@ class GCEVMFlagsTestCase(unittest.TestCase):
     with mock.patch(vm_util.__name__ + '.IssueCommand') as issue_command, \
             mock.patch('__builtin__.open'), \
             mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
-            mock.patch(pkb.__name__ + '.FLAGS') as pkb_flags, \
-            mock.patch(gce_virtual_machine.__name__ + '.FLAGS') as gvm_flags:
-              yield issue_command, pkb_flags, gvm_flags
+            mock_flags.PatchFlags() as mocked_flags:
+      mocked_flags.gcloud_path = 'test_gcloud'
+      mocked_flags.gcloud_scopes = None
+      mocked_flags.run_uri = 'aaaaaa'
+      yield issue_command, mocked_flags
 
   def testPreemptibleVMFlag(self):
     with self._PatchCriticalObjects() as mocked_env:
-      issue_command, pkb_flags, gvm_flags = mocked_env
-      pkb_flags.run_uri = 'foo'
-      gvm_flags.gce_preemptible_vms = True
-      gvm_flags.gcloud_scopes = None
-      vm_spec = gce_virtual_machine.GceVmSpec(image='image')
-      vm_spec.ApplyFlags(gvm_flags)
+      issue_command, mocked_flags = mocked_env
+      mocked_flags.gce_preemptible_vms = True
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', mocked_flags, image='image',
+          machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)
@@ -146,12 +152,11 @@ class GCEVMFlagsTestCase(unittest.TestCase):
   def testImageProjectFlag(self):
     """Tests that custom image_project flag is supported."""
     with self._PatchCriticalObjects() as mocked_env:
-      issue_command, pkb_flags, gvm_flags = mocked_env
-      pkb_flags.run_uri = 'foo'
-      gvm_flags.gcloud_scopes = None
-      gvm_flags.image_project = 'bar'
-      vm_spec = gce_virtual_machine.GceVmSpec(image='image')
-      vm_spec.ApplyFlags(gvm_flags)
+      issue_command, mocked_flags = mocked_env
+      mocked_flags.image_project = 'bar'
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', mocked_flags, image='image',
+          machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)

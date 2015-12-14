@@ -48,12 +48,14 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = 'Static'
 
-  def __init__(self, ip_address=None, user_name=None, ssh_private_key=None,
-               internal_ip=None, ssh_port=22, password=None, disk_specs=None,
-               os_type=None, **kwargs):
+  def __init__(self, component_full_name, ip_address=None, user_name=None,
+               ssh_private_key=None, internal_ip=None, ssh_port=22,
+               password=None, disk_specs=None, os_type=None, **kwargs):
     """Initialize the StaticVmSpec object.
 
     Args:
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config options.
       ip_address: The public ip address of the VM.
       user_name: The username of the VM that the keyfile corresponds to.
       ssh_private_key: The absolute path to the private keyfile to use to ssh
@@ -66,7 +68,7 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
       os_type: The OS type of the VM. See the flag of the same name for more
           information.
     """
-    super(StaticVmSpec, self).__init__(**kwargs)
+    super(StaticVmSpec, self).__init__(component_full_name, **kwargs)
     self.ip_address = ip_address
     self.user_name = user_name
     self.ssh_private_key = ssh_private_key
@@ -251,10 +253,10 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         disk_kwargs_list.append({'device_path': local_disk})
 
       vm_spec = StaticVmSpec(
-          ip_address=ip_address, user_name=user_name, ssh_port=ssh_port,
-          install_packages=install_packages, ssh_private_key=keyfile_path,
-          internal_ip=internal_ip, zone=zone, disk_specs=disk_kwargs_list,
-          password=password)
+          'static_vm_file', ip_address=ip_address, user_name=user_name,
+          ssh_port=ssh_port, install_packages=install_packages,
+          ssh_private_key=keyfile_path, internal_ip=internal_ip, zone=zone,
+          disk_specs=disk_kwargs_list, password=password)
 
       vm_class = GetStaticVmClass(os_type)
       vm = vm_class(vm_spec)
