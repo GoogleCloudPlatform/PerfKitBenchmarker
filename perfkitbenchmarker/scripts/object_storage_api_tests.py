@@ -146,10 +146,13 @@ def PercentileCalculator(numbers):
   count = len(numbers_sorted)
   total = sum(numbers_sorted)
   result = {}
+  result['p0.1'] = numbers_sorted[int(count * 0.001)]
   result['p1'] = numbers_sorted[int(count * 0.01)]
   result['p5'] = numbers_sorted[int(count * 0.05)]
+  result['p10'] = numbers_sorted[int(count * 0.1)]
   result['p50'] = numbers_sorted[int(count * 0.5)]
   result['p90'] = numbers_sorted[int(count * 0.9)]
+  result['p95'] = numbers_sorted[int(count * 0.95)]
   result['p99'] = numbers_sorted[int(count * 0.99)]
   result['p99.9'] = numbers_sorted[int(count * 0.999)]
   if count > 0:
