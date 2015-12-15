@@ -16,11 +16,20 @@
 """Module containing OpenJDK7 installation and cleanup functions."""
 
 JAVA_HOME = '/usr'
-
+JAVA_SUSE11_REPO = 'http://download.opensuse.org/repositories/home:tdaitx/SLE_11_SP3/home:tdaitx.repo'
 
 def YumInstall(vm):
   """Installs the OpenJDK7 package on the VM."""
   vm.InstallPackages('java-1.7.0-openjdk-devel')
+
+
+def ZypperInstall(vm):
+  """Installs the OpenJDK7 package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.InstallPackages('java-1.7.0-openjdk-devel')
+  elif vm.GetSUSEVersion() == 11:
+    vm.AddRepository(JAVA_SUSE11_REPO)
+    vm.InstallPackages('java-1_7_0-openjdk')
 
 
 def AptInstall(vm):

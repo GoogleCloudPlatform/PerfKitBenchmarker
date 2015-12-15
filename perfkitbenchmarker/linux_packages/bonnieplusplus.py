@@ -15,6 +15,8 @@
 
 """Module containing bonnie++ installation and cleanup functions."""
 
+SUSE11_BENCHMARK_REPO_URL = 'http://download.opensuse.org/repositories/benchmark/SLE_11_SP4/benchmark.repo'
+SUSE12_BENCHMARK_REPO_URL = 'http://download.opensuse.org/repositories/benchmark/SLE_12/benchmark.repo'
 
 def _Install(vm):
   """Installs the bonnie++ package on the VM."""
@@ -24,6 +26,15 @@ def _Install(vm):
 def YumInstall(vm):
   """Installs the bonnie++ package on the VM."""
   vm.InstallEpelRepo()
+  _Install(vm)
+
+
+def ZypperInstall(vm):
+  """Installs the bonnie++ package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.AddRepository(SUSE12_BENCHMARK_REPO_URL)
+  elif vm.GetSUSEVersion() == 11:
+    vm.AddRepository(SUSE11_BENCHMARK_REPO_URL)
   _Install(vm)
 
 

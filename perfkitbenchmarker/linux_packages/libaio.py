@@ -21,6 +21,14 @@ def YumInstall(vm):
   vm.InstallPackages('libaio')
 
 
+def ZypperInstall(vm):
+  """Installs the libaio package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.InstallPackages('libaio1')
+  elif vm.GetSUSEVersion() == 11:
+    vm.InstallPackages('libaio')
+
+
 def AptInstall(vm):
   """Installs the libaio package on the VM."""
   vm.InstallPackages('libaio1')

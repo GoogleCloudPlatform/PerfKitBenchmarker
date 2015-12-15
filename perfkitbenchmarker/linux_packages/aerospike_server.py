@@ -46,6 +46,11 @@ def _Install(vm):
                    '&& make'.format(AEROSPIKE_DIR, GIT_TAG))
 
 
+def ZypperInstall(vm):
+  """Installs the memtier package on the VM."""
+  _Install(vm)
+
+
 def YumInstall(vm):
   """Installs the memtier package on the VM."""
   _Install(vm)

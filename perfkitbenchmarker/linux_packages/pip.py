@@ -40,12 +40,22 @@ def AptInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs the pip package on the VM."""
+  _Install(vm)
+
+
 def _Uninstall(vm):
   """Uninstalls the pip package on the VM."""
   vm.RemoteCommand('pip freeze | grep --fixed-strings --line-regexp '
                    '--invert-match --file {0}/requirements.txt | '
                    'xargs --no-run-if-empty sudo pip uninstall -y'.format(
                        vm_util.VM_TMP_DIR))
+
+
+def ZypperUninstall(vm):
+  """Uninstalls the pip package on the VM."""
+  _Uninstall(vm)
 
 
 def YumUninstall(vm):

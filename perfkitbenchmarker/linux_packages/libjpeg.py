@@ -22,6 +22,16 @@ def YumInstall(vm):
   vm.InstallPackages('libjpeg-turbo-devel')
 
 
+def ZypperInstall(vm):
+  """Installs the libjpeg package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.InstallPackages('libjpeg8')
+    vm.InstallPackages('libjpeg8-devel')
+  elif vm.GetSUSEVersion() == 11:
+    vm.InstallPackages('libjpeg')
+    vm.InstallPackages('libjpeg-devel')
+
+
 def AptInstall(vm):
   """Installs the libjpeg package on the VM."""
   vm.InstallPackages('libjpeg-dev')

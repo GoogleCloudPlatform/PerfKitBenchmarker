@@ -36,6 +36,11 @@ def _Install(vm):
                        vm_util.VM_TMP_DIR, ANT_TAR_URL, ANT_HOME_DIR))
 
 
+def ZypperInstall(vm):
+  """Installs the Ant package on the VM."""
+  _Install(vm)
+
+
 def YumInstall(vm):
   """Installs the Ant package on the VM."""
   _Install(vm)

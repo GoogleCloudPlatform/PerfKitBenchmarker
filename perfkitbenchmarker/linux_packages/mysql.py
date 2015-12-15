@@ -16,6 +16,8 @@
 """Module containing mysql installation and cleanup functions."""
 
 MYSQL_RPM = 'http://dev.mysql.com/get/mysql-community-release-el6-5.noarch.rpm'
+MYSQL_RPM_SLES11 = 'http://dev.mysql.com/get/mysql-community-release-sles11-7.noarch.rpm'
+MYSQL_RPM_SLES12 = 'http://dev.mysql.com/get/mysql57-community-release-sles12-7.noarch.rpm'
 MYSQL_PSWD = 'perfkitbenchmarker'
 
 
@@ -25,6 +27,18 @@ def YumInstall(vm):
   vm.RemoteCommand('sudo rpm -ivh --force %s' % MYSQL_RPM)
   vm.InstallPackages('mysql-server')
   vm.RemoteCommand('sudo service mysqld start')
+  vm.RemoteCommand('/usr/bin/mysqladmin -u root password "%s"' % MYSQL_PSWD)
+
+
+def ZypperInstall(vm):
+  """Installs the mysql package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.RemoteCommand('sudo rpm -ivh --force %s' % MYSQL_RPM_SLES12)
+  elif vm.GetSUSEVersion() == 11:
+    vm.RemoteCommand('sudo rpm -ivh --force %s' % MYSQL_RPM_SLES11)
+  vm.RemoteCommand('sudo zypper --no-gpg-checks refresh')
+  vm.InstallPackages('mysql')
+  vm.RemoteCommand('sudo service mysql start')
   vm.RemoteCommand('/usr/bin/mysqladmin -u root password "%s"' % MYSQL_PSWD)
 
 
@@ -42,6 +56,11 @@ def YumGetPathToConfig(vm):
   return '/etc/my.cnf'
 
 
+def ZypperGetPathToConfig(vm):
+  """Returns the path to the mysql config file."""
+  return '/etc/my.cnf'
+
+
 def AptGetPathToConfig(vm):
   """Returns the path to the mysql config file."""
   return '/etc/mysql/my.cnf'
@@ -50,6 +69,11 @@ def AptGetPathToConfig(vm):
 def YumGetServiceName(vm):
   """Returns the name of the mysql service."""
   return 'mysqld'
+
+
+def ZypperGetServiceName(vm):
+  """Returns the name of the mysql service."""
+  return 'mysql'
 
 
 def AptGetServiceName(vm):

@@ -39,6 +39,12 @@ def YumInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs the UnixBench package on the VM."""
+  vm.InstallPackages('libX11-devel mesa-libGL-devel libXext-devel')
+  _Install(vm)
+
+
 def AptInstall(vm):
   """Installs the UnixBench package on the VM."""
   vm.InstallPackages('libx11-dev libgl1-mesa-dev libxext-dev')

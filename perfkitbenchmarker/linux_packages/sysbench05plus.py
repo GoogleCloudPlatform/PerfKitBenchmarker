@@ -22,6 +22,7 @@ separate installer here for 0.5 and later.
 """
 from perfkitbenchmarker import vm_util
 
+SUSE12_BENCHMARK_REPO = 'http://download.opensuse.org/repositories/benchmark/SLE_12/benchmark.repo'
 
 def YumInstall(vm):
   """ Installs SysBench 0.5 for Rhel/CentOS. We have to build from source!"""
@@ -61,3 +62,10 @@ def AptInstall(vm):
   vm.InstallPackages('libc6')
   vm.InstallPackages('mysql-client')
   vm.InstallPackages('sysbench')
+
+
+def ZypperInstall(vm):
+    """ Installs the sysbench 0.5+ from OpenSUSE Benchmark repository """
+    if vm.GetSUSEVersion() >= 12:
+        vm.AddRepository(SUSE12_BENCHMARK_REPO)
+        vm.InstallPackages('sysbench')

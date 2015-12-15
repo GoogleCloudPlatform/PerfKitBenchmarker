@@ -20,6 +20,11 @@ def YumInstall(vm):
   vm.InstallPackages('gcc-gfortran libgfortran')
 
 
+def ZypperInstall(vm):
+  """Installs the fortran package on the VM."""
+  vm.InstallPackages('gcc-fortran libgfortran3')
+
+
 def AptInstall(vm):
   """Installs the fortan package on the VM."""
   vm.InstallPackages('gfortran')

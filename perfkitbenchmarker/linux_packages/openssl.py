@@ -21,6 +21,11 @@ def YumInstall(vm):
   vm.InstallPackages('openssl openssl-devel openssl-static')
 
 
+def ZypperInstall(vm):
+  """Installs OpenSSL on the VM."""
+  vm.InstallPackages('openssl libopenssl-devel')
+
+
 def AptInstall(vm):
   """Installs OpenSSL on the VM."""
   vm.InstallPackages('openssl libssl-dev')

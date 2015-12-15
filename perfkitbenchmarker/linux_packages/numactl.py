@@ -20,6 +20,11 @@ def _Install(vm):
   vm.InstallPackages('numactl')
 
 
+def ZypperInstall(vm):
+  """Installs the numactl package on the VM."""
+  _Install(vm)
+
+
 def YumInstall(vm):
   """Installs the numactl package on the VM."""
   _Install(vm)

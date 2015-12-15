@@ -20,6 +20,11 @@ def YumInstall(vm):
   vm.InstallPackages('glibc-devel.i686 libstdc++-devel.i686')
 
 
+def ZypperInstall(vm):
+  """Installs multilib packages on the VM."""
+  vm.InstallPackages('glibc-devel libstdc++-devel')
+
+
 def AptInstall(vm):
   """Installs multilib packages on the VM."""
   vm.InstallPackages('gcc-multilib g++-multilib')

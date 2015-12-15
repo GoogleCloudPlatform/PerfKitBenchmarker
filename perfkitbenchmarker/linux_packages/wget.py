@@ -21,6 +21,11 @@ def _Install(vm):
   vm.InstallPackages('wget')
 
 
+def ZypperInstall(vm):
+  """Installs the iperf package on the VM."""
+  _Install(vm)
+
+
 def YumInstall(vm):
   """Installs the wget package on the VM."""
   _Install(vm)

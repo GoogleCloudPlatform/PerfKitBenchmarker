@@ -21,6 +21,11 @@ def YumInstall(vm):
   vm.InstallPackages('autoconf')
 
 
+def ZypperInstall(vm):
+  """Installs the Autoconf package on the VM."""
+  vm.InstallPackages('autoconf')
+
+
 def AptInstall(vm):
   """Installs the Autoconf package on the VM."""
   vm.InstallPackages('autoconf')

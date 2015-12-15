@@ -51,6 +51,12 @@ def YumInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs the fio package on the VM."""
+  vm.InstallPackages('libaio libaio-devel bc')
+  _Install(vm)
+
+
 def AptInstall(vm):
   """Installs the fio package on the VM."""
   vm.InstallPackages('libaio-dev libaio1 bc')

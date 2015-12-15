@@ -26,12 +26,30 @@ MEMTIER_DIR = '%s/memtier_benchmark' % vm_util.VM_TMP_DIR
 APT_PACKAGES = ('autoconf automake libpcre3-dev '
                 'libevent-dev pkg-config zlib1g-dev')
 YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
+ZYPPER_PACKAGES = 'zlib-devel pcre-devel libmemcache-devel'
 
 
 def YumInstall(vm):
   """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
+  vm.Install('wget')
+  vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL, vm_util.VM_TMP_DIR))
+  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(vm_util.VM_TMP_DIR,
+                                                   LIBEVENT_TAR))
+  vm.RemoteCommand('cd {0} && ./configure && sudo make install'.format(
+      LIBEVENT_DIR))
+  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
+  vm.RemoteCommand('cd {0} && git checkout {1}'.format(MEMTIER_DIR, GIT_TAG))
+  pkg_config = 'PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}'
+  vm.RemoteCommand('cd {0} && autoreconf -ivf && {1} ./configure && '
+                   'sudo make install'.format(MEMTIER_DIR, pkg_config))
+
+
+def ZypperInstall(vm):
+  """Installs the memtier package on the VM."""
+  vm.Install('build_tools')
+  vm.InstallPackages(ZYPPER_PACKAGES)
   vm.Install('wget')
   vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL, vm_util.VM_TMP_DIR))
   vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(vm_util.VM_TMP_DIR,
@@ -61,6 +79,11 @@ def _Uninstall(vm):
 
 
 def YumUninstall(vm):
+  """Uninstalls the memtier package on the VM."""
+  _Uninstall(vm)
+
+
+def ZypperUninstall(vm):
   """Uninstalls the memtier package on the VM."""
   _Uninstall(vm)
 

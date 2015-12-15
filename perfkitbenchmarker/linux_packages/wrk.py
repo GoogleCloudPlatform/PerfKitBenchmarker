@@ -61,6 +61,11 @@ def YumInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs wrk on the VM."""
+  _Install(vm)
+
+
 def AptInstall(vm):
   """Installs wrk on the VM."""
   _Install(vm)

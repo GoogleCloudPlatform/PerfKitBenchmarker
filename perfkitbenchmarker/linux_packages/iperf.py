@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,17 +17,32 @@
 
 import re
 
-from perfkitbenchmarker import errors
+from perfkitbenchmarker import errors, vm_util
 
 IPERF_EL6_RPM = ('http://pkgs.repoforge.org/iperf/'
                  'iperf-2.0.4-1.el6.rf.x86_64.rpm')
 IPERF_EL7_RPM = ('http://pkgs.repoforge.org/iperf/'
                  'iperf-2.0.4-1.el7.rf.x86_64.rpm')
 
+IPERF_RPM = ('iperf-2.0.5-4.1.x86_64.rpm')
+
+IPERF_URL = ('ftp://fr2.rpmfind.net/linux/opensuse/'
+             'distribution/11.4/repo/oss/suse/x86_64/%s' % IPERF_RPM)
+
 
 def _Install(vm):
   """Installs the iperf package on the VM."""
   vm.InstallPackages('iperf')
+
+
+def ZypperInstall(vm):
+  """
+  Installs the iperf 2.0 package on the VM.
+  In the SUSE standard repository only iperf 3.0 is available
+  """
+  vm.Install('curl')
+  vm.RemoteCommand('curl %s -o %s/%s' % (IPERF_URL, vm_util.VM_TMP_DIR, IPERF_RPM))
+  vm.InstallPackages('%s/%s' % (vm_util.VM_TMP_DIR, IPERF_RPM))
 
 
 def YumInstall(vm):

@@ -151,6 +151,11 @@ def YumInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs the YCSB package on the VM."""
+  _Install(vm)
+
+
 def AptInstall(vm):
   """Installs the YCSB package on the VM."""
   _Install(vm)

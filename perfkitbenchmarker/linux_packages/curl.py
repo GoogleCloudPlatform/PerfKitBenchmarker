@@ -21,6 +21,11 @@ def _Install(vm):
   vm.InstallPackages('curl')
 
 
+def ZypperInstall(vm):
+  """Installs the curl package on the VM."""
+  _Install(vm)
+
+
 def YumInstall(vm):
   """Installs the curl package on the VM."""
   _Install(vm)

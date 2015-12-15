@@ -21,6 +21,11 @@ def YumInstall(vm):
   vm.InstallPackages('python-2.7.5')
 
 
+def ZypperInstall(vm):
+  """Installs the package on the VM."""
+  vm.InstallPackages('python')
+
+
 def AptInstall(vm):
   """Installs the package on the VM."""
   vm.InstallPackages('python2.7')

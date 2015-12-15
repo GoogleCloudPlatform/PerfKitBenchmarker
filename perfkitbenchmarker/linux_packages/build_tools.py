@@ -21,6 +21,12 @@ def YumInstall(vm):
   vm.InstallPackageGroup('Development Tools')
 
 
+def ZypperInstall(vm):
+  """Installs build tools on the VM."""
+  vm.InstallPatterns('Basis-Devel')
+  vm.InstallPackages('git libtool')
+
+
 def AptInstall(vm):
   """Installs build tools on the VM."""
   vm.InstallPackages('build-essential git libtool autoconf automake')

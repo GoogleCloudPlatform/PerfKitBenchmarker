@@ -32,3 +32,15 @@ def AptInstall(vm):
   """Installs the iperf package on the VM."""
   vm.InstallPackages('gcc python-dev libffi-dev')
   _Install(vm)
+
+
+def ZypperInstall(vm):
+  """Installs the iperf package on the VM."""
+  if vm.GetSUSEVersion() >= 12:
+    vm.Install('openssl')
+    vm.InstallPackages('gcc python-devel libffi48-dev')
+    _Install(vm)
+  elif vm.GetSUSEVersion() == 11:
+    vm.Install('openssl')
+    vm.InstallPackages('gcc python-devel libffi-dev')
+    _Install(vm)

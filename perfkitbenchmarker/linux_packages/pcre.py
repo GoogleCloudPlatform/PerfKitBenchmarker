@@ -21,6 +21,11 @@ def YumInstall(vm):
   vm.InstallPackages('pcre pcre-devel')
 
 
+def ZypperInstall(vm):
+  """Installs the pcre package on the VM."""
+  vm.InstallPackages('pcre pcre-devel')
+
+
 def AptInstall(vm):
   """Installs the pcre package on the VM."""
   vm.InstallPackages('libpcre3 libpcre3-dev libpcrecpp0')

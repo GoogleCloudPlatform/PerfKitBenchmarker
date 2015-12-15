@@ -27,7 +27,8 @@ def _Install(vm):
   vm.Install('pcre')
   vm.Install('openssl')
   vm.Install('zlib')
-  vm.InstallPackages('gcc build-essential make')
+  vm.Install('wget')
+  vm.Install('build_tools')
   vm.RemoteCommand('cd {0} && '
                    'wget {1} && '
                    'tar zxf nginx-1.8.0.tar.gz && '
@@ -44,6 +45,11 @@ def YumInstall(vm):
 
 
 def AptInstall(vm):
+  """Installs the Nginx on the VM."""
+  _Install(vm)
+
+
+def ZypperInstall(vm):
   """Installs the Nginx on the VM."""
   _Install(vm)
 

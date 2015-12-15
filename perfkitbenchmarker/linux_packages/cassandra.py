@@ -90,6 +90,11 @@ def AptInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs Cassandra on the VM."""
+  _Install(vm)
+
+
 def Configure(vm, seed_vms):
   """Configure Cassandra on 'vm'.
 

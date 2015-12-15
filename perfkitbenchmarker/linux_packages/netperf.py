@@ -34,6 +34,10 @@ def _Install(vm):
   vm.RemoteCommand('cd %s && ./configure && make' % NETPERF_DIR)
 
 
+def ZypperInstall(vm):
+    _Install(vm)
+
+
 def YumInstall(vm):
   """Installs the netperf package on the VM."""
   _Install(vm)

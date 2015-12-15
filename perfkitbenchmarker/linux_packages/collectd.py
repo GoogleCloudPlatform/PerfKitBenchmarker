@@ -66,11 +66,21 @@ def AptInstall(vm):
   _Install(vm)
 
 
+def ZypperInstall(vm):
+  """Installs collectd on 'vm'."""
+  _Install(vm)
+
+
 def AptUninstall(vm):
   """Stops collectd on 'vm'."""
   _Uninstall(vm)
 
 
 def YumUninstall(vm):
+  """Stops collectd on 'vm'."""
+  _Uninstall(vm)
+
+
+def ZypperUninstall(vm):
   """Stops collectd on 'vm'."""
   _Uninstall(vm)
