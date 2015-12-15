@@ -32,6 +32,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+
 from perfkitbenchmarker import providers  # NOQA
 
 
@@ -69,6 +70,7 @@ DIGITALOCEAN = 'DigitalOcean'
 OPENSTACK = 'OpenStack'
 CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
+MESOS = 'Mesos'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
@@ -79,7 +81,7 @@ SKIP_CHECK = 'none'
 
 FLAGS = flags.FLAGS
 VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD]
+                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS]
 flags.DEFINE_enum('cloud', GCP,
                   VALID_CLOUDS,
                   'Name of the cloud to use.')

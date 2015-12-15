@@ -179,6 +179,44 @@ class IntDecoder(TypeVerifier):
     return value
 
 
+class FloatDecoder(TypeVerifier):
+  """Verifies and decodes a config option value when a float is expected.
+
+  Attributes:
+    max: None or float. If provided, it specifies the maximum accepted value.
+    min: None or float. If provided, it specifies the minimum accepted value.
+  """
+
+  def __init__(self, component, option, max=None, min=None, **kwargs):
+    super(FloatDecoder, self).__init__(component, option, (float,), **kwargs)
+    self.max = max
+    self.min = min
+
+  def Decode(self, value):
+    """Verifies that the provided value is an int.
+
+    Args:
+      value: The value specified in the config.
+
+    Returns:
+      int. The valid value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    value = super(FloatDecoder, self).Decode(value)
+    if value is not None:
+      if self.max and value > self.max:
+        raise errors.Config.InvalidValue(
+            'Invalid {0} "{1}" value: "{2}". Value must be at most '
+            '{3}.'.format(self.component, self.option, value, self.max))
+      if self.min and value < self.min:
+        raise errors.Config.InvalidValue(
+            'Invalid {0} "{1}" value: "{2}". Value must be at least '
+            '{3}.'.format(self.component, self.option, value, self.min))
+    return value
+
+
 class StringDecoder(TypeVerifier):
   """Verifies and decodes a config option value when a string is expected."""
 
