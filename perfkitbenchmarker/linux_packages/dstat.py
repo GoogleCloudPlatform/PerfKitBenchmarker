@@ -15,8 +15,10 @@
 
 """Module containing dstat installation and cleanup functions."""
 
-SUSE11_MONITORING_REPO = 'http://download.opensuse.org/repositories/server:/monitoring/SLE_11_SP3/server:monitoring.repo'
-SUSE12_MONITORING_REPO = 'http://download.opensuse.org/repositories/server:/monitoring/SLE_12/server:monitoring.repo'
+SUSE11_MONITORING_REPO = 'http://download.opensuse.org/repositories/' \
+                         'server:/monitoring/SLE_11_SP3/server:monitoring.repo'
+SUSE12_MONITORING_REPO = 'http://download.opensuse.org/repositories/' \
+                         'server:/monitoring/SLE_12/server:monitoring.repo'
 
 
 def _Install(vm):

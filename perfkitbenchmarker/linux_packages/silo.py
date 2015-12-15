@@ -24,8 +24,8 @@ APT_PACKAGES = ('libjemalloc-dev libnuma-dev libdb++-dev '
                 'libmysqld-dev libaio-dev libssl-dev')
 YUM_PACKAGES = ('jemalloc-devel numactl-devel libdb-cxx-devel mysql-devel '
                 'libaio-devel openssl-devel')
-ZYP_PACKAGES = ('jemalloc-devel libnuma-devel libdb-4_8-devel mysql-community-devel '
-                'libaio-devel openssl-devel')
+ZYP_PACKAGES = ('jemalloc-devel libnuma-devel libdb-4_8-devel '
+                'mysql-community-devel libaio-devel openssl-devel')
 
 
 def _Install(vm):

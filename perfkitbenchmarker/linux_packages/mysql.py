@@ -16,8 +16,10 @@
 """Module containing mysql installation and cleanup functions."""
 
 MYSQL_RPM = 'http://dev.mysql.com/get/mysql-community-release-el6-5.noarch.rpm'
-MYSQL_RPM_SLES11 = 'http://dev.mysql.com/get/mysql-community-release-sles11-7.noarch.rpm'
-MYSQL_RPM_SLES12 = 'http://dev.mysql.com/get/mysql57-community-release-sles12-7.noarch.rpm'
+MYSQL_RPM_SLES11 = 'http://dev.mysql.com/get/' \
+                   'mysql-community-release-sles11-7.noarch.rpm'
+MYSQL_RPM_SLES12 = 'http://dev.mysql.com/get/' \
+                   'mysql57-community-release-sles12-7.noarch.rpm'
 MYSQL_PSWD = 'perfkitbenchmarker'
 
 

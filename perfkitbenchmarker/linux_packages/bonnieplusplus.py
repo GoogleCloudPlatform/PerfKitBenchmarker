@@ -15,8 +15,11 @@
 
 """Module containing bonnie++ installation and cleanup functions."""
 
-SUSE11_BENCHMARK_REPO_URL = 'http://download.opensuse.org/repositories/benchmark/SLE_11_SP4/benchmark.repo'
-SUSE12_BENCHMARK_REPO_URL = 'http://download.opensuse.org/repositories/benchmark/SLE_12/benchmark.repo'
+SUSE11_BENCHMARK_REPO_URL = 'http://download.opensuse.org/repositories/' \
+                            'benchmark/SLE_11_SP4/benchmark.repo'
+SUSE12_BENCHMARK_REPO_URL = 'http://download.opensuse.org/repositories/' \
+                            'benchmark/SLE_12/benchmark.repo'
+
 
 def _Install(vm):
   """Installs the bonnie++ package on the VM."""

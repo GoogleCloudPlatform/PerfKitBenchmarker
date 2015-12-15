@@ -15,7 +15,8 @@
 
 """Module containing sysbench installation and cleanup functions."""
 
-SUSE12_BENCHMARK_REPO = 'http://download.opensuse.org/repositories/benchmark/SLE_12/benchmark.repo'
+SUSE12_BENCHMARK_REPO = 'http://download.opensuse.org/repositories/' \
+                        'benchmark/SLE_12/benchmark.repo'
 
 
 def _Install(vm):

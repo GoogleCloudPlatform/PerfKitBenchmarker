@@ -16,7 +16,9 @@
 """Module containing OpenJDK7 installation and cleanup functions."""
 
 JAVA_HOME = '/usr'
-JAVA_SUSE11_REPO = 'http://download.opensuse.org/repositories/home:tdaitx/SLE_11_SP3/home:tdaitx.repo'
+JAVA_SUSE11_REPO = 'http://download.opensuse.org/repositories/' \
+                   'home:tdaitx/SLE_11_SP3/home:tdaitx.repo'
+
 
 def YumInstall(vm):
   """Installs the OpenJDK7 package on the VM."""
