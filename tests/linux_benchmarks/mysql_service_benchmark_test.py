@@ -37,10 +37,13 @@ class MySQLServiceBenchmarkTestCase(unittest.TestCase,
         self.contents, results, metadata)
     logging.info('results are, %s', results)
     expected_results = [
+        sample.Sample('sysbench tps p0.1', 526.38, 'NA', {}),
         sample.Sample('sysbench tps p1', 526.38, 'NA', {}),
         sample.Sample('sysbench tps p5', 526.38, 'NA', {}),
+        sample.Sample('sysbench tps p10', 526.38, 'NA', {}),
         sample.Sample('sysbench tps p50', 579.5, 'NA', {}),
         sample.Sample('sysbench tps p90', 636.0, 'NA', {}),
+        sample.Sample('sysbench tps p95', 636.0, 'NA', {}),
         sample.Sample('sysbench tps p99', 636.0, 'NA', {}),
         sample.Sample('sysbench tps p99.9', 636.0, 'NA', {}),
         sample.Sample('sysbench tps average', 583.61, 'NA', {}),
