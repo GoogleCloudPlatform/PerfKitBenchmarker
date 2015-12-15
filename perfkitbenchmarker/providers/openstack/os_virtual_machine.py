@@ -95,6 +95,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                               'destination_type': 'volume',
                               'delete_on_termination': True}]
 
+        availability_zone = FLAGS.openstack_availability_zone or self.zone
+
         vm = self.client.servers.create(
             name=self.name,
             image=image_id,
@@ -102,7 +104,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             key_name=self.key_name,
             security_groups=['perfkit_sc_group'],
             nics=nics,
-            availability_zone=self.zone,
+            availability_zone=availability_zone,
             block_device_mapping_v2=boot_from_vol,
             scheduler_hints=scheduler_hints,
             config_drive=FLAGS.openstack_config_drive)

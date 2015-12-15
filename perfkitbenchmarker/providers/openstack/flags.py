@@ -63,3 +63,6 @@ flags.DEFINE_enum('openstack_scheduler_policy', NONE,
                   [NONE, 'affinity', 'anti-affinity'],
                   'Add possibility to use affinity or anti-affinity '
                   'policy in scheduling process')
+
+flags.DEFINE_string('openstack_availability_zone', None,
+                    'Name of availability zone to create instance(s) on.')
