@@ -335,11 +335,11 @@ class BenchmarkSpec(object):
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
-    for port in vm.remote_access_ports:
-      vm.AllowPort(port)
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
+    for port in vm.remote_access_ports:
+      vm.AllowPort(port)
     vm.AddMetadata(benchmark=self.name, perfkit_uuid=self.uuid,
                    benchmark_uid=self.uid)
     vm.WaitForBootCompletion()
