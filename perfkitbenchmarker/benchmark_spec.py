@@ -70,6 +70,7 @@ CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 DEBIAN = 'debian'
 RHEL = 'rhel'
+SUSE = 'suse'
 WINDOWS = 'windows'
 UBUNTU_CONTAINER = 'ubuntu_container'
 
@@ -80,7 +81,7 @@ flags.DEFINE_enum('cloud', GCP,
                   VALID_CLOUDS,
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
-    'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
+    'os_type', DEBIAN, [DEBIAN, RHEL, SUSE, UBUNTU_CONTAINER, WINDOWS],
     'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
     'built on Debian and uses the same package manager. Likewise, CentOS\'s '
     'os_type is "rhel". In general if two OS\'s use the same package manager, '

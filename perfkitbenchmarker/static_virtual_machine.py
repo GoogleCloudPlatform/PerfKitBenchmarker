@@ -39,6 +39,7 @@ from perfkitbenchmarker import windows_virtual_machine
 WINDOWS = 'windows'
 DEBIAN = 'debian'
 RHEL = 'rhel'
+SUSE = 'suse'
 UBUNTU_CONTAINER = 'ubuntu_container'
 FLAGS = flags.FLAGS
 
@@ -197,6 +198,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         DEBIAN: linux_required_keys,
         RHEL: linux_required_keys,
         UBUNTU_CONTAINER: linux_required_keys,
+        SUSE: linux_required_keys,
     }
     required_keys = required_keys_by_os[FLAGS.os_type]
 
@@ -284,6 +286,7 @@ def GetStaticVmClass(os_type):
   class_dict = {
       DEBIAN: DebianBasedStaticVirtualMachine,
       RHEL: RhelBasedStaticVirtualMachine,
+      SUSE: SUSEBasedStaticVirtualMachine,
       WINDOWS: WindowsBasedStaticVirtualMachine,
       UBUNTU_CONTAINER: ContainerizedStaticVirtualMachine,
   }
@@ -307,6 +310,11 @@ class DebianBasedStaticVirtualMachine(StaticVirtualMachine,
 class RhelBasedStaticVirtualMachine(StaticVirtualMachine,
                                     linux_virtual_machine.RhelMixin):
     pass
+
+
+class SUSEBasedStaticVirtualMachine(StaticVirtualMachine,
+                                    linux_virtual_machine.SUSEMixin):
+  pass
 
 
 class WindowsBasedStaticVirtualMachine(StaticVirtualMachine,
