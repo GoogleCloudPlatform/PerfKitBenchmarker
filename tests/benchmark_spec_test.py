@@ -81,6 +81,7 @@ name:
     default:
       vm_spec:
         GCP:
+          machine_type: n1-standard-4
           not_a_vm_parameter: 4
 """
 ALWAYS_SUPPORTED = 'iperf'

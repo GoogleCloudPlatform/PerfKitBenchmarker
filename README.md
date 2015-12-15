@@ -588,10 +588,11 @@ PerfKit Benchmaker.
 
 Flag | Notes
 -----|------
-`--help`       | see all flags
-`--cloud`      | Cloud where the bechmarks are run. See the table below for choices.
-`--zone`       | This flag allows you to override the default zone. See the table below.
-`--benchmarks` | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --help`
+`--help`         | see all flags
+`--benchmarks`   | A comma separated list of benchmarks or benchmark sets to run such as `--benchmarks=iperf,ping` . To see the full list, run `./pkb.py --help`
+`--cloud`        | Cloud where the benchmarks are run. See the table below for choices.
+`--machine_type` | Type of machine to provision if pre-provisioned machines are not used. Most cloud providers accept the names of pre-defined provider-specific machine types (for example, GCP supports `--machine_type=n1-standard-8` for a GCE n1-standard-8 VM). Some cloud providers support YAML expressions that match the corresponding VM spec machine_type property in the [YAML configs](#configurations-and-configuration-overrides) (for example, GCP supports `--machine_type="{cpus: 1, memory: 4.5GiB}"` for a GCE custom VM with 1 vCPU and 4.5GiB memory). Note that the value provided by this flag will affect all provisioned machines; users who wish to provision different machine types for different roles within a single benchmark run should use the [YAML configs](#configurations-and-configuration-overrides) for finer control.
+`--zone`         | This flag allows you to override the default zone. See the table below.
 
 The default cloud is 'GCP', override with the `--cloud` flag. Each cloud has a default
 zone which you can override with the `--zone` flag, the flag supports the same values
@@ -667,7 +668,9 @@ hbase_ycsb:
       cloud: GCP
       vm_spec:
         GCP:
-          machine_type: n1-standard-1
+          machine_type:
+            cpus: 2
+            memory: 10.0GiB
           image: ubuntu-14-04
           zone: us-central1-c
         # Other clouds here...
