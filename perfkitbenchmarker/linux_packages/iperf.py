@@ -41,7 +41,8 @@ def ZypperInstall(vm):
   In the SUSE standard repository only iperf 3.0 is available
   """
   vm.Install('curl')
-  vm.RemoteCommand('curl %s -o %s/%s' % (IPERF_URL, vm_util.VM_TMP_DIR, IPERF_RPM))
+  vm.RemoteCommand('curl %s -o %s/%s' %
+                   (IPERF_URL, vm_util.VM_TMP_DIR, IPERF_RPM))
   vm.InstallPackages('%s/%s' % (vm_util.VM_TMP_DIR, IPERF_RPM))
 
 

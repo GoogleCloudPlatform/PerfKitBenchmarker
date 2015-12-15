@@ -21,9 +21,12 @@ APT_PACKAGES = ('bc gengetopt libevent-dev '
 ZYP_PACKAGES = ('bc gengetopt libevent-dev '
                 'gperftools-dev scons')
 
-SUSE11_TOOLS_REPO = 'http://download.opensuse.org/repositories/devel:/tools/SLE_11_SP4/devel:tools.repo'
-SUSE12_TOOLS_REPO = 'http://download.opensuse.org/repositories/devel:/tools/SLE_12/devel:tools.repo'
-SUSE11_PATRICKFREY_REPO = 'http://download.opensuse.org/repositories/home:/PatrickFrey/SLE_11_SP4/home:PatrickFrey.repo'
+SUSE11_TOOLS_REPO = 'http://download.opensuse.org/repositories/' \
+                    'devel:/tools/SLE_11_SP4/devel:tools.repo'
+SUSE12_TOOLS_REPO = 'http://download.opensuse.org/repositories/' \
+                    'devel:/tools/SLE_12/devel:tools.repo'
+SUSE11_PATRICKFREY_REPO = 'http://download.opensuse.org/repositories' \
+                          '/home:/PatrickFrey/SLE_11_SP4/home:PatrickFrey.repo'
 
 def YumInstall(vm):
   """Installs oldisim dependencies on the VM."""

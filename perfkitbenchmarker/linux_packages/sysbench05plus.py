@@ -22,7 +22,8 @@ separate installer here for 0.5 and later.
 """
 from perfkitbenchmarker import vm_util
 
-SUSE12_BENCHMARK_REPO = 'http://download.opensuse.org/repositories/benchmark/SLE_12/benchmark.repo'
+SUSE12_BENCHMARK_REPO = 'http://download.opensuse.org/repositories/' \
+                        'benchmark/SLE_12/benchmark.repo'
 
 def YumInstall(vm):
   """ Installs SysBench 0.5 for Rhel/CentOS. We have to build from source!"""

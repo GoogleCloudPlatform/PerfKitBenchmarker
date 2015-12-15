@@ -14,7 +14,8 @@
 
 
 """Module containing mongodb installation and cleanup functions."""
-SUSE12_MONGODB_REPO_URL = 'http://download.opensuse.org/repositories/server:/database/SLE_12/server:database.repo'
+SUSE12_MONGODB_REPO_URL = 'http://download.opensuse.org/repositories/' \
+                          'server:/database/SLE_12/server:database.repo'
 
 
 def YumInstall(vm):
