@@ -362,7 +362,7 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
 
   DEFAULT_IMAGE = WINDOWS_IMAGE
   BOOT_DISK_SIZE_GB = 50
-  BOOT_DISK_TYPE = disk.REMOTE_SSD
+  BOOT_DISK_TYPE = gce_disk.PD_SSD
 
   def __init__(self, vm_spec):
     """Initialize a Windows GCE virtual machine.
