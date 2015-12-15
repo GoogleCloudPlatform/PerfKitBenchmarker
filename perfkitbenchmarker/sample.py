@@ -15,7 +15,7 @@
 
 import collections
 import time
-PERCENTILES_LIST = [1, 5, 50, 90, 99, 99.9]
+PERCENTILES_LIST = [0.1, 1, 5, 10, 50, 90, 95, 99, 99.9]
 
 _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 
