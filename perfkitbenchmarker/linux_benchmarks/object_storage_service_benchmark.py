@@ -48,8 +48,8 @@ from perfkitbenchmarker.sample import PercentileCalculator  # noqa
 
 flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
                   [benchmark_spec_class.GCP, benchmark_spec_class.AWS,
-                   benchmark_spec_class.AZURE],
-                  'storage provider (GCP/AZURE/AWS) to use.')
+                   benchmark_spec_class.AZURE, benchmark_spec_class.OPENSTACK],
+                  'storage provider (GCP/AZURE/AWS/OPENSTACK) to use.')
 
 flags.DEFINE_enum('object_storage_scenario', 'all',
                   ['all', 'cli', 'api_data', 'api_namespace'],
@@ -75,6 +75,10 @@ flags.DEFINE_string('boto_file_location', None,
 
 flags.DEFINE_string('azure_lib_version', None,
                     'Use a particular version of azure client lib, e.g.: 1.0.2')
+
+flags.DEFINE_boolean('openstack_swift_insecure', False,
+                     'Allow swiftclient to access Swift service without \n'
+                     'having to verify the SSL certificate')
 
 FLAGS = flags.FLAGS
 
@@ -108,10 +112,13 @@ AZURE_CREDENTIAL_LOCATION = '.azure'
 DEFAULT_BOTO_LOCATION = '~/.boto'
 BOTO_LIB_VERSION = 'boto_lib_version'
 
+SWIFTCLIENT_LIB_VERSION = 'python-swiftclient_lib_version'
+
 OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
     benchmark_spec_class.GCP: '~/' + GCE_CREDENTIAL_LOCATION,
     benchmark_spec_class.AWS: '~/' + AWS_CREDENTIAL_LOCATION,
-    benchmark_spec_class.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION}
+    benchmark_spec_class.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION,
+    benchmark_spec_class.OPENSTACK: '~/'}
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data used in the CLI tests.
@@ -232,6 +239,26 @@ def _MakeAzureCommandSuffix(account_name, account_key, for_cli):
     return (' -a %s -k %s') % (account_name, account_key)
   else:
     return (' --azure_account=%s --azure_key=%s') % (account_name, account_key)
+
+
+def _MakeSwiftCommandPrefix(auth_url, tenant_name, username, password):
+  """This function returns a prefix for Swift CLI command.
+
+  Args:
+    auth_url: URL for obtaining auth token.
+    tenant_name: tenant name for obtaining auth token.
+    username: username for obtaining auth token.
+    password: password for obtaining auth token.
+
+  Returns:
+    string represents a command prefix.
+  """
+  options = ('--os-auth-url', auth_url,
+             '--os-tenant-name', tenant_name,
+             '--os-username', username,
+             '--os-password', password,
+             '--insecure' if FLAGS.openstack_swift_insecure else '',)
+  return ' '.join(options)
 
 
 def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
@@ -897,10 +924,105 @@ class GoogleCloudStorageBenchmark(object):
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
 
 
+class SwiftStorageBenchmark(object):
+  """OpenStack Swift version of storage benchmark."""
+
+  def __init__(self):
+    self.swift_command_prefix = ''
+
+  def Prepare(self, vm):
+    """Prepare vm with swift cli and create a swift container using vm.
+
+    Args:
+      vm: The vm being used to run the benchmark.
+    """
+    # Upgrade to latest urllib3 version fixes SSL SNMI error
+    vm.InstallPackages('python-urllib3')
+    vm.RemoteCommand('sudo pip install python-keystoneclient')
+    vm.RemoteCommand('sudo pip install python-swiftclient')
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
+    self.swift_command_prefix = _MakeSwiftCommandPrefix(vm.client.url,
+                                                        vm.client.tenant,
+                                                        vm.client.user,
+                                                        vm.client.password)
+    vm.RemoteCommand('swift %s post %s' % (self.swift_command_prefix,
+                                           vm.bucket_name))
+
+  def Run(self, vm, metadata):
+    """Run upload/download on vm with swift cli.
+
+    Args:
+      vm: The vm being used to run the benchmark.
+      metadata: the metadata to be stored with the results.
+
+    Returns:
+      A list of lists containing results of the tests. Each scenario outputs
+      results to a list of the following format:
+        name of the scenario ,value, unit of the value, metadata
+        e.g.,
+        'one byte object upload latency p50', 0.800, 'seconds', 'storage=swift'
+
+      Then the final return value is the list of the above list that reflect
+      the results of all scenarios ran here.
+    """
+    metadata[SWIFTCLIENT_LIB_VERSION] = _GetClientLibVersion(
+        vm, 'python-swiftclient')
+    results = []
+    scratch_dir = vm.GetScratchDir()
+
+    # CLI tool based tests
+
+    clean_up_container_cmd = ('swift %s delete %s'
+                              % (self.swift_command_prefix, vm.bucket_name))
+    upload_cmd = ('time '
+                  'swift %(prefix)s upload %(container)s %(directory)s'
+                  % {'container': vm.bucket_name,
+                     'directory': '%s/run/data/' % scratch_dir,
+                     'prefix': self.swift_command_prefix})
+
+    clean_up_local_temp_cmd = 'rm -r %s/run/temp/*' % scratch_dir
+    download_cmd = ('time '
+                    'swift %(prefix)s download %(container)s -D %(directory)s'
+                    % {'container': vm.bucket_name,
+                       'directory': '%s/run/temp/' % scratch_dir,
+                       'prefix': self.swift_command_prefix})
+
+    iteration_count = (CLI_TEST_ITERATION_COUNT
+                       if FLAGS.cli_test_size == 'normal'
+                       else LARGE_CLI_TEST_ITERATION_COUNT)
+
+    _CliBasedTests(results, metadata, vm, iteration_count,
+                   clean_up_container_cmd, upload_cmd, clean_up_local_temp_cmd,
+                   download_cmd)
+
+    if FLAGS.object_storage_scenario in ('all', 'api_data',):
+      logging.warn('Skipping API-based scenario for object storage service. '
+                   'Reason: Not yet implemented for OpenStack Swift')
+
+    return results
+
+  def Cleanup(self, vm):
+    """Clean up OpenStack Swift container and uninstall packages on vm.
+
+    Args:
+      vm: The vm that needs clean up.
+    """
+    remove_content_cmd = ('swift %s delete %s'
+                          % (self.swift_command_prefix, vm.bucket_name))
+    # Command above delete both container and its objects
+    remove_container_cmd = 'echo noop-container-delete'
+    DeleteBucketWithRetry(vm, remove_content_cmd, remove_container_cmd)
+
+    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-swiftclient')
+    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-keystoneclient')
+    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
+
+
 OBJECT_STORAGE_BENCHMARK_DICTIONARY = {
     benchmark_spec_class.GCP: GoogleCloudStorageBenchmark(),
     benchmark_spec_class.AWS: S3StorageBenchmark(),
-    benchmark_spec_class.AZURE: AzureBlobStorageBenchmark()}
+    benchmark_spec_class.AZURE: AzureBlobStorageBenchmark(),
+    benchmark_spec_class.OPENSTACK: SwiftStorageBenchmark()}
 
 
 def Prepare(benchmark_spec):
@@ -917,19 +1039,29 @@ def Prepare(benchmark_spec):
             FLAGS.storage])
   FLAGS.object_storage_credential_file = os.path.expanduser(
       FLAGS.object_storage_credential_file)
-  if not (
-      os.path.isfile(FLAGS.object_storage_credential_file) or os.path.isdir(
-          FLAGS.object_storage_credential_file)):
-    raise errors.Benchmarks.MissingObjectCredentialException(
-        'Credential cannot be found in %s',
-        FLAGS.object_storage_credential_file)
+
+  if FLAGS.storage == benchmark_spec_class.OPENSTACK:
+    openstack_creds_set = ('OS_AUTH_URL' in os.environ,
+                           'OS_TENANT_NAME' in os.environ,
+                           'OS_USERNAME' in os.environ,
+                           'OS_PASSWORD' in os.environ,)
+    if not all(openstack_creds_set):
+      raise errors.Benchmarks.MissingObjectCredentialException(
+          'OpenStack credentials not found in environment variables')
+  else:
+    if not (os.path.isfile(FLAGS.object_storage_credential_file) or
+            os.path.isdir(FLAGS.object_storage_credential_file)):
+      raise errors.Benchmarks.MissingObjectCredentialException(
+          'Credential cannot be found in %s',
+          FLAGS.object_storage_credential_file)
 
   if not FLAGS.boto_file_location:
     FLAGS.boto_file_location = DEFAULT_BOTO_LOCATION
   FLAGS.boto_file_location = os.path.expanduser(FLAGS.boto_file_location)
 
   if not os.path.isfile(FLAGS.boto_file_location):
-    if FLAGS.storage != benchmark_spec_class.AZURE:
+    if FLAGS.storage not in (benchmark_spec_class.AZURE,
+                             benchmark_spec_class.OPENSTACK):
       raise errors.Benchmarks.MissingObjectCredentialException(
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)
