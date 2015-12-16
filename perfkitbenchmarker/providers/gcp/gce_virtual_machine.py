@@ -248,6 +248,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd = self._GenerateCreateCommand(tf.name)
       create_cmd.Issue()
 
+  def _CreateDependencies(self):
+    super(GceVirtualMachine, self)._CreateDependencies()
+    # GCE firewall rules are created for all instances in a network.
+    # Create necessary VM access rules *prior* to creating the VM, such that it
+    # doesn't affect boot time.
+    self.AllowRemoteAccessPorts()
+
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data."""

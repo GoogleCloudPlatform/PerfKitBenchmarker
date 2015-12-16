@@ -251,6 +251,11 @@ class BaseVirtualMachine(resource.BaseResource):
     if self.firewall:
       self.firewall.AllowPort(self, port)
 
+  def AllowRemoteAccessPorts(self):
+    """Allow all ports in self.remote_access_ports."""
+    for port in self.remote_access_ports:
+      self.AllowPort(port)
+
   def AddMetadata(self, **kwargs):
     """Add key/value metadata to the instance.
 

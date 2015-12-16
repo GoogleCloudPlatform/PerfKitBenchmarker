@@ -173,6 +173,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     def _CreateDependencies(self):
         self.ImportKeyfile()
+        self.AllowRemoteAccessPorts()
 
     def _DeleteDependencies(self):
         self.DeleteKeyfile()

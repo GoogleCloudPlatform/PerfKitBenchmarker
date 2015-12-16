@@ -340,11 +340,10 @@ class BenchmarkSpec(object):
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
-    for port in vm.remote_access_ports:
-      vm.AllowPort(port)
+    vm.AllowRemoteAccessPorts()
+    vm.WaitForBootCompletion()
     vm.AddMetadata(benchmark=self.name, perfkit_uuid=self.uuid,
                    benchmark_uid=self.uid)
-    vm.WaitForBootCompletion()
     vm.OnStartup()
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()
