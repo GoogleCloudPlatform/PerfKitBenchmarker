@@ -16,11 +16,11 @@ This README is designed to give you the information you need to get running with
 * You are always welcome to [open an issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) as well to contact us.
 
 
-KNOWN ISSUES
+Known Issues
 ============
 
 
-LICENSING
+Licensing
 =========
 
 PerfKit Benchmarker provides wrappers and workload definitions around popular benchmark tools. We made it very simple
@@ -123,7 +123,7 @@ $ cd /path/to/PerfKitBenchmarker
 $ sudo pip install -r requirements.txt
 ```
 
-##Cloud account setup
+## Cloud account setup
 
 This section describes the setup steps needed for each cloud system.  
 * [Google Cloud](#install-gcloud-and-setup-authentication)
@@ -521,7 +521,7 @@ As a result, a `.boto` file is created under your home directory.
 `client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials`), which was setup as part of the 'gcloud auth login' step.
 
 
-RUNNING A SINGLE BENCHMARK
+Running a Single Benchmark
 ==========================
 PerfKit Benchmarker can run benchmarks both on Cloud Providers (GCP,
 AWS, Azure, DigitalOcean) as well as any "machine" you can SSH into.
@@ -577,7 +577,7 @@ $ ./pkb.py --cloud=Mesos --benchmarks=iperf --marathon_address=localhost:8080 --
 $ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
 ```
 
-HOW TO RUN WINDOWS BENCHMARKS
+How to Run Windows Benchmarks
 ==================
 You must be running on a Windows machine in order to run Windows benchmarks.
 Install all dependencies as above and set TrustedHosts to accept all hosts so
@@ -594,18 +594,18 @@ different set of benchmarks than Linux does. They can be found under
 perfkitbenchmarker/windows_benchmarks/. The target VM OS is Windows Server 2012
 R2.
 
-HOW TO RUN ALL STANDARD BENCHMARKS
+How to Run All Standard Benchmarks
 ==================
 Run without the --benchmarks parameter and every benchmark in the standard set will run serially which can take a couple of hours (alternatively run with --benchmarks="standard_set").  Additionally if you dont specify --cloud=... all benchmarks will run on the Google Cloud Platform.
 
 
-HOW TO RUN ALL BENCHMARKS IN A NAMED SET
+How to Run All Benchmarks in a Named Set
 ==================
 Named sets are are grouping of one or more benchmarks in the benchmarking directory. This feature allows parallel innovation of what is important to measure in the Cloud, and is defined by the set owner. For example the GoogleSet is maintained by Google, whereas the StanfordSet is managed by Stanford. Once a quarter a meeting is held to review all the sets to determine what benchmarks should be promoted to the standard_set. The Standard Set is also reviewed to see if anything should be removed.
 To run all benchmarks in a named set, specify the set name in the benchmarks parameter (e.g. --benchmarks="standard_set"). Sets can be combined with individual benchmarks or other named sets.
 
 
-USEFUL GLOBAL FLAGS
+Useful Global Flags
 ==================
 
 The following are some common flags used when configuring
@@ -657,7 +657,7 @@ Flag | Notes
 `--https_proxy`      | Needed for package manager or Ubuntu guest and for from github downloaded packages
 `--ftp_proxy`       | Needed for some Perfkit packages
 
-CONFIGURATIONS AND CONFIGURATION OVERRIDES
+Configurations and Configuration Overrides
 ==================
 Each benchmark now has an independent configuration which is written in YAML.
 Users may override this default configuration by providing a configuration.
@@ -752,7 +752,7 @@ periods), an equals sign, and finally the new value:
 ```
 See the section below for how to use static (i.e. pre-provisioned) machines in your config.
 
-ADVANCED: HOW TO RUN BENCHMARKS WITHOUT CLOUD PROVISIONING (eg: local workstation)
+Advanced: How To Run Benchmarks Without Cloud Provisioning (e.g., local workstation)
 ==================
 It is possible to run PerfKit Benchmarker without running the Cloud provioning steps.  This is useful if you want to run on a local machine, or have a benchmark like iperf run from an external point to a Cloud VM.
 
@@ -822,7 +822,7 @@ iperf:
         - *vm1
 ```
 
-SPECIFYING FLAGS IN CONFIGURATION FILES
+Specifying Flags in Configuration Files
 =================
 You can now specify flags in configuration files by using the `flags` key at the
 top level in a benchmark config. The expected value is a dictionary mapping
@@ -845,7 +845,7 @@ netperf:
 The new defaults will only apply to the benchmark in which they are specified.
 
 
-HOW TO EXTEND PerfKit Benchmarker
+How to Extend PerfKit Benchmarker
 =================
 First start with the [CONTRIBUTING.md] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
 file.  It has the basics on how to work with PerfKitBenchmarker, and how to submit your pull requests.
@@ -859,7 +859,7 @@ file we have added a lot of comments into the code to make it easy to;
 
 Even with lots of comments we make to support more detailed documention.  You will find the documatation we have on the [Wiki pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki).  Missing documentation you want?  Start a page and/or open an [issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) to get it added.
 
-INTEGRATION TESTING
+Integration Testing
 ===================
 
 In addition to regular unit tests, which are run via `hooks/check-everything`,
@@ -875,6 +875,6 @@ and configured all of the relevant cloud provider SDKs, and will fail if you
 have not done so.
 
 
-PLANNED IMPROVEMENTS
+Planned Improvements
 =======================
 Many... please add new requests via GitHub issues.
