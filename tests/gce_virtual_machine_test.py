@@ -62,6 +62,117 @@ class MemoryDecoderTestCase(unittest.TestCase):
         'must be an integer number of MiB.'))
 
 
+class CustomMachineTypeSpecTestCase(unittest.TestCase):
+
+  def testValid(self):
+    result = gce_virtual_machine.CustomMachineTypeSpec(_COMPONENT, cpus=1,
+                                                       memory='7.5GiB')
+    self.assertEqual(result.cpus, 1)
+    self.assertEqual(result.memory, 7680)
+
+  def testMissingCpus(self):
+    with self.assertRaises(errors.Config.MissingOption) as cm:
+      gce_virtual_machine.CustomMachineTypeSpec(_COMPONENT, memory='7.5GiB')
+    self.assertEqual(str(cm.exception), (
+        'Required options were missing from test_component: cpus.'))
+
+  def testMissingMemory(self):
+    with self.assertRaises(errors.Config.MissingOption) as cm:
+      gce_virtual_machine.CustomMachineTypeSpec(_COMPONENT, cpus=1)
+    self.assertEqual(str(cm.exception), (
+        'Required options were missing from test_component: memory.'))
+
+  def testExtraOptions(self):
+    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
+      gce_virtual_machine.CustomMachineTypeSpec(
+          _COMPONENT, cpus=1, memory='7.5GiB', extra1='one', extra2=2)
+    self.assertEqual(str(cm.exception), (
+        'Unrecognized options were found in test_component: extra1, extra2.'))
+
+  def testInvalidCpus(self):
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      gce_virtual_machine.CustomMachineTypeSpec(_COMPONENT, cpus=0,
+                                                memory='7.5GiB')
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component.cpus value: "0". Value must be at least 1.'))
+
+  def testInvalidMemory(self):
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      gce_virtual_machine.CustomMachineTypeSpec(_COMPONENT, cpus=1, memory=None)
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component.memory value: "None" (of type "NoneType"). '
+        'Value must be one of the following types: basestring.'))
+
+
+class MachineTypeDecoderTestCase(unittest.TestCase):
+
+  def setUp(self):
+    super(MachineTypeDecoderTestCase, self).setUp()
+    self.decoder = gce_virtual_machine.MachineTypeDecoder('machine_type')
+
+  def testDecodeString(self):
+    result = self.decoder.Decode('n1-standard-8', _COMPONENT, {})
+    self.assertEqual(result, 'n1-standard-8')
+
+  def testDecodeCustomVm(self):
+    result = self.decoder.Decode({'cpus': 1, 'memory': '7.5GiB'}, _COMPONENT,
+                                 {})
+    self.assertIsInstance(result, gce_virtual_machine.CustomMachineTypeSpec)
+    self.assertEqual(result.cpus, 1)
+    self.assertEqual(result.memory, 7680)
+
+  def testDecodeInvalidType(self):
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      self.decoder.Decode(None, _COMPONENT, {})
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component.machine_type value: "None" (of type '
+        '"NoneType"). Value must be one of the following types: basestring, '
+        'dict.'))
+
+  def testDecodeInvalidValue(self):
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      self.decoder.Decode({'cpus': 0, 'memory': '7.5GiB'}, _COMPONENT, {})
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component.machine_type.cpus value: "0". Value must be at '
+        'least 1.'))
+
+
+class GceVmSpecTestCase(unittest.TestCase):
+
+  def testStringMachineType(self):
+    result = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                           machine_type='n1-standard-8')
+    self.assertEqual(result.machine_type, 'n1-standard-8')
+    self.assertEqual(result.cpus, None)
+    self.assertEqual(result.memory, None)
+
+  def testCustomMachineType(self):
+    result = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
+        'cpus': 1, 'memory': '7.5GiB'})
+    self.assertEqual(result.machine_type, None)
+    self.assertEqual(result.cpus, 1)
+    self.assertEqual(result.memory, 7680)
+
+  def testStringMachineTypeFlagOverride(self):
+    flags = mock_flags.MockFlags()
+    flags.machine_type = 'n1-standard-8'
+    result = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, flag_values=flags,
+        machine_type={'cpus': 1, 'memory': '7.5GiB'})
+    self.assertEqual(result.machine_type, 'n1-standard-8')
+    self.assertEqual(result.cpus, None)
+    self.assertEqual(result.memory, None)
+
+  def testCustomMachineTypeFlagOverride(self):
+    flags = mock_flags.MockFlags()
+    flags.machine_type = '{cpus: 1, memory: 7.5GiB}'
+    result = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, flag_values=flags, machine_type='n1-standard-8')
+    self.assertEqual(result.machine_type, None)
+    self.assertEqual(result.cpus, 1)
+    self.assertEqual(result.memory, 7680)
+
+
 class GceVirtualMachineTestCase(unittest.TestCase):
 
   def setUp(self):
@@ -73,23 +184,6 @@ class GceVirtualMachineTestCase(unittest.TestCase):
                    '.gce_network.GceFirewall.GetFirewall')
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
-
-  def testConstructorNoMachineTypeNoCpus(self):
-    spec = gce_virtual_machine.GceVmSpec(_COMPONENT)
-    with self.assertRaises(errors.Config.MissingOption) as cm:
-      gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertEqual(str(cm.exception), (
-        'A GCP VM must have either a "machine_type" or both "cpus" and '
-        '"memory" configured.'))
-
-  def testConstructorBothMachineTypeAndCpus(self):
-    spec = gce_virtual_machine.GceVmSpec(
-        _COMPONENT, machine_type='test_machine_type', cpus=1)
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertEqual(str(cm.exception), (
-        'A GCP VM cannot have both a "machine_type" and either "cpus" or '
-        '"memory" configured.'))
 
   def testVmWithMachineTypeNonPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
@@ -106,13 +200,15 @@ class GceVirtualMachineTestCase(unittest.TestCase):
         'machine_type': 'test_machine_type', 'preemptible': True})
 
   def testCustomVmNonPreemptible(self):
-    spec = gce_virtual_machine.GceVmSpec(_COMPONENT, cpus=1, memory='1.0GiB')
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
+        'cpus': 1, 'memory': '1.0GiB'})
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mib': 1024})
 
   def testCustomVmPreemptible(self):
-    spec = gce_virtual_machine.GceVmSpec(_COMPONENT, cpus=1, memory='1.0GiB',
-                                         preemptible=True)
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type={'cpus': 1, 'memory': '1.0GiB'},
+        preemptible=True)
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mib': 1024,
                                                'preemptible': True})
