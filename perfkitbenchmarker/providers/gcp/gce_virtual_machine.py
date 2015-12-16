@@ -249,12 +249,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.Issue()
 
   def _CreateDependencies(self):
+    super(GceVirtualMachine, self)._CreateDependencies()
     # GCE firewall rules are created for all instances in a network.
     # Create necessary VM access rules *prior* to creating the VM, such that it
     # doesn't affect boot time.
-    super(GceVirtualMachine, self)._CreateDependencies()
-    for port in self.remote_access_ports:
-      self.AllowPort(port)
+    self.AllowRemoteAccessPorts()
 
   @vm_util.Retry()
   def _PostCreate(self):

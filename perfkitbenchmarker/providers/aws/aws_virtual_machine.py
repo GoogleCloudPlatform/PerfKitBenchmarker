@@ -220,8 +220,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # _GetDefaultImage calls the AWS CLI.
     self.image = self.image or self._GetDefaultImage(self.machine_type,
                                                      self.region)
-    for port in self.remote_access_ports:
-      self.AllowPort(port)
+    self.AllowRemoteAccessPorts()
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
