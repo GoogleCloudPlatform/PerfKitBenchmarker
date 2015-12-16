@@ -7,7 +7,8 @@ tuned (ie the defaults) because this is what most users will use.  This should h
 Only in the rare cause where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
-This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [Wiki Pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contain more detailed informaiton, 
+This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [wiki] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contains more detailed information:
+
 * [FAQ] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
 * [Tech Talks] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
 * [Governing rules] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
@@ -89,7 +90,7 @@ You also need the software dependencies, which are mostly command line tools and
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
 
 If you are running on Windows, you will need to install GitHub Windows
-since it includes tools like `openssl` and an `ssh` client. Alternatively you can
+since it includes tools like `openssl` and an `ssh` client. Alternatively, you can
 install Cygwin since it should include the same tools.
 
 ## Install Python 2.7 and `pip`
@@ -858,7 +859,7 @@ file we have added a lot of comments into the code to make it easy to;
 * Add new providers (eg: --cloud=<new provider>)
 * etc...
 
-Even with lots of comments we make to support more detailed documention.  You will find the documatation we have on the [Wiki pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki).  Missing documentation you want?  Start a page and/or open an [issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) to get it added.
+Even with lots of comments we make to support more detailed documention.  You will find the documatation we have on the [wiki](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki).  Missing documentation you want?  Start a page and/or open an [issue](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) to get it added.
 
 Integration Testing
 ===================
