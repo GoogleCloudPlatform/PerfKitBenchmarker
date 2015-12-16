@@ -980,7 +980,7 @@ class SwiftStorageBenchmark(object):
                      'directory': '%s/run/data/' % scratch_dir,
                      'prefix': self.swift_command_prefix})
 
-    clean_up_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
+    clean_up_local_temp_cmd = 'rm -r %s/run/temp/*' % scratch_dir
     download_cmd = ('time '
                     'swift %(prefix)s download %(container)s -D %(directory)s'
                     % {'container': vm.bucket_name,
