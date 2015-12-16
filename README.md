@@ -33,37 +33,38 @@ before you use the PerfKit Benchmarker.
 
 In its current release these are the benchmarks that are executed:
 
-  - `aerospike`: Apache V2 for the client and GNU AGPL v3.0 for the server (http://www.aerospike.com/products-services/)
-  - `bonnie++`: GPL v2 (http://www.coker.com.au/bonnie++/readme.html)
-  - `cassandra_ycsb`: Apache v2 (http://cassandra.apache.org/)
-  - `cassandra_stress`: Apache v2 (http://cassandra.apache.org/)
+  - `aerospike`: [Apache v2 for the client](http://www.aerospike.com/aerospike-licensing/)
+    and [GNU AGPL v3.0 for the server](https://github.com/aerospike/aerospike-server/blob/master/LICENSE)
+  - `bonnie++`: [GPL v2](http://www.coker.com.au/bonnie++/readme.html)
+  - `cassandra_ycsb`: [Apache v2](http://cassandra.apache.org/)
+  - `cassandra_stress`: [Apache v2](http://cassandra.apache.org/)
   - `cluster_boot`: MIT License
-  - `coremark`: EEMBC (https://www.eembc.org/)
+  - `coremark`: [EEMBC](https://www.eembc.org/)
   - `copy_throughput`: Apache v2.
-  - `fio`: GPL v2 (https://github.com/axboe/fio/blob/master/COPYING)
-  - `hadoop_terasort`: Apache v2 (http://hadoop.apache.org/)
-  - `hpcc`: Original BSD license (http://icl.cs.utk.edu/hpcc/faq/#263)
-  - `iperf`: BSD license(http://iperf.sourceforge.net/)
-  - `memtier_benchmark`: GPL v2 (https://github.com/RedisLabs/memtier_benchmark)
-  - `mesh_network`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
-  - `mongodb`: **Deprecated**. GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
-  - `mongodb_ycsb`: GNU AGPL v3.0 (http://www.mongodb.org/about/licensing/)
-  - `netperf`: HP license (http://www.calculate-linux.org/packages/licenses/netperf)
+  - `fio`: [GPL v2](https://github.com/axboe/fio/blob/master/COPYING)
+  - `hadoop_terasort`: [Apache v2](http://hadoop.apache.org/)
+  - `hpcc`: [Original BSD license](http://icl.cs.utk.edu/hpcc/faq/#263)
+  - `iperf`: [BSD license](http://iperf.sourceforge.net/)
+  - `memtier_benchmark`: [GPL v2](https://github.com/RedisLabs/memtier_benchmark)
+  - `mesh_network`: [HP license](http://www.calculate-linux.org/packages/licenses/netperf)
+  - `mongodb`: **Deprecated**. [GNU AGPL v3.0](http://www.mongodb.org/about/licensing/)
+  - `mongodb_ycsb`: [GNU AGPL v3.0](http://www.mongodb.org/about/licensing/)
+  - `netperf`: [HP license](http://www.calculate-linux.org/packages/licenses/netperf)
   - `oldisim`: Apache v2.
   - `object_storage_service`: Apache v2.
   - `ping`: No license needed.
   - `silo`: MIT License
-  - `scimark2`: public domain (http://math.nist.gov/scimark2/credits.html)
-  - `speccpu2006`: Spec CPU2006 (http://www.spec.org/cpu2006/)
-  - `sysbench_oltp`: GPL v2 (https://github.com/akopytov/sysbench)
-  * `tomcat`: Apache v2. (http://tomcat.apache.org)
-  - `unixbench`: GPL v2 (https://code.google.com/p/byte-unixbench/)
-  * `wrk`: Apache v2 (https://github.com/wg/wrk)
-  - `ycsb` (used by `mongodb`, `hbase_ycsb`, and others): Apache V2 (https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
+  - `scimark2`: [public domain](http://math.nist.gov/scimark2/credits.html)
+  - `speccpu2006`: [Spec CPU2006](http://www.spec.org/cpu2006/)
+  - `sysbench_oltp`: [GPL v2](https://github.com/akopytov/sysbench)
+  * `tomcat`: [Apache v2](http://tomcat.apache.org)
+  - `unixbench`: [GPL v2](https://code.google.com/p/byte-unixbench/)
+  * `wrk`: [Apache v2](https://github.com/wg/wrk)
+  - `ycsb` (used by `mongodb`, `hbase_ycsb`, and others): [Apache v2](https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
 
-  - openjdk-7-jre: GPL v2 with the Classpath Exception (http://openjdk.java.net/legal/gplv2+ce.html)
+  - `openjdk-7-jre`: [GPL v2 with the Classpath Exception](http://openjdk.java.net/legal/gplv2+ce.html)
 
 [CoreMark](http://www.eembc.org/coremark/) setup cannot be automated. EEMBC requires users to agree with their terms and conditions, and PerfKit
 Benchmarker users must manually download the CoreMark tarball from their website and save it under the
