@@ -45,9 +45,9 @@ NODETOOL = posixpath.join(CASSANDRA_DIR, 'bin', 'nodetool')
 
 # Number of times to attempt to start the cluster.
 CLUSTER_START_TRIES = 10
-CLUSTER_START_SLEEP = 120
+CLUSTER_START_SLEEP = 60
 # Time, in seconds, to sleep between node starts.
-NODE_START_SLEEP = 30
+NODE_START_SLEEP = 5
 
 
 def CheckPrerequisites():
@@ -205,6 +205,7 @@ def StartCluster(seed_vm, vms):
     raise ValueError('Cassandra failed to start on seed.')
 
   if vms:
+    logging.info('Starting remaining %d nodes', len(vms))
     # Start the VMs with a small pause in between each, to allow the node to
     # join.
     # Starting Cassandra nodes fails when multiple nodes attempt to join the
@@ -222,8 +223,8 @@ def StartCluster(seed_vm, vms):
       logging.info('All %d nodes up!', vm_count)
       break
 
-    logging.warn('Try %d: only %s of %s up. Sleeping %ds', i, vms_up,
-                 vm_count, NODE_START_SLEEP)
+    logging.warn('Try %d: only %s of %s up. Restarting and sleeping %ds', i,
+                 vms_up, vm_count, NODE_START_SLEEP)
     vm_util.RunThreaded(_StartCassandraIfNotRunning, vms)
     time.sleep(NODE_START_SLEEP)
   else:
