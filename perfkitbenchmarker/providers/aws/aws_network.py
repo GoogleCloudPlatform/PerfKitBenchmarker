@@ -105,6 +105,24 @@ class AwsVpc(resource.BaseResource):
     self._EnableDnsHostnames()
     util.AddDefaultTags(self.id, self.region)
 
+  def _PostCreate(self):
+    """Looks up the VPC default security group."""
+    cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-security-groups',
+        '--filters',
+        'Name=group-name,Values=default',
+        'Name=vpc-id,Values=' + self.id]
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    response = json.loads(stdout)
+    groups = response['SecurityGroups']
+    if len(groups) != 1:
+      raise ValueError('Expected one security group, got {} in {}'.format(
+          len(groups), response))
+    self.default_security_group_id = groups[0]['GroupId']
+    logging.info('Default security group ID: %s',
+                 self.default_security_group_id)
+
   def _Exists(self):
     """Returns true if the VPC exists."""
     describe_cmd = util.AWS_PREFIX + [
@@ -412,6 +430,7 @@ class AwsRegionalNetwork(network.BaseNetwork):
     self.route_table = None
     self.placement_group = AwsPlacementGroup(self.region)
     self.created = False
+    self.default_security_group_id = None
 
     # Locks to ensure that a single thread creates / deletes the instance.
     self._create_lock = threading.Lock()

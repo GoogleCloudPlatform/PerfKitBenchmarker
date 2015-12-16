@@ -122,6 +122,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.firewall = aws_network.AwsFirewall.GetFirewall()
 
+  @property
+  def group_id(self):
+    """Returns the security group ID of this VM."""
+    return self.network.regional_network.vpc.default_security_group_id
+
   @classmethod
   def _GetDefaultImage(cls, machine_type, region):
     """Returns the default image given the machine type and region.
@@ -202,10 +207,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     instance = response['Reservations'][0]['Instances'][0]
     self.ip_address = instance['PublicIpAddress']
     self.internal_ip = instance['PrivateIpAddress']
-    self.group_id = instance['SecurityGroups'][0]['GroupId']
     if util.IsRegion(self.zone):
       self.zone = str(instance['Placement']['AvailabilityZone'])
     util.AddDefaultTags(self.id, self.region)
+
+    assert self.group_id == instance['SecurityGroups'][0]['GroupId'], (
+        self.group_id, instance['SecurityGroups'][0]['GroupId'])
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -213,6 +220,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # _GetDefaultImage calls the AWS CLI.
     self.image = self.image or self._GetDefaultImage(self.machine_type,
                                                      self.region)
+    for port in self.remote_access_ports:
+      self.AllowPort(port)
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
