@@ -36,12 +36,12 @@ ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 class GceFirewallRule(resource.BaseResource):
   """An object representing a GCE Firewall Rule."""
 
-  def __init__(self, name, project, allow, network, source_range=None):
+  def __init__(self, name, project, allow, network_name, source_range=None):
     super(GceFirewallRule, self).__init__()
     self.name = name
     self.project = project
     self.allow = allow
-    self.network_name = network.network_resource.name
+    self.network_name = network_name
     self.source_range = source_range
 
   def __eq__(self, other):
@@ -109,7 +109,8 @@ class GceFirewall(network.BaseFirewall):
       allow = ','.join('{0}:{1}'.format(protocol, port)
                        for protocol in ('tcp', 'udp'))
       firewall_rule = GceFirewallRule(
-          firewall_name, vm.project, allow, vm.network, source_range)
+          firewall_name, vm.project, allow,
+          vm.network.network_resource.name, source_range)
       self.firewall_rules[key] = firewall_rule
       firewall_rule.Create()
 
@@ -166,7 +167,7 @@ class GceNetwork(network.BaseNetwork):
   def __init__(self, network_spec):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
-    name = 'pkb-network-%s' % FLAGS.run_uri
+    name = FLAGS.gce_network_name or 'pkb-network-%s' % FLAGS.run_uri
     self.network_resource = GceNetworkResource(name, self.project)
     firewall_name = 'default-internal-%s' % FLAGS.run_uri
     self.default_firewall_rule = GceFirewallRule(
@@ -184,10 +185,12 @@ class GceNetwork(network.BaseNetwork):
 
   def Create(self):
     """Creates the actual network."""
-    self.network_resource.Create()
-    self.default_firewall_rule.Create()
+    if FLAGS.gce_network_name is None:
+      self.network_resource.Create()
+      self.default_firewall_rule.Create()
 
   def Delete(self):
     """Deletes the actual network."""
-    self.default_firewall_rule.Delete()
-    self.network_resource.Delete()
+    if FLAGS.gce_network_name is None:
+      self.default_firewall_rule.Delete()
+      self.network_resource.Delete()
