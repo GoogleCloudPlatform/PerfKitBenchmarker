@@ -248,7 +248,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry()
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
-    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0 -O '
+    # Some images may automount one local disk, but we don't
+    # want to fail if this wasn't the case.
+    fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
+               'sudo mke2fs -F -E lazy_itable_init=0 -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteHostCommand(fmt_cmd)
 
@@ -467,9 +470,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def SetupLocalDisks(self):
     """Performs Linux specific setup of local disks."""
-    # Some images may automount one local disk, but we don't
-    # want to fail if this wasn't the case.
-    self.RemoteHostCommand('sudo umount /mnt', ignore_failure=True)
+    pass
 
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to prepare data disks.
