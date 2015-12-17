@@ -647,9 +647,13 @@ class DebianMixin(BaseLinuxMixin):
 
   OS_TYPE = 'debian'
 
-  def SetupPackageManager(self):
-    """Runs apt-get update so InstallPackages shouldn't need to."""
-    self.AptUpdate()
+  def __init__(self, *args, **kwargs):
+    super(DebianMixin, self).__init__(*args, **kwargs)
+
+    # Whether or not apt-get update has been called.
+    # We defer running apt-get update until the first request to install a
+    # package.
+    self._apt_updated = False
 
   @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def AptUpdate(self):
@@ -701,6 +705,11 @@ class DebianMixin(BaseLinuxMixin):
     """Installs a PerfKit package on the VM."""
     if not self.install_packages:
       return
+
+    if not self._apt_updated:
+      self.AptUpdate()
+      self._apt_updated = True
+
     if package_name not in self._installed_packages:
       package = linux_packages.PACKAGES[package_name]
       package.AptInstall(self)
