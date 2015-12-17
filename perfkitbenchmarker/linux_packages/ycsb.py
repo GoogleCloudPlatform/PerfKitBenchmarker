@@ -101,8 +101,9 @@ flags.DEFINE_list('ycsb_run_parameters', [],
 flags.DEFINE_list('ycsb_threads_per_client', ['32'], 'Number of threads per '
                   'loader during the benchmark run. Specify a list to vary the '
                   'number of clients.')
-flags.DEFINE_integer('ycsb_preload_threads', 1, 'Number of threads per '
-                     'loader during the initial data population stage.')
+flags.DEFINE_integer('ycsb_preload_threads', None, 'Number of threads per '
+                     'loader during the initial data population stage. '
+                     'Default value depends on the target DB.')
 flags.DEFINE_integer('ycsb_record_count', 1000000, 'Pre-load with a total '
                      'dataset of records total.')
 flags.DEFINE_integer('ycsb_operation_count', 1000000, 'Number of operations '
@@ -110,6 +111,9 @@ flags.DEFINE_integer('ycsb_operation_count', 1000000, 'Number of operations '
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination. Set to 0 for '
                      'unlimited time.')
+
+# Default loading thread count for non-batching backends.
+DEFAULT_PRELOAD_THREADS = 32
 
 
 def _GetThreadsPerLoaderList():
@@ -512,9 +516,16 @@ class YCSBExecutor(object):
 
     return 'cd %s; %s' % (YCSB_DIR, ' '.join(command))
 
+  @property
+  def _default_preload_threads(self):
+    """The default number of threads to use for pre-populating the DB."""
+    if FLAGS['ycsb_preload_threads'].present:
+      return FLAGS.ycsb_preload_threads
+    return DEFAULT_PRELOAD_THREADS
+
   def _Load(self, vm, **kwargs):
     """Execute 'ycsb load' on 'vm'."""
-    kwargs.setdefault('threads', FLAGS.ycsb_preload_threads)
+    kwargs.setdefault('threads', self._default_preload_threads)
     kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
     for pv in FLAGS.ycsb_load_parameters:
       param, value = pv.split('=', 1)
@@ -538,15 +549,15 @@ class YCSBExecutor(object):
 
     remote_path = posixpath.join(vm_util.VM_TMP_DIR,
                                  os.path.basename(workload_file))
-    kwargs.setdefault('threads', FLAGS.ycsb_preload_threads)
+    kwargs.setdefault('threads', self._default_preload_threads)
     kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
 
     with open(workload_file) as fp:
       workload_meta = _ParseWorkload(fp.read())
       workload_meta.update(kwargs)
       workload_meta.update(stage='load',
-                           clients=len(vms) * FLAGS.ycsb_preload_threads,
-                           threads_per_client_vm=FLAGS.ycsb_preload_threads,
+                           clients=len(vms) * kwargs['threads'],
+                           threads_per_client_vm=kwargs['threads'],
                            workload_name=os.path.basename(workload_file))
     record_count = int(workload_meta.get('recordcount', '1000'))
     n_per_client = long(record_count) // len(vms)

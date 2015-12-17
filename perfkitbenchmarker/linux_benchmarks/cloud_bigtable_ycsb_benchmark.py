@@ -277,7 +277,12 @@ def Run(benchmark_spec):
       'columnfamily': COLUMN_FAMILY,
       'clientbuffering': 'false'}
   load_kwargs = run_kwargs.copy()
+
+  # During the load stage, use a buffered mutator with a single thread.
+  # The BufferedMutator will handle multiplexing RPCs.
   load_kwargs['clientbuffering'] = 'true'
+  if not FLAGS['ycsb_preload_threads'].present:
+    load_kwargs['threads'] = 1
   samples = list(executor.LoadAndRun(vms,
                                      load_kwargs=load_kwargs,
                                      run_kwargs=run_kwargs))
