@@ -20,6 +20,7 @@ import itertools
 import json
 import logging
 import operator
+import pprint
 import sys
 import time
 import uuid
@@ -336,6 +337,7 @@ class LogPublisher(SamplePublisher):
   def __init__(self, level=logging.INFO, logger=None):
     self.level = level
     self.logger = logger or logging.getLogger()
+    self._pprinter = pprint.PrettyPrinter()
 
   def __repr__(self):
     return '<{0} logger={1} level={2}>'.format(type(self).__name__, self.logger,
@@ -346,7 +348,7 @@ class LogPublisher(SamplePublisher):
         '\n' + '-' * 25 + 'PerfKitBenchmarker Complete Results' + '-' * 25 +
         '\n']
     for sample in samples:
-      data.append('%s\n' % sample)
+      data.append('%s\n' % self._pprinter.pformat(sample))
     self.logger.log(self.level, ''.join(data))
 
 
