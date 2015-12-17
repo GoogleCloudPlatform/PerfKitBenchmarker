@@ -176,7 +176,7 @@ Make sure you have installed pip (see the section above).
 Install `python-novaclient` via the following command:
 
 ```bash
-$ sudo pip install python-novaclient
+$ sudo pip install -r requirements-openstack.txt
 ```
 
 You must specify authentication information for test execution, including user
@@ -316,10 +316,10 @@ Make sure your Mesos-slave nodes are reachable (by hostname) from the machine wh
 **Image prerequisites**  
 Please refer to the [Image prerequisites for Docker based clouds](#image-prerequisites-for-docker-based-clouds).
 
-### Cloudstack: Install `csapi` and set the API keys
+### Cloudstack: Install dependencies and set the API keys
 
 ```bash
-$ sudo pip install csapi
+$ sudo pip install -r requirements-cloudstack.txt
 ```
 
 Get the API key and SECRET from Cloudstack. Set the following environement variables.
@@ -343,7 +343,7 @@ Make sure you have installed pip (see the section above).
 Follow instructions at http://aws.amazon.com/cli/ or run the following command (omit the 'sudo' on Windows)
 
 ```bash
-$ sudo pip install awscli
+$ sudo pip install -r requirements-aws.txt
 ```
 
 Navigate to the AWS console to create access credentials: https://console.aws.amazon.com/ec2/
@@ -407,19 +407,13 @@ Run the following command to install `aliyuncli` (omit the `sudo` on Windows)
 2. Install aliyuncli tool and python SDK for ECS:
 
    ```bash
-   $ sudo pip install aliyuncli
+   $ sudo pip install -r requirements-alicloud.txt
    ```
 
    To check if AliCloud is installed:
 
    ```bash
    $ aliyuncli --help
-   ```
-
-   Install python SDK for ECS:
-
-   ```bash
-   $ sudo pip install aliyun-python-sdk-ecs
    ```
 
    Check if `aliyuncli ecs` command is ready:
@@ -506,8 +500,7 @@ To run PerfKit Benchmarker against Rackspace is very easy. First, install the
 CLI clients as follows:
 
 ```bash
-$ pip install -U rackspace-neutronclient
-$ pip install -U rackspace-novaclient
+$ pip install -r requirements-rackspace.txt
 ```
 
 Once these are installed, all we need to do is to set 3 environment variables:

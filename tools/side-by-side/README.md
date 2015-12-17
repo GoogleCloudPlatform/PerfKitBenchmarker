@@ -11,12 +11,11 @@ See:
 
 ## Requirements
 
-Listed in `requirements.txt` and `test-requirements.txt` at the root of this repository.
+Listed in `requirements.txt` and `requirements-testing.txt` at the root of this repository.
 
 From this directory:
 
-    pip install -r ../../requirements.txt
-    pip install -r ../../test-requirements.txt
+    pip install -r ../../requirements-testing.txt
 
 ## Example: testing two different revisions
 
