@@ -41,6 +41,7 @@ from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -170,7 +171,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     project: string or None. The project to create the VM in.
   """
 
-  CLOUD = 'GCP'
+  CLOUD = providers.GCP
 
   def __init__(self, *args, **kwargs):
     super(GceVmSpec, self).__init__(*args, **kwargs)
@@ -226,7 +227,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
-  CLOUD = 'GCP'
+  CLOUD = providers.GCP
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
   BOOT_DISK_SIZE_GB = 10

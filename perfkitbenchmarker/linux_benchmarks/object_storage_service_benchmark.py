@@ -37,7 +37,7 @@ import os
 import re
 import time
 
-from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -46,9 +46,9 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.sample import PercentileCalculator  # noqa
 
-flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
-                  [benchmark_spec_class.GCP, benchmark_spec_class.AWS,
-                   benchmark_spec_class.AZURE, benchmark_spec_class.OPENSTACK],
+flags.DEFINE_enum('storage', providers.GCP,
+                  [providers.GCP, providers.AWS,
+                   providers.AZURE, providers.OPENSTACK],
                   'storage provider (GCP/AZURE/AWS/OPENSTACK) to use.')
 
 flags.DEFINE_enum('object_storage_scenario', 'all',
@@ -115,10 +115,10 @@ BOTO_LIB_VERSION = 'boto_lib_version'
 SWIFTCLIENT_LIB_VERSION = 'python-swiftclient_lib_version'
 
 OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
-    benchmark_spec_class.GCP: '~/' + GCE_CREDENTIAL_LOCATION,
-    benchmark_spec_class.AWS: '~/' + AWS_CREDENTIAL_LOCATION,
-    benchmark_spec_class.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION,
-    benchmark_spec_class.OPENSTACK: '~/'}
+    providers.GCP: '~/' + GCE_CREDENTIAL_LOCATION,
+    providers.AWS: '~/' + AWS_CREDENTIAL_LOCATION,
+    providers.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION,
+    providers.OPENSTACK: '~/'}
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data used in the CLI tests.
@@ -1019,10 +1019,10 @@ class SwiftStorageBenchmark(object):
 
 
 OBJECT_STORAGE_BENCHMARK_DICTIONARY = {
-    benchmark_spec_class.GCP: GoogleCloudStorageBenchmark(),
-    benchmark_spec_class.AWS: S3StorageBenchmark(),
-    benchmark_spec_class.AZURE: AzureBlobStorageBenchmark(),
-    benchmark_spec_class.OPENSTACK: SwiftStorageBenchmark()}
+    providers.GCP: GoogleCloudStorageBenchmark(),
+    providers.AWS: S3StorageBenchmark(),
+    providers.AZURE: AzureBlobStorageBenchmark(),
+    providers.OPENSTACK: SwiftStorageBenchmark()}
 
 
 def Prepare(benchmark_spec):
@@ -1040,7 +1040,7 @@ def Prepare(benchmark_spec):
   FLAGS.object_storage_credential_file = os.path.expanduser(
       FLAGS.object_storage_credential_file)
 
-  if FLAGS.storage == benchmark_spec_class.OPENSTACK:
+  if FLAGS.storage == providers.OPENSTACK:
     openstack_creds_set = ('OS_AUTH_URL' in os.environ,
                            'OS_TENANT_NAME' in os.environ,
                            'OS_USERNAME' in os.environ,
@@ -1060,8 +1060,8 @@ def Prepare(benchmark_spec):
   FLAGS.boto_file_location = os.path.expanduser(FLAGS.boto_file_location)
 
   if not os.path.isfile(FLAGS.boto_file_location):
-    if FLAGS.storage not in (benchmark_spec_class.AZURE,
-                             benchmark_spec_class.OPENSTACK):
+    if FLAGS.storage not in (providers.AZURE,
+                             providers.OPENSTACK):
       raise errors.Benchmarks.MissingObjectCredentialException(
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)

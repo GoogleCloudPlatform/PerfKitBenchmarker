@@ -31,6 +31,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker.providers.alicloud import ali_disk
 from perfkitbenchmarker.providers.alicloud import ali_network
 from perfkitbenchmarker.providers.alicloud import util
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 NON_HVM_PREFIXES = ['t1', 's1', 's2', 's3', 'm1']
@@ -74,7 +75,7 @@ DEFAULT_IMAGE = "ubuntu1404_64_20G_aliaegis_20150325.vhd",
 class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AliCloud Virtual Machine."""
 
-  CLOUD = 'AliCloud'
+  CLOUD = providers.ALICLOUD
   DEFAULT_ZONE = 'cn-hangzhou-d'
   DEFAULT_MACHINE_TYPE = 'ecs.s3.large'
   IMAGE_NAME_FILTER = 'ubuntu1404_64_20G_aliaegis*'

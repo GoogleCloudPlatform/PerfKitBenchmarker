@@ -31,15 +31,15 @@ from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
-AWS = 'AWS'
 
 
 class AwsFirewall(network.BaseFirewall):
   """An object representing the AWS Firewall."""
 
-  CLOUD = AWS
+  CLOUD = providers.AWS
 
   def __init__(self):
     self.firewall_set = set()
@@ -505,7 +505,7 @@ class AwsNetwork(network.BaseNetwork):
     subnet: the AwsSubnet for this zone.
   """
 
-  CLOUD = AWS
+  CLOUD = providers.AWS
 
   def __init__(self, spec):
     """Initializes AwsNetwork instances.

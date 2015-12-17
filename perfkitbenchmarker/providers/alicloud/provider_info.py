@@ -16,11 +16,11 @@
 
 """
 
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import benchmark_spec
 
 
 class AliCloudProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = benchmark_spec.ALICLOUD
+  CLOUD = providers.ALICLOUD

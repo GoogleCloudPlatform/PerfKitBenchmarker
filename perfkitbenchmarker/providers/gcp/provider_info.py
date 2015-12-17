@@ -16,11 +16,11 @@
 
 """
 
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import benchmark_spec
 
 
 class GCPProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = []
-  CLOUD = benchmark_spec.GCP
+  CLOUD = providers.GCP

@@ -32,7 +32,7 @@ import StringIO
 import time
 import uuid
 
-from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -786,8 +786,8 @@ class GoogleCloudSQLBenchmark(object):
 
 
 MYSQL_SERVICE_BENCHMARK_DICTIONARY = {
-    benchmark_spec_class.GCP: GoogleCloudSQLBenchmark(),
-    benchmark_spec_class.AWS: RDSMySQLBenchmark()}
+    providers.GCP: GoogleCloudSQLBenchmark(),
+    providers.AWS: RDSMySQLBenchmark()}
 
 
 def Prepare(benchmark_spec):

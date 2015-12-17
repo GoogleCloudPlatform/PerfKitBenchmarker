@@ -24,6 +24,7 @@ from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import pkb
+from perfkitbenchmarker import providers
 
 
 NAME = 'ping'
@@ -56,7 +57,7 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def setupCommonFlags(self, mock_flags):
     mock_flags.os_type = benchmark_spec.DEBIAN
-    mock_flags.cloud = 'GCP'
+    mock_flags.cloud = providers.GCP
 
   def _CheckVMFromSpec(self, spec, num_working):
     vm0 = spec.vms[0]

@@ -19,6 +19,7 @@ import time
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.openstack import os_disk
 from perfkitbenchmarker.providers.openstack import os_network
 from perfkitbenchmarker.providers.openstack import utils as os_utils
@@ -32,7 +33,7 @@ FLAGS = flags.FLAGS
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
 
-    CLOUD = 'OpenStack'
+    CLOUD = providers.OPENSTACK
     DEFAULT_USERNAME = 'ubuntu'
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None

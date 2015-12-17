@@ -21,6 +21,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
     OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
@@ -37,7 +38,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   """
   Object representing a Kubernetes POD.
   """
-  CLOUD = 'Kubernetes'
+  CLOUD = providers.KUBERNETES
 
   def __init__(self, vm_spec):
     """Initialize a Kubernetes virtual machine.
