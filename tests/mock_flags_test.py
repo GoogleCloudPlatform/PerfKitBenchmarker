@@ -72,5 +72,20 @@ class PatchFlagsTestCase(unittest.TestCase):
     self.assertEqual(FLAGS['test_flag'].value, 0)
 
 
+class PatchTestCaseFlagsTestCase(unittest.TestCase):
+
+  def testGetFlag(self):
+    self.assertEqual(FLAGS.test_flag, 0)
+    flags = mock_flags.PatchTestCaseFlags(self)
+    flags.test_flag = 5
+    self.assertEqual(FLAGS.test_flag, 5)
+
+  def testSetFlag(self):
+    self.assertEqual(FLAGS.test_flag, 0)
+    flags = mock_flags.PatchTestCaseFlags(self)
+    FLAGS.test_flag = 5
+    self.assertEqual(flags.test_flag, 5)
+
+
 if __name__ == '__main__':
   unittest.main()
