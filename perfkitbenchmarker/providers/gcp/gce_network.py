@@ -171,7 +171,7 @@ class GceNetwork(network.BaseNetwork):
     self.network_resource = GceNetworkResource(name, self.project)
     firewall_name = 'default-internal-%s' % FLAGS.run_uri
     self.default_firewall_rule = GceFirewallRule(
-        firewall_name, self.project, ALLOW_ALL, self, NETWORK_RANGE)
+        firewall_name, self.project, ALLOW_ALL, name, NETWORK_RANGE)
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
