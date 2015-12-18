@@ -43,7 +43,7 @@ mongodb_ycsb:
     workers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
-      vm_count: null
+      vm_count: 1
     clients:
       vm_spec: *default_single_core
 """
