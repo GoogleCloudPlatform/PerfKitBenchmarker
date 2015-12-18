@@ -13,10 +13,12 @@
 # limitations under the License.
 
 import logging
+import re
 import threading
 import time
 
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import os_disk
@@ -27,6 +29,10 @@ UBUNTU_IMAGE = 'ubuntu-14.04'
 NONE = 'None'
 
 FLAGS = flags.FLAGS
+
+LSBLK_REGEX = (r'NAME="(.*)"\s+MODEL="(.*)"\s+SIZE="(.*)"'
+               r'\s+TYPE="(.*)"\s+MOUNTPOINT="(.*)"\s+LABEL="(.*)"')
+LSBLK_PATTERN = re.compile(LSBLK_REGEX)
 
 
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -58,6 +64,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.user_name = self.DEFAULT_USERNAME
         self.boot_wait_time = None
         self.image = self.image or self.DEFAULT_IMAGE
+        self.boot_device = None
+        self.root_disk_allocated = False
+        self.mounted_disks = set()
 
     def _Create(self):
         image = self.client.images.findall(name=self.image)[0]
@@ -162,14 +171,75 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         if self.hostname is None:
             self.hostname = resp[:-1]
 
-    def CreateScratchDisk(self, disk_spec):
-        disks_names = ('%s-data-%d-%d'
-                       % (self.name, len(self.scratch_disks), i)
-                       for i in range(disk_spec.num_striped_disks))
-        disks = [os_disk.OpenStackDisk(disk_spec, name, self.zone)
-                 for name in disks_names]
+    def OnStartup(self):
+        super(OpenStackVirtualMachine, self).OnStartup()
+        self.boot_device = self._GetBootDevice()
 
-        self._CreateScratchDiskFromDisks(disk_spec, disks)
+    def CreateScratchDisk(self, disk_spec):
+        """
+        Creates instances of OpenStackDisk child classes depending on disk type.
+        """
+        if disk_spec.disk_type == os_disk.ROOT:  # Ignore num_striped_disks
+            if self.root_disk_allocated:
+                raise errors.Error('Only a Root disk can be created per VM')
+            device_path = '/dev/%s' % self.boot_device['name']
+            scratch_disk = os_disk.OpenStackRootDisk(disk_spec, device_path)
+            self.root_disk_allocated = True
+            self.scratch_disks.append(scratch_disk)
+            scratch_disk.Create()
+            path = disk_spec.mount_point
+            mk_cmd = ('sudo mkdir -p {0};'
+                      'sudo chown -R $USER:$USER {0};').format(path)
+            self.RemoteCommand(mk_cmd)
+        else:
+            scratch_disks = []
+            for disk_num in range(disk_spec.num_striped_disks):
+                if disk_spec.disk_type == os_disk.LOCAL:
+                    scratch_disks.extend(self._CreateLocalDisks(disk_spec))
+                elif disk_spec.disk_type == os_disk.VOLUME:
+                    scratch_disk = os_disk.OpenStackBlockStorageDisk(disk_spec,
+                                                                     self.name,
+                                                                     self.zone)
+                    scratch_disks.append(scratch_disk)
+                else:
+                    raise errors.Error('Unsupported data disk type: %s'
+                                       % disk_spec.disk_type)
+
+            self._CreateScratchDiskFromDisks(disk_spec, scratch_disks)
+
+    def _CreateLocalDisks(self, disk_spec):
+        blk_devices = self._GetBlockDevices()
+        extra_blk_devices = []
+        for dev in blk_devices:
+            if self._IsDiskAvailable(dev):
+                extra_blk_devices.append(dev)
+
+        if len(extra_blk_devices) == 0:
+          raise errors.Error(
+              ''.join(('Machine type %s does not include' % self.machine_type,
+                       ' local disks. Please use a different disk_type,',
+                       ' or a machine_type that provides local disks.')))
+        elif len(extra_blk_devices) < disk_spec.num_striped_disks:
+          raise errors.Error(
+              'Not enough local data disks.'
+              ' Requesting %d disk, but only %d available.'
+              % (disk_spec.num_striped_disks, len(extra_blk_devices)))
+
+        disks = []
+        for i in range(disk_spec.num_striped_disks):
+            local_device = extra_blk_devices[i]
+            local_disk = os_disk.OpenStackLocalDisk(
+                disk_spec, '/dev/%s' % local_device['name'], self.name)
+            self.mounted_disks.add(local_device['name'])
+            disks.append(local_disk)
+
+        return disks
+
+    def _IsDiskAvailable(self, blk_device):
+        return (blk_device['type'] != 'part' and
+                blk_device['name'] != self.boot_device['name'] and
+                'config' not in blk_device['label'] and
+                blk_device['name'] not in self.mounted_disks)
 
     def _CreateDependencies(self):
         self.ImportKeyfile()
@@ -196,6 +266,43 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.client.keypairs.delete(self.pk)
         except NotFound:
             logging.info("Deleting key doesn't exists")
+
+    def _GetBlockDevices(self):
+        stdout, _ = self.RemoteCommand(
+            'sudo lsblk -o NAME,MODEL,SIZE,TYPE,MOUNTPOINT,LABEL -n -b -P')
+        lines = stdout.splitlines()
+        groups = [LSBLK_PATTERN.match(line) for line in lines]
+        tuples = [g.groups() for g in groups if g]
+        colnames = ('name', 'model', 'size_bytes',
+                    'type', 'mountpoint', 'label',)
+        blk_devices = [dict(zip(colnames, t)) for t in tuples]
+        for d in blk_devices:
+            d['model'] = d['model'].rstrip()
+            d['label'] = d['label'].rstrip()
+            d['size_bytes'] = int(d['size_bytes'])
+        return blk_devices
+
+    def _GetBootDevice(self):
+        blk_devices = self._GetBlockDevices()
+        boot_blk_device = None
+        for dev in blk_devices:
+            if dev['mountpoint'] == '/':
+                boot_blk_device = dev
+                break
+
+        if boot_blk_device is None:  # Unlikely
+            raise errors.Error('Could not find disk with "/" root mount point.')
+
+        if boot_blk_device['type'] == 'part':
+            blk_device_name = boot_blk_device['name'].rstrip('0123456789')
+            for dev in blk_devices:
+                if dev['type'] == 'disk' and dev['name'] == blk_device_name:
+                    boot_blk_device = dev
+                    break
+            else:  # Also, unlikely
+                raise errors.Error('Could not find disk containing boot '
+                                   'partition.')
+        return boot_blk_device
 
 
 class DebianBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
