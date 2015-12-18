@@ -90,6 +90,20 @@ def AptInstall(vm):
   _Install(vm)
 
 
+def JujuInstall(vm):
+    if vm.isController is True:
+
+        # TODO: The number of units deployed should match
+        # those in the benchmark_spec
+        vm.Deploy('cs:trusty/cassandra', 3)
+        vm.Set('cassandra', ['authenticator=AllowAllAuthenticator'])
+        vm.Deploy('cs:~marcoceppi/trusty/cassandra-stress')
+        vm.Relate('cassandra', 'cassandra-stress')
+
+        # This will wait for the cassandra cluster and cassandra-stress vms
+        # to fully deploy and be ready for benchmarking
+        vm.Wait(timeout=1800)
+
 def Configure(vm, seed_vms):
   """Configure Cassandra on 'vm'.
 

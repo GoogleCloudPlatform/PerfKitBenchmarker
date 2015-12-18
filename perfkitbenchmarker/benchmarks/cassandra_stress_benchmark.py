@@ -46,6 +46,7 @@ NUM_KEYS_PER_CORE = 2000000
 WRITE_COMMAND = 'write'
 COUNTER_WRITE_COMMAND = 'counter_write'
 USER_COMMAND = 'user'
+JUJU = 'juju'
 
 # cassandra-stress command [options]
 flags.DEFINE_enum('cassandra_stress_command', WRITE_COMMAND,
@@ -165,19 +166,24 @@ def Prepare(benchmark_spec):
   cassandra_vms = vm_dict[CASSANDRA_GROUP]
   logging.info('VM dictionary %s', vm_dict)
 
-  logging.info('Authorizing loader[0] permission to access all other vms.')
-  vm_dict[CLIENT_GROUP][0].AuthenticateVm()
+  if FLAGS.os_type == JUJU:
+    logging.info('[JUJU] Preparing data files and Java on all vms.')
+    vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
+    pass
+  else:
+    logging.info('Authorizing loader[0] permission to access all other vms.')
+    vm_dict[CLIENT_GROUP][0].AuthenticateVm()
 
-  logging.info('Preparing data files and Java on all vms.')
-  vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
-  seed_vm = cassandra_vms[0]
-  configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
-  vm_util.RunThreaded(configure, cassandra_vms)
-  cassandra.StartCluster(seed_vm, cassandra_vms[1:])
-  if FLAGS.cassandra_stress_command == USER_COMMAND:
-    for vm in vm_dict[CLIENT_GROUP]:
-      vm.PushFile(FLAGS.cassandra_stress_profile,
-                  TEMP_PROFILE_PATH)
+    logging.info('Preparing data files and Java on all vms.')
+    vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
+    seed_vm = cassandra_vms[0]
+    configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
+    vm_util.RunThreaded(configure, cassandra_vms)
+    cassandra.StartCluster(seed_vm, cassandra_vms[1:])
+    if FLAGS.cassandra_stress_command == USER_COMMAND:
+      for vm in vm_dict[CLIENT_GROUP]:
+        vm.PushFile(FLAGS.cassandra_stress_profile,
+                    TEMP_PROFILE_PATH)
 
 
 def _ResultFilePath(vm):
@@ -194,6 +200,14 @@ def RunTestOnLoader(vm, loader_index, keys_per_vm, data_node_ips):
     keys_per_vm: The number of keys per loader vm need to insert.
     data_node_ips: List of IP addresses for all data nodes.
   """
+  if FLAGS.os_type == JUJU:
+    """
+    Replace the stock CASSANDRA_STRESS so that it uses the binary
+    installed by the cassandra-stress charm.
+    """
+    global CASSANDRA_STRESS
+    CASSANDRA_STRESS = '/usr/bin/cassandra-stress'
+
   cassandra_stress_command = FLAGS.cassandra_stress_command
 
   if cassandra_stress_command == USER_COMMAND:
@@ -380,5 +394,8 @@ def Cleanup(benchmark_spec):
   vm_dict = benchmark_spec.vm_groups
   cassandra_vms = vm_dict[CASSANDRA_GROUP]
 
-  vm_util.RunThreaded(cassandra.Stop, cassandra_vms)
-  vm_util.RunThreaded(cassandra.CleanNode, cassandra_vms)
+  if FLAGS.os_type == JUJU:
+    pass
+  else:
+    vm_util.RunThreaded(cassandra.Stop, cassandra_vms)
+    vm_util.RunThreaded(cassandra.CleanNode, cassandra_vms)
