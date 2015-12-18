@@ -83,6 +83,7 @@ OPENSTACK = 'OpenStack'
 CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 DEBIAN = 'debian'
+JUJU = 'juju'
 RHEL = 'rhel'
 WINDOWS = 'windows'
 UBUNTU_CONTAINER = 'ubuntu_container'
@@ -113,6 +114,7 @@ CLASSES = {
     AWS: {
         VIRTUAL_MACHINE: {
             DEBIAN: aws_virtual_machine.DebianBasedAwsVirtualMachine,
+            JUJU: aws_virtual_machine.JujuBasedAwsVirtualMachine,
             RHEL: aws_virtual_machine.RhelBasedAwsVirtualMachine,
             WINDOWS: aws_virtual_machine.WindowsAwsVirtualMachine
         },
@@ -167,7 +169,7 @@ flags.DEFINE_enum('cloud', GCP,
                    RACKSPACE, CLOUDSTACK],
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
-    'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
+    'os_type', DEBIAN, [DEBIAN, JUJU, RHEL, UBUNTU_CONTAINER, WINDOWS],
     'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
     'built on Debian and uses the same package manager. Likewise, CentOS\'s '
     'os_type is "rhel". In general if two OS\'s use the same package manager, '
@@ -252,62 +254,107 @@ class BenchmarkSpec(object):
       return group_spec[OS_TYPE]
     return FLAGS.os_type
 
+
+  def ConstructVirtualMachine(self, group_name, group_spec):
+    """
+    Construct the virtual machine(s) needed for a group
+    """
+    vms = []
+    vm_count = group_spec.get(VM_COUNT, DEFAULT_COUNT)
+    if vm_count is None:
+      vm_count = FLAGS.num_vms
+    disk_count = group_spec.get(DISK_COUNT, DEFAULT_COUNT)
+
+    try:
+      # First create the Static VMs.
+      if STATIC_VMS in group_spec:
+        static_vm_specs = group_spec[STATIC_VMS][:vm_count]
+        for spec_kwargs in static_vm_specs:
+          vm_spec = static_vm.StaticVmSpec(**spec_kwargs)
+          static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
+          vms.append(static_vm_class(vm_spec))
+
+      os_type = self._GetOsTypeForGroup(group_name)
+      cloud = self._GetCloudForGroup(group_name)
+
+      # Then create a VmSpec and possibly a DiskSpec which we can
+      # use to create the remaining VMs.
+      vm_spec_class = _GetVmSpecClass(cloud)
+      vm_spec = vm_spec_class(**group_spec[VM_SPEC][cloud])
+
+      if DISK_SPEC in group_spec:
+        disk_spec_class = _GetDiskSpecClass(cloud)
+        disk_spec = disk_spec_class(**group_spec[DISK_SPEC][cloud])
+        disk_spec.ApplyFlags(FLAGS)
+      else:
+        disk_spec = None
+
+    except TypeError as e:
+      # This is what we get if one of the kwargs passed into a spec's
+      # __init__ method was unexpected.
+      raise ValueError(
+        'Config contained an unexpected parameter. Error message:\n%s' % e)
+
+    # Create the remaining VMs using the specs we created earlier.
+    for _ in xrange(vm_count - len(vms)):
+      vm_spec.ApplyFlags(FLAGS)
+      vm = self._CreateVirtualMachine(vm_spec, os_type, cloud)
+
+      if disk_spec:
+        vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
+        # In the event that we need to create multiple disks from the same
+        # DiskSpec, we need to ensure that they have different mount points.
+        if (disk_count > 1 and disk_spec.mount_point):
+          for i, spec in enumerate(vm.disk_specs):
+            spec.mount_point += str(i)
+        logging.warn(_)
+      vms.append(vm)
+
+    return vms
+
+
   def ConstructVirtualMachines(self):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
     vm_group_specs = self.config[VM_GROUPS]
 
+
+    if FLAGS.os_type == JUJU:
+        """
+        The Juju VM needs to be created first, so that subsequent units can
+        be properly added under its control.
+        """
+
+        # Clone the settings of the first VM_GROUP to launch our Juju VM
+        self.config[VM_GROUPS]['juju'] = dict(
+            self.config[VM_GROUPS].get(
+                self.config[VM_GROUPS].keys()[0]
+            )
+        )
+        self.config[VM_GROUPS]['juju']['vm_count'] = 1
+
+        jujuvm = None
+        jujuvms = self.ConstructVirtualMachine('juju', self.config[VM_GROUPS]['juju'])
+        if len(jujuvms):
+            jujuvm = jujuvms.pop()
+            jujuvm.isController = True
+
+        # Destroy our temporary VM group
+        self.config[VM_GROUPS].pop('juju', None)
+
     for group_name, group_spec in vm_group_specs.iteritems():
-      vms = []
-      vm_count = group_spec.get(VM_COUNT, DEFAULT_COUNT)
-      if vm_count is None:
-        vm_count = FLAGS.num_vms
-      disk_count = group_spec.get(DISK_COUNT, DEFAULT_COUNT)
-
-      try:
-        # First create the Static VMs.
-        if STATIC_VMS in group_spec:
-          static_vm_specs = group_spec[STATIC_VMS][:vm_count]
-          for spec_kwargs in static_vm_specs:
-            vm_spec = static_vm.StaticVmSpec(**spec_kwargs)
-            static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
-            vms.append(static_vm_class(vm_spec))
-
-        os_type = self._GetOsTypeForGroup(group_name)
-        cloud = self._GetCloudForGroup(group_name)
-
-        # Then create a VmSpec and possibly a DiskSpec which we can
-        # use to create the remaining VMs.
-        vm_spec_class = _GetVmSpecClass(cloud)
-        vm_spec = vm_spec_class(**group_spec[VM_SPEC][cloud])
-
-        if DISK_SPEC in group_spec:
-          disk_spec_class = _GetDiskSpecClass(cloud)
-          disk_spec = disk_spec_class(**group_spec[DISK_SPEC][cloud])
-          disk_spec.ApplyFlags(FLAGS)
-        else:
-          disk_spec = None
-
-      except TypeError as e:
-        # This is what we get if one of the kwargs passed into a spec's
-        # __init__ method was unexpected.
-        raise ValueError(
-            'Config contained an unexpected parameter. Error message:\n%s' % e)
-
-      # Create the remaining VMs using the specs we created earlier.
-      for _ in xrange(vm_count - len(vms)):
-        vm_spec.ApplyFlags(FLAGS)
-        vm = self._CreateVirtualMachine(vm_spec, os_type, cloud)
-        if disk_spec:
-          vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
-          # In the event that we need to create multiple disks from the same
-          # DiskSpec, we need to ensure that they have different mount points.
-          if (disk_count > 1 and disk_spec.mount_point):
-            for i, spec in enumerate(vm.disk_specs):
-              spec.mount_point += str(i)
-        vms.append(vm)
+      vms = self.ConstructVirtualMachine(group_name, group_spec)
 
       self.vm_groups[group_name] = vms
       self.vms.extend(vms)
+
+    # Append the Juju VM to the end of the vm list
+    if FLAGS.os_type == JUJU and jujuvm is not None:
+        for vm in self.vms:
+            vm.controller = jujuvm
+
+        jujuvm.units = list(self.vms)
+
+        self.vms.extend([jujuvm])
 
   def Prepare(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
@@ -317,6 +364,7 @@ class BenchmarkSpec(object):
       vm_util.RunThreaded(self.PrepareVm, self.vms)
       if FLAGS.os_type != WINDOWS:
         vm_util.GenerateSSHConfig(self.vms)
+
 
   def Delete(self):
     if FLAGS.run_stage not in ['all', 'cleanup'] or self.deleted:
