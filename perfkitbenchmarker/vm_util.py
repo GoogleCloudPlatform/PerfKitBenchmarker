@@ -76,7 +76,7 @@ flags.DEFINE_integer('burn_cpu_threads', 1, 'Number of threads to use to '
                      'burn cpu before starting benchmark.')
 flags.DEFINE_integer('background_cpu_threads', None,
                      'Number of threads of background cpu usage while '
-                     'running benchmark')
+                     'running a benchmark')
 
 
 class IpAddressSubset(object):

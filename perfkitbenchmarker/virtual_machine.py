@@ -552,3 +552,18 @@ class BaseOsMixin(object):
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
     raise NotImplementedError()
+
+  def StartBackgroundWorkload(self):
+    """Start the background workload"""
+    if self.background_cpu_threads:
+      raise NotImplementedError()
+
+  def StopBackgroundWorkload(self):
+    """Stop the background workoad"""
+    if self.background_cpu_threads:
+      raise NotImplementedError()
+
+  def PrepareBackgroundWorkload(self):
+    """Prepare for the background workload"""
+    if self.background_cpu_threads:
+      raise NotImplementedError()

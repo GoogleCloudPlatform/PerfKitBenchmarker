@@ -55,7 +55,7 @@ class TestBackgroundWorkload(unittest.TestCase):
     self.last_call += 1
 
   def setupCommonFlags(self, mock_flags):
-    mock_flags.os_type = 'debian'
+    mock_flags.os_type = benchmark_spec.DEBIAN
     mock_flags.cloud = 'GCP'
 
   def _CheckVMFromSpec(self, spec, num_working):
@@ -110,6 +110,22 @@ class TestBackgroundWorkload(unittest.TestCase):
           self.assertEqual(vm.StartBackgroundWorkload.call_count, 1)
           self.assertEqual(vm.StopBackgroundWorkload.call_count, 1)
 
+  def testWindowsVMCausesError(self):
+    """ windows vm with background_cpu_threads raises exception """
+    with mock_flags.PatchFlags() as mocked_flags:
+      self.setupCommonFlags(mocked_flags)
+      mocked_flags.background_cpu_threads = 1
+      mocked_flags.os_type = benchmark_spec.WINDOWS
+      config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
+      spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+      spec.ConstructVirtualMachines()
+      with self.assertRaises(Exception):
+        spec.Prepare()
+      with self.assertRaises(Exception):
+        spec.StartBackgroundWorkload()
+      with self.assertRaises(Exception):
+        spec.StopBackgroundWorkload()
+
   def testBackgroundWorkloadVM(self):
     """ Check that the vm background workload calls work """
     with mock_flags.PatchFlags() as mocked_flags:
@@ -124,6 +140,20 @@ class TestBackgroundWorkload(unittest.TestCase):
     """ Test that nothing happens with the vanilla config """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
+      mocked_flags.background_cpu_threads = None
+      config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
+      spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+      spec.ConstructVirtualMachines()
+
+      for vm in spec.vms:
+        self.assertIsNone(vm.background_cpu_threads)
+      self._CheckVMFromSpec(spec, 0)
+
+  def testBackgroundWorkloadWindows(self):
+    """ Test that nothing happens with the vanilla config """
+    with mock_flags.PatchFlags() as mocked_flags:
+      self.setupCommonFlags(mocked_flags)
+      mocked_flags.os_type = benchmark_spec.WINDOWS
       mocked_flags.background_cpu_threads = None
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
