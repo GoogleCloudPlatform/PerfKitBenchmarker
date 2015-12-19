@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,9 +50,34 @@ class AzureScratchDiskIntegrationTest(unittest.TestCase):
                 },
                 'disk_spec': {
                     'Azure': {
-                        'disk_type': 'remote_ssd',
+                        'disk_type': 'premium-storage',
                         'disk_size': 10,  # disk size must be between
                                           # 10 and 1024 GB.
+                        'mount_point': MOUNT_POINT
+                    }
+                }
+            }
+        }
+    }, MOUNT_POINT)
+
+  def testStandardDisk(self):
+    test_util.assertDiskMounts({
+        'flags': {
+            'azure_storage_type': 'LRS'
+        },
+        'vm_groups': {
+            'vm_group_1': {
+                'cloud': 'Azure',
+                'vm_spec': {
+                    'Azure': {
+                        'machine_type': 'Standard_D2',
+                        'zone': 'East US 2'
+                    }
+                },
+                'disk_spec': {
+                    'Azure': {
+                        'disk_type': 'standard-disk',
+                        'disk_size': 2,
                         'mount_point': MOUNT_POINT
                     }
                 }

@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,3 +38,19 @@ def LoadModulesForPath(path, package_prefix=None):
   for _, modname, ispkg in module_iter:
     if not ispkg:
       yield importlib.import_module(modname)
+
+
+def LoadModulesWithName(path, package_prefix, name):
+  """Load all modules with 'name'.
+
+  Args:
+    path: Path containing python modules.
+    package_prefix: Prefix (e.g., package name) to prefix all modules.
+      'path' and 'package_prefix' will be joined with a '.'.
+    name: The name of the modules to load.
+  """
+  prefix = package_prefix + '.'
+  module_iter = pkgutil.walk_packages(path, prefix=prefix)
+  for _, modname, ispkg in module_iter:
+    if not ispkg and modname.split('.')[-1] == name:
+      importlib.import_module(modname)

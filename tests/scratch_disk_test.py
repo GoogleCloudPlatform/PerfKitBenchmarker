@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,22 +16,21 @@
 
 import abc
 import unittest
-
 import mock
 
-from perfkitbenchmarker import pkb  # NOQA
+from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker.aws import aws_disk
-from perfkitbenchmarker.aws import aws_virtual_machine
-from perfkitbenchmarker.aws import util as aws_util
-from perfkitbenchmarker.azure import azure_disk
-from perfkitbenchmarker.azure import azure_network
-from perfkitbenchmarker.azure import azure_virtual_machine
-from perfkitbenchmarker.gcp import gce_disk
-from perfkitbenchmarker.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.aws import util as aws_util
+from perfkitbenchmarker.providers.azure import azure_disk
+from perfkitbenchmarker.providers.azure import azure_virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 
 
 class ScratchDiskTestMixin(object):
@@ -75,6 +74,10 @@ class ScratchDiskTestMixin(object):
     # called. Otherwise all "disks" instantiated will be the same object.
     self._GetDiskClass().side_effect = (
         lambda *args, **kwargs: mock.MagicMock(is_striped=False))
+
+    # VM Creation depends on there being a BenchmarkSpec.
+    self.spec = benchmark_spec.BenchmarkSpec({}, 'name', 'uid')
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def testScratchDisks(self):
     """Test for creating and deleting scratch disks.
@@ -129,10 +132,8 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(azure_disk.__name__ + '.AzureDisk'))
 
   def _CreateVm(self):
-    vm_spec = virtual_machine.BaseVmSpec()
-    net = azure_network.AzureNetwork('zone')
-    return azure_virtual_machine.DebianBasedAzureVirtualMachine(
-        vm_spec, net, None)
+    vm_spec = virtual_machine.BaseVmSpec('test_vm_spec.Azure')
+    return azure_virtual_machine.DebianBasedAzureVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return azure_disk.AzureDisk
@@ -144,9 +145,9 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(gce_disk.__name__ + '.GceDisk'))
 
   def _CreateVm(self):
-    vm_spec = gce_virtual_machine.GceVmSpec()
-    return gce_virtual_machine.DebianBasedGceVirtualMachine(
-        vm_spec, None, None)
+    vm_spec = gce_virtual_machine.GceVmSpec('test_vm_spec.GCP',
+                                            machine_type='test_machine_type')
+    return gce_virtual_machine.DebianBasedGceVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return gce_disk.GceDisk
@@ -159,12 +160,31 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(aws_util.__name__ + '.AddDefaultTags'))
 
   def _CreateVm(self):
-    vm_spec = virtual_machine.BaseVmSpec(zone='zone')
-    return aws_virtual_machine.DebianBasedAwsVirtualMachine(
-        vm_spec, None, None)
+    vm_spec = virtual_machine.BaseVmSpec('test_vm_spec.AWS', zone='us-east-1a')
+    return aws_virtual_machine.DebianBasedAwsVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return aws_disk.AwsDisk
+
+
+class GceDeviceIdTest(unittest.TestCase):
+  def testDeviceId(self):
+    with mock.patch(disk.__name__ + '.FLAGS') as disk_flags:
+      disk_flags.os_type = 'windows'
+      disk_spec = disk.BaseDiskSpec(
+          disk_size=2,
+          disk_type=gce_disk.PD_STANDARD,
+          disk_number=1)
+
+      disk_obj = gce_disk.GceDisk(
+          disk_spec,
+          'name',
+          'zone',
+          'project')
+
+      self.assertEquals(disk_obj.GetDeviceId(),
+                        r'\\.\PHYSICALDRIVE1')
+
 
 if __name__ == '__main__':
   unittest.main()

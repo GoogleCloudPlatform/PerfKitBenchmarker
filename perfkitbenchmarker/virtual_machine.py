@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,32 +30,119 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.configs import spec
 
 FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
 
+_VM_SPEC_REGISTRY = {}
+_VM_REGISTRY = {}
 
-class BaseVmSpec(object):
+
+def GetVmSpecClass(cloud):
+  """Returns the VmSpec class corresponding to 'cloud'."""
+  return _VM_SPEC_REGISTRY.get(cloud, BaseVmSpec)
+
+
+def GetVmClass(cloud, os_type):
+  """Returns the VM class corresponding to 'cloud' and 'os_type'."""
+  return _VM_REGISTRY.get((cloud, os_type))
+
+
+class AutoRegisterVmSpecMeta(spec.BaseSpecMetaClass):
+  """Metaclass which allows VmSpecs to automatically be registered."""
+
+  def __init__(cls, name, bases, dct):
+    super(AutoRegisterVmSpecMeta, cls).__init__(name, bases, dct)
+    if cls.CLOUD in _VM_SPEC_REGISTRY:
+      raise Exception('BaseVmSpec subclasses must have a CLOUD attribute.')
+    _VM_SPEC_REGISTRY[cls.CLOUD] = cls
+
+
+class AutoRegisterVmMeta(abc.ABCMeta):
+  """Metaclass which allows VMs to automatically be registered."""
+
+  def __init__(cls, name, bases, dct):
+    if hasattr(cls, 'CLOUD') and hasattr(cls, 'OS_TYPE'):
+      if cls.CLOUD is None:
+        raise Exception('BaseVirtualMachine subclasses must have a CLOUD '
+                        'attribute.')
+      elif cls.OS_TYPE is None:
+        raise Exception('BaseOsMixin subclasses must have an OS_TYPE '
+                        'attribute.')
+      else:
+        _VM_REGISTRY[(cls.CLOUD, cls.OS_TYPE)] = cls
+    super(AutoRegisterVmMeta, cls).__init__(name, bases, dct)
+
+
+class BaseVmSpec(spec.BaseSpec):
   """Storing various data about a single vm.
 
   Attributes:
     zone: The region / zone the in which to launch the VM.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     image: The disk image to boot from.
+    install_packages: If false, no packages will be installed. This is
+        useful if benchmark dependencies have already been installed.
+    background_cpu_threads: The number of threads of background CPU usage
+        while running the benchmark.
   """
 
-  def __init__(self, zone=None, machine_type=None, image=None):
-    self.zone = zone
-    self.machine_type = machine_type
-    self.image = image
+  __metaclass__ = AutoRegisterVmSpecMeta
+  CLOUD = None
 
-  def ApplyFlags(self, flags):
-    """Applies flags to the VmSpec."""
-    if flags.zones:
-      self.zone = flags.zones.pop(0)
-      flags.zones.append(self.zone)
-    self.machine_type = flags.machine_type or self.machine_type
-    self.image = flags.image or self.image
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Overrides config values with flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. Is
+          modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+
+    Returns:
+      dict mapping config option names to values derived from the config
+      values or flag values.
+    """
+    super(BaseVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['image'].present:
+      config_values['image'] = flag_values.image
+    if flag_values['install_packages'].present:
+      config_values['install_packages'] = flag_values.install_packages
+    if flag_values['machine_type'].present:
+      config_values['machine_type'] = flag_values.machine_type
+    if flag_values['background_cpu_threads'].present:
+      config_values['background_cpu_threads'] = (
+          flag_values.background_cpu_threads)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Can be overridden by derived classes to add options or impose additional
+    requirements on existing options.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(BaseVmSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'image': (option_decoders.StringDecoder, {'none_ok': True,
+                                                  'default': None}),
+        'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
+        'machine_type': (option_decoders.StringDecoder, {'none_ok': True,
+                                                         'default': None}),
+        'zone': (option_decoders.StringDecoder, {'none_ok': True,
+                                                 'default': None}),
+        'background_cpu_threads': (option_decoders.IntDecoder, {
+            'none_ok': True, 'default': None})})
+    return result
 
 
 class BaseVirtualMachine(resource.BaseResource):
@@ -82,21 +169,22 @@ class BaseVirtualMachine(resource.BaseResource):
     scratch_disks: list of BaseDisk objects. Scratch disks attached to the VM.
     max_local_disks: The number of local disks on the VM that can be used as
       scratch disks or that can be striped together.
+    background_cpu_threads: The number of threads of background CPU usage
+      while running the benchmark.
   """
 
+  __metaclass__ = AutoRegisterVmMeta
   is_static = False
   CLOUD = None
 
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
 
-  def __init__(self, vm_spec, network, firewall):
+  def __init__(self, vm_spec):
     """Initialize BaseVirtualMachine class.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-      network: network.BaseNetwork object corresponding to the VM.
-      firewall: network.BaseFirewall object corresponding to the VM.
     """
     super(BaseVirtualMachine, self).__init__()
     with self._instance_counter_lock:
@@ -106,6 +194,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
     self.image = vm_spec.image
+    self.install_packages = vm_spec.install_packages
     self.ip_address = None
     self.internal_ip = None
     self.user_name = DEFAULT_USERNAME
@@ -117,8 +206,10 @@ class BaseVirtualMachine(resource.BaseResource):
     self.max_local_disks = 0
     self.local_disk_counter = 0
     self.remote_disk_counter = 0
-    self.network = network
-    self.firewall = firewall
+    self.background_cpu_threads = vm_spec.background_cpu_threads
+
+    self.network = None
+    self.firewall = None
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -170,6 +261,11 @@ class BaseVirtualMachine(resource.BaseResource):
     if self.firewall:
       self.firewall.AllowPort(self, port)
 
+  def AllowRemoteAccessPorts(self):
+    """Allow all ports in self.remote_access_ports."""
+    for port in self.remote_access_ports:
+      self.AllowPort(port)
+
   def AddMetadata(self, **kwargs):
     """Add key/value metadata to the instance.
 
@@ -184,6 +280,17 @@ class BaseVirtualMachine(resource.BaseResource):
         instance.
     """
     pass
+
+  def GetMachineTypeDict(self):
+    """Returns a dict containing properties that specify the machine type.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = {}
+    if self.machine_type is not None:
+      result['machine_type'] = self.machine_type
+    return result
 
 
 class BaseOsMixin(object):
@@ -201,6 +308,7 @@ class BaseOsMixin(object):
   """
 
   __metaclass__ = abc.ABCMeta
+  OS_TYPE = None
 
   def __init__(self):
     super(BaseOsMixin, self).__init__()
@@ -444,3 +552,18 @@ class BaseOsMixin(object):
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
     raise NotImplementedError()
+
+  def StartBackgroundWorkload(self):
+    """Start the background workload"""
+    if self.background_cpu_threads:
+      raise NotImplementedError()
+
+  def StopBackgroundWorkload(self):
+    """Stop the background workoad"""
+    if self.background_cpu_threads:
+      raise NotImplementedError()
+
+  def PrepareBackgroundWorkload(self):
+    """Prepare for the background workload"""
+    if self.background_cpu_threads:
+      raise NotImplementedError()

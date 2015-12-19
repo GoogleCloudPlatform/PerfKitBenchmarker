@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-
+import collections
 import json
 import logging
 import threading
@@ -46,33 +46,34 @@ FLAGS = flags.FLAGS
 class StaticVmSpec(virtual_machine.BaseVmSpec):
   """Object containing all info needed to create a Static VM."""
 
-  def __init__(self, ip_address=None, user_name=None, ssh_private_key=None,
-               internal_ip=None, ssh_port=22, install_packages=True,
+  CLOUD = 'Static'
+
+  def __init__(self, component_full_name, ip_address=None, user_name=None,
+               ssh_private_key=None, internal_ip=None, ssh_port=22,
                password=None, disk_specs=None, os_type=None, **kwargs):
     """Initialize the StaticVmSpec object.
 
     Args:
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config options.
       ip_address: The public ip address of the VM.
       user_name: The username of the VM that the keyfile corresponds to.
       ssh_private_key: The absolute path to the private keyfile to use to ssh
           to the VM.
       internal_ip: The internal ip address of the VM.
       ssh_port: The port number to use for SSH and SCP commands.
-      install_packages: If false, no packages will be installed. This is
-          useful if benchmark dependencies have already been installed.
       password: The password used to log into the VM (Windows Only).
       disk_specs: A list of dictionaries containing kwargs used to create
           disk.BaseDiskSpecs.
       os_type: The OS type of the VM. See the flag of the same name for more
           information.
     """
-    super(StaticVmSpec, self).__init__(**kwargs)
+    super(StaticVmSpec, self).__init__(component_full_name, **kwargs)
     self.ip_address = ip_address
     self.user_name = user_name
     self.ssh_private_key = ssh_private_key
     self.internal_ip = internal_ip
     self.ssh_port = ssh_port
-    self.install_packages = install_packages
     self.password = password
     self.os_type = os_type
     self.disk_specs = disk_specs
@@ -101,8 +102,9 @@ class StaticDisk(disk.BaseDisk):
 class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Static Virtual Machine."""
 
+  CLOUD = 'Static'
   is_static = True
-  vm_pool = []
+  vm_pool = collections.deque()
   vm_pool_lock = threading.Lock()
 
   def __init__(self, vm_spec):
@@ -111,7 +113,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec: A StaticVmSpec object containing arguments.
     """
-    super(StaticVirtualMachine, self).__init__(vm_spec, None, None)
+    super(StaticVirtualMachine, self).__init__(vm_spec)
     self.ip_address = vm_spec.ip_address
     self.user_name = vm_spec.user_name
     self.ssh_private_key = vm_spec.ssh_private_key
@@ -119,20 +121,23 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.zone = self.zone or ('Static - %s@%s' % (self.user_name,
                                                   self.ip_address))
     self.ssh_port = vm_spec.ssh_port
-    self.install_packages = vm_spec.install_packages
     self.password = vm_spec.password
 
     if vm_spec.disk_specs:
       for spec in vm_spec.disk_specs:
         self.disk_specs.append(disk.BaseDiskSpec(**spec))
 
+    self.from_pool = False
+
   def _Create(self):
     """StaticVirtualMachines do not implement _Create()."""
     pass
 
   def _Delete(self):
-    """StaticVirtualMachines do not implement _Delete()."""
-    pass
+    """Returns the virtual machine to the pool."""
+    if self.from_pool:
+      with self.vm_pool_lock:
+        self.vm_pool.appendleft(self)
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
@@ -248,10 +253,10 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         disk_kwargs_list.append({'device_path': local_disk})
 
       vm_spec = StaticVmSpec(
-          ip_address=ip_address, user_name=user_name, ssh_port=ssh_port,
-          install_packages=install_packages, ssh_private_key=keyfile_path,
-          internal_ip=internal_ip, zone=zone, disk_specs=disk_kwargs_list,
-          password=password)
+          'static_vm_file', ip_address=ip_address, user_name=user_name,
+          ssh_port=ssh_port, install_packages=install_packages,
+          ssh_private_key=keyfile_path, internal_ip=internal_ip, zone=zone,
+          disk_specs=disk_kwargs_list, password=password)
 
       vm_class = GetStaticVmClass(os_type)
       vm = vm_class(vm_spec)
@@ -269,7 +274,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     with cls.vm_pool_lock:
       if cls.vm_pool:
-        return cls.vm_pool.pop(0)
+        vm = cls.vm_pool.popleft()
+        vm.from_pool = True
+        return vm
       else:
         return None
 

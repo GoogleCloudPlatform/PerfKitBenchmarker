@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ import yaml
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import packages
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -194,10 +194,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
-    if self.is_static and self.install_packages:
-      self.SnapshotPackages()
+    if self.install_packages:
+      if self.is_static:
+        self.SnapshotPackages()
+      self.SetupPackageManager()
     self.BurnCpu()
-    self.SetupPackageManager()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
@@ -249,7 +250,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry()
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
-    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0 -O '
+    # Some images may automount one local disk, but we don't
+    # want to fail if this wasn't the case.
+    fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
+               'sudo mke2fs -F -E lazy_itable_init=0 -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteHostCommand(fmt_cmd)
 
@@ -468,9 +472,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def SetupLocalDisks(self):
     """Performs Linux specific setup of local disks."""
-    # Some images may automount one local disk, but we don't
-    # want to fail if this wasn't the case.
-    self.RemoteHostCommand('sudo umount /mnt', ignore_failure=True)
+    pass
 
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to prepare data disks.
@@ -525,7 +527,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Burns vm cpu for some amount of time and dirty cache.
 
     Args:
-      vm: The target vm.
       burn_cpu_threads: Number of threads to burn cpu.
       burn_cpu_seconds: Amount of time in seconds to burn cpu.
     """
@@ -541,9 +542,28 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         time.sleep(end_time - time.time())
       self.RemoteCommand('pkill -9 sysbench')
 
+  def PrepareBackgroundWorkload(self):
+    """Install packages needed for the background workload """
+    if self.background_cpu_threads:
+      self.Install('sysbench')
+
+  def StartBackgroundWorkload(self):
+    """Starts the blackground workload."""
+    if self.background_cpu_threads:
+      self.RemoteCommand(
+          'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
+          'run 1> /dev/null 2> /dev/null &' % self.background_cpu_threads)
+
+  def StopBackgroundWorkload(self):
+    """Stops the background workload."""
+    if self.background_cpu_threads:
+      self.RemoteCommand('pkill -9 sysbench')
+
 
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
+
+  OS_TYPE = 'rhel'
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -598,17 +618,16 @@ class RhelMixin(BaseLinuxMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_packages):
+    if not self.install_packages:
       return
     if package_name not in self._installed_packages:
-      package = packages.PACKAGES[package_name]
+      package = linux_packages.PACKAGES[package_name]
       package.YumInstall(self)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
     """Uninstalls a PerfKit package on the VM."""
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     if hasattr(package, 'YumUninstall'):
       package.YumUninstall(self)
 
@@ -619,7 +638,7 @@ class RhelMixin(BaseLinuxMixin):
     don't match across distributions (such as mysql). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.YumGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
@@ -629,7 +648,7 @@ class RhelMixin(BaseLinuxMixin):
     match across distributions (such as mongodb). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.YumGetServiceName(self)
 
   def SetupProxy(self):
@@ -645,9 +664,15 @@ class RhelMixin(BaseLinuxMixin):
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  def SetupPackageManager(self):
-    """Runs apt-get update so InstallPackages shouldn't need to."""
-    self.AptUpdate()
+  OS_TYPE = 'debian'
+
+  def __init__(self, *args, **kwargs):
+    super(DebianMixin, self).__init__(*args, **kwargs)
+
+    # Whether or not apt-get update has been called.
+    # We defer running apt-get update until the first request to install a
+    # package.
+    self._apt_updated = False
 
   @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def AptUpdate(self):
@@ -697,17 +722,21 @@ class DebianMixin(BaseLinuxMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if ((self.is_static and not self.install_packages) or
-        not FLAGS.install_packages):
+    if not self.install_packages:
       return
+
+    if not self._apt_updated:
+      self.AptUpdate()
+      self._apt_updated = True
+
     if package_name not in self._installed_packages:
-      package = packages.PACKAGES[package_name]
+      package = linux_packages.PACKAGES[package_name]
       package.AptInstall(self)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
     """Uninstalls a PerfKit package on the VM."""
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     if hasattr(package, 'AptUninstall'):
       package.AptUninstall(self)
 
@@ -718,7 +747,7 @@ class DebianMixin(BaseLinuxMixin):
     don't match across distributions (such as mysql). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.AptGetPathToConfig(self)
 
   def GetServiceName(self, package_name):
@@ -728,7 +757,7 @@ class DebianMixin(BaseLinuxMixin):
     match across distributions (such as mongodb). Packages don't
     need to implement it if this is not the case.
     """
-    package = packages.PACKAGES[package_name]
+    package = linux_packages.PACKAGES[package_name]
     return package.AptGetServiceName(self)
 
   def SetupProxy(self):
@@ -757,6 +786,8 @@ class ContainerizedDebianMixin(DebianMixin):
   Any call to RemoteCommand() will be run within the container
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
+
+  OS_TYPE = 'ubuntu_container'
 
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
@@ -851,6 +882,9 @@ class ContainerizedDebianMixin(DebianMixin):
       command = 'cp %s %s' % (container_path, destination_path)
       self.RemoteCommand(command)
 
+  @vm_util.Retry(
+      poll_interval=1, max_retries=3,
+      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,))
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the container in the remote VM.
 
@@ -904,11 +938,13 @@ class JujuMixin(DebianMixin):
     https://jujucharms.com/docs/stable/config-manual
     """
 
-    install_packages = [
-        'juju-deployer',
-        'juju-core',
-        'juju-quickstart'
-    ]
+    OS_TYPE = 'juju'
+
+    # install_packages = [
+    #     'juju-deployer',
+    #     'juju-core',
+    #     'juju-quickstart'
+    # ]
     isController = False
 
     """
@@ -940,7 +976,7 @@ class JujuMixin(DebianMixin):
 
             resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
 
-            yaml = self.environments_yaml.format(self.internal_ip)
+            # yaml = self.environments_yaml.format(self.internal_ip)
 
             f = tempfile.NamedTemporaryFile(delete=False)
             f.write(self.environments_yaml.format(self.internal_ip))
@@ -1038,29 +1074,34 @@ class JujuMixin(DebianMixin):
     def AuthenticateVm(self):
         super(JujuMixin, self).AuthenticateVm()
 
-    def Install(self, package_name):
-        """
-        When Install is called from a unit (i.e., a virtual machine allocated
-        to a benchmark), we need to delegate the operation to the juju
-        controller.
-        """
-        if ((self.is_static and not self.install_packages) or
-           not FLAGS.install_packages):
-            return
-        if package_name not in self._installed_packages:
-            package = packages.PACKAGES[package_name]
-            package.JujuInstall(self)
-            self._installed_packages.add(package_name)
+    # def Install(self, package_name):
+    #     """
+    #     When Install is called from a unit (i.e., a virtual machine allocated
+    #     to a benchmark), we need to delegate the operation to the juju
+    #     controller.
+    #     """
+    #     if ((self.is_static and not self.install_packages) or
+    #        not FLAGS.install_packages):
+    #         return
+    #     if package_name not in self._installed_packages:
+    #         package = linux_packages.PACKAGES[package_name]
+    #         package.JujuInstall(self)
+    #         self._installed_packages.add(package_name)
 
     def SetupPackageManager(self):
         resp, _ = self.RemoteHostCommand("sudo add-apt-repository ppa:juju/stable")
         super(JujuMixin, self).SetupPackageManager()
 
     def PrepareVMEnvironment(self):
-        super(JujuMixin, self).PrepareVMEnvironment()
         if self.isController:
             try:
-                self.InstallPackages(" ".join(self.install_packages))
+                logging.warn('#### Installing juju')
+                self.Install('juju')
+                # self.Install('juju-deployer')
+                # self.Install('juju-core')
+                # self.Install('juju-quickstart')
+
+                # self.InstallPackages(" ".join(self.install_packages))
 
                 self.juju_configure_environment()
 
@@ -1075,6 +1116,7 @@ class JujuMixin(DebianMixin):
 
             except errors.VirtualMachine.RemoteCommandError as e:
                 raise e
+        super(JujuMixin, self).PrepareVMEnvironment()
 
     @vm_util.Retry(log_errors=False, poll_interval=1)
     def WaitForBootCompletion(self):

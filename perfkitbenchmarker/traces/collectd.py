@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import posixpath
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.packages import collectd
+from perfkitbenchmarker.linux_packages import collectd
 
 flags.DEFINE_boolean('collectd', False,
                      'Install and run collectd on the guest.')

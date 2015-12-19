@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import posixpath
 import subprocess
 import tarfile
 
-from perfkitbenchmarker.aws.util import AWS_PATH
+from perfkitbenchmarker.providers.aws.util import AWS_PATH
 
 
 def ArchiveRun(run_temp_directory, target_bucket,

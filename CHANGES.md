@@ -1,3 +1,97 @@
+# 1.0.1
+
+* Fix for benchmark_compatibility_checking flag. (thanks @mateusz-blaszkowski;
+  GH-707)
+
+# 1.0.0
+
+New features:
+* Added decoders to configs which allow for additional config validation
+  (GH-672)
+* Add support for GCE custom VMs (GH-664)
+* Providers can now selectively support benchmarks (GH-690)
+
+Breaking changes:
+* Enhanced config usage by multi-node benchmarks - this changes some of their
+  default metadata. (GH-669)
+* YCSB histogram results are now not included by default (GH-656)
+
+Enhancements:
+* Ping benchmark is now bi-directional (GH-685)
+* Metadata flag can be specified multiple times (GH-684)
+* Allow AWS regions as well as zones (GH-658)
+* Added 'vm_count' metadata to all benchmarks (GH-659)
+* GCP now creates networks (GH-648)
+* Added provision and teardown run_stages (GH-652)
+* Update tomcat_wrk to report more samples (GH-650)
+* Add a flag to control the log file log level (GH-651)
+
+Bugfixes and maintenance updates:
+* Added helper for mocking FLAGS (GH-678)
+* Fix for silo benchmark which fails when running behind proxy (thanks
+  @mateusz-blaszkowski; GH-680)
+* Fix for not-installed curl package (thanks @mateusz-blaszkowski; GH-681)
+* Invoke YCSB from its installation directory (GH-677)
+* Fix bug with detecting run_uris (GH-673)
+* Fix the image_project flag so it works as intended (thanks @wonderfly; GH-666)
+* Add explicit --boot-disk-auto-delete to GCE VM creation (GH-670)
+* Improved the README layout and fixed errors (GH-661, GH-660)
+* Broaden exception caught during PKB run (GH-667)
+* Fixed bug with run stages (GH-665)
+* Fixed formatting of docstring (thanks @wonderfly; GH-662)
+* Fixed bug with GCP networks (GH-663)
+* Add GetMachineTypeDict() to replace machine_type in Sample metadata (GH-653)
+* Add GcloudCommand helper (GH-649)
+* Fixed Tomcat download URL (GH-700)
+* Retry RemoteCopy operations (GH-699)
+* Various fixes to data disks for OpenStack (thanks @meteorfox; GH-688)
+
+# 0.24.0
+
+New features:
+* CS2 rachel web serving benchmark (thanks @rmend016; GH-451)
+* Add [AliCloud](http://intl.aliyun.com/) provider (thanks @hicrazyboy; GH-611)
+* Add tomcat/wrk benchmark (GH-598)
+
+Breaking changes:
+* Remove `--parallelism` flag (GH-633)
+* Rename `fio` flags (GH-518, GH-581)
+* Added new disk type options to clarify use. (Breaking change) we will remove
+  the current options in a coming release (GH-599)
+
+Enhancements:
+* Docker support in DigitalOcean and StaticVirtualMachine (thanks @maxking; GH-528)
+* Always use latest Azure package (GH-585)
+* Support `read/counter_read/mixed` in cassandra_stress benchmark (GH-607,
+  GH-592)
+* Add pretty-printed benchmark run summary table (GH-620)
+* Support new configs in the
+  [Cloudsuite web serving](http://parsa.epfl.ch/cloudsuite/web.html) benchmark
+  (GH-605)
+
+Bugfixes and maintenance updates:
+* Move providers to their own directory (GH-617)
+* Automatically register VM classes and specs (GH-600)
+* Only load needed provider modules (GH-635, GH-636)
+* Prefix benchmark and packages directories with `linux_` (GH-640)
+* Update to OpenStack Nova (thanks @meteorfox; GH-613)
+* Add `AUTHORS` file; update copyright header (GH-618)
+* Continue executing benchmarks after one fails (GH-614)
+* Disk integration tests for GCE, AWS, Azure (GH-571, GH-595)
+* Update Windows `cluster_boot` benchmark to match Linux one (GH-647)
+* Update `README` for lazy-loading providers (GH-645)
+* Only call `SetupPackageManager` if `install_packages` is True (GH-644)
+* Generate per-VM-group SSH aliases (GH-639)
+* Move AWS and Azure `_GetDefaultImage` calls to `_CreateDependencies` (GH-641)
+* Get Azure default image name from `azure vm image list` (GH-637)
+* Add `boto` lib version to object storage benchmark metadata (GH-632)
+* Improve the guide on using Docker (thanks @mateusz-blaszkowski; GH-628)
+* Improvements to VM pool handling (GH-626, GH-608)
+* Make benchmark metadata specify benchmark name (GH-615)
+* Support overriding Azure client lib version (GH-587)
+* Update Cassandra version to 2.1.10 (GH-577)
+
+
 # v0.23.0
 
 Known Issues:

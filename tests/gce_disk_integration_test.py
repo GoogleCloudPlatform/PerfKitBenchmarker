@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ class GcpScratchDiskIntegrationTest(unittest.TestCase):
                 },
                 'disk_spec': {
                     'GCP': {
-                        'disk_type': 'standard',
+                        'disk_type': 'pd-standard',
                         'disk_size': 2,
                         'mount_point': MOUNT_POINT
                     }
@@ -69,7 +69,7 @@ class GcpScratchDiskIntegrationTest(unittest.TestCase):
                 },
                 'disk_spec': {
                     'GCP': {
-                        'disk_type': 'remote_ssd',
+                        'disk_type': 'pd-ssd',
                         'disk_size': 2,
                         'mount_point': MOUNT_POINT
                     }

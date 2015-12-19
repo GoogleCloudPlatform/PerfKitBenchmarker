@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import yaml
 
 import mock
 
-from perfkitbenchmarker import benchmarks
+from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import windows_benchmarks
@@ -68,7 +68,8 @@ a:
 class ConfigsTestCase(unittest.TestCase):
 
   def testLoadAllDefaultConfigs(self):
-    all_benchmarks = benchmarks.BENCHMARKS + windows_benchmarks.BENCHMARKS
+    all_benchmarks = (linux_benchmarks.BENCHMARKS +
+                      windows_benchmarks.BENCHMARKS)
     for benchmark_module in all_benchmarks:
       self.assertIsInstance(benchmark_module.GetConfig({}), dict)
 

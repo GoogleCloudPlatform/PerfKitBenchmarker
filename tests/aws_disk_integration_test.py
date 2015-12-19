@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -69,8 +69,31 @@ class AwsScratchDiskIntegrationTest(unittest.TestCase):
                 },
                 'disk_spec': {
                     'AWS': {
-                        'disk_type': 'remote_ssd',
+                        'disk_type': 'gp2',
                         'disk_size': 2,
+                        'mount_point': MOUNT_POINT
+                    }
+                }
+            }
+        }
+    }, MOUNT_POINT)
+
+  def testEBSPIOPS(self):
+    test_util.assertDiskMounts({
+        'vm_groups': {
+            'vm_group_1': {
+                'cloud': 'AWS',
+                'vm_spec': {
+                    'AWS': {
+                        'machine_type': 'm4.large',
+                        'zone': 'us-east-1a'
+                    }
+                },
+                'disk_spec': {
+                    'AWS': {
+                        'disk_type': 'io1',
+                        'disk_size': 35,  # maximum size/IOPS ratio is 30
+                        'iops': 100,  # minimum value is 100 IOPS
                         'mount_point': MOUNT_POINT
                     }
                 }

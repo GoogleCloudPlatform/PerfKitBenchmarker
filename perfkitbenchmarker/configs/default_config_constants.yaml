@@ -12,7 +12,11 @@ default_single_core: &default_single_core
     image: null
   AWS:
     machine_type: m3.medium
-    zone: us-east-1a
+    zone: us-east-1
+    image: null
+  AliCloud:
+    machine_type: ecs.s2.large
+    zone: us-west-1a
     image: null
   DigitalOcean:
     machine_type: 2gb
@@ -32,18 +36,26 @@ default_single_core: &default_single_core
     image: null
   Kubernetes:
     image: null
+  Mesos:
+    image: null
 
 
+# TODO(nlavine): update the disk types below as more providers are
+# updated for the disk types refactor.
 default_500_gb: &default_500_gb
   GCP:
-    disk_type: standard
+    disk_type: pd-standard
     disk_size: 500
     mount_point: /scratch
   Azure:
-    disk_type: standard
+    disk_type: standard-disk
     disk_size: 500
     mount_point: /scratch
   AWS:
+    disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  AliCloud:
     disk_type: standard
     disk_size: 500
     mount_point: /scratch
@@ -64,5 +76,9 @@ default_500_gb: &default_500_gb
     mount_point: /scratch
   Kubernetes:
     disk_type: standard
+    disk_size: 500
+    mount_point: /scratch
+  Mesos:
+    disk_type: local
     disk_size: 500
     mount_point: /scratch

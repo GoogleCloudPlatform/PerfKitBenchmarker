@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,22 +20,36 @@ others in the
 same project.
 """
 
-import threading
+from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 
 
 class BaseFirewall(object):
   """An object representing the Base Firewall."""
 
-  # Lock used to serialize the instantiation of new BaseFirewall objects.
-  _class_lock = threading.Lock()
+  CLOUD = None
 
   @classmethod
-  def GetFirewall(cls, firewalls_dict):
-    """Returns the Firewall."""
-    with cls._class_lock:
-      if cls not in firewalls_dict:
-        firewalls_dict[cls] = cls()
-      return firewalls_dict[cls]
+  def GetFirewall(cls):
+    """Returns a BaseFirewall.
+
+    This method is used instead of directly calling the class's constructor.
+    It creates BaseFirewall instances and registers them.
+    If a BaseFirewall object has already been registered, that object
+    will be returned rather than creating a new one. This enables multiple
+    VMs to call this method and all share the same BaseFirewall object.
+    """
+    if cls.CLOUD is None:
+      raise errors.Error('Firewalls should have CLOUD attributes.')
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetFirewall called in a thread without a '
+                         'BenchmarkSpec.')
+    with benchmark_spec.firewalls_lock:
+      key = cls.CLOUD
+      if key not in benchmark_spec.firewalls:
+        benchmark_spec.firewalls[key] = cls()
+      return benchmark_spec.firewalls[key]
 
   def AllowPort(self, vm, port):
     """Opens a port on the firewall.
@@ -51,27 +65,61 @@ class BaseFirewall(object):
     pass
 
 
+class BaseNetworkSpec(object):
+  """Object containing all information needed to create a Network."""
+
+  def __init__(self, zone=None):
+    """Initializes the BaseNetworkSpec.
+
+    Args:
+      zone: The zone in which to create the network.
+    """
+    self.zone = zone
+
+
 class BaseNetwork(object):
   """Object representing a Base Network."""
 
-  # Lock used to serialize the instantiation of new BaseNetwork objects.
-  _class_lock = threading.Lock()
+  CLOUD = None
 
-  def __init__(self, zone=None):
-    self.zone = zone
+  def __init__(self, spec):
+    self.zone = spec.zone
+
+  @staticmethod
+  def _GetNetworkSpecFromVm(vm):
+    """Returns a BaseNetworkSpec created from VM attributes."""
+    return BaseNetworkSpec(zone=vm.zone)
 
   @classmethod
-  def GetNetwork(cls, zone, networks_dict):
-    """Returns the network corresponding to the given zone."""
-    with cls._class_lock:
-      # This probably will never happen, but we want to ensure that
-      # networks from different clouds never share the same entry, so
-      # in addition to using the zone, we also use the class as part
-      # of the key.
-      key = (cls, zone)
-      if key not in networks_dict:
-        networks_dict[key] = cls(zone)
-      return networks_dict[key]
+  def _GetKeyFromNetworkSpec(cls, spec):
+    """Returns a key used to register Network instances."""
+    if cls.CLOUD is None:
+      raise errors.Error('Networks should have CLOUD attributes.')
+    return (cls.CLOUD, spec.zone)
+
+  @classmethod
+  def GetNetwork(cls, vm):
+    """Returns a BaseNetwork.
+
+    This method is used instead of directly calling the class's constructor.
+    It creates BaseNetwork instances and registers them. If a BaseNetwork
+    object has already been registered with the same key, that object
+    will be returned rather than creating a new one. This enables multiple
+    VMs to call this method and all share the same BaseNetwork object.
+
+    Args:
+      vm: The VM for which the Network is being created.
+    """
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetNetwork called in a thread without a '
+                         'BenchmarkSpec.')
+    spec = cls._GetNetworkSpecFromVm(vm)
+    key = cls._GetKeyFromNetworkSpec(spec)
+    with benchmark_spec.networks_lock:
+      if key not in benchmark_spec.networks:
+        benchmark_spec.networks[key] = cls(spec)
+      return benchmark_spec.networks[key]
 
   def Create(self):
     """Creates the actual network."""

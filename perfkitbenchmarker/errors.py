@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -151,6 +151,18 @@ class Resource(object):
 class Config(object):
   """Errors related to configs."""
 
+  class InvalidValue(Error):
+    """User provided an invalid value for a config option."""
+    pass
+
+  class MissingOption(Error):
+    """User did not provide a value for a required config option."""
+    pass
+
   class ParseError(Error):
     """Error raised when a config can't be loaded properly."""
+    pass
+
+  class UnrecognizedOption(Error):
+    """User provided a value for an unrecognized config option."""
     pass

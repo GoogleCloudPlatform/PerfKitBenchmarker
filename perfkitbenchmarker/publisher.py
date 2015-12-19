@@ -1,4 +1,4 @@
-# Copyright 2014 Google Inc. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import itertools
 import json
 import logging
 import operator
+import pprint
 import sys
 import time
 import uuid
@@ -76,12 +77,13 @@ flags.DEFINE_string(
     None,
     'GCS bucket to upload records to. Bucket must exist.')
 
-flags.DEFINE_list(
+flags.DEFINE_multistring(
     'metadata',
     [],
-    'A list of key-value pairs that will be added to the labels field of all '
-    'samples as metadata. Each key-value pair in the list should be colon '
-    'separated.')
+    'A colon separated key-value pair that will be added to the labels field '
+    'of all samples as metadata. Multiple key-value pairs may be specified '
+    'by separating each pair by commas. This option can be repeated multiple '
+    'times.')
 
 DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
@@ -139,20 +141,38 @@ class DefaultMetadataProvider(MetadataProvider):
       name_prefix = '' if name == 'default' else name + '_'
       metadata[name_prefix + 'cloud'] = vm.CLOUD
       metadata[name_prefix + 'zone'] = vm.zone
-      metadata[name_prefix + 'machine_type'] = vm.machine_type
       metadata[name_prefix + 'image'] = vm.image
+      for k, v in vm.GetMachineTypeDict().iteritems():
+        metadata[name_prefix + k] = v
+      metadata[name_prefix + 'vm_count'] = len(vms)
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
+        # Legacy metadata keys
         metadata[name_prefix + 'scratch_disk_type'] = data_disk.disk_type
         metadata[name_prefix + 'scratch_disk_size'] = data_disk.disk_size
         metadata[name_prefix + 'num_striped_disks'] = (
             data_disk.num_striped_disks)
-        if data_disk.disk_type == disk.PIOPS:
+        if getattr(data_disk, 'iops', None) is not None:
           metadata[name_prefix + 'scratch_disk_iops'] = data_disk.iops
+          metadata[name_prefix + 'aws_provisioned_iops'] = data_disk.iops
+        # Modern metadata keys
+        metadata[name_prefix + 'data_disk_0_type'] = data_disk.disk_type
+        metadata[name_prefix + 'data_disk_0_size'] = (
+            data_disk.disk_size * data_disk.num_striped_disks)
+        metadata[name_prefix + 'data_disk_0_num_stripes'] = (
+            data_disk.num_striped_disks)
+        if getattr(data_disk, 'metadata', None) is not None:
+          if disk.LEGACY_DISK_TYPE in data_disk.metadata:
+            metadata[name_prefix + 'scratch_disk_type'] = (
+                data_disk.metadata[disk.LEGACY_DISK_TYPE])
+          for key, value in data_disk.metadata.iteritems():
+            metadata[name_prefix + 'data_disk_0_' + key] = value
 
-    # User specified metadata
-    for pair in FLAGS.metadata:
+    # Flatten all user metadata into a single list (since each string in the
+    # FLAGS.metadata can actually be several key-value pairs) and then iterate
+    # over it.
+    for pair in [kv for item in FLAGS.metadata for kv in item.split(',')]:
       try:
         key, value = pair.split(':')
         metadata[key] = value
@@ -317,6 +337,7 @@ class LogPublisher(SamplePublisher):
   def __init__(self, level=logging.INFO, logger=None):
     self.level = level
     self.logger = logger or logging.getLogger()
+    self._pprinter = pprint.PrettyPrinter()
 
   def __repr__(self):
     return '<{0} logger={1} level={2}>'.format(type(self).__name__, self.logger,
@@ -327,7 +348,7 @@ class LogPublisher(SamplePublisher):
         '\n' + '-' * 25 + 'PerfKitBenchmarker Complete Results' + '-' * 25 +
         '\n']
     for sample in samples:
-      data.append('%s\n' % sample)
+      data.append('%s\n' % self._pprinter.pformat(sample))
     self.logger.log(self.level, ''.join(data))
 
 
