@@ -315,43 +315,29 @@ def Prepare(benchmark_spec):
   cassandra_vms = vm_dict[CASSANDRA_GROUP]
   logging.info('VM dictionary %s', vm_dict)
 
-  if FLAGS.os_type == JUJU:
-    logging.info('[JUJU] Preparing data files and Java on all vms.')
-    vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
-    pass
-  else:
-    logging.info('Authorizing loader[0] permission to access all other vms.')
-    vm_dict[CLIENT_GROUP][0].AuthenticateVm()
+  logging.info('Authorizing loader[0] permission to access all other vms.')
+  vm_dict[CLIENT_GROUP][0].AuthenticateVm()
 
-    logging.info('Preparing data files and Java on all vms.')
-    vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
-    seed_vm = cassandra_vms[0]
-    configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
-    vm_util.RunThreaded(configure, cassandra_vms)
+  logging.info('Preparing data files and Java on all vms.')
+  vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
+  seed_vm = cassandra_vms[0]
+  configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
+  vm_util.RunThreaded(configure, cassandra_vms)
+
+  if FLAGS.os_type != JUJU:
+    """
+    Juju automatically configures and starts the Cassandra cluster.
+    """
     cassandra.StartCluster(seed_vm, cassandra_vms[1:])
 
-    if FLAGS.cassandra_stress_command == USER_COMMAND:
-      for vm in vm_dict[CLIENT_GROUP]:
-        vm.PushFile(FLAGS.cassandra_stress_profile,
-                    TEMP_PROFILE_PATH)
-    metadata = GenerateMetadataFromFlags(benchmark_spec)
-    if metadata['num_preload_keys']:
-      CheckMetadata(metadata)
-    PreloadCassandraServer(benchmark_spec, metadata)
-
-# <<<<<<< HEAD:perfkitbenchmarker/benchmarks/cassandra_stress_benchmark.py
-#     logging.info('Preparing data files and Java on all vms.')
-#     vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
-#     seed_vm = cassandra_vms[0]
-#     configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
-#     vm_util.RunThreaded(configure, cassandra_vms)
-#     cassandra.StartCluster(seed_vm, cassandra_vms[1:])
-#     if FLAGS.cassandra_stress_command == USER_COMMAND:
-#       for vm in vm_dict[CLIENT_GROUP]:
-#         vm.PushFile(FLAGS.cassandra_stress_profile,
-#                     TEMP_PROFILE_PATH)
-# =======
-# >>>>>>> upstream/master:perfkitbenchmarker/linux_benchmarks/cassandra_stress_benchmark.py
+  if FLAGS.cassandra_stress_command == USER_COMMAND:
+    for vm in vm_dict[CLIENT_GROUP]:
+      vm.PushFile(FLAGS.cassandra_stress_profile,
+                  TEMP_PROFILE_PATH)
+  metadata = GenerateMetadataFromFlags(benchmark_spec)
+  if metadata['num_preload_keys']:
+    CheckMetadata(metadata)
+  PreloadCassandraServer(benchmark_spec, metadata)
 
 
 def _ResultFilePath(vm):
@@ -531,6 +517,7 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   metadata = GenerateMetadataFromFlags(benchmark_spec)
+
   RunCassandraStressTest(
       benchmark_spec.vm_groups[CASSANDRA_GROUP],
       benchmark_spec.vm_groups[CLIENT_GROUP],

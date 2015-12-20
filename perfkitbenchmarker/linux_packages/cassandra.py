@@ -103,6 +103,12 @@ def JujuInstall(vm):
         # This will wait for the cassandra cluster and cassandra-stress vms
         # to fully deploy and be ready for benchmarking
         vm.Wait(timeout=1800)
+    else:
+        # Make sure the cassandra/conf dir is created, since we're skipping
+        # the manual installation to /tmp/pkb.
+        remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
+        vm.RemoteCommand('mkdir -p %s' % remote_path)
+        
 
 def Configure(vm, seed_vms):
   """Configure Cassandra on 'vm'.

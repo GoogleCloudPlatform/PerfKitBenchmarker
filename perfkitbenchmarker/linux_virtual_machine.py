@@ -1074,34 +1074,25 @@ class JujuMixin(DebianMixin):
     def AuthenticateVm(self):
         super(JujuMixin, self).AuthenticateVm()
 
-    # def Install(self, package_name):
-    #     """
-    #     When Install is called from a unit (i.e., a virtual machine allocated
-    #     to a benchmark), we need to delegate the operation to the juju
-    #     controller.
-    #     """
-    #     if ((self.is_static and not self.install_packages) or
-    #        not FLAGS.install_packages):
-    #         return
-    #     if package_name not in self._installed_packages:
-    #         package = linux_packages.PACKAGES[package_name]
-    #         package.JujuInstall(self)
-    #         self._installed_packages.add(package_name)
+    def Install(self, package_name):
+        """Installs a PerfKit package on the VM."""
+        if package_name not in self._installed_packages:
+            package = linux_packages.PACKAGES[package_name]
+            package.JujuInstall(self)
+            self._installed_packages.add(package_name)
 
     def SetupPackageManager(self):
-        resp, _ = self.RemoteHostCommand("sudo add-apt-repository ppa:juju/stable")
+        if self.isController:
+            resp, _ = self.RemoteHostCommand(
+                "sudo add-apt-repository ppa:juju/stable"
+            )
         super(JujuMixin, self).SetupPackageManager()
 
     def PrepareVMEnvironment(self):
+        super(JujuMixin, self).PrepareVMEnvironment()
         if self.isController:
             try:
-                logging.warn('#### Installing juju')
-                self.Install('juju')
-                # self.Install('juju-deployer')
-                # self.Install('juju-core')
-                # self.Install('juju-quickstart')
-
-                # self.InstallPackages(" ".join(self.install_packages))
+                self.InstallPackages('juju')
 
                 self.juju_configure_environment()
 
@@ -1116,8 +1107,7 @@ class JujuMixin(DebianMixin):
 
             except errors.VirtualMachine.RemoteCommandError as e:
                 raise e
-        super(JujuMixin, self).PrepareVMEnvironment()
-
+            
     @vm_util.Retry(log_errors=False, poll_interval=1)
     def WaitForBootCompletion(self):
         super(JujuMixin, self).WaitForBootCompletion()
