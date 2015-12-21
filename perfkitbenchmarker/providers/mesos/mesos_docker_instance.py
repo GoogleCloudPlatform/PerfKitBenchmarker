@@ -52,14 +52,15 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
                                     {'default': False})})
     return result
 
-  def _ApplyFlags(self, flags):
-    super(MesosDockerSpec, self)._ApplyFlags(flags)
-    if flags['docker_cpus'].present:
-      self.docker_cpus = flags.docker_cpus
-    if flags['docker_memory_mb'].present:
-      self.docker_memory_mb = flags.docker_memory_mb
-    if flags['mesos_privileged_docker'].present:
-      self.mesos_privileged_docker = flags.mesos_privileged_docker
+  def _ApplyFlags(self, config_values, flag_values):
+    super(MesosDockerSpec, self)._ApplyFlags(config_values, flag_values)
+    if flag_values['docker_cpus'].present:
+      config_values['docker_cpus'] = flag_values.docker_cpus
+    if flag_values['docker_memory_mb'].present:
+      config_values['docker_memory_mb'] = flag_values.docker_memory_mb
+    if flag_values['mesos_privileged_docker'].present:
+      config_values['mesos_privileged_docker'] =\
+          flag_values.mesos_privileged_docker
 
 
 class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
