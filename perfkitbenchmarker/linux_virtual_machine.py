@@ -687,14 +687,13 @@ class SUSEMixin(BaseLinuxMixin):
     """Remove all repositories that are not into the initial snapshot"""
     self.RemoteCommand('sudo zypper repos | awk \'{if (NR>=3) print $1}\' '
                        '> %s/zypper_repos_snapshot' % vm_util.VM_TMP_DIR)
-    self.RemoteCommand('cat %s/zypper_repos_snapshot | '
+    self.RemoteCommand('cat %(tmp)s/zypper_repos_snapshot | '
                        'grep --fixed-strings --line-regexp --invert-match '
-                       '--file zypper %s/zypper_repos_init_snapshot | '
-                       'xargs sudo zypper removerepo' %
-                       (vm_util.VM_TMP_DIR, vm_util.VM_TMP_DIR))
+                       '--file %(tmp)s/zypper_repos_init_snapshot > '
+                       '%(tmp)s/zypper_repos_diff | '
+                       'xargs --no-run-if-empty sudo zypper removerepo' %
+                       {'tmp': vm_util.VM_TMP_DIR})
     self.RemoteCommand('sudo zypper --no-gpg-checks refresh')
-    self.RemoteCommand('rm %s/zypper_repos_init_snapshot' % vm_util.VM_TMP_DIR)
-    self.RemoteCommand('rm %s/zypper_repos_snapshot' % vm_util.VM_TMP_DIR)
 
   def InstallPackages(self, packages):
     """Installs packages using the zypper package manager."""
