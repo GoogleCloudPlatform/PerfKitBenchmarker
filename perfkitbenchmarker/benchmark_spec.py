@@ -273,6 +273,10 @@ class BenchmarkSpec(object):
       self.vms.extend(vms)
 
   def Prepare(self):
+    targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
+    vm_util.RunParallelThreads(targets, len(targets))
+
+  def Provision(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
     vm_util.RunThreaded(lambda net: net.Create(), self.networks.values())
 
@@ -307,6 +311,14 @@ class BenchmarkSpec(object):
                           'Attempting to continue tearing down.')
     self.deleted = True
 
+  def StartBackgroundWorkload(self):
+    targets = [(vm.StartBackgroundWorkload, (), {}) for vm in self.vms]
+    vm_util.RunParallelThreads(targets, len(targets))
+
+  def StopBackgroundWorkload(self):
+    targets = [(vm.StopBackgroundWorkload, (), {}) for vm in self.vms]
+    vm_util.RunParallelThreads(targets, len(targets))
+
   def _CreateVirtualMachine(self, vm_spec, os_type, cloud):
     """Create a vm in zone.
 
@@ -340,11 +352,10 @@ class BenchmarkSpec(object):
     vm.Create()
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
-    for port in vm.remote_access_ports:
-      vm.AllowPort(port)
+    vm.AllowRemoteAccessPorts()
+    vm.WaitForBootCompletion()
     vm.AddMetadata(benchmark=self.name, perfkit_uuid=self.uuid,
                    benchmark_uid=self.uid)
-    vm.WaitForBootCompletion()
     vm.OnStartup()
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()

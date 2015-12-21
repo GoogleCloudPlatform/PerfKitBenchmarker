@@ -248,7 +248,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry()
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
-    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0 -O '
+    # Some images may automount one local disk, but we don't
+    # want to fail if this wasn't the case.
+    fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
+               'sudo mke2fs -F -E lazy_itable_init=0 -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteHostCommand(fmt_cmd)
 
@@ -467,9 +470,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def SetupLocalDisks(self):
     """Performs Linux specific setup of local disks."""
-    # Some images may automount one local disk, but we don't
-    # want to fail if this wasn't the case.
-    self.RemoteHostCommand('sudo umount /mnt', ignore_failure=True)
+    pass
 
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to prepare data disks.
@@ -524,7 +525,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Burns vm cpu for some amount of time and dirty cache.
 
     Args:
-      vm: The target vm.
       burn_cpu_threads: Number of threads to burn cpu.
       burn_cpu_seconds: Amount of time in seconds to burn cpu.
     """
@@ -538,6 +538,23 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           'run 1> /dev/null 2> /dev/null &' % burn_cpu_threads)
       if time.time() < end_time:
         time.sleep(end_time - time.time())
+      self.RemoteCommand('pkill -9 sysbench')
+
+  def PrepareBackgroundWorkload(self):
+    """Install packages needed for the background workload """
+    if self.background_cpu_threads:
+      self.Install('sysbench')
+
+  def StartBackgroundWorkload(self):
+    """Starts the blackground workload."""
+    if self.background_cpu_threads:
+      self.RemoteCommand(
+          'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
+          'run 1> /dev/null 2> /dev/null &' % self.background_cpu_threads)
+
+  def StopBackgroundWorkload(self):
+    """Stops the background workload."""
+    if self.background_cpu_threads:
       self.RemoteCommand('pkill -9 sysbench')
 
 
@@ -647,9 +664,13 @@ class DebianMixin(BaseLinuxMixin):
 
   OS_TYPE = 'debian'
 
-  def SetupPackageManager(self):
-    """Runs apt-get update so InstallPackages shouldn't need to."""
-    self.AptUpdate()
+  def __init__(self, *args, **kwargs):
+    super(DebianMixin, self).__init__(*args, **kwargs)
+
+    # Whether or not apt-get update has been called.
+    # We defer running apt-get update until the first request to install a
+    # package.
+    self._apt_updated = False
 
   @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def AptUpdate(self):
@@ -701,6 +722,11 @@ class DebianMixin(BaseLinuxMixin):
     """Installs a PerfKit package on the VM."""
     if not self.install_packages:
       return
+
+    if not self._apt_updated:
+      self.AptUpdate()
+      self._apt_updated = True
+
     if package_name not in self._installed_packages:
       package = linux_packages.PACKAGES[package_name]
       package.AptInstall(self)

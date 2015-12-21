@@ -26,6 +26,7 @@ operate on the VM: boot, shutdown, etc.
 
 import json
 import re
+import yaml
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -36,6 +37,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
@@ -98,6 +100,63 @@ class MemoryDecoder(option_decoders.StringDecoder):
     return memory_mib_int
 
 
+class CustomMachineTypeSpec(spec.BaseSpec):
+  """Properties of a GCE custom machine type.
+
+  Attributes:
+    cpus: int. Number of vCPUs.
+    memory: string. Representation of the size of memory, expressed in MiB or
+        GiB. Must be an integer number of MiB (e.g. "1280MiB", "7.5GiB").
+  """
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(CustomMachineTypeSpec, cls)._GetOptionDecoderConstructions()
+    result.update({'cpus': (option_decoders.IntDecoder, {'min': 1}),
+                   'memory': (MemoryDecoder, {})})
+    return result
+
+
+class MachineTypeDecoder(option_decoders.TypeVerifier):
+  """Decodes the machine_type option of a GCE VM config."""
+
+  def __init__(self, option, **kwargs):
+    super(MachineTypeDecoder, self).__init__(option, (basestring, dict),
+                                             **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Decodes the machine_type option of a GCE VM config.
+
+    Args:
+      value: Either a string name of a GCE machine type or a dict containing
+          'cpu' and 'memory' keys describing a custom VM.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+
+    Returns:
+      If value is a string, returns it unmodified. Otherwise, returns the
+      decoded CustomMachineTypeSpec.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    super(MachineTypeDecoder, self).Decode(value, component_full_name,
+                                           flag_values)
+    if isinstance(value, basestring):
+      return value
+    return CustomMachineTypeSpec('.'.join((component_full_name, self.option)),
+                                 flag_values=flag_values, **value)
+
+
 class GceVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a GceVirtualMachine.
 
@@ -112,6 +171,16 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
   """
 
   CLOUD = 'GCP'
+
+  def __init__(self, *args, **kwargs):
+    super(GceVmSpec, self).__init__(*args, **kwargs)
+    if isinstance(self.machine_type, CustomMachineTypeSpec):
+      self.cpus = self.machine_type.cpus
+      self.memory = self.machine_type.memory
+      self.machine_type = None
+    else:
+      self.cpus = None
+      self.memory = None
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -130,6 +199,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['num_local_ssds'] = flag_values.gce_num_local_ssds
     if flag_values['gce_preemptible_vms'].present:
       config_values['preemptible'] = flag_values.gce_preemptible_vms
+    if flag_values['machine_type'].present:
+      config_values['machine_type'] = yaml.load(flag_values.machine_type)
     if flag_values['project'].present:
       config_values['project'] = flag_values.project
 
@@ -144,8 +215,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'cpus': (option_decoders.IntDecoder, {'default': None, 'min': 1}),
-        'memory': (MemoryDecoder, {'default': None}),
+        'machine_type': (MachineTypeDecoder, {}),
         'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
                                                         'min': 0}),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
@@ -182,17 +252,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
     self.project = vm_spec.project
-    # TODO(skschneider): This can be moved into the VM spec if the ApplyFlags
-    # behavior is moved into BaseVmSpec.__init__.
-    if self.machine_type is None:
-      if self.cpus is None or self.memory_mib is None:
-        raise errors.Config.MissingOption(
-            'A GCP VM must have either a "machine_type" or both "cpus" and '
-            '"memory" configured.')
-    elif self.cpus is not None or self.memory_mib is not None:
-      raise errors.Config.InvalidValue(
-          'A GCP VM cannot have both a "machine_type" and either "cpus" or '
-          '"memory" configured.')
     self.network = gce_network.GceNetwork.GetNetwork(self)
     self.firewall = gce_network.GceFirewall.GetFirewall()
     events.sample_created.connect(self.AnnotateSample, weak=False)
@@ -247,6 +306,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       tf.close()
       create_cmd = self._GenerateCreateCommand(tf.name)
       create_cmd.Issue()
+
+  def _CreateDependencies(self):
+    super(GceVirtualMachine, self)._CreateDependencies()
+    # GCE firewall rules are created for all instances in a network.
+    # Create necessary VM access rules *prior* to creating the VM, such that it
+    # doesn't affect boot time.
+    self.AllowRemoteAccessPorts()
 
   @vm_util.Retry()
   def _PostCreate(self):
@@ -362,7 +428,7 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
 
   DEFAULT_IMAGE = WINDOWS_IMAGE
   BOOT_DISK_SIZE_GB = 50
-  BOOT_DISK_TYPE = disk.REMOTE_SSD
+  BOOT_DISK_TYPE = gce_disk.PD_SSD
 
   def __init__(self, vm_spec):
     """Initialize a Windows GCE virtual machine.

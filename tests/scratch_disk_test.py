@@ -166,5 +166,25 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _GetDiskClass(self):
     return aws_disk.AwsDisk
 
+
+class GceDeviceIdTest(unittest.TestCase):
+  def testDeviceId(self):
+    with mock.patch(disk.__name__ + '.FLAGS') as disk_flags:
+      disk_flags.os_type = 'windows'
+      disk_spec = disk.BaseDiskSpec(
+          disk_size=2,
+          disk_type=gce_disk.PD_STANDARD,
+          disk_number=1)
+
+      disk_obj = gce_disk.GceDisk(
+          disk_spec,
+          'name',
+          'zone',
+          'project')
+
+      self.assertEquals(disk_obj.GetDeviceId(),
+                        r'\\.\PHYSICALDRIVE1')
+
+
 if __name__ == '__main__':
   unittest.main()

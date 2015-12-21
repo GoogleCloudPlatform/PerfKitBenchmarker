@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ntpath
 import os
 import time
 
@@ -107,7 +108,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem copying the file.
     """
-    drive, remote_path = os.path.splitdrive(remote_path)
+    drive, remote_path = ntpath.splitdrive(remote_path)
     drive = (drive or self.system_drive).rstrip(':')
 
     set_error_pref = '$ErrorActionPreference="Stop"'
@@ -157,7 +158,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
 
   def OnStartup(self):
     stdout, _ = self.RemoteCommand('echo $env:TEMP')
-    self.temp_dir = os.path.join(stdout.strip(), 'pkb')
+    self.temp_dir = ntpath.join(stdout.strip(), 'pkb')
     stdout, _ = self.RemoteCommand('echo $env:SystemDrive')
     self.system_drive = stdout.strip()
     self.RemoteCommand('mkdir %s' % self.temp_dir)
@@ -247,7 +248,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       tf.write(script)
       tf.close()
       self.RemoteCopy(tf.name, self.temp_dir)
-      script_path = os.path.join(self.temp_dir, os.path.basename(tf.name))
+      script_path = ntpath.join(self.temp_dir, os.path.basename(tf.name))
       self.RemoteCommand('diskpart /s {script_path}'.format(
           script_path=script_path))
 

@@ -88,3 +88,25 @@ def PatchFlags(mock_flags=None):
   with patch as mock_property:
     mock_property.return_value = mock_flags
     yield mock_flags
+
+
+def PatchTestCaseFlags(testcase):
+  """Patches access to perfkitbenchmarker.flags.FLAGS for a TestCase.
+
+  Similar to PatchFlags, but only needs to be called once during a test method
+  or its setUp method, and remains in effect for the rest of the test method.
+
+  Args:
+    testcase: unittest.TestCase. The current test. A cleanup method is
+        registered to undo the patch after this test completes.
+
+  Returns:
+    MockFlags. The mocked FlagValues object.
+  """
+  mock_flags = MockFlags()
+  patch = mock.patch(context.__name__ + '.FlagValuesProxy._thread_flag_values',
+                     new_callable=mock.PropertyMock)
+  mock_property = patch.start()
+  testcase.addCleanup(patch.stop)
+  mock_property.return_value = mock_flags
+  return mock_flags
