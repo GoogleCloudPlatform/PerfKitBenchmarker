@@ -188,7 +188,7 @@ class FloatDecoder(TypeVerifier):
   """
 
   def __init__(self, option, max=None, min=None, **kwargs):
-    super(FloatDecoder, self).__init__(option, (float,), **kwargs)
+    super(FloatDecoder, self).__init__(option, (float, int), **kwargs)
     self.max = max
     self.min = min
 
@@ -209,7 +209,7 @@ class FloatDecoder(TypeVerifier):
       errors.Config.InvalidValue upon invalid input value.
     """
     value = super(FloatDecoder, self).Decode(value, component_full_name,
-                                           flag_values)
+                                             flag_values)
     if value is not None:
       if self.max and value > self.max:
         raise errors.Config.InvalidValue(

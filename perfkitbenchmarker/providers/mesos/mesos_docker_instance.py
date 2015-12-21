@@ -36,6 +36,8 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
   Attributes:
     docker_cpus: None or float. Number of CPUs for Docker instances.
     docker_memory_mb: None or int. Memory limit (in MB) for Docker instances.
+    mesos_privileged_docker: None of boolean. Indicates if Docker container
+        should be run in privileged mode.
   """
 
   CLOUD = 'Mesos'
@@ -50,8 +52,8 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
                                     {'default': False})})
     return result
 
-  def ApplyFlags(self, flags):
-    super(MesosDockerSpec, self).ApplyFlags(flags)
+  def _ApplyFlags(self, flags):
+    super(MesosDockerSpec, self)._ApplyFlags(flags)
     if flags['docker_cpus'].present:
       self.docker_cpus = flags.docker_cpus
     if flags['docker_memory_mb'].present:
