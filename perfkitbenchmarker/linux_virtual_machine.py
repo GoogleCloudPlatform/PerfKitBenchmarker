@@ -711,8 +711,7 @@ class SUSEMixin(BaseLinuxMixin):
 
   def Install(self, package_name):
     """Installs a package on the VM."""
-    if ((self.is_static and not self.install_packages)
-        or not FLAGS.install_packages):
+    if (not self.install_packages):
         return
     if package_name not in self._installed_packages:
       package = linux_packages.PACKAGES[package_name]
