@@ -680,12 +680,12 @@ class SUSEMixin(BaseLinuxMixin):
 
   def SnapshotRepositories(self):
     """Take an initial snapshot of the currently installed repositories"""
-    self.RemoteCommand('sudo zypper repos | awk \'{if (NR>=3) print $1}\ '
+    self.RemoteCommand('sudo zypper repos | awk \'{if (NR>=3) print $1}\' '
                        '> %s/zypper_repos_init_snapshot' % vm_util.VM_TMP_DIR)
 
   def RestoreRepositories(self):
     """Remove all repositories that are not into the initial snapshot"""
-    self.RemoteCommand('sudo zypper repos | awk \'{if (NR>=3) print $1}\ '
+    self.RemoteCommand('sudo zypper repos | awk \'{if (NR>=3) print $1}\' '
                        '> %s/zypper_repos_snapshot' % vm_util.VM_TMP_DIR)
     self.RemoteCommand('cat %s/zypper_repos_snapshot | '
                        'grep --fixed-strings --line-regexp --invert-match'
