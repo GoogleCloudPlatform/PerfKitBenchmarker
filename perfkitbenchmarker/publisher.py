@@ -155,7 +155,8 @@ class DefaultMetadataProvider(MetadataProvider):
         # Modern metadata keys
         metadata[name_prefix + 'data_disk_0_type'] = data_disk.disk_type
         metadata[name_prefix + 'data_disk_0_size'] = (
-            data_disk.disk_size * data_disk.num_striped_disks)
+          int(0 if data_disk.disk_size is None else data_disk.disk_size) *
+          data_disk.num_striped_disks)
         metadata[name_prefix + 'data_disk_0_num_stripes'] = (
             data_disk.num_striped_disks)
         if getattr(data_disk, 'metadata', None) is not None:
