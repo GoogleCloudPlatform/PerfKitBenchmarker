@@ -83,7 +83,7 @@ flags.DEFINE_string('fio_jobfile', None,
                     'Job file that fio will use. If not given, use a job file '
                     'bundled with PKB. Cannot use with '
                     '--fio_generate_scenarios.')
-flags.DEFINE_list('fio_generate_scenarios', None,
+flags.DEFINE_list('fio_generate_scenarios', [],
                   'Generate a job file with the given scenarios. Special '
                   'scenario \'all\' generates all scenarios. Available '
                   'scenarios are sequential_write, sequential_read, '
@@ -105,7 +105,7 @@ flags.DEFINE_string('fio_fill_size', '100%',
                     'filling and remounted afterwards. Only valid when '
                     '--fio_target_mode is against_device_with_fill or '
                     'against_file_with_fill.')
-flag_util.DEFINE_integerlist('fio_io_depths', [1],
+flag_util.DEFINE_integerlist('fio_io_depths', flag_util.IntegerList([1]),
                              'IO queue depths to run on. Can specify a single '
                              'number, like --fio_io_depths=1, a range, like '
                              '--fio_io_depths=1-4, or a list, like '
