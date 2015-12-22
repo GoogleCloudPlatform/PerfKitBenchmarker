@@ -103,7 +103,7 @@ flags.DEFINE_string('archive_bucket', None,
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
 flags.DEFINE_list(
-    'zones', None,
+    'zones', [],
     'A list of zones within which to run PerfKitBenchmarker. '
     'This is specific to the cloud provider you are running o`n. '
     'If multiple zones are given, PerfKitBenchmarker will create 1 VM in '
