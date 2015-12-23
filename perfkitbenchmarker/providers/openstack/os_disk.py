@@ -92,7 +92,7 @@ class OpenStackDisk(disk.BaseDisk):
         self.attached_vm_id = vm.id
 
         result = self.__nclient.volumes.create_server_volume(vm.id,
-                                                             self._disk.id,)
+                                                             self._disk.id, self.device)
         self.attach_id = result.id
 
         volume = None
