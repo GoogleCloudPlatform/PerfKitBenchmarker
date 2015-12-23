@@ -99,9 +99,9 @@ class NovaClient(object):
         raise Exception(error_msg + ' ' + str(e))
       raise Exception(error_msg)
 
-    def __init__(self):
+    def __init__(self, region_name=None):
         from novaclient import client as noclient
-
+        self.region_name = region_name
         self.url = FLAGS.openstack_auth_url
         self.user = FLAGS.openstack_username
         self.tenant = FLAGS.openstack_tenant
@@ -112,6 +112,7 @@ class NovaClient(object):
                                    self.user, self.password)
         self.__client = noclient.Client('2',
                                         auth_url=self.url,
+                                        region_name=self.region_name,
                                         username=self.user,
                                         auth_token=self.__auth.get_token(),
                                         tenant_id=self.__auth.get_tenant_id(),
@@ -131,6 +132,7 @@ class NovaClient(object):
                                    self.password)
         self.__client = noclient.Client('2',
                                         auth_url=self.url,
+                                        region_name=self.region_name,
                                         username=self.user,
                                         auth_token=self.__auth.get_token(),
                                         tenant_id=self.__auth.get_tenant_id(),

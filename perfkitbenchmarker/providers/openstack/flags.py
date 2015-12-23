@@ -22,6 +22,10 @@ flags.DEFINE_string('openstack_auth_url',
                      '$OS_AUTH_URL. Required for discovery of other OpenStack '
                      'service URLs.'))
 
+flags.DEFINE_string('openstack_region',
+                    os.environ.get('OS_REGION_NAME', 'RegionOne'),
+                    'OpenStack region name, defaults to $OS_REGION_NAME')
+
 flags.DEFINE_string('openstack_username',
                     os.getenv('OS_USERNAME', 'admin'),
                     'OpenStack login username, defaults to $OS_USERNAME.')
