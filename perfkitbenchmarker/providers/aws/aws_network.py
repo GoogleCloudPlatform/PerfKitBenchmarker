@@ -110,6 +110,7 @@ class AwsVpc(resource.BaseResource):
     cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-security-groups',
+        '--region', self.region,
         '--filters',
         'Name=group-name,Values=default',
         'Name=vpc-id,Values=' + self.id]
