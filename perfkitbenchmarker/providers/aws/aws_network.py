@@ -91,6 +91,7 @@ class AwsVpc(resource.BaseResource):
     self._subnet_index = 0
     # Lock protecting _subnet_index
     self._subnet_index_lock = threading.Lock()
+    self.default_security_group_id = None
 
   def _Create(self):
     """Creates the VPC."""
@@ -417,7 +418,6 @@ class AwsRegionalNetwork(network.BaseNetwork):
     vpc: an AwsVpc instance.
     internet_gateway: an AwsInternetGateway instance.
     route_table: an AwsRouteTable instance. The default route table.
-    placement_group: An AwsPlacementGroup instance.
   """
   # Map from region to AwsRegionalNetwork
   _network_pool = {}
@@ -429,9 +429,7 @@ class AwsRegionalNetwork(network.BaseNetwork):
     self.vpc = AwsVpc(self.region)
     self.internet_gateway = AwsInternetGateway(region)
     self.route_table = None
-    self.placement_group = AwsPlacementGroup(self.region)
     self.created = False
-    self.default_security_group_id = None
 
     # Locks to ensure that a single thread creates / deletes the instance.
     self._create_lock = threading.Lock()
@@ -478,8 +476,6 @@ class AwsRegionalNetwork(network.BaseNetwork):
       self.route_table.Create()
       self.route_table.CreateRoute(self.internet_gateway.id)
 
-      self.placement_group.Create()
-
       self.created = True
 
   def Delete(self):
@@ -491,7 +487,6 @@ class AwsRegionalNetwork(network.BaseNetwork):
       if self._reference_count:
         return
 
-    self.placement_group.Delete()
     self.internet_gateway.Detach()
     self.internet_gateway.Delete()
     self.vpc.Delete()
@@ -504,6 +499,7 @@ class AwsNetwork(network.BaseNetwork):
     region: The AWS region the Network is in.
     regional_network: The AwsRegionalNetwor for 'region'.
     subnet: the AwsSubnet for this zone.
+    placement_group: An AwsPlacementGroup instance.
   """
 
   CLOUD = AWS
@@ -518,6 +514,7 @@ class AwsNetwork(network.BaseNetwork):
     self.region = util.GetRegionFromZone(spec.zone)
     self.regional_network = AwsRegionalNetwork.GetForRegion(self.region)
     self.subnet = None
+    self.placement_group = AwsPlacementGroup(self.region)
 
   def Create(self):
     """Creates the network."""
@@ -528,13 +525,11 @@ class AwsNetwork(network.BaseNetwork):
       self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
                               cidr_block=cidr)
       self.subnet.Create()
+    self.placement_group.Create()
 
   def Delete(self):
     """Deletes the network."""
     if self.subnet:
       self.subnet.Delete()
+    self.placement_group.Delete()
     self.regional_network.Delete()
-
-  @property
-  def placement_group(self):
-    return self.regional_network.placement_group
