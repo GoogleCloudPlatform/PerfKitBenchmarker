@@ -73,59 +73,14 @@ class AzureFirewall(network.BaseFirewall):
     pass
 
 
-class AzureAffinityGroup(resource.BaseResource):
-  """Object representing an Azure Affinity Group."""
-
-  def __init__(self, name, zone):
-    super(AzureAffinityGroup, self).__init__()
-    self.name = name
-    self.zone = zone
-
-  def _Create(self):
-    """Creates the affinity group."""
-    create_cmd = [AZURE_PATH,
-                  'account',
-                  'affinity-group',
-                  'create',
-                  '--location=%s' % self.zone,
-                  '--label=%s' % self.name,
-                  self.name]
-    vm_util.IssueCommand(create_cmd)
-
-  def _Delete(self):
-    """Deletes the affinity group."""
-    delete_cmd = [AZURE_PATH,
-                  'account',
-                  'affinity-group',
-                  'delete',
-                  '--quiet',
-                  self.name]
-    vm_util.IssueCommand(delete_cmd)
-
-  def _Exists(self):
-    """Returns true if the affinity group exists."""
-    show_cmd = [AZURE_PATH,
-                'account',
-                'affinity-group',
-                'show',
-                '--json',
-                self.name]
-    stdout, _, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
-    try:
-      json.loads(stdout)
-    except ValueError:
-      return False
-    return True
-
-
 class AzureStorageAccount(resource.BaseResource):
   """Object representing an Azure Storage Account."""
 
-  def __init__(self, name, storage_type, affinity_group_name):
+  def __init__(self, name, storage_type, zone):
     super(AzureStorageAccount, self).__init__()
     self.name = name
     self.storage_type = storage_type
-    self.affinity_group_name = affinity_group_name
+    self.zone = zone
 
   def _Create(self):
     """Creates the storage account."""
@@ -133,7 +88,7 @@ class AzureStorageAccount(resource.BaseResource):
                   'storage',
                   'account',
                   'create',
-                  '--affinity-group=%s' % self.affinity_group_name,
+                  '--location=%s' % self.zone,
                   '--type=%s' % self.storage_type,
                   self.name]
     vm_util.IssueCommand(create_cmd)
@@ -167,9 +122,10 @@ class AzureStorageAccount(resource.BaseResource):
 class AzureVirtualNetwork(resource.BaseResource):
   """Object representing an Azure Virtual Network."""
 
-  def __init__(self, name):
+  def __init__(self, name, zone):
     super(AzureVirtualNetwork, self).__init__()
     self.name = name
+    self.zone = zone
 
   def _Create(self):
     """Creates the virtual network."""
@@ -177,7 +133,7 @@ class AzureVirtualNetwork(resource.BaseResource):
                   'network',
                   'vnet',
                   'create',
-                  '--affinity-group=%s' % self.name,
+                  '--location', self.zone,
                   self.name]
     vm_util.IssueCommand(create_cmd)
 
@@ -215,25 +171,18 @@ class AzureNetwork(network.BaseNetwork):
     super(AzureNetwork, self).__init__(spec)
     name = ('pkb%s%s' %
             (FLAGS.run_uri, str(uuid.uuid4())[-12:])).lower()[:MAX_NAME_LENGTH]
-    self.affinity_group = AzureAffinityGroup(name, spec.zone)
     storage_account_name = (STORAGE_ACCOUNT_PREFIX + name)[:MAX_NAME_LENGTH]
     self.storage_account = AzureStorageAccount(
-        storage_account_name, FLAGS.azure_storage_type, name)
-    self.vnet = AzureVirtualNetwork(name)
+        storage_account_name, FLAGS.azure_storage_type, self.zone)
+    self.vnet = AzureVirtualNetwork(name, self.zone)
 
   @vm_util.Retry()
   def Create(self):
     """Creates the actual network."""
-    self.affinity_group.Create()
-
     self.storage_account.Create()
-
     self.vnet.Create()
 
   def Delete(self):
     """Deletes the actual network."""
     self.vnet.Delete()
-
     self.storage_account.Delete()
-
-    self.affinity_group.Delete()

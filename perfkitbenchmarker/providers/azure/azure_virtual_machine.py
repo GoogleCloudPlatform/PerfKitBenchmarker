@@ -106,17 +106,17 @@ def _GetDefaultImage(os_type):
 class AzureService(resource.BaseResource):
   """Object representing an Azure Service."""
 
-  def __init__(self, name, affinity_group_name):
+  def __init__(self, name, zone):
     super(AzureService, self).__init__()
     self.name = name
-    self.affinity_group_name = affinity_group_name
+    self.zone = zone
 
   def _Create(self):
     """Creates the Azure service."""
     create_cmd = [AZURE_PATH,
                   'service',
                   'create',
-                  '--affinitygroup=%s' % self.affinity_group_name,
+                  '--location=%s' % self.zone,
                   self.name]
     vm_util.IssueCommand(create_cmd)
 
@@ -176,8 +176,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(AzureVirtualMachine, self).__init__(vm_spec)
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
-    self.service = AzureService(self.name,
-                                self.network.affinity_group.name)
+    self.service = AzureService(self.name, self.zone)
     disk_spec = disk.BaseDiskSpec()
     self.os_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type)
     self.max_local_disks = 1
@@ -198,7 +197,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_cmd = [AZURE_PATH,
                   'vm',
                   'create',
-                  '--affinity-group=%s' % self.network.affinity_group.name,
+                  '--location=%s' % self.zone,
                   '--virtual-network-name=%s' % self.network.vnet.name,
                   '--vm-size=%s' % self.machine_type,
                   self.name,
