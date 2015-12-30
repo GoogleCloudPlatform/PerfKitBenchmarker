@@ -35,7 +35,7 @@ class OpenStackDisk(disk.BaseDisk):
         self.image = image
         self.name = name
         self.zone = zone
-        self.device = ""
+        self.device = None
         self._disk = None
 
     def _Create(self):
