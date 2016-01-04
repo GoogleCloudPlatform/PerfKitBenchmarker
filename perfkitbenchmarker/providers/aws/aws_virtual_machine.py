@@ -33,6 +33,7 @@ from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -99,7 +100,7 @@ def IsPlacementGroupCompatible(machine_type):
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
 
-  CLOUD = 'AWS'
+  CLOUD = providers.AWS
   IMAGE_NAME_FILTER = None
   DEFAULT_ROOT_DISK_TYPE = 'standard'
 

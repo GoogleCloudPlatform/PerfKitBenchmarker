@@ -41,6 +41,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.rackspace import rackspace_disk
 from perfkitbenchmarker.providers.rackspace import \
     rackspace_machine_types as rax
@@ -74,7 +75,7 @@ RHEL_IMAGE = 'c07409c8-0931-40e4-a3bc-4869ecb5931e'
 
 class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
-  CLOUD = 'Rackspace'
+  CLOUD = providers.RACKSPACE
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 

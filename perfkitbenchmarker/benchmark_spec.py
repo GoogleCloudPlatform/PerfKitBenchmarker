@@ -23,6 +23,7 @@ import thread
 import threading
 import uuid
 import provider_info
+import providers
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
@@ -61,16 +62,6 @@ STATIC_VMS = 'static_vms'
 VM_SPEC = 'vm_spec'
 DISK_SPEC = 'disk_spec'
 
-GCP = 'GCP'
-AZURE = 'Azure'
-AWS = 'AWS'
-ALICLOUD = 'AliCloud'
-KUBERNETES = 'Kubernetes'
-DIGITALOCEAN = 'DigitalOcean'
-OPENSTACK = 'OpenStack'
-CLOUDSTACK = 'CloudStack'
-RACKSPACE = 'Rackspace'
-MESOS = 'Mesos'
 DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
@@ -80,10 +71,9 @@ NOT_EXCLUDED = 'permissive'
 SKIP_CHECK = 'none'
 
 FLAGS = flags.FLAGS
-VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS]
-flags.DEFINE_enum('cloud', GCP,
-                  VALID_CLOUDS,
+
+flags.DEFINE_enum('cloud', providers.GCP,
+                  providers.VALID_CLOUDS,
                   'Name of the cloud to use.')
 flags.DEFINE_enum(
     'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],

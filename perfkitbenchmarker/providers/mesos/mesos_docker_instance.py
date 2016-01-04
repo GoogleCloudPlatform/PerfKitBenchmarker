@@ -23,6 +23,7 @@ from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.mesos.mesos_disk import LocalDisk
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -38,7 +39,7 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
     docker_memory_mb: None or int. Memory limit (in MB) for Docker instances.
   """
 
-  CLOUD = 'Mesos'
+  CLOUD = providers.MESOS
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -65,7 +66,7 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
   Represents a Docker instance spawned by Marathon framework on a Mesos cluster
   """
 
-  CLOUD = 'Mesos'
+  CLOUD = providers.MESOS
 
   def __init__(self, vm_spec):
     super(MesosDockerInstance, self).__init__(vm_spec)

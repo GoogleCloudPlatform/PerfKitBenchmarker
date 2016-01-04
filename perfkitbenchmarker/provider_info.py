@@ -14,10 +14,10 @@
 
 """Module containing class for provider data
 
-Currently, this is only used for IsBenchmarkSupported
+This contains the BaseProviderInfo class which is
+used for IsBenchmarkSupported
 
 """
-
 
 _PROVIDER_INFO_REGISTRY = {}
 

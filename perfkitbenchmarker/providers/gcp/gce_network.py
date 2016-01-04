@@ -26,9 +26,9 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
-GCP = 'GCP'
 NETWORK_RANGE = '10.0.0.0/16'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
@@ -79,7 +79,7 @@ class GceFirewallRule(resource.BaseResource):
 class GceFirewall(network.BaseFirewall):
   """An object representing the GCE Firewall."""
 
-  CLOUD = GCP
+  CLOUD = providers.GCP
 
   def __init__(self):
     """Initialize GCE firewall class.
@@ -162,7 +162,7 @@ class GceNetworkResource(resource.BaseResource):
 class GceNetwork(network.BaseNetwork):
   """Object representing a GCE Network."""
 
-  CLOUD = GCP
+  CLOUD = providers.GCP
 
   def __init__(self, network_spec):
     super(GceNetwork, self).__init__(network_spec)

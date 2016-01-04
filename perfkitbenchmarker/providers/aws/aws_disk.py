@@ -29,6 +29,7 @@ import threading
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker import providers
 
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
@@ -90,7 +91,7 @@ disk.RegisterDiskTypeMap(AWS, DISK_TYPE)
 class AwsDiskSpec(disk.BaseDiskSpec):
   """Object holding the information needed to create an AwsDisk."""
 
-  CLOUD = 'AWS'
+  CLOUD = providers.AWS
 
   def __init__(self, iops=None, **kwargs):
     """Initializes the Disk Spec.

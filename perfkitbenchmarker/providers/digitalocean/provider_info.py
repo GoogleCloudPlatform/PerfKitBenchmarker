@@ -17,11 +17,11 @@
 """
 
 
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import benchmark_spec
 
 
 class DigitalOceanProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = benchmark_spec.DIGITALOCEAN
+  CLOUD = providers.DIGITALOCEAN

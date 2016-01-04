@@ -26,6 +26,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.digitalocean import digitalocean_disk
 from perfkitbenchmarker.providers.digitalocean import util
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -76,7 +77,7 @@ def GetErrorMessage(stdout):
 class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a DigitalOcean Virtual Machine (Droplet)."""
 
-  CLOUD = 'DigitalOcean'
+  CLOUD = providers.DIGITALOCEAN
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 

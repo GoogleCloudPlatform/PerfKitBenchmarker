@@ -16,8 +16,8 @@
 
 """
 
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import benchmark_spec
 
 
 class MesosProviderInfo(provider_info.BaseProviderInfo):
@@ -30,7 +30,7 @@ class MesosProviderInfo(provider_info.BaseProviderInfo):
                           'sysbench_oltp']
   UNSUPPORTED_BENCHMARKS = ['bonnie++', 'mysql_service']
 
-  CLOUD = benchmark_spec.MESOS
+  CLOUD = providers.MESOS
 
   @classmethod
   def IsBenchmarkSupported(cls, benchmark):

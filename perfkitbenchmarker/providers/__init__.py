@@ -24,6 +24,20 @@ from perfkitbenchmarker import import_util
 # actually loading any other provider specific modules.
 import_util.LoadModulesWithName(__path__, __name__, 'flags')
 
+GCP = 'GCP'
+AZURE = 'Azure'
+AWS = 'AWS'
+ALICLOUD = 'AliCloud'
+KUBERNETES = 'Kubernetes'
+DIGITALOCEAN = 'DigitalOcean'
+OPENSTACK = 'OpenStack'
+CLOUDSTACK = 'CloudStack'
+RACKSPACE = 'Rackspace'
+MESOS = 'Mesos'
+
+VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS]
+
 
 def LoadProvider(provider_name):
   """Loads the all modules in the 'provider_name' package.

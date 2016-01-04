@@ -16,7 +16,6 @@
 
 import unittest
 
-from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
 
@@ -24,7 +23,7 @@ from perfkitbenchmarker import provider_info
 class ProviderBenchmarkChecks(unittest.TestCase):
 
   def testPingSupported(self):
-    for cloud in benchmark_spec.VALID_CLOUDS:
+    for cloud in providers.VALID_CLOUDS:
       providers.LoadProvider(cloud.lower())
       ThisProviderInfoClass = provider_info.GetProviderInfoClass(cloud)
       self.assertTrue(ThisProviderInfoClass.IsBenchmarkSupported('iperf'),
@@ -32,10 +31,10 @@ class ProviderBenchmarkChecks(unittest.TestCase):
                           cloud))
 
   def testMYSQLSupport(self):
-    for cloud in benchmark_spec.VALID_CLOUDS:
+    for cloud in providers.VALID_CLOUDS:
       providers.LoadProvider(cloud.lower())
       ThisProviderInfoClass = provider_info.GetProviderInfoClass(cloud)
-      if (cloud == benchmark_spec.AWS or cloud == benchmark_spec.GCP):
+      if (cloud == providers.AWS or cloud == providers.GCP):
         self.assertTrue(ThisProviderInfoClass.IsBenchmarkSupported(
             'mysql_service'))
       else:
