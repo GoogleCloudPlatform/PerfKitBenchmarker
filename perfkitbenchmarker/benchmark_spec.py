@@ -291,7 +291,8 @@ class BenchmarkSpec(object):
         self.config[VM_GROUPS]['juju']['vm_count'] = 1
 
         jujuvm = None
-        jujuvms = self.ConstructVirtualMachine('juju', self.config[VM_GROUPS]['juju'])
+        jujuvms = self.ConstructVirtualMachine('juju',
+                                               self.config[VM_GROUPS]['juju'])
         if len(jujuvms):
             jujuvm = jujuvms.pop()
             jujuvm.isController = True

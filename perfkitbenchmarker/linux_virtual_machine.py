@@ -1017,7 +1017,8 @@ class JujuMixin(DebianMixin):
     def Set(self, service, params=[]):
         ' '.join(params)
         try:
-            output, _ = self.RemoteHostCommand('juju set %s %s' % (service, ' '.join(params)))
+            output, _ = self.RemoteHostCommand(
+                'juju set %s %s' % (service, ' '.join(params)))
             return output.strip()
         except:
             pass
@@ -1032,23 +1033,24 @@ class JujuMixin(DebianMixin):
         while True:
             ready = True
             status = yaml.load(self.juju_status())
-            #logging.warn(status)
+            # logging.warn(status)
             for service in status['services']:
                 # logging.warn("Examining service %s" % service )
                 ss = status['services'][service]['service-status']['current']
                 # logging.warn("Service-status: %s" % ss)
 
-                # Accept blocked because the service may be waiting for a relation
+                # Accept blocked because the service may be waiting on relation
                 if ss not in ['active', 'unknown']:
                     ready = False
 
                 for unit in status['services'][service]['units']:
-                    ag = status['services'][service]['units'][unit]['agent-state']
+                    unit_data = status['services'][service]['units'][unit]
+                    ag = unit_data['agent-state']
                     # logging.warn('agent-state: %s' % ag)
                     if ready and ag != 'started':
                         ready = False
 
-                    ws = status['services'][service]['units'][unit]['workload-status']['current']
+                    ws = unit_data['workload-status']['current']
                     # logging.warn('workload-status: %s' % ws)
                     if ready and ws not in ['active', 'unknown']:
                         ready = False
@@ -1062,7 +1064,8 @@ class JujuMixin(DebianMixin):
         if self.isController:
             # Check if the charm is already deployed?
 
-            resp, _ = self.RemoteHostCommand("juju deploy %s --num-units=%d" % (charm, units))
+            resp, _ = self.RemoteHostCommand(
+                "juju deploy %s --num-units=%d" % (charm, units))
 
             return True
         pass
@@ -1107,7 +1110,7 @@ class JujuMixin(DebianMixin):
 
             except errors.VirtualMachine.RemoteCommandError as e:
                 raise e
-            
+
     @vm_util.Retry(log_errors=False, poll_interval=1)
     def WaitForBootCompletion(self):
         super(JujuMixin, self).WaitForBootCompletion()
