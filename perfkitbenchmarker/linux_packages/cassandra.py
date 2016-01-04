@@ -108,7 +108,7 @@ def JujuInstall(vm):
         # the manual installation to /tmp/pkb.
         remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
         vm.RemoteCommand('mkdir -p %s' % remote_path)
-        
+
 
 def Configure(vm, seed_vms):
   """Configure Cassandra on 'vm'.
