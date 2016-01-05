@@ -87,6 +87,10 @@ class BaseVmSpec(spec.BaseSpec):
         useful if benchmark dependencies have already been installed.
     background_cpu_threads: The number of threads of background CPU usage
         while running the benchmark.
+    background_network_mbits_per_sec: The number of megabits per second of
+        background network traffic during the benchmark.
+    background_network_ip_type: The IP address type (INTERNAL or
+        EXTERNAL) to use for generating background network workload.
   """
 
   __metaclass__ = AutoRegisterVmSpecMeta
@@ -118,6 +122,12 @@ class BaseVmSpec(spec.BaseSpec):
     if flag_values['background_cpu_threads'].present:
       config_values['background_cpu_threads'] = (
           flag_values.background_cpu_threads)
+    if flag_values['background_network_mbits_per_sec'].present:
+      config_values['background_network_mbits_per_sec'] = (
+          flag_values.background_network_mbits_per_sec)
+    if flag_values['background_network_ip_type'].present:
+      config_values['background_network_ip_type'] = (
+          flag_values.background_network_ip_type)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -140,6 +150,12 @@ class BaseVmSpec(spec.BaseSpec):
                                                          'default': None}),
         'zone': (option_decoders.StringDecoder, {'none_ok': True,
                                                  'default': None}),
+        'background_network_mbits_per_sec': (option_decoders.IntDecoder, {
+            'none_ok': True, 'default': None}),
+        'background_network_ip_type': (option_decoders.EnumDecoder, {
+            'default': vm_util.IpAddressSubset.EXTERNAL,
+            'valid_values': [vm_util.IpAddressSubset.EXTERNAL,
+                             vm_util.IpAddressSubset.INTERNAL]}),
         'background_cpu_threads': (option_decoders.IntDecoder, {
             'none_ok': True, 'default': None})})
     return result
@@ -171,6 +187,10 @@ class BaseVirtualMachine(resource.BaseResource):
       scratch disks or that can be striped together.
     background_cpu_threads: The number of threads of background CPU usage
       while running the benchmark.
+    background_network_mbits_per_sec: Number of mbits/sec of background network
+      usage while running the benchmark.
+    background_network_ip_type: Type of IP address to use for generating
+      background network workload
   """
 
   __metaclass__ = AutoRegisterVmMeta
@@ -207,6 +227,9 @@ class BaseVirtualMachine(resource.BaseResource):
     self.local_disk_counter = 0
     self.remote_disk_counter = 0
     self.background_cpu_threads = vm_spec.background_cpu_threads
+    self.background_network_mbits_per_sec = (
+        vm_spec.background_network_mbits_per_sec)
+    self.background_network_ip_type = vm_spec.background_network_ip_type
 
     self.network = None
     self.firewall = None
@@ -555,15 +578,15 @@ class BaseOsMixin(object):
 
   def StartBackgroundWorkload(self):
     """Start the background workload"""
-    if self.background_cpu_threads:
+    if self.background_cpu_threads or self.background_network_mbits_per_sec:
       raise NotImplementedError()
 
   def StopBackgroundWorkload(self):
     """Stop the background workoad"""
-    if self.background_cpu_threads:
+    if self.background_cpu_threads or self.background_network_mbits_per_sec:
       raise NotImplementedError()
 
   def PrepareBackgroundWorkload(self):
     """Prepare for the background workload"""
-    if self.background_cpu_threads:
+    if self.background_cpu_threads or self.background_network_mbits_per_sec:
       raise NotImplementedError()
