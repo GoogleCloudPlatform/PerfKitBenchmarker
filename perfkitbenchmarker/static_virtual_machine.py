@@ -63,8 +63,8 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
       internal_ip: The internal ip address of the VM.
       ssh_port: The port number to use for SSH and SCP commands.
       password: The password used to log into the VM (Windows Only).
-      disk_specs: A list of dictionaries containing kwargs used to create
-          disk.BaseDiskSpecs.
+      disk_specs: None or a list of dictionaries containing kwargs used to
+          create disk.BaseDiskSpecs.
       os_type: The OS type of the VM. See the flag of the same name for more
           information.
     """
@@ -76,7 +76,10 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
     self.ssh_port = ssh_port
     self.password = password
     self.os_type = os_type
-    self.disk_specs = disk_specs
+    self.disk_specs = [
+        disk.BaseDiskSpec(
+            '{0}.disk_specs[{1}]'.format(component_full_name, i), **disk_spec)
+        for i, disk_spec in enumerate(disk_specs or ())]
 
 
 class StaticDisk(disk.BaseDisk):
@@ -122,11 +125,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
                                                   self.ip_address))
     self.ssh_port = vm_spec.ssh_port
     self.password = vm_spec.password
-
-    if vm_spec.disk_specs:
-      for spec in vm_spec.disk_specs:
-        self.disk_specs.append(disk.BaseDiskSpec(**spec))
-
+    self.disk_specs = vm_spec.disk_specs
     self.from_pool = False
 
   def _Create(self):
