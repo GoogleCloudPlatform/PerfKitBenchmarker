@@ -76,6 +76,9 @@ def Prepare(benchmark_spec):
       vm.AllowPort(IPERF_PORT)
     vm.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
                      IPERF_PORT)
+    stdout, _ = vm.RemoteCommand('pgrep -n iperf')
+    # TODO store this in a better place once we have a better place
+    vm.iperf_server_pid = stdout.strip()
 
 
 @vm_util.Retry(max_retries=IPERF_RETRIES)
@@ -189,4 +192,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms[1].RemoteCommand('pkill -9 iperf')
+  for vm in vms:
+    vm.RemoteCommand('kill -9 ' + vm.iperf_server_pid)
