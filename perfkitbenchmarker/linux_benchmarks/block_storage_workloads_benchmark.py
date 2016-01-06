@@ -57,7 +57,7 @@ flags.DEFINE_enum('workload_mode', LOGGING,
                   [LOGGING, DATABASE, STREAMING],
                   'Simulate a logging, database or streaming scenario.')
 
-flags.DEFINE_list('iodepth_list', None, 'A list of iodepth parameter used by '
+flags.DEFINE_list('iodepth_list', [], 'A list of iodepth parameter used by '
                   'fio command in simulated database and streaming scenarios '
                   'only.')
 
