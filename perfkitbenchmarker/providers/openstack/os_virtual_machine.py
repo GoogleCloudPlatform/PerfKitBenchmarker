@@ -33,7 +33,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
 
     CLOUD = 'OpenStack'
-    DEFAULT_USERNAME = 'ubuntu'
+    DEFAULT_USERNAME = FLAGS.openstack_image_username
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None
     _floating_ip_lock = threading.Lock()
