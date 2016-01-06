@@ -22,6 +22,8 @@ import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
+from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.configs import spec
 
 FLAGS = flags.FLAGS
 
@@ -84,10 +86,11 @@ def GetDiskSpecClass(cloud):
   return _DISK_SPEC_REGISTRY.get(cloud, BaseDiskSpec)
 
 
-class AutoRegisterDiskSpecMeta(type):
+class AutoRegisterDiskSpecMeta(spec.BaseSpecMetaClass):
   """Metaclass which automatically registers DiskSpecs."""
 
   def __init__(cls, name, bases, dct):
+    super(AutoRegisterDiskSpecMeta, cls).__init__(name, bases, dct)
     if cls.CLOUD in _DISK_SPEC_REGISTRY:
       raise Exception('BaseDiskSpec subclasses must have a CLOUD attribute.')
     else:
@@ -157,38 +160,77 @@ def WarnAndTranslateDiskFlags():
     WarnAndCopyFlag(old, new)
 
 
-class BaseDiskSpec(object):
-  """Stores the information needed to create a disk."""
+class BaseDiskSpec(spec.BaseSpec):
+  """Stores the information needed to create a disk.
+
+  Attributes:
+    device_path: None or string. Path on the machine where the disk is located.
+    disk_number: None or int. Optional disk identifier unique within the
+        current machine.
+    disk_size: None or int. Size of the disk in GB.
+    disk_type: None or string. See cloud specific disk classes for more
+        information about acceptable values.
+    mount_point: None or string. Directory of mount point.
+    num_striped_disks: int. The number of disks to stripe together. If this is
+        1, it means no striping will occur. This must be >= 1.
+  """
 
   __metaclass__ = AutoRegisterDiskSpecMeta
   CLOUD = None
 
-  def __init__(self, disk_size=None, disk_type=None,
-               mount_point=None, num_striped_disks=1,
-               disk_number=None, device_path=None):
-    """Initializes the DiskSpec object.
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Overrides config values with flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      disk_size: Size of the disk in GB.
-      disk_type: Disk types in string. See cloud specific disk classes for
-          more information on acceptable values.
-      mount_point: Directory of mount point in string.
-      num_striped_disks: The number of disks to stripe together. If this is 1,
-          it means no striping will occur. This must be >= 1.
-    """
-    self.disk_size = disk_size
-    self.disk_type = disk_type
-    self.mount_point = mount_point
-    self.num_striped_disks = num_striped_disks
-    self.disk_number = disk_number
-    self.device_path = device_path
+      config_values: dict mapping config option names to provided values. Is
+          modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
 
-  def ApplyFlags(self, flags):
-    """Applies flags to the DiskSpec."""
-    self.disk_size = flags.data_disk_size or self.disk_size
-    self.disk_type = flags.data_disk_type or self.disk_type
-    self.num_striped_disks = flags.num_striped_disks or self.num_striped_disks
-    self.mount_point = flags.scratch_dir or self.mount_point
+    Returns:
+      dict mapping config option names to values derived from the config
+      values or flag values.
+    """
+    super(BaseDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['data_disk_size'].present:
+      config_values['disk_size'] = flag_values.data_disk_size
+    if flag_values['data_disk_type'].present:
+      config_values['disk_type'] = flag_values.data_disk_type
+    if flag_values['num_striped_disks'].present:
+      config_values['num_striped_disks'] = flag_values.num_striped_disks
+    if flag_values['scratch_dir'].present:
+      config_values['mount_point'] = flag_values.scratch_dir
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Can be overridden by derived classes to add options or impose additional
+    requirements on existing options.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(BaseDiskSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'device_path': (option_decoders.StringDecoder, {'default': None,
+                                                        'none_ok': True}),
+        'disk_number': (option_decoders.IntDecoder, {'default': None,
+                                                     'none_ok': True}),
+        'disk_size': (option_decoders.IntDecoder, {'default': None,
+                                                   'none_ok': True}),
+        'disk_type': (option_decoders.StringDecoder, {'default': None,
+                                                      'none_ok': True}),
+        'mount_point': (option_decoders.StringDecoder, {'default': None,
+                                                        'none_ok': True}),
+        'num_striped_disks': (option_decoders.IntDecoder, {'default': 1,
+                                                           'min': 1})})
+    return result
 
 
 class BaseDisk(resource.BaseResource):

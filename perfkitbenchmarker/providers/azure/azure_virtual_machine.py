@@ -178,7 +178,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     self.service = AzureService(self.name,
                                 self.network.affinity_group.name)
-    disk_spec = disk.BaseDiskSpec()
+    disk_spec = disk.BaseDiskSpec('azure_os_disk')
     self.os_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type)
     self.max_local_disks = 1
 

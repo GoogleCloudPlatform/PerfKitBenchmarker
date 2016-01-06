@@ -19,12 +19,39 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.static_virtual_machine import StaticVirtualMachine
 from perfkitbenchmarker.static_virtual_machine import StaticVmSpec
 
 
 _COMPONENT = 'test_static_vm_spec'
+_DISK_SPEC_DICTS = [{'device_path': '/test_device_path'},
+                    {'mount_point': '/test_mount_point'}]
+
+
+class StaticVmSpecTest(unittest.TestCase):
+
+  def testDefaults(self):
+    spec = StaticVmSpec(_COMPONENT)
+    self.assertIsNone(spec.ip_address)
+    self.assertIsNone(spec.user_name)
+    self.assertIsNone(spec.ssh_private_key)
+    self.assertIsNone(spec.internal_ip)
+    self.assertEqual(spec.ssh_port, 22)
+    self.assertIsNone(spec.password)
+    self.assertIsNone(spec.os_type)
+    self.assertEqual(spec.disk_specs, [])
+
+  def testDiskSpecs(self):
+    spec = StaticVmSpec(_COMPONENT, disk_specs=_DISK_SPEC_DICTS)
+    self.assertEqual(len(spec.disk_specs), 2)
+    for disk_spec in spec.disk_specs:
+      self.assertIsInstance(disk_spec, disk.BaseDiskSpec)
+    self.assertEqual(spec.disk_specs[0].device_path, '/test_device_path')
+    self.assertIsNone(spec.disk_specs[0].mount_point)
+    self.assertIsNone(spec.disk_specs[1].device_path)
+    self.assertEqual(spec.disk_specs[1].mount_point, '/test_mount_point')
 
 
 class StaticVirtualMachineTest(unittest.TestCase):
@@ -128,6 +155,32 @@ class StaticVirtualMachineTest(unittest.TestCase):
     self.assertEqual(2, len(StaticVirtualMachine.vm_pool))
     vm1 = StaticVirtualMachine.GetStaticVirtualMachine()
     self.assertIs(vm0, vm1)
+
+  def testDiskSpecs(self):
+    s = """
+    [{
+        "ip_address": "174.12.14.1",
+        "user_name": "ubuntu",
+        "keyfile_path": "test_keyfile_path",
+        "local_disks": ["/test_local_disk_0", "/test_local_disk_1"],
+        "scratch_disk_mountpoints": ["/test_scratch_disk_0",
+                                     "/test_scratch_disk_1"]
+    }]
+    """
+    expected_paths_and_mount_points = (
+        (None, '/test_scratch_disk_0'), (None, '/test_scratch_disk_1'),
+        ('/test_local_disk_0', None), ('/test_local_disk_1', None))
+    fp = BytesIO(s)
+    StaticVirtualMachine.ReadStaticVirtualMachineFile(fp)
+    self.assertEqual(1, len(StaticVirtualMachine.vm_pool))
+    vm = StaticVirtualMachine.GetStaticVirtualMachine()
+    self.assertTrue(vm.from_pool)
+    self.assertEqual(len(vm.disk_specs), 4)
+    for disk_spec, expected_paths in zip(vm.disk_specs,
+                                         expected_paths_and_mount_points):
+      expected_device_path, expected_mount_point = expected_paths
+      self.assertEqual(disk_spec.device_path, expected_device_path)
+      self.assertEqual(disk_spec.mount_point, expected_mount_point)
 
 
 if __name__ == '__main__':

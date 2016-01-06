@@ -29,14 +29,18 @@ from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util
 
 
+_COMPONENT = 'test_component'
+
+
 class AwsVolumeExistsTestCase(unittest.TestCase):
 
   def setUp(self):
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
-    self.disk = aws_disk.AwsDisk(aws_disk.AwsDiskSpec(disk_type='standard'),
-                                 'us-east-1', 'm4.2xlarge')
+    self.disk = aws_disk.AwsDisk(
+        aws_disk.AwsDiskSpec(_COMPONENT, disk_type='standard'),
+        'us-east-1', 'm4.2xlarge')
     self.disk.id = 'vol-foo'
 
   def testVolumePresent(self):

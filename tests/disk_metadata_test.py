@@ -29,19 +29,14 @@ from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_disk
 
 
+_COMPONENT = 'test_component'
+
+
 class GcpDiskMetadataTest(unittest.TestCase):
   def testPDStandard(self):
-    disk_spec = disk.BaseDiskSpec(
-        disk_size=2,
-        disk_type=gce_disk.PD_STANDARD,
-        mount_point=None)
-
-    disk_obj = gce_disk.GceDisk(
-        disk_spec,
-        'name',
-        'zone',
-        'project')
-
+    disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_size=2,
+                                  disk_type=gce_disk.PD_STANDARD)
+    disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
     self.assertEquals(disk_obj.metadata,
                       {disk.MEDIA: disk.HDD,
                        disk.REPLICATION: disk.ZONE,
@@ -51,10 +46,8 @@ class GcpDiskMetadataTest(unittest.TestCase):
 class AwsDiskMetadataTest(unittest.TestCase):
   def doAwsDiskTest(self, disk_type, machine_type,
                     goal_media, goal_replication, goal_legacy_disk_type):
-    disk_spec = aws_disk.AwsDiskSpec(
-        disk_size=2,
-        disk_type=disk_type,
-        mount_point=None)
+    disk_spec = aws_disk.AwsDiskSpec(_COMPONENT, disk_size=2,
+                                     disk_type=disk_type)
 
     context.SetThreadBenchmarkSpec(benchmark_spec.BenchmarkSpec(
         {}, 'name', 'uid'))
@@ -93,10 +86,8 @@ class AzureDiskMetadataTest(unittest.TestCase):
                       goal_media, goal_replication, goal_legacy_disk_type):
     with mock.patch(azure_disk.__name__ + '.FLAGS') as disk_flags:
       disk_flags.azure_storage_type = storage_type
-      disk_spec = disk.BaseDiskSpec(
-          disk_size=2,
-          disk_type=disk_type,
-          mount_point=None)
+      disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_size=2,
+                                    disk_type=disk_type)
 
       context.SetThreadBenchmarkSpec(benchmark_spec.BenchmarkSpec(
           {}, 'name', 'uid'))
