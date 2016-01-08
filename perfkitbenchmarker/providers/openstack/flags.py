@@ -59,7 +59,7 @@ flags.DEFINE_integer('openstack_volume_size', None,
                      'Size of the volume (GB)')
 
 flags.DEFINE_string('openstack_image_username', 'ubuntu',
-                    'Ssh username for cloud image. Defaults to ubuntu')
+                    'Ssh username for cloud image')
 
 NONE = 'None'
 flags.DEFINE_enum('openstack_scheduler_policy', NONE,
