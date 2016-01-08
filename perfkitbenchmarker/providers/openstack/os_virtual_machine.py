@@ -34,7 +34,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
 
     CLOUD = providers.OPENSTACK
-    DEFAULT_USERNAME = 'ubuntu'
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None
     _floating_ip_lock = threading.Lock()
@@ -56,7 +55,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         )
         self.id = None
         self.pk = None
-        self.user_name = self.DEFAULT_USERNAME
+        self.user_name = FLAGS.openstack_image_username
         self.boot_wait_time = None
         self.image = self.image or self.DEFAULT_IMAGE
 
