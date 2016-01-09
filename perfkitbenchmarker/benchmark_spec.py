@@ -15,38 +15,36 @@
 """Container for all data required for a benchmark to run."""
 
 import copy
-import logging
-import pickle
 import copy_reg
+import logging
 import os
+import pickle
 import thread
 import threading
 import uuid
-import provider_info
-import providers
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
-from perfkitbenchmarker import providers  # NOQA
-
 
 def PickleLock(lock):
-    return UnPickleLock, (lock.locked(),)
+  return UnPickleLock, (lock.locked(),)
 
 
 def UnPickleLock(locked, *args):
-    lock = threading.Lock()
-    if locked:
-        if not lock.acquire(False):
-            raise pickle.UnpicklingError("Cannot acquire lock")
-    return lock
+  lock = threading.Lock()
+  if locked:
+    if not lock.acquire(False):
+      raise pickle.UnpicklingError('Cannot acquire lock')
+  return lock
 
 
 copy_reg.pickle(thread.LockType, PickleLock)
