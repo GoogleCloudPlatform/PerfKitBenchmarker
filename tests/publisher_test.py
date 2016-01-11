@@ -14,6 +14,7 @@
 """Tests for perfkitbenchmarker.publisher."""
 
 import collections
+import csv
 import io
 import json
 import re
@@ -335,3 +336,38 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                     data_disk_0_foo='bar',
                     data_disk_0_legacy_disk_type='remote_ssd')
     self._RunTest(self.mock_spec, expected)
+
+
+class CSVPublisherTestCase(unittest.TestCase):
+  def setUp(self):
+    self.tf = tempfile.NamedTemporaryFile(prefix='perfkit-csv-publisher',
+                                          suffix='.csv')
+    self.addCleanup(self.tf.close)
+
+  def testWritesToStream(self):
+    instance = publisher.CSVPublisher(self.tf.name)
+    samples = [{'test': 'testb', 'metric': '1', 'value': 1.0, 'unit': 'MB',
+                'metadata': {}},
+               {'test': 'testb', 'metric': '2', 'value': 14.0, 'unit': 'MB',
+                'metadata': {}},
+               {'test': 'testa', 'metric': '3', 'value': 47.0, 'unit': 'us',
+                'metadata': {}}]
+    instance.PublishSamples(samples)
+    self.tf.seek(0)
+    rows = list(csv.DictReader(self.tf))
+    self.assertItemsEqual(['1', '2', '3'], [i['metric'] for i in rows])
+
+  def testUsesUnionOfMetaKeys(self):
+    instance = publisher.CSVPublisher(self.tf.name)
+    samples = [{'test': 'testb', 'metric': '1', 'value': 1.0, 'unit': 'MB',
+                'metadata': {'key1': 'value1'}},
+               {'test': 'testb', 'metric': '2', 'value': 14.0, 'unit': 'MB',
+                'metadata': {'key1': 'value2'}},
+               {'test': 'testa', 'metric': '3', 'value': 47.0, 'unit': 'us',
+                'metadata': {'key3': 'value3'}}]
+    instance.PublishSamples(samples)
+    self.tf.seek(0)
+    reader = csv.DictReader(self.tf)
+    rows = list(reader)
+    self.assertEqual(['key1', 'key3'], reader.fieldnames[-2:])
+    self.assertEqual(3, len(rows))
