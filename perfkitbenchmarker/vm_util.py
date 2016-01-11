@@ -77,6 +77,10 @@ flags.DEFINE_integer('burn_cpu_threads', 1, 'Number of threads to use to '
 flags.DEFINE_integer('background_cpu_threads', None,
                      'Number of threads of background cpu usage while '
                      'running a benchmark')
+flags.DEFINE_integer('background_network_mbits_per_sec', None,
+                     'Number of megabits per second of background '
+                     'network traffic to generate during the run phase '
+                     'of the benchmark')
 
 
 class IpAddressSubset(object):
@@ -94,6 +98,11 @@ flags.DEFINE_enum('ip_addresses', IpAddressSubset.REACHABLE,
                   'IP addresses (BOTH), external and internal only if '
                   'the receiving VM is reachable by internal IP (REACHABLE), '
                   'external IP only (EXTERNAL) or internal IP only (INTERNAL)')
+
+flags.DEFINE_enum('background_network_ip_type', IpAddressSubset.EXTERNAL,
+                  (IpAddressSubset.INTERNAL, IpAddressSubset.EXTERNAL),
+                  'IP address type to use when generating background network '
+                  'traffic')
 
 
 def GetTempDir():

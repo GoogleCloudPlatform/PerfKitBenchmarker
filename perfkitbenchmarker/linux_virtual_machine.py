@@ -57,6 +57,9 @@ REMOTE_KEY_PATH = '.ssh/id_rsa'
 CONTAINER_MOUNT_DIR = '/mnt'
 CONTAINER_WORK_DIR = '/root'
 
+BACKGROUND_IPERF_PORT = 20001
+BACKGROUND_IPERF_SECONDS = 2147483647
+
 # This pair of scripts used for executing long-running commands, which will be
 # resilient in the face of SSH connection errors.
 # EXECUTE_COMMAND runs a command, streaming stdout / stderr to a file, then
@@ -545,6 +548,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Install packages needed for the background workload """
     if self.background_cpu_threads:
       self.Install('sysbench')
+    if self.background_network_mbits_per_sec:
+      self.Install('iperf')
 
   def StartBackgroundWorkload(self):
     """Starts the blackground workload."""
@@ -552,11 +557,33 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand(
           'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
           'run 1> /dev/null 2> /dev/null &' % self.background_cpu_threads)
+    if self.background_network_mbits_per_sec:
+      self.AllowPort(BACKGROUND_IPERF_PORT)
+      self.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
+                         BACKGROUND_IPERF_PORT)
+      stdout, _ = self.RemoteCommand('pgrep iperf -n')
+      self.server_pid = stdout.strip()
+
+      if self.background_network_ip_type == vm_util.IpAddressSubset.EXTERNAL:
+        ip_address = self.ip_address
+      else:
+        ip_address = self.internal_ip
+      iperf_cmd = ('nohup iperf --client %s --port %s --time %s -u -b %sM '
+                   '&> /dev/null &' % (ip_address, BACKGROUND_IPERF_PORT,
+                                       BACKGROUND_IPERF_SECONDS,
+                                       self.background_network_mbits_per_sec))
+
+      self.RemoteCommand(iperf_cmd)
+      stdout, _ = self.RemoteCommand('pgrep iperf -n')
+      self.client_pid = stdout.strip()
 
   def StopBackgroundWorkload(self):
     """Stops the background workload."""
     if self.background_cpu_threads:
       self.RemoteCommand('pkill -9 sysbench')
+    if self.background_network_mbits_per_sec:
+      self.RemoteCommand('kill -9 ' + self.client_pid)
+      self.RemoteCommand('kill -9 ' + self.server_pid)
 
 
 class RhelMixin(BaseLinuxMixin):

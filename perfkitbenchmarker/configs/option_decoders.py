@@ -83,6 +83,50 @@ class ConfigOptionDecoder(object):
     raise NotImplementedError()
 
 
+class EnumDecoder(ConfigOptionDecoder):
+  """ Verifies that the config options value is in the allowed set.
+
+  Passes through the value unmodified
+  """
+
+  def __init__(self, option, valid_values, **kwargs):
+    """Initializes the EnumVerifier.
+
+    Args:
+    option: string.  Name of the config option.
+    valid_values: list of the allowed values
+    **kwargs: Keyword arguments to pass to the base class.
+    """
+    super(EnumDecoder, self).__init__(option, **kwargs)
+    self.valid_values = valid_values
+
+  def Decode(self, value, component_full_name, flag_values):
+    """ Verifies that the provided value is in the allowed set.
+
+    Args:
+      value: The value specified in the config.
+      component_full_name: string.  Fully qualified name of the
+          configurable component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be
+          propagated to the BaseSpec constructors.
+
+    Returns:
+      The valid value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    if value in self.valid_values:
+     return value
+    else:
+      raise errors.Config.InvalidValue(
+          'Invalid {0}.{1} value: "{2}". Value must be one '
+          'of the following: {3}.'.format(
+              component_full_name, self.option, value,
+              ', '.join(str(t) for t in self.valid_values)))
+
+
+
 class TypeVerifier(ConfigOptionDecoder):
   """Verifies that a config option value's type belongs to an allowed set.
 
