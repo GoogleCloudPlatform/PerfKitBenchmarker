@@ -21,6 +21,7 @@ import abc
 import logging
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -54,8 +55,6 @@ NONE = 'none'
 ZONE = 'zone'
 REGION = 'region'
 LEGACY_DISK_TYPE = 'legacy_disk_type'
-
-WINDOWS = 'windows'
 
 
 # TODO(nlavine): remove this function when we remove the deprecated
@@ -275,14 +274,14 @@ class BaseDisk(resource.BaseResource):
 
   def GetDevicePath(self):
     """Returns the path to the device inside a Linux VM."""
-    if FLAGS.os_type != WINDOWS:
+    if FLAGS.os_type != os_types.WINDOWS:
       return self.device_path
     else:
       raise ValueError('Windows disks do not have device paths.')
 
   def GetDeviceId(self):
     """Return the Windows DeviceId of this disk."""
-    if FLAGS.os_type == WINDOWS:
+    if FLAGS.os_type == os_types.WINDOWS:
       return r'\\.\PHYSICALDRIVE%s' % self.disk_number
     else:
       raise ValueError('DeviceIds only exist on Windows.')

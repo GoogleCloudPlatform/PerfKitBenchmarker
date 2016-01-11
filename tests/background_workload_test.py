@@ -14,17 +14,20 @@
 
 """Tests for background workload"""
 
-import unittest
-import mock
 import functools
+import unittest
+
+import mock
 from mock import patch
-from tests import mock_flags
-from perfkitbenchmarker import configs
-from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import timing_util
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import timing_util
+from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+from tests import mock_flags
 
 
 NAME = 'ping'
@@ -56,7 +59,7 @@ class TestBackgroundWorkload(unittest.TestCase):
     self.last_call += 1
 
   def setupCommonFlags(self, mock_flags):
-    mock_flags.os_type = benchmark_spec.DEBIAN
+    mock_flags.os_type = os_types.DEBIAN
     mock_flags.cloud = providers.GCP
 
   def _CheckVMFromSpec(self, spec, num_working):
@@ -116,7 +119,7 @@ class TestBackgroundWorkload(unittest.TestCase):
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
       mocked_flags.background_cpu_threads = 1
-      mocked_flags.os_type = benchmark_spec.WINDOWS
+      mocked_flags.os_type = os_types.WINDOWS
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
       spec.ConstructVirtualMachines()
@@ -154,7 +157,7 @@ class TestBackgroundWorkload(unittest.TestCase):
     """ Test that nothing happens with the vanilla config """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
-      mocked_flags.os_type = benchmark_spec.WINDOWS
+      mocked_flags.os_type = os_types.WINDOWS
       mocked_flags.background_cpu_threads = None
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)

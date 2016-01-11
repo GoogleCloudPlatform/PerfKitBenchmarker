@@ -63,7 +63,6 @@ import sys
 import uuid
 
 from perfkitbenchmarker import archive
-from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import benchmark_status
@@ -72,7 +71,9 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import traces
@@ -464,7 +465,7 @@ def RunBenchmarks(publish=True):
 
   _LogCommandLineFlags()
 
-  if FLAGS.os_type == benchmark_spec.WINDOWS and not vm_util.RunningOnWindows():
+  if FLAGS.os_type == os_types.WINDOWS and not vm_util.RunningOnWindows():
     logging.error('In order to run benchmarks on Windows VMs, you must be '
                   'running on Windows.')
     return 1

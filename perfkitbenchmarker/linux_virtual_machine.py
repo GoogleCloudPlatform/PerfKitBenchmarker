@@ -39,6 +39,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -561,7 +562,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
-  OS_TYPE = 'rhel'
+  OS_TYPE = os_types.RHEL
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -662,7 +663,7 @@ class RhelMixin(BaseLinuxMixin):
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  OS_TYPE = 'debian'
+  OS_TYPE = os_types.DEBIAN
 
   def __init__(self, *args, **kwargs):
     super(DebianMixin, self).__init__(*args, **kwargs)
@@ -785,7 +786,7 @@ class ContainerizedDebianMixin(DebianMixin):
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
 
-  OS_TYPE = 'ubuntu_container'
+  OS_TYPE = os_types.UBUNTU_CONTAINER
 
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
