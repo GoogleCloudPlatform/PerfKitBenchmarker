@@ -33,13 +33,10 @@ import threading
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import windows_virtual_machine
 
-WINDOWS = 'windows'
-DEBIAN = 'debian'
-RHEL = 'rhel'
-UBUNTU_CONTAINER = 'ubuntu_container'
 FLAGS = flags.FLAGS
 
 
@@ -194,10 +191,10 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     linux_required_keys = required_keys | frozenset(['keyfile_path'])
 
     required_keys_by_os = {
-        WINDOWS: required_keys | frozenset(['password']),
-        DEBIAN: linux_required_keys,
-        RHEL: linux_required_keys,
-        UBUNTU_CONTAINER: linux_required_keys,
+        os_types.WINDOWS: required_keys | frozenset(['password']),
+        os_types.DEBIAN: linux_required_keys,
+        os_types.RHEL: linux_required_keys,
+        os_types.UBUNTU_CONTAINER: linux_required_keys,
     }
     required_keys = required_keys_by_os[FLAGS.os_type]
 
@@ -240,8 +237,8 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       os_type = item.get('os_type')
       install_packages = item.get('install_packages', True)
 
-      if ((os_type == WINDOWS and FLAGS.os_type != WINDOWS) or
-          (os_type != WINDOWS and FLAGS.os_type == WINDOWS)):
+      if ((os_type == os_types.WINDOWS and FLAGS.os_type != os_types.WINDOWS) or
+          (os_type != os_types.WINDOWS and FLAGS.os_type == os_types.WINDOWS)):
         raise ValueError('Please only use Windows VMs when using '
                          '--os_type=windows and vice versa.')
 
@@ -283,10 +280,10 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 def GetStaticVmClass(os_type):
   """Returns the static VM class that corresponds to the os_type."""
   class_dict = {
-      DEBIAN: DebianBasedStaticVirtualMachine,
-      RHEL: RhelBasedStaticVirtualMachine,
-      WINDOWS: WindowsBasedStaticVirtualMachine,
-      UBUNTU_CONTAINER: ContainerizedStaticVirtualMachine,
+      os_types.DEBIAN: DebianBasedStaticVirtualMachine,
+      os_types.RHEL: RhelBasedStaticVirtualMachine,
+      os_types.WINDOWS: WindowsBasedStaticVirtualMachine,
+      os_types.UBUNTU_CONTAINER: ContainerizedStaticVirtualMachine,
   }
   if os_type in class_dict:
     return class_dict[os_type]

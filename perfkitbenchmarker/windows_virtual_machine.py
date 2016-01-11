@@ -19,6 +19,7 @@ import time
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
@@ -37,7 +38,7 @@ STARTUP_SCRIPT = ('powershell -Command "Enable-PSRemoting -force; '
 
 class WindowsMixin(virtual_machine.BaseOsMixin):
 
-  OS_TYPE = 'windows'
+  OS_TYPE = os_types.WINDOWS
 
   def __init__(self):
     super(WindowsMixin, self).__init__()

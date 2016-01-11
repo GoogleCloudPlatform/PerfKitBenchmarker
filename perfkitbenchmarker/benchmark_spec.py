@@ -28,6 +28,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -60,10 +61,6 @@ STATIC_VMS = 'static_vms'
 VM_SPEC = 'vm_spec'
 DISK_SPEC = 'disk_spec'
 
-DEBIAN = 'debian'
-RHEL = 'rhel'
-WINDOWS = 'windows'
-UBUNTU_CONTAINER = 'ubuntu_container'
 SUPPORTED = 'strict'
 NOT_EXCLUDED = 'permissive'
 SKIP_CHECK = 'none'
@@ -73,13 +70,6 @@ FLAGS = flags.FLAGS
 flags.DEFINE_enum('cloud', providers.GCP,
                   providers.VALID_CLOUDS,
                   'Name of the cloud to use.')
-flags.DEFINE_enum(
-    'os_type', DEBIAN, [DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS],
-    'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
-    'built on Debian and uses the same package manager. Likewise, CentOS\'s '
-    'os_type is "rhel". In general if two OS\'s use the same package manager, '
-    'and are otherwise very similar, the same os_type should work on both of '
-    'them.')
 flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM.'
                     'Upon creation, these directories will have numbers'
@@ -264,7 +254,7 @@ class BenchmarkSpec(object):
 
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
-      if FLAGS.os_type != WINDOWS:
+      if FLAGS.os_type != os_types.WINDOWS:
         vm_util.GenerateSSHConfig(self)
 
   def Delete(self):
