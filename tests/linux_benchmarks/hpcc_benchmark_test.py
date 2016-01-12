@@ -28,14 +28,14 @@ class HPCCTestCase(unittest.TestCase):
     p.start()
     self.addCleanup(p.stop)
 
-    path = os.path.join(os.path.dirname(__file__), 'data', 'hpcc-sample.txt')
+    path = os.path.join(os.path.dirname(__file__), '../data', 'hpcc-sample.txt')
     with open(path) as fp:
       self.contents = fp.read()
 
   def testParseHpcc(self):
     benchmark_spec = mock.MagicMock()
     result = hpcc_benchmark.ParseOutput(self.contents, benchmark_spec)
-    self.assertEqual(6, len(result))
+    self.assertEqual(7, len(result))
     results = {i[0]: i[1] for i in result}
 
     self.assertAlmostEqual(0.0331844, results['HPL Throughput'])
@@ -44,7 +44,7 @@ class HPCCTestCase(unittest.TestCase):
     self.assertAlmostEqual(11.6338, results['STREAM Scale Throughput'])
     self.assertAlmostEqual(12.7265, results['STREAM Add Throughput'])
     self.assertAlmostEqual(12.2433, results['STREAM Triad Throughput'])
-
+    self.assertAlmostEqual(0.338561, results['PTRANS Throughput'])
 
 if __name__ == '__main__':
   unittest.main()

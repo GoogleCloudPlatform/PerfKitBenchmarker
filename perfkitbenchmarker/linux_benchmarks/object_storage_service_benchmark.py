@@ -37,7 +37,7 @@ import os
 import re
 import time
 
-from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -46,10 +46,13 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.sample import PercentileCalculator  # noqa
 
-flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
-                  [benchmark_spec_class.GCP, benchmark_spec_class.AWS,
-                   benchmark_spec_class.AZURE],
-                  'storage provider (GCP/AZURE/AWS) to use.')
+flags.DEFINE_enum('storage', providers.GCP,
+                  [providers.GCP, providers.AWS,
+                   providers.AZURE, providers.OPENSTACK],
+                  'storage provider (GCP/AZURE/AWS/OPENSTACK) to use.')
+
+flags.DEFINE_string('object_storage_region', None,
+                    'Storage region for object storage benchmark.')
 
 flags.DEFINE_enum('object_storage_scenario', 'all',
                   ['all', 'cli', 'api_data', 'api_namespace'],
@@ -75,6 +78,10 @@ flags.DEFINE_string('boto_file_location', None,
 
 flags.DEFINE_string('azure_lib_version', None,
                     'Use a particular version of azure client lib, e.g.: 1.0.2')
+
+flags.DEFINE_boolean('openstack_swift_insecure', False,
+                     'Allow swiftclient to access Swift service without \n'
+                     'having to verify the SSL certificate')
 
 FLAGS = flags.FLAGS
 
@@ -108,10 +115,13 @@ AZURE_CREDENTIAL_LOCATION = '.azure'
 DEFAULT_BOTO_LOCATION = '~/.boto'
 BOTO_LIB_VERSION = 'boto_lib_version'
 
+SWIFTCLIENT_LIB_VERSION = 'python-swiftclient_lib_version'
+
 OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
-    benchmark_spec_class.GCP: '~/' + GCE_CREDENTIAL_LOCATION,
-    benchmark_spec_class.AWS: '~/' + AWS_CREDENTIAL_LOCATION,
-    benchmark_spec_class.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION}
+    providers.GCP: '~/' + GCE_CREDENTIAL_LOCATION,
+    providers.AWS: '~/' + AWS_CREDENTIAL_LOCATION,
+    providers.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION,
+    providers.OPENSTACK: '~/'}
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data used in the CLI tests.
@@ -129,8 +139,8 @@ LIST_CONSISTENCY_ITERATIONS = 200
 THROUGHPUT_UNIT = 'Mbps'
 LATENCY_UNIT = 'seconds'
 NA_UNIT = 'na'
-PERCENTILES_LIST = ['p1', 'p5', 'p50', 'p90', 'p99', 'p99.9', 'average',
-                    'stddev']
+PERCENTILES_LIST = ['p0.1', 'p1', 'p5', 'p10', 'p50', 'p90', 'p95', 'p99',
+                    'p99.9', 'average', 'stddev']
 
 UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli Mbps'
 DOWNLOAD_THROUGHPUT_VIA_CLI = 'download throughput via cli Mbps'
@@ -161,7 +171,26 @@ CONTENT_REMOVAL_RETRY_LIMIT = 5
 BUCKET_REMOVAL_RETRY_LIMIT = 120
 RETRY_WAIT_INTERVAL_SECONDS = 30
 
-DEFAULT_GCS_REGION = 'US-CENTRAL1'
+DEFAULT_GCP_REGION = 'us-central1'
+DEFAULT_AWS_REGION = 'us-east-1'
+DEFAULT_AZURE_REGION = 'East US'
+
+# The endpoints in this table are subdomains of 'amazonaws.com'. So
+# where the table says 's3-us-west-2', you should connect to
+# 's3-us-west-2.amazonaws.com'. This table comes from
+# http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
+AWS_S3_REGION_TO_ENDPOINT_TABLE = {
+    'us-east-1': 's3-external-1',
+    'us-west-2': 's3-us-west-2',
+    'us-west-1': 's3-us-west-1',
+    'eu-west-1': 's3-eu-west-1',
+    'eu-central-1': 's3-eu-central-1',
+    'ap-southeast-1': 's3-ap-southeast-1',
+    'ap-southeast-2': 's3-ap-southeast-2',
+    'ap-northeast-1': 's3-ap-northeast-1',
+    'sa-east-1': 's3-sa-east-1'
+}
+AWS_S3_ENDPOINT_SUFFIX = '.amazonaws.com'
 
 
 def GetConfig(user_config):
@@ -234,9 +263,29 @@ def _MakeAzureCommandSuffix(account_name, account_key, for_cli):
     return (' --azure_account=%s --azure_key=%s') % (account_name, account_key)
 
 
+def _MakeSwiftCommandPrefix(auth_url, tenant_name, username, password):
+  """This function returns a prefix for Swift CLI command.
+
+  Args:
+    auth_url: URL for obtaining auth token.
+    tenant_name: tenant name for obtaining auth token.
+    username: username for obtaining auth token.
+    password: password for obtaining auth token.
+
+  Returns:
+    string represents a command prefix.
+  """
+  options = ('--os-auth-url', auth_url,
+             '--os-tenant-name', tenant_name,
+             '--os-username', username,
+             '--os-password', password,
+             '--insecure' if FLAGS.openstack_swift_insecure else '',)
+  return ' '.join(options)
+
+
 def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                        bucket_name, regional_bucket_name=None,
-                       azure_command_suffix=None):
+                       azure_command_suffix=None, host_to_connect=None):
     """This function contains all api-based benchmarks.
        It uses the value of the global flag "object_storage_scenario" to
        decide which scenario to run inside this function. The caller simply
@@ -251,6 +300,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       bucket_name: The name of the bucket caller has created for this test.
       regional_bucket_name: The name of the "regional" bucket, if applicable.
       azure_command_suffix: A suffix for all Azure related test commands.
+      host_to_connect: An optional endpoint string to connect to.
 
     Raises:
       ValueError: unexpected test outcome is found from the API test script.
@@ -258,6 +308,28 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     if FLAGS.object_storage_scenario == 'cli':
       # User only wants to run the CLI based tests, do nothing here:
       return
+
+    def BuildBenchmarkScriptCommand(args):
+      """Build a command string for the API test script.
+
+      Args:
+        A list of strings. These will become space-separated arguments to the
+          test script.
+
+      Returns:
+        A string that can be passed to vm.RemoteCommand.
+      """
+
+      cmd_parts = [
+          test_script_path,
+          '--storage_provider=%s' % storage
+      ] + args
+      if azure_command_suffix is not None:
+        cmd_parts += [azure_command_suffix]
+      if host_to_connect is not None:
+        cmd_parts += ['--host', host_to_connect]
+
+      return ' '.join(cmd_parts)
 
     if (FLAGS.object_storage_scenario == 'all' or
         FLAGS.object_storage_scenario == 'api_data'):
@@ -267,12 +339,9 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
         buckets.append(regional_bucket_name)
 
       for bucket in buckets:
-        one_byte_rw_cmd = ('%s --bucket=%s --storage_provider=%s '
-                           '--scenario=OneByteRW') % (
-                               test_script_path, bucket, storage)
-
-        if azure_command_suffix is not None:
-          one_byte_rw_cmd = ('%s %s') % (one_byte_rw_cmd, azure_command_suffix)
+        one_byte_rw_cmd = BuildBenchmarkScriptCommand([
+            '--bucket=%s' % bucket,
+            '--scenario=OneByteRW'])
 
         _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
         logging.info('OneByteRW raw result is %s', raw_result)
@@ -295,14 +364,9 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                              '%s.' % raw_result)
 
       # Single stream large object throughput metrics
-      single_stream_throughput_cmd = ('%s --bucket=%s --storage_provider=%s '
-                                      '--scenario=SingleStreamThroughput') % (
-                                          test_script_path,
-                                          bucket_name,
-                                          storage)
-      if azure_command_suffix is not None:
-        single_stream_throughput_cmd = ('%s %s') % (
-            single_stream_throughput_cmd, azure_command_suffix)
+      single_stream_throughput_cmd = BuildBenchmarkScriptCommand([
+          '--bucket=%s' % bucket_name,
+          '--scenario=SingleStreamThroughput'])
 
       _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
       logging.info('SingleStreamThroughput raw result is %s', raw_result)
@@ -330,17 +394,10 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     if (FLAGS.object_storage_scenario == 'all' or
         FLAGS.object_storage_scenario == 'api_namespace'):
       # list-after-write consistency metrics
-      list_consistency_cmd = ('%s --bucket=%s --storage_provider=%s '
-                              '--iterations=%d --scenario=ListConsistency') % (
-                                  test_script_path,
-                                  bucket_name,
-                                  storage,
-                                  LIST_CONSISTENCY_ITERATIONS)
-
-      if azure_command_suffix is not None:
-        list_consistency_cmd = ('%s %s') % (list_consistency_cmd,
-                                            azure_command_suffix)
-
+      list_consistency_cmd = BuildBenchmarkScriptCommand([
+          '--bucket=%s' % bucket_name,
+          '--iterations=%d' % LIST_CONSISTENCY_ITERATIONS,
+          '--scenario=ListConsistency'])
 
       _, raw_result = vm.RemoteCommand(list_consistency_cmd)
       logging.info('ListConsistency raw result is %s', raw_result)
@@ -561,9 +618,11 @@ class S3StorageBenchmark(object):
     vm.PushFile(FLAGS.object_storage_credential_file, AWS_CREDENTIAL_LOCATION)
     vm.PushFile(FLAGS.boto_file_location, DEFAULT_BOTO_LOCATION)
 
-    self.bucket_name = 'pkb%s' % FLAGS.run_uri
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
+    vm.storage_region = FLAGS.object_storage_region or DEFAULT_AWS_REGION
+
     vm.RemoteCommand(
-        'aws s3 mb s3://%s --region=us-east-1' % self.bucket_name)
+        'aws s3 mb s3://%s --region=%s' % (vm.bucket_name, vm.storage_region))
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with s3 tool.
@@ -588,12 +647,12 @@ class S3StorageBenchmark(object):
 
     # CLI tool based tests.
 
-    clean_up_bucket_cmd = 'aws s3 rm s3://%s --recursive' % self.bucket_name
+    clean_up_bucket_cmd = 'aws s3 rm s3://%s --recursive' % vm.bucket_name
     upload_cmd = 'time aws s3 sync %s/run/data/ s3://%s/' % (scratch_dir,
-                                                             self.bucket_name)
+                                                             vm.bucket_name)
     cleanup_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
     download_cmd = 'time aws s3 sync s3://%s/ %s/run/temp/' % (
-                   self.bucket_name, scratch_dir)
+                   vm.bucket_name, scratch_dir)
 
     if FLAGS.cli_test_size == 'normal':
       iteration_count = CLI_TEST_ITERATION_COUNT
@@ -606,8 +665,10 @@ class S3StorageBenchmark(object):
 
     # Now tests the storage provider via APIs
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
+    hostname = AWS_S3_REGION_TO_ENDPOINT_TABLE[vm.storage_region]
     ApiBasedBenchmarks(results, metadata, vm, 'S3', test_script_path,
-                       self.bucket_name)
+                       vm.bucket_name,
+                       host_to_connect=hostname + AWS_S3_ENDPOINT_SUFFIX)
 
     return results
 
@@ -617,8 +678,8 @@ class S3StorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    remove_content_cmd = 'aws s3 rm s3://%s --recursive' % self.bucket_name
-    remove_bucket_cmd = 'aws s3 rb s3://%s' % self.bucket_name
+    remove_content_cmd = 'aws s3 rm s3://%s --recursive' % vm.bucket_name
+    remove_bucket_cmd = 'aws s3 rb s3://%s' % vm.bucket_name
     DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
@@ -636,13 +697,16 @@ class AzureBlobStorageBenchmark(object):
     Args:
       vm: The vm being used to run the benchmark.
     """
+
     vm.Install('node_js')
     vm.RemoteCommand('sudo npm install azure-cli -g')
 
     vm.PushFile(FLAGS.object_storage_credential_file, AZURE_CREDENTIAL_LOCATION)
+    region = FLAGS.object_storage_region or DEFAULT_AZURE_REGION
     vm.RemoteCommand(
-        'azure storage account create --type ZRS -l \'East US\' ''"pkb%s"' %
-        (FLAGS.run_uri), ignore_failure=False)
+        'azure storage account create --type ZRS -l \'%s\' ''"pkb%s"' %
+        (region, FLAGS.run_uri),
+        ignore_failure=False)
     vm.azure_account = ('pkb%s' % FLAGS.run_uri)
 
     output, _ = (
@@ -658,10 +722,10 @@ class AzureBlobStorageBenchmark(object):
 
     vm.RemoteCommand('azure storage container create pkb%s %s' % (
         FLAGS.run_uri, azure_command_suffix))
-    self.bucket_name = 'pkb%s' % FLAGS.run_uri
 
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
     vm.RemoteCommand('azure storage blob list %s %s' % (
-        self.bucket_name, azure_command_suffix))
+        vm.bucket_name, azure_command_suffix))
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with Azure CLI tool.
@@ -690,7 +754,7 @@ class AzureBlobStorageBenchmark(object):
     cleanup_bucket_cmd = ('%s --bucket=%s --storage_provider=AZURE '
                           ' --scenario=CleanupBucket %s' %
                           (test_script_path,
-                           self.bucket_name,
+                           vm.bucket_name,
                            _MakeAzureCommandSuffix(vm.azure_account,
                                                    vm.azure_key,
                                                    False)))
@@ -698,7 +762,7 @@ class AzureBlobStorageBenchmark(object):
       upload_cmd = ('time for i in {0..99}; do azure storage blob upload '
                     '%s/run/data/file-$i.dat %s %s; done' %
                     (scratch_dir,
-                     self.bucket_name,
+                     vm.bucket_name,
                      _MakeAzureCommandSuffix(vm.azure_account,
                                              vm.azure_key,
                                              True)))
@@ -706,7 +770,7 @@ class AzureBlobStorageBenchmark(object):
       upload_cmd = ('time azure storage blob upload '
                     '%s/run/data/file_large_3gib.dat %s %s' %
                     (scratch_dir,
-                     self.bucket_name,
+                     vm.bucket_name,
                      _MakeAzureCommandSuffix(vm.azure_account,
                                              vm.azure_key,
                                              True)))
@@ -716,7 +780,7 @@ class AzureBlobStorageBenchmark(object):
     if FLAGS.cli_test_size == 'normal':
       download_cmd = ('time for i in {0..99}; do azure storage blob download '
                       '%s file-$i.dat %s/run/temp/file-$i.dat %s; done' % (
-                          self.bucket_name,
+                          vm.bucket_name,
                           scratch_dir,
                           _MakeAzureCommandSuffix(vm.azure_account,
                                                   vm.azure_key,
@@ -725,7 +789,7 @@ class AzureBlobStorageBenchmark(object):
       download_cmd = ('time azure storage blob download %s '
                       'file_large_3gib.dat '
                       '%s/run/temp/file_large_3gib.dat %s' % (
-                          self.bucket_name,
+                          vm.bucket_name,
                           scratch_dir,
                           _MakeAzureCommandSuffix(vm.azure_account,
                                                   vm.azure_key,
@@ -736,7 +800,7 @@ class AzureBlobStorageBenchmark(object):
                    download_cmd)
 
     ApiBasedBenchmarks(results, metadata, vm, 'AZURE', test_script_path,
-                       self.bucket_name, regional_bucket_name=None,
+                       vm.bucket_name, regional_bucket_name=None,
                        azure_command_suffix=_MakeAzureCommandSuffix(
                            vm.azure_account, vm.azure_key, False))
 
@@ -751,13 +815,13 @@ class AzureBlobStorageBenchmark(object):
     test_script_path = '%s/run/%s' % (vm.GetScratchDir(), API_TEST_SCRIPT)
     remove_content_cmd = ('%s --bucket=%s --storage_provider=AZURE '
                           ' --scenario=CleanupBucket %s' %
-                          (test_script_path, self.bucket_name,
+                          (test_script_path, vm.bucket_name,
                            _MakeAzureCommandSuffix(vm.azure_account,
                                                    vm.azure_key,
                                                    False)))
 
     remove_bucket_cmd = ('azure storage container delete -q %s %s' % (
-                         self.bucket_name,
+                         vm.bucket_name,
                          _MakeAzureCommandSuffix(vm.azure_account,
                                                  vm.azure_key,
                                                  True)))
@@ -799,14 +863,16 @@ class GoogleCloudStorageBenchmark(object):
     vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)
     vm.gsutil_path = vm.gsutil_path.split()[0]
 
-    self.bucket_name = 'pkb%s' % FLAGS.run_uri
-    vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, self.bucket_name))
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
 
-    self.regional_bucket_name = '%s-%s' % (self.bucket_name,
-                                           DEFAULT_GCS_REGION.lower())
+    vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, vm.bucket_name))
+
+    region = FLAGS.object_storage_region or DEFAULT_GCP_REGION
+    vm.regional_bucket_name = '%s-%s' % (vm.bucket_name,
+                                         region.lower())
     vm.RemoteCommand('%s mb -c DRA -l %s gs://%s' % (vm.gsutil_path,
-                                                     DEFAULT_GCS_REGION,
-                                                     self.regional_bucket_name))
+                                                     region.upper(),
+                                                     vm.regional_bucket_name))
 
     # Detect if we need to install crcmod for gcp.
     # See "gsutil help crc" for details.
@@ -855,13 +921,13 @@ class GoogleCloudStorageBenchmark(object):
     metadata[BOTO_LIB_VERSION] = _GetClientLibVersion(vm, 'boto')
     # CLI tool based tests.
     scratch_dir = vm.GetScratchDir()
-    clean_up_bucket_cmd = '%s rm gs://%s/*' % (vm.gsutil_path, self.bucket_name)
+    clean_up_bucket_cmd = '%s rm gs://%s/*' % (vm.gsutil_path, vm.bucket_name)
     upload_cmd = 'time %s -m cp %s/run/data/* gs://%s/' % (vm.gsutil_path,
                                                            scratch_dir,
-                                                           self.bucket_name)
+                                                           vm.bucket_name)
     cleanup_local_temp_cmd = 'rm %s/run/temp/*' % scratch_dir
     download_cmd = 'time %s -m cp gs://%s/* %s/run/temp/' % (vm.gsutil_path,
-                                                             self.bucket_name,
+                                                             vm.bucket_name,
                                                              scratch_dir)
     if FLAGS.cli_test_size == 'normal':
       iteration_count = CLI_TEST_ITERATION_COUNT
@@ -875,7 +941,7 @@ class GoogleCloudStorageBenchmark(object):
     # API-based benchmarking of GCS
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
     ApiBasedBenchmarks(results, metadata, vm, 'GCS', test_script_path,
-                       self.bucket_name, self.regional_bucket_name)
+                       vm.bucket_name, vm.regional_bucket_name)
 
     return results
 
@@ -886,7 +952,7 @@ class GoogleCloudStorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    for bucket in [self.bucket_name, self.regional_bucket_name]:
+    for bucket in [vm.bucket_name, vm.regional_bucket_name]:
       remove_content_cmd = '%s -m rm -r gs://%s/*' % (vm.gsutil_path,
                                                       bucket)
       remove_bucket_cmd = '%s rb gs://%s' % (vm.gsutil_path, bucket)
@@ -895,10 +961,105 @@ class GoogleCloudStorageBenchmark(object):
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
 
 
+class SwiftStorageBenchmark(object):
+  """OpenStack Swift version of storage benchmark."""
+
+  def __init__(self):
+    self.swift_command_prefix = ''
+
+  def Prepare(self, vm):
+    """Prepare vm with swift cli and create a swift container using vm.
+
+    Args:
+      vm: The vm being used to run the benchmark.
+    """
+    # Upgrade to latest urllib3 version fixes SSL SNMI error
+    vm.InstallPackages('python-urllib3')
+    vm.RemoteCommand('sudo pip install python-keystoneclient')
+    vm.RemoteCommand('sudo pip install python-swiftclient')
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
+    self.swift_command_prefix = _MakeSwiftCommandPrefix(vm.client.url,
+                                                        vm.client.tenant,
+                                                        vm.client.user,
+                                                        vm.client.password)
+    vm.RemoteCommand('swift %s post %s' % (self.swift_command_prefix,
+                                           vm.bucket_name))
+
+  def Run(self, vm, metadata):
+    """Run upload/download on vm with swift cli.
+
+    Args:
+      vm: The vm being used to run the benchmark.
+      metadata: the metadata to be stored with the results.
+
+    Returns:
+      A list of lists containing results of the tests. Each scenario outputs
+      results to a list of the following format:
+        name of the scenario ,value, unit of the value, metadata
+        e.g.,
+        'one byte object upload latency p50', 0.800, 'seconds', 'storage=swift'
+
+      Then the final return value is the list of the above list that reflect
+      the results of all scenarios ran here.
+    """
+    metadata[SWIFTCLIENT_LIB_VERSION] = _GetClientLibVersion(
+        vm, 'python-swiftclient')
+    results = []
+    scratch_dir = vm.GetScratchDir()
+
+    # CLI tool based tests
+
+    clean_up_container_cmd = ('swift %s delete %s'
+                              % (self.swift_command_prefix, vm.bucket_name))
+    upload_cmd = ('time '
+                  'swift %(prefix)s upload %(container)s %(directory)s'
+                  % {'container': vm.bucket_name,
+                     'directory': '%s/run/data/' % scratch_dir,
+                     'prefix': self.swift_command_prefix})
+
+    clean_up_local_temp_cmd = 'rm -r %s/run/temp/*' % scratch_dir
+    download_cmd = ('time '
+                    'swift %(prefix)s download %(container)s -D %(directory)s'
+                    % {'container': vm.bucket_name,
+                       'directory': '%s/run/temp/' % scratch_dir,
+                       'prefix': self.swift_command_prefix})
+
+    iteration_count = (CLI_TEST_ITERATION_COUNT
+                       if FLAGS.cli_test_size == 'normal'
+                       else LARGE_CLI_TEST_ITERATION_COUNT)
+
+    _CliBasedTests(results, metadata, vm, iteration_count,
+                   clean_up_container_cmd, upload_cmd, clean_up_local_temp_cmd,
+                   download_cmd)
+
+    if FLAGS.object_storage_scenario in ('all', 'api_data',):
+      logging.warn('Skipping API-based scenario for object storage service. '
+                   'Reason: Not yet implemented for OpenStack Swift')
+
+    return results
+
+  def Cleanup(self, vm):
+    """Clean up OpenStack Swift container and uninstall packages on vm.
+
+    Args:
+      vm: The vm that needs clean up.
+    """
+    remove_content_cmd = ('swift %s delete %s'
+                          % (self.swift_command_prefix, vm.bucket_name))
+    # Command above delete both container and its objects
+    remove_container_cmd = 'echo noop-container-delete'
+    DeleteBucketWithRetry(vm, remove_content_cmd, remove_container_cmd)
+
+    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-swiftclient')
+    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-keystoneclient')
+    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
+
+
 OBJECT_STORAGE_BENCHMARK_DICTIONARY = {
-    benchmark_spec_class.GCP: GoogleCloudStorageBenchmark(),
-    benchmark_spec_class.AWS: S3StorageBenchmark(),
-    benchmark_spec_class.AZURE: AzureBlobStorageBenchmark()}
+    providers.GCP: GoogleCloudStorageBenchmark(),
+    providers.AWS: S3StorageBenchmark(),
+    providers.AZURE: AzureBlobStorageBenchmark(),
+    providers.OPENSTACK: SwiftStorageBenchmark()}
 
 
 def Prepare(benchmark_spec):
@@ -908,6 +1069,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
+
   vms = benchmark_spec.vms
   if not FLAGS.object_storage_credential_file:
     FLAGS.object_storage_credential_file = (
@@ -915,19 +1077,29 @@ def Prepare(benchmark_spec):
             FLAGS.storage])
   FLAGS.object_storage_credential_file = os.path.expanduser(
       FLAGS.object_storage_credential_file)
-  if not (
-      os.path.isfile(FLAGS.object_storage_credential_file) or os.path.isdir(
-          FLAGS.object_storage_credential_file)):
-    raise errors.Benchmarks.MissingObjectCredentialException(
-        'Credential cannot be found in %s',
-        FLAGS.object_storage_credential_file)
+
+  if FLAGS.storage == providers.OPENSTACK:
+    openstack_creds_set = ('OS_AUTH_URL' in os.environ,
+                           'OS_TENANT_NAME' in os.environ,
+                           'OS_USERNAME' in os.environ,
+                           'OS_PASSWORD' in os.environ,)
+    if not all(openstack_creds_set):
+      raise errors.Benchmarks.MissingObjectCredentialException(
+          'OpenStack credentials not found in environment variables')
+  else:
+    if not (os.path.isfile(FLAGS.object_storage_credential_file) or
+            os.path.isdir(FLAGS.object_storage_credential_file)):
+      raise errors.Benchmarks.MissingObjectCredentialException(
+          'Credential cannot be found in %s',
+          FLAGS.object_storage_credential_file)
 
   if not FLAGS.boto_file_location:
     FLAGS.boto_file_location = DEFAULT_BOTO_LOCATION
   FLAGS.boto_file_location = os.path.expanduser(FLAGS.boto_file_location)
 
   if not os.path.isfile(FLAGS.boto_file_location):
-    if FLAGS.storage != benchmark_spec_class.AZURE:
+    if FLAGS.storage not in (providers.AZURE,
+                             providers.OPENSTACK):
       raise errors.Benchmarks.MissingObjectCredentialException(
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)

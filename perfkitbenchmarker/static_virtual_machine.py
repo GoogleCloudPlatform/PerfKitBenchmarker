@@ -33,13 +33,10 @@ import threading
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import windows_virtual_machine
 
-WINDOWS = 'windows'
-DEBIAN = 'debian'
-RHEL = 'rhel'
-UBUNTU_CONTAINER = 'ubuntu_container'
 FLAGS = flags.FLAGS
 
 
@@ -48,12 +45,14 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = 'Static'
 
-  def __init__(self, ip_address=None, user_name=None, ssh_private_key=None,
-               internal_ip=None, ssh_port=22, password=None, disk_specs=None,
-               os_type=None, **kwargs):
+  def __init__(self, component_full_name, ip_address=None, user_name=None,
+               ssh_private_key=None, internal_ip=None, ssh_port=22,
+               password=None, disk_specs=None, os_type=None, **kwargs):
     """Initialize the StaticVmSpec object.
 
     Args:
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config options.
       ip_address: The public ip address of the VM.
       user_name: The username of the VM that the keyfile corresponds to.
       ssh_private_key: The absolute path to the private keyfile to use to ssh
@@ -61,12 +60,12 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
       internal_ip: The internal ip address of the VM.
       ssh_port: The port number to use for SSH and SCP commands.
       password: The password used to log into the VM (Windows Only).
-      disk_specs: A list of dictionaries containing kwargs used to create
-          disk.BaseDiskSpecs.
+      disk_specs: None or a list of dictionaries containing kwargs used to
+          create disk.BaseDiskSpecs.
       os_type: The OS type of the VM. See the flag of the same name for more
           information.
     """
-    super(StaticVmSpec, self).__init__(**kwargs)
+    super(StaticVmSpec, self).__init__(component_full_name, **kwargs)
     self.ip_address = ip_address
     self.user_name = user_name
     self.ssh_private_key = ssh_private_key
@@ -74,7 +73,10 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
     self.ssh_port = ssh_port
     self.password = password
     self.os_type = os_type
-    self.disk_specs = disk_specs
+    self.disk_specs = [
+        disk.BaseDiskSpec(
+            '{0}.disk_specs[{1}]'.format(component_full_name, i), **disk_spec)
+        for i, disk_spec in enumerate(disk_specs or ())]
 
 
 class StaticDisk(disk.BaseDisk):
@@ -120,11 +122,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
                                                   self.ip_address))
     self.ssh_port = vm_spec.ssh_port
     self.password = vm_spec.password
-
-    if vm_spec.disk_specs:
-      for spec in vm_spec.disk_specs:
-        self.disk_specs.append(disk.BaseDiskSpec(**spec))
-
+    self.disk_specs = vm_spec.disk_specs
     self.from_pool = False
 
   def _Create(self):
@@ -193,10 +191,10 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     linux_required_keys = required_keys | frozenset(['keyfile_path'])
 
     required_keys_by_os = {
-        WINDOWS: required_keys | frozenset(['password']),
-        DEBIAN: linux_required_keys,
-        RHEL: linux_required_keys,
-        UBUNTU_CONTAINER: linux_required_keys,
+        os_types.WINDOWS: required_keys | frozenset(['password']),
+        os_types.DEBIAN: linux_required_keys,
+        os_types.RHEL: linux_required_keys,
+        os_types.UBUNTU_CONTAINER: linux_required_keys,
     }
     required_keys = required_keys_by_os[FLAGS.os_type]
 
@@ -239,8 +237,8 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       os_type = item.get('os_type')
       install_packages = item.get('install_packages', True)
 
-      if ((os_type == WINDOWS and FLAGS.os_type != WINDOWS) or
-          (os_type != WINDOWS and FLAGS.os_type == WINDOWS)):
+      if ((os_type == os_types.WINDOWS and FLAGS.os_type != os_types.WINDOWS) or
+          (os_type != os_types.WINDOWS and FLAGS.os_type == os_types.WINDOWS)):
         raise ValueError('Please only use Windows VMs when using '
                          '--os_type=windows and vice versa.')
 
@@ -251,10 +249,10 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         disk_kwargs_list.append({'device_path': local_disk})
 
       vm_spec = StaticVmSpec(
-          ip_address=ip_address, user_name=user_name, ssh_port=ssh_port,
-          install_packages=install_packages, ssh_private_key=keyfile_path,
-          internal_ip=internal_ip, zone=zone, disk_specs=disk_kwargs_list,
-          password=password)
+          'static_vm_file', ip_address=ip_address, user_name=user_name,
+          ssh_port=ssh_port, install_packages=install_packages,
+          ssh_private_key=keyfile_path, internal_ip=internal_ip, zone=zone,
+          disk_specs=disk_kwargs_list, password=password)
 
       vm_class = GetStaticVmClass(os_type)
       vm = vm_class(vm_spec)
@@ -282,10 +280,10 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 def GetStaticVmClass(os_type):
   """Returns the static VM class that corresponds to the os_type."""
   class_dict = {
-      DEBIAN: DebianBasedStaticVirtualMachine,
-      RHEL: RhelBasedStaticVirtualMachine,
-      WINDOWS: WindowsBasedStaticVirtualMachine,
-      UBUNTU_CONTAINER: ContainerizedStaticVirtualMachine,
+      os_types.DEBIAN: DebianBasedStaticVirtualMachine,
+      os_types.RHEL: RhelBasedStaticVirtualMachine,
+      os_types.WINDOWS: WindowsBasedStaticVirtualMachine,
+      os_types.UBUNTU_CONTAINER: ContainerizedStaticVirtualMachine,
   }
   if os_type in class_dict:
     return class_dict[os_type]

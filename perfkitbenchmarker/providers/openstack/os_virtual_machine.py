@@ -19,6 +19,7 @@ import time
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.openstack import os_disk
 from perfkitbenchmarker.providers.openstack import os_network
 from perfkitbenchmarker.providers.openstack import utils as os_utils
@@ -32,7 +33,7 @@ FLAGS = flags.FLAGS
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Object representing an OpenStack Virtual Machine"""
 
-    CLOUD = 'OpenStack'
+    CLOUD = providers.OPENSTACK
     DEFAULT_USERNAME = 'ubuntu'
     # Subclasses should override the default image.
     DEFAULT_IMAGE = None
@@ -132,22 +133,21 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     @os_utils.retry_authorization(max_retries=4)
     def _Delete(self):
+        from novaclient.exceptions import NotFound
         try:
             self.client.servers.delete(self.id)
             time.sleep(5)
-        except os_utils.NotFound:
-            logging.info('Instance already deleted')
+        except NotFound:
+            logging.info('Instance not found, may have been already deleted')
 
         self.public_network.release(self.floating_ip)
 
     @os_utils.retry_authorization(max_retries=4)
     def _Exists(self):
+        from novaclient.exceptions import NotFound
         try:
-            if self.client.servers.findall(name=self.name):
-                return True
-            else:
-                return False
-        except os_utils.NotFound:
+            return self.client.servers.get(self.id) is not None
+        except NotFound:
             return False
 
     @vm_util.Retry(log_errors=False, poll_interval=1)
@@ -164,18 +164,17 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.hostname = resp[:-1]
 
     def CreateScratchDisk(self, disk_spec):
-        name = '%s-scratch-%s' % (self.name, len(self.scratch_disks))
-        scratch_disk = os_disk.OpenStackDisk(disk_spec, name, self.zone)
-        self.scratch_disks.append(scratch_disk)
+        disks_names = ('%s-data-%d-%d'
+                       % (self.name, len(self.scratch_disks), i)
+                       for i in range(disk_spec.num_striped_disks))
+        disks = [os_disk.OpenStackDisk(disk_spec, name, self.zone)
+                 for name in disks_names]
 
-        scratch_disk.Create()
-        scratch_disk.Attach(self)
-
-        self.FormatDisk(scratch_disk.GetDevicePath())
-        self.MountDisk(scratch_disk.GetDevicePath(), disk_spec.mount_point)
+        self._CreateScratchDiskFromDisks(disk_spec, disks)
 
     def _CreateDependencies(self):
         self.ImportKeyfile()
+        self.AllowRemoteAccessPorts()
 
     def _DeleteDependencies(self):
         self.DeleteKeyfile()
@@ -193,9 +192,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     @os_utils.retry_authorization(max_retries=4)
     def DeleteKeyfile(self):
+        from novaclient.exceptions import NotFound
         try:
             self.client.keypairs.delete(self.pk)
-        except os_utils.NotFound:
+        except NotFound:
             logging.info("Deleting key doesn't exists")
 
 

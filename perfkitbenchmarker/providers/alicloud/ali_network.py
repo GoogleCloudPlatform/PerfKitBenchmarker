@@ -29,11 +29,10 @@ from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.alicloud import util
 from perfkitbenchmarker import resource
-
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 MAX_NAME_LENGTH = 128
-ALICLOUD = 'AliCloud'
 
 
 class AliVpc(resource.BaseResource):
@@ -202,7 +201,7 @@ class AliSecurityGroup(resource.BaseResource):
 class AliFirewall(network.BaseFirewall):
   """An object representing the AliCloud Firewall."""
 
-  CLOUD = ALICLOUD
+  CLOUD = providers.ALICLOUD
 
   def __init__(self):
     self.firewall_set = set()
@@ -246,7 +245,7 @@ class AliFirewall(network.BaseFirewall):
 class AliNetwork(network.BaseNetwork):
   """Object representing a AliCloud Network."""
 
-  CLOUD = ALICLOUD
+  CLOUD = providers.ALICLOUD
 
   def __init__(self, spec):
     super(AliNetwork, self).__init__(spec)

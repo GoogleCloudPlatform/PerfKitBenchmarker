@@ -1,3 +1,51 @@
+# 1.0.1
+
+* Fix for benchmark_compatibility_checking flag. (thanks @mateusz-blaszkowski;
+  GH-707)
+
+# 1.0.0
+
+New features:
+* Added decoders to configs which allow for additional config validation
+  (GH-672)
+* Add support for GCE custom VMs (GH-664)
+* Providers can now selectively support benchmarks (GH-690)
+
+Breaking changes:
+* Enhanced config usage by multi-node benchmarks - this changes some of their
+  default metadata. (GH-669)
+* YCSB histogram results are now not included by default (GH-656)
+
+Enhancements:
+* Ping benchmark is now bi-directional (GH-685)
+* Metadata flag can be specified multiple times (GH-684)
+* Allow AWS regions as well as zones (GH-658)
+* Added 'vm_count' metadata to all benchmarks (GH-659)
+* GCP now creates networks (GH-648)
+* Added provision and teardown run_stages (GH-652)
+* Update tomcat_wrk to report more samples (GH-650)
+* Add a flag to control the log file log level (GH-651)
+
+Bugfixes and maintenance updates:
+* Added helper for mocking FLAGS (GH-678)
+* Fix for silo benchmark which fails when running behind proxy (thanks
+  @mateusz-blaszkowski; GH-680)
+* Fix for not-installed curl package (thanks @mateusz-blaszkowski; GH-681)
+* Invoke YCSB from its installation directory (GH-677)
+* Fix bug with detecting run_uris (GH-673)
+* Fix the image_project flag so it works as intended (thanks @wonderfly; GH-666)
+* Add explicit --boot-disk-auto-delete to GCE VM creation (GH-670)
+* Improved the README layout and fixed errors (GH-661, GH-660)
+* Broaden exception caught during PKB run (GH-667)
+* Fixed bug with run stages (GH-665)
+* Fixed formatting of docstring (thanks @wonderfly; GH-662)
+* Fixed bug with GCP networks (GH-663)
+* Add GetMachineTypeDict() to replace machine_type in Sample metadata (GH-653)
+* Add GcloudCommand helper (GH-649)
+* Fixed Tomcat download URL (GH-700)
+* Retry RemoteCopy operations (GH-699)
+* Various fixes to data disks for OpenStack (thanks @meteorfox; GH-688)
+
 # 0.24.0
 
 New features:

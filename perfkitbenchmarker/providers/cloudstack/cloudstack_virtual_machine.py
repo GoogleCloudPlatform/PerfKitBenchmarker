@@ -26,6 +26,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.cloudstack import cloudstack_disk
 from perfkitbenchmarker.providers.cloudstack import cloudstack_network
 from perfkitbenchmarker.providers.cloudstack import util
+from perfkitbenchmarker import providers
 
 UBUNTU_IMAGE = 'Ubuntu 14.04.2 HVM base (64bit)'
 RHEL_IMAGE = 'CentOS 7 HVM base (64bit)'
@@ -36,7 +37,7 @@ FLAGS = flags.FLAGS
 class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a CloudStack Virtual Machine."""
 
-  CLOUD = 'CloudStack'
+  CLOUD = providers.CLOUDSTACK
   DEFAULT_ZONE = 'QC-1'
   DEFAULT_MACHINE_TYPE = '1vCPU.1GB'
   DEFAULT_IMAGE = 'Ubuntu 14.04.2 HVM base (64bit)'

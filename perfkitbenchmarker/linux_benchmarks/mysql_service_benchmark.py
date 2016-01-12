@@ -32,9 +32,10 @@ import StringIO
 import time
 import uuid
 
-from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
@@ -133,22 +134,6 @@ RESPONSE_TIME_TOKENS = ['min', 'avg', 'max', 'percentile']
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
-
-def CheckPrerequisites():
-  """Verifies that we are running on a cloud provider that supports managed
-     MySQL service.
-
-  Raises:
-    ProviderNotSupportedError
-  """
-  if FLAGS.cloud != 'GCP' and FLAGS.cloud != 'AWS':
-    raise ProviderNotSupportedError('Provider %s is not supported yet.' %
-                                    FLAGS.cloud)
-
-
-class ProviderNotSupportedError(Exception):
-  pass
 
 
 class DBStatusQueryError(Exception):
@@ -290,7 +275,7 @@ def _GetSysbenchCommandPrefix():
   Returns:
     A string representing the sysbench command prefix.
   """
-  if FLAGS.os_type == 'rhel':
+  if FLAGS.os_type == os_types.RHEL:
     return vm_util.VM_TMP_DIR
   else:
     return NORMAL_SYSBENCH_PATH_PREFIX
@@ -802,8 +787,8 @@ class GoogleCloudSQLBenchmark(object):
 
 
 MYSQL_SERVICE_BENCHMARK_DICTIONARY = {
-    benchmark_spec_class.GCP: GoogleCloudSQLBenchmark(),
-    benchmark_spec_class.AWS: RDSMySQLBenchmark()}
+    providers.GCP: GoogleCloudSQLBenchmark(),
+    providers.AWS: RDSMySQLBenchmark()}
 
 
 def Prepare(benchmark_spec):

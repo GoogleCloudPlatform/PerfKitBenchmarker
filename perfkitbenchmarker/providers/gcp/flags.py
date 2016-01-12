@@ -17,8 +17,7 @@ from perfkitbenchmarker import flags
 flags.DEFINE_string('gcloud_path',
                     'gcloud',
                     'The path for the gcloud utility.')
-flags.DEFINE_list('additional_gcloud_flags',
-                  [],
+flags.DEFINE_list('additional_gcloud_flags', [],
                   'Additional flags to pass to gcloud.')
 flags.DEFINE_integer('gce_num_local_ssds', 0,
                      'The number of ssds that should be added to the VM. Note '
@@ -34,3 +33,5 @@ flags.DEFINE_string(
     'image_project', None, 'The project against which all image references will'
     ' be resolved. See: '
     'https://cloud.google.com/sdk/gcloud/reference/compute/disks/create')
+flags.DEFINE_string('gce_network_name', None, 'The name of an already created '
+                    'network to use instead of creating a new one.')

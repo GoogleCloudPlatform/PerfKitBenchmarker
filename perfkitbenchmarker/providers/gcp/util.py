@@ -112,4 +112,4 @@ class GcloudCommand(object):
       self.flags['project'] = resource.project
     if hasattr(resource, 'zone'):
       self.flags['zone'] = resource.zone
-    self.additional_flags.extend(FLAGS.additional_gcloud_flags)
+    self.additional_flags.extend(FLAGS.additional_gcloud_flags or ())

@@ -32,7 +32,8 @@ class MockFlags(object):
   Flag-like object supports the 'present' and 'value' attributes.
 
   Attempting to get a Flag that does not exist will generate a new MagicMock
-  with the 'present' attribute initialized to False.
+  with the 'present' attribute initialized to False and the 'value' attribute
+  initialized to None.
   """
 
   def __init__(self):
@@ -50,6 +51,7 @@ class MockFlags(object):
     if key not in self._dict:
       mock_flag = mock.MagicMock()
       mock_flag.present = False
+      mock_flag.value = None
       self._dict[key] = mock_flag
     return self._dict[key]
 
@@ -86,3 +88,25 @@ def PatchFlags(mock_flags=None):
   with patch as mock_property:
     mock_property.return_value = mock_flags
     yield mock_flags
+
+
+def PatchTestCaseFlags(testcase):
+  """Patches access to perfkitbenchmarker.flags.FLAGS for a TestCase.
+
+  Similar to PatchFlags, but only needs to be called once during a test method
+  or its setUp method, and remains in effect for the rest of the test method.
+
+  Args:
+    testcase: unittest.TestCase. The current test. A cleanup method is
+        registered to undo the patch after this test completes.
+
+  Returns:
+    MockFlags. The mocked FlagValues object.
+  """
+  mock_flags = MockFlags()
+  patch = mock.patch(context.__name__ + '.FlagValuesProxy._thread_flag_values',
+                     new_callable=mock.PropertyMock)
+  mock_property = patch.start()
+  testcase.addCleanup(patch.stop)
+  mock_property.return_value = mock_flags
+  return mock_flags

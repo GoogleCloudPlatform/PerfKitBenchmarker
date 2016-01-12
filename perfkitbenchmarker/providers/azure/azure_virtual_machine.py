@@ -39,6 +39,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -162,7 +163,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
 
   __metaclass__ = AzureVirtualMachineMetaClass
-  CLOUD = 'Azure'
+  CLOUD = providers.AZURE
   # Subclasses should override the default image pattern.
   DEFAULT_IMAGE_PATTERN = None
 
@@ -177,7 +178,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     self.service = AzureService(self.name,
                                 self.network.affinity_group.name)
-    disk_spec = disk.BaseDiskSpec()
+    disk_spec = disk.BaseDiskSpec('azure_os_disk')
     self.os_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type)
     self.max_local_disks = 1
 

@@ -14,6 +14,7 @@
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
 import unittest
+import mock_flags
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -22,6 +23,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
+from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
 
 NAME = 'name'
 UID = 'name0'
@@ -79,8 +81,36 @@ name:
     default:
       vm_spec:
         GCP:
+          machine_type: n1-standard-4
           not_a_vm_parameter: 4
 """
+BAD_DISK_PARAMETER_CONFIG = """
+name:
+  vm_groups:
+    default:
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+      disk_spec:
+        GCP:
+          not_a_disk_parameter: 4
+"""
+VALID_CONFIG_WITH_DISK_SPEC = """
+name:
+  vm_groups:
+    default:
+      disk_count: 3
+      disk_spec:
+        GCP:
+          disk_size: 75
+      vm_count: 2
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+"""
+ALWAYS_SUPPORTED = 'iperf'
+NEVER_SUPPORTED = 'mysql_service'
+NO_SUPPORT_INFO = 'this_is_not_a_benchmark'
 
 
 class ConstructVmsTestCase(unittest.TestCase):
@@ -100,6 +130,7 @@ class ConstructVmsTestCase(unittest.TestCase):
     self.assertEqual(vm.machine_type, 'n1-standard-4')
     self.assertEqual(vm.zone, 'us-central1-c')
     self.assertEqual(vm.project, 'my-project')
+    self.assertEqual(vm.disk_specs, [])
 
   def testMultiCloud(self):
     config = configs.LoadConfig(MULTI_CLOUD_CONFIG, {}, NAME)
@@ -127,8 +158,76 @@ class ConstructVmsTestCase(unittest.TestCase):
 
     self.assertEqual(vm2.disk_specs[0].mount_point, '/scratch')
 
-  def testBadParameter(self):
+  def testBadVmParameter(self):
     config = configs.LoadConfig(BAD_VM_PARAMETER_CONFIG, {}, NAME)
     spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
-    with self.assertRaises(errors.Config.UnrecognizedOption):
+    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
       spec.ConstructVirtualMachines()
+    self.assertEqual(str(cm.exception), (
+        'Unrecognized options were found in '
+        'name.vm_groups.default.vm_spec.GCP: not_a_vm_parameter.'))
+
+  def testBadDiskParameter(self):
+    config = configs.LoadConfig(BAD_DISK_PARAMETER_CONFIG, {}, NAME)
+    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
+      spec.ConstructVirtualMachines()
+    self.assertEqual(str(cm.exception), (
+        'Unrecognized options were found in '
+        'name.vm_groups.default.disk_spec.GCP: not_a_disk_parameter.'))
+
+  def testValidConfigWithDiskSpec(self):
+    config = configs.LoadConfig(VALID_CONFIG_WITH_DISK_SPEC, {}, NAME)
+    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+    spec.ConstructVirtualMachines()
+    vms = spec.vm_groups['default']
+    self.assertEqual(len(vms), 2)
+    for vm in vms:
+      self.assertEqual(len(vm.disk_specs), 3)
+      self.assertTrue(all(disk_spec.disk_size == 75
+                          for disk_spec in vm.disk_specs))
+
+
+class BenchmarkSupportTestCase(unittest.TestCase):
+
+  def setUp(self):
+    # Reset the current benchmark spec.
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
+
+  def createBenchmarkSpec(self, config, benchmark):
+    spec = benchmark_spec.BenchmarkSpec(config, benchmark, UID)
+    spec.ConstructVirtualMachines()
+    return True
+
+  def testBenchmarkSupportFlag(self):
+    """ Test the benchmark_compatibility_checking flag
+
+    We use Kubernetes as our test cloud platform because it has
+    supported benchmarks (IsBenchmarkSupported returns true)
+    unsupported benchmarks (IsBenchmarkSupported returns false)
+    and returns None if the benchmark isn't in either list.
+    """
+
+    with mock_flags.PatchFlags() as mocked_flags:
+      mocked_flags.cloud = 'Kubernetes'
+      mocked_flags.os_type = 'debian'
+      mocked_flags.machine_type = None
+      config = configs.LoadConfig(iperf_benchmark.BENCHMARK_CONFIG,
+                                  {}, ALWAYS_SUPPORTED)
+      self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
+      with self.assertRaises(ValueError):
+        self.createBenchmarkSpec(config, NEVER_SUPPORTED)
+      with self.assertRaises(ValueError):
+        self.createBenchmarkSpec(config, NO_SUPPORT_INFO)
+
+      mocked_flags.benchmark_compatibility_checking = 'permissive'
+      self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED),
+                      'benchmark is supported, mode is permissive')
+      with self.assertRaises(ValueError):
+        self.createBenchmarkSpec(config, NEVER_SUPPORTED)
+      self.assertTrue(self.createBenchmarkSpec(config, NO_SUPPORT_INFO))
+
+      mocked_flags.benchmark_compatibility_checking = 'none'
+      self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
+      self.assertTrue(self.createBenchmarkSpec(config, NEVER_SUPPORTED))
+      self.assertTrue(self.createBenchmarkSpec(config, NO_SUPPORT_INFO))

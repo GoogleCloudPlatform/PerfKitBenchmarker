@@ -22,6 +22,7 @@ import json
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker.providers import GCP
 
 FLAGS = flags.FLAGS
 
@@ -48,7 +49,6 @@ DISK_METADATA = {
     }
 }
 
-GCP = 'GCP'
 disk.RegisterDiskTypeMap(GCP, DISK_TYPE)
 
 

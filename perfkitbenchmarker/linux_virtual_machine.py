@@ -39,6 +39,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -55,6 +56,9 @@ DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '.ssh/id_rsa'
 CONTAINER_MOUNT_DIR = '/mnt'
 CONTAINER_WORK_DIR = '/root'
+
+BACKGROUND_IPERF_PORT = 20001
+BACKGROUND_IPERF_SECONDS = 2147483647
 
 # This pair of scripts used for executing long-running commands, which will be
 # resilient in the face of SSH connection errors.
@@ -248,7 +252,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry()
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
-    fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0,discard -O '
+    # Some images may automount one local disk, but we don't
+    # want to fail if this wasn't the case.
+    fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
+               'sudo mke2fs -F -E lazy_itable_init=0,discard -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteHostCommand(fmt_cmd)
 
@@ -467,9 +474,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def SetupLocalDisks(self):
     """Performs Linux specific setup of local disks."""
-    # Some images may automount one local disk, but we don't
-    # want to fail if this wasn't the case.
-    self.RemoteHostCommand('sudo umount /mnt', ignore_failure=True)
+    pass
 
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to prepare data disks.
@@ -524,7 +529,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Burns vm cpu for some amount of time and dirty cache.
 
     Args:
-      vm: The target vm.
       burn_cpu_threads: Number of threads to burn cpu.
       burn_cpu_seconds: Amount of time in seconds to burn cpu.
     """
@@ -540,11 +544,52 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         time.sleep(end_time - time.time())
       self.RemoteCommand('pkill -9 sysbench')
 
+  def PrepareBackgroundWorkload(self):
+    """Install packages needed for the background workload """
+    if self.background_cpu_threads:
+      self.Install('sysbench')
+    if self.background_network_mbits_per_sec:
+      self.Install('iperf')
+
+  def StartBackgroundWorkload(self):
+    """Starts the blackground workload."""
+    if self.background_cpu_threads:
+      self.RemoteCommand(
+          'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
+          'run 1> /dev/null 2> /dev/null &' % self.background_cpu_threads)
+    if self.background_network_mbits_per_sec:
+      self.AllowPort(BACKGROUND_IPERF_PORT)
+      self.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
+                         BACKGROUND_IPERF_PORT)
+      stdout, _ = self.RemoteCommand('pgrep iperf -n')
+      self.server_pid = stdout.strip()
+
+      if self.background_network_ip_type == vm_util.IpAddressSubset.EXTERNAL:
+        ip_address = self.ip_address
+      else:
+        ip_address = self.internal_ip
+      iperf_cmd = ('nohup iperf --client %s --port %s --time %s -u -b %sM '
+                   '&> /dev/null &' % (ip_address, BACKGROUND_IPERF_PORT,
+                                       BACKGROUND_IPERF_SECONDS,
+                                       self.background_network_mbits_per_sec))
+
+      self.RemoteCommand(iperf_cmd)
+      stdout, _ = self.RemoteCommand('pgrep iperf -n')
+      self.client_pid = stdout.strip()
+
+  def StopBackgroundWorkload(self):
+    """Stops the background workload."""
+    if self.background_cpu_threads:
+      self.RemoteCommand('pkill -9 sysbench')
+    if self.background_network_mbits_per_sec:
+      self.RemoteCommand('kill -9 ' + self.client_pid)
+      self.RemoteCommand('kill -9 ' + self.server_pid)
+
 
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
-  OS_TYPE = 'rhel'
+  OS_TYPE = os_types.RHEL
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -645,11 +690,15 @@ class RhelMixin(BaseLinuxMixin):
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  OS_TYPE = 'debian'
+  OS_TYPE = os_types.DEBIAN
 
-  def SetupPackageManager(self):
-    """Runs apt-get update so InstallPackages shouldn't need to."""
-    self.AptUpdate()
+  def __init__(self, *args, **kwargs):
+    super(DebianMixin, self).__init__(*args, **kwargs)
+
+    # Whether or not apt-get update has been called.
+    # We defer running apt-get update until the first request to install a
+    # package.
+    self._apt_updated = False
 
   @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def AptUpdate(self):
@@ -701,6 +750,11 @@ class DebianMixin(BaseLinuxMixin):
     """Installs a PerfKit package on the VM."""
     if not self.install_packages:
       return
+
+    if not self._apt_updated:
+      self.AptUpdate()
+      self._apt_updated = True
+
     if package_name not in self._installed_packages:
       package = linux_packages.PACKAGES[package_name]
       package.AptInstall(self)
@@ -759,7 +813,7 @@ class ContainerizedDebianMixin(DebianMixin):
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
 
-  OS_TYPE = 'ubuntu_container'
+  OS_TYPE = os_types.UBUNTU_CONTAINER
 
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
@@ -854,6 +908,9 @@ class ContainerizedDebianMixin(DebianMixin):
       command = 'cp %s %s' % (container_path, destination_path)
       self.RemoteCommand(command)
 
+  @vm_util.Retry(
+      poll_interval=1, max_retries=3,
+      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,))
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the container in the remote VM.
 

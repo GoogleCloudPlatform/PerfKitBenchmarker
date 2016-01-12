@@ -24,6 +24,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.rackspace import util
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -33,7 +34,7 @@ SSH_PORT = 22
 class RackspaceSecurityGroup(network.BaseFirewall):
     """An object representing the Rackspace Security Group."""
 
-    CLOUD = 'Rackspace'
+    CLOUD = providers.RACKSPACE
 
     def __init__(self):
         """Initialize Rackspace security group class."""

@@ -2,6 +2,7 @@
 # See http://wiki.apache.org/cassandra/StorageConfiguration
 cluster_name: '{{ cluster_name }}'
 num_tokens: 256
+auto_bootstrap: false
 hinted_handoff_enabled: true
 max_hint_window_in_ms: 10800000 # 3 hours
 hinted_handoff_throttle_in_kb: 1024

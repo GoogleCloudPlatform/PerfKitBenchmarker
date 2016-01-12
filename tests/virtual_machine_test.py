@@ -20,6 +20,9 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 
 
+_COMPONENT = 'test_component'
+
+
 class TestVmSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = 'test_cloud'
@@ -35,7 +38,7 @@ class TestVmSpec(virtual_machine.BaseVmSpec):
 class BaseVmSpecTestCase(unittest.TestCase):
 
   def testDefaults(self):
-    spec = virtual_machine.BaseVmSpec()
+    spec = virtual_machine.BaseVmSpec(_COMPONENT)
     self.assertEqual(spec.image, None)
     self.assertEqual(spec.install_packages, True)
     self.assertEqual(spec.machine_type, None)
@@ -43,7 +46,7 @@ class BaseVmSpecTestCase(unittest.TestCase):
 
   def testProvidedValid(self):
     spec = virtual_machine.BaseVmSpec(
-        image='test_image', install_packages=False,
+        _COMPONENT, image='test_image', install_packages=False,
         machine_type='test_machine_type', zone='test_zone')
     self.assertEqual(spec.image, 'test_image')
     self.assertEqual(spec.install_packages, False)
@@ -52,33 +55,34 @@ class BaseVmSpecTestCase(unittest.TestCase):
 
   def testUnrecognizedOptions(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      virtual_machine.BaseVmSpec(color='red', flavor='cherry', texture=None)
+      virtual_machine.BaseVmSpec(_COMPONENT, color='red', flavor='cherry',
+                                 texture=None)
     self.assertEqual(str(cm.exception), (
-        'Unrecognized options were found in a VM config: color, flavor, '
+        'Unrecognized options were found in test_component: color, flavor, '
         'texture.'))
 
   def testMissingOptions(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
-      TestVmSpec()
+      TestVmSpec(_COMPONENT)
     self.assertEqual(str(cm.exception), (
-        'Required options were missing from a test_cloud VM config: '
-        'required_int, required_string.'))
+        'Required options were missing from test_component: required_int, '
+        'required_string.'))
 
   def testInvalidImage(self):
     with self.assertRaises(errors.Config.InvalidValue):
-      virtual_machine.BaseVmSpec(image=0)
+      virtual_machine.BaseVmSpec(_COMPONENT, image=0)
 
   def testInvalidInstallPackages(self):
     with self.assertRaises(errors.Config.InvalidValue):
-      virtual_machine.BaseVmSpec(install_packages='yes')
+      virtual_machine.BaseVmSpec(_COMPONENT, install_packages='yes')
 
   def testInvalidMachineType(self):
     with self.assertRaises(errors.Config.InvalidValue):
-      virtual_machine.BaseVmSpec(machine_type=True)
+      virtual_machine.BaseVmSpec(_COMPONENT, machine_type=True)
 
   def testInvalidZone(self):
     with self.assertRaises(errors.Config.InvalidValue):
-      virtual_machine.BaseVmSpec(zone=0)
+      virtual_machine.BaseVmSpec(_COMPONENT, zone=0)
 
 
 if __name__ == '__main__':

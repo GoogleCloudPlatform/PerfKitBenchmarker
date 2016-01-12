@@ -28,10 +28,10 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 AZURE_PATH = 'azure'
-AZURE = 'Azure'
 MAX_NAME_LENGTH = 24
 SSH_PORT = 22
 # We need to prefix storage account names so that VMs won't create their own
@@ -46,7 +46,7 @@ class AzureFirewall(network.BaseFirewall):
   On Azure, endpoints are used to open ports instead of firewalls.
   """
 
-  CLOUD = AZURE
+  CLOUD = providers.AZURE
 
   def AllowPort(self, vm, port):
     """Opens a port on the firewall.
@@ -209,7 +209,7 @@ class AzureVirtualNetwork(resource.BaseResource):
 class AzureNetwork(network.BaseNetwork):
   """Object representing an Azure Network."""
 
-  CLOUD = AZURE
+  CLOUD = providers.AZURE
 
   def __init__(self, spec):
     super(AzureNetwork, self).__init__(spec)
