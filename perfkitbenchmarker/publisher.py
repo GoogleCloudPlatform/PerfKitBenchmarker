@@ -15,6 +15,7 @@
 """Classes to collect and publish performance samples to various sinks."""
 
 import abc
+import csv
 import io
 import itertools
 import json
@@ -53,7 +54,11 @@ flags.DEFINE_string(
 flags.DEFINE_boolean(
     'collapse_labels',
     True,
-    'Collapse entries in labels.')
+    'Collapse entries in labels in JSON output.')
+flags.DEFINE_string(
+    'csv_path',
+    None,
+    'A path to write CSV-format results')
 
 flags.DEFINE_string(
     'bigquery_table',
@@ -203,6 +208,39 @@ class SamplePublisher(object):
       samples: list of dicts to publish.
     """
     raise NotImplementedError()
+
+
+
+class CSVPublisher(SamplePublisher):
+  """Publisher which writes results in CSV format to a specified path.
+
+  The default field names are written first, followed by all unique metadata
+  keys found in the data.
+  """
+
+  _DEFAULT_FIELDS = ('timestamp', 'test', 'metric', 'value', 'unit',
+                     'product_name', 'official', 'owner', 'run_uri',
+                     'sample_uri')
+
+  def __init__(self, path):
+    self._path = path
+
+  def PublishSamples(self, samples):
+    samples = list(samples)
+    # Union of all metadata keys.
+    meta_keys = sorted(
+        set(key for sample in samples for key in sample['metadata']))
+
+    logging.info('Writing CSV results to %s', self._path)
+    with open(self._path, 'w') as fp:
+      writer = csv.DictWriter(fp, list(self._DEFAULT_FIELDS) + meta_keys)
+      writer.writeheader()
+
+      for sample in samples:
+        d = {}
+        d.update(sample)
+        d.update(d.pop('metadata'))
+        writer.writerow(d)
 
 
 class PrettyPrintStreamPublisher(SamplePublisher):
@@ -542,6 +580,8 @@ class SampleCollector(object):
     if FLAGS.cloud_storage_bucket:
       publishers.append(CloudStoragePublisher(FLAGS.cloud_storage_bucket,
                                               gsutil_path=FLAGS.gsutil_path))
+    if FLAGS.csv_path:
+      publishers.append(CSVPublisher(FLAGS.csv_path))
 
     return publishers
 
