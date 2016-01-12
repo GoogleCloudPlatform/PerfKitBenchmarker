@@ -13,6 +13,7 @@
 # limitations under the License.
 """Base class for objects decoded from a YAML config."""
 
+from collections import OrderedDict
 import threading
 
 from perfkitbenchmarker import errors
@@ -25,7 +26,7 @@ class BaseSpecMetaClass(type):
   def __init__(cls, name, bases, dct):
     super(BaseSpecMetaClass, cls).__init__(name, bases, dct)
     cls._init_decoders_lock = threading.Lock()
-    cls._decoders = {}
+    cls._decoders = OrderedDict()
     cls._required_options = set()
 
 
@@ -90,8 +91,8 @@ class BaseSpec(object):
     """
     with cls._init_decoders_lock:
       if not cls._decoders:
-        decoder_constructions = cls._GetOptionDecoderConstructions()
-        for option, decoder_construction in decoder_constructions.iteritems():
+        constructions = cls._GetOptionDecoderConstructions()
+        for option, decoder_construction in sorted(constructions.iteritems()):
           decoder_class, init_args = decoder_construction
           decoder = decoder_class(option, **init_args)
           cls._decoders[option] = decoder
