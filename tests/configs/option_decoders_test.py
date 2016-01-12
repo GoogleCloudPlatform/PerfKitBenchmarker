@@ -197,5 +197,84 @@ class StringDecoderTestCase(unittest.TestCase):
     self.assertEqual(decoder.Decode('red', _COMPONENT, _FLAGS), 'red')
 
 
+class FloatDecoderTestCase(unittest.TestCase):
+
+  def testDefault(self):
+    decoder = option_decoders.FloatDecoder(_OPTION, default=2.5)
+    self.assertIs(decoder.required, False)
+    self.assertIs(decoder.default, 2.5)
+
+  def testNone(self):
+    decoder = option_decoders.FloatDecoder(_OPTION, none_ok=True)
+    self.assertIsNone(decoder.Decode(None, _COMPONENT, _FLAGS))
+    decoder = option_decoders.IntDecoder(_OPTION)
+    with self.assertRaises(errors.Config.InvalidValue):
+      decoder.Decode(None, _COMPONENT, _FLAGS)
+
+  def testNonFloat(self):
+    decoder = option_decoders.FloatDecoder(_OPTION)
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      decoder.Decode('5', _COMPONENT, _FLAGS)
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component.test_option value: "5" (of type "str"). '
+        'Value must be one of the following types: float, int.'))
+
+  def testValidFloat(self):
+    decoder = option_decoders.FloatDecoder(_OPTION)
+    self.assertEqual(decoder.Decode(2.5, _COMPONENT, _FLAGS), 2.5)
+
+  def testValidFloatAsInt(self):
+    decoder = option_decoders.FloatDecoder(_OPTION)
+    self.assertEqual(decoder.Decode(2, _COMPONENT, _FLAGS), 2)
+
+  def testMaxFloat(self):
+    MAX = 2.0
+    decoder = option_decoders.FloatDecoder(_OPTION, max=MAX)
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      decoder.Decode(5, _COMPONENT, _FLAGS)
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component.test_option value: "5". Value must be at '
+        'most %s.' % MAX))
+    self.assertIs(decoder.Decode(MAX, _COMPONENT, _FLAGS), MAX)
+    self.assertIs(decoder.Decode(2, _COMPONENT, _FLAGS), 2)
+    self.assertIs(decoder.Decode(1, _COMPONENT, _FLAGS), 1)
+
+  def testMaxInt(self):
+    MAX = 2
+    decoder = option_decoders.FloatDecoder(_OPTION, max=MAX)
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      decoder.Decode(2.01, _COMPONENT, _FLAGS)
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component.test_option value: "2.01". Value must be at '
+        'most %s.' % MAX))
+    self.assertIs(decoder.Decode(MAX, _COMPONENT, _FLAGS), MAX)
+    self.assertIs(decoder.Decode(2.0, _COMPONENT, _FLAGS), 2.0)
+    self.assertIs(decoder.Decode(1, _COMPONENT, _FLAGS), 1)
+
+  def testMinFloat(self):
+    MIN = 2.0
+    decoder = option_decoders.FloatDecoder(_OPTION, min=MIN)
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      decoder.Decode(0, _COMPONENT, _FLAGS)
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component.test_option value: "0". Value must be at '
+        'least %s.' % MIN))
+    self.assertIs(decoder.Decode(MIN, _COMPONENT, _FLAGS), MIN)
+    self.assertIs(decoder.Decode(2, _COMPONENT, _FLAGS), 2)
+    self.assertIs(decoder.Decode(5, _COMPONENT, _FLAGS), 5)
+
+  def testMinInt(self):
+    MIN = 2
+    decoder = option_decoders.FloatDecoder(_OPTION, min=MIN)
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      decoder.Decode(0, _COMPONENT, _FLAGS)
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_component.test_option value: "0". Value must be at '
+        'least %s.' % MIN))
+    self.assertIs(decoder.Decode(MIN, _COMPONENT, _FLAGS), MIN)
+    self.assertIs(decoder.Decode(2.0, _COMPONENT, _FLAGS), 2.0)
+    self.assertIs(decoder.Decode(5, _COMPONENT, _FLAGS), 5)
+
+
 if __name__ == '__main__':
   unittest.main()
