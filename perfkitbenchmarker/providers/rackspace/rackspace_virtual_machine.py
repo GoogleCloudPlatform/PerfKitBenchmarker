@@ -365,7 +365,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
     if device_path != self.boot_device_path:
-      fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0 -O '
+      fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0,discard -O '
                  '^has_journal -t ext4 -b 4096 %s' % device_path)
       self.RemoteCommand(fmt_cmd)
 

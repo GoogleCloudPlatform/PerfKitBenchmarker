@@ -255,13 +255,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # Some images may automount one local disk, but we don't
     # want to fail if this wasn't the case.
     fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
-               'sudo mke2fs -F -E lazy_itable_init=0 -O '
+               'sudo mke2fs -F -E lazy_itable_init=0,discard -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteHostCommand(fmt_cmd)
 
   def MountDisk(self, device_path, mount_path):
     """Mounts a formatted disk in the VM."""
-    mnt_cmd = ('sudo mkdir -p {1};sudo mount {0} {1};'
+    mnt_cmd = ('sudo mkdir -p {1};sudo mount -o discard {0} {1};'
                'sudo chown -R $USER:$USER {1};').format(device_path, mount_path)
     self.RemoteHostCommand(mnt_cmd)
 

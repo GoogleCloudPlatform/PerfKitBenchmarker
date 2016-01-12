@@ -16,6 +16,8 @@
 
 import re
 
+_IPV4_REGEX = r'[0-9]+(?:\.[0-9]+){3}'
+
 
 class NoMatchError(ValueError):
   """Raised when no matches for a regex are found within a string."""
@@ -50,6 +52,22 @@ def ExtractGroup(regex, text, group=1):
 def ExtractFloat(regex, text, group=1):
   """Extracts a float from a regular expression matched to 'text'."""
   return float(ExtractGroup(regex, text, group=group))
+
+
+def ExtractIpv4Addresses(text):
+  """Extracts all ipv4 addresses within 'text'.
+
+  Args:
+    text: string. Text to search.
+  Returns:
+    A list of ipv4 strings.
+  RaisesL
+    NoMatchError: when no ipv4 address is found.
+  """
+  match = re.findall(_IPV4_REGEX, text)
+  if not match:
+    raise NoMatchError('No match for ipv4 addresses in "{0}"'.format(text))
+  return match
 
 
 def ExtractAllMatches(regex, text):
