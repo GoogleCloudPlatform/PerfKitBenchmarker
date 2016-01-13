@@ -250,7 +250,17 @@ class BenchmarkSpec(object):
 
   def Provision(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
-    vm_util.RunThreaded(lambda net: net.Create(), self.networks.values())
+    # Sort networks into a guaranteed order of creation based on dict key.
+    # There is a finite limit on the number of threads that are created to
+    # provision networks. Until support is added to provision resources in an
+    # order based on dependencies, this key ordering can be used to avoid
+    # deadlock by placing dependent networks later and their dependencies
+    # earlier. As an example, AWS stores both per-region and per-zone objects
+    # in this dict, and each per-zone object depends on a corresponding
+    # per-region object, so the per-region objects are given keys that come
+    # first when sorted.
+    networks = [self.networks[key] for key in sorted(self.networks.iterkeys())]
+    vm_util.RunThreaded(lambda net: net.Create(), networks)
 
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
