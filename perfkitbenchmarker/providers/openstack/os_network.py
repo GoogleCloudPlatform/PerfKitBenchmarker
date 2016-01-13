@@ -88,7 +88,8 @@ class OpenStackPublicNetwork(object):
         with self.__floating_ip_lock:
             floating_ips = self.__nclient.floating_ips.findall(
                 fixed_ip=None,
-                pool=self.ip_pool_name
+                pool=self.ip_pool_name,
+                status='Down'
             )
         if floating_ips:
             return floating_ips[0]
