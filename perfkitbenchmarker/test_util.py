@@ -97,11 +97,11 @@ def assertDiskMounts(benchmark_config, mount_point):
   vm_group = benchmark_config['vm_groups'].itervalues().next()
   assert vm_group.get('num_vms', 1) == 1
 
-  spec = benchmark_spec.BenchmarkSpec(benchmark_config, 'uid')
+  spec = benchmark_spec.BenchmarkSpec(benchmark_config, 'test_benchmark', 'uid')
 
   try:
     spec.ConstructVirtualMachines()
-    spec.Prepare()
+    spec.Provision()
 
     vm = spec.vms[0]
 
