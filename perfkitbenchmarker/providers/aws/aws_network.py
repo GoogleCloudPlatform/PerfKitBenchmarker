@@ -26,6 +26,8 @@ import logging
 import threading
 import uuid
 
+from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
@@ -34,6 +36,10 @@ from perfkitbenchmarker.providers.aws import util
 from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
+
+
+REGION = 'region'
+ZONE = 'zone'
 
 
 class AwsFirewall(network.BaseFirewall):
@@ -407,11 +413,11 @@ class AwsPlacementGroup(resource.BaseResource):
     return len(placement_groups) > 0
 
 
-class AwsRegionalNetwork(network.BaseNetwork):
+class _AwsRegionalNetwork(network.BaseNetwork):
   """Object representing regional components of an AWS network.
 
-  This class maintains a singleton-per-region; acquire instances via
-  AwsRegionalNetwork.GetForRegion.
+  The benchmark spec contains one instance of this class per region, which an
+  AwsNetwork may retrieve or create via _AwsRegionalNetwork.GetForRegion.
 
   Attributes:
     region: string. The AWS region.
@@ -419,10 +425,6 @@ class AwsRegionalNetwork(network.BaseNetwork):
     internet_gateway: an AwsInternetGateway instance.
     route_table: an AwsRouteTable instance. The default route table.
   """
-  # Map from region to AwsRegionalNetwork
-  _network_pool = {}
-  # Lock protecting _network_pool
-  _network_pool_lock = threading.Lock()
 
   def __init__(self, region):
     self.region = region
@@ -434,7 +436,7 @@ class AwsRegionalNetwork(network.BaseNetwork):
     # Locks to ensure that a single thread creates / deletes the instance.
     self._create_lock = threading.Lock()
 
-    # Tracks the number of AwsNetworks using this AwsRegionalNetwork.
+    # Tracks the number of AwsNetworks using this _AwsRegionalNetwork.
     # Incremented by Create(); decremented by Delete();
     # When a Delete() call decrements _reference_count to 0, the RegionalNetwork
     # is destroyed.
@@ -443,15 +445,27 @@ class AwsRegionalNetwork(network.BaseNetwork):
 
   @classmethod
   def GetForRegion(cls, region):
-    """Gets the AwsRegionalNetwork for a given AWS region.
+    """Retrieves or creates an _AwsRegionalNetwork.
 
     Args:
-      region: str. A Region name.
+      region: string. AWS region name.
+
     Returns:
-      The AwsRegionalNetwork for 'region'.
+      _AwsRegionalNetwork. If an _AwsRegionalNetwork for the same region already
+      exists in the benchmark spec, that instance is returned. Otherwise, a new
+      _AwsRegionalNetwork is created and returned.
     """
-    with cls._network_pool_lock:
-      return cls._network_pool.setdefault(region, cls(region))
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetNetwork called in a thread without a '
+                         'BenchmarkSpec.')
+    key = cls.CLOUD, REGION, region
+    # Because this method is only called from the AwsNetwork constructor, which
+    # is only called from AwsNetwork.GetNetwork, we already hold the
+    # benchmark_spec.networks_lock.
+    if key not in benchmark_spec.networks:
+      benchmark_spec.networks[key] = cls(region)
+    return benchmark_spec.networks[key]
 
   def Create(self):
     """Creates the network."""
@@ -512,7 +526,7 @@ class AwsNetwork(network.BaseNetwork):
     """
     super(AwsNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
-    self.regional_network = AwsRegionalNetwork.GetForRegion(self.region)
+    self.regional_network = _AwsRegionalNetwork.GetForRegion(self.region)
     self.subnet = None
     self.placement_group = AwsPlacementGroup(self.region)
 
@@ -533,3 +547,8 @@ class AwsNetwork(network.BaseNetwork):
       self.subnet.Delete()
     self.placement_group.Delete()
     self.regional_network.Delete()
+
+  @classmethod
+  def _GetKeyFromNetworkSpec(cls, spec):
+    """Returns a key used to register Network instances."""
+    return (cls.CLOUD, ZONE, spec.zone)
