@@ -848,7 +848,7 @@ and reference the static VM as follows:
 ```yaml
 iperf:
   vm_groups:
-    iperf_vm_1:
+    vm_1:
       static_vms:
         - *vm1
 ```
@@ -880,10 +880,10 @@ static_vms:
 
 iperf:
   vm_groups:
-    iperf_vm_1:
+    vm_1:
       static_vms:
         - *vm2
-    iperf_vm_2:
+    vm_2:
       static_vms:
         - *vm1
 ```
