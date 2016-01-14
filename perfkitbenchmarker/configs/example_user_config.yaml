@@ -29,10 +29,10 @@ static_vms:
 # Multi cloud iperf config.
 iperf: &iperf_multicloud
   vm_groups:
-    iperf_vm_1:
+    vm_1:
       cloud: GCP
       vm_spec: *four_core
-    iperf_vm_2:
+    vm_2:
       cloud: AWS
       vm_spec: *four_core
 
