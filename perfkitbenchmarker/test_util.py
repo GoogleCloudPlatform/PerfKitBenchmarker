@@ -98,19 +98,19 @@ def assertDiskMounts(benchmark_config, mount_point):
   assert vm_group.get('num_vms', 1) == 1
 
   spec = benchmark_spec.BenchmarkSpec(benchmark_config, 'test_benchmark', 'uid')
+  with spec.RedirectGlobalFlags():
+    try:
+      spec.ConstructVirtualMachines()
+      spec.Provision()
 
-  try:
-    spec.ConstructVirtualMachines()
-    spec.Provision()
+      vm = spec.vms[0]
 
-    vm = spec.vms[0]
+      test_file_path = os.path.join(mount_point, 'test_file')
+      vm.RemoteCommand('touch %s' % test_file_path)
 
-    test_file_path = os.path.join(mount_point, 'test_file')
-    vm.RemoteCommand('touch %s' % test_file_path)
+      # This will raise RemoteCommandError if the test file does not
+      # exist.
+      vm.RemoteCommand('test -e %s' % test_file_path)
 
-    # This will raise RemoteCommandError if the test file does not
-    # exist.
-    vm.RemoteCommand('test -e %s' % test_file_path)
-
-  finally:
-    spec.Delete()
+    finally:
+      spec.Delete()

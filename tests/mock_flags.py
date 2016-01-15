@@ -17,7 +17,7 @@ import contextlib
 
 import mock
 
-from perfkitbenchmarker import context
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 
 
@@ -48,6 +48,8 @@ class MockFlags(object):
     return self[key].value
 
   def __getitem__(self, key):
+    if key.startswith('__'):
+      return super(MockFlags, self).__getitem__(key)
     if key not in self._dict:
       mock_flag = mock.MagicMock()
       mock_flag.present = False
@@ -55,12 +57,17 @@ class MockFlags(object):
       self._dict[key] = mock_flag
     return self._dict[key]
 
+  def __contains__(self, item):
+    if item.startswith('__'):
+      return super(MockFlags, self).__contains__(item)
+    return True
+
 
 @contextlib.contextmanager
 def PatchFlags(mock_flags=None):
   """Patches read and write access to perfkitbenchmarker.flags.FLAGS.
 
-  By patching the underlying FlagValuesProxy instance, this method affects all
+  By patching the underlying FlagValues instance, this method affects all
   modules that have read FLAGS from perfkitbenchmarker.flags. For example, a
   module my_module.py may have the code
       from perfkitbenchmarker import flags
@@ -83,10 +90,7 @@ def PatchFlags(mock_flags=None):
     MockFlags. Either mock_flags or the newly created MockFlags value.
   """
   mock_flags = mock_flags or MockFlags()
-  patch = mock.patch(context.__name__ + '.FlagValuesProxy._thread_flag_values',
-                     new_callable=mock.PropertyMock)
-  with patch as mock_property:
-    mock_property.return_value = mock_flags
+  with flag_util.FlagDictSubstitution(FLAGS, lambda: mock_flags):
     yield mock_flags
 
 
@@ -104,9 +108,7 @@ def PatchTestCaseFlags(testcase):
     MockFlags. The mocked FlagValues object.
   """
   mock_flags = MockFlags()
-  patch = mock.patch(context.__name__ + '.FlagValuesProxy._thread_flag_values',
-                     new_callable=mock.PropertyMock)
-  mock_property = patch.start()
-  testcase.addCleanup(patch.stop)
-  mock_property.return_value = mock_flags
+  substitution = flag_util.FlagDictSubstitution(FLAGS, lambda: mock_flags)
+  substitution.__enter__()
+  testcase.addCleanup(substitution.__exit__)
   return mock_flags

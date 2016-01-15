@@ -19,6 +19,9 @@ import re
 
 from perfkitbenchmarker import flags
 
+
+FLAGS = flags.FLAGS
+
 INTEGER_GROUP_REGEXP = re.compile(r'(\d+)(-(\d+))?$')
 
 
@@ -183,10 +186,36 @@ class IntegerListSerializer(flags.ArgumentSerializer):
 
 
 def DEFINE_integerlist(name, default, help, on_nonincreasing=None,
-                       flag_values=flags.GLOBAL_FLAGS, **args):
+                       flag_values=FLAGS, **args):
   """Register a flag whose value must be an integer list."""
 
   parser = IntegerListParser(on_nonincreasing=on_nonincreasing)
   serializer = IntegerListSerializer()
 
   flags.DEFINE(parser, name, default, help, flag_values, serializer, **args)
+
+
+class FlagDictSubstitution(object):
+  """Context manager that redirects flag reads and writes."""
+
+  def __init__(self, flag_values, substitute):
+    """Initializes a FlagDictSubstitution.
+
+    Args:
+      flag_values: FlagValues that is temporarily modified such that all its
+          flag reads and writes are redirected.
+      substitute: Callable that temporarily replaces the FlagDict function of
+          flag_values. Accepts no arguments and returns a dict mapping flag
+          name string to Flag object.
+    """
+    self._flags = flag_values
+    self._substitute = substitute
+
+  def __enter__(self):
+    """Begins the flag substitution."""
+    self._original_flagdict = self._flags.FlagDict
+    self._flags.__dict__['FlagDict'] = self._substitute
+
+  def __exit__(self, *unused_args, **unused_kwargs):
+    """Stops the flag substitution."""
+    self._flags.__dict__['FlagDict'] = self._original_flagdict
