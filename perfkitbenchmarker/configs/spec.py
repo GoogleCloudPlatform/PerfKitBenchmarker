@@ -94,7 +94,7 @@ class BaseSpec(object):
         constructions = cls._GetOptionDecoderConstructions()
         for option, decoder_construction in sorted(constructions.iteritems()):
           decoder_class, init_args = decoder_construction
-          decoder = decoder_class(option, **init_args)
+          decoder = decoder_class(option=option, **init_args)
           cls._decoders[option] = decoder
           if decoder.required:
             cls._required_options.add(option)
