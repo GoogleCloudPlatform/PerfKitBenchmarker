@@ -34,7 +34,7 @@ class MemoryDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
     super(MemoryDecoderTestCase, self).setUp()
-    self.decoder = gce_virtual_machine.MemoryDecoder('memory')
+    self.decoder = gce_virtual_machine.MemoryDecoder(option='memory')
 
   def testValidStrings(self):
     self.assertEqual(self.decoder.Decode('1280MiB', _COMPONENT, _FLAGS), 1280)
@@ -108,7 +108,7 @@ class MachineTypeDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
     super(MachineTypeDecoderTestCase, self).setUp()
-    self.decoder = gce_virtual_machine.MachineTypeDecoder('machine_type')
+    self.decoder = gce_virtual_machine.MachineTypeDecoder(option='machine_type')
 
   def testDecodeString(self):
     result = self.decoder.Decode('n1-standard-8', _COMPONENT, {})

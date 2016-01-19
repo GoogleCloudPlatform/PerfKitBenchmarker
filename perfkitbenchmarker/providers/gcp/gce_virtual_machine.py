@@ -82,22 +82,25 @@ class MemoryDecoder(option_decoders.StringDecoder):
     match = self._CONFIG_MEMORY_PATTERN.match(string)
     if not match:
       raise errors.Config.InvalidValue(
-          'Invalid {0}.{1} value: "{2}". Examples of valid values: "1280MiB", '
-          '"7.5GiB".'.format(component_full_name, self.option, string))
+          'Invalid {0} value: "{1}". Examples of valid values: "1280MiB", '
+          '"7.5GiB".'.format(self._GetOptionFullName(component_full_name),
+                             string))
     try:
       memory_value = float(match.group(1))
     except ValueError:
       raise errors.Config.InvalidValue(
-          'Invalid {0}.{1} value: "{2}". "{3}" is not a valid float.'.format(
-              component_full_name, self.option, string, match.group(1)))
+          'Invalid {0} value: "{1}". "{2}" is not a valid float.'.format(
+              self._GetOptionFullName(component_full_name), string,
+              match.group(1)))
     memory_units = match.group(2)
     if memory_units == 'GiB':
       memory_value *= 1024
     memory_mib_int = int(memory_value)
     if memory_value != memory_mib_int:
       raise errors.Config.InvalidValue(
-          'Invalid {0}.{1} value: "{2}". The specified size must be an integer '
-          'number of MiB.'.format(component_full_name, self.option, string))
+          'Invalid {0} value: "{1}". The specified size must be an integer '
+          'number of MiB.'.format(self._GetOptionFullName(component_full_name),
+                                  string))
     return memory_mib_int
 
 
@@ -128,9 +131,8 @@ class CustomMachineTypeSpec(spec.BaseSpec):
 class MachineTypeDecoder(option_decoders.TypeVerifier):
   """Decodes the machine_type option of a GCE VM config."""
 
-  def __init__(self, option, **kwargs):
-    super(MachineTypeDecoder, self).__init__(option, (basestring, dict),
-                                             **kwargs)
+  def __init__(self, **kwargs):
+    super(MachineTypeDecoder, self).__init__((basestring, dict), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the machine_type option of a GCE VM config.
@@ -154,7 +156,7 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
                                            flag_values)
     if isinstance(value, basestring):
       return value
-    return CustomMachineTypeSpec('.'.join((component_full_name, self.option)),
+    return CustomMachineTypeSpec(self._GetOptionFullName(component_full_name),
                                  flag_values=flag_values, **value)
 
 
