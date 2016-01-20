@@ -80,6 +80,7 @@ from perfkitbenchmarker import traces
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_benchmarks
+from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.publisher import SampleCollector
 
 STAGE_ALL = 'all'
@@ -316,8 +317,11 @@ def _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid):
     return benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
                                         benchmark_uid)
   else:
+    # TODO(skschneider): Build BenchmarkConfigSpec before RunBenchmark.
+    config = benchmark_config_spec.BenchmarkConfigSpec(
+        benchmark_name, flag_values=FLAGS, **benchmark_config)
     try:
-      return benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid)
+      return benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid, config)
     except IOError:
       if FLAGS.run_stage == STAGE_PREPARE:
         logging.error(

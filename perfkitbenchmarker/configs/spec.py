@@ -53,7 +53,8 @@ class BaseSpec(object):
     Args:
       component_full_name: string. Fully qualified name of the configurable
           component containing the config options.
-      flag_values: flags.FlagValues. Runtime flags that may override kwargs.
+      flag_values: None or flags.FlagValues. Runtime flags that may override
+          the provided config option values in kwargs.
       **kwargs: dict mapping config option names to provided values.
 
     Raises:
@@ -76,12 +77,8 @@ class BaseSpec(object):
       raise errors.Config.UnrecognizedOption(
           'Unrecognized options were found in {0}: {1}.'.format(
               component_full_name, ', '.join(sorted(unrecognized_options))))
-    for option, decoder in self._decoders.iteritems():
-      if option in kwargs:
-        value = decoder.Decode(kwargs[option], component_full_name, flag_values)
-      else:
-        value = decoder.default
-      setattr(self, option, value)
+    self._DecodeAndInit(component_full_name, kwargs, self._decoders,
+                        flag_values)
 
   @classmethod
   def _InitDecoders(cls):
@@ -126,3 +123,26 @@ class BaseSpec(object):
           arguments to construct in order to decode the named option.
     """
     return {}
+
+  def _DecodeAndInit(self, component_full_name, config, decoders, flag_values):
+    """Initializes spec attributes from provided config option values.
+
+    Args:
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config options.
+      config: dict mapping option name string to option value.
+      flag_values: flags.FlagValues. Runtime flags that may override provided
+          config option values. These flags have already been applied to the
+          current config, but they may be passed to the decoders for propagation
+          to deeper spec constructors.
+      decoders: OrderedDict mapping option name string to ConfigOptionDecoder.
+    """
+    assert isinstance(decoders, OrderedDict), (
+        'decoders must be an OrderedDict. The order in which options are '
+        'decoded must be guaranteed.')
+    for option, decoder in decoders.iteritems():
+      if option in config:
+        value = decoder.Decode(config[option], component_full_name, flag_values)
+      else:
+        value = decoder.default
+      setattr(self, option, value)
