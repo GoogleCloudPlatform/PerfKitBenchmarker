@@ -170,6 +170,14 @@ class IntDecoderTestCase(unittest.TestCase):
     self.assertIs(decoder.Decode(10, _COMPONENT, _FLAGS), 10)
     self.assertIs(decoder.Decode(15, _COMPONENT, _FLAGS), 15)
 
+  def testZeroMaxOrMin(self):
+    decoder = option_decoders.IntDecoder(max=0, min=0, option=_OPTION)
+    with self.assertRaises(errors.Config.InvalidValue):
+      decoder.Decode(-1, _COMPONENT, _FLAGS)
+    with self.assertRaises(errors.Config.InvalidValue):
+      decoder.Decode(1, _COMPONENT, _FLAGS)
+    self.assertEqual(decoder.Decode(0, _COMPONENT, _FLAGS), 0)
+
 
 class StringDecoderTestCase(unittest.TestCase):
 
@@ -275,6 +283,14 @@ class FloatDecoderTestCase(unittest.TestCase):
     self.assertIs(decoder.Decode(MIN, _COMPONENT, _FLAGS), MIN)
     self.assertIs(decoder.Decode(2.0, _COMPONENT, _FLAGS), 2.0)
     self.assertIs(decoder.Decode(5, _COMPONENT, _FLAGS), 5)
+
+  def testZeroMaxOrMin(self):
+    decoder = option_decoders.FloatDecoder(max=0, min=0, option=_OPTION)
+    with self.assertRaises(errors.Config.InvalidValue):
+      decoder.Decode(-1, _COMPONENT, _FLAGS)
+    with self.assertRaises(errors.Config.InvalidValue):
+      decoder.Decode(1, _COMPONENT, _FLAGS)
+    self.assertEqual(decoder.Decode(0, _COMPONENT, _FLAGS), 0)
 
 
 class ListDecoderTestCase(unittest.TestCase):

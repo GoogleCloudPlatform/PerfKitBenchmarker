@@ -219,11 +219,11 @@ class IntDecoder(TypeVerifier):
     value = super(IntDecoder, self).Decode(value, component_full_name,
                                            flag_values)
     if value is not None:
-      if self.max and value > self.max:
+      if self.max is not None and value > self.max:
         raise errors.Config.InvalidValue(
             'Invalid {0} value: "{1}". Value must be at most {2}.'.format(
                 self._GetOptionFullName(component_full_name), value, self.max))
-      if self.min and value < self.min:
+      if self.min is not None and value < self.min:
         raise errors.Config.InvalidValue(
             'Invalid {0} value: "{1}". Value must be at least {2}.'.format(
                 self._GetOptionFullName(component_full_name), value, self.min))
@@ -262,11 +262,11 @@ class FloatDecoder(TypeVerifier):
     value = super(FloatDecoder, self).Decode(value, component_full_name,
                                              flag_values)
     if value is not None:
-      if self.max and value > self.max:
+      if self.max is not None and value > self.max:
         raise errors.Config.InvalidValue(
             'Invalid {0} value: "{1}". Value must be at most {2}.'.format(
                 self._GetOptionFullName(component_full_name), value, self.max))
-      if self.min and value < self.min:
+      if self.min is not None and value < self.min:
         raise errors.Config.InvalidValue(
             'Invalid {0} value: "{1}". Value must be at least {2}.'.format(
                 self._GetOptionFullName(component_full_name), value, self.min))
