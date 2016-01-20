@@ -20,10 +20,16 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
+
+
+flags.DEFINE_integer('benchmark_spec_test_flag', 0, 'benchmark_spec_test flag.')
+
+FLAGS = flags.FLAGS
 
 NAME = 'name'
 UID = 'name0'
@@ -231,3 +237,29 @@ class BenchmarkSupportTestCase(unittest.TestCase):
       self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
       self.assertTrue(self.createBenchmarkSpec(config, NEVER_SUPPORTED))
       self.assertTrue(self.createBenchmarkSpec(config, NO_SUPPORT_INFO))
+
+
+class RedirectGlobalFlagsTestCase(unittest.TestCase):
+
+  def testNoFlagOverride(self):
+    spec = benchmark_spec.BenchmarkSpec({}, NAME, UID)
+    self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+    with spec.RedirectGlobalFlags():
+      self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+      FLAGS.benchmark_spec_test_flag = 2
+      self.assertEqual(FLAGS.benchmark_spec_test_flag, 2)
+    self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+
+  def testFlagOverride(self):
+    config = {'flags': {'benchmark_spec_test_flag': 1}}
+    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+    self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+    with spec.RedirectGlobalFlags():
+      self.assertEqual(FLAGS.benchmark_spec_test_flag, 1)
+      FLAGS.benchmark_spec_test_flag = 2
+      self.assertEqual(FLAGS.benchmark_spec_test_flag, 2)
+    self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+
+
+if __name__ == '__main__':
+  unittest.main()

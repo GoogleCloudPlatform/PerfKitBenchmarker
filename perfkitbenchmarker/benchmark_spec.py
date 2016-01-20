@@ -14,6 +14,7 @@
 
 """Container for all data required for a benchmark to run."""
 
+import contextlib
 import copy
 import copy_reg
 import logging
@@ -27,6 +28,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
@@ -112,17 +114,21 @@ class BenchmarkSpec(object):
     self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
     self.uuid = str(uuid.uuid4())
     self.always_call_cleanup = False
-    self._flags = None
 
     # Set the current thread's BenchmarkSpec object to this one.
     context.SetThreadBenchmarkSpec(self)
 
-  @property
-  def FLAGS(self):
-    """Returns the result of merging config flags with the global flags."""
-    if self._flags is None:
-      self._flags = configs.GetMergedFlags(self.config)
-    return self._flags
+  @contextlib.contextmanager
+  def RedirectGlobalFlags(self):
+    """Redirects flag reads and writes to the benchmark-specific flags object.
+
+    Within the enclosed code block, reads and writes to the flags.FLAGS object
+    are redirected to a copy that has been merged with config-provided flag
+    overrides specific to this benchmark run.
+    """
+    merged_flags = configs.GetMergedFlags(self.config)
+    with flag_util.FlagDictSubstitution(FLAGS, merged_flags.FlagDict):
+      yield
 
   def _GetCloudForGroup(self, group_name):
     """Gets the cloud for a VM group by looking at flags and the config.
@@ -361,11 +367,8 @@ class BenchmarkSpec(object):
 
   def PickleSpec(self):
     """Pickles the spec so that it can be unpickled on a subsequent run."""
-    # FlagValues objects can't be pickled without getting an error.
-    flags, self._flags = self._flags, None
     with open(self.file_name, 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)
-    self._flags = flags
 
   @classmethod
   def GetSpecFromFile(cls, name):

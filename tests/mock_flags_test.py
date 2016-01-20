@@ -62,6 +62,9 @@ class PatchFlagsTestCase(unittest.TestCase):
     with mock_flags.PatchFlags(self.flags):
       FLAGS.test_flag = 5
       self.assertEqual(FLAGS.test_flag, 5)
+      self.assertFalse(FLAGS['test_flag'].present)
+      self.assertEqual(FLAGS['test_flag'].value, 5)
+      FLAGS['test_flag'].present = True
       self.assertTrue(FLAGS['test_flag'].present)
       self.assertEqual(FLAGS['test_flag'].value, 5)
     self.assertEqual(self.flags.test_flag, 5)

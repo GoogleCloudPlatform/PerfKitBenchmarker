@@ -213,7 +213,7 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
 def GetMergedFlags(config):
   """Returns a copy of the flags.FLAGS merged with those in the config."""
   config_flags = config.get('flags')
-  flags_values = copy.deepcopy(flags.GLOBAL_FLAGS)
+  flags_values = copy.deepcopy(flags.FLAGS)
 
   if config_flags:
     for key, value in config_flags.iteritems():
