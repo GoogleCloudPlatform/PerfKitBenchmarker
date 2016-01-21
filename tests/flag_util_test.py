@@ -14,8 +14,10 @@
 
 """Tests for flag_util.py."""
 
+import copy
 import unittest
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 
 
@@ -100,3 +102,35 @@ class TestIntegerListSerializer(unittest.TestCase):
 
     self.assertEqual(ser.Serialize(il),
                      '1,2-5,9')
+
+
+class FlagDictSubstitutionTestCase(unittest.TestCase):
+
+  def assertFlagState(self, flag_values, value, present):
+    self.assertEqual(flag_values.test_flag, value)
+    self.assertEqual(flag_values['test_flag'].value, value)
+    self.assertEqual(flag_values['test_flag'].present, present)
+
+  def testReadAndWrite(self):
+    flag_values = flags.FlagValues()
+    flags.DEFINE_integer('test_flag', 0, 'Test flag.', flag_values=flag_values)
+    flag_values_copy = copy.deepcopy(flag_values)
+    flag_values_copy.test_flag = 1
+    self.assertFlagState(flag_values, 0, False)
+    self.assertFlagState(flag_values_copy, 1, False)
+    with flag_util.FlagDictSubstitution(flag_values, flag_values_copy.FlagDict):
+      self.assertFlagState(flag_values, 1, False)
+      self.assertFlagState(flag_values_copy, 1, False)
+      flag_values.test_flag = 2
+      flag_values['test_flag'].present += 1
+      self.assertFlagState(flag_values, 2, True)
+      self.assertFlagState(flag_values_copy, 2, True)
+    self.assertFlagState(flag_values, 0, False)
+    self.assertFlagState(flag_values_copy, 2, True)
+    flag_values.test_flag = 3
+    self.assertFlagState(flag_values, 3, False)
+    self.assertFlagState(flag_values_copy, 2, True)
+
+
+if __name__ == '__main__':
+  unittest.main()
