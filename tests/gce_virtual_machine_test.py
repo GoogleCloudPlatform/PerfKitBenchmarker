@@ -155,7 +155,7 @@ class GceVmSpecTestCase(unittest.TestCase):
 
   def testStringMachineTypeFlagOverride(self):
     flags = mock_flags.MockFlags()
-    flags.machine_type = 'n1-standard-8'
+    flags['machine_type'].Parse('n1-standard-8')
     result = gce_virtual_machine.GceVmSpec(
         _COMPONENT, flag_values=flags,
         machine_type={'cpus': 1, 'memory': '7.5GiB'})
@@ -165,7 +165,7 @@ class GceVmSpecTestCase(unittest.TestCase):
 
   def testCustomMachineTypeFlagOverride(self):
     flags = mock_flags.MockFlags()
-    flags.machine_type = '{cpus: 1, memory: 7.5GiB}'
+    flags['machine_type'].Parse('{cpus: 1, memory: 7.5GiB}')
     result = gce_virtual_machine.GceVmSpec(
         _COMPONENT, flag_values=flags, machine_type='n1-standard-8')
     self.assertEqual(result.machine_type, None)
@@ -236,7 +236,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
   def testPreemptibleVMFlag(self):
     with self._PatchCriticalObjects() as mocked_env:
       issue_command, mocked_flags = mocked_env
-      mocked_flags.gce_preemptible_vms = True
+      mocked_flags['gce_preemptible_vms'].Parse(True)
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', mocked_flags, image='image',
           machine_type='test_machine_type')

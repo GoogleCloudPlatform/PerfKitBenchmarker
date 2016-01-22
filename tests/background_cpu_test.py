@@ -72,8 +72,8 @@ class TestBackgroundWorkload(unittest.TestCase):
     """ windows vm with background_cpu_threads raises exception """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
-      mocked_flags.background_cpu_threads = 1
-      mocked_flags.os_type = os_types.WINDOWS
+      mocked_flags['background_cpu_threads'].Parse(1)
+      mocked_flags['os_type'].Parse(os_types.WINDOWS)
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
       spec.ConstructVirtualMachines()
@@ -88,7 +88,7 @@ class TestBackgroundWorkload(unittest.TestCase):
     """ Check that the background_cpu_threads causes calls """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
-      mocked_flags.background_cpu_threads = 1
+      mocked_flags['background_cpu_threads'].Parse(1)
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
       spec.ConstructVirtualMachines()
@@ -110,8 +110,7 @@ class TestBackgroundWorkload(unittest.TestCase):
     """ Test that nothing happens with the vanilla config """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
-      mocked_flags.os_type = os_types.WINDOWS
-      mocked_flags.background_cpu_threads = None
+      mocked_flags['os_type'].Parse(os_types.WINDOWS)
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
       spec.ConstructVirtualMachines()
@@ -126,7 +125,7 @@ class TestBackgroundWorkload(unittest.TestCase):
     """ Check that the background_cpu_threads flags overrides the config """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
-      mocked_flags.background_cpu_threads = 2
+      mocked_flags['background_cpu_threads'].Parse(2)
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
       spec.ConstructVirtualMachines()
