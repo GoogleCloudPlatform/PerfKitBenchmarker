@@ -119,8 +119,8 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def testWindowsVMCausesError(self):
     """ windows vm with background_network_mbits_per_sec raises exception """
-    self.mocked_flags.background_network_mbits_per_sec = 200
-    self.mocked_flags.os_type = os_types.WINDOWS
+    self.mocked_flags['background_network_mbits_per_sec'].Parse(200)
+    self.mocked_flags['os_type'].Parse(os_types.WINDOWS)
     spec = self.makeSpec()
     with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
       spec.Prepare()
@@ -131,7 +131,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVM(self):
     """ Check that the vm background workload calls work """
-    self.mocked_flags.background_network_mbits_per_sec = 200
+    self.mocked_flags['background_network_mbits_per_sec'].Parse(200)
     spec = self.makeSpec()
     self._CheckVMFromSpec(spec, 2)
 
@@ -155,7 +155,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVanillaConfigFlag(self):
     """ Check that the flag overrides the config """
-    self.mocked_flags.background_network_mbits_per_sec = 200
+    self.mocked_flags['background_network_mbits_per_sec'].Parse(200)
     spec = self.makeSpec()
     for vm in spec.vms:
       self.assertEqual(vm.background_network_mbits_per_sec, 200)
@@ -164,8 +164,8 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVanillaConfigFlagIpType(self):
     """ Check that the flag overrides the config """
-    self.mocked_flags.background_network_mbits_per_sec = 200
-    self.mocked_flags.background_network_ip_type = 'INTERNAL'
+    self.mocked_flags['background_network_mbits_per_sec'].Parse(200)
+    self.mocked_flags['background_network_ip_type'].Parse('INTERNAL')
     spec = self.makeSpec()
     for vm in spec.vms:
       self.assertEqual(vm.background_network_mbits_per_sec, 200)
@@ -174,8 +174,8 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVanillaConfigBadIpTypeFlag(self):
     """ Check that the flag overrides the config """
-    self.mocked_flags.background_network_mbits_per_sec = 200
-    self.mocked_flags.background_network_ip_type = 'IAMABADFLAGVALUE'
+    self.mocked_flags['background_network_mbits_per_sec'].Parse(200)
+    self.mocked_flags['background_network_ip_type'].Parse('IAMABADFLAGVALUE')
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
     spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
     with self.assertRaises(errors.Config.InvalidValue):
