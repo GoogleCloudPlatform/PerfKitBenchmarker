@@ -37,7 +37,7 @@ import os
 import re
 import time
 
-from perfkitbenchmarker import benchmark_spec as benchmark_spec_class
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -46,10 +46,13 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.sample import PercentileCalculator  # noqa
 
-flags.DEFINE_enum('storage', benchmark_spec_class.GCP,
-                  [benchmark_spec_class.GCP, benchmark_spec_class.AWS,
-                   benchmark_spec_class.AZURE, benchmark_spec_class.OPENSTACK],
+flags.DEFINE_enum('storage', providers.GCP,
+                  [providers.GCP, providers.AWS,
+                   providers.AZURE, providers.OPENSTACK],
                   'storage provider (GCP/AZURE/AWS/OPENSTACK) to use.')
+
+flags.DEFINE_string('object_storage_region', None,
+                    'Storage region for object storage benchmark.')
 
 flags.DEFINE_enum('object_storage_scenario', 'all',
                   ['all', 'cli', 'api_data', 'api_namespace'],
@@ -115,10 +118,10 @@ BOTO_LIB_VERSION = 'boto_lib_version'
 SWIFTCLIENT_LIB_VERSION = 'python-swiftclient_lib_version'
 
 OBJECT_STORAGE_CREDENTIAL_DEFAULT_LOCATION = {
-    benchmark_spec_class.GCP: '~/' + GCE_CREDENTIAL_LOCATION,
-    benchmark_spec_class.AWS: '~/' + AWS_CREDENTIAL_LOCATION,
-    benchmark_spec_class.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION,
-    benchmark_spec_class.OPENSTACK: '~/'}
+    providers.GCP: '~/' + GCE_CREDENTIAL_LOCATION,
+    providers.AWS: '~/' + AWS_CREDENTIAL_LOCATION,
+    providers.AZURE: '~/' + AZURE_CREDENTIAL_LOCATION,
+    providers.OPENSTACK: '~/'}
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data used in the CLI tests.
@@ -168,7 +171,26 @@ CONTENT_REMOVAL_RETRY_LIMIT = 5
 BUCKET_REMOVAL_RETRY_LIMIT = 120
 RETRY_WAIT_INTERVAL_SECONDS = 30
 
-DEFAULT_GCS_REGION = 'US-CENTRAL1'
+DEFAULT_GCP_REGION = 'us-central1'
+DEFAULT_AWS_REGION = 'us-east-1'
+DEFAULT_AZURE_REGION = 'East US'
+
+# The endpoints in this table are subdomains of 'amazonaws.com'. So
+# where the table says 's3-us-west-2', you should connect to
+# 's3-us-west-2.amazonaws.com'. This table comes from
+# http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
+AWS_S3_REGION_TO_ENDPOINT_TABLE = {
+    'us-east-1': 's3-external-1',
+    'us-west-2': 's3-us-west-2',
+    'us-west-1': 's3-us-west-1',
+    'eu-west-1': 's3-eu-west-1',
+    'eu-central-1': 's3-eu-central-1',
+    'ap-southeast-1': 's3-ap-southeast-1',
+    'ap-southeast-2': 's3-ap-southeast-2',
+    'ap-northeast-1': 's3-ap-northeast-1',
+    'sa-east-1': 's3-sa-east-1'
+}
+AWS_S3_ENDPOINT_SUFFIX = '.amazonaws.com'
 
 
 def GetConfig(user_config):
@@ -263,7 +285,7 @@ def _MakeSwiftCommandPrefix(auth_url, tenant_name, username, password):
 
 def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                        bucket_name, regional_bucket_name=None,
-                       azure_command_suffix=None):
+                       azure_command_suffix=None, host_to_connect=None):
     """This function contains all api-based benchmarks.
        It uses the value of the global flag "object_storage_scenario" to
        decide which scenario to run inside this function. The caller simply
@@ -278,6 +300,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       bucket_name: The name of the bucket caller has created for this test.
       regional_bucket_name: The name of the "regional" bucket, if applicable.
       azure_command_suffix: A suffix for all Azure related test commands.
+      host_to_connect: An optional endpoint string to connect to.
 
     Raises:
       ValueError: unexpected test outcome is found from the API test script.
@@ -285,6 +308,28 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     if FLAGS.object_storage_scenario == 'cli':
       # User only wants to run the CLI based tests, do nothing here:
       return
+
+    def BuildBenchmarkScriptCommand(args):
+      """Build a command string for the API test script.
+
+      Args:
+        A list of strings. These will become space-separated arguments to the
+          test script.
+
+      Returns:
+        A string that can be passed to vm.RemoteCommand.
+      """
+
+      cmd_parts = [
+          test_script_path,
+          '--storage_provider=%s' % storage
+      ] + args
+      if azure_command_suffix is not None:
+        cmd_parts += [azure_command_suffix]
+      if host_to_connect is not None:
+        cmd_parts += ['--host', host_to_connect]
+
+      return ' '.join(cmd_parts)
 
     if (FLAGS.object_storage_scenario == 'all' or
         FLAGS.object_storage_scenario == 'api_data'):
@@ -294,12 +339,9 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
         buckets.append(regional_bucket_name)
 
       for bucket in buckets:
-        one_byte_rw_cmd = ('%s --bucket=%s --storage_provider=%s '
-                           '--scenario=OneByteRW') % (
-                               test_script_path, bucket, storage)
-
-        if azure_command_suffix is not None:
-          one_byte_rw_cmd = ('%s %s') % (one_byte_rw_cmd, azure_command_suffix)
+        one_byte_rw_cmd = BuildBenchmarkScriptCommand([
+            '--bucket=%s' % bucket,
+            '--scenario=OneByteRW'])
 
         _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
         logging.info('OneByteRW raw result is %s', raw_result)
@@ -322,14 +364,9 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
                              '%s.' % raw_result)
 
       # Single stream large object throughput metrics
-      single_stream_throughput_cmd = ('%s --bucket=%s --storage_provider=%s '
-                                      '--scenario=SingleStreamThroughput') % (
-                                          test_script_path,
-                                          bucket_name,
-                                          storage)
-      if azure_command_suffix is not None:
-        single_stream_throughput_cmd = ('%s %s') % (
-            single_stream_throughput_cmd, azure_command_suffix)
+      single_stream_throughput_cmd = BuildBenchmarkScriptCommand([
+          '--bucket=%s' % bucket_name,
+          '--scenario=SingleStreamThroughput'])
 
       _, raw_result = vm.RemoteCommand(single_stream_throughput_cmd)
       logging.info('SingleStreamThroughput raw result is %s', raw_result)
@@ -357,17 +394,10 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
     if (FLAGS.object_storage_scenario == 'all' or
         FLAGS.object_storage_scenario == 'api_namespace'):
       # list-after-write consistency metrics
-      list_consistency_cmd = ('%s --bucket=%s --storage_provider=%s '
-                              '--iterations=%d --scenario=ListConsistency') % (
-                                  test_script_path,
-                                  bucket_name,
-                                  storage,
-                                  LIST_CONSISTENCY_ITERATIONS)
-
-      if azure_command_suffix is not None:
-        list_consistency_cmd = ('%s %s') % (list_consistency_cmd,
-                                            azure_command_suffix)
-
+      list_consistency_cmd = BuildBenchmarkScriptCommand([
+          '--bucket=%s' % bucket_name,
+          '--iterations=%d' % LIST_CONSISTENCY_ITERATIONS,
+          '--scenario=ListConsistency'])
 
       _, raw_result = vm.RemoteCommand(list_consistency_cmd)
       logging.info('ListConsistency raw result is %s', raw_result)
@@ -589,9 +619,10 @@ class S3StorageBenchmark(object):
     vm.PushFile(FLAGS.boto_file_location, DEFAULT_BOTO_LOCATION)
 
     vm.bucket_name = 'pkb%s' % FLAGS.run_uri
+    vm.storage_region = FLAGS.object_storage_region or DEFAULT_AWS_REGION
 
     vm.RemoteCommand(
-        'aws s3 mb s3://%s --region=us-east-1' % vm.bucket_name)
+        'aws s3 mb s3://%s --region=%s' % (vm.bucket_name, vm.storage_region))
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with s3 tool.
@@ -634,8 +665,10 @@ class S3StorageBenchmark(object):
 
     # Now tests the storage provider via APIs
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
+    hostname = AWS_S3_REGION_TO_ENDPOINT_TABLE[vm.storage_region]
     ApiBasedBenchmarks(results, metadata, vm, 'S3', test_script_path,
-                       vm.bucket_name)
+                       vm.bucket_name,
+                       host_to_connect=hostname + AWS_S3_ENDPOINT_SUFFIX)
 
     return results
 
@@ -664,13 +697,16 @@ class AzureBlobStorageBenchmark(object):
     Args:
       vm: The vm being used to run the benchmark.
     """
+
     vm.Install('node_js')
     vm.RemoteCommand('sudo npm install azure-cli -g')
 
     vm.PushFile(FLAGS.object_storage_credential_file, AZURE_CREDENTIAL_LOCATION)
+    region = FLAGS.object_storage_region or DEFAULT_AZURE_REGION
     vm.RemoteCommand(
-        'azure storage account create --type ZRS -l \'East US\' ''"pkb%s"' %
-        (FLAGS.run_uri), ignore_failure=False)
+        'azure storage account create --type ZRS -l \'%s\' ''"pkb%s"' %
+        (region, FLAGS.run_uri),
+        ignore_failure=False)
     vm.azure_account = ('pkb%s' % FLAGS.run_uri)
 
     output, _ = (
@@ -831,10 +867,11 @@ class GoogleCloudStorageBenchmark(object):
 
     vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, vm.bucket_name))
 
+    region = FLAGS.object_storage_region or DEFAULT_GCP_REGION
     vm.regional_bucket_name = '%s-%s' % (vm.bucket_name,
-                                         DEFAULT_GCS_REGION.lower())
+                                         region.lower())
     vm.RemoteCommand('%s mb -c DRA -l %s gs://%s' % (vm.gsutil_path,
-                                                     DEFAULT_GCS_REGION,
+                                                     region.upper(),
                                                      vm.regional_bucket_name))
 
     # Detect if we need to install crcmod for gcp.
@@ -1019,10 +1056,10 @@ class SwiftStorageBenchmark(object):
 
 
 OBJECT_STORAGE_BENCHMARK_DICTIONARY = {
-    benchmark_spec_class.GCP: GoogleCloudStorageBenchmark(),
-    benchmark_spec_class.AWS: S3StorageBenchmark(),
-    benchmark_spec_class.AZURE: AzureBlobStorageBenchmark(),
-    benchmark_spec_class.OPENSTACK: SwiftStorageBenchmark()}
+    providers.GCP: GoogleCloudStorageBenchmark(),
+    providers.AWS: S3StorageBenchmark(),
+    providers.AZURE: AzureBlobStorageBenchmark(),
+    providers.OPENSTACK: SwiftStorageBenchmark()}
 
 
 def Prepare(benchmark_spec):
@@ -1032,6 +1069,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
+
   vms = benchmark_spec.vms
   if not FLAGS.object_storage_credential_file:
     FLAGS.object_storage_credential_file = (
@@ -1040,7 +1078,7 @@ def Prepare(benchmark_spec):
   FLAGS.object_storage_credential_file = os.path.expanduser(
       FLAGS.object_storage_credential_file)
 
-  if FLAGS.storage == benchmark_spec_class.OPENSTACK:
+  if FLAGS.storage == providers.OPENSTACK:
     openstack_creds_set = ('OS_AUTH_URL' in os.environ,
                            'OS_TENANT_NAME' in os.environ,
                            'OS_USERNAME' in os.environ,
@@ -1060,8 +1098,8 @@ def Prepare(benchmark_spec):
   FLAGS.boto_file_location = os.path.expanduser(FLAGS.boto_file_location)
 
   if not os.path.isfile(FLAGS.boto_file_location):
-    if FLAGS.storage not in (benchmark_spec_class.AZURE,
-                             benchmark_spec_class.OPENSTACK):
+    if FLAGS.storage not in (providers.AZURE,
+                             providers.OPENSTACK):
       raise errors.Benchmarks.MissingObjectCredentialException(
           'Boto file cannot be found in %s but it is required for gcs or s3.',
           FLAGS.boto_file_location)

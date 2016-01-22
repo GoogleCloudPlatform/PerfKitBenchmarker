@@ -18,14 +18,14 @@ import unittest
 
 import mock
 
-from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import benchmark_spec
 
 
 class LoadProvidersTestCase(unittest.TestCase):
 
   def testLoadAllProviders(self):
-    for cloud in benchmark_spec.VALID_CLOUDS:
+    for cloud in providers.VALID_CLOUDS:
       providers.LoadProvider(cloud.lower())
 
   def testLoadInvalidProvider(self):

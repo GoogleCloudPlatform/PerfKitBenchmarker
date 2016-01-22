@@ -16,8 +16,8 @@
 
 """
 
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import benchmark_spec
 
 
 class KubernetesProviderInfo(provider_info.BaseProviderInfo):
@@ -28,7 +28,7 @@ class KubernetesProviderInfo(provider_info.BaseProviderInfo):
                           'netperf', 'redis', 'sysbench_oltp']
   UNSUPPORTED_BENCHMARKS = ['bonnie++', 'mysql_service']
 
-  CLOUD = benchmark_spec.KUBERNETES
+  CLOUD = providers.KUBERNETES
 
   @classmethod
   def IsBenchmarkSupported(cls, benchmark):

@@ -26,20 +26,26 @@ import logging
 import threading
 import uuid
 
+from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
-AWS = 'AWS'
+
+
+REGION = 'region'
+ZONE = 'zone'
 
 
 class AwsFirewall(network.BaseFirewall):
   """An object representing the AWS Firewall."""
 
-  CLOUD = AWS
+  CLOUD = providers.AWS
 
   def __init__(self):
     self.firewall_set = set()
@@ -91,6 +97,7 @@ class AwsVpc(resource.BaseResource):
     self._subnet_index = 0
     # Lock protecting _subnet_index
     self._subnet_index_lock = threading.Lock()
+    self.default_security_group_id = None
 
   def _Create(self):
     """Creates the VPC."""
@@ -110,6 +117,7 @@ class AwsVpc(resource.BaseResource):
     cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-security-groups',
+        '--region', self.region,
         '--filters',
         'Name=group-name,Values=default',
         'Name=vpc-id,Values=' + self.id]
@@ -405,37 +413,30 @@ class AwsPlacementGroup(resource.BaseResource):
     return len(placement_groups) > 0
 
 
-class AwsRegionalNetwork(network.BaseNetwork):
+class _AwsRegionalNetwork(network.BaseNetwork):
   """Object representing regional components of an AWS network.
 
-  This class maintains a singleton-per-region; acquire instances via
-  AwsRegionalNetwork.GetForRegion.
+  The benchmark spec contains one instance of this class per region, which an
+  AwsNetwork may retrieve or create via _AwsRegionalNetwork.GetForRegion.
 
   Attributes:
     region: string. The AWS region.
     vpc: an AwsVpc instance.
     internet_gateway: an AwsInternetGateway instance.
     route_table: an AwsRouteTable instance. The default route table.
-    placement_group: An AwsPlacementGroup instance.
   """
-  # Map from region to AwsRegionalNetwork
-  _network_pool = {}
-  # Lock protecting _network_pool
-  _network_pool_lock = threading.Lock()
 
   def __init__(self, region):
     self.region = region
     self.vpc = AwsVpc(self.region)
     self.internet_gateway = AwsInternetGateway(region)
     self.route_table = None
-    self.placement_group = AwsPlacementGroup(self.region)
     self.created = False
-    self.default_security_group_id = None
 
     # Locks to ensure that a single thread creates / deletes the instance.
     self._create_lock = threading.Lock()
 
-    # Tracks the number of AwsNetworks using this AwsRegionalNetwork.
+    # Tracks the number of AwsNetworks using this _AwsRegionalNetwork.
     # Incremented by Create(); decremented by Delete();
     # When a Delete() call decrements _reference_count to 0, the RegionalNetwork
     # is destroyed.
@@ -444,15 +445,27 @@ class AwsRegionalNetwork(network.BaseNetwork):
 
   @classmethod
   def GetForRegion(cls, region):
-    """Gets the AwsRegionalNetwork for a given AWS region.
+    """Retrieves or creates an _AwsRegionalNetwork.
 
     Args:
-      region: str. A Region name.
+      region: string. AWS region name.
+
     Returns:
-      The AwsRegionalNetwork for 'region'.
+      _AwsRegionalNetwork. If an _AwsRegionalNetwork for the same region already
+      exists in the benchmark spec, that instance is returned. Otherwise, a new
+      _AwsRegionalNetwork is created and returned.
     """
-    with cls._network_pool_lock:
-      return cls._network_pool.setdefault(region, cls(region))
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    if benchmark_spec is None:
+      raise errors.Error('GetNetwork called in a thread without a '
+                         'BenchmarkSpec.')
+    key = cls.CLOUD, REGION, region
+    # Because this method is only called from the AwsNetwork constructor, which
+    # is only called from AwsNetwork.GetNetwork, we already hold the
+    # benchmark_spec.networks_lock.
+    if key not in benchmark_spec.networks:
+      benchmark_spec.networks[key] = cls(region)
+    return benchmark_spec.networks[key]
 
   def Create(self):
     """Creates the network."""
@@ -477,8 +490,6 @@ class AwsRegionalNetwork(network.BaseNetwork):
       self.route_table.Create()
       self.route_table.CreateRoute(self.internet_gateway.id)
 
-      self.placement_group.Create()
-
       self.created = True
 
   def Delete(self):
@@ -490,7 +501,6 @@ class AwsRegionalNetwork(network.BaseNetwork):
       if self._reference_count:
         return
 
-    self.placement_group.Delete()
     self.internet_gateway.Detach()
     self.internet_gateway.Delete()
     self.vpc.Delete()
@@ -503,9 +513,10 @@ class AwsNetwork(network.BaseNetwork):
     region: The AWS region the Network is in.
     regional_network: The AwsRegionalNetwor for 'region'.
     subnet: the AwsSubnet for this zone.
+    placement_group: An AwsPlacementGroup instance.
   """
 
-  CLOUD = AWS
+  CLOUD = providers.AWS
 
   def __init__(self, spec):
     """Initializes AwsNetwork instances.
@@ -515,8 +526,9 @@ class AwsNetwork(network.BaseNetwork):
     """
     super(AwsNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
-    self.regional_network = AwsRegionalNetwork.GetForRegion(self.region)
+    self.regional_network = _AwsRegionalNetwork.GetForRegion(self.region)
     self.subnet = None
+    self.placement_group = AwsPlacementGroup(self.region)
 
   def Create(self):
     """Creates the network."""
@@ -527,13 +539,16 @@ class AwsNetwork(network.BaseNetwork):
       self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
                               cidr_block=cidr)
       self.subnet.Create()
+    self.placement_group.Create()
 
   def Delete(self):
     """Deletes the network."""
     if self.subnet:
       self.subnet.Delete()
+    self.placement_group.Delete()
     self.regional_network.Delete()
 
-  @property
-  def placement_group(self):
-    return self.regional_network.placement_group
+  @classmethod
+  def _GetKeyFromNetworkSpec(cls, spec):
+    """Returns a key used to register Network instances."""
+    return (cls.CLOUD, ZONE, spec.zone)

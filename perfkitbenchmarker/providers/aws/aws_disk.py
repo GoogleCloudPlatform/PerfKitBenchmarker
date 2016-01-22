@@ -27,7 +27,9 @@ import string
 import threading
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import util
 
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
@@ -88,24 +90,43 @@ disk.RegisterDiskTypeMap(AWS, DISK_TYPE)
 
 
 class AwsDiskSpec(disk.BaseDiskSpec):
-  """Object holding the information needed to create an AwsDisk."""
+  """Object holding the information needed to create an AwsDisk.
 
-  CLOUD = 'AWS'
+  Attributes:
+    iops: None or int. IOPS for Provisioned IOPS (SSD) volumes in AWS.
+  """
 
-  def __init__(self, iops=None, **kwargs):
-    """Initializes the Disk Spec.
+  CLOUD = providers.AWS
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      iops: The number of provisioned IOPS for a PIOPS disk type.
-      kwargs: The key word arguments to disk.BaseDiskSpec's __init__ method.
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
     """
-    super(AwsDiskSpec, self).__init__(**kwargs)
-    self.iops = iops
+    super(AwsDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['aws_provisioned_iops'].present:
+      config_values['iops'] = flag_values.aws_provisioned_iops
 
-  def ApplyFlags(self, flags):
-    """Apply flags to the DiskSpec."""
-    super(AwsDiskSpec, self).ApplyFlags(flags)
-    self.iops = flags.aws_provisioned_iops or self.iops
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(AwsDiskSpec, cls)._GetOptionDecoderConstructions()
+    result.update({'iops': (option_decoders.IntDecoder, {'default': None,
+                                                         'none_ok': True})})
+    return result
 
 
 class AwsDisk(disk.BaseDisk):

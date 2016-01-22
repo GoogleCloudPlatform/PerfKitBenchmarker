@@ -83,6 +83,50 @@ class ConfigOptionDecoder(object):
     raise NotImplementedError()
 
 
+class EnumDecoder(ConfigOptionDecoder):
+  """ Verifies that the config options value is in the allowed set.
+
+  Passes through the value unmodified
+  """
+
+  def __init__(self, option, valid_values, **kwargs):
+    """Initializes the EnumVerifier.
+
+    Args:
+    option: string.  Name of the config option.
+    valid_values: list of the allowed values
+    **kwargs: Keyword arguments to pass to the base class.
+    """
+    super(EnumDecoder, self).__init__(option, **kwargs)
+    self.valid_values = valid_values
+
+  def Decode(self, value, component_full_name, flag_values):
+    """ Verifies that the provided value is in the allowed set.
+
+    Args:
+      value: The value specified in the config.
+      component_full_name: string.  Fully qualified name of the
+          configurable component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be
+          propagated to the BaseSpec constructors.
+
+    Returns:
+      The valid value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    if value in self.valid_values:
+     return value
+    else:
+      raise errors.Config.InvalidValue(
+          'Invalid {0}.{1} value: "{2}". Value must be one '
+          'of the following: {3}.'.format(
+              component_full_name, self.option, value,
+              ', '.join(str(t) for t in self.valid_values)))
+
+
+
 class TypeVerifier(ConfigOptionDecoder):
   """Verifies that a config option value's type belongs to an allowed set.
 
@@ -187,33 +231,38 @@ class FloatDecoder(TypeVerifier):
     min: None or float. If provided, it specifies the minimum accepted value.
   """
 
-  def __init__(self, component, option, max=None, min=None, **kwargs):
-    super(FloatDecoder, self).__init__(component, option, (float,), **kwargs)
+  def __init__(self, option, max=None, min=None, **kwargs):
+    super(FloatDecoder, self).__init__(option, (float, int), **kwargs)
     self.max = max
     self.min = min
 
-  def Decode(self, value):
-    """Verifies that the provided value is an int.
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies that the provided value is a float.
 
     Args:
       value: The value specified in the config.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
 
     Returns:
-      int. The valid value.
+      float. The valid value.
 
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    value = super(FloatDecoder, self).Decode(value)
+    value = super(FloatDecoder, self).Decode(value, component_full_name,
+                                             flag_values)
     if value is not None:
       if self.max and value > self.max:
         raise errors.Config.InvalidValue(
-            'Invalid {0} "{1}" value: "{2}". Value must be at most '
-            '{3}.'.format(self.component, self.option, value, self.max))
+            'Invalid {0}.{1} value: "{2}". Value must be at most '
+            '{3}.'.format(component_full_name, self.option, value, self.max))
       if self.min and value < self.min:
         raise errors.Config.InvalidValue(
-            'Invalid {0} "{1}" value: "{2}". Value must be at least '
-            '{3}.'.format(self.component, self.option, value, self.min))
+            'Invalid {0}.{1} value: "{2}". Value must be at least '
+            '{3}.'.format(component_full_name, self.option, value, self.min))
     return value
 
 

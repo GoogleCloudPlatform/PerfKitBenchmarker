@@ -17,6 +17,7 @@ import time
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
 from perfkitbenchmarker.providers.openstack import utils
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -28,7 +29,7 @@ class OpenStackFirewall(network.BaseFirewall):
     An object representing OpenStack Firewall based on Secure Groups.
     """
 
-    CLOUD = 'OpenStack'
+    CLOUD = providers.OPENSTACK
 
     def __init__(self):
         super(OpenStackFirewall, self).__init__()
@@ -87,7 +88,8 @@ class OpenStackPublicNetwork(object):
         with self.__floating_ip_lock:
             floating_ips = self.__nclient.floating_ips.findall(
                 fixed_ip=None,
-                pool=self.ip_pool_name
+                pool=self.ip_pool_name,
+                status='Down'
             )
         if floating_ips:
             return floating_ips[0]

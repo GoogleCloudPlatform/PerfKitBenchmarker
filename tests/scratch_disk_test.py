@@ -33,6 +33,9 @@ from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 
 
+_COMPONENT = 'test_component'
+
+
 class ScratchDiskTestMixin(object):
   """Sets up and tears down some of the mocks needed to test scratch disks."""
 
@@ -88,7 +91,7 @@ class ScratchDiskTestMixin(object):
 
     vm = self._CreateVm()
 
-    disk_spec = disk.BaseDiskSpec(None, None, '/mountpoint0')
+    disk_spec = disk.BaseDiskSpec(_COMPONENT, mount_point='/mountpoint0')
     vm.CreateScratchDisk(disk_spec)
 
     assert len(vm.scratch_disks) == 1, 'Disk not added to scratch disks.'
@@ -100,7 +103,7 @@ class ScratchDiskTestMixin(object):
     vm.MountDisk.assert_called_once_with(
         scratch_disk.GetDevicePath(), '/mountpoint0')
 
-    disk_spec = disk.BaseDiskSpec(None, None, '/mountpoint1')
+    disk_spec = disk.BaseDiskSpec(_COMPONENT, mount_point='/mountpoint1')
     vm.CreateScratchDisk(disk_spec)
 
     assert len(vm.scratch_disks) == 2, 'Disk not added to scratch disks.'
@@ -171,19 +174,10 @@ class GceDeviceIdTest(unittest.TestCase):
   def testDeviceId(self):
     with mock.patch(disk.__name__ + '.FLAGS') as disk_flags:
       disk_flags.os_type = 'windows'
-      disk_spec = disk.BaseDiskSpec(
-          disk_size=2,
-          disk_type=gce_disk.PD_STANDARD,
-          disk_number=1)
-
-      disk_obj = gce_disk.GceDisk(
-          disk_spec,
-          'name',
-          'zone',
-          'project')
-
-      self.assertEquals(disk_obj.GetDeviceId(),
-                        r'\\.\PHYSICALDRIVE1')
+      disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_number=1, disk_size=2,
+                                    disk_type=gce_disk.PD_STANDARD)
+      disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
+      self.assertEquals(disk_obj.GetDeviceId(), r'\\.\PHYSICALDRIVE1')
 
 
 if __name__ == '__main__':

@@ -58,6 +58,9 @@ flags.DEFINE_boolean('openstack_boot_from_volume', False,
 flags.DEFINE_integer('openstack_volume_size', None,
                      'Size of the volume (GB)')
 
+flags.DEFINE_string('openstack_image_username', 'ubuntu',
+                    'Ssh username for cloud image')
+
 NONE = 'None'
 flags.DEFINE_enum('openstack_scheduler_policy', NONE,
                   [NONE, 'affinity', 'anti-affinity'],

@@ -197,6 +197,8 @@ def ParseOutput(hpcc_output, benchmark_spec):
     results.append(sample.Sample('STREAM %s Throughput' % metric, value,
                                  'GB/s'))
 
+  value = regex_util.ExtractFloat(r'PTRANS_GBs=([0-9]*\.[0-9]*)', hpcc_output)
+  results.append(sample.Sample('PTRANS Throughput', value, 'GB/s', metadata))
   return results
 
 

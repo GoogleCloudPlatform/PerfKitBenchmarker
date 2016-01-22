@@ -41,7 +41,7 @@ In its current release these are the benchmarks that are executed:
   - `cassandra_stress`: [Apache v2](http://cassandra.apache.org/)
   - `cluster_boot`: MIT License
   - `coremark`: [EEMBC](https://www.eembc.org/)
-  - `copy_throughput`: Apache v2.
+  - `copy_throughput`: Apache v2
   - `fio`: [GPL v2](https://github.com/axboe/fio/blob/master/COPYING)
   - `hadoop_terasort`: [Apache v2](http://hadoop.apache.org/)
   - `hpcc`: [Original BSD license](http://icl.cs.utk.edu/hpcc/faq/#263)
@@ -51,17 +51,22 @@ In its current release these are the benchmarks that are executed:
   - `mongodb`: **Deprecated**. [GNU AGPL v3.0](http://www.mongodb.org/about/licensing/)
   - `mongodb_ycsb`: [GNU AGPL v3.0](http://www.mongodb.org/about/licensing/)
   - `netperf`: [HP license](http://www.calculate-linux.org/packages/licenses/netperf)
-  - `oldisim`: Apache v2.
-  - `object_storage_service`: Apache v2.
+  - [`oldisim`](https://github.com/GoogleCloudPlatform/oldisim):
+    [Apache v2](https://github.com/GoogleCloudPlatform/oldisim/blob/master/LICENSE.txt)
+  - `object_storage_service`: Apache v2
   - `ping`: No license needed.
   - `silo`: MIT License
   - `scimark2`: [public domain](http://math.nist.gov/scimark2/credits.html)
   - `speccpu2006`: [Spec CPU2006](http://www.spec.org/cpu2006/)
   - `sysbench_oltp`: [GPL v2](https://github.com/akopytov/sysbench)
-  * `tomcat`: [Apache v2](http://tomcat.apache.org)
-  - `unixbench`: [GPL v2](https://code.google.com/p/byte-unixbench/)
-  * `wrk`: [Apache v2](https://github.com/wg/wrk)
-  - `ycsb` (used by `mongodb`, `hbase_ycsb`, and others): [Apache v2](https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
+  - [`tomcat`](https://github.com/apache/tomcat):
+    [Apache v2](https://github.com/apache/tomcat/blob/trunk/LICENSE)
+  - [`unixbench`](https://github.com/kdlucas/byte-unixbench):
+    [GPL v2](https://github.com/kdlucas/byte-unixbench/blob/master/LICENSE.txt)
+  - [`wrk`](https://github.com/wg/wrk):
+    [Modified Apache v2](https://github.com/wg/wrk/blob/master/LICENSE)
+  - [`ycsb`](https://github.com/brianfrankcooper/YCSB) (used by `mongodb`, `hbase_ycsb`, and others):
+    [Apache v2](https://github.com/brianfrankcooper/YCSB/blob/master/LICENSE.txt)
 
 Some of the benchmarks invoked require Java. You must also agree with the following license:
 
@@ -843,7 +848,7 @@ and reference the static VM as follows:
 ```yaml
 iperf:
   vm_groups:
-    iperf_vm_1:
+    vm_1:
       static_vms:
         - *vm1
 ```
@@ -875,10 +880,10 @@ static_vms:
 
 iperf:
   vm_groups:
-    iperf_vm_1:
+    vm_1:
       static_vms:
         - *vm2
-    iperf_vm_2:
+    vm_2:
       static_vms:
         - *vm1
 ```

@@ -41,6 +41,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -57,6 +58,9 @@ DEFAULT_SSH_PORT = 22
 REMOTE_KEY_PATH = '.ssh/id_rsa'
 CONTAINER_MOUNT_DIR = '/mnt'
 CONTAINER_WORK_DIR = '/root'
+
+BACKGROUND_IPERF_PORT = 20001
+BACKGROUND_IPERF_SECONDS = 2147483647
 
 # This pair of scripts used for executing long-running commands, which will be
 # resilient in the face of SSH connection errors.
@@ -253,13 +257,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # Some images may automount one local disk, but we don't
     # want to fail if this wasn't the case.
     fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
-               'sudo mke2fs -F -E lazy_itable_init=0 -O '
+               'sudo mke2fs -F -E lazy_itable_init=0,discard -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteHostCommand(fmt_cmd)
 
   def MountDisk(self, device_path, mount_path):
     """Mounts a formatted disk in the VM."""
-    mnt_cmd = ('sudo mkdir -p {1};sudo mount {0} {1};'
+    mnt_cmd = ('sudo mkdir -p {1};sudo mount -o discard {0} {1};'
                'sudo chown -R $USER:$USER {1};').format(device_path, mount_path)
     self.RemoteHostCommand(mnt_cmd)
 
@@ -546,6 +550,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Install packages needed for the background workload """
     if self.background_cpu_threads:
       self.Install('sysbench')
+    if self.background_network_mbits_per_sec:
+      self.Install('iperf')
 
   def StartBackgroundWorkload(self):
     """Starts the blackground workload."""
@@ -553,17 +559,39 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand(
           'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
           'run 1> /dev/null 2> /dev/null &' % self.background_cpu_threads)
+    if self.background_network_mbits_per_sec:
+      self.AllowPort(BACKGROUND_IPERF_PORT)
+      self.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
+                         BACKGROUND_IPERF_PORT)
+      stdout, _ = self.RemoteCommand('pgrep iperf -n')
+      self.server_pid = stdout.strip()
+
+      if self.background_network_ip_type == vm_util.IpAddressSubset.EXTERNAL:
+        ip_address = self.ip_address
+      else:
+        ip_address = self.internal_ip
+      iperf_cmd = ('nohup iperf --client %s --port %s --time %s -u -b %sM '
+                   '&> /dev/null &' % (ip_address, BACKGROUND_IPERF_PORT,
+                                       BACKGROUND_IPERF_SECONDS,
+                                       self.background_network_mbits_per_sec))
+
+      self.RemoteCommand(iperf_cmd)
+      stdout, _ = self.RemoteCommand('pgrep iperf -n')
+      self.client_pid = stdout.strip()
 
   def StopBackgroundWorkload(self):
     """Stops the background workload."""
     if self.background_cpu_threads:
       self.RemoteCommand('pkill -9 sysbench')
+    if self.background_network_mbits_per_sec:
+      self.RemoteCommand('kill -9 ' + self.client_pid)
+      self.RemoteCommand('kill -9 ' + self.server_pid)
 
 
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
-  OS_TYPE = 'rhel'
+  OS_TYPE = os_types.RHEL
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -664,7 +692,7 @@ class RhelMixin(BaseLinuxMixin):
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
-  OS_TYPE = 'debian'
+  OS_TYPE = os_types.DEBIAN
 
   def __init__(self, *args, **kwargs):
     super(DebianMixin, self).__init__(*args, **kwargs)
@@ -787,7 +815,7 @@ class ContainerizedDebianMixin(DebianMixin):
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
 
-  OS_TYPE = 'ubuntu_container'
+  OS_TYPE = os_types.UBUNTU_CONTAINER
 
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""

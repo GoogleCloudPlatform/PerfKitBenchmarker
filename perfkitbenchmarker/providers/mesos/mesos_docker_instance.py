@@ -23,6 +23,7 @@ from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.mesos.mesos_disk import LocalDisk
+from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -36,9 +37,11 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
   Attributes:
     docker_cpus: None or float. Number of CPUs for Docker instances.
     docker_memory_mb: None or int. Memory limit (in MB) for Docker instances.
+    mesos_privileged_docker: None of boolean. Indicates if Docker container
+        should be run in privileged mode.
   """
 
-  CLOUD = 'Mesos'
+  CLOUD = providers.MESOS
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -50,14 +53,15 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
                                     {'default': False})})
     return result
 
-  def ApplyFlags(self, flags):
-    super(MesosDockerSpec, self).ApplyFlags(flags)
-    if flags['docker_cpus'].present:
-      self.docker_cpus = flags.docker_cpus
-    if flags['docker_memory_mb'].present:
-      self.docker_memory_mb = flags.docker_memory_mb
-    if flags['mesos_privileged_docker'].present:
-      self.mesos_privileged_docker = flags.mesos_privileged_docker
+  def _ApplyFlags(self, config_values, flag_values):
+    super(MesosDockerSpec, self)._ApplyFlags(config_values, flag_values)
+    if flag_values['docker_cpus'].present:
+      config_values['docker_cpus'] = flag_values.docker_cpus
+    if flag_values['docker_memory_mb'].present:
+      config_values['docker_memory_mb'] = flag_values.docker_memory_mb
+    if flag_values['mesos_privileged_docker'].present:
+      config_values['mesos_privileged_docker'] =\
+          flag_values.mesos_privileged_docker
 
 
 class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
@@ -65,7 +69,7 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
   Represents a Docker instance spawned by Marathon framework on a Mesos cluster
   """
 
-  CLOUD = 'Mesos'
+  CLOUD = providers.MESOS
 
   def __init__(self, vm_spec):
     super(MesosDockerInstance, self).__init__(vm_spec)

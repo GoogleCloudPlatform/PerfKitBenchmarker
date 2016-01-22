@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for background workload"""
+"""Tests for background cpu workload """
 
-import unittest
-import mock
-import functools
 from mock import patch
-from tests import mock_flags
-from perfkitbenchmarker import configs
-from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import timing_util
-from perfkitbenchmarker import pkb
-
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import providers
+from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+from tests import mock_flags
+import unittest
 
 NAME = 'ping'
 UID = 'name0'
@@ -47,16 +44,9 @@ ping:
 
 class TestBackgroundWorkload(unittest.TestCase):
 
-  def setUp(self):
-    self.last_call = 0
-
-  def _CheckAndIncrement(self, throwaway=None, expected_last_call=None):
-    self.assertEqual(self.last_call, expected_last_call)
-    self.last_call += 1
-
   def setupCommonFlags(self, mock_flags):
-    mock_flags.os_type = benchmark_spec.DEBIAN
-    mock_flags.cloud = 'GCP'
+    mock_flags.os_type = os_types.DEBIAN
+    mock_flags.cloud = providers.GCP
 
   def _CheckVMFromSpec(self, spec, num_working):
     vm0 = spec.vms[0]
@@ -78,56 +68,24 @@ class TestBackgroundWorkload(unittest.TestCase):
                        expected_remote_post_stop)
 
 
-  def testBackgroundWorkloadSpec(self):
-    """ Check that the benchmark spec calls the prepare, stop, and start
-    methods on the vms """
-
-    with mock_flags.PatchFlags() as mocked_flags:
-      self.setupCommonFlags(mocked_flags)
-      mocked_flags.background_cpu_threads = 1
-      collector = mock.MagicMock()
-      config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
-      spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
-      vm0 = mock.MagicMock()
-      vm1 = mock.MagicMock()
-      spec.ConstructVirtualMachines()
-      spec.vms = [vm0, vm1]
-      timer = timing_util.IntervalTimer()
-      pkb.DoPreparePhase(ping_benchmark, NAME, spec, timer)
-      for vm in spec.vms:
-        self.assertEqual(vm.PrepareBackgroundWorkload.call_count, 1)
-
-      with mock.patch(ping_benchmark.__name__ + '.Run'):
-        ping_benchmark.Run.side_effect = functools.partial(
-            self._CheckAndIncrement, expected_last_call=1)
-        vm0.StartBackgroundWorkload.side_effect = functools.partial(
-            self._CheckAndIncrement, expected_last_call=0)
-        vm0.StopBackgroundWorkload.side_effect = functools.partial(
-            self._CheckAndIncrement, expected_last_call=2)
-        pkb.DoRunPhase(ping_benchmark, NAME, spec, collector, timer)
-        self.assertEqual(ping_benchmark.Run.call_count, 1)
-        for vm in spec.vms:
-          self.assertEqual(vm.StartBackgroundWorkload.call_count, 1)
-          self.assertEqual(vm.StopBackgroundWorkload.call_count, 1)
-
   def testWindowsVMCausesError(self):
     """ windows vm with background_cpu_threads raises exception """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
       mocked_flags.background_cpu_threads = 1
-      mocked_flags.os_type = benchmark_spec.WINDOWS
+      mocked_flags.os_type = os_types.WINDOWS
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
       spec.ConstructVirtualMachines()
-      with self.assertRaises(Exception):
+      with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
         spec.Prepare()
-      with self.assertRaises(Exception):
+      with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
         spec.StartBackgroundWorkload()
-      with self.assertRaises(Exception):
+      with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
         spec.StopBackgroundWorkload()
 
   def testBackgroundWorkloadVM(self):
-    """ Check that the vm background workload calls work """
+    """ Check that the background_cpu_threads causes calls """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
       mocked_flags.background_cpu_threads = 1
@@ -140,20 +98,19 @@ class TestBackgroundWorkload(unittest.TestCase):
     """ Test that nothing happens with the vanilla config """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
-      mocked_flags.background_cpu_threads = None
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
       spec.ConstructVirtualMachines()
-
       for vm in spec.vms:
         self.assertIsNone(vm.background_cpu_threads)
+        self.assertIsNone(vm.background_network_mbits_per_sec)
       self._CheckVMFromSpec(spec, 0)
 
   def testBackgroundWorkloadWindows(self):
     """ Test that nothing happens with the vanilla config """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
-      mocked_flags.os_type = benchmark_spec.WINDOWS
+      mocked_flags.os_type = os_types.WINDOWS
       mocked_flags.background_cpu_threads = None
       config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
       spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
@@ -161,11 +118,12 @@ class TestBackgroundWorkload(unittest.TestCase):
 
       for vm in spec.vms:
         self.assertIsNone(vm.background_cpu_threads)
+        self.assertIsNone(vm.background_network_mbits_per_sec)
       self._CheckVMFromSpec(spec, 0)
 
 
   def testBackgroundWorkloadVanillaConfigFlag(self):
-    """ Check that the flag overrides the config """
+    """ Check that the background_cpu_threads flags overrides the config """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
       mocked_flags.background_cpu_threads = 2
@@ -178,7 +136,7 @@ class TestBackgroundWorkload(unittest.TestCase):
 
 
   def testBackgroundWorkloadConfig(self):
-    """ Check that the config can be used to set the background cpu threads """
+    """ Check that the config can be used to set background_cpu_threads """
     with mock_flags.PatchFlags() as mocked_flags:
       self.setupCommonFlags(mocked_flags)
       config = configs.LoadConfig(CONFIG_WITH_BACKGROUND_CPU, {}, NAME)

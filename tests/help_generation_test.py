@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for Digitial Ocean
+"""Test that we can generate help for PKB."""
 
-"""
+import os
+import unittest
+
+from perfkitbenchmarker import flags
 
 
-from perfkitbenchmarker import providers
-from perfkitbenchmarker import provider_info
+class HelpTest(unittest.TestCase):
+  def testHelp(self):
+    # Test that help generation finishes without errors
+    flags.GLOBAL_FLAGS.GetHelp()
 
 
-class DigitalOceanProviderInfo(provider_info.BaseProviderInfo):
-
-  UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = providers.DIGITALOCEAN
+class HelpXMLTest(unittest.TestCase):
+  def testHelpXML(self):
+    with open(os.devnull, 'w') as out:
+      flags.GLOBAL_FLAGS.WriteHelpInXMLFormat(outfile=out)

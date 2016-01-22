@@ -15,7 +15,7 @@
 from perfkitbenchmarker import flags
 
 
-flags.DEFINE_boolean('mesos_privileged_docker', True,
+flags.DEFINE_boolean('mesos_privileged_docker', False,
                      'If set to True, will attempt to create Docker containers '
                      'in a privileged mode. Note that some benchmarks execute '
                      'commands which are only allowed in privileged mode.')

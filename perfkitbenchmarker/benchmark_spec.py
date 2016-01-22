@@ -15,37 +15,37 @@
 """Container for all data required for a benchmark to run."""
 
 import copy
-import logging
-import pickle
 import copy_reg
+import logging
 import os
+import pickle
 import thread
 import threading
 import uuid
-import provider_info
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
-from perfkitbenchmarker import providers  # NOQA
-
 
 def PickleLock(lock):
-    return UnPickleLock, (lock.locked(),)
+  return UnPickleLock, (lock.locked(),)
 
 
 def UnPickleLock(locked, *args):
-    lock = threading.Lock()
-    if locked:
-        if not lock.acquire(False):
-            raise pickle.UnpicklingError("Cannot acquire lock")
-    return lock
+  lock = threading.Lock()
+  if locked:
+    if not lock.acquire(False):
+      raise pickle.UnpicklingError('Cannot acquire lock')
+  return lock
 
 
 copy_reg.pickle(thread.LockType, PickleLock)
@@ -61,38 +61,15 @@ STATIC_VMS = 'static_vms'
 VM_SPEC = 'vm_spec'
 DISK_SPEC = 'disk_spec'
 
-GCP = 'GCP'
-AZURE = 'Azure'
-AWS = 'AWS'
-ALICLOUD = 'AliCloud'
-KUBERNETES = 'Kubernetes'
-DIGITALOCEAN = 'DigitalOcean'
-OPENSTACK = 'OpenStack'
-CLOUDSTACK = 'CloudStack'
-RACKSPACE = 'Rackspace'
-MESOS = 'Mesos'
-DEBIAN = 'debian'
-JUJU = 'juju'
-RHEL = 'rhel'
-WINDOWS = 'windows'
-UBUNTU_CONTAINER = 'ubuntu_container'
 SUPPORTED = 'strict'
 NOT_EXCLUDED = 'permissive'
 SKIP_CHECK = 'none'
 
 FLAGS = flags.FLAGS
-VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS]
-flags.DEFINE_enum('cloud', GCP,
-                  VALID_CLOUDS,
+
+flags.DEFINE_enum('cloud', providers.GCP,
+                  providers.VALID_CLOUDS,
                   'Name of the cloud to use.')
-flags.DEFINE_enum(
-    'os_type', DEBIAN, [DEBIAN, JUJU, RHEL, UBUNTU_CONTAINER, WINDOWS],
-    'The VM\'s OS type. Ubuntu\'s os_type is "debian" because it is largely '
-    'built on Debian and uses the same package manager. Likewise, CentOS\'s '
-    'os_type is "rhel". In general if two OS\'s use the same package manager, '
-    'and are otherwise very similar, the same os_type should work on both of '
-    'them.')
 flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM.'
                     'Upon creation, these directories will have numbers'
@@ -213,16 +190,19 @@ class BenchmarkSpec(object):
           '.'.join((self.name, VM_GROUPS, group_name, VM_SPEC, cloud)),
           FLAGS, **group_spec[VM_SPEC][cloud])
 
+
       if DISK_SPEC in group_spec:
         disk_spec_class = disk.GetDiskSpecClass(cloud)
-        disk_spec = disk_spec_class(**group_spec[DISK_SPEC][cloud])
-        disk_spec.ApplyFlags(FLAGS)
+        disk_spec = disk_spec_class(
+            '.'.join((self.name, VM_GROUPS, group_name, DISK_SPEC, cloud)),
+            FLAGS, **group_spec[DISK_SPEC][cloud])
         # disk_spec.disk_type may contain legacy values that were
         # copied from FLAGS.scratch_disk_type into
         # FLAGS.data_disk_type at the beginning of the run. We
         # translate them here, rather than earlier, because here is
         # where we know what cloud we're using and therefore we're
         # able to pick the right translation table.
+        logging.warn('WarnAndTranslateDiskTypes')
         disk_spec.disk_type = disk.WarnAndTranslateDiskTypes(
             disk_spec.disk_type, cloud)
       else:
@@ -276,7 +256,7 @@ class BenchmarkSpec(object):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
     vm_group_specs = self.config[VM_GROUPS]
 
-    if FLAGS.os_type == JUJU:
+    if FLAGS.os_type == os_types.JUJU:
         """
         The Juju VM needs to be created first, so that subsequent units can
         be properly added under its control.
@@ -290,6 +270,15 @@ class BenchmarkSpec(object):
         )
         self.config[VM_GROUPS]['juju']['vm_count'] = 1
 
+        import json
+        import pprint
+
+        # logging.warn(json.dumps(self.config[VM_GROUPS]['juju']))
+        logging.warn(
+            pprint.PrettyPrinter().pformat(
+                json.dumps(self.config[VM_GROUPS]['juju'])
+            )
+        )
         jujuvm = None
         jujuvms = self.ConstructVirtualMachine('juju',
                                                self.config[VM_GROUPS]['juju'])
@@ -307,7 +296,7 @@ class BenchmarkSpec(object):
       self.vms.extend(vms)
 
     # Append the Juju VM to the end of the vm list
-    if FLAGS.os_type == JUJU and jujuvm is not None:
+    if FLAGS.os_type == os_types.JUJU and jujuvm is not None:
         for vm in self.vms:
             vm.controller = jujuvm
 
@@ -321,11 +310,21 @@ class BenchmarkSpec(object):
 
   def Provision(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
-    vm_util.RunThreaded(lambda net: net.Create(), self.networks.values())
+    # Sort networks into a guaranteed order of creation based on dict key.
+    # There is a finite limit on the number of threads that are created to
+    # provision networks. Until support is added to provision resources in an
+    # order based on dependencies, this key ordering can be used to avoid
+    # deadlock by placing dependent networks later and their dependencies
+    # earlier. As an example, AWS stores both per-region and per-zone objects
+    # in this dict, and each per-zone object depends on a corresponding
+    # per-region object, so the per-region objects are given keys that come
+    # first when sorted.
+    networks = [self.networks[key] for key in sorted(self.networks.iterkeys())]
+    vm_util.RunThreaded(lambda net: net.Create(), networks)
 
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
-      if FLAGS.os_type != WINDOWS:
+      if FLAGS.os_type != os_types.WINDOWS:
         vm_util.GenerateSSHConfig(self)
 
 

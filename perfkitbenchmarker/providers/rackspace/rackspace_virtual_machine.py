@@ -41,6 +41,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.rackspace import rackspace_disk
 from perfkitbenchmarker.providers.rackspace import \
     rackspace_machine_types as rax
@@ -74,7 +75,7 @@ RHEL_IMAGE = 'c07409c8-0931-40e4-a3bc-4869ecb5931e'
 
 class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
-  CLOUD = 'Rackspace'
+  CLOUD = providers.RACKSPACE
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 
@@ -364,7 +365,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def FormatDisk(self, device_path):
     """Formats a disk attached to the VM."""
     if device_path != self.boot_device_path:
-      fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0 -O '
+      fmt_cmd = ('sudo mke2fs -F -E lazy_itable_init=0,discard -O '
                  '^has_journal -t ext4 -b 4096 %s' % device_path)
       self.RemoteCommand(fmt_cmd)
 

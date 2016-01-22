@@ -90,6 +90,9 @@ class IntegerList(object):
         for val in xrange(low, high + 1):
           yield val
 
+  def __str__(self):
+      return IntegerListSerializer().Serialize(self)
+
 
 class IntegerListParser(flags.ArgumentParser):
   """Parse a string containing a comma-separated list of nonnegative integers.

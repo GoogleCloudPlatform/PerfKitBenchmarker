@@ -17,10 +17,10 @@
 AWS provider info
 """
 
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import benchmark_spec
 
 
 class AWSProviderInfo(provider_info.BaseProviderInfo):
 
-  CLOUD = benchmark_spec.AWS
+  CLOUD = providers.AWS
