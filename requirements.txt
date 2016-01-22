@@ -18,3 +18,4 @@ colorlog[windows]==2.6.0
 blinker>=1.3
 futures>=3.0.3
 PyYAML==3.11
+pint>=0.6
