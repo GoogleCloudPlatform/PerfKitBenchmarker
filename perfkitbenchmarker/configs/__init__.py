@@ -220,8 +220,7 @@ def GetMergedFlags(config):
       if key not in flags_values:
         raise ValueError('Flag "%s" is not defined.' % key)
       if not flags_values[key].present:
-        flags_values[key].value = value
-        flags_values[key].present += 1
+        flags_values[key].Parse(value)
 
   return flags_values
 

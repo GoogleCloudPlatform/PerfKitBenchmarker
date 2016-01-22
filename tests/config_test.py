@@ -21,7 +21,10 @@ import mock
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import windows_benchmarks
+
+FLAGS = flags.FLAGS
 
 CONFIG_NAME = 'a'
 INVALID_NAME = 'b'
@@ -62,6 +65,11 @@ a:
   vm_groups:
     default:
       vm_spec: *anchor_does_not_exist
+"""
+LIST_FLAG_CONFIG = """
+a:
+  flags:
+    list_flag: a,b,c
 """
 
 
@@ -129,3 +137,13 @@ class ConfigsTestCase(unittest.TestCase):
     config = configs.GetUserConfig()
     self.assertEqual(config['a']['vm_groups']['default']['vm_count'], 5)
     self.assertEqual(config['a']['flags']['flag'], 'value')
+
+  def testConfigFlagStillParsed(self):
+    flags.DEFINE_list('list_flag', ['default_val'], 'List flag.')
+    list_flag_config = yaml.load(LIST_FLAG_CONFIG)
+    flag_values = configs.GetMergedFlags(list_flag_config['a'])
+
+    self.assertEqual(flag_values.list_flag,
+                     ['a', 'b', 'c'])
+
+    del FLAGS.list_flag
