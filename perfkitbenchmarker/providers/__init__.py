@@ -34,10 +34,9 @@ OPENSTACK = 'OpenStack'
 CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 MESOS = 'Mesos'
-JUJU = 'Juju'
 
 VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS, JUJU]
+                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS]
 
 
 def LoadProvider(provider_name):
