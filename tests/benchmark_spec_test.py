@@ -19,7 +19,6 @@ import mock_flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
@@ -80,26 +79,6 @@ name:
          user_name: user2
          disk_specs:
            - mount_point: /scratch
-"""
-BAD_VM_PARAMETER_CONFIG = """
-name:
-  vm_groups:
-    default:
-      vm_spec:
-        GCP:
-          machine_type: n1-standard-4
-          not_a_vm_parameter: 4
-"""
-BAD_DISK_PARAMETER_CONFIG = """
-name:
-  vm_groups:
-    default:
-      vm_spec:
-        GCP:
-          machine_type: n1-standard-4
-      disk_spec:
-        GCP:
-          not_a_disk_parameter: 4
 """
 VALID_CONFIG_WITH_DISK_SPEC = """
 name:
@@ -163,24 +142,6 @@ class ConstructVmsTestCase(unittest.TestCase):
     self.assertIsInstance(vm3, gce_vm.GceVirtualMachine)
 
     self.assertEqual(vm2.disk_specs[0].mount_point, '/scratch')
-
-  def testBadVmParameter(self):
-    config = configs.LoadConfig(BAD_VM_PARAMETER_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
-    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      spec.ConstructVirtualMachines()
-    self.assertEqual(str(cm.exception), (
-        'Unrecognized options were found in '
-        'name.vm_groups.default.vm_spec.GCP: not_a_vm_parameter.'))
-
-  def testBadDiskParameter(self):
-    config = configs.LoadConfig(BAD_DISK_PARAMETER_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
-    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      spec.ConstructVirtualMachines()
-    self.assertEqual(str(cm.exception), (
-        'Unrecognized options were found in '
-        'name.vm_groups.default.disk_spec.GCP: not_a_disk_parameter.'))
 
   def testValidConfigWithDiskSpec(self):
     config = configs.LoadConfig(VALID_CONFIG_WITH_DISK_SPEC, {}, NAME)

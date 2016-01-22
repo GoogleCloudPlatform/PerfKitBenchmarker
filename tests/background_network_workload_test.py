@@ -177,9 +177,8 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     self.mocked_flags['background_network_mbits_per_sec'].Parse(200)
     self.mocked_flags['background_network_ip_type'].Parse('IAMABADFLAGVALUE')
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
     with self.assertRaises(errors.Config.InvalidValue):
-      spec.ConstructVirtualMachines()
+      benchmark_spec.BenchmarkSpec(config, NAME, UID)
 
   def testBackgroundWorkloadConfig(self):
     """ Check that the config can be used to set the background iperf """
@@ -196,9 +195,8 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     """ Check that the config with invalid ip type gets an error """
     config = configs.LoadConfig(CONFIG_WITH_BACKGROUND_NETWORK_BAD_IPFLAG,
                                 {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
     with self.assertRaises(errors.Config.InvalidValue):
-      spec.ConstructVirtualMachines()
+      benchmark_spec.BenchmarkSpec(config, NAME, UID)
 
   def testBackgroundWorkloadConfigGoodIp(self):
     """ Check that the config can be used with an internal ip address """
