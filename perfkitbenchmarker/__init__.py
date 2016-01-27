@@ -14,3 +14,17 @@
 
 import gflags as flags  # NOQA
 import gflags_validators as flags_validators  # NOQA
+import pint
+
+# Pint recommends one global UnitRegistry for the entire program, so
+# we create it here.
+UNIT_REGISTRY = pint.UnitRegistry()
+
+# Pint 0.6 uses 'Bo' as the abbreviation for a byte. We want to use
+# 'B', like the rest of the world.
+UNIT_REGISTRY.define('byte = 8 * bit = B')
+
+# Apparently the prefix kilo- is supposed to be abbreviated with a
+# lower-case k. However, everyone uses the upper-case K, and would be
+# very surprised to find out that 'KB' is not a valid unit.
+UNIT_REGISTRY.define('K- = 1000')
