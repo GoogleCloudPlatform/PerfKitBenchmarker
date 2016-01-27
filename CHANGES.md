@@ -1,3 +1,20 @@
+# 1.2.0
+
+New features:
+* Introduce Object Sizes (GH-808).
+* Add ListDecoder for verifying a config option that expects list values
+  (GH-807).
+
+Enhancements:
+* Change MockFlags to be more like the real FlagValues (GH-812).
+* Rename test_flag_util.py and add FlagDictSubstitution tests (GH-811).
+* Create BenchmarkConfigSpec to aggregate benchmark input checking (GH-810).
+* Remove flag proxy objects (GH-802).
+
+Bugfixes and maintenance updates:
+* Fix sample iperf sample (GH-801).
+* FixIntDecoder and FloatDecoder behavior when min=0 or max=0 (GH-800).
+
 # 1.1.0
 
 External contributions:
