@@ -35,7 +35,6 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.configs import benchmark_config_spec
 
 
 def PickleLock(lock):
@@ -83,17 +82,13 @@ class BenchmarkSpec(object):
     """Initialize a BenchmarkSpec object.
 
     Args:
-      benchmark_config: A Python dictionary representation of the configuration
-        for the benchmark. For a complete explanation, see
-        perfkitbenchmarker/configs/__init__.py.
+      benchmark_config: BenchmarkConfigSpec. The configuration for the
+          benchmark.
       benchmark_name: string. Name of the benchmark.
       benchmark_uid: An identifier unique to this run of the benchmark even
-        if the same benchmark is run multiple times with different configs.
+          if the same benchmark is run multiple times with different configs.
     """
-    # TODO(skschneider): Build the BenchmarkConfigSpec outside of this method,
-    # and pass it in.
-    self.config = benchmark_config_spec.BenchmarkConfigSpec(
-        benchmark_name, flag_values=FLAGS, **benchmark_config)
+    self.config = benchmark_config
     self.name = benchmark_name
     self.uid = benchmark_uid
     self.vms = []

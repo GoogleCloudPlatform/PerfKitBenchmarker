@@ -17,9 +17,33 @@
 import unittest
 
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import context
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker.configs import benchmark_config_spec
+from tests import mock_flags
 
 
-class GcpDiskTypeRenamingTest(unittest.TestCase):
+_BENCHMARK_NAME = 'name'
+_BENCHMARK_UID = 'uid'
+
+
+class _DiskTypeRenamingTestCase(unittest.TestCase):
+
+  def setUp(self):
+    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    self.mocked_flags.os_type = os_types.DEBIAN
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
+
+  def _CreateBenchmarkSpec(self, config_dict):
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        _BENCHMARK_NAME, flag_values=self.mocked_flags, **config_dict)
+    spec = benchmark_spec.BenchmarkSpec(config_spec, _BENCHMARK_NAME,
+                                        _BENCHMARK_UID)
+    spec.ConstructVirtualMachines()
+    return spec
+
+
+class GcpDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
   """Test that the disk type renaming works for GCP.
   """
 
@@ -42,12 +66,8 @@ class GcpDiskTypeRenamingTest(unittest.TestCase):
             }
         }
     }
-
-    spec = benchmark_spec.BenchmarkSpec(config, 'name', 'uid')
-    spec.ConstructVirtualMachines()
-
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type,
-                      'pd-standard')
+    spec = self._CreateBenchmarkSpec(config)
+    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'pd-standard')
 
   def testPDSSD(self):
     config = {
@@ -68,15 +88,11 @@ class GcpDiskTypeRenamingTest(unittest.TestCase):
             }
         }
     }
-
-    spec = benchmark_spec.BenchmarkSpec(config, 'name', 'uid')
-    spec.ConstructVirtualMachines()
-
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type,
-                      'pd-ssd')
+    spec = self._CreateBenchmarkSpec(config)
+    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'pd-ssd')
 
 
-class AwsDiskTypeRenamingTest(unittest.TestCase):
+class AwsDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
   def testEBSStandard(self):
     config = {
         'vm_groups': {
@@ -96,12 +112,8 @@ class AwsDiskTypeRenamingTest(unittest.TestCase):
             }
         }
     }
-
-    spec = benchmark_spec.BenchmarkSpec(config, 'name', 'uid')
-    spec.ConstructVirtualMachines()
-
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type,
-                      'standard')
+    spec = self._CreateBenchmarkSpec(config)
+    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'standard')
 
   def testEBSGP(self):
     config = {
@@ -122,12 +134,8 @@ class AwsDiskTypeRenamingTest(unittest.TestCase):
             }
         }
     }
-
-    spec = benchmark_spec.BenchmarkSpec(config, 'name', 'uid')
-    spec.ConstructVirtualMachines()
-
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type,
-                      'gp2')
+    spec = self._CreateBenchmarkSpec(config)
+    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'gp2')
 
   def testEBSPIOPS(self):
     config = {
@@ -148,9 +156,5 @@ class AwsDiskTypeRenamingTest(unittest.TestCase):
             }
         }
     }
-
-    spec = benchmark_spec.BenchmarkSpec(config, 'name', 'uid')
-    spec.ConstructVirtualMachines()
-
-    self.assertEquals(spec.vms[0].disk_specs[0].disk_type,
-                      'io1')
+    spec = self._CreateBenchmarkSpec(config)
+    self.assertEquals(spec.vms[0].disk_specs[0].disk_type, 'io1')

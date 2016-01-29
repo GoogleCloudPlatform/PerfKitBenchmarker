@@ -304,9 +304,8 @@ def _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid):
   created during the provision stage from a file.
 
   Args:
-    benchmark_config: A Python dictionary representation of the configuration
-        for the benchmark. For a complete explanation, see
-        perfkitbenchmarker/configs/__init__.py.
+    benchmark_config: BenchmarkConfigSpec. The benchmark configuration to use
+        while running the current stage.
     benchmark_name: string. Name of the benchmark.
     benchmark_uid: string. Identifies a specific run of a benchmark.
 
@@ -317,11 +316,9 @@ def _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid):
     return benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
                                         benchmark_uid)
   else:
-    # TODO(skschneider): Build BenchmarkConfigSpec before RunBenchmark.
-    config = benchmark_config_spec.BenchmarkConfigSpec(
-        benchmark_name, flag_values=FLAGS, **benchmark_config)
     try:
-      return benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid, config)
+      return benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid,
+                                                          benchmark_config)
     except IOError:
       if FLAGS.run_stage == STAGE_PREPARE:
         logging.error(
@@ -342,7 +339,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
     sequence_number: The sequence number of when the benchmark was started
       relative to the other benchmarks in the suite.
     total_benchmarks: The total number of benchmarks in the suite.
-    benchmark_config: The config to run the benchmark with.
+    benchmark_config: BenchmarkConfigSpec. The config to run the benchmark with.
     benchmark_uid: An identifier unique to this run of the benchmark even
       if the same benchmark is run multiple times with different configs.
   """
@@ -506,12 +503,18 @@ def RunBenchmarks(publish=True):
   for i, benchmark_tuple in enumerate(benchmark_tuple_list):
     benchmark_module, user_config = benchmark_tuple
     benchmark_name = benchmark_module.BENCHMARK_NAME
+    benchmark_config_dict = benchmark_module.GetConfig(user_config)
+    benchmark_config_spec_class = getattr(
+        benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
+        benchmark_config_spec.BenchmarkConfigSpec)
+    benchmark_config = benchmark_config_spec_class(
+        benchmark_name, flag_values=FLAGS, **benchmark_config_dict)
     benchmark_uid = benchmark_name + str(
         benchmark_counts[benchmark_name].next())
     run_status_lists.append([benchmark_name, benchmark_uid,
                              benchmark_status.SKIPPED])
     args.append((benchmark_module, collector, i + 1, total_benchmarks,
-                 benchmark_module.GetConfig(user_config), benchmark_uid))
+                 benchmark_config, benchmark_uid))
 
   try:
     for run_args, run_status_list in zip(args, run_status_lists):

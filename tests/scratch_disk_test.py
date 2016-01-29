@@ -23,7 +23,10 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util as aws_util
@@ -31,8 +34,11 @@ from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from tests import mock_flags
 
 
+_BENCHMARK_NAME = 'name'
+_BENCHMARK_UID = 'uid'
 _COMPONENT = 'test_component'
 
 
@@ -55,6 +61,9 @@ class ScratchDiskTestMixin(object):
     pass
 
   def setUp(self):
+    mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    mocked_flags.cloud = providers.GCP
+    mocked_flags.os_type = os_types.DEBIAN
     self.patches = []
 
     vm_prefix = linux_virtual_machine.__name__ + '.BaseLinuxMixin'
@@ -79,7 +88,10 @@ class ScratchDiskTestMixin(object):
         lambda *args, **kwargs: mock.MagicMock(is_striped=False))
 
     # VM Creation depends on there being a BenchmarkSpec.
-    self.spec = benchmark_spec.BenchmarkSpec({}, 'name', 'uid')
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        _BENCHMARK_NAME, flag_values=mocked_flags, vm_groups={})
+    self.spec = benchmark_spec.BenchmarkSpec(config_spec, _BENCHMARK_NAME,
+                                             _BENCHMARK_UID)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def testScratchDisks(self):

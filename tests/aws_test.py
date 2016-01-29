@@ -22,13 +22,19 @@ import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util
+from tests import mock_flags
 
 
+_BENCHMARK_NAME = 'name'
+_BENCHMARK_UID = 'uid'
 _COMPONENT = 'test_component'
 
 
@@ -87,20 +93,20 @@ class AwsVpcExistsTestCase(unittest.TestCase):
 class AwsVirtualMachineExistsTestCase(unittest.TestCase):
 
   def setUp(self):
-    for module in ('perfkitbenchmarker.virtual_machine',
-                   'perfkitbenchmarker.vm_util',
-                   'perfkitbenchmarker.providers.aws.aws_network'):
-      p = mock.patch('{0}.FLAGS'.format(module))
-      mock_flags = p.start()
-      mock_flags.run_uri = 'aaaaaa'
-      self.addCleanup(p.stop)
+    mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    mocked_flags.cloud = providers.AWS
+    mocked_flags.os_type = os_types.DEBIAN
+    mocked_flags.run_uri = 'aaaaaa'
     p = mock.patch('perfkitbenchmarker.providers.aws.'
                    'util.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
 
     # VM Creation depends on there being a BenchmarkSpec.
-    self.spec = benchmark_spec.BenchmarkSpec({}, 'name', 'benchmark_uid')
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        _BENCHMARK_NAME, flag_values=mocked_flags, vm_groups={})
+    self.spec = benchmark_spec.BenchmarkSpec(config_spec, _BENCHMARK_NAME,
+                                             _BENCHMARK_UID)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
     self.vm = aws_virtual_machine.AwsVirtualMachine(

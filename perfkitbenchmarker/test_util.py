@@ -16,7 +16,13 @@
 import os
 
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.configs import benchmark_config_spec
+
+
+_BENCHMARK_NAME = 'test_benchmark'
+_BENCHMARK_UID = 'uid'
 
 
 class SamplesTestMixin(object):
@@ -97,7 +103,10 @@ def assertDiskMounts(benchmark_config, mount_point):
   vm_group = benchmark_config['vm_groups'].itervalues().next()
   assert vm_group.get('num_vms', 1) == 1
 
-  spec = benchmark_spec.BenchmarkSpec(benchmark_config, 'test_benchmark', 'uid')
+  config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+      _BENCHMARK_NAME, flag_values=flags.FLAGS, **benchmark_config)
+  spec = benchmark_spec.BenchmarkSpec(config_spec, _BENCHMARK_NAME,
+                                      _BENCHMARK_UID)
   with spec.RedirectGlobalFlags():
     try:
       spec.ConstructVirtualMachines()
