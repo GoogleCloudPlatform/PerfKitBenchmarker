@@ -14,17 +14,21 @@
 
 """Tests for background workload framework"""
 
-import unittest
-import mock
 import functools
-from tests import mock_flags
-from perfkitbenchmarker import configs
-from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+import unittest
+
+import mock
+
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import timing_util
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import context
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import pkb
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import timing_util
+from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+from tests import mock_flags
 
 
 NAME = 'ping'
@@ -39,6 +43,7 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self.mocked_flags.os_type = os_types.DEBIAN
     self.mocked_flags.cloud = providers.GCP
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CheckAndIncrement(self, throwaway=None, expected_last_call=None):
     self.assertEqual(self.last_call, expected_last_call)
@@ -50,7 +55,9 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
 
     collector = mock.MagicMock()
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        NAME, flag_values=self.mocked_flags, **config)
+    spec = benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
     vm0 = mock.MagicMock()
     vm1 = mock.MagicMock()
     spec.ConstructVirtualMachines()

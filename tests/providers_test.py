@@ -19,7 +19,8 @@ import unittest
 import mock
 
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker.configs import benchmark_config_spec
+from tests import mock_flags
 
 
 class LoadProvidersTestCase(unittest.TestCase):
@@ -32,7 +33,7 @@ class LoadProvidersTestCase(unittest.TestCase):
     with self.assertRaises(ImportError):
       providers.LoadProvider('InvalidCloud')
 
-  def testBenchmarkSpecLoadsProvider(self):
+  def testBenchmarkConfigSpecLoadsProvider(self):
     p = mock.patch(providers.__name__ + '.LoadProvider')
     p.start()
     self.addCleanup(p.stop)
@@ -40,11 +41,13 @@ class LoadProvidersTestCase(unittest.TestCase):
         'vm_groups': {
             'group1': {
                 'cloud': 'AWS',
+                'os_type': 'debian',
                 'vm_count': 0,
                 'vm_spec': {'AWS': {}}
             }
         }
     }
-    spec = benchmark_spec.BenchmarkSpec(config, 'name', 'uid')
-    spec.ConstructVirtualMachines()
+    with mock_flags.PatchFlags() as mocked_flags:
+      benchmark_config_spec.BenchmarkConfigSpec(
+          'name', flag_values=mocked_flags, **config)
     providers.LoadProvider.assert_called_with('aws')

@@ -11,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Classes that verify and transform benchmark configuration input."""
+"""Classes that verify and transform benchmark configuration input.
+
+See perfkitbenchmarker/configs/__init__.py for more information about
+configuration files.
+"""
 
 import copy
 import os
@@ -282,7 +286,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
   Attributes:
-    description: string. Description of the benchmark to run.
+    description: None or string. Description of the benchmark to run.
     flags: flags.FlagValues. Values to use for each flag while executing the
         benchmark.
     vm_groups: dict mapping VM group name string to _VmGroupSpec. Configurable
@@ -302,14 +306,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
       to construct in order to decode the named option.
     """
     result = super(BenchmarkConfigSpec, cls)._GetOptionDecoderConstructions()
-    result.update({'description': (option_decoders.StringDecoder, {}),
-                   'flags': (_FlagsDecoder, {}),
-                   'vm_groups': (_VmGroupsDecoder, {})})
-    # TODO(skschneider): Old tests construct BenchmarkSpec without providing a
-    # description or vm_groups, but they should be required. As a separate
-    # change, those tests should be fixed, and the two lines should be removed.
-    result['description'][1]['default'] = None
-    result['vm_groups'][1]['default'] = None
+    result.update({
+        'description': (option_decoders.StringDecoder, {'default': None}),
+        'flags': (_FlagsDecoder, {}),
+        'vm_groups': (_VmGroupsDecoder, {})})
     return result
 
   def _DecodeAndInit(self, component_full_name, config, decoders, flag_values):

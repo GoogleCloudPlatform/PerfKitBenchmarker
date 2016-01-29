@@ -15,14 +15,19 @@
 """Tests for background network workload"""
 
 import unittest
+
 from mock import patch
-from tests import mock_flags
-from perfkitbenchmarker import configs
-from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import configs
+from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import providers
+from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+from tests import mock_flags
+
 
 NAME = 'ping'
 UID = 'name0'
@@ -83,6 +88,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self.mocked_flags.os_type = os_types.DEBIAN
     self.mocked_flags.cloud = providers.GCP
+    self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CheckVMFromSpec(self, spec, num_working):
     vm0 = spec.vms[0]
@@ -113,7 +119,9 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
   def makeSpec(self, yaml_benchmark_config=ping_benchmark.BENCHMARK_CONFIG):
     config = configs.LoadConfig(yaml_benchmark_config, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        NAME, flag_values=self.mocked_flags, **config)
+    spec = benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
     spec.ConstructVirtualMachines()
     return spec
 
@@ -178,7 +186,8 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     self.mocked_flags['background_network_ip_type'].Parse('IAMABADFLAGVALUE')
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
     with self.assertRaises(errors.Config.InvalidValue):
-      benchmark_spec.BenchmarkSpec(config, NAME, UID)
+      benchmark_config_spec.BenchmarkConfigSpec(
+          NAME, flag_values=self.mocked_flags, **config)
 
   def testBackgroundWorkloadConfig(self):
     """ Check that the config can be used to set the background iperf """
@@ -196,7 +205,8 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     config = configs.LoadConfig(CONFIG_WITH_BACKGROUND_NETWORK_BAD_IPFLAG,
                                 {}, NAME)
     with self.assertRaises(errors.Config.InvalidValue):
-      benchmark_spec.BenchmarkSpec(config, NAME, UID)
+      benchmark_config_spec.BenchmarkConfigSpec(
+          NAME, flag_values=self.mocked_flags, **config)
 
   def testBackgroundWorkloadConfigGoodIp(self):
     """ Check that the config can be used with an internal ip address """
