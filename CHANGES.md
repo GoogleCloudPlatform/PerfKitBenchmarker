@@ -6,6 +6,7 @@ New features:
   (GH-807).
 
 Enhancements:
+* Bump HBase to 1.0.3 (GH-822).
 * Change MockFlags to be more like the real FlagValues (GH-812).
 * Rename test_flag_util.py and add FlagDictSubstitution tests (GH-811).
 * Create BenchmarkConfigSpec to aggregate benchmark input checking (GH-810).
