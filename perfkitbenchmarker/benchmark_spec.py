@@ -22,6 +22,7 @@ import os
 import pickle
 import thread
 import threading
+import time
 import uuid
 
 from perfkitbenchmarker import context
@@ -209,11 +210,12 @@ class BenchmarkSpec(object):
     # first when sorted.
     networks = [self.networks[key] for key in sorted(self.networks.iterkeys())]
     vm_util.RunThreaded(lambda net: net.Create(), networks)
-
+    self.vm_boot_starttime = time.time()
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
-      if FLAGS.os_type != os_types.WINDOWS:
-        vm_util.GenerateSSHConfig(self)
+    self.vm_boot_endtime = time.time()
+    if self.vms and FLAGS.os_type != os_types.WINDOWS:
+      vm_util.GenerateSSHConfig(self)
 
   def Delete(self):
     if self.deleted:
