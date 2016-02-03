@@ -38,9 +38,6 @@ _BENCHMARK_UID = 'uid'
 _COMPONENT = 'test_component'
 
 
-_COMPONENT = 'test_component'
-
-
 class AwsVolumeExistsTestCase(unittest.TestCase):
 
   def setUp(self):

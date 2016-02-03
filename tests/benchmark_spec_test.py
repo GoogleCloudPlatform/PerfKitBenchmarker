@@ -96,30 +96,6 @@ name:
         GCP:
           machine_type: n1-standard-4
 """
-BAD_DISK_PARAMETER_CONFIG = """
-name:
-  vm_groups:
-    default:
-      vm_spec:
-        GCP:
-          machine_type: n1-standard-4
-      disk_spec:
-        GCP:
-          not_a_disk_parameter: 4
-"""
-VALID_CONFIG_WITH_DISK_SPEC = """
-name:
-  vm_groups:
-    default:
-      disk_count: 3
-      disk_spec:
-        GCP:
-          disk_size: 75
-      vm_count: 2
-      vm_spec:
-        GCP:
-          machine_type: n1-standard-4
-"""
 ALWAYS_SUPPORTED = 'iperf'
 NEVER_SUPPORTED = 'mysql_service'
 NO_SUPPORT_INFO = 'this_is_not_a_benchmark'
