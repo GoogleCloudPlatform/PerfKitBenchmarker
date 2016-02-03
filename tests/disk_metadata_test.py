@@ -47,7 +47,6 @@ class _DiskMetadataTestCase(unittest.TestCase):
 
 
 class GcpDiskMetadataTest(_DiskMetadataTestCase):
->>>>>>> upstream/master
   def testPDStandard(self):
     disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_size=2,
                                   disk_type=gce_disk.PD_STANDARD)
