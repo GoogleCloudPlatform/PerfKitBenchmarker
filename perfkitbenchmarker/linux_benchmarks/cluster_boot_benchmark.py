@@ -58,7 +58,7 @@ def _GetTimeToBoot(vms, vm_index):
   """
   vm = vms[vm_index]
   metadata = {'num_cpus': vm.num_cpus, 'machine_instance': vm_index,
-              'num_vms': len(vms)}
+              'num_vms': len(vms), 'os_type': vm.OS_TYPE}
   metadata.update(vm.GetMachineTypeDict())
   assert vm.bootable_time
   assert vm.create_start_time
