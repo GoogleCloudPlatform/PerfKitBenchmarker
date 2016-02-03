@@ -1,3 +1,21 @@
+# 1.2.0
+
+New features:
+* Introduced Object Sizes in flags (GH-808).
+* Add ListDecoder for verifying a config option that expects list values
+  (GH-807).
+
+Enhancements:
+* Bump HBase to 1.0.3 in hbase_ycsb benchmark (GH-822).
+* Change MockFlags to be more like the real FlagValues (GH-812).
+* Rename test_flag_util.py and add FlagDictSubstitution tests (GH-811).
+* Create BenchmarkConfigSpec to aggregate benchmark input checking (GH-810).
+* Remove flag proxy objects (GH-802).
+
+Bugfixes and maintenance updates:
+* Fix sample iperf config (GH-801).
+* FixIntDecoder and FloatDecoder behavior when min=0 or max=0 (GH-800).
+
 # 1.1.0
 
 External contributions:
