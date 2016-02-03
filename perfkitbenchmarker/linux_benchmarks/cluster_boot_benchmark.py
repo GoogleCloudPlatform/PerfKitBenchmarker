@@ -58,7 +58,7 @@ def _GetTimeToBoot(vms, vm_index):
   """
   vm = vms[vm_index]
   metadata = {'num_cpus': vm.num_cpus, 'machine_instance': vm_index,
-              'num_vms': len(vms)}
+              'num_vms': len(vms), 'os_type': vm.OS_TYPE}
   metadata.update(vm.GetMachineTypeDict())
   assert vm.bootable_time
   assert vm.create_start_time
@@ -83,7 +83,26 @@ def Run(benchmark_spec):
   samples = vm_util.RunThreaded(_GetTimeToBoot, params)
   logging.info(samples)
   assert len(samples) == len(vms)
-  return samples
+  total_boot = benchmark_spec.vm_boot_endtime - benchmark_spec.vm_boot_starttime
+  uniform_machine_type = vms[0].machine_type
+  uniform_os_type = vms[0].OS_TYPE
+  # make sure machine type and os type are shared.
+  for vm in vms:
+    if (uniform_machine_type is not None and
+        vm.machine_type != uniform_machine_type):
+      uniform_machine_type = None
+    if uniform_os_type is not None and vm.OS_TYPE != uniform_os_type:
+      uniform_os_type = None
+
+  metadata = {'num_vms': len(vms)}
+  if uniform_os_type is not None:
+    metadata['os_type'] = uniform_os_type
+  if uniform_machine_type is not None:
+    metadata['machine_type'] = uniform_machine_type
+  overall = sample.Sample('Total Boot Time', total_boot, 'seconds', metadata)
+  assert overall
+  all_data = samples + [overall]
+  return all_data
 
 
 def Cleanup(unused_benchmark_spec):
