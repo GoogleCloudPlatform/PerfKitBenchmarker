@@ -17,7 +17,13 @@
 import logging
 import re
 
+import pint
+
+import perfkitbenchmarker
 from perfkitbenchmarker import flags
+
+
+FLAGS = flags.FLAGS
 
 INTEGER_GROUP_REGEXP = re.compile(r'(\d+)(-(\d+))?$')
 
@@ -183,10 +189,118 @@ class IntegerListSerializer(flags.ArgumentSerializer):
 
 
 def DEFINE_integerlist(name, default, help, on_nonincreasing=None,
-                       flag_values=flags.GLOBAL_FLAGS, **args):
+                       flag_values=FLAGS, **kwargs):
   """Register a flag whose value must be an integer list."""
 
   parser = IntegerListParser(on_nonincreasing=on_nonincreasing)
   serializer = IntegerListSerializer()
 
-  flags.DEFINE(parser, name, default, help, flag_values, serializer, **args)
+  flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)
+
+
+class FlagDictSubstitution(object):
+  """Context manager that redirects flag reads and writes."""
+
+  def __init__(self, flag_values, substitute):
+    """Initializes a FlagDictSubstitution.
+
+    Args:
+      flag_values: FlagValues that is temporarily modified such that all its
+          flag reads and writes are redirected.
+      substitute: Callable that temporarily replaces the FlagDict function of
+          flag_values. Accepts no arguments and returns a dict mapping flag
+          name string to Flag object.
+    """
+    self._flags = flag_values
+    self._substitute = substitute
+
+  def __enter__(self):
+    """Begins the flag substitution."""
+    self._original_flagdict = self._flags.FlagDict
+    self._flags.__dict__['FlagDict'] = self._substitute
+
+  def __exit__(self, *unused_args, **unused_kwargs):
+    """Stops the flag substitution."""
+    self._flags.__dict__['FlagDict'] = self._original_flagdict
+
+
+class UnitsParser(flags.ArgumentParser):
+  """Parse a flag containing a unit expression.
+
+  The user may require that the provided expression is convertible to
+  a particular unit. The parser will throw an error if the condition
+  is not satisfied. For instance, if a unit parser requires that its
+  arguments are convertible to bits, then KiB and GB are valid units
+  to input, but meters are not. If the user does not require this,
+  than *any* unit expression is allowed.
+  """
+
+  syntactic_help = ('A quantity with a unit. Ex: 12.3MB.')
+
+  def __init__(self, convertible_to=None):
+    """Initialize the UnitsParser.
+
+    Args:
+      convertible_to: perfkitbenchmarker.UNIT_REGISTRY.Unit or
+        None. If a unit, the input must be convertible to this unit or
+        the Parse() method will raise a ValueError.
+    """
+
+    self.convertible_to = convertible_to
+
+  def Parse(self, inp):
+    """Parse the input.
+
+    Args:
+      inp: a string or a perfkitbenchmarker.UNIT_REGISTRY.Quantity. If a string,
+        string has the format "<number><units>", as in "12KB", or "2.5GB".
+
+    Returns:
+      A perfkitbenchmarker.UNIT_REGISTRY.Quantity.
+
+    Raises:
+      ValueError if it can't parse its input.
+    """
+
+    if isinstance(inp, perfkitbenchmarker.UNIT_REGISTRY.Quantity):
+      quantity = inp
+    else:
+      try:
+        quantity = perfkitbenchmarker.UNIT_REGISTRY.parse_expression(inp)
+      except Exception as e:
+        raise ValueError("Couldn't parse unit expresion %s: %s" %
+                         (inp, e.message))
+
+    if self.convertible_to is not None:
+      try:
+        quantity.to(self.convertible_to)
+      except pint.DimensionalityError:
+        raise ValueError("Expression %s is not convertible to %s" %
+                         (inp, self.convertible_to))
+
+    return quantity
+
+
+class UnitsSerializer(flags.ArgumentSerializer):
+  def Serialize(self, units):
+    return str(units)
+
+
+def DEFINE_units(name, default, help, convertible_to=None,
+                 flag_values=flags.FLAGS, **kwargs):
+  """Register a flag whose value is a units expression.
+
+  Args:
+    name: string. The name of the flag.
+    default: perfkitbenchmarker.UNIT_REGISTRY.Quantity. The default value.
+    help: string. A help message for the user.
+    convertible_to: perfkitbenchmarker.UNIT_REGISTRY.Unit or None. If
+      a unit is provided, the input must be convertible to this unit
+      to be considered valid.
+    flag_values: the gflags.FlagValues object to define the flag in.
+  """
+
+  parser = UnitsParser(convertible_to=convertible_to)
+  serializer = UnitsSerializer()
+
+  flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)

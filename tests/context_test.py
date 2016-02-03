@@ -14,26 +14,12 @@
 
 """Tests for perfkitbenchmarker.context."""
 
-import types
 import unittest
 
 import mock
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util
-
-
-class FlagModuleProxyTestCase(unittest.TestCase):
-
-  def setUp(self):
-    self.flags_module = context.FlagsModuleProxy()
-
-  def testGetAttributes(self):
-    self.assertIsInstance(self.flags_module.FLAGS, context.FlagValuesProxy)
-    self.assertIsInstance(self.flags_module.GLOBAL_FLAGS,
-                          self.flags_module.FlagValues)
-    self.assertEqual(type(self.flags_module.DEFINE_string),
-                     types.FunctionType)
 
 
 class ThreadLocalBenchmarkSpecTestCase(unittest.TestCase):

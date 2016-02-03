@@ -23,17 +23,17 @@ class ConfigOptionDecoder(object):
   """Verifies and decodes a config option value.
 
   Attributes:
-    option: string. Name of the config option.
+    option: None or string. Name of the config option.
     required: boolean. True if the config option is required. False if not.
   """
 
   __metaclass__ = abc.ABCMeta
 
-  def __init__(self, option, **kwargs):
+  def __init__(self, option=None, **kwargs):
     """Initializes a ConfigOptionDecoder.
 
     Args:
-      option: string. Name of the config option.
+      option: None or string. Name of the config option.
       **kwargs: May optionally contain a 'default' key mapping to a value or
           callable object. If a value is provided, the config option is
           optional, and the provided value is the default if the user does not
@@ -48,6 +48,16 @@ class ConfigOptionDecoder(object):
       self._default = kwargs.pop('default')
     assert not kwargs, ('__init__() received unexpected keyword arguments: '
                         '{0}'.format(kwargs))
+
+  def _GetOptionFullName(self, component_full_name):
+    """Returns the fully qualified name of a config option.
+
+    Args:
+      component_full_name: string. Fully qualified name of a configurable object
+          to which the option belongs.
+    """
+    return (component_full_name if self.option is None
+            else '{0}.{1}'.format(component_full_name, self.option))
 
   @property
   def default(self):
@@ -89,15 +99,14 @@ class EnumDecoder(ConfigOptionDecoder):
   Passes through the value unmodified
   """
 
-  def __init__(self, option, valid_values, **kwargs):
+  def __init__(self, valid_values, **kwargs):
     """Initializes the EnumVerifier.
 
     Args:
-    option: string.  Name of the config option.
-    valid_values: list of the allowed values
-    **kwargs: Keyword arguments to pass to the base class.
+      valid_values: list of the allowed values
+      **kwargs: Keyword arguments to pass to the base class.
     """
-    super(EnumDecoder, self).__init__(option, **kwargs)
+    super(EnumDecoder, self).__init__(**kwargs)
     self.valid_values = valid_values
 
   def Decode(self, value, component_full_name, flag_values):
@@ -120,11 +129,9 @@ class EnumDecoder(ConfigOptionDecoder):
      return value
     else:
       raise errors.Config.InvalidValue(
-          'Invalid {0}.{1} value: "{2}". Value must be one '
-          'of the following: {3}.'.format(
-              component_full_name, self.option, value,
-              ', '.join(str(t) for t in self.valid_values)))
-
+          'Invalid {0} value: "{1}". Value must be one of the following: '
+          '{2}.'.format(self._GetOptionFullName(component_full_name), value,
+                        ', '.join(str(t) for t in self.valid_values)))
 
 
 class TypeVerifier(ConfigOptionDecoder):
@@ -133,16 +140,15 @@ class TypeVerifier(ConfigOptionDecoder):
   Passes value through unmodified.
   """
 
-  def __init__(self, option, valid_types, none_ok=False, **kwargs):
+  def __init__(self, valid_types, none_ok=False, **kwargs):
     """Initializes a TypeVerifier.
 
     Args:
-      option: string. Name of the config option.
       valid_types: tuple of allowed types.
       none_ok: boolean. If True, None is also an allowed option value.
       **kwargs: Keyword arguments to pass to the base class.
     """
-    super(TypeVerifier, self).__init__(option, **kwargs)
+    super(TypeVerifier, self).__init__(**kwargs)
     if none_ok:
       self._valid_types = (types.NoneType,) + valid_types
     else:
@@ -166,9 +172,10 @@ class TypeVerifier(ConfigOptionDecoder):
     """
     if not isinstance(value, self._valid_types):
       raise errors.Config.InvalidValue(
-          'Invalid {0}.{1} value: "{2}" (of type "{3}"). Value must be one '
-          'of the following types: {4}.'.format(
-              component_full_name, self.option, value, value.__class__.__name__,
+          'Invalid {0} value: "{1}" (of type "{2}"). Value must be one of the '
+          'following types: {3}.'.format(
+              self._GetOptionFullName(component_full_name), value,
+              value.__class__.__name__,
               ', '.join(t.__name__ for t in self._valid_types)))
     return value
 
@@ -176,8 +183,8 @@ class TypeVerifier(ConfigOptionDecoder):
 class BooleanDecoder(TypeVerifier):
   """Verifies and decodes a config option value when a boolean is expected."""
 
-  def __init__(self, option, **kwargs):
-    super(BooleanDecoder, self).__init__(option, (bool,), **kwargs)
+  def __init__(self, **kwargs):
+    super(BooleanDecoder, self).__init__((bool,), **kwargs)
 
 
 class IntDecoder(TypeVerifier):
@@ -188,8 +195,8 @@ class IntDecoder(TypeVerifier):
     min: None or int. If provided, it specifies the minimum accepted value.
   """
 
-  def __init__(self, option, max=None, min=None, **kwargs):
-    super(IntDecoder, self).__init__(option, (int,), **kwargs)
+  def __init__(self, max=None, min=None, **kwargs):
+    super(IntDecoder, self).__init__((int,), **kwargs)
     self.max = max
     self.min = min
 
@@ -212,14 +219,14 @@ class IntDecoder(TypeVerifier):
     value = super(IntDecoder, self).Decode(value, component_full_name,
                                            flag_values)
     if value is not None:
-      if self.max and value > self.max:
+      if self.max is not None and value > self.max:
         raise errors.Config.InvalidValue(
-            'Invalid {0}.{1} value: "{2}". Value must be at most '
-            '{3}.'.format(component_full_name, self.option, value, self.max))
-      if self.min and value < self.min:
+            'Invalid {0} value: "{1}". Value must be at most {2}.'.format(
+                self._GetOptionFullName(component_full_name), value, self.max))
+      if self.min is not None and value < self.min:
         raise errors.Config.InvalidValue(
-            'Invalid {0}.{1} value: "{2}". Value must be at least '
-            '{3}.'.format(component_full_name, self.option, value, self.min))
+            'Invalid {0} value: "{1}". Value must be at least {2}.'.format(
+                self._GetOptionFullName(component_full_name), value, self.min))
     return value
 
 
@@ -231,8 +238,8 @@ class FloatDecoder(TypeVerifier):
     min: None or float. If provided, it specifies the minimum accepted value.
   """
 
-  def __init__(self, option, max=None, min=None, **kwargs):
-    super(FloatDecoder, self).__init__(option, (float, int), **kwargs)
+  def __init__(self, max=None, min=None, **kwargs):
+    super(FloatDecoder, self).__init__((float, int), **kwargs)
     self.max = max
     self.min = min
 
@@ -255,19 +262,63 @@ class FloatDecoder(TypeVerifier):
     value = super(FloatDecoder, self).Decode(value, component_full_name,
                                              flag_values)
     if value is not None:
-      if self.max and value > self.max:
+      if self.max is not None and value > self.max:
         raise errors.Config.InvalidValue(
-            'Invalid {0}.{1} value: "{2}". Value must be at most '
-            '{3}.'.format(component_full_name, self.option, value, self.max))
-      if self.min and value < self.min:
+            'Invalid {0} value: "{1}". Value must be at most {2}.'.format(
+                self._GetOptionFullName(component_full_name), value, self.max))
+      if self.min is not None and value < self.min:
         raise errors.Config.InvalidValue(
-            'Invalid {0}.{1} value: "{2}". Value must be at least '
-            '{3}.'.format(component_full_name, self.option, value, self.min))
+            'Invalid {0} value: "{1}". Value must be at least {2}.'.format(
+                self._GetOptionFullName(component_full_name), value, self.min))
     return value
 
 
 class StringDecoder(TypeVerifier):
   """Verifies and decodes a config option value when a string is expected."""
 
-  def __init__(self, option, **kwargs):
-    super(StringDecoder, self).__init__(option, (basestring,), **kwargs)
+  def __init__(self, **kwargs):
+    super(StringDecoder, self).__init__((basestring,), **kwargs)
+
+
+class ListDecoder(TypeVerifier):
+  """Verifies and decodes a config option value when a list is expected."""
+
+  def __init__(self, item_decoder, **kwargs):
+    """Initializes a ListDecoder.
+
+    Args:
+      item_decoder: ConfigOptionDecoder. Used to decode the items of an input
+          list.
+      **kwargs: Keyword arguments to pass to the base class.
+    """
+    super(ListDecoder, self).__init__((list,), **kwargs)
+    self._item_decoder = item_decoder
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies that the provided value is a list with appropriate items.
+
+    Args:
+      value: The value specified in the config.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+
+    Returns:
+      None if the input value was None. Otherwise, a list containing the decoded
+      value of each item in the input list.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    input_list = super(ListDecoder, self).Decode(value, component_full_name,
+                                                 flag_values)
+    if input_list is None:
+      return None
+    list_full_name = self._GetOptionFullName(component_full_name)
+    result = []
+    for index, input_item in enumerate(input_list):
+      item_full_name = '{0}[{1}]'.format(list_full_name, index)
+      result.append(self._item_decoder.Decode(input_item, item_full_name,
+                                              flag_values))
+    return result

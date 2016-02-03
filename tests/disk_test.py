@@ -101,10 +101,10 @@ class BaseDiskSpecTestCase(unittest.TestCase):
 
   def testPresentFlagsOverrideConfigs(self):
     flags = mock_flags.MockFlags()
-    flags.data_disk_size = 100
-    flags.data_disk_type = 'flag_disk_type'
-    flags.num_striped_disks = 3
-    flags.scratch_dir = '/flag_scratch_dir'
+    flags['data_disk_size'].Parse(100)
+    flags['data_disk_type'].Parse('flag_disk_type')
+    flags['num_striped_disks'].Parse(3)
+    flags['scratch_dir'].Parse('/flag_scratch_dir')
     spec = disk.BaseDiskSpec(
         _COMPONENT, flags, device_path='config_device_path', disk_number=1,
         disk_size=75, disk_type='config_disk_type', mount_point='/mountpoint',

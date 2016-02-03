@@ -14,16 +14,24 @@
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
 import unittest
-import mock_flags
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
+from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
+from tests import mock_flags
+
+
+flags.DEFINE_integer('benchmark_spec_test_flag', 0, 'benchmark_spec_test flag.')
+
+FLAGS = flags.FLAGS
 
 NAME = 'name'
 UID = 'name0'
@@ -75,14 +83,18 @@ name:
          disk_specs:
            - mount_point: /scratch
 """
-BAD_VM_PARAMETER_CONFIG = """
+VALID_CONFIG_WITH_DISK_SPEC = """
 name:
   vm_groups:
     default:
+      disk_count: 3
+      disk_spec:
+        GCP:
+          disk_size: 75
+      vm_count: 2
       vm_spec:
         GCP:
           machine_type: n1-standard-4
-          not_a_vm_parameter: 4
 """
 BAD_DISK_PARAMETER_CONFIG = """
 name:
@@ -113,15 +125,28 @@ NEVER_SUPPORTED = 'mysql_service'
 NO_SUPPORT_INFO = 'this_is_not_a_benchmark'
 
 
-class ConstructVmsTestCase(unittest.TestCase):
+class _BenchmarkSpecTestCase(unittest.TestCase):
 
   def setUp(self):
-    # Reset the current benchmark spec.
+    self._mocked_flags = mock_flags.MockFlags()
+    self._mocked_flags.cloud = providers.GCP
+    self._mocked_flags.os_type = os_types.DEBIAN
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
+  def _CreateBenchmarkSpecFromYaml(self, yaml_string, benchmark_name=NAME):
+    config = configs.LoadConfig(yaml_string, {}, benchmark_name)
+    return self._CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
+
+  def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        benchmark_name, flag_values=self._mocked_flags, **config_dict)
+    return benchmark_spec.BenchmarkSpec(config_spec, benchmark_name, UID)
+
+
+class ConstructVmsTestCase(_BenchmarkSpecTestCase):
+
   def testSimpleConfig(self):
-    config = configs.LoadConfig(SIMPLE_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+    spec = self._CreateBenchmarkSpecFromYaml(SIMPLE_CONFIG)
     spec.ConstructVirtualMachines()
 
     self.assertEqual(len(spec.vms), 1)
@@ -133,8 +158,7 @@ class ConstructVmsTestCase(unittest.TestCase):
     self.assertEqual(vm.disk_specs, [])
 
   def testMultiCloud(self):
-    config = configs.LoadConfig(MULTI_CLOUD_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+    spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
 
     self.assertEqual(len(spec.vms), 2)
@@ -142,8 +166,7 @@ class ConstructVmsTestCase(unittest.TestCase):
     self.assertIsInstance(spec.vm_groups['group2'][0], gce_vm.GceVirtualMachine)
 
   def testStaticVms(self):
-    config = configs.LoadConfig(STATIC_VM_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+    spec = self._CreateBenchmarkSpecFromYaml(STATIC_VM_CONFIG)
     spec.ConstructVirtualMachines()
 
     self.assertEqual(len(spec.vms), 4)
@@ -158,27 +181,8 @@ class ConstructVmsTestCase(unittest.TestCase):
 
     self.assertEqual(vm2.disk_specs[0].mount_point, '/scratch')
 
-  def testBadVmParameter(self):
-    config = configs.LoadConfig(BAD_VM_PARAMETER_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
-    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      spec.ConstructVirtualMachines()
-    self.assertEqual(str(cm.exception), (
-        'Unrecognized options were found in '
-        'name.vm_groups.default.vm_spec.GCP: not_a_vm_parameter.'))
-
-  def testBadDiskParameter(self):
-    config = configs.LoadConfig(BAD_DISK_PARAMETER_CONFIG, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
-    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      spec.ConstructVirtualMachines()
-    self.assertEqual(str(cm.exception), (
-        'Unrecognized options were found in '
-        'name.vm_groups.default.disk_spec.GCP: not_a_disk_parameter.'))
-
   def testValidConfigWithDiskSpec(self):
-    config = configs.LoadConfig(VALID_CONFIG_WITH_DISK_SPEC, {}, NAME)
-    spec = benchmark_spec.BenchmarkSpec(config, NAME, UID)
+    spec = self._CreateBenchmarkSpecFromYaml(VALID_CONFIG_WITH_DISK_SPEC)
     spec.ConstructVirtualMachines()
     vms = spec.vm_groups['default']
     self.assertEqual(len(vms), 2)
@@ -188,14 +192,10 @@ class ConstructVmsTestCase(unittest.TestCase):
                           for disk_spec in vm.disk_specs))
 
 
-class BenchmarkSupportTestCase(unittest.TestCase):
-
-  def setUp(self):
-    # Reset the current benchmark spec.
-    self.addCleanup(context.SetThreadBenchmarkSpec, None)
+class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
 
   def createBenchmarkSpec(self, config, benchmark):
-    spec = benchmark_spec.BenchmarkSpec(config, benchmark, UID)
+    spec = self._CreateBenchmarkSpecFromConfigDict(config, benchmark)
     spec.ConstructVirtualMachines()
     return True
 
@@ -208,10 +208,8 @@ class BenchmarkSupportTestCase(unittest.TestCase):
     and returns None if the benchmark isn't in either list.
     """
 
-    with mock_flags.PatchFlags() as mocked_flags:
-      mocked_flags.cloud = 'Kubernetes'
-      mocked_flags.os_type = 'debian'
-      mocked_flags.machine_type = None
+    with mock_flags.PatchFlags(self._mocked_flags):
+      self._mocked_flags.cloud = 'Kubernetes'
       config = configs.LoadConfig(iperf_benchmark.BENCHMARK_CONFIG,
                                   {}, ALWAYS_SUPPORTED)
       self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
@@ -220,14 +218,44 @@ class BenchmarkSupportTestCase(unittest.TestCase):
       with self.assertRaises(ValueError):
         self.createBenchmarkSpec(config, NO_SUPPORT_INFO)
 
-      mocked_flags.benchmark_compatibility_checking = 'permissive'
+      self._mocked_flags.benchmark_compatibility_checking = 'permissive'
       self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED),
                       'benchmark is supported, mode is permissive')
       with self.assertRaises(ValueError):
         self.createBenchmarkSpec(config, NEVER_SUPPORTED)
       self.assertTrue(self.createBenchmarkSpec(config, NO_SUPPORT_INFO))
 
-      mocked_flags.benchmark_compatibility_checking = 'none'
+      self._mocked_flags.benchmark_compatibility_checking = 'none'
       self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
       self.assertTrue(self.createBenchmarkSpec(config, NEVER_SUPPORTED))
       self.assertTrue(self.createBenchmarkSpec(config, NO_SUPPORT_INFO))
+
+
+class RedirectGlobalFlagsTestCase(_BenchmarkSpecTestCase):
+
+  def testNoFlagOverride(self):
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        NAME, flag_values=FLAGS, vm_groups={})
+    spec = benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
+    self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+    with spec.RedirectGlobalFlags():
+      self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+      FLAGS.benchmark_spec_test_flag = 2
+      self.assertEqual(FLAGS.benchmark_spec_test_flag, 2)
+    self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+
+  def testFlagOverride(self):
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        NAME, flag_values=FLAGS, flags={'benchmark_spec_test_flag': 1},
+        vm_groups={})
+    spec = benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
+    self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+    with spec.RedirectGlobalFlags():
+      self.assertEqual(FLAGS.benchmark_spec_test_flag, 1)
+      FLAGS.benchmark_spec_test_flag = 2
+      self.assertEqual(FLAGS.benchmark_spec_test_flag, 2)
+    self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
+
+
+if __name__ == '__main__':
+  unittest.main()

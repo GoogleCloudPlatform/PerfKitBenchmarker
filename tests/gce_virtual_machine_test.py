@@ -21,11 +21,16 @@ import unittest
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import mock_flags
 
 
+_BENCHMARK_NAME = 'name'
+_BENCHMARK_UID = 'benchmark_uid'
 _COMPONENT = 'test_component'
 _FLAGS = None
 
@@ -34,7 +39,7 @@ class MemoryDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
     super(MemoryDecoderTestCase, self).setUp()
-    self.decoder = gce_virtual_machine.MemoryDecoder('memory')
+    self.decoder = gce_virtual_machine.MemoryDecoder(option='memory')
 
   def testValidStrings(self):
     self.assertEqual(self.decoder.Decode('1280MiB', _COMPONENT, _FLAGS), 1280)
@@ -108,7 +113,7 @@ class MachineTypeDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
     super(MachineTypeDecoderTestCase, self).setUp()
-    self.decoder = gce_virtual_machine.MachineTypeDecoder('machine_type')
+    self.decoder = gce_virtual_machine.MachineTypeDecoder(option='machine_type')
 
   def testDecodeString(self):
     result = self.decoder.Decode('n1-standard-8', _COMPONENT, {})
@@ -155,7 +160,7 @@ class GceVmSpecTestCase(unittest.TestCase):
 
   def testStringMachineTypeFlagOverride(self):
     flags = mock_flags.MockFlags()
-    flags.machine_type = 'n1-standard-8'
+    flags['machine_type'].Parse('n1-standard-8')
     result = gce_virtual_machine.GceVmSpec(
         _COMPONENT, flag_values=flags,
         machine_type={'cpus': 1, 'memory': '7.5GiB'})
@@ -165,7 +170,7 @@ class GceVmSpecTestCase(unittest.TestCase):
 
   def testCustomMachineTypeFlagOverride(self):
     flags = mock_flags.MockFlags()
-    flags.machine_type = '{cpus: 1, memory: 7.5GiB}'
+    flags['machine_type'].Parse('{cpus: 1, memory: 7.5GiB}')
     result = gce_virtual_machine.GceVmSpec(
         _COMPONENT, flag_values=flags, machine_type='n1-standard-8')
     self.assertEqual(result.machine_type, None)
@@ -217,28 +222,32 @@ class GceVirtualMachineTestCase(unittest.TestCase):
 class GCEVMFlagsTestCase(unittest.TestCase):
 
   def setUp(self):
-    # VM Creation depends on there being a BenchmarkSpec.
-    self.spec = benchmark_spec.BenchmarkSpec({}, 'name', 'benchmark_uid')
+    self._mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    self._mocked_flags.cloud = providers.GCP
+    self._mocked_flags.gcloud_path = 'test_gcloud'
+    self._mocked_flags.os_type = os_types.DEBIAN
+    self._mocked_flags.run_uri = 'aaaaaa'
+    # Creating a VM object causes network objects to be added to the current
+    # thread's benchmark spec. Create such a benchmark spec for these tests.
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        _BENCHMARK_NAME, flag_values=self._mocked_flags, vm_groups={})
+    self._benchmark_spec = benchmark_spec.BenchmarkSpec(
+        config_spec, _BENCHMARK_NAME, _BENCHMARK_UID)
 
   @contextlib.contextmanager
   def _PatchCriticalObjects(self):
     """A context manager that patches a few critical objects with mocks."""
     with mock.patch(vm_util.__name__ + '.IssueCommand') as issue_command, \
             mock.patch('__builtin__.open'), \
-            mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
-            mock_flags.PatchFlags() as mocked_flags:
-      mocked_flags.gcloud_path = 'test_gcloud'
-      mocked_flags.gcloud_scopes = None
-      mocked_flags.run_uri = 'aaaaaa'
-      yield issue_command, mocked_flags
+            mock.patch(vm_util.__name__ + '.NamedTemporaryFile'):
+      yield issue_command
 
   def testPreemptibleVMFlag(self):
-    with self._PatchCriticalObjects() as mocked_env:
-      issue_command, mocked_flags = mocked_env
-      mocked_flags.gce_preemptible_vms = True
+    with self._PatchCriticalObjects() as issue_command:
+      self._mocked_flags['gce_preemptible_vms'].Parse(True)
       vm_spec = gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', mocked_flags, image='image',
+          'test_vm_spec.GCP', self._mocked_flags, image='image',
           machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
@@ -247,11 +256,10 @@ class GCEVMFlagsTestCase(unittest.TestCase):
 
   def testImageProjectFlag(self):
     """Tests that custom image_project flag is supported."""
-    with self._PatchCriticalObjects() as mocked_env:
-      issue_command, mocked_flags = mocked_env
-      mocked_flags.image_project = 'bar'
+    with self._PatchCriticalObjects() as issue_command:
+      self._mocked_flags.image_project = 'bar'
       vm_spec = gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', mocked_flags, image='image',
+          'test_vm_spec.GCP', self._mocked_flags, image='image',
           machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()

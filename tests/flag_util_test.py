@@ -14,8 +14,11 @@
 
 """Tests for flag_util.py."""
 
+import copy
 import unittest
 
+import perfkitbenchmarker
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 
 
@@ -100,3 +103,75 @@ class TestIntegerListSerializer(unittest.TestCase):
 
     self.assertEqual(ser.Serialize(il),
                      '1,2-5,9')
+
+
+class FlagDictSubstitutionTestCase(unittest.TestCase):
+
+  def assertFlagState(self, flag_values, value, present):
+    self.assertEqual(flag_values.test_flag, value)
+    self.assertEqual(flag_values['test_flag'].value, value)
+    self.assertEqual(flag_values['test_flag'].present, present)
+
+  def testReadAndWrite(self):
+    flag_values = flags.FlagValues()
+    flags.DEFINE_integer('test_flag', 0, 'Test flag.', flag_values=flag_values)
+    flag_values_copy = copy.deepcopy(flag_values)
+    flag_values_copy.test_flag = 1
+    self.assertFlagState(flag_values, 0, False)
+    self.assertFlagState(flag_values_copy, 1, False)
+    with flag_util.FlagDictSubstitution(flag_values, flag_values_copy.FlagDict):
+      self.assertFlagState(flag_values, 1, False)
+      self.assertFlagState(flag_values_copy, 1, False)
+      flag_values.test_flag = 2
+      flag_values['test_flag'].present += 1
+      self.assertFlagState(flag_values, 2, True)
+      self.assertFlagState(flag_values_copy, 2, True)
+    self.assertFlagState(flag_values, 0, False)
+    self.assertFlagState(flag_values_copy, 2, True)
+    flag_values.test_flag = 3
+    self.assertFlagState(flag_values, 3, False)
+    self.assertFlagState(flag_values_copy, 2, True)
+
+
+class TestUnitsParser(unittest.TestCase):
+  def setUp(self):
+    self.up = flag_util.UnitsParser()
+
+  def testParser(self):
+    self.assertEqual(self.up.Parse('10KiB'),
+                     10 * 1024 * perfkitbenchmarker.UNIT_REGISTRY.bytes)
+
+  def testQuantity(self):
+    quantity = 1.0 * perfkitbenchmarker.UNIT_REGISTRY.meter
+    self.assertEqual(self.up.Parse(quantity),
+                     quantity)
+
+  def testBadExpression(self):
+    with self.assertRaises(ValueError):
+      self.up.Parse('asdf')
+
+  def testBytes(self):
+    q = self.up.Parse('1B')
+    self.assertEqual(q.magnitude, 1.0)
+    self.assertEqual(q.units, {'byte': 1.0})
+
+  def testBytesWithPrefix(self):
+    q = self.up.Parse('2KB').to(perfkitbenchmarker.UNIT_REGISTRY.byte)
+    self.assertEqual(q.magnitude, 2000.0)
+    self.assertEqual(q.units, {'byte': 1.0})
+
+  def testConvertibleTo(self):
+    up = flag_util.UnitsParser(
+        convertible_to=perfkitbenchmarker.UNIT_REGISTRY.byte)
+    self.assertEqual(up.Parse('10KiB'),
+                     10 * 1024 * perfkitbenchmarker.UNIT_REGISTRY.bytes)
+
+  def testConvertibleToWrongUnit(self):
+    up = flag_util.UnitsParser(
+        convertible_to=perfkitbenchmarker.UNIT_REGISTRY.byte)
+    with self.assertRaises(ValueError):
+      up.Parse('1m')
+
+
+if __name__ == '__main__':
+  unittest.main()

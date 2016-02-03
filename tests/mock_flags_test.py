@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for tests.mock_flags."""
 
+import copy
 import unittest
 
 from perfkitbenchmarker import flags
@@ -35,11 +36,32 @@ class MockFlagsTestCase(unittest.TestCase):
     self.assertFalse(flag.present)
     self.assertIsNone(flag.value)
 
-  def testSetAndGetFlag(self):
+  def testSetViaAttribute(self):
     self.flags.test_flag = 5
     self.assertEqual(self.flags.test_flag, 5)
+    self.assertFalse(self.flags['test_flag'].present)
+    self.assertEqual(self.flags['test_flag'].value, 5)
+
+  def testSetViaItemAttribute(self):
+    self.flags['test_flag'].value = 5
+    self.assertFalse(self.flags['test_flag'].present)
+    self.assertEqual(self.flags['test_flag'].value, 5)
+    self.flags['test_flag'].present = True
     self.assertTrue(self.flags['test_flag'].present)
     self.assertEqual(self.flags['test_flag'].value, 5)
+
+  def testSetViaParse(self):
+    self.flags['test_flag'].Parse(5)
+    self.assertTrue(self.flags['test_flag'].present)
+    self.assertEqual(self.flags['test_flag'].value, 5)
+
+  def testCopy(self):
+    copied_flags = copy.deepcopy(self.flags)
+    copied_flags['test_flag'].Parse(5)
+    self.assertFalse(self.flags['test_flag'].present)
+    self.assertIsNone(self.flags['test_flag'].value)
+    self.assertTrue(copied_flags['test_flag'].present)
+    self.assertEqual(copied_flags['test_flag'].value, 5)
 
 
 class PatchFlagsTestCase(unittest.TestCase):
@@ -49,7 +71,7 @@ class PatchFlagsTestCase(unittest.TestCase):
     self.flags = mock_flags.MockFlags()
 
   def testGetFlag(self):
-    self.flags.test_flag = 5
+    self.flags['test_flag'].Parse(5)
     with mock_flags.PatchFlags(self.flags):
       self.assertEqual(FLAGS.test_flag, 5)
       self.assertTrue(FLAGS['test_flag'].present)
@@ -62,6 +84,9 @@ class PatchFlagsTestCase(unittest.TestCase):
     with mock_flags.PatchFlags(self.flags):
       FLAGS.test_flag = 5
       self.assertEqual(FLAGS.test_flag, 5)
+      self.assertFalse(FLAGS['test_flag'].present)
+      self.assertEqual(FLAGS['test_flag'].value, 5)
+      FLAGS['test_flag'].present = True
       self.assertTrue(FLAGS['test_flag'].present)
       self.assertEqual(FLAGS['test_flag'].value, 5)
     self.assertEqual(self.flags.test_flag, 5)
@@ -70,6 +95,18 @@ class PatchFlagsTestCase(unittest.TestCase):
     self.assertEqual(FLAGS.test_flag, 0)
     self.assertFalse(FLAGS['test_flag'].present)
     self.assertEqual(FLAGS['test_flag'].value, 0)
+
+  def testCopyPatchedFlags(self):
+    with mock_flags.PatchFlags(self.flags):
+      FLAGS.test_flag = 1
+      copied_flags = copy.deepcopy(FLAGS)
+      copied_flags.test_flag = 2
+      self.assertEqual(FLAGS.test_flag, 1)
+      self.assertEqual(self.flags.test_flag, 1)
+      self.assertEqual(copied_flags.test_flag, 2)
+    self.assertEqual(FLAGS.test_flag, 0)
+    self.assertEqual(self.flags.test_flag, 1)
+    self.assertEqual(copied_flags.test_flag, 2)
 
 
 class PatchTestCaseFlagsTestCase(unittest.TestCase):

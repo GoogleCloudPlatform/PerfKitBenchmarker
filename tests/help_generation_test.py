@@ -18,15 +18,21 @@ import os
 import unittest
 
 from perfkitbenchmarker import flags
+# Import pkb to add all flag definitions to flags.FLAGS.
+from perfkitbenchmarker import pkb  # NOQA
 
 
 class HelpTest(unittest.TestCase):
   def testHelp(self):
     # Test that help generation finishes without errors
-    flags.GLOBAL_FLAGS.GetHelp()
+    flags.FLAGS.GetHelp()
 
 
 class HelpXMLTest(unittest.TestCase):
   def testHelpXML(self):
     with open(os.devnull, 'w') as out:
-      flags.GLOBAL_FLAGS.WriteHelpInXMLFormat(outfile=out)
+      flags.FLAGS.WriteHelpInXMLFormat(outfile=out)
+
+
+if __name__ == '__main__':
+  unittest.main()

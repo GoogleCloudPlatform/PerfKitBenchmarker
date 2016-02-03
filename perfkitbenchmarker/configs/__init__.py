@@ -54,6 +54,10 @@ Valid VM group keys:
 
 For valid VM spec keys, see virtual_machine.BaseVmSpec and derived classes.
 For valid disk spec keys, see disk.BaseDiskSpec and derived classes.
+
+See configs.spec.BaseSpec for more information about adding additional keys to
+VM specs, disk specs, or any component of the benchmark configuration
+dictionary.
 """
 
 import copy
@@ -80,37 +84,6 @@ flags.DEFINE_multistring(
     'a higher priority than that config. The value of the flag should be '
     'fully.qualified.key=value (e.g. --config_override=cluster_boot.vm_groups.'
     'default.vm_count=4). This flag can be repeated.')
-
-# Config keys.
-VM_GROUPS = 'vm_groups'
-DESCRIPTION = 'description'
-CONFIG_FLAGS = 'flags'
-CONFIG_VALUE_TYPES = {
-    VM_GROUPS: [dict],
-    DESCRIPTION: [str],
-    CONFIG_FLAGS: [dict]
-}
-VALID_CONFIG_KEYS = frozenset(CONFIG_VALUE_TYPES.keys())
-REQUIRED_CONFIG_KEYS = frozenset([VM_GROUPS])
-# Group keys.
-VM_SPEC = 'vm_spec'
-DISK_SPEC = 'disk_spec'
-VM_COUNT = 'vm_count'
-DISK_COUNT = 'disk_count'
-CLOUD = 'cloud'
-OS_TYPE = 'os_type'
-STATIC_VMS = 'static_vms'
-GROUP_VALUE_TYPES = {
-    VM_SPEC: [dict],
-    DISK_SPEC: [dict],
-    VM_COUNT: [int, type(None)],
-    DISK_COUNT: [int],
-    CLOUD: [str],
-    OS_TYPE: [str],
-    STATIC_VMS: [list]
-}
-VALID_GROUP_KEYS = frozenset(GROUP_VALUE_TYPES.keys())
-REQUIRED_GROUP_KEYS = frozenset([VM_SPEC])
 
 
 def _LoadUserConfig(path):
@@ -210,22 +183,6 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
     return default_config
 
 
-def GetMergedFlags(config):
-  """Returns a copy of the flags.FLAGS merged with those in the config."""
-  config_flags = config.get('flags')
-  flags_values = copy.deepcopy(flags.GLOBAL_FLAGS)
-
-  if config_flags:
-    for key, value in config_flags.iteritems():
-      if key not in flags_values:
-        raise ValueError('Flag "%s" is not defined.' % key)
-      if not flags_values[key].present:
-        flags_values[key].value = value
-        flags_values[key].present += 1
-
-  return flags_values
-
-
 def LoadMinimalConfig(benchmark_config, benchmark_name):
   """Loads a benchmark config without using any flags in the process.
 
@@ -259,62 +216,6 @@ def LoadMinimalConfig(benchmark_config, benchmark_name):
   return config[benchmark_name]
 
 
-def _ValidateGroup(group_name, group):
-  """Raises an exception if the group config is not valid."""
-  group_keys = frozenset(group.keys())
-
-  invalid_group_keys = group_keys - VALID_GROUP_KEYS
-  if invalid_group_keys:
-    raise ValueError(
-        'Invalid key(s) found in group "%s": %s' %
-        (group_name, ' '.join(invalid_group_keys)))
-
-  missing_group_keys = REQUIRED_GROUP_KEYS - group_keys
-  if missing_group_keys:
-    raise ValueError(
-        'Missing required key(s) in group "%s": %s' %
-        (group_name, ' '.join(missing_group_keys)))
-
-  bad_types = []
-  for key in group_keys:
-    value_type = type(group[key])
-    if value_type not in GROUP_VALUE_TYPES[key]:
-      bad_types.append('Key:%s Value Type: %s Expected Type(s): %s' %
-                       (key, value_type, GROUP_VALUE_TYPES[key]))
-  if bad_types:
-    raise ValueError(
-        'Value(s) in group "%s" didn\'t match expected type(s): %s' %
-        (group_name, ','.join(bad_types)))
-
-
-def _ValidateConfig(config):
-  """Raises an exception if the config is not valid."""
-  config_keys = frozenset(config.keys())
-
-  invalid_config_keys = config_keys - VALID_CONFIG_KEYS
-  if invalid_config_keys:
-    raise ValueError('Invalid key(s) found in config: %s' %
-                     ' '.join(invalid_config_keys))
-
-  missing_config_keys = REQUIRED_CONFIG_KEYS - config_keys
-  if missing_config_keys:
-    raise ValueError('Missing required key(s) in config: %s' %
-                     ' '.join(missing_config_keys))
-  bad_types = []
-  for key in config_keys:
-    value_type = type(config[key])
-    if value_type not in CONFIG_VALUE_TYPES[key]:
-      bad_types.append('Key:%s Value Type: %s Expected Type(s): %s' %
-                       (key, value_type, CONFIG_VALUE_TYPES[key]))
-  if bad_types:
-    raise ValueError(
-        "Values(s) didn't match expected type(s): %s" % ','.join(bad_types))
-
-
-  for group_name, group in config[VM_GROUPS].iteritems():
-    _ValidateGroup(group_name, group)
-
-
 def LoadConfig(benchmark_config, user_config, benchmark_name):
   """Loads a benchmark configuration.
 
@@ -333,7 +234,4 @@ def LoadConfig(benchmark_config, user_config, benchmark_name):
   """
   config = LoadMinimalConfig(benchmark_config, benchmark_name)
   config = MergeConfigs(config, user_config, warn_new_key=True)
-
-  _ValidateConfig(config)
-
   return config

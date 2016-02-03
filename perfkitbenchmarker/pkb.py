@@ -80,6 +80,7 @@ from perfkitbenchmarker import traces
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_benchmarks
+from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.publisher import SampleCollector
 
 STAGE_ALL = 'all'
@@ -209,6 +210,7 @@ def DoProvisionPhase(name, spec, timer):
       provisioning.
   """
   logging.info('Provisioning resources for benchmark %s', name)
+  spec.ConstructVirtualMachines()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.PickleSpec()
@@ -294,6 +296,39 @@ def DoTeardownPhase(name, spec, timer):
     spec.Delete()
 
 
+def _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid):
+  """Creates a BenchmarkSpec or loads one from a file.
+
+  During the provision stage, creates a BenchmarkSpec from the provided
+  configuration. During any later stage, loads the BenchmarkSpec that was
+  created during the provision stage from a file.
+
+  Args:
+    benchmark_config: BenchmarkConfigSpec. The benchmark configuration to use
+        while running the current stage.
+    benchmark_name: string. Name of the benchmark.
+    benchmark_uid: string. Identifies a specific run of a benchmark.
+
+  Returns:
+    The created or loaded BenchmarkSpec.
+  """
+  if FLAGS.run_stage in (STAGE_ALL, STAGE_PROVISION):
+    return benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
+                                        benchmark_uid)
+  else:
+    try:
+      return benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid,
+                                                          benchmark_config)
+    except IOError:
+      if FLAGS.run_stage == STAGE_PREPARE:
+        logging.error(
+            'We were unable to load the BenchmarkSpec. This may be related '
+            'to two additional run stages which have recently been added. '
+            'Please make sure to run the stage "provision" before "prepare". '
+            'Similarly, make sure to run "teardown" after "cleanup".')
+      raise
+
+
 def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
                  benchmark_config, benchmark_uid):
   """Runs a single benchmark and adds the results to the collector.
@@ -304,7 +339,7 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
     sequence_number: The sequence number of when the benchmark was started
       relative to the other benchmarks in the suite.
     total_benchmarks: The total number of benchmarks in the suite.
-    benchmark_config: The config to run the benchmark with.
+    benchmark_config: BenchmarkConfigSpec. The config to run the benchmark with.
     benchmark_uid: An identifier unique to this run of the benchmark even
       if the same benchmark is run multiple times with different configs.
   """
@@ -324,75 +359,58 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
         logging.exception('Prerequisite check failed for %s', benchmark_name)
         raise
 
-    end_to_end_timer = timing_util.IntervalTimer()
-    detailed_timer = timing_util.IntervalTimer()
-    spec = None
-    try:
-      with end_to_end_timer.Measure('End to End'):
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_PROVISION]:
-          # It is important to create the spec outside of DoProvisionPhase
-          # because if DoPreparePhase raises an exception, we still need
-          # a reference to the spec in order to delete it in the "finally"
-          # section below.
-          spec = benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
-                                              benchmark_uid)
-          spec.ConstructVirtualMachines()
-          DoProvisionPhase(benchmark_name, spec, detailed_timer)
-        else:
-          try:
-            spec = benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid)
-          except IOError:
-            if FLAGS.run_stage == STAGE_PREPARE:
-              logging.error(
-                  'We were unable to load the BenchmarkSpec. This may be '
-                  'related to two additional run stages which have recently '
-                  'been added. Please make sure to run the stage "provision" '
-                  'before "prepare". Similarly, make sure to run "teardown" '
-                  'after "cleanup".')
-            raise
+    spec = _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid)
+    with spec.RedirectGlobalFlags():
+      end_to_end_timer = timing_util.IntervalTimer()
+      detailed_timer = timing_util.IntervalTimer()
+      try:
+        with end_to_end_timer.Measure('End to End'):
+          if FLAGS.run_stage in (STAGE_ALL, STAGE_PROVISION):
+            DoProvisionPhase(benchmark_name, spec, detailed_timer)
 
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_PREPARE]:
-          DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
+          if FLAGS.run_stage in (STAGE_ALL, STAGE_PREPARE):
+            DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
 
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_RUN]:
-          DoRunPhase(benchmark, benchmark_name, spec, collector, detailed_timer)
+          if FLAGS.run_stage in (STAGE_ALL, STAGE_RUN):
+            DoRunPhase(benchmark, benchmark_name, spec, collector,
+                       detailed_timer)
 
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP]:
+          if FLAGS.run_stage in (STAGE_ALL, STAGE_CLEANUP):
+            DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
+
+          if FLAGS.run_stage in (STAGE_ALL, STAGE_TEARDOWN):
+            DoTeardownPhase(benchmark_name, spec, detailed_timer)
+
+        # Add samples for any timed interval that was measured.
+        include_end_to_end = timing_util.EndToEndRuntimeMeasurementEnabled()
+        include_runtimes = timing_util.RuntimeMeasurementsEnabled()
+        include_timestamps = timing_util.TimestampMeasurementsEnabled()
+        if FLAGS.run_stage == STAGE_ALL:
+          collector.AddSamples(
+              end_to_end_timer.GenerateSamples(
+                  include_runtime=include_end_to_end or include_runtimes,
+                  include_timestamps=include_timestamps),
+              benchmark_name, spec)
+        collector.AddSamples(detailed_timer.GenerateSamples(include_runtimes,
+                                                            include_timestamps),
+                             benchmark_name, spec)
+
+      except:
+        # Resource cleanup (below) can take a long time. Log the error to give
+        # immediate feedback, then re-throw.
+        logging.exception('Error during benchmark %s', benchmark_name)
+        # If the particular benchmark requests us to always call cleanup, do it
+        # here.
+        if (FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP] and spec and
+            spec.always_call_cleanup):
           DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
-
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_TEARDOWN]:
-          DoTeardownPhase(benchmark_name, spec, detailed_timer)
-
-      # Add samples for any timed interval that was measured.
-      include_end_to_end = timing_util.EndToEndRuntimeMeasurementEnabled()
-      include_runtimes = timing_util.RuntimeMeasurementsEnabled()
-      include_timestamps = timing_util.TimestampMeasurementsEnabled()
-      if FLAGS.run_stage == STAGE_ALL:
-        collector.AddSamples(
-            end_to_end_timer.GenerateSamples(
-                include_runtime=include_end_to_end or include_runtimes,
-                include_timestamps=include_timestamps),
-            benchmark_name, spec)
-      collector.AddSamples(
-          detailed_timer.GenerateSamples(include_runtimes, include_timestamps),
-          benchmark_name, spec)
-
-    except:
-      # Resource cleanup (below) can take a long time. Log the error to give
-      # immediate feedback, then re-throw.
-      logging.exception('Error during benchmark %s', benchmark_name)
-      # If the particular benchmark requests us to always call cleanup, do it
-      # here.
-      if (FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP] and spec and
-          spec.always_call_cleanup):
-        DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
-      raise
-    finally:
-      if spec:
-        if FLAGS.run_stage in [STAGE_ALL, STAGE_TEARDOWN]:
-          spec.Delete()
-        # Pickle spec to save final resource state.
-        spec.PickleSpec()
+        raise
+      finally:
+        if spec:
+          if FLAGS.run_stage in (STAGE_ALL, STAGE_TEARDOWN):
+            spec.Delete()
+          # Pickle spec to save final resource state.
+          spec.PickleSpec()
 
 
 def _LogCommandLineFlags():
@@ -485,12 +503,18 @@ def RunBenchmarks(publish=True):
   for i, benchmark_tuple in enumerate(benchmark_tuple_list):
     benchmark_module, user_config = benchmark_tuple
     benchmark_name = benchmark_module.BENCHMARK_NAME
+    benchmark_config_dict = benchmark_module.GetConfig(user_config)
+    benchmark_config_spec_class = getattr(
+        benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
+        benchmark_config_spec.BenchmarkConfigSpec)
+    benchmark_config = benchmark_config_spec_class(
+        benchmark_name, flag_values=FLAGS, **benchmark_config_dict)
     benchmark_uid = benchmark_name + str(
         benchmark_counts[benchmark_name].next())
     run_status_lists.append([benchmark_name, benchmark_uid,
                              benchmark_status.SKIPPED])
     args.append((benchmark_module, collector, i + 1, total_benchmarks,
-                 benchmark_module.GetConfig(user_config), benchmark_uid))
+                 benchmark_config, benchmark_uid))
 
   try:
     for run_args, run_status_list in zip(args, run_status_lists):
