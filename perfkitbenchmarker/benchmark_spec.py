@@ -120,73 +120,47 @@ class BenchmarkSpec(object):
     """
     Construct the virtual machine(s) needed for a group
     """
+    vms = []
     zone_index = 0
 
-    vms = []
-    vm_count = group_spec.get(VM_COUNT, DEFAULT_COUNT)
-    if vm_count is None:
-      vm_count = FLAGS.num_vms
-    disk_count = group_spec.get(DISK_COUNT, DEFAULT_COUNT)
+    vm_count = group_spec.vm_count
+    disk_count = group_spec.disk_count
 
-    try:
-      # First create the Static VMs.
-      if STATIC_VMS in group_spec:
-        static_vm_specs = group_spec[STATIC_VMS][:vm_count]
-        for static_vm_spec_index, spec_kwargs in enumerate(static_vm_specs):
-          vm_spec = static_vm.StaticVmSpec(
-              '{0}.{1}.{2}.{3}[{4}]'.format(self.name, VM_GROUPS, group_name,
-                                            STATIC_VMS, static_vm_spec_index),
-              **spec_kwargs)
-          static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
-          vms.append(static_vm_class(vm_spec))
+    # First create the Static VM objects.
+    if group_spec.static_vms:
+      for vm_spec in group_spec.static_vms[:vm_count]:
+        static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
+        vms.append(static_vm_class(vm_spec))
 
-      os_type = self._GetOsTypeForGroup(group_name)
-      cloud = self._GetCloudForGroup(group_name)
-      providers.LoadProvider(cloud.lower())
+    os_type = group_spec.os_type
+    cloud = group_spec.cloud
 
-      # This throws an exception if the benchmark is not
-      # supported.
-      self._CheckBenchmarkSupport(cloud)
+    # This throws an exception if the benchmark is not
+    # supported.
+    self._CheckBenchmarkSupport(cloud)
 
-      # Then create a VmSpec and possibly a DiskSpec which we can
-      # use to create the remaining VMs.
-      vm_spec_class = virtual_machine.GetVmSpecClass(cloud)
-      vm_spec = vm_spec_class(
-          '.'.join((self.name, VM_GROUPS, group_name, VM_SPEC, cloud)),
-          FLAGS, **group_spec[VM_SPEC][cloud])
+    # Then create the remaining VM objects using VM and disk specs.
 
+    if group_spec.disk_spec:
+      disk_spec = group_spec.disk_spec
+      # disk_spec.disk_type may contain legacy values that were
+      # copied from FLAGS.scratch_disk_type into
+      # FLAGS.data_disk_type at the beginning of the run. We
+      # translate them here, rather than earlier, because here is
+      # where we know what cloud we're using and therefore we're
+      # able to pick the right translation table.
+      disk_spec.disk_type = disk.WarnAndTranslateDiskTypes(
+          disk_spec.disk_type, cloud)
+    else:
+      disk_spec = None
 
-      if DISK_SPEC in group_spec:
-        disk_spec_class = disk.GetDiskSpecClass(cloud)
-        disk_spec = disk_spec_class(
-            '.'.join((self.name, VM_GROUPS, group_name, DISK_SPEC, cloud)),
-            FLAGS, **group_spec[DISK_SPEC][cloud])
-        # disk_spec.disk_type may contain legacy values that were
-        # copied from FLAGS.scratch_disk_type into
-        # FLAGS.data_disk_type at the beginning of the run. We
-        # translate them here, rather than earlier, because here is
-        # where we know what cloud we're using and therefore we're
-        # able to pick the right translation table.
-        logging.warn('WarnAndTranslateDiskTypes')
-        disk_spec.disk_type = disk.WarnAndTranslateDiskTypes(
-            disk_spec.disk_type, cloud)
-      else:
-        disk_spec = None
-
-    except TypeError as e:
-      # This is what we get if one of the kwargs passed into a spec's
-      # __init__ method was unexpected.
-      raise ValueError(
-          'Config contained an unexpected parameter. Error message:\n%s' % e)
-
-    # Create the remaining VMs using the specs we created earlier.
     for _ in xrange(vm_count - len(vms)):
       # Assign a zone to each VM sequentially from the --zones flag.
       if FLAGS.zones:
-        vm_spec.zone = FLAGS.zones[zone_index]
+        group_spec.vm_spec.zone = FLAGS.zones[zone_index]
         zone_index = (zone_index + 1 if zone_index < len(FLAGS.zones) - 1
                       else 0)
-      vm = self._CreateVirtualMachine(vm_spec, os_type, cloud)
+      vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       if disk_spec:
         vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
         # In the event that we need to create multiple disks from the same
@@ -227,89 +201,15 @@ class BenchmarkSpec(object):
         be properly added under its control.
         """
 
-        # Clone the settings of the first VM_GROUP to launch our Juju VM
-        self.vm_groups['juju'] = dict(
-            self.vm_groups.get(
-                self.vm_groups.keys()[0]
-            )
-        )
-        self.vm_groups['juju']['vm_count'] = 1
-
-        # self.config[VM_GROUPS]['juju'] = dict(
-        #     self.config[VM_GROUPS].get(
-        #         self.config[VM_GROUPS].keys()[0]
-        #     )
-        # )
-        # self.config[VM_GROUPS]['juju']['vm_count'] = 1
-
-        # import json
-        # import pprint
-        #
-        # # logging.warn(json.dumps(self.config[VM_GROUPS]['juju']))
-        # logging.warn(
-        #     pprint.PrettyPrinter().pformat(
-        #         json.dumps(self.config[VM_GROUPS]['juju'])
-        #     )
-        # )
-        jujuvm = None
-        jujuvms = self.ConstructVirtualMachine('juju',
-                                               self.vm_groups['juju'])
+        juju_spec = copy.copy(vm_group_specs[vm_group_specs.keys()[0]])
+        juju_spec.vm_count = 1
+        jujuvms = self.ConstructVirtualMachine('juju', juju_spec)
         if len(jujuvms):
             jujuvm = jujuvms.pop()
             jujuvm.isController = True
 
-        # Destroy our temporary VM group
-        self.vm_groups.pop('juju', None)
-
-    zone_index = 0
     for group_name, group_spec in vm_group_specs.iteritems():
       vms = self.ConstructVirtualMachine(group_name, group_spec)
-      vm_count = group_spec.vm_count
-      disk_count = group_spec.disk_count
-
-      # First create the Static VM objects.
-      if group_spec.static_vms:
-        for vm_spec in group_spec.static_vms[:vm_count]:
-          static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
-          vms.append(static_vm_class(vm_spec))
-
-      os_type = group_spec.os_type
-      cloud = group_spec.cloud
-
-      # This throws an exception if the benchmark is not
-      # supported.
-      self._CheckBenchmarkSupport(cloud)
-
-      # Then create the remaining VM objects using VM and disk specs.
-
-      if group_spec.disk_spec:
-        disk_spec = group_spec.disk_spec
-        # disk_spec.disk_type may contain legacy values that were
-        # copied from FLAGS.scratch_disk_type into
-        # FLAGS.data_disk_type at the beginning of the run. We
-        # translate them here, rather than earlier, because here is
-        # where we know what cloud we're using and therefore we're
-        # able to pick the right translation table.
-        disk_spec.disk_type = disk.WarnAndTranslateDiskTypes(
-            disk_spec.disk_type, cloud)
-      else:
-        disk_spec = None
-
-      for _ in xrange(vm_count - len(vms)):
-        # Assign a zone to each VM sequentially from the --zones flag.
-        if FLAGS.zones:
-          group_spec.vm_spec.zone = FLAGS.zones[zone_index]
-          zone_index = (zone_index + 1 if zone_index < len(FLAGS.zones) - 1
-                        else 0)
-        vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
-        if disk_spec:
-          vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
-          # In the event that we need to create multiple disks from the same
-          # DiskSpec, we need to ensure that they have different mount points.
-          if (disk_count > 1 and disk_spec.mount_point):
-            for i, spec in enumerate(vm.disk_specs):
-              spec.mount_point += str(i)
-        vms.append(vm)
 
       self.vm_groups[group_name] = vms
       self.vms.extend(vms)
@@ -412,6 +312,7 @@ class BenchmarkSpec(object):
         vm: The BaseVirtualMachine object representing the VM.
     """
     vm.Create()
+
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
     vm.AllowRemoteAccessPorts()
