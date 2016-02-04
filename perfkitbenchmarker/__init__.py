@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy_reg
 import gflags as flags  # NOQA
 import gflags_validators as flags_validators  # NOQA
 import pint
@@ -28,3 +29,20 @@ UNIT_REGISTRY.define('byte = 8 * bit = B')
 # lower-case k. However, everyone uses the upper-case K, and would be
 # very surprised to find out that 'KB' is not a valid unit.
 UNIT_REGISTRY.define('K- = 1000')
+
+
+# The Pint documentation suggests serializing Quantities as
+# strings. If we don't supply any serializers, using --run_stage to
+# separate prepare and run phases of a benchmark can fail for any
+# benchmark that has a units flag where the default value is not
+# overridden, because the default value will have been serialized with
+# a different UnitRegistry than the one in the run phase.
+def _PickleQuantity(q):
+  return _UnPickleQuantity, (str(q),)
+
+
+def _UnPickleQuantity(inp):
+  return UNIT_REGISTRY.parse_expression(inp)
+
+
+copy_reg.pickle(UNIT_REGISTRY.Quantity, _PickleQuantity)
