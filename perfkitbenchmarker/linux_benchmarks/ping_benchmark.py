@@ -26,9 +26,10 @@ import re
 
 flags.DEFINE_enum('ping_net_interface_type', 'internal_ip',
                   ['internal_ip', 'external_ip', 'both'],
-                  'run ping test using the internal, external IP of the vms in the same or \n'
-                  'across zones. Note if running ping across zone and the cloud provider does not \n'
-                  'support stretched network (Layer 2) then internal IP test will report erroneous results')
+                  'runs ping test using the internal or external IP of the vms'
+                  'in the same or across different zones. note AWS / Azure does'
+                  'not support natively support a single virtual network  '
+                  'spanning across zones. )
 
 FLAGS = flags.FLAGS
 
@@ -76,16 +77,16 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   results = []
   for sending_vm, receiving_vm in vms, reversed(vms):
-    if FLAGS.ping_net_interface_type in ('external_ip','both'):
+    if FLAGS.ping_net_interface_type in ('external_ip', 'both'):
         results = results + _RunPing(sending_vm,
-                                 receiving_vm,
-                                 receiving_vm.ip_address,
-                                 'external')
-    if FLAGS.ping_net_interface_type in ('internal_ip','both'):
+                                     receiving_vm,
+                                     receiving_vm.ip_address,
+                                     'external')
+    if FLAGS.ping_net_interface_type in ('internal_ip', 'both'):
         results = results + _RunPing(sending_vm,
-                                 receiving_vm,
-                                 receiving_vm.internal_ip,
-                                 'internal')
+                                    receiving_vm,
+                                    receiving_vm.internal_ip,
+                                    'internal')
 
   return results
 

@@ -158,6 +158,7 @@ class AzureVirtualMachineMetaClass(virtual_machine.AutoRegisterVmMeta):
           '{0} did not override DEFAULT_IMAGE_PATTERN'.format(cls.__name__))
       _default_image_patterns[cls.OS_TYPE] = cls.DEFAULT_IMAGE_PATTERN
 
+
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
 
@@ -247,8 +248,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.os_disk.name = response['OSDisk']['name']
     self.os_disk.created = True
     self.internal_ip = response['IPAddress']
-    #ping does not work with VIP
-    #self.ip_address = response['VirtualIPAddresses'][0]['address']
+    # ping does not work with azure virtual ip, leveraging public ip
     self.ip_address = response['PublicIPs'][0]['address']
 
   def CreateScratchDisk(self, disk_spec):

@@ -212,7 +212,7 @@ class AzureStorageAccount(resource.BaseResource):
 class AzureVirtualNetwork(resource.BaseResource):
   """Object representing an Azure Virtual Network."""
 
-  def __init__(self, name,zone):
+  def __init__(self, name, zone):
     super(AzureVirtualNetwork, self).__init__()
     self.name = name
     self.zone = zone
@@ -264,7 +264,7 @@ class AzureNetwork(network.BaseNetwork):
     storage_account_name = (STORAGE_ACCOUNT_PREFIX + name)[:MAX_NAME_LENGTH]
     self.storage_account = AzureStorageAccount(
         storage_account_name, FLAGS.azure_storage_type, self.zone)
-    self.vnet = AzureVirtualNetwork(name,self.zone)
+    self.vnet = AzureVirtualNetwork(name, self.zone)
 
   @vm_util.Retry()
   def Create(self):
@@ -279,4 +279,3 @@ class AzureNetwork(network.BaseNetwork):
     self.vnet.Delete()
 
     self.storage_account.Delete()
-
