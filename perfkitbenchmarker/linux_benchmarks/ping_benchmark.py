@@ -29,7 +29,7 @@ flags.DEFINE_enum('ping_net_interface_type', 'internal_ip',
                   'runs ping test using the internal or external IP of the vms'
                   'in the same or across different zones. note AWS / Azure does'
                   'not support natively support a single virtual network  '
-                  'spanning across zones. )
+                  'spanning across zones.')
 
 FLAGS = flags.FLAGS
 
@@ -84,9 +84,9 @@ def Run(benchmark_spec):
                                      'external')
     if FLAGS.ping_net_interface_type in ('internal_ip', 'both'):
         results = results + _RunPing(sending_vm,
-                                    receiving_vm,
-                                    receiving_vm.internal_ip,
-                                    'internal')
+                                     receiving_vm,
+                                     receiving_vm.internal_ip,
+                                     'internal')
 
   return results
 
