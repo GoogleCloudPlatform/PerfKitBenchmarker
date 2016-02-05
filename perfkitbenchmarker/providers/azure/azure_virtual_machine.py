@@ -106,17 +106,17 @@ def _GetDefaultImage(os_type):
 class AzureService(resource.BaseResource):
   """Object representing an Azure Service."""
 
-  def __init__(self, name, affinity_group_name):
+  def __init__(self, name, zone):
     super(AzureService, self).__init__()
     self.name = name
-    self.affinity_group_name = affinity_group_name
+    self.zone = zone
 
   def _Create(self):
     """Creates the Azure service."""
     create_cmd = [AZURE_PATH,
                   'service',
                   'create',
-                  '--affinitygroup=%s' % self.affinity_group_name,
+                  '--location=%s' % self.zone,
                   self.name]
     vm_util.IssueCommand(create_cmd)
 
@@ -158,7 +158,6 @@ class AzureVirtualMachineMetaClass(virtual_machine.AutoRegisterVmMeta):
           '{0} did not override DEFAULT_IMAGE_PATTERN'.format(cls.__name__))
       _default_image_patterns[cls.OS_TYPE] = cls.DEFAULT_IMAGE_PATTERN
 
-
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
 
@@ -177,7 +176,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     self.service = AzureService(self.name,
-                                self.network.affinity_group.name)
+                                self.zone)
     disk_spec = disk.BaseDiskSpec('azure_os_disk')
     self.os_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type)
     self.max_local_disks = 1
@@ -198,9 +197,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_cmd = [AZURE_PATH,
                   'vm',
                   'create',
-                  '--affinity-group=%s' % self.network.affinity_group.name,
+                  '--location=%s' % self.zone,
                   '--virtual-network-name=%s' % self.network.vnet.name,
                   '--vm-size=%s' % self.machine_type,
+                  '--public-ip=%s' % self.name,
                   self.name,
                   self.image,
                   self.user_name]
@@ -247,7 +247,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.os_disk.name = response['OSDisk']['name']
     self.os_disk.created = True
     self.internal_ip = response['IPAddress']
-    self.ip_address = response['VirtualIPAddresses'][0]['address']
+    #ping does not work with VIP
+    #self.ip_address = response['VirtualIPAddresses'][0]['address']
+    self.ip_address = response['PublicIPs'][0]['address']
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
