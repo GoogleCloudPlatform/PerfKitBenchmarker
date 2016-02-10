@@ -84,7 +84,7 @@ def Prepare(benchmark_spec):
   master.RemoteCommand('sudo docker pull cloudsuite/in-memory-analytics')
 
   for vm in vms:
-    vm.RemoteCommand('sudo docker create --name data'
+    vm.RemoteCommand('sudo docker create --name data '
                      'cloudsuite/movielens-dataset')
 
   master_cmd = ('sudo docker run -d --net host -e SPARK_MASTER_IP=%s '
@@ -113,7 +113,7 @@ def Run(benchmark_spec):
   results = []
 
   benchmark_cmd = ('sudo docker run --rm --net host --volumes-from data '
-                   'cloudsuite/in-memory-analytics %s %s'
+                   'cloudsuite/in-memory-analytics %s %s '
                    '--master spark://%s:7077' %
                    (FLAGS.ima_dataset,
                     FLAGS.ima_ratings_file,
