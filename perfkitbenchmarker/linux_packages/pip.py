@@ -25,6 +25,7 @@ from perfkitbenchmarker import vm_util
 def _Install(vm):
   """Install pip on the VM."""
   vm.InstallPackages('python-pip')
+  vm.RemoteCommand('sudo pip install -U pip')  # Make pip upgrade pip
   vm.RemoteCommand('mkdir -p {0} && pip freeze > {0}/requirements.txt'.format(
       vm_util.VM_TMP_DIR))
 
