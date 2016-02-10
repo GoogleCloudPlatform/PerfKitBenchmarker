@@ -138,6 +138,10 @@ BENCHMARK_SETS = {
     'mit_set': {
         MESSAGE: 'Massachusetts Institute of Technology benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET, 'silo']
+    },
+    'cloudsuite_set': {
+        MESSAGE: 'CloudSuite benchmark set.',
+        BENCHMARK_LIST: ['cloudsuite_inmemory_analytics']
     }
 }
 
