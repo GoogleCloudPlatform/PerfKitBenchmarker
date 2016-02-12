@@ -13,140 +13,295 @@
 # limitations under the License.
 """Module containing classes related to Rackspace VM networking.
 
-The SecurityGroup class provides a way of opening VM ports. The Network class
-allows VMs to communicate via internal IPs.
+The SecurityGroup class provides a way of opening VM ports via
+Security group rules.
 """
 import json
-import os
 import threading
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.rackspace import util
 from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
+INGRESS = 'ingress'
+EGRESS = 'egress'
+SEC_GROUP_DIRECTIONS = frozenset([INGRESS, EGRESS])
+
+IPV4 = 'ipv4'
+IPV6 = 'ipv6'
+ETHER_TYPES = frozenset([IPV4, IPV6])
+
+TCP = 'tcp'
+UDP = 'udp'
+ICMP = 'icmp'
+SEC_GROUP_PROTOCOLS = frozenset([TCP, UDP, ICMP])
+
+PORT_RANGE_MIN = '1'
+PORT_RANGE_MAX = '65535'
+
+PUBLIC_NET_ID = '00000000-0000-0000-0000-000000000000'
+SERVICE_NET_ID = '11111111-1111-1111-1111-111111111111'
+DEFAULT_SUBNET_CIDR = '192.168.0.0/16'
+
 SSH_PORT = 22
 
 
-class RackspaceSecurityGroup(network.BaseFirewall):
-    """An object representing the Rackspace Security Group."""
+class RackspaceSecurityGroup(resource.BaseResource):
+  """An object representing a Rackspace Security Group."""
 
-    CLOUD = providers.RACKSPACE
+  def __init__(self, name):
+    super(RackspaceSecurityGroup, self).__init__()
+    self.name = name
+    self.id = None
 
-    def __init__(self):
-        """Initialize Rackspace security group class."""
-        self._lock = threading.Lock()
-        self.firewall_names = set()
-        self.sg_counter = 0
+  def _Create(self):
+    cmd = util.RackCLICommand(self, 'networks', 'security-group', 'create')
+    cmd.flags['name'] = self.name
+    stdout, stderr, _ = cmd.Issue()
+    resp = json.loads(stdout)
+    self.id = resp['ID']
 
-    def AllowPort(self, vm, port):
-        """Opens a port on the firewall.
+  def _Delete(self):
+    if self.id is None:
+      return
+    cmd = util.RackCLICommand(self, 'networks', 'security-group', 'delete')
+    cmd.flags['id'] = self.id
+    cmd.Issue()
 
-        Args:
-          vm: The BaseVirtualMachine object to open the port for.
-          port: The local port to open.
-        """
-        if vm.is_static or not FLAGS.use_security_group or port == SSH_PORT:
-            return
-        with self._lock:
-            firewall_name = ('perfkit-firewall-%s-%d-%d' %
-                             (FLAGS.run_uri, port, self.sg_counter))
-            self.sg_counter += 1
-            if firewall_name in self.firewall_names:
-                return
+  def _Exists(self):
+    if self.id is None:
+      return False
+    cmd = util.RackCLICommand(self, 'networks', 'security-group', 'get')
+    cmd.flags['id'] = self.id
+    stdout, stderr, _ = cmd.Issue()
+    return not stderr
 
-            firewall_env = dict(os.environ.copy(),
-                                **util.GetDefaultRackspaceNeutronEnv(self))
 
-            firewall_cmd = [FLAGS.neutron_path]
-            firewall_cmd.extend(['security-group-create'])
-            firewall_cmd.append(firewall_name)
+class RackspaceSecurityGroupRule(resource.BaseResource):
+  """An object representing a Security Group Rule."""
 
-            vm_util.IssueRetryableCommand(firewall_cmd, env=firewall_env)
+  def __init__(self, sec_group_rule_name, sec_group_id, direction=None,
+               ip_ver=None, protocol=None, port_range_min=None,
+               port_range_max=None, source_cidr=None):
+    super(RackspaceSecurityGroupRule, self).__init__()
+    self.id = None
+    self.name = sec_group_rule_name
+    self.sec_group_id = sec_group_id
+    self.direction = direction if direction in SEC_GROUP_DIRECTIONS else INGRESS
+    self.ip_ver = ip_ver if ip_ver in ETHER_TYPES else IPV4
+    self.protocol = protocol if protocol in SEC_GROUP_PROTOCOLS else TCP
+    self.port_range_min = port_range_min if port_range_min else PORT_RANGE_MIN
+    self.port_range_max = port_range_max if port_range_max else PORT_RANGE_MAX
+    self.source_cidr = source_cidr
 
-            self.firewall_names.add(firewall_name)
+  def __eq__(self, other):
+    # Name does not matter
+    return (self.sec_group_id == other.sec_group_id and
+            self.direction == other.direction and
+            self.ip_ver == other.ip_ver and
+            self.protocol == other.protocol and
+            self.source_cidr == other.source_cidr)
 
-            for protocol in ['tcp', 'udp']:
-                rule_cmd = []
-                rule_cmd.extend([FLAGS.neutron_path,
-                                 'security-group-rule-create',
-                                 '--direction', 'ingress',
-                                 '--ethertype', 'IPv4',
-                                 '--protocol', protocol,
-                                 '--port-range-min', str(port),
-                                 '--port-range-max', str(port)])
-                rule_cmd.append(firewall_name)
+  def _Create(self):
+    cmd = util.RackCLICommand(self, 'networks', 'security-group-rule', 'create')
+    cmd.flags['security-group-id'] = self.sec_group_id
+    cmd.flags['direction'] = self.direction
+    cmd.flags['ether-type'] = self.ip_ver
+    cmd.flags['protocol'] = self.protocol
+    cmd.flags['port-range-min'] = self.port_range_min
+    cmd.flags['port-range-max'] = self.port_range_max
+    if self.source_cidr:
+      cmd.flags['remote-ip-prefix'] = self.source_cidr
+    stdout, stderr, _ = cmd.Issue()
+    resp = json.loads(stdout)
+    self.id = resp['ID']
 
-                vm_util.IssueRetryableCommand(rule_cmd, env=firewall_env)
+  def _Delete(self):
+    if self.id is None:
+      return
+    cmd = util.RackCLICommand(self, 'networks', 'security-group-rule', 'delete')
+    cmd.flags['id'] = self.id
+    cmd.Issue()
 
-            rule_cmd = []
-            rule_cmd.extend([FLAGS.neutron_path,
-                             'security-group-rule-create',
-                             '--direction', 'ingress',
-                             '--ethertype', 'IPv4',
-                             '--protocol', 'tcp',
-                             '--port-range-min', str(SSH_PORT),
-                             '--port-range-max', str(SSH_PORT)])
-            rule_cmd.append(firewall_name)
+  def _Exists(self):
+    if self.id is None:
+      return False
+    cmd = util.RackCLICommand(self, 'networks', 'security-group-rule', 'get')
+    cmd.flags['id'] = self.id
+    stdout, stderr, _ = cmd.Issue()
+    return not stderr
 
-            vm_util.IssueRetryableCommand(rule_cmd, env=firewall_env)
 
-            getport_cmd = []
-            getport_cmd.extend([FLAGS.neutron_path, 'port-list',
-                                '--format', 'table'])
+class RackspaceSubnet(resource.BaseResource):
+  """An object that represents a Rackspace Subnet,"""
 
-            stdout, _ = vm_util.IssueRetryableCommand(getport_cmd,
-                                                      env=firewall_env)
-            attrs = stdout.split('\n')
-            for attr in attrs:
-                if vm.ip_address in attr or vm.ip_address6 in attr:
-                    port_id = [v.strip() for v in attr.split('|') if v != ''][0]
-                    if port_id != '':
-                        break
+  def __init__(self, network_id, cidr, ip_ver, name=None, tenant_id=None):
+    super(RackspaceSubnet, self).__init__()
+    self.id = None
+    self.network_id = network_id
+    self.cidr = cidr
+    self.ip_ver = ip_ver
+    self.name = name
+    self.tenant_id = tenant_id
 
-            if not port_id:
-              raise ValueError('Could not find port_id from response.')
+  def _Create(self):
+    cmd = util.RackCLICommand(self, 'networks', 'subnet', 'create')
+    cmd.flags['network-id'] = self.network_id
+    cmd.flags['cidr'] = self.cidr
+    cmd.flags['ip-version'] = self.ip_ver
+    if self.name:
+      cmd.flags['name'] = self.name
+    if self.tenant_id:
+      cmd.flags['tenant-id'] = self.tenant_id
+    stdout, stderr, _ = cmd.Issue()
+    resp = json.loads(stdout)
+    self.id = resp['ID']
 
-            updateport_cmd = []
-            updateport_cmd.extend([FLAGS.neutron_path, 'port-update'])
-            for firewall in self.firewall_names:
-                updateport_cmd.extend(['--security-group', firewall])
-            updateport_cmd.append(port_id)
+  def _Delete(self):
+    if self.id is None:
+      return
+    cmd = util.RackCLICommand(self, 'networks', 'subnet', 'delete')
+    cmd.flags['id'] = self.id
+    cmd.Issue()
 
-            vm_util.IssueRetryableCommand(updateport_cmd, env=firewall_env)
+  def _Exists(self):
+    if self.id is None:
+      return False
+    cmd = util.RackCLICommand(self, 'networks', 'subnet', 'get')
+    cmd.flags['id'] = self.id
+    stdout, stderr, _ = cmd.Issue()
+    return not stderr
 
-    def DisallowAllPorts(self):
-        """Closes all ports on the firewall."""
-        firewall_env = dict(os.environ.copy(),
-                            **util.GetDefaultRackspaceNeutronEnv(self))
 
-        for firewall in self.firewall_names:
-            firewall_cmd = []
-            firewall_cmd.extend([FLAGS.neutron_path,
-                                 'security-group-show',
-                                 '--format', 'value'])
-            firewall_cmd.append(firewall)
+class RackspaceNetworkSpec(network.BaseNetworkSpec):
+  """Object containing the information needed to create a Rackspace network."""
 
-            stdout, _ = vm_util.IssueRetryableCommand(firewall_cmd,
-                                                      env=firewall_env)
+  def __init__(self, tenant_id=None, region=None, **kwargs):
+    super(RackspaceNetworkSpec, self).__init__(**kwargs)
+    self.tenant_id = tenant_id
+    self.region = region
 
-            rules = [v for v in stdout.split('\n') if v != ''][2:-1]
-            for rule in rules:
-                rule_id = str(json.loads(rule)['id'])
-                rule_cmd = []
-                rule_cmd.extend([FLAGS.neutron_path,
-                                 'security-group-rule-delete'])
-                rule_cmd.append(rule_id)
 
-                vm_util.IssueRetryableCommand(rule_cmd, env=firewall_env)
+class RackspaceNetworkResource(resource.BaseResource):
+  """Object representing a Rackspace Network Resource."""
 
-            firewall_cmd = [FLAGS.neutron_path]
-            firewall_cmd.extend(['security-group-delete'])
-            firewall_cmd.append(firewall)
+  def __init__(self, name, tenant_id=None):
+    super(RackspaceNetworkResource, self).__init__()
+    self.name = name
+    self.tenant_id = tenant_id
+    self.id = None
 
-            vm_util.IssueRetryableCommand(firewall_cmd, env=firewall_env)
+  def _Create(self):
+    cmd = util.RackCLICommand(self, 'networks', 'network', 'create')
+    cmd.flags['name'] = self.name
+    if self.tenant_id:
+      cmd.flags['tenant-id'] = self.tenant_id
+    stdout, _, _ = cmd.Issue()
+    resp = json.loads(stdout)
+    if resp['ID']:
+      self.id = resp['ID']
 
-            self.firewall_names.remove(firewall)
+  def _Delete(self):
+    if self.id is None:
+      return
+    cmd = util.RackCLICommand(self, 'networks', 'network', 'delete')
+    cmd.flags['id'] = self.id
+    cmd.Issue()
+
+  def _Exists(self):
+    if self.id is None:
+      return False
+    cmd = util.RackCLICommand(self, 'networks', 'network', 'get')
+    cmd.flags['id'] = self.id
+    stdout, stderr, _ = cmd.Issue()
+    return not stderr
+
+
+class RackspaceNetwork(network.BaseNetwork):
+  """An object representing a Rackspace Network."""
+
+  CLOUD = providers.RACKSPACE
+
+  def __init__(self, network_spec):
+    super(RackspaceNetwork, self).__init__(network_spec)
+    self.tenant_id = network_spec.tenant_id
+    name = FLAGS.rackspace_network_name or 'pkb-network-%s' % FLAGS.run_uri
+    self.network_resource = RackspaceNetworkResource(name, self.tenant_id)
+    self.subnet = RackspaceSubnet(self.network_resource.id, DEFAULT_SUBNET_CIDR,
+                                  ip_ver='4', name='subnet-%s' % name,
+                                  tenant_id=self.tenant_id)
+    self.security_group = RackspaceSecurityGroup('default-internal-%s' % name)
+    self.default_firewall_rules = []
+
+  @staticmethod
+  def _GetNetworkSpecFromVm(vm):
+    return RackspaceNetworkSpec(tenant_id=vm.tenant_id, region=vm.zone)
+
+  @classmethod
+  def _GetKeyFromNetworkSpec(cls, spec):
+    return (cls.CLOUD, spec.tenant_id, spec.region)
+
+  def Create(self):
+    if FLAGS.rackspace_network_name is None:
+      self.network_resource.Create()
+      self.subnet.Create()
+      self.security_group.Create()
+      self.default_firewall_rules = self._GenerateDefaultRules(
+          self.security_group.id, self.network_resource.name)
+      for rule in self.default_firewall_rules:
+        rule.Create()
+
+  def Delete(self):
+    if FLAGS.rackspace_network_name is None:
+      for rule in self.default_firewall_rules:
+        rule.Delete()
+      self.security_group.Delete()
+      self.subnet.Delete()
+      self.network_resource.Delete()
+
+  def _GenerateDefaultRules(self, sec_group_id, network_name):
+    firewall_rules = [
+        RackspaceSecurityGroupRule(
+            sec_group_rule_name='tcp-default-internal-%s' % network_name,
+            sec_group_id=sec_group_id,
+            direction=INGRESS,
+            ip_ver=IPV4,
+            protocol=TCP),
+        RackspaceSecurityGroupRule(
+            sec_group_rule_name='udp-default-internal-%s' % network_name,
+            sec_group_id=sec_group_id,
+            direction=INGRESS,
+            ip_ver=IPV4, protocol=UDP),
+        RackspaceSecurityGroupRule(
+            sec_group_rule_name='icmp-default-internal-%s' % network_name,
+            sec_group_id=sec_group_id,
+            direction=INGRESS,
+            ip_ver=IPV4, protocol=ICMP)]
+    return firewall_rules
+
+
+class RackspaceFirewall(network.BaseFirewall):
+  """An object representing a Rackspace Security Group applied to PublicNet and
+  ServiceNet."""
+
+  CLOUD = providers.RACKSPACE
+
+  def __init__(self):
+    # TODO(meteorfox) Support a Firewall per region
+    self._lock = threading.Lock()  # Guards security-group creation/deletion
+    self.firewall_rules = {}
+
+
+  def AllowPort(self, vm, port, to_port=None, source_range=None):
+    if vm.is_static or not FLAGS.use_security_group:
+      # At Rackspace all ports are open by default
+      return
+    # TODO(meteorfox) Implement security groups support
+    pass
+
+  def DisallowAllPorts(self):
+    pass
