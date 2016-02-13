@@ -30,7 +30,7 @@ flags.DEFINE_string('profile', default=None,
 flags.DEFINE_boolean('boot_from_cbs_volume', 'False',
                      'When flag is included the instance will use a remote disk'
                      ' as its boot disk, if machine_type supports it'
-                     ' (Currently Standard and OnMetal flavors do no support'
+                     ' (Currently Standard and OnMetal flavors do not support'
                      '  boot from CBS volume).')
 
 flags.DEFINE_boolean(
@@ -48,4 +48,5 @@ flags.DEFINE_string('rackspace_network_id', None,
 
 flags.DEFINE_list('additional_rackspace_flags',
                   [],
-                  'Additional flags to pass to Rackspace.')
+                  'Additional global flags to pass to the every '
+                  'RackCLI command. See "rack --help" for more.')
