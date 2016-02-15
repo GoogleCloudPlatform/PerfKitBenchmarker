@@ -84,18 +84,24 @@ class RackspaceSecurityGroup(resource.BaseResource):
 class RackspaceSecurityGroupRule(resource.BaseResource):
   """An object representing a Security Group Rule."""
 
-  def __init__(self, sec_group_rule_name, sec_group_id, direction=None,
-               ip_ver=None, protocol=None, port_range_min=None,
-               port_range_max=None, source_cidr=None):
+  def __init__(self, sec_group_rule_name, sec_group_id, direction=INGRESS,
+               ip_ver=IPV4, protocol=TCP, port_range_min=PORT_RANGE_MIN,
+               port_range_max=PORT_RANGE_MAX, source_cidr=None):
     super(RackspaceSecurityGroupRule, self).__init__()
     self.id = None
     self.name = sec_group_rule_name
     self.sec_group_id = sec_group_id
-    self.direction = direction if direction in SEC_GROUP_DIRECTIONS else INGRESS
-    self.ip_ver = ip_ver if ip_ver in ETHER_TYPES else IPV4
-    self.protocol = protocol if protocol in SEC_GROUP_PROTOCOLS else TCP
-    self.port_range_min = port_range_min if port_range_min else PORT_RANGE_MIN
-    self.port_range_max = port_range_max if port_range_max else PORT_RANGE_MAX
+    assert direction in SEC_GROUP_DIRECTIONS
+    self.direction = direction
+    assert ip_ver in ETHER_TYPES
+    self.ip_ver = ip_ver
+    assert protocol in SEC_GROUP_PROTOCOLS
+    self.protocol = protocol
+    assert (int(PORT_RANGE_MIN) <= int(port_range_min) <= int(PORT_RANGE_MAX))
+    self.port_range_min = port_range_min
+    assert (int(PORT_RANGE_MIN) <= int(port_range_max) <= int(PORT_RANGE_MAX))
+    self.port_range_max = port_range_max
+    assert int(port_range_min) <= int(port_range_max)
     self.source_cidr = source_cidr
 
   def __eq__(self, other):
