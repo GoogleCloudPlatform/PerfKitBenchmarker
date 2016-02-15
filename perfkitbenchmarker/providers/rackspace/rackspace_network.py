@@ -297,11 +297,11 @@ class RackspaceFirewall(network.BaseFirewall):
 
 
   def AllowPort(self, vm, port, to_port=None, source_range=None):
-    if vm.is_static or not FLAGS.use_security_group:
+    if FLAGS.use_security_group:
       # At Rackspace all ports are open by default
-      return
-    # TODO(meteorfox) Implement security groups support
-    pass
+      # TODO(meteorfox) Implement security groups support
+      raise NotImplementedError()
 
   def DisallowAllPorts(self):
-    pass
+    if FLAGS.use_security_group:
+      raise NotImplementedError()
