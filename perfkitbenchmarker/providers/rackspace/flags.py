@@ -18,10 +18,10 @@ flags.DEFINE_string('rack_path',
                     default='rack',
                     help='The path for the rack CLI binary.')
 
-flags.DEFINE_string('region', default='IAD',
+flags.DEFINE_string('rackspace_region', default='IAD',
                     help='A string indicating which Rackspace region to use.')
 
-flags.DEFINE_string('profile', default=None,
+flags.DEFINE_string('rack_profile', default=None,
                     help='A string indicating which RackCLI profile to use. '
                          'If none is specified default profile is used '
                          '(see https://developer.rackspace.com/docs/'
@@ -29,13 +29,11 @@ flags.DEFINE_string('profile', default=None,
 
 flags.DEFINE_boolean('boot_from_cbs_volume', 'False',
                      'When flag is included the instance will use a remote disk'
-                     ' as its boot disk, if machine_type supports it'
-                     ' (Currently Standard and OnMetal flavors do not support'
-                     '  boot from CBS volume).')
+                     ' as its boot disk, if machine_type supports it.')
 
 flags.DEFINE_boolean(
     'use_security_group', False,
-    '(EXPERIMENTAL) A boolean indicating if whether or not to create a security'
+    '(EXPERIMENTAL) A boolean indicating whether or not to create a security'
     ' group for the new instance. Applies default security group rules'
     ' (e.g. allow ingress TCP, and UDP traffic through port 22). If no security'
     ' group is used, all incoming and outgoing traffic through TCP, UDP and'
@@ -48,5 +46,5 @@ flags.DEFINE_string('rackspace_network_id', None,
 
 flags.DEFINE_list('additional_rackspace_flags',
                   [],
-                  'Additional global flags to pass to the every '
+                  'Additional global flags to pass to every '
                   'RackCLI command. See "rack --help" for more.')

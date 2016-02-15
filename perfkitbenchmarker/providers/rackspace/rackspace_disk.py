@@ -13,8 +13,8 @@
 # limitations under the License.
 """Module containing classes related to Rackspace volumes.
 
-Volumes can be created, deleted, *attached to VMs, and *detached from VMs. Also
-disks could be either remote, or ephemeral. Remote disks are storage volumes
+Volumes can be created, deleted, attached to VMs, and detached from VMs. Also
+disks could be either remote, or local. Remote disks are storage volumes
 provided by Rackspace Cloud Block Storage, and supports two disk types, cbs-ssd,
 and cbs-sata. Local disks can be local data disks if they are provided by the
 flavor.
@@ -64,7 +64,8 @@ DISK_METADATA = {
     },
     CBS_SSD: {
         disk.REPLICATION: disk.REGION,
-        DURABILITY: PERSISTENT
+        DURABILITY: PERSISTENT,
+        disk.MEDIA: disk.SSD
     },
     CBS_SATA: {
         disk.REPLICATION: disk.REGION,
@@ -81,25 +82,25 @@ class RackspaceDiskSpec(disk.BaseDiskSpec):
   RackspaceDisk.
 
   Attributes:
-    region: None or string. Rackspace region to build VM resources.
-    profile: None or string. Rack CLI profile configuration.
+    rackspace_region: None or string. Rackspace region to build VM resources.
+    rack_profile: None or string. Rack CLI profile configuration.
   """
   CLOUD = providers.RACKSPACE
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     super(RackspaceDiskSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['region'].present:
-      config_values['region'] = flag_values.region
-    if flag_values['profile'].present:
-      config_values['profile'] = flag_values.region
+    if flag_values['rackspace_region'].present:
+      config_values['rackspace_region'] = flag_values.rackspace_region
+    if flag_values['rack_profile'].present:
+      config_values['rack_profile'] = flag_values.rack_profile
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     result = super(RackspaceDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'region': (option_decoders.StringDecoder, {'default': 'IAD'}),
-        'profile': (option_decoders.StringDecoder, {'default': None})})
+        'rackspace_region': (option_decoders.StringDecoder, {'default': 'IAD'}),
+        'rack_profile': (option_decoders.StringDecoder, {'default': None})})
     return result
 
 
@@ -110,8 +111,8 @@ class RackspaceDisk(disk.BaseDisk):
     super(RackspaceDisk, self).__init__(disk_spec)
     self.name = name
     self.zone = region
-    self.region = disk_spec.region
-    self.profile = disk_spec.profile
+    self.region = disk_spec.rackspace_region
+    self.profile = disk_spec.rack_profile
     self.project = project
     self.image = image
     self.attached_vm_id = None

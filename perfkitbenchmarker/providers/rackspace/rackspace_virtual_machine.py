@@ -104,8 +104,8 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
 
   Attributes:
     project: None or string. Project ID, also known as Tenant ID
-    region: None or string. Rackspace region to build VM resources.
-    profile: None or string. Rack CLI profile configuration.
+    rackspace_region: None or string. Rackspace region to build VM resources.
+    rack_profile: None or string. Rack CLI profile configuration.
   """
 
   CLOUD = providers.RACKSPACE
@@ -123,10 +123,10 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
     super(RackspaceVmSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['project'].present:
       config_values['project'] = flag_values.project
-    if flag_values['region'].present:
-      config_values['region'] = flag_values.region
-    if flag_values['profile'].present:
-      config_values['profile'] = flag_values.region
+    if flag_values['rackspace_region'].present:
+      config_values['rackspace_region'] = flag_values.rackspace_region
+    if flag_values['rack_profile'].present:
+      config_values['rack_profile'] = flag_values.rack_profile
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -140,8 +140,8 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
     result = super(RackspaceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'project': (option_decoders.StringDecoder, {'default': None}),
-        'region': (option_decoders.StringDecoder, {'default': 'IAD'}),
-        'profile': (option_decoders.StringDecoder, {'default': None})})
+        'rackspace_region': (option_decoders.StringDecoder, {'default': 'IAD'}),
+        'rack_profile': (option_decoders.StringDecoder, {'default': None})})
     return result
 
 
@@ -164,8 +164,9 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.allocated_disks = set()
     self.id = None
     self.image = self.image or self.DEFAULT_IMAGE
-    self.region = vm_spec.region
+    self.region = vm_spec.rackspace_region
     self.project = vm_spec.project
+    self.profile = vm_spec.rack_profile
     # Isolated tenant networks are regional, not globally available.
     # Security groups (firewalls) apply to a network, hence they are regional.
     # TODO(meteorfox) Create tenant network if it doesn't exist in the region.
