@@ -313,21 +313,21 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     get_cmd = util.RackCLICommand(self, 'servers', 'instance', 'get')
     get_cmd.flags['id'] = self.id
     stdout, stderr, _ = get_cmd.Issue()
-    if stdout:
-      instance = json.loads(stdout)
-      if instance['Status'] == 'DELETED':
-        logging.info('VM: %s has been successfully deleted.' % self.name)
-        return
-      elif instance['Status'] == 'ERROR':
-        logging.error('VM: %s failed to delete.' % self.name)
-        raise errors.VirtualMachine.VmStateError()
-    elif stderr:
+    if stderr:
       resp = json.loads(stderr)
       if 'error' in resp and "couldn't find" in resp['error']:
         logging.info('VM: %s has been successfully deleted.' % self.name)
         return
-    raise errors.Resource.RetryableDeletionError(
-        'VM: %s has not been deleted. Retrying to check status.' % self.name)
+    instance = json.loads(stdout)
+    if instance['Status'] == 'ERROR':
+      logging.error('VM: %s failed to delete.' % self.name)
+      raise errors.VirtualMachine.VmStateError()
+
+    if instance['Status'] == 'DELETED':
+        logging.info('VM: %s has been successfully deleted.' % self.name)
+    else:
+      raise errors.Resource.RetryableDeletionError(
+          'VM: %s has not been deleted. Retrying to check status.' % self.name)
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM via RackCLI update-metadata command."""
@@ -493,15 +493,17 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
         break
     if boot_blk_device is None:  # Unlikely
       raise errors.Error('Could not find disk with "/" root mount point.')
-    if boot_blk_device['type'] == 'part':
-      blk_device_name = boot_blk_device['name'].rstrip('0123456789')
-      for dev in blk_devices:
-        if dev['type'] == 'disk' and dev['name'] == blk_device_name:
-          boot_blk_device = dev
-          break
-      else:  # Also, unlikely
-        raise errors.Error('Could not find disk containing boot partition.')
-    return boot_blk_device
+    if boot_blk_device['type'] != 'part':
+      return boot_blk_device
+    return self._FindBootBlockDevice(blk_devices, boot_blk_device)
+
+  def _FindBootBlockDevice(self, blk_devices, boot_blk_device):
+    """Helper method to search for backing block device of a partition."""
+    blk_device_name = boot_blk_device['name'].rstrip('0123456789')
+    for dev in blk_devices:
+      if dev['type'] == 'disk' and dev['name'] == blk_device_name:
+        boot_blk_device = dev
+        return boot_blk_device
 
   def _IsDiskAvailable(self, blk_device):
     """Returns True if a block device is available.
