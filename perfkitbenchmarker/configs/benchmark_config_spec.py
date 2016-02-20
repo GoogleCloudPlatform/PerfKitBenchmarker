@@ -181,7 +181,10 @@ class _VmGroupSpec(spec.BaseSpec):
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_VmGroupSpec, self).__init__(component_full_name,
                                        flag_values=flag_values, **kwargs)
-    providers.LoadProvider(self.cloud.lower())
+    ignore_package_requirements = (
+        getattr(flag_values, 'ignore_package_requirements', True) if flag_values
+        else True)
+    providers.LoadProvider(self.cloud.lower(), ignore_package_requirements)
     if self.disk_spec:
       disk_config = getattr(self.disk_spec, self.cloud, None)
       if disk_config is None:

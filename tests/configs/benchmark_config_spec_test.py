@@ -16,6 +16,8 @@
 import os
 import unittest
 
+import mock
+
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
@@ -365,6 +367,20 @@ class VmGroupSpecTestCase(unittest.TestCase):
         **self._kwargs)
     self.assertEqual(result.vm_count, 3)
 
+  def testCallsLoadProviderAndChecksRequirements(self):
+    flag_values = self.createNonPresentFlags()
+    flag_values.ignore_package_requirements = False
+    with mock.patch(providers.__name__ + '.LoadProvider'):
+      self._spec_class(_COMPONENT, flag_values, **self._kwargs)
+      providers.LoadProvider.assert_called_once_with('gcp', False)
+
+  def testCallsLoadProviderAndIgnoresRequirements(self):
+    flag_values = self.createNonPresentFlags()
+    flag_values.ignore_package_requirements = True
+    with mock.patch(providers.__name__ + '.LoadProvider'):
+      self._spec_class(_COMPONENT, flag_values, **self._kwargs)
+      providers.LoadProvider.assert_called_once_with('gcp', True)
+
 
 class VmGroupsDecoderTestCase(unittest.TestCase):
 
@@ -441,7 +457,8 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
         'following types: NoneType, int.'))
 
   def testFlagOverridesPropagate(self):
-    self._kwargs['flags'] = {'cloud': providers.AWS}
+    self._kwargs['flags'] = {'cloud': providers.AWS,
+                             'ignore_package_requirements': True}
     result = self._spec_class(_COMPONENT, flag_values=flags.FLAGS,
                               **self._kwargs)
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)

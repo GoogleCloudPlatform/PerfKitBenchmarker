@@ -24,6 +24,10 @@ class Error(Exception):
 class Setup(object):
   """Errors raised in setting up PKB."""
 
+  class PythonPackageRequirementUnfulfilled(Error):
+    """Error raised when a Python package requirement is unfulfilled."""
+    pass
+
   class MissingExecutableError(Error):
     """Error raised when we cannot find an executable we need."""
     pass
