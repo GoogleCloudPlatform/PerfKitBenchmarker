@@ -49,7 +49,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.name = 'perfkit_vm_%d_%s' % (self.instance_number, FLAGS.run_uri)
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
                                                FLAGS.run_uri)
-        self.client = os_utils.NovaClient()
+        self.client = os_utils.NovaClient(region_name=FLAGS.openstack_region)
         self.public_network = os_network.OpenStackPublicNetwork(
             FLAGS.openstack_public_network
         )

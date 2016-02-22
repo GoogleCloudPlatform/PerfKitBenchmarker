@@ -263,7 +263,8 @@ def _MakeAzureCommandSuffix(account_name, account_key, for_cli):
     return (' --azure_account=%s --azure_key=%s') % (account_name, account_key)
 
 
-def _MakeSwiftCommandPrefix(auth_url, tenant_name, username, password):
+def _MakeSwiftCommandPrefix(auth_url, tenant_name, username, password,
+                            region_name):
   """This function returns a prefix for Swift CLI command.
 
   Args:
@@ -271,7 +272,7 @@ def _MakeSwiftCommandPrefix(auth_url, tenant_name, username, password):
     tenant_name: tenant name for obtaining auth token.
     username: username for obtaining auth token.
     password: password for obtaining auth token.
-
+    region_name: region name where Swift endpoint is located.
   Returns:
     string represents a command prefix.
   """
@@ -279,6 +280,7 @@ def _MakeSwiftCommandPrefix(auth_url, tenant_name, username, password):
              '--os-tenant-name', tenant_name,
              '--os-username', username,
              '--os-password', password,
+             '--os-region-name', region_name,
              '--insecure' if FLAGS.openstack_swift_insecure else '',)
   return ' '.join(options)
 
@@ -981,7 +983,8 @@ class SwiftStorageBenchmark(object):
     self.swift_command_prefix = _MakeSwiftCommandPrefix(vm.client.url,
                                                         vm.client.tenant,
                                                         vm.client.user,
-                                                        vm.client.password)
+                                                        vm.client.password,
+                                                        vm.client.region_name)
     vm.RemoteCommand('swift %s post %s' % (self.swift_command_prefix,
                                            vm.bucket_name))
 

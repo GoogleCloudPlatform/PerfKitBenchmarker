@@ -33,7 +33,7 @@ class OpenStackFirewall(network.BaseFirewall):
 
     def __init__(self):
         super(OpenStackFirewall, self).__init__()
-        self.__nclient = utils.NovaClient()
+        self.__nclient = utils.NovaClient(region_name=FLAGS.openstack_region)
 
         if not (self.__nclient.security_groups.findall(
                 name='perfkit_sc_group')):
@@ -67,7 +67,7 @@ class OpenStackFirewall(network.BaseFirewall):
 class OpenStackPublicNetwork(object):
 
     def __init__(self, pool):
-        self.__nclient = utils.NovaClient()
+        self.__nclient = utils.NovaClient(region_name=FLAGS.openstack_region)
         self.__floating_ip_lock = threading.Lock()
         self.ip_pool_name = pool
 
