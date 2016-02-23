@@ -51,6 +51,14 @@ flags.DEFINE_enum('storage', providers.GCP,
                    providers.AZURE, providers.OPENSTACK],
                   'storage provider (GCP/AZURE/AWS/OPENSTACK) to use.')
 
+flags.DEFINE_string('object_storage_bucket', None,
+                    'Bucket to use for object storage benchmark. If provided, '
+                    'the benchmark will not create its own bucket(s).')
+
+flags.DEFINE_string('object_storage_azure_storage_account', None,
+                    'Azure storage account to use with a custom bucket. Should '
+                    'only be used with a user-provided bucket.')
+
 flags.DEFINE_string('object_storage_region', None,
                     'Storage region for object storage benchmark.')
 
@@ -606,6 +614,18 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
 class S3StorageBenchmark(object):
   """S3 version of storage benchmark."""
 
+  def CreateBucket(self, vm):
+    """Create a bucket using the provided VM.
+
+    Args:
+      vm: The VM being used to run the benchmark.
+    """
+
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
+
+    vm.RemoteCommand(
+        'aws s3 mb s3://%s --region=%s' % (vm.bucket_name, vm.storage_region))
+
   def Prepare(self, vm):
     """Prepare vm with AWS s3 tool and create a bucket using vm.
 
@@ -618,11 +638,7 @@ class S3StorageBenchmark(object):
     vm.PushFile(FLAGS.object_storage_credential_file, AWS_CREDENTIAL_LOCATION)
     vm.PushFile(FLAGS.boto_file_location, DEFAULT_BOTO_LOCATION)
 
-    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
     vm.storage_region = FLAGS.object_storage_region or DEFAULT_AWS_REGION
-
-    vm.RemoteCommand(
-        'aws s3 mb s3://%s --region=%s' % (vm.bucket_name, vm.storage_region))
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with s3 tool.
@@ -672,15 +688,23 @@ class S3StorageBenchmark(object):
 
     return results
 
+  def CleanupBucket(self, vm):
+    """Clean up our S3 bucket.
+
+    Args:
+      vm: The VM used for the benchmark.
+    """
+
+    remove_content_cmd = 'aws s3 rm s3://%s --recursive' % vm.bucket_name
+    remove_bucket_cmd = 'aws s3 rb s3://%s' % vm.bucket_name
+    DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
+
   def Cleanup(self, vm):
     """Clean up S3 bucket and uninstall packages on vm.
 
     Args:
       vm: The vm needs cleanup.
     """
-    remove_content_cmd = 'aws s3 rm s3://%s --recursive' % vm.bucket_name
-    remove_bucket_cmd = 'aws s3 rb s3://%s' % vm.bucket_name
-    DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
@@ -688,6 +712,21 @@ class S3StorageBenchmark(object):
 
 class AzureBlobStorageBenchmark(object):
   """Azure Blob version of storage benchmark."""
+
+  def CreateBucket(self, vm):
+    """Create a bucket using the provided VM.
+
+    Args:
+      vm: The VM being used to run the benchmark.
+    """
+    azure_command_suffix = _MakeAzureCommandSuffix(vm.azure_account,
+                                                   vm.azure_key,
+                                                   True)
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
+    vm.RemoteCommand('azure storage container create %s %s' % (
+        vm.bucket_name, azure_command_suffix))
+    vm.RemoteCommand('azure storage blob list %s %s' % (
+        vm.bucket_name, azure_command_suffix))
 
   def Prepare(self, vm):
     """Prepare vm with Azure CLI tool and create a storage container using vm.
@@ -702,12 +741,15 @@ class AzureBlobStorageBenchmark(object):
     vm.RemoteCommand('sudo npm install azure-cli -g')
 
     vm.PushFile(FLAGS.object_storage_credential_file, AZURE_CREDENTIAL_LOCATION)
-    region = FLAGS.object_storage_region or DEFAULT_AZURE_REGION
-    vm.RemoteCommand(
-        'azure storage account create --type ZRS -l \'%s\' ''"pkb%s"' %
-        (region, FLAGS.run_uri),
-        ignore_failure=False)
-    vm.azure_account = ('pkb%s' % FLAGS.run_uri)
+    if FLAGS['object_storage_azure_storage_account'].present:
+      vm.azure_account = FLAGS.object_storage_azure_storage_account
+    else:
+      region = FLAGS.object_storage_region or DEFAULT_AZURE_REGION
+      vm.RemoteCommand(
+          'azure storage account create --type ZRS -l \'%s\' ''"pkb%s"' %
+          (region, FLAGS.run_uri),
+          ignore_failure=False)
+      vm.azure_account = ('pkb%s' % FLAGS.run_uri)
 
     output, _ = (
         vm.RemoteCommand(
@@ -715,17 +757,6 @@ class AzureBlobStorageBenchmark(object):
             vm.azure_account))
     key = re.findall(r'Primary:* (.+)', output)
     vm.azure_key = key[0]
-
-    azure_command_suffix = _MakeAzureCommandSuffix(vm.azure_account,
-                                                   vm.azure_key,
-                                                   True)
-
-    vm.RemoteCommand('azure storage container create pkb%s %s' % (
-        FLAGS.run_uri, azure_command_suffix))
-
-    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
-    vm.RemoteCommand('azure storage blob list %s %s' % (
-        vm.bucket_name, azure_command_suffix))
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with Azure CLI tool.
@@ -806,12 +837,13 @@ class AzureBlobStorageBenchmark(object):
 
     return results
 
-  def Cleanup(self, vm):
-    """Clean up Azure storage container and uninstall packages on vm.
+  def CleanupBucket(self, vm):
+    """Clean up our S3 bucket.
 
     Args:
-      vm: The vm needs cleanup.
+      vm: The VM used for the benchmark.
     """
+
     test_script_path = '%s/run/%s' % (vm.GetScratchDir(), API_TEST_SCRIPT)
     remove_content_cmd = ('%s --bucket=%s --storage_provider=AZURE '
                           ' --scenario=CleanupBucket %s' %
@@ -827,12 +859,38 @@ class AzureBlobStorageBenchmark(object):
                                                  True)))
     DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
-    vm.RemoteCommand('azure storage account delete -q pkb%s' %
-                     FLAGS.run_uri)
+  def Cleanup(self, vm):
+    """Clean up Azure storage container and uninstall packages on vm.
+
+    Args:
+      vm: The vm needs cleanup.
+    """
+
+    if not FLAGS['object_storage_azure_storage_account'].present:
+      vm.RemoteCommand('azure storage account delete -q pkb%s' %
+                       FLAGS.run_uri)
 
 
 class GoogleCloudStorageBenchmark(object):
   """Google Cloud Storage version of storage benchmark."""
+
+  def CreateBucket(self, vm):
+    """Create a bucket using the provided VM.
+
+    Args:
+      vm: The VM being used to run the benchmark.
+    """
+
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
+
+    vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, vm.bucket_name))
+
+    region = FLAGS.object_storage_region or DEFAULT_GCP_REGION
+    vm.regional_bucket_name = '%s-%s' % (vm.bucket_name,
+                                         region.lower())
+    vm.RemoteCommand('%s mb -c DRA -l %s gs://%s' % (vm.gsutil_path,
+                                                     region.upper(),
+                                                     vm.regional_bucket_name))
 
   def Prepare(self, vm):
     """Prepare vm with gsutil tool and create a bucket using vm.
@@ -862,17 +920,6 @@ class GoogleCloudStorageBenchmark(object):
 
     vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)
     vm.gsutil_path = vm.gsutil_path.split()[0]
-
-    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
-
-    vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, vm.bucket_name))
-
-    region = FLAGS.object_storage_region or DEFAULT_GCP_REGION
-    vm.regional_bucket_name = '%s-%s' % (vm.bucket_name,
-                                         region.lower())
-    vm.RemoteCommand('%s mb -c DRA -l %s gs://%s' % (vm.gsutil_path,
-                                                     region.upper(),
-                                                     vm.regional_bucket_name))
 
     # Detect if we need to install crcmod for gcp.
     # See "gsutil help crc" for details.
@@ -940,10 +987,26 @@ class GoogleCloudStorageBenchmark(object):
 
     # API-based benchmarking of GCS
     test_script_path = '%s/run/%s' % (scratch_dir, API_TEST_SCRIPT)
+    # If the user provided a custom bucket name, then we won't have a
+    # regional bucket.
+    regional_bucket_name = getattr(vm, 'regional_bucket_name', None)
     ApiBasedBenchmarks(results, metadata, vm, 'GCS', test_script_path,
-                       vm.bucket_name, vm.regional_bucket_name)
+                       vm.bucket_name, regional_bucket_name)
 
     return results
+
+  def CleanupBucket(self, vm):
+    """Clean up our bucket.
+
+    Args:
+      vm: The VM used for the benchmark.
+    """
+
+    for bucket in [vm.bucket_name, vm.regional_bucket_name]:
+      remove_content_cmd = '%s -m rm -r gs://%s/*' % (vm.gsutil_path,
+                                                      bucket)
+      remove_bucket_cmd = '%s rb gs://%s' % (vm.gsutil_path, bucket)
+      DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
 
   def Cleanup(self, vm):
@@ -952,11 +1015,6 @@ class GoogleCloudStorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    for bucket in [vm.bucket_name, vm.regional_bucket_name]:
-      remove_content_cmd = '%s -m rm -r gs://%s/*' % (vm.gsutil_path,
-                                                      bucket)
-      remove_bucket_cmd = '%s rb gs://%s' % (vm.gsutil_path, bucket)
-      DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
 
@@ -966,6 +1024,21 @@ class SwiftStorageBenchmark(object):
 
   def __init__(self):
     self.swift_command_prefix = ''
+
+  def CreateBucket(self, vm):
+    """Create an OpenStack Swift container using the provided VM.
+
+    Args:
+      vm: The VM being used to run the benchmark.
+    """
+
+    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
+    self.swift_command_prefix = _MakeSwiftCommandPrefix(vm.client.url,
+                                                        vm.client.tenant,
+                                                        vm.client.user,
+                                                        vm.client.password)
+    vm.RemoteCommand('swift %s post %s' % (self.swift_command_prefix,
+                                           vm.bucket_name))
 
   def Prepare(self, vm):
     """Prepare vm with swift cli and create a swift container using vm.
@@ -977,13 +1050,6 @@ class SwiftStorageBenchmark(object):
     vm.InstallPackages('python-urllib3')
     vm.RemoteCommand('sudo pip install python-keystoneclient')
     vm.RemoteCommand('sudo pip install python-swiftclient')
-    vm.bucket_name = 'pkb%s' % FLAGS.run_uri
-    self.swift_command_prefix = _MakeSwiftCommandPrefix(vm.client.url,
-                                                        vm.client.tenant,
-                                                        vm.client.user,
-                                                        vm.client.password)
-    vm.RemoteCommand('swift %s post %s' % (self.swift_command_prefix,
-                                           vm.bucket_name))
 
   def Run(self, vm, metadata):
     """Run upload/download on vm with swift cli.
@@ -1038,17 +1104,26 @@ class SwiftStorageBenchmark(object):
 
     return results
 
-  def Cleanup(self, vm):
-    """Clean up OpenStack Swift container and uninstall packages on vm.
+  def CleanupBucket(self, vm):
+    """Clean up our OpenStack Swift container.
 
     Args:
-      vm: The vm that needs clean up.
+      vm: The VM used for the benchmark.
     """
+
     remove_content_cmd = ('swift %s delete %s'
                           % (self.swift_command_prefix, vm.bucket_name))
     # Command above delete both container and its objects
     remove_container_cmd = 'echo noop-container-delete'
     DeleteBucketWithRetry(vm, remove_content_cmd, remove_container_cmd)
+
+
+  def Cleanup(self, vm):
+    """Uninstall packages on vm.
+
+    Args:
+      vm: The vm that needs clean up.
+    """
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-swiftclient')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-keystoneclient')
@@ -1112,7 +1187,13 @@ def Prepare(benchmark_spec):
   vms[0].RemoteCommand('sudo pip install azure%s' % azure_version_string)
   vms[0].Install('gcs_boto_plugin')
 
-  OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
+  provider_benchmark = OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage]
+  provider_benchmark.Prepare(vms[0])
+
+  if FLAGS['object_storage_bucket'].present:
+    vms[0].bucket_name = FLAGS.object_storage_bucket
+  else:
+    provider_benchmark.CreateBucket(vms[0])
 
   # We would like to always cleanup server side states when exception happens.
   benchmark_spec.always_call_cleanup = True
@@ -1170,5 +1251,11 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Cleanup(vms[0])
+
+  provider_benchmark = OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage]
+
+  if not FLAGS['object_storage_bucket'].present:
+    provider_benchmark.CleanupBucket(vms[0])
+
+  provider_benchmark.Cleanup(vms[0])
   vms[0].RemoteCommand('rm -rf %s/run/' % vms[0].GetScratchDir())
