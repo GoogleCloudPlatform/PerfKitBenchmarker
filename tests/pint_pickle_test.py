@@ -25,7 +25,7 @@ import perfkitbenchmarker
 class TestPintPickling(unittest.TestCase):
 
   def testSameUnitRegistry(self):
-    q_prepickle = perfkitbenchmarker.UNIT_REGISTRY.second
+    q_prepickle = 1.0 * perfkitbenchmarker.UNIT_REGISTRY.second
     q_pickled = pickle.dumps(q_prepickle)
     q_postpickle = pickle.loads(q_pickled)
 
@@ -36,26 +36,28 @@ class TestPintPickling(unittest.TestCase):
     # need all of your Quantities to point to the same UnitRegistry
     # object, and when we close and reopen PKB, we create a new
     # UnitRegistry. So to test it, we create a new UnitRegistry.
-    q_prepickle = perfkitbenchmarker.UNIT_REGISTRY.second
+    q_prepickle = 1.0 * perfkitbenchmarker.UNIT_REGISTRY.second
     q_pickled = pickle.dumps(q_prepickle)
 
     perfkitbenchmarker.UNIT_REGISTRY = pint.UnitRegistry()
 
     q_postpickle = pickle.loads(q_pickled)
 
-    with self.assertRaises(TypeError):
-      # We're checking that Pint can't convert the q_prepickle to the
-      # same units as q_postpickle, even though the units are both
-      # seconds, because they come from different UnitRegistries. For
-      # some reason the self.assertNotEqual check doesn't catch this.
-      q_prepickle.to(q_postpickle)
-
-    new_second = perfkitbenchmarker.UNIT_REGISTRY.second
+    new_second = 1.0 * perfkitbenchmarker.UNIT_REGISTRY.second
     self.assertEqual(q_postpickle, new_second)
     # This next line checks that q_postpickle is in the same "Pint
     # universe" as new_second, because we can convert q_postpickle to
     # the units of new_second.
     q_postpickle.to(new_second)
+
+  def testKB(self):
+    # Make sure we can pickle and unpickle quantities with the unit we
+    # defined ourselves.
+    q_prepickle = perfkitbenchmarker.UNIT_REGISTRY.parse_expression('1KB')
+    q_pickled = pickle.dumps(q_prepickle)
+    q_postpickle = pickle.loads(q_pickled)
+
+    self.assertEqual(q_prepickle, q_postpickle)
 
 
 if __name__ == '__main__':
