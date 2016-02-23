@@ -21,28 +21,21 @@ import pint
 # we create it here.
 UNIT_REGISTRY = pint.UnitRegistry()
 
-# Pint 0.6 uses 'Bo' as the abbreviation for a byte. We want to use
-# 'B', like the rest of the world.
-UNIT_REGISTRY.define('byte = 8 * bit = B')
-
 # Apparently the prefix kilo- is supposed to be abbreviated with a
 # lower-case k. However, everyone uses the upper-case K, and would be
 # very surprised to find out that 'KB' is not a valid unit.
 UNIT_REGISTRY.define('K- = 1000')
 
 
-# The Pint documentation suggests serializing Quantities as
-# strings. If we don't supply any serializers, using --run_stage to
-# separate prepare and run phases of a benchmark can fail for any
-# benchmark that has a units flag where the default value is not
-# overridden, because the default value will have been serialized with
-# a different UnitRegistry than the one in the run phase.
+# The Pint documentation suggests serializing Quantities as tuples. We
+# supply serializers to make sure that Quantities are unpickled with
+# our UnitRegistry, where we have added the K- unit.
 def _PickleQuantity(q):
-  return _UnPickleQuantity, (str(q),)
+  return _UnPickleQuantity, (q.to_tuple(),)
 
 
 def _UnPickleQuantity(inp):
-  return UNIT_REGISTRY.parse_expression(inp)
+  return UNIT_REGISTRY.Quantity.from_tuple(inp)
 
 
 copy_reg.pickle(UNIT_REGISTRY.Quantity, _PickleQuantity)
