@@ -54,6 +54,9 @@ flags.DEFINE_enum('storage', providers.GCP,
 flags.DEFINE_string('object_storage_region', None,
                     'Storage region for object storage benchmark.')
 
+flags.DEFINE_string('object_storage_gcs_multiregion', None,
+                    'Storage multiregion for GCS in object storage benchmark.')
+
 flags.DEFINE_enum('object_storage_scenario', 'all',
                   ['all', 'cli', 'api_data', 'api_namespace'],
                   'select all, or one particular scenario to run: \n'
@@ -191,6 +194,13 @@ AWS_S3_REGION_TO_ENDPOINT_TABLE = {
     'sa-east-1': 's3-sa-east-1'
 }
 AWS_S3_ENDPOINT_SUFFIX = '.amazonaws.com'
+
+# Keys for flag names and metadata values
+OBJECT_STORAGE_REGION = 'object_storage_region'
+REGIONAL_BUCKET_LOCATION = 'regional_bucket_location'
+OBJECT_STORAGE_GCS_MULTIREGION = 'object_storage_gcs_multiregion'
+GCS_MULTIREGION_LOCATION = 'gcs_multiregion_location'
+DEFAULT = 'default'
 
 
 def GetConfig(user_config):
@@ -865,7 +875,11 @@ class GoogleCloudStorageBenchmark(object):
 
     vm.bucket_name = 'pkb%s' % FLAGS.run_uri
 
-    vm.RemoteCommand('%s mb gs://%s' % (vm.gsutil_path, vm.bucket_name))
+    make_bucket_command = '%s mb' % vm.gsutil_path
+    if FLAGS.object_storage_gcs_multiregion:
+      make_bucket_command += ' -l %s' % FLAGS.object_storage_gcs_multiregion
+    make_bucket_command += ' gs://%s' % vm.bucket_name
+    vm.RemoteCommand(make_bucket_command)
 
     region = FLAGS.object_storage_region or DEFAULT_GCP_REGION
     vm.regional_bucket_name = '%s-%s' % (vm.bucket_name,
@@ -919,6 +933,11 @@ class GoogleCloudStorageBenchmark(object):
     results = []
     metadata['pkb_installed_crcmod'] = vm.installed_crcmod
     metadata[BOTO_LIB_VERSION] = _GetClientLibVersion(vm, 'boto')
+    if FLAGS[OBJECT_STORAGE_GCS_MULTIREGION].present:
+      metadata[GCS_MULTIREGION_LOCATION] = FLAGS.object_storage_gcs_multiregion
+    else:
+      metadata[GCS_MULTIREGION_LOCATION] = DEFAULT
+
     # CLI tool based tests.
     scratch_dir = vm.GetScratchDir()
     clean_up_bucket_cmd = '%s rm gs://%s/*' % (vm.gsutil_path, vm.bucket_name)
@@ -1156,6 +1175,11 @@ def Run(benchmark_spec):
   vms[0].RemoteCommand(
       'cd %s/run/; bash cloud-storage-workload.sh %s' % (vms[0].GetScratchDir(),
                                                          FLAGS.cli_test_size))
+  if FLAGS[OBJECT_STORAGE_REGION].present:
+    metadata[REGIONAL_BUCKET_LOCATION] = FLAGS.object_storage_region
+  else:
+    metadata[REGIONAL_BUCKET_LOCATION] = DEFAULT
+
   results = OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0],
                                                                    metadata)
   print results
