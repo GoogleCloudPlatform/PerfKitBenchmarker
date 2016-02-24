@@ -19,6 +19,7 @@ import unittest
 import mock
 
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import requirements
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import mock_flags
 
@@ -32,6 +33,16 @@ class LoadProvidersTestCase(unittest.TestCase):
   def testLoadInvalidProvider(self):
     with self.assertRaises(ImportError):
       providers.LoadProvider('InvalidCloud')
+
+  def testLoadProviderChecksRequirements(self):
+    with mock.patch(requirements.__name__ + '.CheckProviderRequirements'):
+      providers.LoadProvider('gcp', ignore_package_requirements=False)
+      requirements.CheckProviderRequirements.assert_called_once_with('gcp')
+
+  def testLoadProviderIgnoresRequirements(self):
+    with mock.patch(requirements.__name__ + '.CheckProviderRequirements'):
+      providers.LoadProvider('gcp')
+      requirements.CheckProviderRequirements.assert_not_called()
 
   def testBenchmarkConfigSpecLoadsProvider(self):
     p = mock.patch(providers.__name__ + '.LoadProvider')
@@ -50,4 +61,4 @@ class LoadProvidersTestCase(unittest.TestCase):
     with mock_flags.PatchFlags() as mocked_flags:
       benchmark_config_spec.BenchmarkConfigSpec(
           'name', flag_values=mocked_flags, **config)
-    providers.LoadProvider.assert_called_with('aws')
+    providers.LoadProvider.assert_called_with('aws', True)

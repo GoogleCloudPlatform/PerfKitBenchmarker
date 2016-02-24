@@ -16,6 +16,7 @@ import logging
 import os
 
 from perfkitbenchmarker import import_util
+from perfkitbenchmarker import requirements
 
 # This unconditionally loads any modules in any provider
 # directory with the name 'flags'. It is expected that providers
@@ -39,18 +40,23 @@ VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
                 RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS]
 
 
-def LoadProvider(provider_name):
+def LoadProvider(provider_name, ignore_package_requirements=True):
   """Loads the all modules in the 'provider_name' package.
 
-  This function loads all modules in the provided package. By loading these
-  modules, relevant classes (e.g. VMs) will register themselves. This should
-  be called with the exact name of the package, which is usually the name of
-  the provider in lower case (e.g. the package name for the 'GCP' provider
-  is 'gcp').
+  This function first checks the specified provider's Python package
+  requirements file, if one exists, and verifies that all requirements are met.
+  Next, it loads all modules in the specified provider's package. By loading
+  these modules, relevant classes (e.g. VMs) will register themselves.
 
   Args:
     provider_name: The name of the package whose modules should be loaded.
+        Usually the name of the provider in lower case (e.g. the package name
+        for the 'GCP' provider is 'gcp'.
+    ignore_package_requirements: boolean. If True, the provider's Python package
+        requirements file is ignored.
   """
+  if not ignore_package_requirements:
+    requirements.CheckProviderRequirements(provider_name)
   provider_package_path = os.path.join(__path__[0], provider_name)
   try:
     # Iterating through this generator will load all modules in the provider
