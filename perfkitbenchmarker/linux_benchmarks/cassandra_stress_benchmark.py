@@ -44,7 +44,6 @@ PROPAGATION_WAIT_TIME = 30
 WRITE_COMMAND = 'write'
 COUNTER_WRITE_COMMAND = 'counter_write'
 USER_COMMAND = 'user'
-JUJU = 'juju'
 
 READ_COMMAND = 'read'
 COUNTER_READ_COMMAND = 'counter_read'
@@ -324,11 +323,7 @@ def Prepare(benchmark_spec):
   configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
   vm_util.RunThreaded(configure, cassandra_vms)
 
-  if FLAGS.os_type != JUJU:
-    """
-    Juju automatically configures and starts the Cassandra cluster.
-    """
-    cassandra.StartCluster(seed_vm, cassandra_vms[1:])
+  cassandra.StartCluster(seed_vm, cassandra_vms[1:])
 
   if FLAGS.cassandra_stress_command == USER_COMMAND:
     for vm in vm_dict[CLIENT_GROUP]:
