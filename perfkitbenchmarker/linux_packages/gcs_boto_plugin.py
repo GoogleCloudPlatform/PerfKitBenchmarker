@@ -19,7 +19,7 @@
 def _Install(vm):
   """Installs the iperf package on the VM."""
   vm.Install('pip')
-  vm.RemoteCommand('sudo pip install gcs-oauth2-boto-plugin==1.8')
+  vm.RemoteCommand('sudo pip install gcs-oauth2-boto-plugin')
 
 
 def YumInstall(vm):

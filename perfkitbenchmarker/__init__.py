@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy_reg
 import gflags as flags  # NOQA
 import gflags_validators as flags_validators  # NOQA
 import pint
@@ -20,11 +21,21 @@ import pint
 # we create it here.
 UNIT_REGISTRY = pint.UnitRegistry()
 
-# Pint 0.6 uses 'Bo' as the abbreviation for a byte. We want to use
-# 'B', like the rest of the world.
-UNIT_REGISTRY.define('byte = 8 * bit = B')
-
 # Apparently the prefix kilo- is supposed to be abbreviated with a
 # lower-case k. However, everyone uses the upper-case K, and would be
 # very surprised to find out that 'KB' is not a valid unit.
 UNIT_REGISTRY.define('K- = 1000')
+
+
+# The Pint documentation suggests serializing Quantities as tuples. We
+# supply serializers to make sure that Quantities are unpickled with
+# our UnitRegistry, where we have added the K- unit.
+def _PickleQuantity(q):
+  return _UnPickleQuantity, (q.to_tuple(),)
+
+
+def _UnPickleQuantity(inp):
+  return UNIT_REGISTRY.Quantity.from_tuple(inp)
+
+
+copy_reg.pickle(UNIT_REGISTRY.Quantity, _PickleQuantity)

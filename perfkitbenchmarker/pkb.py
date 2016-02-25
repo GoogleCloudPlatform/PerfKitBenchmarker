@@ -74,6 +74,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import requirements
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import traces
@@ -182,6 +183,10 @@ flags.DEFINE_bool(
     'execution ends. When False, benchmarks continue to be scheduled. Does not '
     'apply to keyboard interrupts, which will always prevent further '
     'benchmarks from being scheduled.')
+flags.DEFINE_boolean(
+    'ignore_package_requirements', False,
+    'Disables Python package requirement runtime checks.')
+
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -430,6 +435,8 @@ def SetUpPKB():
   SetUpPKB() also modifies the local file system by creating a temp
   directory and storing new SSH keys.
   """
+  if not FLAGS.ignore_package_requirements:
+    requirements.CheckBasicRequirements()
 
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):

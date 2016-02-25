@@ -14,4 +14,5 @@
 
 # Additional requirements (beyond those in requirements.txt) for running
 # PerfKitBenchmarker on OpenStack.
-python-novaclient
+python-keystoneclient==2.1.1
+python-novaclient==2.35.0

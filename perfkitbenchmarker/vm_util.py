@@ -112,7 +112,7 @@ def GetTempDir():
 
 def PrependTempDir(file_name):
   """Returns the file name prepended with the tmp dir of the current run."""
-  return '%s/%s' % (GetTempDir(), file_name)
+  return os.path.join(GetTempDir(), file_name)
 
 
 def GenTempDir():
