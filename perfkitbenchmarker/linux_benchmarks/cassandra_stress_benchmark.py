@@ -167,8 +167,6 @@ CLIENT_GROUP = 'client'
 SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
 TEMP_PROFILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'profile.yaml')
 
-CASSANDRA_STRESS = posixpath.join(cassandra.CASSANDRA_DIR, 'tools', 'bin',
-                                  'cassandra-stress')
 # Results documentation:
 # http://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStressOutput_c.html
 RESULTS_METRICS = (
@@ -358,14 +356,6 @@ def RunTestOnLoader(vm, loader_index, operations_per_vm, data_node_ips,
     population_params: string. Representing additional population parameters.
   """
 
-  if FLAGS.os_type == JUJU:
-    """
-    Replace the stock CASSANDRA_STRESS so that it uses the binary
-    installed by the cassandra-stress charm.
-    """
-    global CASSANDRA_STRESS
-    CASSANDRA_STRESS = '/usr/bin/cassandra-stress'
-
   command = FLAGS.cassandra_stress_command
 
   if command == USER_COMMAND:
@@ -397,7 +387,7 @@ def RunTestOnLoader(vm, loader_index, operations_per_vm, data_node_ips,
       '-node {nodes} {schema} {population_dist} '
       '-log file={result_file} -rate threads={threads} '
       '-errors retries={retries}'.format(
-          cassandra=CASSANDRA_STRESS,
+          cassandra=cassandra.GetCassandraStressPath(),
           command=command,
           consistency_level=FLAGS.cassandra_stress_consistency_level,
           num_keys=operations_per_vm,
@@ -535,8 +525,5 @@ def Cleanup(benchmark_spec):
   vm_dict = benchmark_spec.vm_groups
   cassandra_vms = vm_dict[CASSANDRA_GROUP]
 
-  if FLAGS.os_type == JUJU:
-    pass
-  else:
-    vm_util.RunThreaded(cassandra.Stop, cassandra_vms)
-    vm_util.RunThreaded(cassandra.CleanNode, cassandra_vms)
+  vm_util.RunThreaded(cassandra.Stop, cassandra_vms)
+  vm_util.RunThreaded(cassandra.CleanNode, cassandra_vms)
