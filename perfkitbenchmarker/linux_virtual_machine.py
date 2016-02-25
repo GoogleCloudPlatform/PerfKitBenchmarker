@@ -1022,6 +1022,14 @@ class JujuMixin(DebianMixin):
             pass
         return None
 
+    def juju_run(self, cmd):
+        try:
+            output, _ = self.RemoteHostCommand(cmd)
+            return output.strip()
+        except:
+            pass
+        return None
+
     def juju_status(self):
         """
         Return the status of the Juju environment.
@@ -1070,6 +1078,12 @@ class JujuMixin(DebianMixin):
                 # Accept blocked because the service may be waiting on relation
                 if ss not in ['active', 'unknown']:
                     ready = False
+
+                if ss in ['error']:
+                    # The service has failed to deploy.
+                    debuglog = self.juju_run('juju debug-log --limit 200')
+                    logging.warn(debuglog)
+                    return False
 
                 for unit in status['services'][service]['units']:
                     unit_data = status['services'][service]['units'][unit]
