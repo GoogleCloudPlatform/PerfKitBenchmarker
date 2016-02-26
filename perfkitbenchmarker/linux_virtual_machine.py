@@ -968,11 +968,6 @@ class JujuMixin(DebianMixin):
 
     OS_TYPE = 'juju'
 
-    # install_packages = [
-    #     'juju-deployer',
-    #     'juju-core',
-    #     'juju-quickstart'
-    # ]
     isController = False
 
     """
@@ -1003,8 +998,6 @@ class JujuMixin(DebianMixin):
         if self.isController:
 
             resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
-
-            # yaml = self.environments_yaml.format(self.internal_ip)
 
             f = tempfile.NamedTemporaryFile(delete=False)
             f.write(self.environments_yaml.format(self.internal_ip))
@@ -1071,9 +1064,7 @@ class JujuMixin(DebianMixin):
             status = yaml.load(self.juju_status())
             # logging.warn(status)
             for service in status['services']:
-                # logging.warn("Examining service %s" % service )
                 ss = status['services'][service]['service-status']['current']
-                # logging.warn("Service-status: %s" % ss)
 
                 # Accept blocked because the service may be waiting on relation
                 if ss not in ['active', 'unknown']:
@@ -1088,24 +1079,21 @@ class JujuMixin(DebianMixin):
                 for unit in status['services'][service]['units']:
                     unit_data = status['services'][service]['units'][unit]
                     ag = unit_data['agent-state']
-                    # logging.warn('agent-state: %s' % ag)
                     if ready and ag != 'started':
                         ready = False
 
                     ws = unit_data['workload-status']['current']
-                    # logging.warn('workload-status: %s' % ws)
                     if ready and ws not in ['active', 'unknown']:
                         ready = False
             # TODO: Exit loop if timeout exceeded
             if ready:
                 return
-            time.sleep(15)
+            time.sleep(30)
 
 
     def Deploy(self, charm, units=1):
         if self.isController:
             # Check if the charm is already deployed?
-
             resp, _ = self.RemoteHostCommand(
                 "juju deploy %s --num-units=%d" % (charm, units))
 
