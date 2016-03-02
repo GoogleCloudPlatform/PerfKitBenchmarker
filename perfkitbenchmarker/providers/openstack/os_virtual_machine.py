@@ -17,6 +17,7 @@ import threading
 import time
 
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import providers
@@ -54,21 +55,47 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                                                FLAGS.run_uri)
         self.client = os_utils.NovaClient()
         self.public_network = os_network.OpenStackPublicNetwork(
-            FLAGS.openstack_public_network
+            FLAGS.openstack_floating_ip_pool
         )
         self.id = None
         self.pk = None
         self.user_name = FLAGS.openstack_image_username
         self.boot_wait_time = None
         self.image = self.image or self.DEFAULT_IMAGE
+        self.public_net = None
+        self.private_net = None
+        self.floating_ip = None
 
     def _Create(self):
         image = self.client.images.findall(name=self.image)[0]
         flavor = self.client.flavors.findall(name=self.machine_type)[0]
 
-        network = self.client.networks.find(
-            label=FLAGS.openstack_private_network)
-        nics = [{'net-id': network.id}]
+        # FIXME(meteofox): Remove --openstack_public_network and
+        # --openstack_private_network once depreciation time has expired
+        self.floating_ip_pool_name = (FLAGS.openstack_floating_ip_pool or
+                                      FLAGS.openstack_public_network)
+        self.network_name = (FLAGS.openstack_network or
+                             FLAGS.openstack_private_network)
+
+        if self.network_name:
+            self.private_net = self.client.networks.find(
+                label=self.network_name)
+        if self.floating_ip_pool_name:
+            self.public_net = self.client.networks.find(
+                label=self.floating_ip_pool_name)
+
+        if self.public_net is None and self.private_net is None:
+            raise errors.Error(
+                'Cannot build instance without a network. Make sure to set '
+                'either just --openstack_network or both --openstack_network '
+                'and --openstack_private_network flags.')
+        elif self.private_net is None and self.public_net:
+            raise errors.Error(
+                'Cannot allocate floating IP address without an internally '
+                'routable network. Make sure --openstack_network flag is set.')
+
+        nics = [{'net-id': self.private_net.id}]
+
         image_id = image.id
         boot_from_vol = []
         scheduler_hints = None
@@ -84,7 +111,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             scheduler_hints = {'group': group.id}
 
         if FLAGS.openstack_boot_from_volume:
-
             if FLAGS.openstack_volume_size:
                 volume_size = FLAGS.openstack_volume_size
             else:
@@ -120,18 +146,22 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             instance = self.client.servers.get(self.id)
             status = instance.status
 
+        assert self.private_net is not None  # Previously checked, must be true.
+        self.internal_ip = instance.networks[self.network_name][0]
+        self.ip_address = self.internal_ip
+        if self.public_net:
+            self.floating_ip = self._AllocateFloatingIP(instance)
+            self.ip_address = self.floating_ip.ip
+
+    def _AllocateFloatingIP(self, instance):
         with self._floating_ip_lock:
-            self.floating_ip = self.public_network.get_or_create()
-            instance.add_floating_ip(self.floating_ip)
-            logging.info('floating-ip associated: {}'.format(
-                self.floating_ip.ip))
-
-        while not self.public_network.is_attached(self.floating_ip):
+            floating_ip = self.public_network.get_or_create()
+            instance.add_floating_ip(floating_ip)
+            logging.info(
+                'floating-ip associated: {}'.format(floating_ip.ip))
+        while not self.public_network.is_attached(floating_ip):
             time.sleep(1)
-
-        self.ip_address = self.floating_ip.ip
-        self.internal_ip = instance.networks[
-            FLAGS.openstack_private_network][0]
+        return floating_ip
 
     @os_utils.retry_authorization(max_retries=4)
     def _Delete(self):
@@ -142,7 +172,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         except NotFound:
             logging.info('Instance not found, may have been already deleted')
 
-        self.public_network.release(self.floating_ip)
+        if self.floating_ip:
+            self.public_network.release(self.floating_ip)
 
     @os_utils.retry_authorization(max_retries=4)
     def _Exists(self):
