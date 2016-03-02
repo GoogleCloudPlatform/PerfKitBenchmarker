@@ -498,38 +498,18 @@ override the path.
 
 ### Installing CLIs and credentials for Rackspace
 
-In order to interact with the Rackspace Public Cloud, PerfKit Benchmarker makes
-use of the Nova, and the Neutron CLI clients with the Rackspace extensions.
+In order to interact with the Rackspace Public Cloud, PerfKitBenchmarker makes
+use of RackCLI. You can find the instructions to install and configure
+RackCLI here: https://developer.rackspace.com/docs/rack-cli/
 
-To run PerfKit Benchmarker against Rackspace is very easy. First, install the
-CLI clients as follows:
+To run PerfKit Benchmarker against Rackspace is very easy. Simply make sure
+Rack CLI is installed and available in your PATH, optionally use the flag
+`--rack_path` to indicate the path to the binary.
 
-```bash
-$ pip install -r requirements-rackspace.txt
-```
-
-Once these are installed, all we need to do is to set 3 environment variables:
-
-```bash
-export OS_USERNAME=<your_rackspace_username>
-export OS_PASSWORD=<your_rackspace_API_key>
-export OS_TENANT_NAME=<your_rackspace_account_number>
-```
-
-For a Rackspace UK Public Cloud account, an extra environment variable has to
-be set, please remember that only the LON region is available under
-a Rackspace UK Public Cloud account.
-
-```bash
-export OS_AUTH_URL=https://lon.identity.api.rackspacecloud.com/v2.0/
-
-export OS_USERNAME=<your_rackspace_uk_username>
-export OS_PASSWORD=<your_rackspace_uk_API_key>
-export OS_TENANT_NAME=<your_rackspace_uk_account_number>
-```
-
-*Tip*: Put these variables in a file, and simple source them to your shell with
-`source <filename>` 
+For a Rackspace UK Public Cloud account, unless it's your default RackCLI
+profile then it's recommended that you create a profile for your UK account.
+Once configured, use flag `--profile` to specify which RackCLI profile to use.
+You can find more details here: https://developer.rackspace.com/docs/rack-cli/configuration/#config-file
 
 **Note:** Not all flavors are supported on every region. Always check first
 if the flavor is supported in the region.

@@ -14,37 +14,37 @@
 
 from perfkitbenchmarker import flags
 
-flags.DEFINE_boolean('boot_from_cbs_volume', 'False',
+flags.DEFINE_string('rack_path',
+                    default='rack',
+                    help='The path for the rack CLI binary.')
+
+flags.DEFINE_string('rackspace_region', default='IAD',
+                    help='A string indicating which Rackspace region to use.')
+
+flags.DEFINE_string('rack_profile', default=None,
+                    help='A string indicating which RackCLI profile to use. '
+                         'If none is specified default profile is used '
+                         '(see https://developer.rackspace.com/docs/'
+                         'rack-cli/configuration/#config-file)')
+
+flags.DEFINE_boolean('rackspace_boot_from_cbs_volume', 'False',
                      'When flag is included the instance will use a remote disk'
-                     'as its boot disk, if machine_type supports it.')
-
-flags.DEFINE_string('nova_path',
-                    'nova',
-                    'The path for the rackspace-novaclient tool.')
-
-flags.DEFINE_string('neutron_path',
-                    'neutron',
-                    'The path for the rackspace-neutronclient tool.')
-
-flags.DEFINE_list('additional_rackspace_flags',
-                  [],
-                  'Additional flags to pass to Rackspace.')
+                     ' as its boot disk, if machine_type supports it.')
 
 flags.DEFINE_boolean(
-    'use_security_group', False,
-    'A boolean indicating if whether or not to create a security group for the'
-    ' new instance. Applies default security group rules'
+    'rackspace_use_security_group', False,
+    '(EXPERIMENTAL) A boolean indicating whether or not to create a security'
+    ' group for the new instance. Applies default security group rules'
     ' (e.g. allow ingress TCP, and UDP traffic through port 22). If no security'
     ' group is used, all incoming and outgoing traffic through TCP, UDP and'
     ' ICMP is allowed, this is the default.')
 
-flags.DEFINE_boolean(
-    'rackspace_apply_onmetal_ssd_tuning', default=False,
-    help='Apply Rackspace recommended tuning to PCIe-based flash storage '
-         'included with OnMetal IO instances. See: '
-         'http://www.rackspace.com/knowledge_center/article/'
-         'configure-flash-drives-in-high-io-instances-as-data-drives')
+flags.DEFINE_string('rackspace_network_id', None,
+                    '(EXPERIMENTAL) The ID of an already '
+                    'created network to use instead of creating a new one. '
+                    'Must have a subnet already associated with the network.')
 
-flags.DEFINE_string(
-    'image_id', None, 'The ID of the image from which you want to'
-    ' create the volume.')
+flags.DEFINE_list('additional_rackspace_flags',
+                  [],
+                  'Additional global flags to pass to every '
+                  'RackCLI command. See "rack --help" for more.')

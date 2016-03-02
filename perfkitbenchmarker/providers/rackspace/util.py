@@ -13,97 +13,98 @@
 # limitations under the License.
 """Utilities for working with Rackspace Cloud Platform resources."""
 
-import os
-import re
+from collections import OrderedDict
 
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-PROPERTY_VALUE_ROW_REGEX = r'\|\s+(:?\S+\s\S+|\S+)\s+\|\s+(.*?)\s+\|'
-PROP_VAL_PATTERN = re.compile(PROPERTY_VALUE_ROW_REGEX)
 
+class RackCLICommand(object):
+  """A rack cli command.
 
-def ParseNovaTable(output):
-  """Returns a dict with key/values returned from a Nova CLI formatted table.
-
-  Returns:
-  dict with key/values of the resource requested.
+  Attributes:
+    args: list of strings. Positional args to pass to rack cli, typically
+        specifying an operation to perform (e.g. ['servers', 'images', 'list']
+        to list available images).
+    flags: OrderedDict mapping flag name string to flag value. Flags to pass to
+        rack cli (e.g. {'image-id': 'some-image-id'}).
+    additional_flags: list of strings. Additional flags to append unmodified to
+        the end of the rack cli command (e.g. ['--metadata', 'owner=user']).
   """
-  stdout_lines = output.split('\n')
-  groups = (PROP_VAL_PATTERN.match(line) for line in stdout_lines)
-  tuples = (g.groups() for g in groups if g)
-  filtered_tuples = ((key, val) for (key, val) in tuples
-                     if key and key not in ('', 'Property',))
-  return dict(filtered_tuples)
 
+  def __init__(self, resource, *args):
+    """Initialize a RackCLICommand with the provided args and common flags.
 
-def GetDefaultRackspaceCommonEnv(zone='IAD'):
-  """Return common set of environment variables for using any OpenStack client
-  against the Rackspace Public Cloud.
+    Args:
+      resource: A Rackspace resource of type BaseResource.
+      *args: sequence of strings. Positional args to pass to rack cli, typically
+          specifying an operation to perform. (e.g. ['servers', 'image', 'list']
+          to list available images).
+    """
+    self.resource = resource
+    self.args = list(args)
+    self.flags = OrderedDict()
+    self.additional_flags = []
 
-  Args:
-  zone: string specifying Rackspace region to use.
+  def __repr__(self):
+    return '{0}({1})'.format(type(self).__name__, ' '.join(self._GetCommand()))
 
-  Returns:
-  dict of environment variables
-  """
-  env = {
-      'OS_AUTH_URL': os.getenv('OS_AUTH_URL',
-                               'https://identity.api.rackspacecloud.com/v2.0/'),
-      'OS_AUTH_SYSTEM': os.getenv('OS_AUTH_SYSTEM', 'rackspace'),
-      'OS_SERVICE_NAME': os.getenv('OS_SERVICE_NAME', 'cloudServersOpenStack'),
-      'OS_REGION_NAME': zone,
-      'OS_USERNAME': os.getenv('OS_USERNAME'),
-      'OS_PASSWORD': os.getenv('OS_PASSWORD'),
-      'OS_TENANT_NAME': os.getenv('OS_TENANT_NAME'),
-      'OS_NO_CACHE': os.getenv('OS_NO_CACHE', '1'),
-  }
+  def Issue(self, **kwargs):
+    """Tries running the rack cli command once.
 
-  environment_vars_missing = []
-  for key, val in env.items():
-    if val is None:
-      environment_vars_missing.append(key)
+    Args:
+      **kwargs: Keyword arguments to forward to vm_util.IssueCommand when
+          issuing the rack cli command.
 
-  if len(environment_vars_missing) != 0:
-    msg = ('The following required environment variables were not found:\n',
-           '\n'.join(environment_vars_missing),
-           '\n\nPlease make sure to source them into your environment, and try',
-           ' again.',)
-    raise errors.Error(''.join(msg))
+    Returns:
+      A tuple of stdout, stderr, and retcode from running the rack cli command.
+    """
+    return vm_util.IssueCommand(self._GetCommand(), **kwargs)
 
-  return env
+  def IssueRetryable(self, **kwargs):
+    """Tries running the rack cli command until it succeeds or times out.
 
+    Args:
+      **kwargs: Keyword arguments to forward to vm_util.IssueRetryableCommand
+          when issuing the rack cli command.
 
-def GetDefaultRackspaceNovaEnv(zone):
-  """Return common set of environment variables for using the Nova client
-  against the Rackspace Public Cloud.
+    Returns:
+      (stdout, stderr) pair of strings from running the rack cli command.
+    """
+    return vm_util.IssueRetryableCommand(self._GetCommand(), **kwargs)
 
-  Args:
-  zone: string specifying Rackspace region to use.
+  def _AddCommonFlags(self, resource):
+    """Adds common flags to the command.
 
-  Returns:
-  dict of environment variables for Nova
-  """
-  env = GetDefaultRackspaceCommonEnv(zone)
-  env.update({
-      'NOVA_RAX_AUTH': os.getenv('NOVA_RAX_AUTH', '1'),
-  })
+    Adds common rack cli flags derived from the PKB flags and provided resource.
 
-  return env
+    Args:
+      resource: A Rackspace resource of type BaseResource.
+    """
+    self.flags['output'] = 'json'
+    if hasattr(resource, 'profile') and resource.profile is not None:
+      self.flags['profile'] = resource.profile
+    if hasattr(resource, 'region'):
+      self.flags['region'] = resource.region
+    self.additional_flags.extend(FLAGS.additional_rackspace_flags or ())
 
+  def _GetCommand(self):
+    """Generates the rack cli command.
 
-def GetDefaultRackspaceNeutronEnv(zone):
-  """Return common set of environment variables for using the Neutron client
-  against the Rackspace Public Cloud.
-
-  Args:
-  zone: string specifying Rackspace region to use.
-
-  Returns:
-  dict of environment variables for Neutron
-  """
-  env = GetDefaultRackspaceCommonEnv(zone)
-
-  return env
+    Returns:
+        list of strings. When joined by spaces, form the rack cli command.
+    """
+    cmd = [FLAGS.rack_path]
+    cmd.extend(self.args)
+    self._AddCommonFlags(self.resource)
+    for flag_name, value in self.flags.iteritems():
+      flag_name_str = '--{0}'.format(flag_name)
+      if value is True:
+        cmd.append(flag_name_str)
+      else:
+        cmd.append(flag_name_str)
+        cmd.append(str(value))
+    cmd.extend(self.additional_flags)
+    return cmd
