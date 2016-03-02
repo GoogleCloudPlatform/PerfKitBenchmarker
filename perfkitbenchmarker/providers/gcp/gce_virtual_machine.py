@@ -25,6 +25,7 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import json
+import logging
 import re
 import yaml
 
@@ -32,7 +33,9 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
@@ -41,7 +44,6 @@ from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
-from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -283,11 +285,32 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['machine-type'] = self.machine_type
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
-    cmd.flags['metadata-from-file'] = 'sshKeys=%s' % ssh_keys_path
-    metadata = ['owner=%s' % FLAGS.owner]
-    for key, value in self.boot_metadata.iteritems():
-      metadata.append('%s=%s' % (key, value))
-    cmd.flags['metadata'] = ','.join(metadata)
+
+    metadata_from_file = {'sshKeys': ssh_keys_path}
+    parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
+        FLAGS.gcp_instance_metadata_from_file)
+    for key, value in parsed_metadata_from_file.iteritems():
+      if key in metadata_from_file:
+        logging.warning('Metadata "%s" is set internally. Cannot be overridden '
+                        'from command line.' % key)
+        continue
+      metadata_from_file[key] = value
+    cmd.flags['metadata-from-file'] = ','.join([
+        '%s=%s' % (k, v) for k, v in metadata_from_file.iteritems()
+    ])
+
+    metadata = {'owner': FLAGS.owner} if FLAGS.owner else {}
+    metadata.update(self.boot_metadata)
+    parsed_metadata = flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata)
+    for key, value in parsed_metadata.iteritems():
+      if key in metadata:
+        logging.warning('Metadata "%s" is set internally. Cannot be overridden '
+                        'from command line.' % key)
+        continue
+      metadata[key] = value
+    cmd.flags['metadata'] = ','.join(
+        ['%s=%s' % (k, v) for k, v in metadata.iteritems()])
+
     if not FLAGS.gce_migrate_on_maintenance:
       cmd.flags['maintenance-policy'] = 'TERMINATE'
     ssd_interface_option = NVME if NVME in self.image else SCSI
