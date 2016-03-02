@@ -173,5 +173,23 @@ class TestUnitsParser(unittest.TestCase):
       up.Parse('1m')
 
 
+class TestYAMLParser(unittest.TestCase):
+
+  def setUp(self):
+    self.parser = flag_util.YAMLParser()
+
+  def testValidString(self):
+    self.assertEqual(self.parser.Parse('[1, 2, 3]'),
+                     [1, 2, 3])
+
+  def testPreParsedYAML(self):
+    self.assertEqual(self.parser.Parse([1, 2, 3]),
+                     [1, 2, 3])
+
+  def testBadYAML(self):
+    with self.assertRaises(ValueError):
+      self.parser.Parse('{a')
+
+
 if __name__ == '__main__':
   unittest.main()
