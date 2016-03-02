@@ -16,6 +16,7 @@
 
 import contextlib
 import mock
+import re
 import unittest
 
 from perfkitbenchmarker import benchmark_spec
@@ -227,6 +228,8 @@ class GCEVMFlagsTestCase(unittest.TestCase):
     self._mocked_flags.gcloud_path = 'test_gcloud'
     self._mocked_flags.os_type = os_types.DEBIAN
     self._mocked_flags.run_uri = 'aaaaaa'
+    self._mocked_flags.gcp_instance_metadata = []
+    self._mocked_flags.gcp_instance_metadata_from_file = []
     # Creating a VM object causes network objects to be added to the current
     # thread's benchmark spec. Create such a benchmark spec for these tests.
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
@@ -266,6 +269,41 @@ class GCEVMFlagsTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       self.assertIn('--image-project bar',
                     ' '.join(issue_command.call_args[0][0]))
+
+  def testGcpInstanceMetadataFlag(self):
+    with self._PatchCriticalObjects() as issue_command:
+      self._mocked_flags.gcp_instance_metadata = ['k1:v1', 'k2:v2,k3:v3']
+      self._mocked_flags.owner = 'test-owner'
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', self._mocked_flags, image='image',
+          machine_type='test_machine_type')
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      actual_metadata = re.compile('--metadata\s+(.*)(\s+--)?').search(
+          ' '.join(issue_command.call_args[0][0])).group(1)
+      self.assertIn('k1=v1', actual_metadata)
+      self.assertIn('k2=v2', actual_metadata)
+      self.assertIn('k3=v3', actual_metadata)
+      # Assert that FLAGS.owner is honored and added to instance metadata.
+      self.assertIn('owner=test-owner', actual_metadata)
+
+  def testGcpInstanceMetadataFromFileFlag(self):
+    with self._PatchCriticalObjects() as issue_command:
+      self._mocked_flags.gcp_instance_metadata_from_file = [
+          'k1:p1', 'k2:p2,k3:p3']
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', self._mocked_flags, image='image',
+          machine_type='test_machine_type')
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      actual_metadata_from_file = re.compile(
+          '--metadata-from-file\s+(.*)(\s+--)?').search(
+          ' '.join(issue_command.call_args[0][0])).group(1)
+      self.assertIn('k1=p1', actual_metadata_from_file)
+      self.assertIn('k2=p2', actual_metadata_from_file)
+      self.assertIn('k3=p3', actual_metadata_from_file)
 
 
 if __name__ == '__main__':
