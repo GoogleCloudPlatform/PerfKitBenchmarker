@@ -643,7 +643,7 @@ How to Run Windows Benchmarks
 You must be running on a Windows machine in order to run Windows benchmarks.
 Install all dependencies as above and set TrustedHosts to accept all hosts so
 that you can open PowerShell sessions with the VMs (both machines having each
-other in their TrustedHosts list is neccessary, but not sufficient to issue
+other in their TrustedHosts list is necessary, but not sufficient to issue
 remote commands; valid credentials are still required):
 
 ```
@@ -691,7 +691,7 @@ Useful Global Flags
 ==================
 
 The following are some common flags used when configuring
-PerfKit Benchmaker.
+PerfKit Benchmarker.
 
 Flag | Notes
 -----|------
@@ -837,10 +837,10 @@ See the section below for how to use static (i.e. pre-provisioned) machines in y
 
 Advanced: How To Run Benchmarks Without Cloud Provisioning (e.g., local workstation)
 ==================
-It is possible to run PerfKit Benchmarker without running the Cloud provioning steps.  This is useful if you want to run on a local machine, or have a benchmark like iperf run from an external point to a Cloud VM.
+It is possible to run PerfKit Benchmarker without running the Cloud provisioning steps.  This is useful if you want to run on a local machine, or have a benchmark like iperf run from an external point to a Cloud VM.
 
 In order to do this you need to make sure:
-* The static (ie not provisioned by PerfKit Benchmarker) machine is ssh'able
+* The static (i.e. not provisioned by PerfKit Benchmarker) machine is ssh'able
 * The user PerfKitBenchmarker will login as has 'sudo' access.  (*** Note we hope to remove this restriction soon ***)
 
 Next, you will want to create a YAML user config file describing how to connect to the machine as follows:
@@ -880,7 +880,7 @@ I called my file `iperf.yaml` and used it to run iperf from Siberia to a GCP VM 
 $ ./pkb.py --benchmarks=iperf --machine_type=f1-micro --benchmark_config_file=iperf.yaml --zone=us-central1-f --ip_addresses=EXTERNAL
 ```
 
-* `ip_addresses=EXTERNAL` tells PerfKit Bechmarker not to use 10.X (ie Internal) machine addresses that all Cloud VMs have.  Just use the external IP address.
+* `ip_addresses=EXTERNAL` tells PerfKit Benchmarker not to use 10.X (ie Internal) machine addresses that all Cloud VMs have.  Just use the external IP address.
 
 If a benchmark requires two machines like iperf, you can have two machines in the same YAML file as shown below.  This means you can indeed run between two machines and never provision any VMs in the Cloud.
 
@@ -945,7 +945,7 @@ file we have added a lot of comments into the code to make it easy to:
 * Add new providers (e.g.: `--cloud=<new provider>`)
 * etc.
 
-Even with lots of comments we make to support more detailed documention.  You will find the documatation we have on the [wiki](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki).  Missing documentation you want?  Start a page and/or open an [issue](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) to get it added.
+Even with lots of comments we make to support more detailed documention.  You will find the documentation we have on the [wiki](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki).  Missing documentation you want?  Start a page and/or open an [issue](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) to get it added.
 
 Integration Testing
 ===================
