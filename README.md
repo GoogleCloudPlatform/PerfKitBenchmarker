@@ -144,7 +144,7 @@ This section describes the setup steps needed for each cloud system.
 * [DigitalOcean](#digitalocean-configuration-and-credentials)
 * [RackSpace](#installing-clis-and-credentials-for-rackspace)
 
-After configuring the clouds you intend to use, skip to  [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks). 
+After configuring the clouds you intend to use, skip to  [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks).
 
 ### Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using OS X or Linux, you can run the command below:
@@ -396,13 +396,13 @@ Make sure you have installed pip (see the section above).
 Run the following command to install `aliyuncli` (omit the `sudo` on Windows)
 
 1. Install python development tools:
-   
+
    In Debian or Ubuntu:
 
    ```bash
    $ sudo apt-get install -y python-dev
    ```
-   
+
    In CentOS:
 
    ```bash
@@ -529,7 +529,7 @@ export OS_TENANT_NAME=<your_rackspace_uk_account_number>
 ```
 
 *Tip*: Put these variables in a file, and simple source them to your shell with
-`source <filename>` 
+`source <filename>`
 
 **Note:** Not all flavors are supported on every region. Always check first
 if the flavor is supported in the region.
@@ -654,6 +654,27 @@ Now you can run Windows benchmarks by running with `--os_type=windows`. Windows 
 different set of benchmarks than Linux does. They can be found under
 [`perfkitbenchmarker/windows_benchmarks/`](perfkitbenchmarker/windows_benchmarks).
 The target VM OS is Windows Server 2012 R2.
+
+How to Run Benchmarks with Juju
+==================
+
+[Juju](https://jujucharms.com/) is a service orchestration tool that enables you
+to quickly model, configure, deploy and manage entire cloud environments.
+Supported benchmarks will deploy a Juju-modeled service automatically, with no
+extra user configuration required, by specifying the `--os_type=juju` flag.
+
+## Example
+```bash
+$ ./pkb.py --cloud=AWS --os_type=juju --benchmarks=cassandra_stress
+```
+
+## Benchmark support
+Benchmark/Package authors need to implement the JujuInstall() method inside
+their package. This method deploys, configures, and relates the services to be
+benchmarked. Please note that other software installation and configuration
+should be bypassed when `FLAGS.os_type == JUJU`. See
+[`perfkitbenchmarker/linux_packages/cassandra.py`](perfkitbenchmarker/linux_packages/cassandra.py)
+for an example implementation.
 
 How to Run All Standard Benchmarks
 ==================
