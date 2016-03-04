@@ -18,6 +18,7 @@ import logging
 import re
 
 import pint
+import yaml
 
 import perfkitbenchmarker
 from perfkitbenchmarker import flags
@@ -302,5 +303,64 @@ def DEFINE_units(name, default, help, convertible_to=None,
 
   parser = UnitsParser(convertible_to=convertible_to)
   serializer = UnitsSerializer()
+
+  flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)
+
+
+# The YAML flag type is necessary because flags can be read either via
+# the command line or from a config file. If they come from a config
+# file, they will already be parsed as YAML, but if they come from the
+# command line, they will be raw strings. The point of this flag is to
+# guarantee a consistent representation to the rest of the program.
+class YAMLParser(flags.ArgumentParser):
+  """Parse a flag containing YAML."""
+
+  syntactic_help = 'A YAML expression.'
+
+  def Parse(self, inp):
+    """Parse the input.
+
+    Args:
+      inp. A string or the result of yaml.load. If a string, should be
+      a valid YAML document.
+    """
+
+    if isinstance(inp, basestring):
+      # This will work unless the user writes a config with a quoted
+      # string that, if unquoted, would be parsed as a non-string
+      # Python type (example: '123'). In that case, the first
+      # yaml.load() in the config system will strip away the quotation
+      # marks, and this second yaml.load() will parse it as the
+      # non-string type. However, I think this is the best we can do
+      # without significant changes to the config system, and the
+      # problem is unlikely to occur in PKB.
+      try:
+        return yaml.load(inp)
+      except yaml.YAMLError as e:
+        raise ValueError("Couldn't parse YAML string '%s': %s" %
+                         (inp, e.message))
+    else:
+      return inp
+
+
+class YAMLSerializer(flags.ArgumentSerializer):
+
+  def Serialize(self, val):
+    return yaml.dump(val)
+
+
+def DEFINE_yaml(name, default, help, flag_values=flags.FLAGS, **kwargs):
+  """Register a flag whose value is a YAML expression.
+
+  Args:
+    name: string. The name of the flag.
+    default: object. The default value of the flag.
+    help: string. A help message for the user.
+    flag_values: the gflags.FlagValues object to define the flag in.
+    kwargs: extra arguments to pass to gflags.DEFINE().
+  """
+
+  parser = YAMLParser()
+  serializer = YAMLSerializer()
 
   flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)

@@ -24,6 +24,7 @@ from perfkitbenchmarker.providers.openstack import os_disk
 from perfkitbenchmarker.providers.openstack import os_network
 from perfkitbenchmarker.providers.openstack import utils as os_utils
 
+RHEL_IMAGE = 'rhel-7.2'
 UBUNTU_IMAGE = 'ubuntu-14.04'
 NONE = 'None'
 
@@ -203,3 +204,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 class DebianBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                          linux_virtual_machine.DebianMixin):
     DEFAULT_IMAGE = UBUNTU_IMAGE
+
+
+class RhelBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
+                                       linux_virtual_machine.RhelMixin):
+    DEFAULT_IMAGE = RHEL_IMAGE
