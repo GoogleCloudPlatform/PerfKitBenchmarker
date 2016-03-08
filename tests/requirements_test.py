@@ -25,6 +25,11 @@ from perfkitbenchmarker import requirements
 
 _PATH = 'path'
 
+_FAKE_PACKAGE_REQUIREMENTS = """
+# This is not a real package.
+perfkitbenchmarker-fake-package>=1.2
+"""
+
 
 class _MockOpenRequirementsFile(object):
 
@@ -38,13 +43,14 @@ class _MockOpenRequirementsFile(object):
     pass
 
 
-class CheckRequirementsTestCase(unittest.TestCase):
+@contextlib.contextmanager
+def _MockOpen(file_content):
+  mocked_open = _MockOpenRequirementsFile(file_content)
+  with mock.patch(requirements.__name__ + '.open', return_value=mocked_open):
+    yield
 
-  @contextlib.contextmanager
-  def _MockOpen(self, file_content):
-    mocked_open = _MockOpenRequirementsFile(file_content)
-    with mock.patch(requirements.__name__ + '.open', return_value=mocked_open):
-      yield
+
+class CheckRequirementsTestCase(unittest.TestCase):
 
   def testFulfilledRequirement(self):
     requirements_content = """
@@ -52,15 +58,11 @@ class CheckRequirementsTestCase(unittest.TestCase):
 
     python-gflags>=2.0
     """
-    with self._MockOpen(requirements_content):
+    with _MockOpen(requirements_content):
       requirements._CheckRequirements(_PATH)
 
   def testMissingPackage(self):
-    requirements_content = """
-    # This is not a real package.
-    perfkitbenchmarker-fake-package>=1.2
-    """
-    with self._MockOpen(requirements_content):
+    with _MockOpen(_FAKE_PACKAGE_REQUIREMENTS):
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
 
@@ -69,7 +71,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     # The version of the installed python-gflags will be less than 42.
     python-gflags>=42
     """
-    with self._MockOpen(requirements_content):
+    with _MockOpen(requirements_content):
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
 
@@ -78,7 +80,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     # The version of the installed python-gflags will be greater than 0.5.
     python-gflags==0.5
     """
-    with self._MockOpen(requirements_content):
+    with _MockOpen(requirements_content):
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
 
@@ -97,10 +99,9 @@ class CheckProviderRequirementsTestCase(unittest.TestCase):
     requirements.CheckProviderRequirements('fakeprovider')
 
   def testUnfulfilledRequirements(self):
-    # AWS does have a requirements file, but it contains packages that are not
-    # installed as part of the test environment.
-    with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
-      requirements.CheckProviderRequirements('aws')
+    with _MockOpen(_FAKE_PACKAGE_REQUIREMENTS):
+      with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
+        requirements.CheckProviderRequirements('aws')
 
 
 if __name__ == '__main__':
