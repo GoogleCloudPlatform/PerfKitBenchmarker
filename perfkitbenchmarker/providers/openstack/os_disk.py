@@ -20,7 +20,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker.providers.openstack import utils as os_utils
-from perfkitbenchmarker.providers.openstack.utils import retry_authorization
 
 FLAGS = flags.FLAGS
 
@@ -53,7 +52,6 @@ class OpenStackDisk(disk.BaseDisk):
                 is_unavailable = not (volume.status == "available")
                 self._disk = volume
 
-    @retry_authorization(max_retries=4)
     def _Delete(self):
         from novaclient.exceptions import NotFound
 

@@ -133,7 +133,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.internal_ip = instance.networks[
             FLAGS.openstack_private_network][0]
 
-    @os_utils.retry_authorization(max_retries=4)
     def _Delete(self):
         from novaclient.exceptions import NotFound
         try:
@@ -144,7 +143,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
         self.public_network.release(self.floating_ip)
 
-    @os_utils.retry_authorization(max_retries=4)
     def _Exists(self):
         from novaclient.exceptions import NotFound
         try:
@@ -152,7 +150,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         except NotFound:
             return False
 
-    @vm_util.Retry(log_errors=False, poll_interval=1)
     def WaitForBootCompletion(self):
         # Do one longer sleep, then check at shorter intervals.
         if self.boot_wait_time is None:
@@ -192,7 +189,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             pk = self.client.keypairs.findall(name=self.key_name)[0]
         self.pk = pk
 
-    @os_utils.retry_authorization(max_retries=4)
     def DeleteKeyfile(self):
         from novaclient.exceptions import NotFound
         try:
