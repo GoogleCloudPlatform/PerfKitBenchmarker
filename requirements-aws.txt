@@ -15,3 +15,4 @@
 # Additional requirements (beyond those in requirements.txt) for running
 # PerfKitBenchmarker on AWS.
 awscli
+colorama==0.3.3
