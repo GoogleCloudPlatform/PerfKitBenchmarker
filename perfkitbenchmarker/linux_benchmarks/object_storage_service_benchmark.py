@@ -324,36 +324,38 @@ def _MakeSwiftCommandPrefix(auth_url, tenant_name, username, password):
   return ' '.join(options)
 
 
-def _ParseMultiStreamResults(raw_result, metadata=None):
-  """Read results from the api_multistream worker process.
+def _ProcessMultiStreamResults(raw_result, operation, results, metadata=None):
+  """Read and process results from the api_multistream worker process.
 
   Args:
     raw_result: string. The stdout of the worker process.
+    operation: 'upload' or 'download'. The operation the results are from.
+    results: a list to append Sample objects to.
     metadata: dict. Base sample metadata
-
-  Returns:
-    A list of sample.Sample objects.
   """
 
   if metadata is None:
     metadata = {}
 
   records = json.loads(raw_result)
-  results = []
+  metric_name = 'Multi-stream %s latency' % operation
+  # This depends on all objects having the same size!!!
+  object_size = records[0]['size']
 
-  for record in records:
-    metric = 'Multi-stream %s latency' % record['operation']
-    md = metadata.copy()
-    md['stream_num'] = record['stream_num']
-    md['object_size_b'] = record['size']
+  logging.info('Processing %s multi-stream %s results for object size %s',
+               len(records), operation, object_size)
 
-    results.append(sample.Sample(metric,
-                                 record['latency'],
-                                 'sec',
-                                 md,
-                                 record['start_time']))
+  # Once we land size distributions, we will report different latency
+  # for each object size.
+  metadata = metadata.copy()
+  metadata['size_B'] = object_size
 
-  return results
+  _AppendPercentilesToResults(
+      results,
+      (record['latency'] for record in records),
+      metric_name,
+      'sec',
+      metadata)
 
 
 def _DistributionToBackendFormat(dist):
@@ -587,8 +589,8 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
           '--scenario=MultiStreamWrite'])
       write_out, _ = vm.RobustRemoteCommand(
           multi_stream_write_cmd, should_log=True)
-      results.extend(
-          _ParseMultiStreamResults(write_out, metadata=multistream_metadata))
+      _ProcessMultiStreamResults(write_out, 'upload', results,
+                                 metadata=multistream_metadata)
 
       logging.info('Finished multi-stream write test. Starting multi-stream '
                    'read test.')
@@ -612,8 +614,8 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       try:
         read_out, _ = vm.RobustRemoteCommand(
             multi_stream_read_cmd, should_log=True)
-        results.extend(
-            _ParseMultiStreamResults(read_out, metadata=multistream_metadata))
+        _ProcessMultiStreamResults(read_out, 'download', results,
+                                   metadata=multistream_metadata)
       except Exception as ex:
         logging.info('MultiStreamRead test failed with exception %s. Still '
                      'recording write data.', ex.msg)

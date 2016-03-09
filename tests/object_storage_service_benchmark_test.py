@@ -18,7 +18,6 @@ import mock
 import unittest
 import time
 
-from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import object_storage_service_benchmark
 from tests import mock_flags
 
@@ -38,7 +37,7 @@ class TestBuildCommands(unittest.TestCase):
 
     with mock.patch(time.__name__ + '.time', return_value=1.0):
       with mock.patch(object_storage_service_benchmark.__name__ +
-                      '._ParseMultiStreamResults'):
+                      '._ProcessMultiStreamResults'):
         object_storage_service_benchmark.ApiBasedBenchmarks(
             [], {}, vm, 'GCP', 'test_script.py', 'bucket')
 
@@ -61,32 +60,36 @@ class TestBuildCommands(unittest.TestCase):
                   should_log=True))
 
 
-class TestParseMultiStreamResults(unittest.TestCase):
+class TestProcessMultiStreamResults(unittest.TestCase):
   def setUp(self):
     self.raw_result = """
 [{"latency": 0.1, "operation": "upload", "stream_num": 1, "start_time": 5.0, "size": 1},
- {"latency": 0.1, "operation": "download", "stream_num": 1, "start_time": 10.0, "size": 1}]"""  # noqa: line too long
+ {"latency": 0.1, "operation": "upload", "stream_num": 1, "start_time": 10.0, "size": 1}]"""  # noqa: line too long
 
-  def testParseResults(self):
-    samples = object_storage_service_benchmark._ParseMultiStreamResults(
-        self.raw_result)
+  def testProcessResults(self):
+    with mock.patch(object_storage_service_benchmark.__name__ +
+                    '._AppendPercentilesToResults',
+                    return_value=[3]) as append_percentiles:
+      object_storage_service_benchmark._ProcessMultiStreamResults(
+          self.raw_result, 'upload', [])
 
-    self.assertEqual(samples,
-                     [sample.Sample('Multi-stream upload latency',
-                                    0.1,
-                                    'sec',
-                                    {'stream_num': 1, 'object_size_b': 1},
-                                    5.0),
-                      sample.Sample('Multi-stream download latency',
-                                    0.1,
-                                    'sec',
-                                    {'stream_num': 1, 'object_size_b': 1},
-                                    10.0)])
+      # Can't use append_percentiles.assert_called_once_with when one
+      # of the arguments is a generator, because it compares
+      # generators by object identity, not by the objects they
+      # generate.
+      positional_args = append_percentiles.call_args[0]
+      self.assertEqual(positional_args[0], [])
+      self.assertEqual(list(positional_args[1]), [0.1, 0.1])
+      self.assertEqual(positional_args[2],
+                       'Multi-stream upload latency')
+      self.assertEqual(positional_args[3], 'sec')
+      self.assertEqual(positional_args[4], {'object_size_B': 1})
 
   def testKeepsBaseMetadata(self):
-    samples = object_storage_service_benchmark._ParseMultiStreamResults(
-        self.raw_result, metadata={'foo': 'bar'})
-    self.assertEqual(samples[0].metadata['foo'],
+    results = []
+    object_storage_service_benchmark._ProcessMultiStreamResults(
+        self.raw_result, 'upload', results, metadata={'foo': 'bar'})
+    self.assertEqual(results[0].metadata['foo'],
                      'bar')
 
 
