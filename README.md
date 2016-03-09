@@ -913,10 +913,10 @@ In addition to regular unit tests, which are run via
 [`hooks/check-everything`](hooks/check-everything), PerfKit Benchmarker has
 integration tests, which create actual cloud resources and take time and money
 to run. For this reason, they will only run when the variable
-`PERFKIT_INTEGRATION` is defined in the environment. For instance, the command
+`PERFKIT_INTEGRATION` is defined in the environment. The command
 
 ```bash
-$ PERFKIT_INTEGRATION=1 hooks/check-everything
+$ tox -e integration
 ```
 
 will run the integration tests. The integration tests depend on having installed
