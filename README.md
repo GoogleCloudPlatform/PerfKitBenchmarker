@@ -659,6 +659,7 @@ Flag | Notes
 `--cloud`        | Cloud where the benchmarks are run. See the table below for choices.
 `--machine_type` | Type of machine to provision if pre-provisioned machines are not used. Most cloud providers accept the names of pre-defined provider-specific machine types (for example, GCP supports `--machine_type=n1-standard-8` for a GCE n1-standard-8 VM). Some cloud providers support YAML expressions that match the corresponding VM spec machine_type property in the [YAML configs](#configurations-and-configuration-overrides) (for example, GCP supports `--machine_type="{cpus: 1, memory: 4.5GiB}"` for a GCE custom VM with 1 vCPU and 4.5GiB memory). Note that the value provided by this flag will affect all provisioned machines; users who wish to provision different machine types for different roles within a single benchmark run should use the [YAML configs](#configurations-and-configuration-overrides) for finer control.
 `--zone`         | This flag allows you to override the default zone. See the table below.
+`--data_disk_type` | Type of disk to use. Names are provider-specific, but see table below.
 
 The default cloud is 'GCP', override with the `--cloud` flag. Each cloud has a default
 zone which you can override with the `--zone` flag, the flag supports the same values
@@ -681,6 +682,24 @@ Example:
 ```bash
 ./pkb.py --cloud=GCP --zone=us-central1-a --benchmarks=iperf,ping
 ```
+
+The disk type names vary by provider, but the following table summarizes some
+useful ones. (Many cloud providers have more disk types beyond these options.)
+
+Cloud name | Network-attached SSD | Network-attached HDD
+-----------|----------------------|---------------------
+GCP | pd-ssd | pd-standard
+AWS | gp2 | standard
+Azure | premium-storage | standard-disk
+Rackspace | cbs-ssd | cbs-sata
+
+Also note that `--data_disk_type=local` tells PKB not to allocate a separate
+disk, but to use whatever comes with the VM. This is useful with AWS instance
+types that come with local SSDs, or with the GCP `--gce_num_local_ssds` flag.
+
+If an instance type comes with more than one disk, PKB uses whichever does *not*
+hold the root partition. Specifically, on Azure, PKB always uses `/dev/sdb` as
+its scratch device.
 
 ## Proxy configuration for VM guests.
 
