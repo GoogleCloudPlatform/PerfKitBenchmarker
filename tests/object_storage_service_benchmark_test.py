@@ -66,6 +66,13 @@ class TestProcessMultiStreamResults(unittest.TestCase):
 [{"latency": 0.1, "operation": "upload", "stream_num": 1, "start_time": 5.0, "size": 1},
  {"latency": 0.1, "operation": "upload", "stream_num": 1, "start_time": 10.0, "size": 1}]"""  # noqa: line too long
 
+    mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    mocked_flags.object_storage_scenario = 'api_multistream'
+    mocked_flags.object_storage_multistream_objects_per_stream = 100
+    mocked_flags.object_storage_object_sizes = '1B'
+    mocked_flags.object_storage_multistream_num_streams = 10
+
+
   def testProcessResults(self):
     with mock.patch(object_storage_service_benchmark.__name__ +
                     '._AppendPercentilesToResults',
@@ -83,7 +90,9 @@ class TestProcessMultiStreamResults(unittest.TestCase):
       self.assertEqual(positional_args[2],
                        'Multi-stream upload latency')
       self.assertEqual(positional_args[3], 'sec')
-      self.assertEqual(positional_args[4], {'object_size_B': 1})
+      self.assertEqual(positional_args[4], {'object_size_B': 1,
+                                            'num_streams': 10,
+                                            'objects_per_stream': 100})
 
   def testKeepsBaseMetadata(self):
     results = []

@@ -355,8 +355,6 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
   """
 
   payload_bytes, payload_string = GenerateWritePayload(size)
-  payload_bytes_view = memoryview(payload_bytes)
-  payload_string_view = memoryview(str(payload_string))
 
   for i in xrange(count):
     object_name = '%s_%d' % (object_prefix, i)
@@ -364,7 +362,7 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
     try:
       _, latency = WriteObjectFromBuffer(
           storage_schema, bucket, object_name,
-          payload_bytes_view, payload_string_view, size,
+          payload_bytes, payload_string,
           host_to_connect=host_to_connect)
 
       objects_written.append(object_name)
@@ -378,8 +376,8 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
 
 
 def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
-                          payload_bytes_view, payload_string_view,
-                          size_to_write, host_to_connect=None):
+                          payload_bytes, payload_string,
+                          host_to_connect=None):
   """Write an object to a storage provider.
 
   Exceptions are propagated to the caller, which can decide whether to
@@ -389,11 +387,8 @@ def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
     storage_schema: The address schema identifying a storage. e.g., "gs"
     bucket_name: Name of the bucket to write to.
     object_name: Name of the object.
-    payload_bytes_view: A memoryview of a bytearray.
-    payload_string_view: A memoryview of a string.
-    size_to_write: The size of the objects to write, in bytes. If size is
-      less than the size of payload_{bytes,string}, then this will
-      transfer the prefix of payload_{bytes,string} of the desired size.
+    payload_bytes: A bytearray to transfer.
+    payload_string: A string version of payload_bytes.
     host_to_connect: An optional endpoint string to connect to.
 
   Returns:
@@ -410,10 +405,10 @@ def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
     if host_to_connect is not None:
       object_uri.connect(host=host_to_connect)
 
-    object_uri.set_contents_from_string(payload_string_view[:size_to_write])
+    object_uri.set_contents_from_string(payload_string)
   else:
     _AZURE_BLOB_SERVICE.put_block_blob_from_bytes(
-        bucket_name, object_name, bytes(payload_bytes_view[:size_to_write]))
+        bucket_name, object_name, bytes(payload_bytes))
 
   latency = time.time() - start_time
 
@@ -745,15 +740,13 @@ def MultiStreamWrites(storage_schema, host_to_connect=None):
 
   payload_bytes, payload_string = GenerateWritePayload(
       MaxSizeInDistribution(size_distribution))
-  payload_bytes_view = memoryview(payload_bytes)
-  payload_string_view = memoryview(str(payload_string))
 
   results = RunThreadedWorkers(
       WriteWorker,
       (storage_schema,
        host_to_connect,
-       payload_bytes_view,
-       payload_string_view,
+       payload_bytes,
+       payload_string,
        size_distribution,
        FLAGS.objects_per_stream,
        FLAGS.start_time))
@@ -886,7 +879,7 @@ def SleepUntilTime(when):
 
 
 def WriteWorker(storage_schema, host_to_connect,
-                payload_bytes_view, payload_string_view,
+                payload_bytes, payload_string,
                 size_distribution, num_objects,
                 start_time, result_queue, worker_num):
   object_names = []
@@ -907,7 +900,7 @@ def WriteWorker(storage_schema, host_to_connect,
     try:
       start_time, latency = WriteObjectFromBuffer(
           storage_schema, FLAGS.bucket, object_name,
-          payload_bytes_view, payload_string_view, object_size,
+          payload_bytes, payload_string,
           host_to_connect=host_to_connect)
 
       object_names.append(object_name)

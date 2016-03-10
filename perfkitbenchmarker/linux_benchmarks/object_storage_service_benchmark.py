@@ -339,7 +339,8 @@ def _ProcessMultiStreamResults(raw_result, operation, results, metadata=None):
 
   records = json.loads(raw_result)
   metric_name = 'Multi-stream %s latency' % operation
-  # This depends on all objects having the same size!!!
+  # TODO: when object size distributions are added, support multiple
+  # sizes.
   object_size = records[0]['size']
 
   logging.info('Processing %s multi-stream %s results for object size %s',
@@ -348,7 +349,10 @@ def _ProcessMultiStreamResults(raw_result, operation, results, metadata=None):
   # Once we land size distributions, we will report different latency
   # for each object size.
   metadata = metadata.copy()
-  metadata['size_B'] = object_size
+  metadata['object_size_B'] = object_size
+  metadata['num_streams'] = FLAGS.object_storage_multistream_num_streams
+  metadata['objects_per_stream'] = (
+      FLAGS.object_storage_multistream_objects_per_stream)
 
   _AppendPercentilesToResults(
       results,
@@ -557,13 +561,6 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
 
       logging.info('Starting multi-stream write test.')
 
-      # Add metadata specific to the multistream throughput test.
-      multistream_metadata = metadata.copy()
-      multistream_metadata['num_streams'] = (
-          FLAGS.object_storage_multistream_num_streams)
-      multistream_metadata['objects_per_stream'] = (
-          FLAGS.object_storage_multistream_objects_per_stream)
-
       objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
                                             OBJECTS_WRITTEN_FILE)
 
@@ -590,7 +587,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       write_out, _ = vm.RobustRemoteCommand(
           multi_stream_write_cmd, should_log=True)
       _ProcessMultiStreamResults(write_out, 'upload', results,
-                                 metadata=multistream_metadata)
+                                 metadata=metadata)
 
       logging.info('Finished multi-stream write test. Starting multi-stream '
                    'read test.')
@@ -615,7 +612,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
         read_out, _ = vm.RobustRemoteCommand(
             multi_stream_read_cmd, should_log=True)
         _ProcessMultiStreamResults(read_out, 'download', results,
-                                   metadata=multistream_metadata)
+                                   metadata=metadata)
       except Exception as ex:
         logging.info('MultiStreamRead test failed with exception %s. Still '
                      'recording write data.', ex.msg)
