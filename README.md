@@ -4,7 +4,7 @@ PerfKit Benchmarker
 PerfKit Benchmarker is an open effort to define a canonical set of benchmarks to measure and compare cloud
 offerings.  It's designed to operate via vendor provided command line tools. The benchmarks are not
 tuned (ie the defaults) because this is what most users will use.  This should help us drive to great defaults.
-Only in the rare cause where there is a common practice like setting the buffer pool size of a database do we
+Only in the rare case where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
 This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [wiki] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contains more detailed information:
@@ -26,10 +26,10 @@ Licensing
 
 PerfKit Benchmarker provides wrappers and workload definitions around popular benchmark tools. We made it very simple
 to use and automate everything we can.  It instantiates VMs on the Cloud provider of your choice, automatically
-installs benchmarks, and run the workloads without user interaction.
+installs benchmarks, and runs the workloads without user interaction.
 
 Due to the level of automation you will not see prompts for software installed as part of a benchmark run.
-Therefore you must accept the license of each benchmarks individually, and take responsibility for using them
+Therefore you must accept the license of each of the benchmarks individually, and take responsibility for using them
 before you use the PerfKit Benchmarker.
 
 In its current release these are the benchmarks that are executed:
@@ -105,7 +105,7 @@ with it. Make sure your `PATH` environment variable is set so that you can use
 both `python` and `pip` on the command line (you can have the installer do it
 for you if you select the correct option).
 
-Most Linux distributions and recent Mac OS X version already have Python 2.7
+Most Linux distributions and recent Mac OS X versions already have Python 2.7
 installed.
 If Python is not installed, you can likely install it using your distribution's package manager, or see the [Python Download page](https://www.python.org/downloads/).
 
@@ -144,7 +144,7 @@ This section describes the setup steps needed for each cloud system.
 * [DigitalOcean](#digitalocean-configuration-and-credentials)
 * [RackSpace](#installing-clis-and-credentials-for-rackspace)
 
-After configuring the clouds you intend to use, skip to  [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks). 
+After configuring the clouds you intend to use, skip to [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks). 
 
 ### Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using OS X or Linux, you can run the command below:
@@ -212,8 +212,8 @@ $ ./pkb.py --cloud=OpenStack --benchmarks=ping
 ```
 
 ### Kubernetes configuration and credentials
-Perfkit uses `kubectl` binary in order to communicate with Kubernetes cluster - you need to pass the path to `kubectl` binary using `--kubectl` flag. It's recommended to use [version 1.0.1](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl).
-Authentication to Kubernetes cluster is done via a [`kubeconfig` file](https://github.com/kubernetes/kubernetes/blob/release-1.0/docs/user-guide/kubeconfig-file.md). Its path is passed using the `--kubeconfig` flag.
+Perfkit uses the `kubectl` binary in order to communicate with a Kubernetes cluster - you need to pass the path to the `kubectl` binary using the `--kubectl` flag. It's recommended to use [version 1.0.1](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl).
+Authentication to a Kubernetes cluster is done via a [`kubeconfig` file](https://github.com/kubernetes/kubernetes/blob/release-1.0/docs/user-guide/kubeconfig-file.md). Its path is passed using the `--kubeconfig` flag.
 
 **Image prerequisites**  
 Please refer to the [Image prerequisites for Docker based clouds](#image-prerequisites-for-docker-based-clouds).
@@ -228,7 +228,7 @@ If your Kubernetes cluster is running on CoreOS:
    $ sudo vim /etc/systemd/system/kubelet.service.d/10-env.conf
    ```
 
-   Add the following line to `[Service]` section:
+   Add the following line to the `[Service]` section:
 
    ```
    Environment=PATH=/opt/bin:/usr/bin:/usr/sbin:$PATH
@@ -240,16 +240,16 @@ If your Kubernetes cluster is running on CoreOS:
    $ sudo reboot
    ```
 
-Note that some benchmark require to run within a privileged container. By default Kubernetes doesn't allow to schedule Dockers in privileged mode - you have to add `--allow-privileged=true` flag to `kube-apiserver` and each `kubelet` startup commands.
+Note that some benchmarks must be run within a privileged container. By default Kubernetes doesn't allow containers to be scheduled in privileged mode - you have to add the `--allow-privileged=true` flag to `kube-apiserver` and each `kubelet` startup command.
 
 **Ceph integration**  
-When you run benchmarks with standard scratch disk type (`--scratch_disk_type=standard` - which is a default option), Ceph storage will be used. There are some configuration steps you need to follow before you will be able to spawn Kubernetes PODs with Ceph volume. On each of Kubernetes-Nodes and on the machine which is running Perfkit benchmarks do the following:
+When you run benchmarks with the standard scratch disk type (`--scratch_disk_type=standard` - which is a default option), Ceph storage will be used. There are some configuration steps you need to follow before you will be able to spawn Kubernetes PODs with Ceph volume. On each Kubernetes node, and on the machine which is running the Perfkit benchmarks, do the following:
 
 1. Copy `/etc/ceph` directory from Ceph-host.
 
 2. Install `ceph-common` package so that `rbd` command is available:
 
-  * If your Kubernetes cluster is running on CoreOS, then you need to create a bash script called `rbd` which will run `rbd` command inside a Docker container:
+  * If your Kubernetes cluster is running on CoreOS, then you need to create a bash script called `rbd` which will run the `rbd` command inside a Docker container:
 
       ```bash
       #!/usr/bin/bash
@@ -642,7 +642,7 @@ Run without the `--benchmarks` parameter and every benchmark in the standard set
 
 How to Run All Benchmarks in a Named Set
 ==================
-Named sets are are grouping of one or more benchmarks in the benchmarking directory. This feature allows parallel innovation of what is important to measure in the Cloud, and is defined by the set owner. For example the GoogleSet is maintained by Google, whereas the StanfordSet is managed by Stanford. Once a quarter a meeting is held to review all the sets to determine what benchmarks should be promoted to the `standard_set`. The Standard Set is also reviewed to see if anything should be removed.
+Named sets are are groupings of one or more benchmarks in the benchmarking directory. This feature allows parallel innovation of what is important to measure in the Cloud, and is defined by the set owner. For example the GoogleSet is maintained by Google, whereas the StanfordSet is managed by Stanford. Once a quarter a meeting is held to review all the sets to determine what benchmarks should be promoted to the `standard_set`. The Standard Set is also reviewed to see if anything should be removed.
 To run all benchmarks in a named set, specify the set name in the benchmarks parameter (e.g., `--benchmarks="standard_set"`). Sets can be combined with individual benchmarks or other named sets.
 
 
