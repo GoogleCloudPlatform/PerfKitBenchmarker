@@ -897,6 +897,8 @@ def WriteWorker(storage_schema, host_to_connect,
     object_name = '%s_%d' % (object_prefix, i)
     object_size = size_iterator.next()
 
+    # TODO: make use of object_size later when adding object size
+    # distribution support.
     try:
       start_time, latency = WriteObjectFromBuffer(
           storage_schema, FLAGS.bucket, object_name,
