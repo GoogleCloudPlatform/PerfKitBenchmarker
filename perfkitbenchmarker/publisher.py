@@ -29,6 +29,7 @@ import uuid
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 
@@ -177,14 +178,8 @@ class DefaultMetadataProvider(MetadataProvider):
     # Flatten all user metadata into a single list (since each string in the
     # FLAGS.metadata can actually be several key-value pairs) and then iterate
     # over it.
-    for pair in [kv for item in FLAGS.metadata for kv in item.split(',')]:
-      try:
-        key, value = pair.split(':')
-        metadata[key] = value
-      except ValueError:
-        logging.error('Bad metadata flag format. Skipping "%s".', pair)
-        continue
-
+    parsed_metadata = flag_util.ParseKeyValuePairs(FLAGS.metadata)
+    metadata.update(parsed_metadata)
     return metadata
 
 

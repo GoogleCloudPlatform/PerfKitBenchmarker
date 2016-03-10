@@ -364,3 +364,27 @@ def DEFINE_yaml(name, default, help, flag_values=flags.FLAGS, **kwargs):
   serializer = YAMLSerializer()
 
   flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)
+
+
+def ParseKeyValuePairs(strings):
+  """Parses colon separated key value pairs from a list of strings.
+
+  Pairs should be separated by a comma and key and value by a colon, e.g.,
+  ['k1:v1', 'k2:v2,k3:v3'].
+
+  Args:
+    strings: A list of strings.
+
+  Returns:
+    A dict populated with keys and values from the flag.
+  """
+  pairs = {}
+  for pair in [kv for s in strings for kv in s.split(',')]:
+    try:
+      key, value = pair.split(':')
+      pairs[key] = value
+    except ValueError:
+      logging.error('Bad key value pair format. Skipping "%s".', pair)
+      continue
+
+  return pairs
