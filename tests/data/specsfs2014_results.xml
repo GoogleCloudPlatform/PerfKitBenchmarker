@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<summary id="8d2bae78">
+  <run fingerprint="974f" id="ae3f7377" time="1457121835.47" version="1072">
+    <business_metric>1</business_metric>
+    <metric name="op rate" units="ops/s">500.00</metric>
+    <metric name="achieved rate" units="ops/s">500.05</metric>
+    <metric name="average latency" units="milliseconds">1.48</metric>
+    <metric name="overall throughput" units="KB/s">6463.95</metric>
+    <metric name="read throughput" units="KB/s">3204.78</metric>
+    <metric name="write throughput" units="KB/s">3259.17</metric>
+    <metric name="run time" units="seconds">300</metric>
+    <metric name="clients">1</metric>
+    <metric name="processes per client">5</metric>
+    <metric name="file size" units="KB">16</metric>
+    <metric name="client data set size" units="MiB">4296</metric>
+    <metric name="starting data set size" units="MiB">4296</metric>
+    <metric name="initial file space" units="MiB">4296</metric>
+    <metric name="maximum file space" units="MiB">4687</metric>
+    <benchmark name="SWBUILD"/>
+    <valid_run/>
+  </run>
+</summary>
+
