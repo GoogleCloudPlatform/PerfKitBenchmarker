@@ -187,6 +187,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if commands:
       self.RemoteCommand(";".join(commands))
 
+  def UpdateHosts(self):
+      """Modifies /etc/hosts to include an entry with internal ip address."""
+      hostname = self.name.replace("_", "-")
+      hosts_file = "/etc/hosts"
+
+      self.RemoteCommand("echo '%s %s' | sudo tee -a %s" % (self.internal_ip,
+                                                            hostname,
+                                                            hosts_file))
+
   def SetupPackageManager(self):
     """Specific Linux flavors should override this."""
     pass

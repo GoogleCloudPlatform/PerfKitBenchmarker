@@ -27,16 +27,17 @@ import time
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages.ant import ANT_HOME_DIR
 
 
 JNA_JAR_URL = ('https://maven.java.net/content/repositories/releases/'
                'net/java/dev/jna/jna/4.1.0/jna-4.1.0.jar')
-CASSANDRA_GIT_REPRO = 'https://github.com/apache/cassandra.git'
-CASSANDRA_VERSION = 'cassandra-2.1.10'
+CASSANDRA_VERSION = '2.1.13'
+CASSANDRA_URL = ('http://apache.mirror.anlx.net/cassandra/{0}/'
+                 'apache-cassandra-{0}-bin.tar.gz').format(CASSANDRA_VERSION)
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
 CASSANDRA_ENV_TEMPLATE = 'cassandra/cassandra-env.sh.j2'
-CASSANDRA_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'cassandra')
+CASSANDRA_DIR = posixpath.join(vm_util.VM_TMP_DIR,
+                               'apache-cassandra-{0}').format(CASSANDRA_VERSION)
 CASSANDRA_PID = posixpath.join(CASSANDRA_DIR, 'cassandra.pid')
 CASSANDRA_OUT = posixpath.join(CASSANDRA_DIR, 'cassandra.out')
 CASSANDRA_ERR = posixpath.join(CASSANDRA_DIR, 'cassandra.err')
@@ -63,17 +64,17 @@ def CheckPrerequisites():
 
 def _Install(vm):
   """Installs Cassandra from a tarball."""
-  vm.Install('ant')
-  vm.Install('build_tools')
   vm.Install('openjdk7')
   vm.Install('curl')
+  archive_name = 'apache-cassandra-{0}-bin.tar.gz'.format(CASSANDRA_VERSION)
   vm.RemoteCommand(
-      'cd {0}; git clone {1}; cd {2}; git checkout {3}; {4}/bin/ant'.format(
+      'cd {0}; curl -LJO {1}; tar -zxf {2}'.format(
           vm_util.VM_TMP_DIR,
-          CASSANDRA_GIT_REPRO,
-          CASSANDRA_DIR,
-          CASSANDRA_VERSION,
-          ANT_HOME_DIR))
+          CASSANDRA_URL,
+          archive_name
+      )
+  )
+
   # Add JNA
   vm.RemoteCommand('cd {0} && curl -LJO {1}'.format(
       posixpath.join(CASSANDRA_DIR, 'lib'),
@@ -102,6 +103,8 @@ def Configure(vm, seed_vms):
              'seeds': ','.join(vm.internal_ip for vm in seed_vms),
              'num_cpus': vm.num_cpus,
              'cluster_name': 'Test cluster'}
+
+  vm.UpdateHosts()
 
   for config_file in [CASSANDRA_ENV_TEMPLATE, CASSANDRA_YAML_TEMPLATE]:
     local_path = data.ResourcePath(config_file)
