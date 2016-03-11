@@ -117,6 +117,7 @@ AZURE_CREDENTIAL_LOCATION = '.azure'
 
 DEFAULT_BOTO_LOCATION = '~/.boto'
 BOTO_LIB_VERSION = 'boto_lib_version'
+BOTO3_LIB_VERSION = 'boto3_lib_version'
 
 SWIFTCLIENT_LIB_VERSION = 'python-swiftclient_lib_version'
 
@@ -651,7 +652,7 @@ class S3StorageBenchmark(object):
       Then the final return value is the list of the above list that reflect
       the results of all scenarios run here.
     """
-    metadata[BOTO_LIB_VERSION] = _GetClientLibVersion(vm, 'boto')
+    metadata[BOTO3_LIB_VERSION] = _GetClientLibVersion(vm, 'boto3')
     results = []
     scratch_dir = vm.GetScratchDir()
 
@@ -1125,6 +1126,7 @@ def Prepare(benchmark_spec):
 
   vms[0].Install('pip')
   vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
+  vms[0].RemoteCommand('sudo pip install boto3')
   azure_version_string = ''
   if FLAGS.azure_lib_version is not None:
     azure_version_string = '==%s' % FLAGS.azure_lib_version

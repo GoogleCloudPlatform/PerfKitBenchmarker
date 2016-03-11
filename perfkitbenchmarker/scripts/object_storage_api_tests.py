@@ -26,11 +26,13 @@ import json
 import logging
 import sys
 from threading import Thread
+import threading
 import string
 import random
 import time
 
 import boto
+import boto3
 import gflags as flags
 import gcs_oauth2_boto_plugin  # noqa
 from azure.storage.blob import BlobService
@@ -117,6 +119,10 @@ LARGE_OBJECT_FAILURE_TOLERANCE = 0.1
 # A global variable initialized once for Azure Blob Service
 _AZURE_BLOB_SERVICE = None
 
+# boto3 recommends creating per-thread sessions. We store them in
+# THREAD_LOCAL.boto_session.
+THREAD_LOCAL = threading.local()
+
 
 # When a storage provider fails more than a threshold number of requests, we
 # stop the benchmarking tests and raise a low availability error back to the
@@ -135,10 +141,35 @@ def _useBotoApi(storage_schema):
     A boolean indicates whether or not to use boto API.
   """
 
-  if storage_schema == 'gs' or storage_schema == 's3':
+  if storage_schema == 'gs':
     return True
   else:
     return False
+
+
+def _useBoto3Api(storage_schema):
+  """Decides if the caller should use the boto3 api given a storage schema.
+
+  Args:
+    storage_schema: The schema represents the storage provider.
+
+  Returns:
+    A boolean indicates whether or not to use boto API.
+  """
+
+  if storage_schema == 's3':
+    return True
+  else:
+    return False
+
+
+def _getS3():
+  """Get a boto3 resource for S3, local to the current thread."""
+
+  session = getattr(THREAD_LOCAL, 'boto_session', None)
+  if session is None:
+    THREAD_LOCAL.boto_session = session = boto3.session.Session()
+  return session.resource('s3')
 
 
 def PercentileCalculator(numbers):
@@ -180,21 +211,19 @@ def _ListObjects(storage_schema, bucket, prefix, host_to_connect=None):
     A list of object names.
   """
 
-  bucket_list_result = None
   if _useBotoApi(storage_schema):
     bucket_uri = boto.storage_uri(bucket, storage_schema)
     if host_to_connect is not None:
       bucket_uri.connect(host=host_to_connect)
 
-    bucket_list_result = bucket_uri.list_bucket(prefix=prefix)
+    return [key.name for key in bucket_uri.list_bucket(prefix=prefix)]
+  elif _useBoto3Api(storage_schema):
+    s3 = _getS3()
+    bucket = s3.Bucket(bucket)
+    return [object.key for object in bucket.objects.filter(Prefix=prefix)]
   else:
-    bucket_list_result = _AZURE_BLOB_SERVICE.list_blobs(bucket, prefix=prefix)
-
-  list_result = []
-  for k in bucket_list_result:
-    list_result.append(k.name)
-
-  return list_result
+    return [blob.name
+            for blob in _AZURE_BLOB_SERVICE.list_blobs(bucket, prefix=prefix)]
 
 
 def DeleteObjects(storage_schema, bucket, objects_to_delete,
@@ -211,6 +240,10 @@ def DeleteObjects(storage_schema, bucket, objects_to_delete,
         successfully deleted.
   """
 
+  if _useBoto3Api(storage_schema):
+    s3 = _getS3()
+    bucket = s3.Bucket(bucket)
+
   for object_name in objects_to_delete:
     try:
       if _useBotoApi(storage_schema):
@@ -220,6 +253,8 @@ def DeleteObjects(storage_schema, bucket, objects_to_delete,
           object_uri.connect(host=host_to_connect)
 
         object_uri.delete_key()
+      elif _useBoto3Api(storage_schema):
+        bucket.Object(object_name).delete()
       else:
         _AZURE_BLOB_SERVICE.delete_blob(bucket, object_name)
 
@@ -278,6 +313,10 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
 
   payload_string = payload_bytes.decode('ascii')
 
+  if _useBoto3Api(storage_schema):
+    s3 = _getS3()
+    bucket = s3.Bucket(bucket)
+
   for i in range(count):
     object_name = '%s_%d' % (object_prefix, i)
 
@@ -297,6 +336,8 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
           object_uri.connect(host=host_to_connect)
 
         object_uri.set_contents_from_string(payload_string)
+      elif _useBoto3Api(storage_schema):
+        bucket.Object(object_name).put(Body=bytes(payload_bytes))
       else:
         _AZURE_BLOB_SERVICE.put_block_blob_from_bytes(bucket, object_name,
                                                       bytes(payload_bytes))
@@ -328,8 +369,12 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
     object_size: Size of the object that will be read, used to calculate bw.
     host_to_connect: An optional endpoint string to connect to.
   """
-  for object_name in objects_to_read:
 
+  if _useBoto3Api(storage_schema):
+    s3 = _getS3()
+    bucket = s3.Bucket(bucket)
+
+  for object_name in objects_to_read:
     start_time = time.time()
     try:
       if _useBotoApi(storage_schema):
@@ -337,6 +382,8 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
         object_uri = boto.storage_uri(object_path, storage_schema)
         object_uri.connect(host=host_to_connect)
         object_uri.new_key().get_contents_as_string()
+      elif _useBoto3Api(storage_schema):
+        bucket.Object(object_name).get()
       else:
         _AZURE_BLOB_SERVICE.get_blob_to_bytes(bucket, object_name)
 
@@ -755,6 +802,12 @@ def Main(argv=sys.argv):
       LIST_CONSISTENCY_THREAD_COUNT = 10
       global LIST_CONSISTENCY_OBJECT_COUNT
       LIST_CONSISTENCY_OBJECT_COUNT = 1000
+  elif FLAGS.storage_provider == 'S3':
+    # boto3 logs every operation at the info level. This can actually
+    # cause out-of-memory errors in the PKB process because there is
+    # so much output.
+    logging.getLogger('boto3').setLevel(logging.WARNING)
+    logging.getLogger('botocore').setLevel(logging.WARNING)
 
   storage_schema = STORAGE_TO_SCHEMA_DICT[FLAGS.storage_provider]
 
