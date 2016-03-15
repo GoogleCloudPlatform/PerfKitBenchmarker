@@ -52,9 +52,9 @@ flags.DEFINE_string('openstack_private_network', 'private',
                     'Name of OpenStack private network.')
 
 flags.DEFINE_string('openstack_network', 'private',
-                    'Name of OpenStack network. Network provides '
+                    'Name of OpenStack network. This network provides '
                     'automatically allocated fixed-IP addresses to attached '
-                    'instances. Typically, network is used for internal '
+                    'instances. Typically, this network is used for internal '
                     'communication between instances. '
                     'If openstack_floating_ip_pool is not '
                     'set then this network will be used to communicate with '
@@ -64,8 +64,8 @@ flags.DEFINE_string('openstack_floating_ip_pool', None,
                     'Name of OpenStack floating IP-address pool. If set, '
                     'a floating-ip address from this pool will be associated'
                     'to each instance and will be used for communicating '
-                    'with it. An internally routable network must be set as '
-                    'well using the openstack_network flag.')
+                    'with it. To use this flag, an internally routable network '
+                    'must also be specified via the openstack_network flag.')
 
 flags.DEFINE_boolean('openstack_config_drive', False,
                      'Add possibilities to get metadata from external drive')

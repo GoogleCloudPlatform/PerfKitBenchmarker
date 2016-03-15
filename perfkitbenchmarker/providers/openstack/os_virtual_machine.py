@@ -54,9 +54,14 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
                                                FLAGS.run_uri)
         self.client = os_utils.NovaClient()
+        # FIXME(meteorfox): Remove --openstack_public_network and
+        # --openstack_private_network once depreciation time has expired
+        self.network_name = (FLAGS.openstack_network or
+                             FLAGS.openstack_private_network)
+        self.floating_ip_pool_name = (FLAGS.openstack_floating_ip_pool or
+                                      FLAGS.openstack_public_network)
         self.public_network = os_network.OpenStackPublicNetwork(
-            FLAGS.openstack_floating_ip_pool
-        )
+            FLAGS.openstack_floating_ip_pool)
         self.id = None
         self.pk = None
         self.user_name = FLAGS.openstack_image_username
@@ -69,53 +74,32 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     def _Create(self):
         image = self.client.images.findall(name=self.image)[0]
         flavor = self.client.flavors.findall(name=self.machine_type)[0]
-
-        # FIXME(meteofox): Remove --openstack_public_network and
-        # --openstack_private_network once depreciation time has expired
-        self.floating_ip_pool_name = (FLAGS.openstack_floating_ip_pool or
-                                      FLAGS.openstack_public_network)
-        self.network_name = (FLAGS.openstack_network or
-                             FLAGS.openstack_private_network)
-
-        if self.network_name:
-            self.private_net = self.client.networks.find(
-                label=self.network_name)
+        self.private_net = self.client.networks.find(label=self.network_name)
         if self.floating_ip_pool_name:
             self.public_net = self.client.networks.find(
                 label=self.floating_ip_pool_name)
 
-        if self.public_net is None and self.private_net is None:
-            raise errors.Error(
-                'Cannot build instance without a network. Make sure to set '
-                'either just --openstack_network or both --openstack_network '
-                'and --openstack_private_network flags.')
-        elif self.private_net is None and self.public_net:
-            raise errors.Error(
-                'Cannot allocate floating IP address without an internally '
-                'routable network. Make sure --openstack_network flag is set.')
+        if self.private_net is None:
+            if self.public_net is None:
+                raise errors.Error(
+                    'Cannot build instance without a network. Make sure to set '
+                    'either just --openstack_network or both '
+                    '--openstack_network and --openstack_floating_ip_pool '
+                    'flags.')
+            else:
+                raise errors.Error(
+                    'Cannot associate floating-ip address from pool %s without '
+                    'an internally routable network. Make sure '
+                    '--openstack_network flag is set.')
 
         nics = [{'net-id': self.private_net.id}]
 
         image_id = image.id
         boot_from_vol = []
-        scheduler_hints = None
-
-        if FLAGS.openstack_scheduler_policy != NONE:
-            group_name = 'perfkit_%s' % FLAGS.run_uri
-            try:
-                group = self.client.server_groups.findall(name=group_name)[0]
-            except IndexError:
-                group = self.client.server_groups.create(
-                    policies=[FLAGS.openstack_scheduler_policy],
-                    name=group_name)
-            scheduler_hints = {'group': group.id}
+        scheduler_hints = self._GetSchedulerHints()
 
         if FLAGS.openstack_boot_from_volume:
-            if FLAGS.openstack_volume_size:
-                volume_size = FLAGS.openstack_volume_size
-            else:
-                volume_size = flavor.disk
-
+            volume_size = FLAGS.openstack_volume_size or flavor.disk
             image_id = None
             boot_from_vol = [{'boot_index': 0,
                               'uuid': image.id,
@@ -136,6 +120,19 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             scheduler_hints=scheduler_hints,
             config_drive=FLAGS.openstack_config_drive)
         self.id = vm.id
+
+    def _GetSchedulerHints(self):
+        scheduler_hints = None
+        if FLAGS.openstack_scheduler_policy != NONE:
+            group_name = 'perfkit_%s' % FLAGS.run_uri
+            try:
+                group = self.client.server_groups.findall(name=group_name)[0]
+            except IndexError:
+                group = self.client.server_groups.create(
+                    policies=[FLAGS.openstack_scheduler_policy],
+                    name=group_name)
+            scheduler_hints = {'group': group.id}
+        return scheduler_hints
 
     @vm_util.Retry(max_retries=4, poll_interval=2)
     def _PostCreate(self):
