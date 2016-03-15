@@ -104,6 +104,15 @@ flags.DEFINE_integer('object_storage_multistream_num_streams', 10,
                      'Only applies to the api_multistream scenario.',
                      lower_bound=1)
 
+flags.DEFINE_integer('object_storage_list_consistency_iterations', 200,
+                     'Number of iterations to perform for the api_namespace '
+                     'list consistency benchmark. This flag is mainly for '
+                     'regression testing in the benchmarks. Reduce the number '
+                     'to shorten the execution time of the api_namespace '
+                     'scenario. However, to get useful metrics from the '
+                     'api_namespace scenario, a high number of iterations '
+                     'should be used (>=200).')
+
 
 FLAGS = flags.FLAGS
 
@@ -153,9 +162,6 @@ LARGE_DATA_SIZE_IN_BYTES = 3 * 1024 * 1024 * 1024
 LARGE_DATA_SIZE_IN_MBITS = 8 * LARGE_DATA_SIZE_IN_BYTES / 1000 / 1000
 
 API_TEST_SCRIPT = 'object_storage_api_tests.py'
-
-# The default number of iterations to run for the list consistency benchmark.
-LIST_CONSISTENCY_ITERATIONS = 200
 
 # Various constants to name the result metrics.
 THROUGHPUT_UNIT = 'Mbps'
@@ -514,7 +520,7 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       # list-after-write consistency metrics
       list_consistency_cmd = BuildBenchmarkScriptCommand([
           '--bucket=%s' % bucket_name,
-          '--iterations=%d' % LIST_CONSISTENCY_ITERATIONS,
+          '--iterations=%d' % FLAGS.object_storage_list_consistency_iterations,
           '--scenario=ListConsistency'])
 
       _, raw_result = vm.RemoteCommand(list_consistency_cmd)
