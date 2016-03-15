@@ -187,32 +187,55 @@ class SizeDistributionIterator(object):
     dist: dict. The distribution to draw sizes from.
   """
 
-  # IMPLEMENTATION LIMITATION: right now, this object only supports
-  # point distributions, which contain only a single size.
-
   def __init__(self, dist):
-    if len(dist) != 1:
-      raise NotImplementedError(
-          'General distributions are not implemented yet.')
+    # This class chooses random numbers by using random.random() to
+    # pick a float in [0.0, 100.0), then converting that into a choice
+    # from our distribution. The data structure is two lists, sizes
+    # and cutoffs. If the random number is in the range [cutoffs[i-1],
+    # cutoffs[i]), then the random choice is sizes[i]. Cutoffs has an
+    # implied starting element 0.0, and its last element must be
+    # 100.0.
+    self.sizes = []
+    self.cutoffs = []
 
-    size, _ = dist.iteritems().next()
-    self.size = size
+    total_percent = 0.0
+    for size, percent in dist.iteritems():
+      total_percent += percent
+      self.sizes.append(size)
+      self.cutoffs.append(total_percent)
+
+    # I considered storing probabilities instead of percents, but I'm
+    # afraid that there is an edge case where the probability
+    # corresponding to a percent doesn't have a terminating binary
+    # representation and then the total percent is less than 1.0 even
+    # though the percentages add up to 100. I can't prove that this
+    # happens, but storing percentages seems safer.
+    assert total_percent == 100.0
 
   # this is required by the Python iterator protocol
   def __iter__(self):
     return self
 
   def next(self):
+    val = random.random() * 100.0
+
+    # binary search has a lower asymptotic complexity than linear
+    # scanning, but thanks to caches and sequential access, I suspect
+    # linear scanning will be faster for any realistic distribution.
+    for i in xrange(len(self.sizes)):
+      if self.cutoffs[i] > val:
+        return self.sizes[i]
+
+    raise AssertionError("Random percent %s didn't match percent cutoff list %s"
+                         % (val, self.cutoffs))
+
     return self.size
 
 
 def MaxSizeInDistribution(dist):
   """Find the maximum object size in a distribution."""
 
-  if len(dist) != 1:
-    raise NotImplementedError('General distributions are not implemented yet.')
-
-  return long(dist.iterkeys().next())
+  return max(dist.iterkeys())
 
 
 def PercentileCalculator(numbers):
@@ -319,6 +342,15 @@ def CleanupBucket(storage_schema):
 
 
 def GenerateWritePayload(size):
+  """Generate random data for use with WriteObjectFromBuffer.
+
+  Args:
+    size: the amount of data needed, in bytes.
+
+  Returns:
+    A string of the length requested, filled with random data.
+  """
+
   payload_bytes = bytearray(size)
   # don't use a for...range(100M), range(100M) will create a list of 100mm items
   # with each item being the default object size of 30 bytes or so, it will lead
@@ -326,9 +358,7 @@ def GenerateWritePayload(size):
   for i in xrange(size):
     payload_bytes[i] = ord(random.choice(string.letters))
 
-  payload_string = payload_bytes.decode('ascii')
-
-  return payload_bytes, payload_string
+  return payload_bytes.decode('ascii')
 
 
 def WriteObjects(storage_schema, bucket, object_prefix, count,
@@ -354,7 +384,8 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
     host_to_connect: An optional endpoint string to connect to.
   """
 
-  payload_bytes, payload_string = GenerateWritePayload(size)
+  payload = GenerateWritePayload(size)
+  handle = cStringIO.StringIO(payload)
 
   for i in xrange(count):
     object_name = '%s_%d' % (object_prefix, i)
@@ -362,7 +393,7 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
     try:
       _, latency = WriteObjectFromBuffer(
           storage_schema, bucket, object_name,
-          payload_bytes, payload_string,
+          handle, size,
           host_to_connect=host_to_connect)
 
       objects_written.append(object_name)
@@ -370,14 +401,14 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
         latency_results.append(latency)
       if bandwidth_results is not None and latency > 0.0:
         bandwidth_results.append(size / latency)
+      handle.seek(0)
     except Exception as e:
       logging.info('Caught exception %s while writing object %s' %
                    (e, object_name))
 
 
 def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
-                          payload_bytes, payload_string,
-                          host_to_connect=None):
+                          stream, size, host_to_connect=None):
   """Write an object to a storage provider.
 
   Exceptions are propagated to the caller, which can decide whether to
@@ -387,8 +418,8 @@ def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
     storage_schema: The address schema identifying a storage. e.g., "gs"
     bucket_name: Name of the bucket to write to.
     object_name: Name of the object.
-    payload_bytes: A bytearray to transfer.
-    payload_string: A string version of payload_bytes.
+    stream: A read()-able stream to transfer.
+    size: The number of bytes to transfer.
     host_to_connect: An optional endpoint string to connect to.
 
   Returns:
@@ -405,10 +436,10 @@ def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
     if host_to_connect is not None:
       object_uri.connect(host=host_to_connect)
 
-    object_uri.set_contents_from_string(payload_string)
+    object_uri.set_contents_from_file(stream, size=size)
   else:
-    _AZURE_BLOB_SERVICE.put_block_blob_from_bytes(
-        bucket_name, object_name, bytes(payload_bytes))
+    _AZURE_BLOB_SERVICE.put_block_blob_from_file(
+        bucket_name, object_name, stream, count=size)
 
   latency = time.time() - start_time
 
@@ -736,17 +767,15 @@ def MultiStreamWrites(storage_schema, host_to_connect=None):
 
   """
 
-  size_distribution = yaml.load(cStringIO.StringIO(FLAGS.object_sizes))
+  size_distribution = yaml.load(FLAGS.object_sizes)
 
-  payload_bytes, payload_string = GenerateWritePayload(
-      MaxSizeInDistribution(size_distribution))
+  payload = GenerateWritePayload(MaxSizeInDistribution(size_distribution))
 
   results = RunThreadedWorkers(
       WriteWorker,
       (storage_schema,
        host_to_connect,
-       payload_bytes,
-       payload_string,
+       payload,
        size_distribution,
        FLAGS.objects_per_stream,
        FLAGS.start_time))
@@ -879,9 +908,22 @@ def SleepUntilTime(when):
 
 
 def WriteWorker(storage_schema, host_to_connect,
-                payload_bytes, payload_string,
-                size_distribution, num_objects,
+                payload, size_distribution, num_objects,
                 start_time, result_queue, worker_num):
+  """Upload objects for the multi-stream writes benchmark.
+
+  Args:
+    storage_schema: a two-character string indicating the storage
+      type. Ex: 'gs', 's3'.
+    host_to_connect: if given, an endpoint URL to connect to.
+    payload: a string. The bytes to upload.
+    size_distribution: the distribution of object sizes to use.
+    num_objects: the number of objects to upload.
+    start_time: a POSIX timestamp. When to start uploading.
+    result_queue: a Queue.Queue to record results in.
+    worker_num: the thread number of this worker.
+  """
+
   object_names = []
   start_times = []
   latencies = []
@@ -890,6 +932,8 @@ def WriteWorker(storage_schema, host_to_connect,
   size_iterator = SizeDistributionIterator(size_distribution)
   object_prefix = ('pkb_write_worker_%f_%s' % (time.time(), worker_num))
 
+  payload_handle = cStringIO.StringIO(payload)
+
   if start_time is not None:
     SleepUntilTime(start_time)
 
@@ -897,18 +941,18 @@ def WriteWorker(storage_schema, host_to_connect,
     object_name = '%s_%d' % (object_prefix, i)
     object_size = size_iterator.next()
 
-    # TODO: make use of object_size later when adding object size
-    # distribution support.
     try:
       start_time, latency = WriteObjectFromBuffer(
           storage_schema, FLAGS.bucket, object_name,
-          payload_bytes, payload_string,
+          payload_handle, object_size,
           host_to_connect=host_to_connect)
 
       object_names.append(object_name)
       start_times.append(start_time)
       latencies.append(latency)
       sizes.append(object_size)
+
+      payload_handle.seek(0)
     except Exception as e:
       logging.info('Worker %s caught exception %s while writing object %s' %
                    (worker_num, e, object_name))
