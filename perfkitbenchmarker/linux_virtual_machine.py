@@ -389,9 +389,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       remote_path: The destination of the file on the TARGET machine, default
           is the home directory.
     """
-    if not self.has_private_key:
-      self.RemoteHostCopy(target.ssh_private_key, REMOTE_KEY_PATH)
-      self.has_private_key = True
+    self.AuthenticateVm()
 
     # TODO(user): For security we may want to include
     #     -o UserKnownHostsFile=/dev/null in the scp command
@@ -406,9 +404,31 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def AuthenticateVm(self):
     """Authenticate a remote machine to access all peers."""
-    self.RemoteHostCopy(vm_util.GetPrivateKeyPath(),
-                        REMOTE_KEY_PATH)
-    self.has_private_key = True
+    if not self.is_static and not self.has_private_key:
+      self.RemoteHostCopy(vm_util.GetPrivateKeyPath(),
+                          REMOTE_KEY_PATH)
+      with vm_util.NamedTemporaryFile() as tf:
+        tf.write('Host *\n')
+        tf.write('  StrictHostKeyChecking no\n')
+        tf.close()
+        self.PushFile(tf.name, '~/.ssh/config')
+
+      self.has_private_key = True
+
+  def TestAuthentication(self, peer):
+    """Tests whether the VM can access its peer.
+
+    Raises:
+      AuthError: If the VM cannot access its peer.
+    """
+    try:
+      self.RemoteCommand('ssh %s hostname' % peer.internal_ip)
+    except errors.VirtualMachine.RemoteCommandError:
+      raise errors.VirtualMachine.AuthError(
+          'Authentication check failed. If you are running with Static VMs, '
+          'please make sure that %s can ssh into %s without supplying any '
+          'arguments except the ip address.' % (self, peer))
+
 
   def CheckJavaVersion(self):
     """Check the version of java on remote machine.

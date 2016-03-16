@@ -18,6 +18,7 @@
 
 def YumInstall(vm):
   """Installs the mongodb package on the VM."""
+  vm.RemoteCommand('sudo setenforce 0')
   mongodb_repo = (
       '[mongodb]\nname=MongoDB Repository\nbaseurl='
       'http://downloads-distro.mongodb.org/repo/redhat/os/x86_64/\n'

@@ -525,25 +525,28 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   logging.info('Running: %s', full_cmd)
 
   shell_value = RunningOnWindows()
-  process = subprocess.Popen(cmd, env=env, shell=shell_value,
-                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+  with tempfile.TemporaryFile() as tf_out, tempfile.TemporaryFile() as tf_err:
+    process = subprocess.Popen(cmd, env=env, shell=shell_value,
+                               stdin=subprocess.PIPE, stdout=tf_out,
+                               stderr=tf_err)
 
-  def _KillProcess():
-    logging.error('IssueCommand timed out after %d seconds. '
-                  'Killing command "%s".', timeout, full_cmd)
-    process.kill()
+    def _KillProcess():
+      logging.error('IssueCommand timed out after %d seconds. '
+                    'Killing command "%s".', timeout, full_cmd)
+      process.kill()
 
-  timer = threading.Timer(timeout, _KillProcess)
-  timer.start()
+    timer = threading.Timer(timeout, _KillProcess)
+    timer.start()
 
-  try:
-    stdout, stderr = process.communicate(input)
-  finally:
-    timer.cancel()
+    try:
+      process.wait()
+    finally:
+      timer.cancel()
 
-  stdout = stdout.decode('ascii', 'ignore')
-  stderr = stderr.decode('ascii', 'ignore')
+    tf_out.seek(0)
+    stdout = tf_out.read().decode('ascii', 'ignore')
+    tf_err.seek(0)
+    stderr = tf_err.read().decode('ascii', 'ignore')
 
   debug_text = ('Ran %s. Got return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
                 (full_cmd, process.returncode, stdout, stderr))
