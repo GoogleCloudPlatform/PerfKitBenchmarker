@@ -40,10 +40,7 @@ class TestSizeDistributionIterator(unittest.TestCase):
     with mock.patch(random.__name__ + '.random') as rand:
       rand.side_effect = [0.2, 0.7, 0.2]
       values = list(itertools.islice(iter, 3))
-      # We should draw either 1, 10, 1 or 10, 1, 10, but which one
-      # depends on Python's hash function, and I don't want this test
-      # to depend on that.
-      self.assertTrue(values == [1, 10, 1] or values == [10, 1, 10])
+      self.assertTrue(values == [1, 10, 1])
 
   def testNonTerminatingBinaryPercent(self):
     # 20/100 = 1/5 does not terminate in binary
@@ -54,7 +51,7 @@ class TestSizeDistributionIterator(unittest.TestCase):
       rand.side_effect = [0.1, 0.9]
       values = list(itertools.islice(iter, 2))
 
-      self.assertTrue(values == [1, 10] or values == [10, 1])
+      self.assertTrue(values == [1, 10])
 
 
 class TestMaxSizeInDistribution(unittest.TestCase):

@@ -198,8 +198,12 @@ class SizeDistributionIterator(object):
     self.sizes = []
     self.cutoffs = []
 
+    # Sorting the (size, percent change) pairs by size makes for a
+    # nicer interface and also simplifies unit testing.
+    sorted_dist = sorted(dist.iteritems(), key=lambda x: x[0])
+
     total_percent = 0.0
-    for size, percent in dist.iteritems():
+    for size, percent in sorted_dist:
       total_percent += percent
       self.sizes.append(size)
       self.cutoffs.append(total_percent)
