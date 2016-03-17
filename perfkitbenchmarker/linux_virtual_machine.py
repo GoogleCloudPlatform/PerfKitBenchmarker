@@ -1009,7 +1009,6 @@ class JujuMixin(DebianMixin):
 
     def juju_bootstrap(self):
         resp, _ = self.RemoteHostCommand("juju bootstrap")
-        pass
 
     def juju_addmachine(self, ip):
         resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" % ip)
@@ -1024,7 +1023,6 @@ class JujuMixin(DebianMixin):
             f.close()
             self.RemoteCopy(f.name, "~/.juju/environments.yaml")
             os.unlink(f.name)
-        pass
 
     def juju_environment(self, environment=''):
         # TODO: set environment on demand
@@ -1118,11 +1116,9 @@ class JujuMixin(DebianMixin):
                 "juju deploy %s --num-units=%d" % (charm, units))
 
             return True
-        pass
 
     def Relate(self, a, b):
         resp, _ = self.RemoteHostCommand("juju add-relation %s %s" % (a, b))
-        pass
 
     def AuthenticateVm(self):
         super(JujuMixin, self).AuthenticateVm()
