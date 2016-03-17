@@ -144,7 +144,7 @@ This section describes the setup steps needed for each cloud system.
 * [DigitalOcean](#digitalocean-configuration-and-credentials)
 * [RackSpace](#installing-clis-and-credentials-for-rackspace)
 
-After configuring the clouds you intend to use, skip to [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks). 
+After configuring the clouds you intend to use, skip to [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks).
 
 ### Install `gcloud` and setup authentication
 Instructions: https://developers.google.com/cloud/sdk/. If you're using OS X or Linux, you can run the command below:
