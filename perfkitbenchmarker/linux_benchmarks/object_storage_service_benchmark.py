@@ -352,16 +352,12 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
       FLAGS.object_storage_multistream_objects_per_stream)
 
   overall_metadata = metadata.copy()
-  # I would love to publish the full distribution in the metadata, but
-  # I'm afraid that including a complex value like a dictionary in
-  # metadata that is otherwise simple Python objects would break
-  # parsers. Also, we'd need to implement a custom serializer unless
-  # we wanted regular expression parsing of metadata to depend on
-  # Python's hash function. I add 'object_size_B':'distribution' for
-  # the full results because the metadata for the per-object-size
-  # values will include the 'object_size_B' field, and searching can
-  # be easier when all the records you care about have the same
-  # metadata fields.
+  # Don't publish the full distribution in the metadata because doing
+  # so might break regexp-based parsers that assume that all metadata
+  # values are simple Python objects. However, do add an
+  # 'object_size_B' metadata field even for the full results because
+  # searching metadata is easier when all records with the same metric
+  # name have the same set of metadata fields.
   overall_metadata['object_size_B'] = 'distribution'
   logging.info('Processing %s multi-stream %s results for the full '
                'distribution.', len(records), operation)

@@ -204,12 +204,10 @@ class SizeDistributionIterator(object):
       self.sizes.append(size)
       self.cutoffs.append(total_percent)
 
-    # I considered storing probabilities instead of percents, but I'm
-    # afraid that there is an edge case where the probability
-    # corresponding to a percent doesn't have a terminating binary
-    # representation and then the total percent is less than 1.0 even
-    # though the percentages add up to 100. I can't prove that this
-    # happens, but storing percentages seems safer.
+    # We store percents instead of probabilities because it avoids any
+    # possible edge cases where the percentages would add to 100.0 but
+    # their equivalent probabilities would have truncated
+    # floating-point representations and would not add to 1.0.
     assert total_percent == 100.0
 
   # this is required by the Python iterator protocol
@@ -220,8 +218,8 @@ class SizeDistributionIterator(object):
     val = random.random() * 100.0
 
     # binary search has a lower asymptotic complexity than linear
-    # scanning, but thanks to caches and sequential access, I suspect
-    # linear scanning will be faster for any realistic distribution.
+    # scanning, but thanks to caches and sequential access, linear
+    # scanning will probably be faster for any realistic distribution.
     for i in xrange(len(self.sizes)):
       if self.cutoffs[i] > val:
         return self.sizes[i]
@@ -401,7 +399,6 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
         latency_results.append(latency)
       if bandwidth_results is not None and latency > 0.0:
         bandwidth_results.append(size / latency)
-      handle.seek(0)
     except Exception as e:
       logging.info('Caught exception %s while writing object %s' %
                    (e, object_name))
@@ -412,13 +409,14 @@ def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
   """Write an object to a storage provider.
 
   Exceptions are propagated to the caller, which can decide whether to
-  tolerate them or not.
+  tolerate them or not. This function will seek() to the beginning of stream
+  before sending.
 
   Args:
     storage_schema: The address schema identifying a storage. e.g., "gs"
     bucket_name: Name of the bucket to write to.
     object_name: Name of the object.
-    stream: A read()-able stream to transfer.
+    stream: A read()-able and seek()-able stream to transfer.
     size: The number of bytes to transfer.
     host_to_connect: An optional endpoint string to connect to.
 
@@ -428,6 +426,7 @@ def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
   """
 
   # Ready to go!
+  stream.seek(0)
   start_time = time.time()
 
   if _useBotoApi(storage_schema):
@@ -951,8 +950,6 @@ def WriteWorker(storage_schema, host_to_connect,
       start_times.append(start_time)
       latencies.append(latency)
       sizes.append(object_size)
-
-      payload_handle.seek(0)
     except Exception as e:
       logging.info('Worker %s caught exception %s while writing object %s' %
                    (worker_num, e, object_name))
