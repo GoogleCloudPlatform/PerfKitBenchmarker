@@ -1024,52 +1024,30 @@ class JujuMixin(DebianMixin):
             self.RemoteCopy(f.name, "~/.juju/environments.yaml")
             os.unlink(f.name)
 
-    def juju_environment(self, environment=''):
-        # TODO: set environment on demand
-        try:
-            output, _ = self.RemoteHostCommand('juju switch')
-            return output.strip()
-        except:
-            pass
-        return None
+    def juju_environment(self):
+        output, _ = self.RemoteHostCommand('juju switch')
+        return output.strip()
 
     def juju_run(self, cmd):
-        try:
-            output, _ = self.RemoteHostCommand(cmd)
-            return output.strip()
-        except:
-            pass
-        return None
+        output, _ = self.RemoteHostCommand(cmd)
+        return output.strip()
 
     def juju_status(self):
         """
         Return the status of the Juju environment.
         """
-        try:
-
-            output, _ = self.RemoteHostCommand('juju status --format=json')
-            return output.strip()
-        except:
-            pass
-        return None
+        output, _ = self.RemoteHostCommand('juju status --format=json')
+        return output.strip()
 
     def juju_version(self):
-        try:
-            output, _ = self.RemoteHostCommand('juju version')
-            return output.strip()
-        except:
-            pass
-        return None
+        output, _ = self.RemoteHostCommand('juju version')
+        return output.strip()
 
     def Set(self, service, params=[]):
         ' '.join(params)
-        try:
-            output, _ = self.RemoteHostCommand(
-                'juju set %s %s' % (service, ' '.join(params)))
-            return output.strip()
-        except:
-            pass
-
+        output, _ = self.RemoteHostCommand(
+            'juju set %s %s' % (service, ' '.join(params)))
+        return output.strip()
 
     def Wait(self, timeout=900):
         """
