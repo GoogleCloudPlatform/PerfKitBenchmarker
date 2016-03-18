@@ -100,14 +100,15 @@ def JujuInstall(vm):
 
         # TODO: The number of units deployed should match
         # those in the benchmark_spec
-        vm.Deploy('cs:trusty/cassandra', 3)
-        vm.Set('cassandra', ['authenticator=AllowAllAuthenticator'])
-        vm.Deploy('cs:~marcoceppi/trusty/cassandra-stress')
-        vm.Relate('cassandra', 'cassandra-stress')
+        vm.JujuDeploy('cs:trusty/cassandra', 3)
+        vm.JujuSet('cassandra', ['authenticator=AllowAllAuthenticator'])
+        vm.JujuDeploy('cs:~marcoceppi/trusty/cassandra-stress')
+        vm.JujuRelate('cassandra', 'cassandra-stress')
 
         # This will wait for the cassandra cluster and cassandra-stress vms
         # to fully deploy and be ready for benchmarking
-        vm.Wait(timeout=1800)
+        if not vm.JujuWait(timeout=3600):
+            print "JujuWait failed!"
     else:
         # Make sure the cassandra/conf dir is created, since we're skipping
         # the manual installation to /tmp/pkb.
@@ -142,7 +143,7 @@ def Start(vm):
   Args:
     vm: The target vm. Should already be configured via 'Configure'.
   """
-  if FLAGS.os_type != JUJU:
+  if vm.OS_TYPE != JUJU:
     vm.RemoteCommand(
         'nohup {0}/bin/cassandra -p "{1}" 1> {2} 2> {3} &'.format(
             CASSANDRA_DIR, CASSANDRA_PID, CASSANDRA_OUT, CASSANDRA_ERR))
@@ -150,7 +151,7 @@ def Start(vm):
 
 def Stop(vm):
   """Stops Cassandra on 'vm'."""
-  if FLAGS.os_type != JUJU:
+  if vm.OS_TYPE != JUJU:
     vm.RemoteCommand('kill $(cat {0})'.format(CASSANDRA_PID),
                      ignore_failure=True)
 
@@ -180,7 +181,7 @@ def CleanNode(vm):
   Args:
     vm: VirtualMachine. VM to clean.
   """
-  if FLAGS.os_type != JUJU:
+  if vm.OS_TYPE != JUJU:
     data_path = posixpath.join(vm.GetScratchDir(), 'cassandra')
     vm.RemoteCommand('rm -rf {0}'.format(data_path))
 
@@ -192,8 +193,8 @@ def _StartCassandraIfNotRunning(vm):
     Start(vm)
 
 
-def GetCassandraStressPath():
-  if FLAGS.os_type == JUJU:
+def GetCassandraStressPath(vm):
+  if vm.OS_TYPE == JUJU:
     """
     Replace the stock CASSANDRA_STRESS so that it uses the binary
     installed by the cassandra-stress charm.
@@ -227,7 +228,7 @@ def StartCluster(seed_vm, vms):
     vms: list of VirtualMachines. VMs *other than* seed_vm which should be
       started.
   """
-  if FLAGS.os_type != JUJU:
+  if seed_vm.OS_TYPE != JUJU:
     """
     Juju automatically configures and starts the Cassandra cluster.
     """
