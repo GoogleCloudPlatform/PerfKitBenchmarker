@@ -59,6 +59,9 @@ flags.DEFINE_string('object_storage_region', None,
 flags.DEFINE_string('object_storage_gcs_multiregion', None,
                     'Storage multiregion for GCS in object storage benchmark.')
 
+flags.DEFINE_string('object_storage_storage_class', None,
+                    'Storage class to use in object storage benchmark.')
+
 flags.DEFINE_enum('object_storage_scenario', 'all',
                   ['all', 'cli', 'api_data', 'api_namespace',
                    'api_multistream'],
@@ -471,6 +474,9 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
         cmd_parts += [azure_command_suffix]
       if host_to_connect is not None:
         cmd_parts += ['--host', host_to_connect]
+      if FLAGS.object_storage_storage_class is not None:
+        cmd_parts += ['--object_storage_class',
+                      FLAGS.object_storage_storage_class]
 
       return ' '.join(cmd_parts)
 
@@ -1076,6 +1082,8 @@ class GoogleCloudStorageBenchmark(object):
     make_bucket_command = '%s mb' % vm.gsutil_path
     if FLAGS.object_storage_gcs_multiregion:
       make_bucket_command += ' -l %s' % FLAGS.object_storage_gcs_multiregion
+    if FLAGS.object_storage_storage_class is not None:
+      make_bucket_command += ' -c %s' % FLAGS.object_storage_storage_class
     make_bucket_command += ' gs://%s' % vm.bucket_name
     vm.RemoteCommand(make_bucket_command)
 
