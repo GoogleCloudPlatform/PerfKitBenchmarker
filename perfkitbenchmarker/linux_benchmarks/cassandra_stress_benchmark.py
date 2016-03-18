@@ -387,7 +387,7 @@ def RunTestOnLoader(vm, loader_index, operations_per_vm, data_node_ips,
       '-node {nodes} {schema} {population_dist} '
       '-log file={result_file} -rate threads={threads} '
       '-errors retries={retries}'.format(
-          cassandra=cassandra.GetCassandraStressPath(),
+          cassandra=cassandra.GetCassandraStressPath(vm),
           command=command,
           consistency_level=FLAGS.cassandra_stress_consistency_level,
           num_keys=operations_per_vm,
