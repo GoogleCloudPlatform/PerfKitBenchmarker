@@ -100,9 +100,10 @@ flags.DEFINE_float('start_time', None, 'The time (as a POSIX timestamp) '
                    'to start the operation. Only applies to the '
                    'MultiStreamRead and MultiStreamWrite scenarios.')
 
-flags.DEFINE_string('storage_class', None, 'The storage class to use for '
-                    'uploads. Currently only applicable to AWS, ignored by '
-                    'other providers.')
+flags.DEFINE_string('object_storage_class', None, 'The storage class to use '
+                    'for uploads. Currently only applicable to AWS. For other '
+                    'providers, storage class is determined by the bucket, '
+                    'which is passed in by the --bucket parameter.')
 
 STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
@@ -443,12 +444,12 @@ def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
     if host_to_connect is not None:
       object_uri.connect(host=host_to_connect)
 
-    if FLAGS.storage_class and storage_schema == 's3':
+    if FLAGS.object_storage_class and storage_schema == 's3':
       # We need to use a lower-level upload method when using an S3
       # storage class because we need access to the key object so we
       # can set its storage class.
       key = object_uri.new_key()
-      key._set_storage_class(FLAGS.storage_class)
+      key._set_storage_class(FLAGS.object_storage_class)
       key.set_contents_from_file(stream, size=size)
     else:
       object_uri.set_contents_from_file(stream, size=size)

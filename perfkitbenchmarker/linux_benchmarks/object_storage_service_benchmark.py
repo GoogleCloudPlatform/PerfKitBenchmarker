@@ -475,7 +475,8 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       if host_to_connect is not None:
         cmd_parts += ['--host', host_to_connect]
       if FLAGS.object_storage_storage_class is not None:
-        cmd_parts += ['--storage_class', FLAGS.object_storage_storage_class]
+        cmd_parts += ['--object_storage_class',
+                      FLAGS.object_storage_storage_class]
 
       return ' '.join(cmd_parts)
 
@@ -1081,7 +1082,7 @@ class GoogleCloudStorageBenchmark(object):
     make_bucket_command = '%s mb' % vm.gsutil_path
     if FLAGS.object_storage_gcs_multiregion:
       make_bucket_command += ' -l %s' % FLAGS.object_storage_gcs_multiregion
-    if FLAGS.object_storage_storage_class:
+    if FLAGS.object_storage_storage_class is not None:
       make_bucket_command += ' -c %s' % FLAGS.object_storage_storage_class
     make_bucket_command += ' gs://%s' % vm.bucket_name
     vm.RemoteCommand(make_bucket_command)
