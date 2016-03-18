@@ -78,7 +78,7 @@ class TestProcessMultiStreamResults(unittest.TestCase):
                     '._AppendPercentilesToResults',
                     return_value=[3]) as append_percentiles:
       object_storage_service_benchmark._ProcessMultiStreamResults(
-          self.raw_result, 'upload', [])
+          self.raw_result, 'upload', [1], [])
 
       # Can't use append_percentiles.assert_called_once_with when one
       # of the arguments is a generator, because it compares
@@ -94,12 +94,24 @@ class TestProcessMultiStreamResults(unittest.TestCase):
                                             'num_streams': 10,
                                             'objects_per_stream': 100})
 
-  def testKeepsBaseMetadata(self):
+  def testPreservesBaseMetadata(self):
     results = []
     object_storage_service_benchmark._ProcessMultiStreamResults(
-        self.raw_result, 'upload', results, metadata={'foo': 'bar'})
+        self.raw_result, 'upload', [1], results, metadata={'foo': 'bar'})
+
     self.assertEqual(results[0].metadata['foo'],
                      'bar')
+
+  def testObjectSizeMetadata(self):
+    results = []
+    object_storage_service_benchmark._ProcessMultiStreamResults(
+        self.raw_result, 'upload', [1], results)
+
+    # Testing with [0] and [-1] makes this test independent of exactly
+    # how many percentiles _AppendPercentilesToResults adds to
+    # results for each object size.
+    self.assertEqual(results[0].metadata['object_size_B'], 'distribution')
+    self.assertEqual(results[-1].metadata['object_size_B'], 1)
 
 
 class TestDistributionToBackendFormat(unittest.TestCase):

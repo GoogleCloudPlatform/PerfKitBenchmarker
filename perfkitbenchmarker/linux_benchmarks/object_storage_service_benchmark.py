@@ -330,14 +330,20 @@ def _MakeSwiftCommandPrefix(auth_url, tenant_name, username, password):
   return ' '.join(options)
 
 
-def _ProcessMultiStreamResults(raw_result, operation, results, metadata=None):
+def _ProcessMultiStreamResults(raw_result, operation, sizes,
+                               results, metadata=None):
   """Read and process results from the api_multistream worker process.
+
+  Results will be reported per-object size and combined for all
+  objects.
 
   Args:
     raw_result: string. The stdout of the worker process.
     operation: 'upload' or 'download'. The operation the results are from.
+    sizes: the object sizes used in the benchmark, in bytes.
     results: a list to append Sample objects to.
     metadata: dict. Base sample metadata
+
   """
 
   if metadata is None:
@@ -345,27 +351,40 @@ def _ProcessMultiStreamResults(raw_result, operation, results, metadata=None):
 
   records = json.loads(raw_result)
   metric_name = 'Multi-stream %s latency' % operation
-  # TODO: when object size distributions are added, support multiple
-  # sizes.
-  object_size = records[0]['size']
 
-  logging.info('Processing %s multi-stream %s results for object size %s',
-               len(records), operation, object_size)
-
-  # Once we land size distributions, we will report different latency
-  # for each object size.
   metadata = metadata.copy()
-  metadata['object_size_B'] = object_size
   metadata['num_streams'] = FLAGS.object_storage_multistream_num_streams
   metadata['objects_per_stream'] = (
       FLAGS.object_storage_multistream_objects_per_stream)
 
+  overall_metadata = metadata.copy()
+  # Don't publish the full distribution in the metadata because doing
+  # so might break regexp-based parsers that assume that all metadata
+  # values are simple Python objects. However, do add an
+  # 'object_size_B' metadata field even for the full results because
+  # searching metadata is easier when all records with the same metric
+  # name have the same set of metadata fields.
+  overall_metadata['object_size_B'] = 'distribution'
+  logging.info('Processing %s multi-stream %s results for the full '
+               'distribution.', len(records), operation)
   _AppendPercentilesToResults(
       results,
       (record['latency'] for record in records),
       metric_name,
       'sec',
-      metadata)
+      overall_metadata)
+
+  for size in sizes:
+    metadata = metadata.copy()
+    metadata['object_size_B'] = size
+    logging.info('Processing %s multi-stream %s results for object size %s',
+                 len(records), operation, size)
+    _AppendPercentilesToResults(
+        results,
+        (record['latency'] for record in records if record['size'] == size),
+        metric_name,
+        'sec',
+        metadata)
 
 
 def _DistributionToBackendFormat(dist):
@@ -592,7 +611,8 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
           '--scenario=MultiStreamWrite'])
       write_out, _ = vm.RobustRemoteCommand(
           multi_stream_write_cmd, should_log=True)
-      _ProcessMultiStreamResults(write_out, 'upload', results,
+      _ProcessMultiStreamResults(write_out, 'upload',
+                                 size_distribution.iterkeys(), results,
                                  metadata=metadata)
 
       logging.info('Finished multi-stream write test. Starting multi-stream '
@@ -617,7 +637,8 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       try:
         read_out, _ = vm.RobustRemoteCommand(
             multi_stream_read_cmd, should_log=True)
-        _ProcessMultiStreamResults(read_out, 'download', results,
+        _ProcessMultiStreamResults(read_out, 'download',
+                                   size_distribution.iterkeys(), results,
                                    metadata=metadata)
       except Exception as ex:
         logging.info('MultiStreamRead test failed with exception %s. Still '
