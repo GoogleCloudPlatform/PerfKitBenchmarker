@@ -1007,13 +1007,13 @@ class JujuMixin(DebianMixin):
             bootstrap-host: {0}
     """
 
-    def juju_bootstrap(self):
+    def JujuBootstrap(self):
         resp, _ = self.RemoteHostCommand("juju bootstrap")
 
-    def juju_addmachine(self, ip):
+    def JujuAddMachine(self, ip):
         resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" % ip)
 
-    def juju_configure_environment(self):
+    def JujuConfigureEnvironment(self):
         if self.isController:
 
             resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
@@ -1024,41 +1024,42 @@ class JujuMixin(DebianMixin):
             self.RemoteCopy(f.name, "~/.juju/environments.yaml")
             os.unlink(f.name)
 
-    def juju_environment(self):
+    def JujuEnvironment(self):
         output, _ = self.RemoteHostCommand('juju switch')
         return output.strip()
 
-    def juju_run(self, cmd):
+    def JujuRun(self, cmd):
         output, _ = self.RemoteHostCommand(cmd)
         return output.strip()
 
-    def juju_status(self):
+    def JujuStatus(self):
         """
         Return the status of the Juju environment.
         """
         output, _ = self.RemoteHostCommand('juju status --format=json')
+        logging.warn(output)
+
         return output.strip()
 
-    def juju_version(self):
+    def JujuVersion(self):
         output, _ = self.RemoteHostCommand('juju version')
         return output.strip()
 
-    def Set(self, service, params=[]):
+    def JujuSet(self, service, params=[]):
         ' '.join(params)
         output, _ = self.RemoteHostCommand(
             'juju set %s %s' % (service, ' '.join(params)))
         return output.strip()
 
-    def Wait(self, timeout=900):
+    def JujuWait(self, timeout=900):
         """
         Wait until all services are deployed, related or idle
         """
 
-        # This should do while start+timeout < time()
+        start = time.time()
         while True:
             ready = True
-            status = yaml.load(self.juju_status())
-            # logging.warn(status)
+            status = yaml.load(self.JujuStatus())
             for service in status['services']:
                 ss = status['services'][service]['service-status']['current']
 
@@ -1068,7 +1069,7 @@ class JujuMixin(DebianMixin):
 
                 if ss in ['error']:
                     # The service has failed to deploy.
-                    debuglog = self.juju_run('juju debug-log --limit 200')
+                    debuglog = self.JujuRun('juju debug-log --limit 200')
                     logging.warn(debuglog)
                     return False
 
@@ -1081,13 +1082,18 @@ class JujuMixin(DebianMixin):
                     ws = unit_data['workload-status']['current']
                     if ready and ws not in ['active', 'unknown']:
                         ready = False
-            # TODO: Exit loop if timeout exceeded
+
+            if start + timeout < time.time():
+                ready = False
+
             if ready:
-                return
+                return True
+
             time.sleep(30)
 
+        return True
 
-    def Deploy(self, charm, units=1):
+    def JujuDeploy(self, charm, units=1):
         if self.isController:
             # Check if the charm is already deployed?
             resp, _ = self.RemoteHostCommand(
@@ -1095,7 +1101,7 @@ class JujuMixin(DebianMixin):
 
             return True
 
-    def Relate(self, a, b):
+    def JujuRelate(self, a, b):
         resp, _ = self.RemoteHostCommand("juju add-relation %s %s" % (a, b))
 
     def AuthenticateVm(self):
@@ -1121,20 +1127,20 @@ class JujuMixin(DebianMixin):
             try:
                 self.InstallPackages('juju')
 
-                self.juju_configure_environment()
+                self.JujuConfigureEnvironment()
 
                 self.AuthenticateVm()
 
-                self.juju_bootstrap()
+                self.JujuBootstrap()
 
                 # Install the Juju agent on the other VMs
                 for unit in self.units:
                     unit.controller = self
-                    self.juju_addmachine(unit.internal_ip)
+                    self.JujuAddMachine(unit.internal_ip)
 
             except errors.VirtualMachine.RemoteCommandError as e:
                 raise e
 
-    @vm_util.Retry(log_errors=False, poll_interval=1)
-    def WaitForBootCompletion(self):
-        super(JujuMixin, self).WaitForBootCompletion()
+    # @vm_util.Retry(log_errors=False, poll_interval=1)
+    # def WaitForBootCompletion(self):
+    #     super(JujuMixin, self).WaitForBootCompletion()
