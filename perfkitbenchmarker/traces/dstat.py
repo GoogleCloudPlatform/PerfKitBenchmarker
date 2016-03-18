@@ -103,7 +103,7 @@ class _DStatCollector(object):
     vm.RemoteCommand(cmd)
     try:
       vm.PullFile(self.output_directory, file_name)
-    except:
+    except Exception:
       logging.exception('Failed fetching dstat result from %s.', vm.name)
 
   def Start(self, sender, benchmark_spec):

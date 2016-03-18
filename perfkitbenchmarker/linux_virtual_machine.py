@@ -154,7 +154,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     '--delete']
     try:
       return self.RemoteCommand(' '.join(wait_command), should_log=should_log)
-    except:
+    except errors.VirtualMachine.RemoteCommandError:
       # In case the error was with the wrapper script itself, print the log.
       stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
       if stdout.strip():

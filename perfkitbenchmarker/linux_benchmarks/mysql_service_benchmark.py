@@ -616,21 +616,21 @@ class RDSMySQLBenchmark(object):
     for status_query_count in xrange(1, DB_STATUS_QUERY_LIMIT + 1):
       try:
         response = json.loads(stdout)
-        db_status = _RDSParseDBInstanceStatus(response)
-
-        if db_status == 'deleting':
-          logging.info('DB is still in the deleting state, status_query_count '
-                       'is %d', status_query_count)
-          # Wait for a few seconds and query status
-          time.sleep(DB_STATUS_QUERY_INTERVAL)
-          stdout, stderr, _ = vm_util.IssueCommand(status_query_cmd)
-        else:
-          logging.info('DB deletion status is no longer in deleting, it is %s',
-                       db_status)
-          break
-      except:
+      except ValueError:
         # stdout cannot be parsed into json, it might simply be empty because
         # deletion has been completed.
+        break
+
+      db_status = _RDSParseDBInstanceStatus(response)
+      if db_status == 'deleting':
+        logging.info('DB is still in the deleting state, status_query_count '
+                     'is %d', status_query_count)
+        # Wait for a few seconds and query status
+        time.sleep(DB_STATUS_QUERY_INTERVAL)
+        stdout, stderr, _ = vm_util.IssueCommand(status_query_cmd)
+      else:
+        logging.info('DB deletion status is no longer in deleting, it is %s',
+                     db_status)
         break
     else:
       logging.warn('DB is still in deleting state after long wait, bail.')

@@ -736,7 +736,7 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
     try:
       _, res = vm.RemoteCommand(upload_cmd)
       upload_successful = True
-    except:
+    except errors.VirtualMachine.RemoteCommandError:
       logging.info('failed to upload, skip this iteration.')
       pass
 
@@ -753,7 +753,7 @@ def _CliBasedTests(output_results, metadata, vm, iteration_count,
       try:
         _, res = vm.RemoteCommand(download_cmd)
         download_successful = True
-      except:
+      except errors.VirtualMachine.RemoteCommandError:
         logging.info('failed to download, skip this iteration.')
         pass
 
@@ -1079,7 +1079,7 @@ class GoogleCloudStorageBenchmark(object):
         # https://cloud.google.com/storage/docs/
         # gsutil/addlhelp/CRC32CandInstallingcrcmod
         vm.RemoteCommand('/usr/bin/yes |sudo pip uninstall crcmod')
-      except:
+      except errors.VirtualMachine.RemoteCommandError:
         logging.info('pip uninstall crcmod failed, could be normal if crcmod '
                      'is not available at all.')
         pass
