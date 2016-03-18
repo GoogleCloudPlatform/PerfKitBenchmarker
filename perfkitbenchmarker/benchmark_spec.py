@@ -195,7 +195,8 @@ class BenchmarkSpec(object):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
     vm_group_specs = self.config.vm_groups
 
-    if vm_group_specs[vm_group_specs.keys()[0]].os_type == os_types.JUJU:
+    os_type = vm_group_specs[vm_group_specs.keys()[0]].os_type
+    if os_type == os_types.JUJU:
         """
         The Juju VM needs to be created first, so that subsequent units can
         be properly added under its control.
@@ -215,7 +216,7 @@ class BenchmarkSpec(object):
       self.vms.extend(vms)
 
     # Append the Juju VM to the end of the vm list
-    if vm_group_specs[vm_group_specs.keys()[0]].os_type == os_types.JUJU and jujuvm is not None:
+    if os_type == os_types.JUJU and jujuvm is not None:
         for vm in self.vms:
             vm.controller = jujuvm
 
