@@ -164,7 +164,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         from novaclient.exceptions import NotFound
         try:
             self.client.servers.delete(self.id)
-            time.sleep(5)
+            self._WaitForDeleteCompletion()
         except NotFound:
             logging.info('Instance not found, may have been already deleted')
 
@@ -189,6 +189,17 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.bootable_time = time.time()
         if self.hostname is None:
             self.hostname = resp[:-1]
+
+    @vm_util.Retry(poll_interval=5, max_retries=-1, timeout=300,
+                   log_errors=False,
+                   retryable_exceptions=(
+                       errors.Resource.RetryableDeletionError,))
+    def _WaitForDeleteCompletion(self):
+        instance = self.client.servers.get(self.id)
+        if instance and instance.status == 'ACTIVE':
+            raise errors.Resource.RetryableDeletionError(
+                'VM: %s has not been deleted. Retrying to check status.'
+                % self.name)
 
     def CreateScratchDisk(self, disk_spec):
         disks_names = ('%s-data-%d-%d'
