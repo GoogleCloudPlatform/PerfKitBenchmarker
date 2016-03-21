@@ -38,6 +38,9 @@ import posixpath
 import re
 import time
 
+import pandas as pd
+
+from perfkitbenchmarker import analyze
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -358,43 +361,88 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
 
   if metadata is None:
     metadata = {}
-
-  records = json.loads(raw_result)
-  metric_name = 'Multi-stream %s latency' % operation
-
-  metadata = metadata.copy()
   metadata['num_streams'] = FLAGS.object_storage_multistream_num_streams
   metadata['objects_per_stream'] = (
       FLAGS.object_storage_multistream_objects_per_stream)
 
-  overall_metadata = metadata.copy()
+  records_json = json.loads(raw_result)
+  records = pd.DataFrame(records_json)
+
+  all_streams_start, all_streams_duration = analyze.AllStreamsInterval(
+      records['start_time'], records['latency'], records['stream_num'])
+  logging.info(
+      'First stream started %s seconds before last stream started',
+      all_streams_start - records['start_time'].min())
+  logging.info(
+      'Last stream ended %s seconds after first stream ended',
+      (records['start_time'] + records['latency']).max() -
+      (all_streams_start + all_streams_duration))
+  records_in_interval = records[
+      analyze.FullyInInterval(records['start_time'],
+                              records['latency'],
+                              all_streams_start,
+                              all_streams_duration)]
+
   # Don't publish the full distribution in the metadata because doing
   # so might break regexp-based parsers that assume that all metadata
   # values are simple Python objects. However, do add an
   # 'object_size_B' metadata field even for the full results because
   # searching metadata is easier when all records with the same metric
   # name have the same set of metadata fields.
-  overall_metadata['object_size_B'] = 'distribution'
+  distribution_metadata = metadata.copy()
+  distribution_metadata['object_size_B'] = 'distribution'
+
+  latency_prefix = 'Multi-stream %s latency ' % operation
+  throughput_prefix = 'Multi-stream %s throughput ' % operation
   logging.info('Processing %s multi-stream %s results for the full '
                'distribution.', len(records), operation)
-  _AppendPercentilesToResults(
-      results,
-      (record['latency'] for record in records),
-      metric_name,
+  analyze.AppendStatsAsSamples(
+      records_in_interval['latency'],
       'sec',
-      overall_metadata)
+      results,
+      name_prefix=latency_prefix,
+      metadata=distribution_metadata)
 
+  analyze.AppendStatsAsSamples(
+      records_in_interval['size'] / records_in_interval['latency'],
+      'B/sec',
+      results,
+      name_prefix=throughput_prefix,
+      metadata=distribution_metadata)
+
+  logging.info('Processing %s multi-stream %s results for net throughput',
+               len(records), operation)
+  results.append(
+      sample.Sample(
+          'Multi-stream %s net throughput' % operation,
+          records_in_interval['size'].sum() /
+          records_in_interval['latency'].sum(),
+          'B/sec',
+          metadata=distribution_metadata))
+
+
+  # Publish by-size and full-distribution stats even if there's only
+  # one size in the distribution, because it simplifies postprocessing
+  # of results.
   for size in sizes:
-    metadata = metadata.copy()
-    metadata['object_size_B'] = size
+    this_size_records = records_in_interval[records_in_interval['size'] == size]
+    this_size_metadata = metadata.copy()
+    this_size_metadata['object_size_B'] = size
     logging.info('Processing %s multi-stream %s results for object size %s',
                  len(records), operation, size)
-    _AppendPercentilesToResults(
-        results,
-        (record['latency'] for record in records if record['size'] == size),
-        metric_name,
+    analyze.AppendStatsAsSamples(
+        this_size_records['latency'],
         'sec',
-        metadata)
+        results,
+        name_prefix=latency_prefix,
+        metadata=this_size_metadata)
+
+    analyze.AppendStatsAsSamples(
+        this_size_records['size'] / this_size_records['latency'],
+        'B/sec',
+        results,
+        name_prefix=throughput_prefix,
+        metadata=this_size_metadata)
 
 
 def _DistributionToBackendFormat(dist):
