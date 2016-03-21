@@ -79,18 +79,18 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.public_net = self.client.networks.find(
                 label=self.floating_ip_pool_name)
 
-        if self.private_net is None:
-            if self.public_net is None:
+        if not self.private_net:
+            if self.public_net:
+                raise errors.Error(
+                    'Cannot associate floating-ip address from pool %s without '
+                    'an internally routable network. Make sure '
+                    '--openstack_network flag is set.')
+            else:
                 raise errors.Error(
                     'Cannot build instance without a network. Make sure to set '
                     'either just --openstack_network or both '
                     '--openstack_network and --openstack_floating_ip_pool '
                     'flags.')
-            else:
-                raise errors.Error(
-                    'Cannot associate floating-ip address from pool %s without '
-                    'an internally routable network. Make sure '
-                    '--openstack_network flag is set.')
 
         nics = [{'net-id': self.private_net.id}]
 
@@ -142,8 +142,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             time.sleep(5)
             instance = self.client.servers.get(self.id)
             status = instance.status
-
-        assert self.private_net is not None  # Previously checked, must be true.
+        # Unlikely to be false, previously checked to be true in self._Create()
+        assert self.private_net is not None, '--openstack_network must be set.'
         self.internal_ip = instance.networks[self.network_name][0]
         self.ip_address = self.internal_ip
         if self.public_net:
