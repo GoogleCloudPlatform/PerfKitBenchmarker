@@ -17,6 +17,7 @@ import threading
 import time
 
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import providers
@@ -53,43 +54,52 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
                                                FLAGS.run_uri)
         self.client = os_utils.NovaClient()
+        # FIXME(meteorfox): Remove --openstack_public_network and
+        # --openstack_private_network once depreciation time has expired
+        self.network_name = (FLAGS.openstack_network or
+                             FLAGS.openstack_private_network)
+        self.floating_ip_pool_name = (FLAGS.openstack_floating_ip_pool or
+                                      FLAGS.openstack_public_network)
         self.public_network = os_network.OpenStackPublicNetwork(
-            FLAGS.openstack_public_network
-        )
+            FLAGS.openstack_floating_ip_pool)
         self.id = None
         self.pk = None
         self.user_name = FLAGS.openstack_image_username
         self.boot_wait_time = None
         self.image = self.image or self.DEFAULT_IMAGE
+        self.public_net = None
+        self.private_net = None
+        self.floating_ip = None
 
     def _Create(self):
         image = self.client.images.findall(name=self.image)[0]
         flavor = self.client.flavors.findall(name=self.machine_type)[0]
+        self.private_net = self.client.networks.find(label=self.network_name)
+        if self.floating_ip_pool_name:
+            self.public_net = self.client.networks.find(
+                label=self.floating_ip_pool_name)
 
-        network = self.client.networks.find(
-            label=FLAGS.openstack_private_network)
-        nics = [{'net-id': network.id}]
+        if not self.private_net:
+            if self.public_net:
+                raise errors.Error(
+                    'Cannot associate floating-ip address from pool %s without '
+                    'an internally routable network. Make sure '
+                    '--openstack_network flag is set.')
+            else:
+                raise errors.Error(
+                    'Cannot build instance without a network. Make sure to set '
+                    'either just --openstack_network or both '
+                    '--openstack_network and --openstack_floating_ip_pool '
+                    'flags.')
+
+        nics = [{'net-id': self.private_net.id}]
+
         image_id = image.id
         boot_from_vol = []
-        scheduler_hints = None
-
-        if FLAGS.openstack_scheduler_policy != NONE:
-            group_name = 'perfkit_%s' % FLAGS.run_uri
-            try:
-                group = self.client.server_groups.findall(name=group_name)[0]
-            except IndexError:
-                group = self.client.server_groups.create(
-                    policies=[FLAGS.openstack_scheduler_policy],
-                    name=group_name)
-            scheduler_hints = {'group': group.id}
+        scheduler_hints = self._GetSchedulerHints()
 
         if FLAGS.openstack_boot_from_volume:
-
-            if FLAGS.openstack_volume_size:
-                volume_size = FLAGS.openstack_volume_size
-            else:
-                volume_size = flavor.disk
-
+            volume_size = FLAGS.openstack_volume_size or flavor.disk
             image_id = None
             boot_from_vol = [{'boot_index': 0,
                               'uuid': image.id,
@@ -111,6 +121,19 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             config_drive=FLAGS.openstack_config_drive)
         self.id = vm.id
 
+    def _GetSchedulerHints(self):
+        scheduler_hints = None
+        if FLAGS.openstack_scheduler_policy != NONE:
+            group_name = 'perfkit_%s' % FLAGS.run_uri
+            try:
+                group = self.client.server_groups.findall(name=group_name)[0]
+            except IndexError:
+                group = self.client.server_groups.create(
+                    policies=[FLAGS.openstack_scheduler_policy],
+                    name=group_name)
+            scheduler_hints = {'group': group.id}
+        return scheduler_hints
+
     @vm_util.Retry(max_retries=4, poll_interval=2)
     def _PostCreate(self):
         status = 'BUILD'
@@ -119,19 +142,23 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
             time.sleep(5)
             instance = self.client.servers.get(self.id)
             status = instance.status
+        # Unlikely to be false, previously checked to be true in self._Create()
+        assert self.private_net is not None, '--openstack_network must be set.'
+        self.internal_ip = instance.networks[self.network_name][0]
+        self.ip_address = self.internal_ip
+        if self.public_net:
+            self.floating_ip = self._AllocateFloatingIP(instance)
+            self.ip_address = self.floating_ip.ip
 
+    def _AllocateFloatingIP(self, instance):
         with self._floating_ip_lock:
-            self.floating_ip = self.public_network.get_or_create()
-            instance.add_floating_ip(self.floating_ip)
-            logging.info('floating-ip associated: {}'.format(
-                self.floating_ip.ip))
-
-        while not self.public_network.is_attached(self.floating_ip):
+            floating_ip = self.public_network.get_or_create()
+            instance.add_floating_ip(floating_ip)
+            logging.info(
+                'floating-ip associated: {}'.format(floating_ip.ip))
+        while not self.public_network.is_attached(floating_ip):
             time.sleep(1)
-
-        self.ip_address = self.floating_ip.ip
-        self.internal_ip = instance.networks[
-            FLAGS.openstack_private_network][0]
+        return floating_ip
 
     def _Delete(self):
         from novaclient.exceptions import NotFound
@@ -141,7 +168,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         except NotFound:
             logging.info('Instance not found, may have been already deleted')
 
-        self.public_network.release(self.floating_ip)
+        if self.floating_ip:
+            self.public_network.release(self.floating_ip)
 
     def _Exists(self):
         from novaclient.exceptions import NotFound
