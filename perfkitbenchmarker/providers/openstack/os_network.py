@@ -125,6 +125,9 @@ class OpenStackPublicNetwork(object):
 
     def __init__(self, pool):
         self.__nclient = utils.NovaClient()
+        # TODO(meteorfox) Is this lock needed? Callers to these methods seem
+        # to be using a lock already. Should we make callers use a lock, or
+        # should this object handle the lock?
         self.__floating_ip_lock = threading.Lock()
         self.ip_pool_name = pool
 
@@ -134,9 +137,9 @@ class OpenStackPublicNetwork(object):
 
     def release(self, floating_ip):
         f_id = floating_ip.id
-        if self.__nclient.floating_ips.get(f_id).fixed_ip:
+        if self.__nclient.floating_ips.get(f_id):
             with self.__floating_ip_lock:
-                if not self.__nclient.floating_ips.get(f_id).fixed_ip:
+                if self.__nclient.floating_ips.get(f_id):
                     self.__nclient.floating_ips.delete(floating_ip)
                     while self.__nclient.floating_ips.findall(id=f_id):
                         time.sleep(1)
@@ -144,11 +147,8 @@ class OpenStackPublicNetwork(object):
     def get_or_create(self):
         with self.__floating_ip_lock:
             floating_ips = self.__nclient.floating_ips.findall(
-                fixed_ip=None,
-                pool=self.ip_pool_name,
-                status='Down'
-            )
-        # FIXME(meteorfox) Floating IP allocation must be done within the lock
+                instance_id=None,
+                pool=self.ip_pool_name)
         if floating_ips:
             return floating_ips[0]
         else:

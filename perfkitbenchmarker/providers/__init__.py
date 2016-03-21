@@ -67,6 +67,6 @@ def LoadProvider(provider_name, ignore_package_requirements=True):
                                               __name__ + '.' + provider_name)]
     if not modules:
       raise ImportError('No modules found for provider.')
-  except:
+  except Exception:
     logging.error('Unable to load provider %s.', provider_name)
     raise

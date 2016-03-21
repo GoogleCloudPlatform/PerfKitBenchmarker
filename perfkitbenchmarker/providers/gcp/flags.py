@@ -35,3 +35,21 @@ flags.DEFINE_string(
     'https://cloud.google.com/sdk/gcloud/reference/compute/disks/create')
 flags.DEFINE_string('gce_network_name', None, 'The name of an already created '
                     'network to use instead of creating a new one.')
+flags.DEFINE_multistring(
+    'gcp_instance_metadata_from_file',
+    [],
+    'A colon separated key-value pair that will be added to the '
+    '"--metadata-from-file" flag of the gcloud cli (with the colon replaced by '
+    'the equal sign). Multiple key-value pairs may be specified by separating '
+    'each pair by commas. This option can be repeated multiple times. For '
+    'information about GCP instance metadata, see: --metadata-from-file from '
+    '`gcloud help compute instances create`.')
+flags.DEFINE_multistring(
+    'gcp_instance_metadata',
+    [],
+    'A colon separated key-value pair that will be added to the '
+    '"--metadata" flag of the gcloud cli (with the colon replaced by the equal '
+    'sign). Multiple key-value pairs may be specified by separating each pair '
+    'by commas. This option can be repeated multiple times. For information '
+    'about GCP instance metadata, see: --metadata from '
+    '`gcloud help compute instances create`.')

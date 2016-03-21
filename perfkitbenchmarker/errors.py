@@ -51,6 +51,10 @@ class VirtualMachine(object):
   class RemoteExceptionError(Error):
     pass
 
+  class AuthError(Error):
+    """Error raised when one VM cannot access another VM."""
+    pass
+
   class VirtualMachineError(Error):
     """An error raised when VM is having an issue."""
 

@@ -173,6 +173,54 @@ class TestUnitsParser(unittest.TestCase):
       up.Parse('1m')
 
 
+class TestStringToBytes(unittest.TestCase):
+  def testValidString(self):
+    self.assertEqual(flag_util.StringToBytes('100KB'),
+                     100000)
+
+  def testUnparseableString(self):
+    with self.assertRaises(ValueError):
+      flag_util.StringToBytes('asdf')
+
+  def testBadUnits(self):
+    with self.assertRaises(ValueError):
+      flag_util.StringToBytes('100m')
+
+  def testNonIntegerBytes(self):
+    with self.assertRaises(ValueError):
+      flag_util.StringToBytes('1.5B')
+
+  def testNegativeBytes(self):
+    with self.assertRaises(ValueError):
+      flag_util.StringToBytes('-10KB')
+
+
+class TestStringToRawPct(unittest.TestCase):
+  def testValidPct(self):
+    self.assertEquals(flag_util.StringToRawPercent('50.5%'),
+                      50.5)
+
+  def testNullString(self):
+    with self.assertRaises(ValueError):
+      flag_util.StringToRawPercent('')
+
+  def testOneCharacterString(self):
+    with self.assertRaises(ValueError):
+      flag_util.StringToRawPercent('%')
+
+  def testNoPercentSign(self):
+    with self.assertRaises(ValueError):
+      flag_util.StringToRawPercent('100')
+
+  def testNegativePercent(self):
+    with self.assertRaises(ValueError):
+      flag_util.StringToRawPercent('-12%')
+
+  def testPercentAbove100(self):
+    with self.assertRaises(ValueError):
+      flag_util.StringToRawPercent('112%')
+
+
 class TestYAMLParser(unittest.TestCase):
 
   def setUp(self):

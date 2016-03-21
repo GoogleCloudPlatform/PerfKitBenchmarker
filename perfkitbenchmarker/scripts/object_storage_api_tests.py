@@ -22,13 +22,19 @@
    run this script.
 """
 
+import cStringIO
 import json
 import logging
+import os
+import Queue
 import sys
 from threading import Thread
+import threading
 import string
 import random
 import time
+
+import yaml
 
 import boto
 import gflags as flags
@@ -57,15 +63,47 @@ flags.DEFINE_string('azure_key', None,
 
 flags.DEFINE_enum(
     'scenario', 'OneByteRW', ['OneByteRW', 'ListConsistency',
-                              'SingleStreamThroughput', 'CleanupBucket'],
+                              'SingleStreamThroughput', 'CleanupBucket',
+                              'MultiStreamWrite', 'MultiStreamRead'],
     'The various scenarios to run. OneByteRW: read and write of single byte. '
     'ListConsistency: List-after-write and list-after-update consistency. '
     'SingleStreamThroughput: Throughput of single stream large object RW. '
-    'CleanupBucket: Cleans up everything in a given bucket.')
+    'CleanupBucket: Cleans up everything in a given bucket.'
+    'MultiStreamWrite: Write objects with many streams at once.'
+    'MultiStreamRead: Read objects with many streams at once.')
 
 flags.DEFINE_integer('iterations', 1, 'The number of iterations to run for the '
                      'particular test scenario. Currently only applicable to '
                      'the ListConsistency scenario, ignored in others.')
+
+flags.DEFINE_integer('objects_per_stream', 1000, 'The number of objects to '
+                     'read and write per stream in the MultiStreamThroughput '
+                     'scenario.')
+flags.DEFINE_string('object_sizes', "{1024: 100.0}", 'The size of the objects '
+                    'to use, as a distribution. Currently only applicable to '
+                    'the MultiStreamThroughput scenario, ignored in others. '
+                    'Must be a dict-based representation, even for a constant '
+                    'distribution. Ex: {1024: 100.0}, (1KiB 100% of the time), '
+                    '{1000: 50.0, 10000: 50.0} (1KB 50% of the time, 10KB 50% '
+                    'of the time)')
+flags.DEFINE_integer('num_streams', 10, 'The number of streams to use. Only '
+                     'applies to the MultiStreamThroughput scenario.',
+                     lower_bound=1)
+flags.DEFINE_string('objects_written_file', None, 'The path where the '
+                    'multistream write benchmark will save a list of the '
+                    'objects it wrote, and the multistream read benchmark will '
+                    'get a list of objects to read. If the scenario is '
+                    'MultiStreamWrite and this file exists, it will be '
+                    'deleted.')
+
+flags.DEFINE_float('start_time', None, 'The time (as a POSIX timestamp) '
+                   'to start the operation. Only applies to the '
+                   'MultiStreamRead and MultiStreamWrite scenarios.')
+
+flags.DEFINE_string('object_storage_class', None, 'The storage class to use '
+                    'for uploads. Currently only applicable to AWS. For other '
+                    'providers, storage class is determined by the bucket, '
+                    'which is passed in by the --bucket parameter.')
 
 STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
@@ -117,6 +155,12 @@ LARGE_OBJECT_FAILURE_TOLERANCE = 0.1
 # A global variable initialized once for Azure Blob Service
 _AZURE_BLOB_SERVICE = None
 
+BYTES_PER_KILOBYTE = 1024
+
+# The multistream benchmarks log how many threads are still active
+# every THREAD_STATUS_LOG_INTERVAL seconds.
+THREAD_STATUS_LOG_INTERVAL = 10
+
 
 # When a storage provider fails more than a threshold number of requests, we
 # stop the benchmarking tests and raise a low availability error back to the
@@ -139,6 +183,66 @@ def _useBotoApi(storage_schema):
     return True
   else:
     return False
+
+
+class SizeDistributionIterator(object):
+  """Draw object sizes from a distribution.
+
+  Args:
+    dist: dict. The distribution to draw sizes from.
+  """
+
+  def __init__(self, dist):
+    # This class chooses random numbers by using random.random() to
+    # pick a float in [0.0, 100.0), then converting that into a choice
+    # from our distribution. The data structure is two lists, sizes
+    # and cutoffs. If the random number is in the range [cutoffs[i-1],
+    # cutoffs[i]), then the random choice is sizes[i]. Cutoffs has an
+    # implied starting element 0.0, and its last element must be
+    # 100.0.
+    self.sizes = []
+    self.cutoffs = []
+
+    # Sorting the (size, percent change) pairs by size makes for a
+    # nicer interface and also simplifies unit testing.
+    sorted_dist = sorted(dist.iteritems(), key=lambda x: x[0])
+
+    total_percent = 0.0
+    for size, percent in sorted_dist:
+      total_percent += percent
+      self.sizes.append(size)
+      self.cutoffs.append(total_percent)
+
+    # We store percents instead of probabilities because it avoids any
+    # possible edge cases where the percentages would add to 100.0 but
+    # their equivalent probabilities would have truncated
+    # floating-point representations and would not add to 1.0.
+    assert total_percent == 100.0
+
+  # this is required by the Python iterator protocol
+  def __iter__(self):
+    return self
+
+  def next(self):
+    val = random.random() * 100.0
+
+    # binary search has a lower asymptotic complexity than linear
+    # scanning, but thanks to caches and sequential access, linear
+    # scanning will probably be faster for any realistic distribution.
+    for i in xrange(len(self.sizes)):
+      if self.cutoffs[i] > val:
+        return self.sizes[i]
+
+    raise AssertionError("Random percent %s didn't match percent cutoff list %s"
+                         % (val, self.cutoffs))
+
+    return self.size
+
+
+def MaxSizeInDistribution(dist):
+  """Find the maximum object size in a distribution."""
+
+  return max(dist.iterkeys())
 
 
 def PercentileCalculator(numbers):
@@ -244,6 +348,26 @@ def CleanupBucket(storage_schema):
     objects_to_cleanup = _ListObjects(storage_schema, FLAGS.bucket, prefix=None)
 
 
+def GenerateWritePayload(size):
+  """Generate random data for use with WriteObjectFromBuffer.
+
+  Args:
+    size: the amount of data needed, in bytes.
+
+  Returns:
+    A string of the length requested, filled with random data.
+  """
+
+  payload_bytes = bytearray(size)
+  # don't use a for...range(100M), range(100M) will create a list of 100mm items
+  # with each item being the default object size of 30 bytes or so, it will lead
+  # to out of memory error.
+  for i in xrange(size):
+    payload_bytes[i] = ord(random.choice(string.letters))
+
+  return payload_bytes.decode('ascii')
+
+
 def WriteObjects(storage_schema, bucket, object_prefix, count,
                  size, objects_written, latency_results=None,
                  bandwidth_results=None, host_to_connect=None):
@@ -266,57 +390,81 @@ def WriteObjects(storage_schema, bucket, object_prefix, count,
         successfully written.
     host_to_connect: An optional endpoint string to connect to.
   """
-  payload_bytes = bytearray(size)
-  # Use a while loop to fill up the byte array which is by default 100MB in size
-  # don't use a for...range(100M), range(100M) will create a list of 100mm items
-  # with each item being the default object size of 30 bytes or so, it will lead
-  # to out of memory error.
-  i = 0
-  while i < size:
-    payload_bytes[i] = ord(random.choice(string.letters))
-    i += 1
 
-  payload_string = payload_bytes.decode('ascii')
+  payload = GenerateWritePayload(size)
+  handle = cStringIO.StringIO(payload)
 
-  for i in range(count):
+  for i in xrange(count):
     object_name = '%s_%d' % (object_prefix, i)
 
-    # Ready to go!
-    start_time = time.time()
-
-    # We write the object to storage provider and if successful we place the
-    # name of the object to the objects_written list. When a write fails, the
-    # object won't be placed into the objects_written list, and then it's up to
-    # the caller to decide if they want to tolerate the failure and accept
-    # the results, depending on test scenarios.
     try:
-      if _useBotoApi(storage_schema):
-        object_path = '%s/%s' % (bucket, object_name)
-        object_uri = boto.storage_uri(object_path, storage_schema)
-        if host_to_connect is not None:
-          object_uri.connect(host=host_to_connect)
-
-        object_uri.set_contents_from_string(payload_string)
-      else:
-        _AZURE_BLOB_SERVICE.put_block_blob_from_bytes(bucket, object_name,
-                                                      bytes(payload_bytes))
-
-      latency = time.time() - start_time
-
-      if latency_results is not None:
-        latency_results.append(latency)
-
-      if bandwidth_results is not None and latency > 0.0:
-        bandwidth_results.append(size / latency)
+      _, latency = WriteObjectFromBuffer(
+          storage_schema, bucket, object_name,
+          handle, size,
+          host_to_connect=host_to_connect)
 
       objects_written.append(object_name)
-    except:
-      logging.exception('Caught exception while writing object %s.',
-                        object_name)
+      if latency_results is not None:
+        latency_results.append(latency)
+      if bandwidth_results is not None and latency > 0.0:
+        bandwidth_results.append(size / latency)
+    except Exception as e:
+      logging.info('Caught exception %s while writing object %s' %
+                   (e, object_name))
+
+
+def WriteObjectFromBuffer(storage_schema, bucket_name, object_name,
+                          stream, size, host_to_connect=None):
+  """Write an object to a storage provider.
+
+  Exceptions are propagated to the caller, which can decide whether to
+  tolerate them or not. This function will seek() to the beginning of stream
+  before sending.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    bucket_name: Name of the bucket to write to.
+    object_name: Name of the object.
+    stream: A read()-able and seek()-able stream to transfer.
+    size: The number of bytes to transfer.
+    host_to_connect: An optional endpoint string to connect to.
+
+  Returns:
+    a tuple (start_time, latency).
+
+  """
+
+  # Ready to go!
+  stream.seek(0)
+  start_time = time.time()
+
+  if _useBotoApi(storage_schema):
+    object_path = '%s/%s' % (bucket_name, object_name)
+    object_uri = boto.storage_uri(object_path, storage_schema)
+    if host_to_connect is not None:
+      object_uri.connect(host=host_to_connect)
+
+    if FLAGS.object_storage_class and storage_schema == 's3':
+      # We need to use a lower-level upload method when using an S3
+      # storage class because we need access to the key object so we
+      # can set its storage class.
+      key = object_uri.new_key()
+      key._set_storage_class(FLAGS.object_storage_class)
+      key.set_contents_from_file(stream, size=size)
+    else:
+      object_uri.set_contents_from_file(stream, size=size)
+  else:
+    _AZURE_BLOB_SERVICE.put_block_blob_from_file(
+        bucket_name, object_name, stream, count=size)
+
+  latency = time.time() - start_time
+
+  return start_time, latency
 
 
 def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
-                bandwidth_results=None, object_size=None, host_to_connect=None):
+                bandwidth_results=None, object_size=None,
+                start_times=None, host_to_connect=None):
   """Read a bunch of objects.
 
   Args:
@@ -326,21 +474,17 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
     latency_results: An optional list to receive latency results.
     bandwidth_results: An optional list to receive bandwidth results.
     object_size: Size of the object that will be read, used to calculate bw.
+    start_times: An optional list to receive start time results.
     host_to_connect: An optional endpoint string to connect to.
   """
+
   for object_name in objects_to_read:
-
-    start_time = time.time()
     try:
-      if _useBotoApi(storage_schema):
-        object_path = '%s/%s' % (bucket, object_name)
-        object_uri = boto.storage_uri(object_path, storage_schema)
-        object_uri.connect(host=host_to_connect)
-        object_uri.new_key().get_contents_as_string()
-      else:
-        _AZURE_BLOB_SERVICE.get_blob_to_bytes(bucket, object_name)
+      start_time, latency = ReadObject(storage_schema, bucket, object_name,
+                                       host_to_connect=host_to_connect)
 
-      latency = time.time() - start_time
+      if start_times is not None:
+        start_times.append(start_time)
 
       if latency_results is not None:
         latency_results.append(latency)
@@ -350,6 +494,38 @@ def ReadObjects(storage_schema, bucket, objects_to_read, latency_results=None,
         bandwidth_results.append(object_size / latency)
     except:
       logging.exception('Failed to read object %s', object_name)
+
+
+def ReadObject(storage_schema, bucket_name, object_name, host_to_connect=None):
+  """Read an object.
+
+  Exceptions are propagated to the caller, which can decide whether to
+  tolerate them or not.
+
+  Args:
+    storage_schema: The address schema identifying a storage. e.g., "gs"
+    bucket_name: Name of the bucket.
+    object_name: Name of the object.
+    host_to_connect: An optional endpoint string to connect to.
+
+  Returns:
+    A tuple (start_time, latency)
+  """
+
+  start_time = time.time()
+
+  if _useBotoApi(storage_schema):
+    object_path = '%s/%s' % (bucket_name, object_name)
+    object_uri = boto.storage_uri(object_path, storage_schema)
+    if host_to_connect is not None:
+      object_uri.connect(host=host_to_connect)
+    object_uri.new_key().get_contents_as_string()
+  else:
+    _AZURE_BLOB_SERVICE.get_blob_to_bytes(bucket_name, object_name)
+
+  latency = time.time() - start_time
+
+  return start_time, latency
 
 
 def DeleteObjectsConcurrently(storage_schema, per_thread_objects_to_delete,
@@ -516,6 +692,322 @@ def SingleStreamThroughputBenchmark(storage_schema, host_to_connect=None):
   finally:
     DeleteObjects(storage_schema, FLAGS.bucket, objects_written,
                   host_to_connect=host_to_connect)
+
+
+def RunThreadedWorkers(worker, worker_args, per_thread_args=None):
+  """Run a worker function in many threads, then gather and return the results.
+
+  Args:
+    worker: either WriteWorker or ReadWorker. The worker function to call.
+    worker_args: a tuple. The arguments to pass to the worker function. The
+      result queue and stream number will be appended as the last two arguments.
+    per_thread_args: if given, an array with length equal to the
+      number of threads. Thread number i will be passed
+      per_thread_args[i] after its regular arguments and before the
+      result queue and stream number.
+
+  Returns:
+    A list of the results returned by the workers.
+  """
+
+  result_queue = Queue.Queue()
+
+  logging.info('Creating %s threads', FLAGS.num_streams)
+  if per_thread_args is None:
+    threads = [threading.Thread(target=worker,
+                                args=worker_args + (result_queue, i))
+               for i in xrange(FLAGS.num_streams)]
+  else:
+    threads = [threading.Thread(target=worker,
+                                args=worker_args +
+                                (per_thread_args[i],) +
+                                (result_queue, i))
+               for i in xrange(FLAGS.num_streams)]
+  logging.info('Threads created. Starting threads.')
+  for thread in threads:
+    thread.start()
+  logging.info('Threads started.')
+  while True:
+    time.sleep(THREAD_STATUS_LOG_INTERVAL)
+    num_alive = sum((thread.isAlive() for thread in threads))
+    if num_alive == 0:
+      break
+    else:
+      logging.info('%s of %s threads are still working.',
+                   num_alive, FLAGS.num_streams)
+  logging.info('All threads complete.')
+
+  results = []
+
+  try:
+    while True:
+      res = result_queue.get_nowait()
+      results.append(res)
+  except Queue.Empty:
+    pass
+
+  return results
+
+
+def MultiStreamWrites(storage_schema, host_to_connect=None):
+  """Run multi-stream write benchmark.
+
+  Args:
+    storage_schema: a two-character string indicating the storage
+      type. Ex: 'gs', 's3'.
+    host_to_connect: if given, an endpoint URL to connect to.
+
+  This function writes objects to the storage backend, potentially
+  using multiple threads.
+
+  It doesn't return anything, but it outputs two sets of results in
+  two different ways. First, it writes a list of the names of all the
+  objects it has written with their sizes to
+  FLAGS.objects_written_file (if given). The format is
+
+  [[object_name_1, object_size_1],
+   [object_name_2, object_size_2],
+   ...]
+
+  Second, it writes records of the objects it wrote, along with timing
+  information, to sys.stdout. The format is
+
+  [{"operation": "upload", "start_time": start_time_1,
+    "latency": latency_1, "size": size_1, "stream_num": stream_num_1},
+   [{"operation": "upload", "start_time": start_time_2,
+    "latency": latency_2, "size": size_2, "stream_num": stream_num_2}
+   ...]
+
+  Both kinds of output are written as JSON, for easy serialization and
+  deserialization.
+
+  """
+
+  size_distribution = yaml.load(FLAGS.object_sizes)
+
+  payload = GenerateWritePayload(MaxSizeInDistribution(size_distribution))
+
+  results = RunThreadedWorkers(
+      WriteWorker,
+      (storage_schema,
+       host_to_connect,
+       payload,
+       size_distribution,
+       FLAGS.objects_per_stream,
+       FLAGS.start_time))
+
+  # object_records is the data we leave on the VM for future reads. We
+  # need to pass data to the reader so it will know what object names
+  # it can read.
+  if FLAGS.objects_written_file is not None:
+    try:
+      object_records = []
+      for result in results:
+        for name, size in zip(result['object_names'], result['sizes']):
+          object_records.append([name, size])
+      if os.path.exists(FLAGS.objects_written_file):
+        os.remove(FLAGS.objects_written_file)
+      with open(FLAGS.objects_written_file, 'w') as out:
+        json.dump(object_records, out)
+    except Exception as ex:
+      # If we can't write our objects written, we still want to return
+      # the data we collected, so keep going.
+      logging.info('Got exception %s while trying to write objects written '
+                   'file.', ex.msg)
+
+  # operation_records is the data we send back to the controller.
+  operation_records = []
+  for result in results:
+    operation = result['operation']
+    stream_num = result['stream_num']
+    for start_time, latency, size in zip(result['start_times'],
+                                         result['latencies'],
+                                         result['sizes']):
+      operation_records.append({'operation': operation,
+                                'start_time': start_time,
+                                'latency': latency,
+                                'size': size,
+                                'stream_num': stream_num})
+
+  num_writes_requested = FLAGS.objects_per_stream * FLAGS.num_streams
+  min_writes_required = num_writes_requested * (1.0 - FAILURE_TOLERANCE)
+  if len(operation_records) < min_writes_required:
+    raise LowAvailabilityError(
+        'Wrote %s objects out of %s requested (%s requred)' %
+        (len(operation_records), num_writes_requested, min_writes_required))
+
+  json.dump(operation_records, sys.stdout, indent=0)
+
+
+def MultiStreamReads(storage_schema, host_to_connect=None):
+  """Run multi-stream read benchmark.
+
+  Args:
+    storage_schema: a two-character string indicating the storage
+      type. Ex: 'gs', 's3'.
+    host_to_connect: if given, an endpoint URL to connect to.
+
+  This function reads a list of object names and sizes from
+  FLAGS.objects_written_file (in the format written by
+  MultiStreamWrites and then reads the objects from the storage
+  backend, potentially using multiple threads.
+
+  It doesn't directly return anything, but it writes its results to
+  sys.stdout in the following format:
+
+  [{"operation": "download", "start_time": start_time_1,
+    "latency": latency_1, "size": size_1, "stream_num": stream_num_1},
+   {"operation": "download", "start_time": start_time_1,
+    "latency": latency_1, "size": size_1, "stream_num": stream_num_1},
+   ...]
+
+  """
+
+  # Read the object records that the MultiStreamWriter left for us.
+  if FLAGS.objects_written_file is None:
+    raise ValueError('The MultiStreamRead benchmark needs a list of object '
+                     'names to read from. Use '
+                     '--objects_written_file=<filename>.')
+  with open(FLAGS.objects_written_file, 'r') as object_file:
+    object_records = json.load(object_file)
+
+  num_workers = FLAGS.num_streams
+  objects_by_worker = [object_records[i::num_workers]
+                       for i in xrange(num_workers)]
+
+  results = RunThreadedWorkers(
+      ReadWorker,
+      (storage_schema,
+       host_to_connect,
+       FLAGS.start_time),
+      per_thread_args=objects_by_worker)
+
+  # send data back to the controller
+  operation_records = []
+  for result in results:
+    operation = result['operation']
+    stream_num = result['stream_num']
+    for start_time, latency, size in zip(result['start_times'],
+                                         result['latencies'],
+                                         result['sizes']):
+      operation_records.append({'operation': operation,
+                                'stream_num': stream_num,
+                                'start_time': start_time,
+                                'latency': latency,
+                                'size': size})
+
+  num_reads_requested = len(object_records)
+  min_reads_required = num_reads_requested * (1.0 - FAILURE_TOLERANCE)
+  if len(operation_records) < min_reads_required:
+    raise LowAvailabilityError(
+        'Read %s objects out of %s requested (%s requred)' %
+        (len(operation_records), num_reads_requested, min_reads_required))
+
+  json.dump(operation_records, sys.stdout, indent=0)
+
+
+def SleepUntilTime(when):
+  """Sleep until a given time.
+
+  Args:
+    when: float. The time to sleep to, as a POSIX timestamp.
+  """
+
+  now = time.time()
+  sleep_time = when - now
+  if sleep_time > 0.0:
+    time.sleep(sleep_time)
+  elif sleep_time == 0.0:
+    pass
+  else:
+    logging.info('Sleep time %s was too small', sleep_time)
+
+
+def WriteWorker(storage_schema, host_to_connect,
+                payload, size_distribution, num_objects,
+                start_time, result_queue, worker_num):
+  """Upload objects for the multi-stream writes benchmark.
+
+  Args:
+    storage_schema: a two-character string indicating the storage
+      type. Ex: 'gs', 's3'.
+    host_to_connect: if given, an endpoint URL to connect to.
+    payload: a string. The bytes to upload.
+    size_distribution: the distribution of object sizes to use.
+    num_objects: the number of objects to upload.
+    start_time: a POSIX timestamp. When to start uploading.
+    result_queue: a Queue.Queue to record results in.
+    worker_num: the thread number of this worker.
+  """
+
+  object_names = []
+  start_times = []
+  latencies = []
+  sizes = []
+
+  size_iterator = SizeDistributionIterator(size_distribution)
+  object_prefix = ('pkb_write_worker_%f_%s' % (time.time(), worker_num))
+
+  payload_handle = cStringIO.StringIO(payload)
+
+  if start_time is not None:
+    SleepUntilTime(start_time)
+
+  for i in xrange(num_objects):
+    object_name = '%s_%d' % (object_prefix, i)
+    object_size = size_iterator.next()
+
+    try:
+      start_time, latency = WriteObjectFromBuffer(
+          storage_schema, FLAGS.bucket, object_name,
+          payload_handle, object_size,
+          host_to_connect=host_to_connect)
+
+      object_names.append(object_name)
+      start_times.append(start_time)
+      latencies.append(latency)
+      sizes.append(object_size)
+    except Exception as e:
+      logging.info('Worker %s caught exception %s while writing object %s' %
+                   (worker_num, e, object_name))
+
+  result_queue.put({'operation': 'upload',
+                    'object_names': object_names,
+                    'start_times': start_times,
+                    'latencies': latencies,
+                    'sizes': sizes,
+                    'stream_num': worker_num})
+
+
+def ReadWorker(storage_schema, host_to_connect,
+               start_time, object_records,
+               result_queue, worker_num):
+
+  start_times = []
+  latencies = []
+  sizes = []
+
+  if start_time is not None:
+    SleepUntilTime(start_time)
+
+  for name, size in object_records:
+    try:
+      start_time, latency = ReadObject(storage_schema, FLAGS.bucket,
+                                       name, host_to_connect=host_to_connect)
+
+      start_times.append(start_time)
+      latencies.append(latency)
+      sizes.append(size)
+    except Exception as e:
+      logging.info('Worker %s caught exception %s while reading object %s' %
+                   (worker_num, e, name))
+
+
+  result_queue.put({'operation': 'download',
+                    'start_times': start_times,
+                    'latencies': latencies,
+                    'sizes': sizes,
+                    'stream_num': worker_num})
 
 
 def OneByteRWBenchmark(storage_schema, host_to_connect=None):
@@ -809,6 +1301,10 @@ def Main(argv=sys.argv):
     return SingleStreamThroughputBenchmark(storage_schema, host_to_connect)
   elif FLAGS.scenario == 'CleanupBucket':
     return CleanupBucket(storage_schema)
+  elif FLAGS.scenario == 'MultiStreamWrite':
+    return MultiStreamWrites(storage_schema, host_to_connect)
+  elif FLAGS.scenario == 'MultiStreamRead':
+    return MultiStreamReads(storage_schema, host_to_connect)
 
 if __name__ == '__main__':
   sys.exit(Main())
