@@ -25,8 +25,8 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 
-HBASE_VERSION = '1.0.3'
-HBASE_URL = ('http://www.us.apache.org/dist/hbase/hbase-{0}/'
+HBASE_VERSION = '1.1.3'
+HBASE_URL = ('http://www.us.apache.org/dist/hbase/{0}/'
              'hbase-{0}-bin.tar.gz').format(HBASE_VERSION)
 
 DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
