@@ -12,7 +12,7 @@ New features:
 * User-specified multiregion for GCS benchmarking (GH-845)
 * Support metadata for gcp instances (GH-859)
 
-Bugfixes and maintences updates:
+Bugfixes and maintenance updates:
 * Change rackspace's AllowPort to enable UDP (thanks @meteorfox; GH-805)
 * Allow most recent verison gcs-oauth2-boto-plugin (GH-849)
 * Require Pint >= 0.7 (GH-850)
