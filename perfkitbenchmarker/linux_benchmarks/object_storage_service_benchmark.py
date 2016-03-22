@@ -415,8 +415,10 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
   results.append(
       sample.Sample(
           'Multi-stream %s net throughput' % operation,
-          records_in_interval['size'].sum() /
-          records_in_interval['latency'].sum(),
+          analyze.AllStreamsNetThroughput(
+              records_in_interval['latency'],
+              records_in_interval['size'],
+              records_in_interval['stream_num']),
           'B/sec',
           metadata=distribution_metadata))
 

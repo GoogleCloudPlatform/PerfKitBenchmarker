@@ -59,6 +59,16 @@ class TestFullyInInterval(unittest.TestCase):
         (overlaps == pd.Series([False, False, True, False, False, True])).all())
 
 
+class TestAllStreamsNetThroughput(unittest.TestCase):
+  def testAllStreamsNetThroughput(self):
+    self.assertAlmostEqual(
+        analyze.AllStreamsNetThroughput(
+            SAMPLE_TABLE['duration'],
+            SAMPLE_TABLE['size'],
+            SAMPLE_TABLE['stream_num']),
+        17.0 / 11.0 + 4.0 / 4.0)
+
+
 class TestSummaryStats(unittest.TestCase):
   def testSummaryStats(self):
     series = pd.Series(range(0, 1001))

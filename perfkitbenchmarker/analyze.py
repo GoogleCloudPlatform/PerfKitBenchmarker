@@ -80,7 +80,30 @@ def FullyInInterval(start_times, durations, interval_start, interval_duration):
   return (start_times >= interval_start) & (record_ends <= interval_end)
 
 
+def AllStreamsNetThroughput(durations, sizes, stream_ids):
+  """Compute the net throughput of multiple streams doing operations.
+
+  Args:
+    durations: a pd.Series of durations in seconds, as floats.
+    sizes: a pd.Series of bytes.
+    stream_ids: a pd.Series of any type.
+
+  durations, sizes, and stream_ids must have matching indices. This
+  function computes the per-stream net throughput (sum of bytes
+  transferred / total transfer time) and then adds the results to find
+  the overall net throughput. Operations from the same stream cannot
+  overlap, but operations from different streams may overlap.
+
+  Returns: a float. The net throughput of all streams together.
+
+  """
+
+  return (sizes.groupby(stream_ids).sum() /
+          durations.groupby(stream_ids).sum()).sum()
+
+
 def SummaryStats(series, name_prefix=''):
+
   """Compute some summary statistics for a series.
 
   Args:
