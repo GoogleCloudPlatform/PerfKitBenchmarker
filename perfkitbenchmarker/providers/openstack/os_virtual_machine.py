@@ -22,6 +22,7 @@ Images:
   run 'openstack image list'
 """
 
+import json
 import logging
 import threading
 import time
@@ -49,6 +50,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_IMAGE = None
   _floating_ip_lock = threading.Lock()
 
+  _lock = threading.Lock()  # Guards the following:
+  uploaded_keypair_set = set()
+  deleted_keypair_set = set()
+
   def __init__(self, vm_spec):
     """Initialize an OpenStack virtual machine.
 
@@ -60,8 +65,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.firewall.AllowICMP(self)
     self.firewall.AllowPort(self, 1, os_network.MAX_PORT)
     self.name = 'perfkit_vm_%d_%s' % (self.instance_number, FLAGS.run_uri)
-    self.key_name = 'perfkit_key_%d_%s' % (self.instance_number,
-                                           FLAGS.run_uri)
+    self.key_name = 'perfkit_key_%s' % FLAGS.run_uri
     self.client = os_utils.NovaClient()
     # FIXME(meteorfox): Remove --openstack_public_network and
     # --openstack_private_network once depreciation time has expired
@@ -79,6 +83,12 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.public_net = None
     self.private_net = None
     self.floating_ip = None
+
+  def _CreateDependencies(self):
+    """Validate and Create dependencies prior creating the VM."""
+    self._CheckPrerequisites()
+    self._UploadSSHPublicKey()
+    self.AllowRemoteAccessPorts()
 
   def _Create(self):
     image = self.client.images.findall(name=self.image)[0]
@@ -178,12 +188,92 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.floating_ip:
       self.public_network.release(self.floating_ip)
 
+  def _DeleteDependencies(self):
+    """Delete dependencies that were needed for the VM after the VM has been
+    deleted."""
+    self._DeleteSSHPublicKey()
+
   def _Exists(self):
     from novaclient.exceptions import NotFound
     try:
       return self.client.servers.get(self.id) is not None
     except NotFound:
       return False
+
+  def _CheckPrerequisites(self):
+    """Checks prerequisites are met otherwise aborts execution."""
+    logging.info("Validating prerequisites.")
+    self._CheckImage()
+    self._CheckFlavor()
+    self._CheckNetworks()
+    logging.info("Prerequisites validated.")
+
+  def _CheckImage(self):
+    """Tries to get image, if found continues execution otherwise aborts."""
+    cmd = os_utils.OpenStackCLICommand(self, 'image', 'show', self.image)
+    stdout, stderr, _ = cmd.Issue()
+    if stderr:
+      raise errors.Config.InvalidValue(' '.join(
+          ('Image %s could not be found.' % self.image,
+           'For valid image IDs/names run "openstack image list".',)))
+
+  def _CheckFlavor(self):
+    """Tries to get flavor, if found continues execution otherwise aborts."""
+    cmd = os_utils.OpenStackCLICommand(self, 'flavor', 'show',
+                                       self.machine_type)
+    stdout, stderr, _ = cmd.Issue()
+    if stderr:
+      raise errors.Config.InvalidValue(' '.join(
+          ('Machine type %s could not be found.' % self.machine_type,
+           'For valid machine type IDs/names run "openstack flavor list".',)))
+
+  def _CheckNetworks(self):
+    """Tries to get network, if found continues execution otherwise aborts."""
+    cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',
+                                       self.network_name)
+    stdout, stderr, _ = cmd.Issue()
+    if stderr:
+      raise errors.Config.InvalidValue(' '.join(
+          ('Network %s could not be found.' % self.network_name,
+           'For valid network IDs/names run "openstack network list".',)))
+    if self.floating_ip_pool_name:
+      cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'pool', 'list')
+      stdout, stderr, _ = cmd.Issue()
+      resp = json.loads(stdout)
+      for flip_pool in resp:
+        if flip_pool['Name'] == self.floating_ip_pool_name:
+          return
+      raise errors.Config.InvalidValue(' '.join(
+          ('Floating IP pool %s could not be found.'
+           % self.floating_ip_pool_name,
+           'For valid floating IP pools run '
+           '"openstack ip floating pool list".')))
+
+  def _UploadSSHPublicKey(self):
+    """Uploads SSH public key to the VM's region."""
+    with self._lock:
+      if self.zone in self.uploaded_keypair_set:
+        return
+      cmd = os_utils.OpenStackCLICommand(self, 'keypair', 'create',
+                                         self.key_name)
+      cmd.flags['public-key'] = self.ssh_public_key
+      cmd.IssueRetryable()
+      self.uploaded_keypair_set.add(self.zone)
+      if self.zone in self.deleted_keypair_set:
+        self.deleted_keypair_set.remove(self.zone)
+
+  def _DeleteSSHPublicKey(self):
+    """Deletes SSH publick key used for the VM."""
+    with self._lock:
+      if self.zone in self.deleted_keypair_set:
+        return
+      cmd = os_utils.OpenStackCLICommand(self, 'keypair', 'delete',
+                                         self.key_name)
+      del cmd.flags['format']  # keypair delete does not support json output
+      cmd.Issue()
+      self.deleted_keypair_set.add(self.zone)
+      if self.zone in self.uploaded_keypair_set:
+        self.uploaded_keypair_set.remove(self.zone)
 
   def WaitForBootCompletion(self):
     # Do one longer sleep, then check at shorter intervals.
@@ -214,29 +304,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
              for name in disks_names]
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
-
-  def _CreateDependencies(self):
-    self.ImportKeyfile()
-    self.AllowRemoteAccessPorts()
-
-  def _DeleteDependencies(self):
-    self.DeleteKeyfile()
-
-  def ImportKeyfile(self):
-    if not (self.client.keypairs.findall(name=self.key_name)):
-        cat_cmd = ['cat', vm_util.GetPublicKeyPath()]
-        key_file, _ = vm_util.IssueRetryableCommand(cat_cmd)
-        pk = self.client.keypairs.create(self.key_name, public_key=key_file)
-    else:
-        pk = self.client.keypairs.findall(name=self.key_name)[0]
-    self.pk = pk
-
-  def DeleteKeyfile(self):
-    from novaclient.exceptions import NotFound
-    try:
-      self.client.keypairs.delete(self.pk)
-    except NotFound:
-      logging.info("Deleting key doesn't exists")
 
 
 class DebianBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
