@@ -48,6 +48,16 @@ class TestAllStreamsInterval(unittest.TestCase):
     self.assertEquals(duration, 4.0)
 
 
+class TestStreamStartAndEndGaps(unittest.TestCase):
+  def testStreamStartAndEndGaps(self):
+    start_gap, stop_gap = analyze.StreamStartAndEndGaps(
+        SAMPLE_TABLE['start_time'], SAMPLE_TABLE['duration'],
+        4.0, 4.0)
+
+    self.assertEqual(start_gap, 4.0)
+    self.assertEqual(stop_gap, 6.0)
+
+
 class TestFullyInInterval(unittest.TestCase):
   def testFullyInInterval(self):
     overlaps = analyze.FullyInInterval(
@@ -59,14 +69,76 @@ class TestFullyInInterval(unittest.TestCase):
         (overlaps == pd.Series([False, False, True, False, False, True])).all())
 
 
-class TestAllStreamsNetThroughput(unittest.TestCase):
-  def testAllStreamsNetThroughput(self):
-    self.assertAlmostEqual(
-        analyze.AllStreamsNetThroughput(
-            SAMPLE_TABLE['duration'],
-            SAMPLE_TABLE['size'],
-            SAMPLE_TABLE['stream_num']),
-        17.0 / 11.0 + 4.0 / 4.0)
+class TestAllStreamsThroughputStats(unittest.TestCase):
+  def testOneObject(self):
+    # Base case: one object.
+    one_op = pd.DataFrame({'duration': [1],
+                           'size': [2],
+                           'stream_num': [0]})
+    self.assertEqual(
+        analyze.AllStreamsThroughputStats(
+            one_op['duration'], one_op['size'], one_op['stream_num'], 1, 1.0),
+        (2.0, 2.0, 0.0, 0.0))
+
+  def testSecondObjectSameSpeed(self):
+    # Adding a second object at same speed has no effect on any metric.
+    no_gap = pd.DataFrame({'duration': [1, 1],
+                           'size': [2, 2],
+                           'stream_num': [0, 0]})
+    self.assertEqual(
+        analyze.AllStreamsThroughputStats(
+            no_gap['duration'], no_gap['size'], no_gap['stream_num'], 1, 2.0),
+        (2.0, 2.0, 0.0, 0.0))
+
+  def testSecondObjectDifferentSpeed(self):
+    # Adding a second object at a different speed yields a different throughput.
+    different_speeds = pd.DataFrame({'duration': [1, 3],  # 4 seconds total
+                                     'size': [2, 8],      # 10 bytes total
+                                     'stream_num': [0, 0]})
+    self.assertEqual(
+        analyze.AllStreamsThroughputStats(
+            different_speeds['duration'],
+            different_speeds['size'],
+            different_speeds['stream_num'],
+            1, 4.0),
+        (2.5, 2.5, 0.0, 0.0))
+
+  def testGapBetweenObjects(self):
+    # Adding a gap affects throughput with overheads, but not without.
+    with_gap = pd.DataFrame({'duration': [1, 1],
+                             'size': [2, 2],
+                             'stream_num': [0, 0]})
+    self.assertEqual(
+        analyze.AllStreamsThroughputStats(
+            with_gap['duration'], with_gap['size'], with_gap['stream_num'],
+            1, 4.0),
+        (2.0, 1.0, 2.0, 0.5))
+
+  def testSimultaneousObjects(self):
+    # With two simultaneous objects, throughput adds.
+    two_streams = pd.DataFrame({'duration': [1, 1],
+                                'size': [2, 2],
+                                'stream_num': [0, 1]})
+    self.assertEqual(
+        analyze.AllStreamsThroughputStats(
+            two_streams['duration'],
+            two_streams['size'],
+            two_streams['stream_num'],
+            2, 1.0),
+        (4.0, 4.0, 0.0, 0.0))
+
+  def testTwoStreamGaps(self):
+    # With two streams, overhead is compared to 2 * interval length.
+    two_streams_with_gap = pd.DataFrame({'duration': [1, 1, 1, 1],
+                                         'size': [2, 2, 2, 2],
+                                         'stream_num': [0, 0, 1, 1]})
+    self.assertEqual(
+        analyze.AllStreamsThroughputStats(
+            two_streams_with_gap['duration'],
+            two_streams_with_gap['size'],
+            two_streams_with_gap['stream_num'],
+            2, 4.0),
+        (4.0, 2.0, 4.0, 0.5))
 
 
 class TestSummaryStats(unittest.TestCase):

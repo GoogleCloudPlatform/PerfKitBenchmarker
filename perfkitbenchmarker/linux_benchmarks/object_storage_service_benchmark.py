@@ -252,6 +252,12 @@ MULTISTREAM_DELAY_PER_STREAM = 0.1
 # benchmark. This is the filename.
 OBJECTS_WRITTEN_FILE = 'pkb-objects-written'
 
+# If the period of time when some streams, but not all, are active is
+# more than MULTISTREAM_STREAM_GAP_THRESHOLD percent of the time when
+# all streams are active, then log a warning and put metadata in the
+# samples.
+MULTISTREAM_STREAM_GAP_THRESHOLD = 0.2
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -356,12 +362,13 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
     sizes: the object sizes used in the benchmark, in bytes.
     results: a list to append Sample objects to.
     metadata: dict. Base sample metadata
-
   """
+
+  num_streams = FLAGS.object_storage_multistream_num_streams
 
   if metadata is None:
     metadata = {}
-  metadata['num_streams'] = FLAGS.object_storage_multistream_num_streams
+  metadata['num_streams'] = num_streams
   metadata['objects_per_stream'] = (
       FLAGS.object_storage_multistream_objects_per_stream)
 
@@ -370,13 +377,23 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
 
   all_streams_start, all_streams_duration = analyze.AllStreamsInterval(
       records['start_time'], records['latency'], records['stream_num'])
-  logging.info(
-      'First stream started %s seconds before last stream started',
-      all_streams_start - records['start_time'].min())
-  logging.info(
-      'Last stream ended %s seconds after first stream ended',
-      (records['start_time'] + records['latency']).max() -
-      (all_streams_start + all_streams_duration))
+  start_gap, stop_gap = analyze.StreamStartAndEndGaps(
+      records['start_time'], records['latency'],
+      all_streams_start, all_streams_duration)
+  if ((start_gap + stop_gap) / all_streams_duration <
+      MULTISTREAM_STREAM_GAP_THRESHOLD):
+    logging.info(
+        'First stream started %s seconds before last stream started', start_gap)
+    logging.info(
+        'Last stream ended %s seconds after first stream ended', stop_gap)
+  else:
+    logging.warning(
+        'Difference between first and last stream start/end times was %s and '
+        '%s, which is more than %s of the benchmark time %s.',
+        start_gap, stop_gap, MULTISTREAM_STREAM_GAP_THRESHOLD,
+        all_streams_duration)
+    metadata['stream_gap_above_threshold'] = True
+
   records_in_interval = records[
       analyze.FullyInInterval(records['start_time'],
                               records['latency'],
@@ -393,9 +410,8 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
   distribution_metadata['object_size_B'] = 'distribution'
 
   latency_prefix = 'Multi-stream %s latency ' % operation
-  throughput_prefix = 'Multi-stream %s throughput ' % operation
   logging.info('Processing %s multi-stream %s results for the full '
-               'distribution.', len(records), operation)
+               'distribution.', len(records_in_interval), operation)
   analyze.AppendStatsAsSamples(
       records_in_interval['latency'],
       'sec',
@@ -403,24 +419,31 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
       name_prefix=latency_prefix,
       metadata=distribution_metadata)
 
-  analyze.AppendStatsAsSamples(
-      records_in_interval['size'] / records_in_interval['latency'],
-      'B/sec',
-      results,
-      name_prefix=throughput_prefix,
-      metadata=distribution_metadata)
-
   logging.info('Processing %s multi-stream %s results for net throughput',
                len(records), operation)
-  results.append(
+  net_thpt, thpt_with_overhead, total_overhead, overhead_prop = (
+      analyze.AllStreamsThroughputStats(
+          records_in_interval['latency'],
+          records_in_interval['size'],
+          records_in_interval['stream_num'],
+          num_streams,
+          all_streams_duration))
+  logging.info('Benchmark overhead was %s percent of total benchmark time',
+               overhead_prop * 100.0)
+
+  results.extend([
       sample.Sample(
           'Multi-stream %s net throughput' % operation,
-          analyze.AllStreamsNetThroughput(
-              records_in_interval['latency'],
-              records_in_interval['size'],
-              records_in_interval['stream_num']),
-          'B/sec',
-          metadata=distribution_metadata))
+          net_thpt, 'B/sec', metadata=distribution_metadata),
+      sample.Sample(
+          'Multi-stream %s net throughput (experimental)' % operation,
+          thpt_with_overhead, 'B/sec', metadata=distribution_metadata),
+      sample.Sample(
+          'Multi-stream %s total overhead time' % operation,
+          total_overhead, 'sec', metadata=distribution_metadata),
+      sample.Sample(
+          'Multi-stream %s overhead time proportion' % operation,
+          overhead_prop * 100.0, 'percent', metadata=distribution_metadata)])
 
 
   # Publish by-size and full-distribution stats even if there's only
@@ -437,13 +460,6 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
         'sec',
         results,
         name_prefix=latency_prefix,
-        metadata=this_size_metadata)
-
-    analyze.AppendStatsAsSamples(
-        this_size_records['size'] / this_size_records['latency'],
-        'B/sec',
-        results,
-        name_prefix=throughput_prefix,
         metadata=this_size_metadata)
 
 

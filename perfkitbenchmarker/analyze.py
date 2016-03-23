@@ -55,6 +55,28 @@ def AllStreamsInterval(start_times, durations, stream_ids):
   return interval_start, interval_end - interval_start
 
 
+def StreamStartAndEndGaps(start_times, durations,
+                          interval_start, interval_duration):
+  """Compute the stream start and stream end timing gaps.
+
+  Args:
+    start_times: a pd.Series of POSIX timestamps, as floats.
+    durations: a pd.Series of durations, as floats measured in seconds.
+    interval_start: float. The POSIX timestamp when the last stream started.
+    interval_duration: float. The time in seconds that all streams were active.
+
+  Returns: a tuple of
+    - The time between when the first and last streams started.
+    - The time between when the first and last streams ended.
+  """
+
+  interval_end = interval_start + interval_duration
+  first_start = start_times.min()
+  last_end = (start_times + durations).max()
+
+  return interval_start - first_start, last_end - interval_end
+
+
 def FullyInInterval(start_times, durations, interval_start, interval_duration):
   """Compute which records are completely inside an interval.
 
@@ -80,13 +102,16 @@ def FullyInInterval(start_times, durations, interval_start, interval_duration):
   return (start_times >= interval_start) & (record_ends <= interval_end)
 
 
-def AllStreamsNetThroughput(durations, sizes, stream_ids):
+def AllStreamsThroughputStats(durations, sizes, stream_ids,
+                              num_streams, interval_duration):
   """Compute the net throughput of multiple streams doing operations.
 
   Args:
     durations: a pd.Series of durations in seconds, as floats.
     sizes: a pd.Series of bytes.
     stream_ids: a pd.Series of any type.
+    num_streams: int. The number of streams.
+    interval_duration: a float. The time all streams were active, in seconds.
 
   durations, sizes, and stream_ids must have matching indices. This
   function computes the per-stream net throughput (sum of bytes
@@ -94,12 +119,22 @@ def AllStreamsNetThroughput(durations, sizes, stream_ids):
   the overall net throughput. Operations from the same stream cannot
   overlap, but operations from different streams may overlap.
 
-  Returns: a float. The net throughput of all streams together.
-
+  Returns: a tuple of
+    - The net throughput of all streams, excluding times they were inactive.
+    - The throughput of all streams, including times they were inactive.
+    - The total time that all streams were inactive.
+    - The total time all streams were inactive, as a proportion of the
+      total benchmark time.
   """
 
-  return (sizes.groupby(stream_ids).sum() /
-          durations.groupby(stream_ids).sum()).sum()
+  total_bytes_by_stream = sizes.groupby(stream_ids).sum()
+  active_time_by_stream = durations.groupby(stream_ids).sum()
+  total_overhead = interval_duration * num_streams - active_time_by_stream.sum()
+
+  return ((total_bytes_by_stream / active_time_by_stream).sum(),
+          total_bytes_by_stream.sum() / interval_duration,
+          total_overhead,
+          total_overhead / (interval_duration * num_streams))
 
 
 def SummaryStats(series, name_prefix=''):
