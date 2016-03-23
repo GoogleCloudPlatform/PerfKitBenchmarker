@@ -23,6 +23,7 @@
 # or install command-line tools, and are not needed for unit tests.
 -rrequirements-alicloud.txt
 -rrequirements-cloudstack.txt
+-rrequirements-openstack.txt
 
 # Test requirements
 mock>=1.0.1
