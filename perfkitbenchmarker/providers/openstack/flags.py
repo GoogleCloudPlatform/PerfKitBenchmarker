@@ -16,6 +16,15 @@ import os
 
 from perfkitbenchmarker import flags
 
+flags.DEFINE_string('openstack_cli_path',
+                    default='openstack',
+                    help='The path to the OpenStack CLI binary.')
+
+flags.DEFINE_string('openstack_additional_flags',
+                    default=[],
+                    help='Additional flags to pass to every OpenStack CLI '
+                         'command. See "openstack --help" for more.')
+
 flags.DEFINE_string('openstack_auth_url',
                     os.environ.get('OS_AUTH_URL', 'http://localhost:5000'),
                     ('Url for Keystone authentication service, defaults to '

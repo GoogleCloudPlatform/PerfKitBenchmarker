@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Class to represent an OpenStack Virtual Machine.
+
+Regions:
+  User defined
+Machine types, or flavors:
+  run 'openstack flavor list'
+Images:
+  run 'openstack image list'
+"""
+
 import logging
 import threading
 import time
