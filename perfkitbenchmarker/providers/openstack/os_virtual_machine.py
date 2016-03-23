@@ -50,7 +50,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_IMAGE = None
   _floating_ip_lock = threading.Lock()
 
-  _lock = threading.Lock()  # Guards the following:
+  _lock = threading.Lock()  # _lock guards the following:
   uploaded_keypair_set = set()
   deleted_keypair_set = set()
 
@@ -61,28 +61,33 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(OpenStackVirtualMachine, self).__init__(vm_spec)
-    self.firewall = os_network.OpenStackFirewall.GetFirewall()
-    self.firewall.AllowICMP(self)
-    self.firewall.AllowPort(self, 1, os_network.MAX_PORT)
-    self.name = 'perfkit_vm_%d_%s' % (self.instance_number, FLAGS.run_uri)
     self.key_name = 'perfkit_key_%s' % FLAGS.run_uri
-    self.client = os_utils.NovaClient()
+    self.user_name = FLAGS.openstack_image_username
+    self.image = self.image or self.DEFAULT_IMAGE
     # FIXME(meteorfox): Remove --openstack_public_network and
     # --openstack_private_network once depreciation time has expired
     self.network_name = (FLAGS.openstack_network or
                          FLAGS.openstack_private_network)
     self.floating_ip_pool_name = (FLAGS.openstack_floating_ip_pool or
                                   FLAGS.openstack_public_network)
-    self.public_network = os_network.OpenStackPublicNetwork(
-        FLAGS.openstack_floating_ip_pool)
     self.id = None
     self.pk = None
-    self.user_name = FLAGS.openstack_image_username
     self.boot_wait_time = None
-    self.image = self.image or self.DEFAULT_IMAGE
     self.public_net = None
     self.private_net = None
     self.floating_ip = None
+
+    self._CheckCanaryCommand()
+    self.client = os_utils.NovaClient()
+    self.firewall = os_network.OpenStackFirewall.GetFirewall()
+    self.firewall.AllowICMP(self)  # Allowing ICMP traffic (i.e. ping)
+    self.public_network = os_network.OpenStackPublicNetwork(
+        FLAGS.openstack_floating_ip_pool)
+
+  @property
+  def group_id(self):
+    """Returns the security group ID of this VM."""
+    return 'perfkit_sc_group'
 
   def _CreateDependencies(self):
     """Validate and Create dependencies prior creating the VM."""
@@ -200,13 +205,22 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     except NotFound:
       return False
 
+  def _CheckCanaryCommand(self):
+    logging.info('Testing OpenStack CLI command is installed and working')
+    cmd = os_utils.OpenStackCLICommand(self, 'image', 'list')
+    stdout, stderr, _ = cmd.Issue()
+    if stderr:
+      raise errors.Config.InvalidValue(
+          'OpenStack CLI test command failed. Please make sure the OpenStack '
+          'CLI client is installed and properly configured')
+
   def _CheckPrerequisites(self):
     """Checks prerequisites are met otherwise aborts execution."""
-    logging.info("Validating prerequisites.")
+    logging.info('Validating prerequisites.')
     self._CheckImage()
     self._CheckFlavor()
     self._CheckNetworks()
-    logging.info("Prerequisites validated.")
+    logging.info('Prerequisites validated.')
 
   def _CheckImage(self):
     """Tries to get image, if found continues execution otherwise aborts."""

@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+""""Module containing classes related to OpenStack Networking."""
 
-import logging
 import threading
 import time
 
@@ -32,22 +32,19 @@ class OpenStackFirewall(network.BaseFirewall):
   """
 
   CLOUD = providers.OPENSTACK
-  _lock = threading.Lock()
 
   def __init__(self):
+    self._lock = threading.Lock()  # Guards security-group rule set
     self.sec_group_rules_set = set()
-    self.__nclient = utils.NovaClient()
 
     with self._lock:
-      if not (self.__nclient.security_groups.findall(
-              name='perfkit_sc_group')):
-        self.sec_group = self.__nclient.security_groups.create(
-            'perfkit_sc_group',
-            'Firewall configuration for Perfkit Benchmarker'
-        )
-      else:
-        self.sec_group = self.__nclient.security_groups.findall(
-            name='perfkit_sc_group')[0]
+      cmd = utils.OpenStackCLICommand(self, 'security group', 'show',
+                                      'perfkit_sc_group')
+      stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+      if stderr:
+        cmd = utils.OpenStackCLICommand(self, 'security group', 'create',
+                                        'perfkit_sc_group')
+        cmd.Issue()
 
   def AllowICMP(self, vm, icmp_type=-1, icmp_code=-1):
     """Creates a Security Group Rule on the Firewall to allow/disallow
@@ -61,23 +58,15 @@ class OpenStackFirewall(network.BaseFirewall):
     if vm.is_static:
       return
 
-    from novaclient.exceptions import BadRequest
-
-    sec_group_rule = ('icmp', icmp_type, icmp_code, self.sec_group.id)
-    if sec_group_rule in self.sec_group_rules_set:
-      return
-
+    sec_group_rule = ('icmp', icmp_type, icmp_code, vm.group_id)
     with self._lock:
+      cmd = utils.OpenStackCLICommand(vm, 'security group rule', 'create',
+                                      vm.group_id)
+      cmd.flags['dst-port'] = '%d:%d' % (icmp_type, icmp_code)
+      cmd.flags['proto'] = 'icmp'
       if sec_group_rule in self.sec_group_rules_set:
         return
-
-      try:
-        self.__nclient.security_group_rules.create(self.sec_group.id,
-                                                   ip_protocol='icmp',
-                                                   from_port=icmp_type,
-                                                   to_port=icmp_code)
-      except BadRequest:
-        logging.debug('Rule icmp:%d-%d already exists' % (icmp_type, icmp_code))
+      cmd.Issue(suppress_warning=True)
       self.sec_group_rules_set.add(sec_group_rule)
 
   def AllowPort(self, vm, port, to_port=None):
@@ -93,30 +82,24 @@ class OpenStackFirewall(network.BaseFirewall):
     if vm.is_static:
       return
 
-    from novaclient.exceptions import BadRequest
-
     if to_port is None:
       to_port = port
 
-    sec_group_rule = (port, to_port, self.sec_group.id)
-    if sec_group_rule in self.sec_group_rules_set:
-      return
+    sec_group_rule = (port, to_port, vm.group_id)
 
     with self._lock:
+      cmd = utils.OpenStackCLICommand(vm, 'security group rule', 'create',
+                                      vm.group_id)
+      cmd.flags['dst-port'] = '%d:%d' % (port, to_port)
       if sec_group_rule in self.sec_group_rules_set:
         return
       for prot in ('tcp', 'udp',):
-        try:
-            self.__nclient.security_group_rules.create(
-                self.sec_group.id, ip_protocol=prot,
-                from_port=port, to_port=to_port)
-        except BadRequest:
-            logging.debug('Rule %s:%d-%d already exists',
-                          prot, port, to_port)
-
+        cmd.flags['proto'] = prot
+        cmd.Issue(suppress_warning=True)
       self.sec_group_rules_set.add(sec_group_rule)
 
   def DisallowAllPorts(self):
+    """Closes all ports on the firewall."""
     pass
 
 
