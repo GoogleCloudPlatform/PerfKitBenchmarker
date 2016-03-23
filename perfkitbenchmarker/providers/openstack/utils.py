@@ -16,6 +16,10 @@
 import logging
 import os
 
+from keystoneclient import session as ksc_session
+from keystoneclient.auth.identity import v2
+from novaclient import client as nova
+
 from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
@@ -27,7 +31,7 @@ class NovaClient(object):
         try:
             return super(NovaClient, self).__getattribute__(item)
         except AttributeError:
-            return self.__client.__getattribute__(item)
+            return self._client.__getattribute__(item)
 
     def GetPassword(self):
       # For compatibility with Nova CLI, use 'OS'-prefixed environment value
@@ -51,10 +55,6 @@ class NovaClient(object):
       raise Exception(error_msg)
 
     def __init__(self):
-        from keystoneclient import session as ksc_session
-        from keystoneclient.auth.identity import v2
-        from novaclient import client as nova
-
         self.url = FLAGS.openstack_auth_url
         self.user = FLAGS.openstack_username
         self.tenant = FLAGS.openstack_tenant
@@ -62,15 +62,32 @@ class NovaClient(object):
         self.http_log_debug = FLAGS.log_level == 'debug'
         self.password = self.GetPassword()
 
-        self.__auth = v2.Password(auth_url=self.url,
-                                  username=self.user,
-                                  password=self.password,
-                                  tenant_name=self.tenant)
-        self._session = ksc_session.Session(auth=self.__auth)
-        self.__client = nova.Client(version='2', session=self._session,
-                                    http_log_debug=self.http_log_debug)
+        self._auth = v2.Password(auth_url=self.url,
+                                 username=self.user,
+                                 password=self.password,
+                                 tenant_name=self.tenant)
+        self._session = ksc_session.Session(auth=self._auth)
+        self._client = nova.Client(version='2', session=self._session,
+                                   http_log_debug=self.http_log_debug)
         # Set requests library logging level to WARNING
         # so it doesn't spam logs with unhelpful messages,
         # such as 'Starting new HTTP Connection'.
         rq_logger = logging.getLogger('requests')
         rq_logger.setLevel(logging.WARNING)
+
+    def __getstate__(self):
+      d = self.__dict__.copy()
+      del d['_client']
+      del d['_session']
+      del d['_auth']
+      return d
+
+    def __setstate__(self, state):
+      self.__dict__ = state
+      self._auth = v2.Password(auth_url=self.url,
+                               username=self.user,
+                               password=self.password,
+                               tenant_name=self.tenant)
+      self._session = ksc_session.Session(auth=self._auth)
+      self._client = nova.Client(version='2', session=self._session,
+                                 http_log_debug=self.http_log_debug)
