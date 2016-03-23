@@ -187,7 +187,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if commands:
       self.RemoteCommand(";".join(commands))
 
-  def UpdateHosts(self):
+  def UpdateVMHostsFile(self):
       """Modifies /etc/hosts to include an entry with internal ip address."""
       hostname = self.name.replace("_", "-")
       hosts_file = "/etc/hosts"

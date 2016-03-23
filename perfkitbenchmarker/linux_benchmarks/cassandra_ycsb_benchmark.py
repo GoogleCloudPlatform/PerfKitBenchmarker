@@ -50,7 +50,7 @@ cassandra_ycsb:
 
 # TODO: Add flags.
 REPLICATION_FACTOR = 3
-COLUMN_FAMILY = 'data'
+YCSB_FIELD_COUNT = 10
 WRITE_CONSISTENCY = 'QUORUM'
 READ_CONSISTENCY = 'QUORUM'
 
@@ -85,14 +85,23 @@ def _InstallCassandra(vm, seed_vms):
   cassandra.Configure(vm, seed_vms=seed_vms)
 
 
-def _CreateYCSBTable(vm, replication_factor=REPLICATION_FACTOR):
+def _CreateYCSBTable(vm, replication_factor=REPLICATION_FACTOR,
+                     ycsb_field_count=YCSB_FIELD_COUNT):
   """Creates a Cassandra table for use with YCSB."""
   template_path = data.ResourcePath(CREATE_TABLE_SCRIPT)
   remote_path = os.path.join(
       cassandra.CASSANDRA_DIR,
       os.path.basename(os.path.splitext(template_path)[0]))
+
+  for pv in FLAGS.ycsb_load_parameters:
+    param, value = pv.split('=', 1)
+    if param == 'fieldcount':
+      ycsb_field_count = value
+
   vm.RenderTemplate(template_path, remote_path,
-                    context={'replication_factor': replication_factor})
+                    context={
+                        'replication_factor': replication_factor,
+                        'ycsb_field_count': int(ycsb_field_count)})
 
   cassandra_cli = os.path.join(cassandra.CASSANDRA_DIR, 'bin', 'cqlsh')
   command = '{0} -f {1} {2}'.format(cassandra_cli, remote_path,
@@ -162,7 +171,6 @@ def Run(benchmark_spec):
       hosts=','.join(vm.internal_ip for vm in cassandra_vms))
 
   kwargs = {'hosts': ','.join(vm.internal_ip for vm in cassandra_vms),
-            'columnfamily': COLUMN_FAMILY,
             'cassandra.readconsistencylevel': READ_CONSISTENCY,
             'cassandra.scanconsistencylevel': READ_CONSISTENCY,
             'cassandra.writeconsistencylevel': WRITE_CONSISTENCY,

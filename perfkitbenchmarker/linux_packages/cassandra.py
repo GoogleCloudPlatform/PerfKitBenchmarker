@@ -104,7 +104,7 @@ def Configure(vm, seed_vms):
              'num_cpus': vm.num_cpus,
              'cluster_name': 'Test cluster'}
 
-  vm.UpdateHosts()
+  vm.UpdateVMHostsFile()
 
   for config_file in [CASSANDRA_ENV_TEMPLATE, CASSANDRA_YAML_TEMPLATE]:
     local_path = data.ResourcePath(config_file)
