@@ -51,6 +51,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   _floating_ip_lock = threading.Lock()
 
   _lock = threading.Lock()  # _lock guards the following:
+  command_works = False
+  validated_resources_set = set()
   uploaded_keypair_set = set()
   deleted_keypair_set = set()
 
@@ -206,21 +208,33 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       return False
 
   def _CheckCanaryCommand(self):
-    logging.info('Testing OpenStack CLI command is installed and working')
-    cmd = os_utils.OpenStackCLICommand(self, 'image', 'list')
-    stdout, stderr, _ = cmd.Issue()
-    if stderr:
-      raise errors.Config.InvalidValue(
-          'OpenStack CLI test command failed. Please make sure the OpenStack '
-          'CLI client is installed and properly configured')
+    if self.command_works:  # fast path before locking
+        return
+    if self._lock:
+      if self.command_works:
+        return
+      logging.info('Testing OpenStack CLI command is installed and working')
+      cmd = os_utils.OpenStackCLICommand(self, 'image', 'list')
+      stdout, stderr, _ = cmd.Issue()
+      if stderr:
+        raise errors.Config.InvalidValue(
+            'OpenStack CLI test command failed. Please make sure the OpenStack '
+            'CLI client is installed and properly configured')
+      self.command_works = True
 
   def _CheckPrerequisites(self):
     """Checks prerequisites are met otherwise aborts execution."""
-    logging.info('Validating prerequisites.')
-    self._CheckImage()
-    self._CheckFlavor()
-    self._CheckNetworks()
-    logging.info('Prerequisites validated.')
+    if self.zone in self.validated_resources_set:
+      return  # No need to check again
+    with self._lock:
+      if self.zone in self.validated_resources_set:
+        return
+      logging.info('Validating prerequisites.')
+      self._CheckImage()
+      self._CheckFlavor()
+      self._CheckNetworks()
+      self.validated_resources_set.add(self.zone)
+      logging.info('Prerequisites validated.')
 
   def _CheckImage(self):
     """Tries to get image, if found continues execution otherwise aborts."""
