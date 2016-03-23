@@ -13,11 +13,13 @@
 # limitations under the License.
 """"Module containing classes related to OpenStack Networking."""
 
+import json
 import threading
-import time
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import utils
 from perfkitbenchmarker import providers
 
@@ -103,37 +105,59 @@ class OpenStackFirewall(network.BaseFirewall):
     pass
 
 
-class OpenStackPublicNetwork(object):
+class OpenStackFloatingIPPool(object):
 
-  def __init__(self, pool):
-    self.__nclient = utils.NovaClient()
-    # TODO(meteorfox) Is this lock needed? Callers to these methods seem
-    # to be using a lock already. Should we make callers use a lock, or
-    # should this object handle the lock?
-    self.__floating_ip_lock = threading.Lock()
-    self.ip_pool_name = pool
+  _floating_ip_lock = threading.Lock()  # Guards floating IP allocation/release
 
-  def allocate(self):
-    with self.__floating_ip_lock:
-      return self.__nclient.floating_ips.create(pool=self.ip_pool_name)
+  def __init__(self, pool_name):
+    self.ip_pool_name = pool_name
 
-  def release(self, floating_ip):
-    f_id = floating_ip.id
-    if self.__nclient.floating_ips.get(f_id):
-      with self.__floating_ip_lock:
-        if self.__nclient.floating_ips.get(f_id):
-          self.__nclient.floating_ips.delete(floating_ip)
-          while self.__nclient.floating_ips.findall(id=f_id):
-            time.sleep(1)
+  def get_or_create(self, vm):
+    with self._floating_ip_lock:
+      cmd = utils.OpenStackCLICommand(vm, 'ip', 'floating', 'list')
+      stdout, stderr, _ = cmd.Issue()
+      floating_ip_dict_list = json.loads(stdout)
+      for flip_dict in floating_ip_dict_list:
+        if flip_dict['Pool'] == self.ip_pool_name and flip_dict['ID'] is None:
+          d = {}
+          for k, v in flip_dict.iteritems():
+            new_key = k.lower.replace(' ', '_')  # Transforms keys
+            d[new_key] = v
+          return d
+      return self._allocate(vm)
 
-  def get_or_create(self):
-    with self.__floating_ip_lock:
-      floating_ips = self.__nclient.floating_ips.findall(instance_id=None,
-                                                         pool=self.ip_pool_name)
-    if floating_ips:
-      return floating_ips[0]
-    else:
-      return self.allocate()
+  def _allocate(self, vm):
+    cmd = utils.OpenStackCLICommand(vm, 'ip', 'floating', 'create',
+                                    self.ip_pool_name)
+    stdout, stderr, _ = cmd.Issue()
+    if stderr.strip():  # Strip spaces
+      raise errors.Config.InvalidValue(
+          'Could not allocate a floating ip from the pool "%s".'
+          % self.ip_pool_name)
+    floating_ip_dict = json.loads(stdout)
+    return floating_ip_dict
 
-  def is_attached(self, floating_ip):
-    return self.__nclient.floating_ips.get(floating_ip.id).fixed_ip is not None
+  def release(self, vm, floating_ip_dict):
+    # TODO(meteorfox): Change floating IP commands to OpenStack CLI once
+    # support for them is added.
+    show_cmd = [FLAGS.openstack_neutron_path,
+                'floatingip-show', floating_ip_dict['id'], '--format', 'json']
+    stdout, stderr, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
+    if stderr:
+      return  # Not found, moving on
+    updated_flip_dict = json.loads(stdout)
+    with self._floating_ip_lock:
+      delete_cmd = [FLAGS.openstack_neutron_path,
+                    'floatingip-delete', updated_flip_dict['id'],
+                    '--format', 'json']
+      stdout, stderr, _ = vm_util.IssueCommand(delete_cmd)
+
+  def is_attached(self, floating_ip_dict):
+    with self._floating_ip_lock:
+      show_cmd = ['neutron', 'floatingip-show', floating_ip_dict['id'],
+                  '--format', 'json']
+      stdout, stderr, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
+      if stderr:
+        return  # Not found, moving on
+      updated_flip_dict = json.loads(stdout)
+      return updated_flip_dict['port_id']

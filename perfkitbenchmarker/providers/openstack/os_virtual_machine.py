@@ -48,7 +48,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   CLOUD = providers.OPENSTACK
   DEFAULT_IMAGE = None
-  _floating_ip_lock = threading.Lock()
 
   _lock = threading.Lock()  # _lock guards the following:
   command_works = False
@@ -83,8 +82,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.client = os_utils.NovaClient()
     self.firewall = os_network.OpenStackFirewall.GetFirewall()
     self.firewall.AllowICMP(self)  # Allowing ICMP traffic (i.e. ping)
-    self.public_network = os_network.OpenStackPublicNetwork(
-        FLAGS.openstack_floating_ip_pool)
+    self.public_network = os_network.OpenStackFloatingIPPool(
+        self.floating_ip_pool_name)
 
   @property
   def group_id(self):
@@ -169,19 +168,28 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       status = instance.status
     # Unlikely to be false, previously checked to be true in self._Create()
     assert self.private_net is not None, '--openstack_network must be set.'
-    self.internal_ip = instance.networks[self.network_name][0]
-    self.ip_address = self.internal_ip
+    show_cmd = os_utils.OpenStackCLICommand(self, 'server', 'show', self.name)
+    stdout, stderr, _ = show_cmd.Issue()
+    server_dict = json.loads(stdout)
+    self.ip_address = self._GetNetworkIPAddress(server_dict, self.network_name)
     if self.public_net:
-      self.floating_ip = self._AllocateFloatingIP(instance)
-      self.ip_address = self.floating_ip.ip
+      self.floating_ip = self._AllocateFloatingIP()
+      self.ip_address = self.floating_ip['ip']
 
-  def _AllocateFloatingIP(self, instance):
-    with self._floating_ip_lock:
-      floating_ip = self.public_network.get_or_create()
-      instance.add_floating_ip(floating_ip)
-      logging.info('floating-ip associated: {}'.format(floating_ip.ip))
-    while not self.public_network.is_attached(floating_ip):
-      time.sleep(1)
+  def _GetNetworkIPAddress(self, server_dict, network_name):
+    addresses = server_dict['addresses'].split(',')
+    for address in addresses:
+      if network_name in address:
+        _, ip = address.split('=')
+        return ip
+
+  def _AllocateFloatingIP(self):
+    floating_ip = self.public_network.get_or_create(self)
+    cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'add',
+                                       floating_ip['ip'], self.id)
+    del cmd.flags['format']  # Command does not support json output format
+    stdout, stderr, _ = cmd.Issue()
+    logging.info('floating-ip associated: {}'.format(floating_ip['ip']))
     return floating_ip
 
   def _Delete(self):
@@ -193,7 +201,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       logging.info('Instance not found, may have been already deleted')
 
     if self.floating_ip:
-      self.public_network.release(self.floating_ip)
+      self.public_network.release(self, self.floating_ip)
 
   def _DeleteDependencies(self):
     """Delete dependencies that were needed for the VM after the VM has been
