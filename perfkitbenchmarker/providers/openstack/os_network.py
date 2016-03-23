@@ -64,7 +64,7 @@ class OpenStackFirewall(network.BaseFirewall):
     with self._lock:
       cmd = utils.OpenStackCLICommand(vm, 'security group rule', 'create',
                                       vm.group_id)
-      cmd.flags['dst-port'] = '%d:%d' % (icmp_type, icmp_code)
+      cmd.flags['dst-port'] = str(icmp_type)
       cmd.flags['proto'] = 'icmp'
       if sec_group_rule in self.sec_group_rules_set:
         return
