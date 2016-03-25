@@ -20,11 +20,12 @@ PERCENTILES_LIST = [0.1, 1, 5, 10, 50, 90, 95, 99, 99.9]
 _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 
 
-def PercentileCalculator(numbers):
+def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
   """Computes percentiles, stddev and mean on a set of numbers
 
   Args:
     numbers: The set of numbers to compute percentiles for.
+    percentiles: If given, a list of percentiles to compute.
 
   Returns:
     A dictionary of percentiles.
@@ -33,10 +34,12 @@ def PercentileCalculator(numbers):
   count = len(numbers_sorted)
   total = sum(numbers_sorted)
   result = {}
-  for percentile in PERCENTILES_LIST:
+  for percentile in percentiles:
     percentile_string = 'p%s' % str(percentile)
-    result[percentile_string] = numbers_sorted[
-        int(count * float(percentile) / 100)]
+    index = int(count * float(percentile) / 100.0)
+    if index == count:
+      index = count - 1
+    result[percentile_string] = numbers_sorted[index]
 
   if count > 0:
     average = total / float(count)
