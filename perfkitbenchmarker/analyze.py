@@ -19,13 +19,50 @@ frames, because that seems to be the most standard Python statistical
 data format.
 """
 
-import pandas as pd
-
-from perfkitbenchmarker import sample
+import perfkitbenchmarker
 
 
-def AllStreamsInterval(start_times, durations, stream_ids):
-  """Compute when all streams were active from multistream records.
+class Interval(object):
+  """Represents an interval in time.
+
+  Args:
+    start: float. A POSIX timestamp.
+    duration: float. A length of time, in seconds.
+    end: float. A POSIX timestamp.
+
+  Either duration or end must be passed to the constructor.
+  """
+
+  def __init__(self, start, duration=None, end=None):
+    self.start = start
+
+    if duration is not None:
+      if end is not None and start + duration != end:
+        raise ValueError(
+            'Invalid arguments to interval constructor: %s + %s != %s' %
+            (start, duration, end))
+      self.duration = duration
+    elif end is not None:
+      self.duration = end - start
+
+
+  @property
+  def end(self):
+    return self.start + self.duration
+
+
+  def __eq__(self, other):
+    return (isinstance(other, Interval) and
+            self.start == other.start and
+            self.duration == other.duration)
+
+
+  def __repr__(self):
+    return 'Interval(%s, %s, %s)' % (self.start, self.duration, self.end)
+
+
+def AnyAndAllStreamsIntervals(start_times, durations, stream_ids):
+  """Compute when all streams were active and when any streams were active.
 
   Args:
     start_times: a pd.Series of POSIX timestamps, as floats.
@@ -40,51 +77,53 @@ def AllStreamsInterval(start_times, durations, stream_ids):
   operation.
 
   Returns: a tuple of
-    - a float holding the POSIX timestamp when the last stream to
-      start began its first operation
-    - a float holding the length of time in seconds from the first
-      return value until the first proceess to end stopped its last
-      operation
+    - an Interval describing when any streams were active
+    - an Interval describing when all streams were active
   """
+
+  assert start_times.index.equals(durations.index)
+  assert start_times.index.equals(stream_ids.index)
+
+  first_start = start_times.min()
+  last_end = (start_times + durations).max()
 
   stream_start_times = start_times.groupby(stream_ids).min()
   stream_end_times = (start_times + durations).groupby(stream_ids).max()
   interval_start = stream_start_times.max()
   interval_end = stream_end_times.min()
 
-  return interval_start, interval_end - interval_start
+  return (Interval(first_start, end=last_end),
+          Interval(interval_start, end=interval_end))
 
 
-def StreamStartAndEndGaps(start_times, durations,
-                          interval_start, interval_duration):
+def StreamStartAndEndGaps(start_times, durations, interval):
   """Compute the stream start and stream end timing gaps.
 
   Args:
     start_times: a pd.Series of POSIX timestamps, as floats.
     durations: a pd.Series of durations, as floats measured in seconds.
-    interval_start: float. The POSIX timestamp when the last stream started.
-    interval_duration: float. The time in seconds that all streams were active.
+    interval: Interval. The interval when all streams were active.
 
   Returns: a tuple of
     - The time between when the first and last streams started.
     - The time between when the first and last streams ended.
   """
 
-  interval_end = interval_start + interval_duration
+  assert start_times.index.equals(durations.index)
+
   first_start = start_times.min()
   last_end = (start_times + durations).max()
 
-  return interval_start - first_start, last_end - interval_end
+  return interval.start - first_start, last_end - interval.end
 
 
-def FullyInInterval(start_times, durations, interval_start, interval_duration):
+def FullyInInterval(start_times, durations, interval):
   """Compute which records are completely inside an interval.
 
   Args:
     start_times: a pd.Series of POSIX timestamps, as floats
     durations: a pd.Series of durations in seconds, as floats
-    interval_start: the POSIX timestamp of the interval start, as a float
-    interval_duration: the duration of the interval in seconds, as a float
+    interval: Interval. The interval to check membership in.
 
   start_times and durations must have matching indices. Each
   (start_time, duration) pair is considered a record of an operation
@@ -96,107 +135,95 @@ def FullyInInterval(start_times, durations, interval_start, interval_duration):
     and false otherwise.
   """
 
-  interval_end = interval_start + interval_duration
+  assert start_times.index.equals(durations.index)
+
   record_ends = start_times + durations
+  return (start_times >= interval.start) & (record_ends <= interval.end)
 
-  return (start_times >= interval_start) & (record_ends <= interval_end)
 
-
-def AllStreamsThroughputStats(durations, sizes, stream_ids,
-                              num_streams, interval_duration):
-  """Compute the net throughput of multiple streams doing operations.
+def ThroughputStats(start_times, durations, sizes, stream_ids, num_streams):
+  """Compute throughput stats of multiple streams doing operations.
 
   Args:
+    start_times: a pd.Series of POSIX timestamps, as floats.
     durations: a pd.Series of durations in seconds, as floats.
     sizes: a pd.Series of bytes.
     stream_ids: a pd.Series of any type.
     num_streams: int. The number of streams.
-    interval_duration: a float. The time all streams were active, in seconds.
 
-  durations, sizes, and stream_ids must have matching indices. This
-  function computes the per-stream net throughput (sum of bytes
+  start_times, durations, sizes, and stream_ids must have matching indices.
+  This function computes the per-stream net throughput (sum of bytes
   transferred / total transfer time) and then adds the results to find
   the overall net throughput. Operations from the same stream cannot
   overlap, but operations from different streams may overlap.
 
-  Returns: a tuple of
-    - The net throughput of all streams, excluding times they were inactive.
-    - The throughput of all streams, including times they were inactive.
-    - The total time that all streams were inactive.
-    - The total time all streams were inactive, as a proportion of the
-      total benchmark time.
+  Returns: a dictionary whose keys are metric names and whose values
+  are Quantity objects holding the metric values with appropriate
+  units.
   """
+
+  assert start_times.index.equals(durations.index)
+  assert start_times.index.equals(sizes.index)
+  assert start_times.index.equals(stream_ids.index)
+
+  bit = perfkitbenchmarker.UNIT_REGISTRY.bit
+  sec = perfkitbenchmarker.UNIT_REGISTRY.second
+
+  end_times = start_times + durations
+
+  stream_starts = start_times.groupby(stream_ids).min()
+  stream_ends = end_times.groupby(stream_ids).max()
 
   total_bytes_by_stream = sizes.groupby(stream_ids).sum()
   active_time_by_stream = durations.groupby(stream_ids).sum()
-  total_overhead = interval_duration * num_streams - active_time_by_stream.sum()
+  overall_duration_by_stream = stream_ends - stream_starts
 
-  return ((total_bytes_by_stream / active_time_by_stream).sum(),
-          total_bytes_by_stream.sum() / interval_duration,
-          total_overhead,
-          total_overhead / (interval_duration * num_streams))
-
-
-def SummaryStats(series, name_prefix=''):
-
-  """Compute some summary statistics for a series.
-
-  Args:
-    series: a pd.Series of floats.
-    name_prefix: if given, a prefix for the statistic names.
-
-  Returns: a pd.Series with summary statistics.
-  """
-
-  # Percentiles 0, 1, 2, ..., 100
-  percentiles = range(0, 101, 1)
-  # range() and xrange() don't accept floating-point arguments, so
-  # add 99.1, 99.2, ..., 99.9 ourselves.
-  for i in xrange(1, 10):
-    percentiles.append(99 + i / 10.0)
-
-  # TODO: use series.describe() to simplify this once we upgrade to a
-  # version of pandas where describe() has the 'percentiles' keyword
-  # argument.
-  result = {}
-  values = sorted(series)
-  count = len(values)
-
-  for percentile in percentiles:
-    name = name_prefix + 'p' + str(percentile)
-    val = values[int((count - 1) * float(percentile) / 100.0)]
-    result[name] = val
-
-  result[name_prefix + 'min'] = values[0]
-  result[name_prefix + 'max'] = values[-1]
-  result[name_prefix + 'median'] = result[name_prefix + 'p50']
-  result[name_prefix + 'mean'] = sum(values) / float(count)
-
-  sum_of_squares = sum([num ** 2 for num in values])
-  result[name_prefix + 'stddev'] = (sum_of_squares / (count - 1)) ** 0.5
-
-  return pd.Series(result)
+  return {
+      'net throughput':
+      (total_bytes_by_stream / active_time_by_stream).sum() * 8 * bit / sec,
+      'net throughput (experimental)':
+      (total_bytes_by_stream /
+       overall_duration_by_stream).sum() * 8 * bit / sec}
 
 
-def AppendStatsAsSamples(series, unit, samples_list,
-                         name_prefix=None, timestamps=None, metadata=None):
-  """Append statistics about a series to a list as sample.Samples.
+def GapStats(start_times, durations, stream_ids, interval, num_streams):
+  """Compute statistics about operation gaps in an interval.
 
   Args:
-    series: a pd.Series of floats.
-    unit: string. Passed to sample.Sample.
-    samples_list: the list of sample.Samples to append to.
-    name_prefix: if given, a prefix for the statistic names.
-    timestamps: if given, a pd.Series of floats, used as Sample timestamps.
-    metadata: if given, extra metadata for the sample.Samples.
+    start_times: a pd.Series of POSIX timestamps, as floats.
+    durations: a pd.Series of durations in seconds, as floats.
+    stream_ids: a pd.Series of any type.
+    interval: the interval to compute statistics for.
+    num_streams: the total number of streams.
 
-  If timestamps is given, its index must match the index of series.
+  Returns: a dictionary whose keys are metric names and whose values
+  are Quantity objects holding metric values with appropriate units.
   """
 
-  stats = SummaryStats(series, name_prefix=name_prefix)
+  assert start_times.index.equals(durations.index)
+  assert start_times.index.equals(stream_ids.index)
 
-  for name, value in stats.iteritems():
-    samples_list.append(sample.Sample(
-        name, value, unit,
-        timestamp=timestamps[name] if timestamps is not None else None,
-        metadata=metadata))
+  sec = perfkitbenchmarker.UNIT_REGISTRY.second
+  percent = perfkitbenchmarker.UNIT_REGISTRY.percent
+
+  end_times = start_times + durations
+
+  # True if record overlaps the interval at all, False if not.
+  overlaps_interval = ((start_times < interval.end) &
+                       (end_times > interval.start))
+
+  # The records that overlap the interval, shunk to be completely in
+  # the interval.
+  start_or_interval = start_times[overlaps_interval].apply(
+      lambda x: max(x, interval.start))
+  end_or_interval = end_times[overlaps_interval].apply(
+      lambda x: min(x, interval.end))
+
+  total_active_time = (end_or_interval - start_or_interval).sum()
+  total_gap_time = interval.duration * num_streams - total_active_time
+
+  return {'total gap time': total_gap_time * sec,
+          'gap time proportion':
+          float(total_gap_time) /
+          (interval.duration * num_streams) *
+          100.0 * percent}

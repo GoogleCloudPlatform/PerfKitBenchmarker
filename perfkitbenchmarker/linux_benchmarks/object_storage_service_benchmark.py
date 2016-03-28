@@ -31,6 +31,7 @@ category:
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
 """
 
+import itertools
 import json
 import logging
 import os
@@ -252,10 +253,10 @@ MULTISTREAM_DELAY_PER_STREAM = 0.1
 # benchmark. This is the filename.
 OBJECTS_WRITTEN_FILE = 'pkb-objects-written'
 
-# If the period of time when some streams, but not all, are active is
-# more than MULTISTREAM_STREAM_GAP_THRESHOLD percent of the time when
-# all streams are active, then log a warning and put metadata in the
-# samples.
+# If the gap between different stream starts and ends is above a
+# certain proportion of the total time, we log a warning because we
+# are throwing out a lot of information. We also put the warning in
+# the sample metadata.
 MULTISTREAM_STREAM_GAP_THRESHOLD = 0.2
 
 
@@ -375,12 +376,11 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
   records_json = json.loads(raw_result)
   records = pd.DataFrame(records_json)
 
-  all_streams_start, all_streams_duration = analyze.AllStreamsInterval(
+  any_streams_active, all_streams_active = analyze.AnyAndAllStreamsIntervals(
       records['start_time'], records['latency'], records['stream_num'])
   start_gap, stop_gap = analyze.StreamStartAndEndGaps(
-      records['start_time'], records['latency'],
-      all_streams_start, all_streams_duration)
-  if ((start_gap + stop_gap) / all_streams_duration <
+      records['start_time'], records['latency'], all_streams_active)
+  if ((start_gap + stop_gap) / any_streams_active.duration <
       MULTISTREAM_STREAM_GAP_THRESHOLD):
     logging.info(
         'First stream started %s seconds before last stream started', start_gap)
@@ -391,14 +391,13 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
         'Difference between first and last stream start/end times was %s and '
         '%s, which is more than %s of the benchmark time %s.',
         start_gap, stop_gap, MULTISTREAM_STREAM_GAP_THRESHOLD,
-        all_streams_duration)
+        any_streams_active.duration)
     metadata['stream_gap_above_threshold'] = True
 
   records_in_interval = records[
       analyze.FullyInInterval(records['start_time'],
                               records['latency'],
-                              all_streams_start,
-                              all_streams_duration)]
+                              all_streams_active)]
 
   # Don't publish the full distribution in the metadata because doing
   # so might break regexp-based parsers that assume that all metadata
@@ -409,42 +408,38 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
   distribution_metadata = metadata.copy()
   distribution_metadata['object_size_B'] = 'distribution'
 
-  latency_prefix = 'Multi-stream %s latency ' % operation
+  latency_prefix = 'Multi-stream %s latency' % operation
   logging.info('Processing %s multi-stream %s results for the full '
                'distribution.', len(records_in_interval), operation)
-  analyze.AppendStatsAsSamples(
-      records_in_interval['latency'],
-      'sec',
+  _AppendPercentilesToResults(
       results,
-      name_prefix=latency_prefix,
-      metadata=distribution_metadata)
+      records_in_interval['latency'],
+      latency_prefix,
+      'sec',
+      distribution_metadata)
 
   logging.info('Processing %s multi-stream %s results for net throughput',
                len(records), operation)
-  net_thpt, thpt_with_overhead, total_overhead, overhead_prop = (
-      analyze.AllStreamsThroughputStats(
-          records_in_interval['latency'],
-          records_in_interval['size'],
-          records_in_interval['stream_num'],
-          num_streams,
-          all_streams_duration))
+  throughput_stats = analyze.ThroughputStats(
+      records_in_interval['start_time'],
+      records_in_interval['latency'],
+      records_in_interval['size'],
+      records_in_interval['stream_num'],
+      num_streams)
+  gap_stats = analyze.GapStats(
+      records['start_time'],
+      records['latency'],
+      records['stream_num'],
+      all_streams_active,
+      num_streams)
   logging.info('Benchmark overhead was %s percent of total benchmark time',
-               overhead_prop * 100.0)
+               gap_stats['gap time proportion'].magnitude)
 
-  results.extend([
-      sample.Sample(
-          'Multi-stream %s net throughput' % operation,
-          net_thpt, 'B/sec', metadata=distribution_metadata),
-      sample.Sample(
-          'Multi-stream %s net throughput (experimental)' % operation,
-          thpt_with_overhead, 'B/sec', metadata=distribution_metadata),
-      sample.Sample(
-          'Multi-stream %s total overhead time' % operation,
-          total_overhead, 'sec', metadata=distribution_metadata),
-      sample.Sample(
-          'Multi-stream %s overhead time proportion' % operation,
-          overhead_prop * 100.0, 'percent', metadata=distribution_metadata)])
-
+  for name, value in itertools.chain(throughput_stats.iteritems(),
+                                     gap_stats.iteritems()):
+    results.append(sample.Sample(
+        'Multi-stream ' + operation + ' ' + name,
+        value.magnitude, str(value.units), metadata=distribution_metadata))
 
   # Publish by-size and full-distribution stats even if there's only
   # one size in the distribution, because it simplifies postprocessing
@@ -455,12 +450,12 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
     this_size_metadata['object_size_B'] = size
     logging.info('Processing %s multi-stream %s results for object size %s',
                  len(records), operation, size)
-    analyze.AppendStatsAsSamples(
-        this_size_records['latency'],
-        'sec',
+    _AppendPercentilesToResults(
         results,
-        name_prefix=latency_prefix,
-        metadata=this_size_metadata)
+        this_size_records['latency'],
+        latency_prefix,
+        'sec',
+        this_size_metadata)
 
 
 def _DistributionToBackendFormat(dist):
@@ -1471,7 +1466,7 @@ def Run(benchmark_spec):
 
   results = OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0],
                                                                    metadata)
-  print results
+  # print results
   return results
 
 

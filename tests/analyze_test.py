@@ -16,13 +16,13 @@
 
 import unittest
 
-import mock
 import pandas as pd
 
 from perfkitbenchmarker import analyze
-from perfkitbenchmarker import sample
+import perfkitbenchmarker
 
-# All streams were active from time 4.0 to time 8.0.
+# The first stream starts at 0.0 and the last one ends at 14.0. All
+# streams were active from time 4.0 to time 8.0.
 SAMPLE_TABLE = pd.DataFrame([
     {'start_time': 0.0, 'duration': 2.0,   # completely before
      'stream_num': 0, 'size': 1},
@@ -38,21 +38,41 @@ SAMPLE_TABLE = pd.DataFrame([
      'stream_num': 1, 'size': 4}])
 
 
-class TestAllStreamsInterval(unittest.TestCase):
-  def testAllStreamsInterval(self):
-    start_time, duration = analyze.AllStreamsInterval(
+class TestInterval(unittest.TestCase):
+  def testStartAndDuration(self):
+    interval = analyze.Interval(2, duration=5)
+    self.assertEqual(interval.end, 7)
+
+  def testStartAndEnd(self):
+    interval = analyze.Interval(2, end=7)
+    self.assertEqual(interval.duration, 5)
+
+  def testThreeArgsGood(self):
+    # Test that the constructor doesn't raise an exception
+    analyze.Interval(2, duration=5, end=7)
+
+  def testThreeArgsBad(self):
+    with self.assertRaises(ValueError):
+      analyze.Interval(2, duration=5, end=8)
+
+
+class TestAnyAndAllStreamsIntervals(unittest.TestCase):
+  def testAnyAndAllStreamsInterval(self):
+    any_stream, all_streams = analyze.AnyAndAllStreamsIntervals(
         SAMPLE_TABLE['start_time'],
         SAMPLE_TABLE['duration'],
         SAMPLE_TABLE['stream_num'])
-    self.assertEquals(start_time, 4.0)
-    self.assertEquals(duration, 4.0)
+
+    print "any_stream", any_stream, "all_streams", all_streams
+    self.assertEqual(any_stream, analyze.Interval(0, end=14.0))
+    self.assertEqual(all_streams, analyze.Interval(4.0, end=8.0))
 
 
 class TestStreamStartAndEndGaps(unittest.TestCase):
   def testStreamStartAndEndGaps(self):
     start_gap, stop_gap = analyze.StreamStartAndEndGaps(
         SAMPLE_TABLE['start_time'], SAMPLE_TABLE['duration'],
-        4.0, 4.0)
+        analyze.Interval(4.0, duration=4.0))
 
     self.assertEqual(start_gap, 4.0)
     self.assertEqual(stop_gap, 6.0)
@@ -63,116 +83,133 @@ class TestFullyInInterval(unittest.TestCase):
     overlaps = analyze.FullyInInterval(
         SAMPLE_TABLE['start_time'],
         SAMPLE_TABLE['duration'],
-        4.0, 4.0)
+        analyze.Interval(4.0, duration=4.0))
 
     self.assertTrue(
         (overlaps == pd.Series([False, False, True, False, False, True])).all())
 
 
 class TestAllStreamsThroughputStats(unittest.TestCase):
+
+  def setUp(self):
+    self.byte = perfkitbenchmarker.UNIT_REGISTRY.byte
+    self.sec = perfkitbenchmarker.UNIT_REGISTRY.second
+    self.percent = perfkitbenchmarker.UNIT_REGISTRY.percent
+
+  def doTest(self, data, num_streams, correct_answer):
+    output = analyze.ThroughputStats(
+        data['start_time'], data['duration'], data['size'], data['stream_num'],
+        num_streams)
+    print 'output', output
+
+    for name, value in output.iteritems():
+      if name not in correct_answer:
+        raise KeyError('IntervalThroughputStats produced key %s not in correct '
+                       'output %s' % (name, str(correct_answer)))
+
+      self.assertEqual(value, correct_answer[name])
+
   def testOneObject(self):
     # Base case: one object.
-    one_op = pd.DataFrame({'duration': [1],
+    one_op = pd.DataFrame({'start_time': [0],
+                           'duration': [1],
                            'size': [2],
                            'stream_num': [0]})
-    self.assertEqual(
-        analyze.AllStreamsThroughputStats(
-            one_op['duration'], one_op['size'], one_op['stream_num'], 1, 1.0),
-        (2.0, 2.0, 0.0, 0.0))
+    self.doTest(one_op, 1,
+                {'net throughput': 2.0 * self.byte / self.sec,
+                 'net throughput (experimental)': 2.0 * self.byte / self.sec})
 
   def testSecondObjectSameSpeed(self):
     # Adding a second object at same speed has no effect on any metric.
-    no_gap = pd.DataFrame({'duration': [1, 1],
+    no_gap = pd.DataFrame({'start_time': [0, 1],
+                           'duration': [1, 1],
                            'size': [2, 2],
                            'stream_num': [0, 0]})
-    self.assertEqual(
-        analyze.AllStreamsThroughputStats(
-            no_gap['duration'], no_gap['size'], no_gap['stream_num'], 1, 2.0),
-        (2.0, 2.0, 0.0, 0.0))
+    self.doTest(no_gap, 1,
+                {'net throughput': 2.0 * self.byte / self.sec,
+                 'net throughput (experimental)': 2.0 * self.byte / self.sec})
 
   def testSecondObjectDifferentSpeed(self):
     # Adding a second object at a different speed yields a different throughput.
-    different_speeds = pd.DataFrame({'duration': [1, 3],  # 4 seconds total
+    different_speeds = pd.DataFrame({'start_time': [0, 1],
+                                     'duration': [1, 3],  # 4 seconds total
                                      'size': [2, 8],      # 10 bytes total
                                      'stream_num': [0, 0]})
-    self.assertEqual(
-        analyze.AllStreamsThroughputStats(
-            different_speeds['duration'],
-            different_speeds['size'],
-            different_speeds['stream_num'],
-            1, 4.0),
-        (2.5, 2.5, 0.0, 0.0))
+    self.doTest(different_speeds, 1,
+                {'net throughput': 2.5 * self.byte / self.sec,
+                 'net throughput (experimental)': 2.5 * self.byte / self.sec})
 
   def testGapBetweenObjects(self):
     # Adding a gap affects throughput with overheads, but not without.
-    with_gap = pd.DataFrame({'duration': [1, 1],
+    with_gap = pd.DataFrame({'start_time': [0, 3],
+                             'duration': [1, 1],
                              'size': [2, 2],
                              'stream_num': [0, 0]})
-    self.assertEqual(
-        analyze.AllStreamsThroughputStats(
-            with_gap['duration'], with_gap['size'], with_gap['stream_num'],
-            1, 4.0),
-        (2.0, 1.0, 2.0, 0.5))
+    self.doTest(with_gap, 1,
+                {'net throughput': 2.0 * self.byte / self.sec,
+                 'net throughput (experimental)': 1.0 * self.byte / self.sec})
 
   def testSimultaneousObjects(self):
     # With two simultaneous objects, throughput adds.
-    two_streams = pd.DataFrame({'duration': [1, 1],
+    two_streams = pd.DataFrame({'start_time': [0, 0],
+                                'duration': [1, 1],
                                 'size': [2, 2],
                                 'stream_num': [0, 1]})
-    self.assertEqual(
-        analyze.AllStreamsThroughputStats(
-            two_streams['duration'],
-            two_streams['size'],
-            two_streams['stream_num'],
-            2, 1.0),
-        (4.0, 4.0, 0.0, 0.0))
+    self.doTest(two_streams, 2,
+                {'net throughput': 4.0 * self.byte / self.sec,
+                 'net throughput (experimental)': 4.0 * self.byte / self.sec})
 
   def testTwoStreamGaps(self):
     # With two streams, overhead is compared to 2 * interval length.
-    two_streams_with_gap = pd.DataFrame({'duration': [1, 1, 1, 1],
+    two_streams_with_gap = pd.DataFrame({'start_time': [0, 3, 0, 3],
+                                         'duration': [1, 1, 1, 1],
                                          'size': [2, 2, 2, 2],
                                          'stream_num': [0, 0, 1, 1]})
-    self.assertEqual(
-        analyze.AllStreamsThroughputStats(
-            two_streams_with_gap['duration'],
-            two_streams_with_gap['size'],
-            two_streams_with_gap['stream_num'],
-            2, 4.0),
-        (4.0, 2.0, 4.0, 0.5))
+    self.doTest(two_streams_with_gap, 2,
+                {'net throughput': 4.0 * self.byte / self.sec,
+                 'net throughput (experimental)': 2.0 * self.byte / self.sec})
 
 
-class TestSummaryStats(unittest.TestCase):
-  def testSummaryStats(self):
-    series = pd.Series(range(0, 1001))
-    stats = analyze.SummaryStats(series, name_prefix='foo ')
+class TestGapStats(unittest.TestCase):
 
-    self.assertEqual(stats['foo p0'], 0)
-    self.assertEqual(stats['foo p1'], 10)
-    self.assertEqual(stats['foo p99.9'], 999)
-    self.assertEqual(stats['foo p100'], 1000)
-    self.assertEqual(stats['foo mean'], 500)
+  def setUp(self):
+    self.sec = perfkitbenchmarker.UNIT_REGISTRY.second
+    self.percent = perfkitbenchmarker.UNIT_REGISTRY.percent
 
+  def doTest(self, data, num_streams, interval, correct_answer):
+    output = analyze.GapStats(
+        data['start_time'], data['duration'], data['stream_num'],
+        interval, num_streams)
 
-class TestAppendStatsAsSamples(unittest.TestCase):
-  def testAppendStatsAsSamples(self):
-    with mock.patch(analyze.__name__ + '.SummaryStats',
-                    return_value=pd.Series({'a': 1, 'b': 2, 'c': 3})):
-      samples_list = []
-      analyze.AppendStatsAsSamples(
-          [], 'unit', samples_list,
-          timestamps=pd.Series({'a': 11, 'b': 12, 'c': 13}))
+    for name, value in output.iteritems():
+      if name not in correct_answer:
+        raise KeyError('GapStats produced key %s not in correct output %s' %
+                       (name, str(correct_answer)))
+      self.assertEqual(value, correct_answer[name])
 
-      self.assertEqual(
-          samples_list[0],
-          sample.Sample('a', 1, 'unit', timestamp=11))
+  def testOneRecord(self):
+    one_record = pd.DataFrame({'start_time': [0],
+                               'duration': [1],
+                               'stream_num': [0]})
+    self.doTest(one_record, 1, analyze.Interval(0, duration=1),
+                {'total gap time': 0.0 * self.sec,
+                 'gap time proportion': 0.0 * self.percent})
 
-      self.assertEqual(
-          samples_list[1],
-          sample.Sample('b', 2, 'unit', timestamp=12))
+  def testOneStream(self):
+    one_stream = pd.DataFrame({'start_time': [0, 2, 4],
+                               'duration': [1, 1, 1],
+                               'stream_num': [0, 0, 0]})
+    self.doTest(one_stream, 1, analyze.Interval(0, duration=5),
+                {'total gap time': 2.0 * self.sec,
+                 'gap time proportion': 40.0 * self.percent})
 
-      self.assertEqual(
-          samples_list[2],
-          sample.Sample('c', 3, 'unit', timestamp=13))
+  def testOverlapInterval(self):
+    overlap = pd.DataFrame({'start_time': [0, 2, 5, 10, 13],
+                            'duration': [1, 2, 4, 2, 1],
+                            'stream_num': [0, 0, 0, 0, 0]})
+    self.doTest(overlap, 1, analyze.Interval(3, duration=8),
+                {'total gap time': 2.0 * self.sec,
+                 'gap time proportion': 25.0 * self.percent})
 
 
 if __name__ == '__main__':
