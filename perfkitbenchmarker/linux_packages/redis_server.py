@@ -17,8 +17,8 @@
 
 from perfkitbenchmarker import vm_util
 
-REDIS_TAR = 'redis-stable.tar.gz'
-REDIS_DIR = '%s/redis-stable' % vm_util.VM_TMP_DIR
+REDIS_TAR = 'redis-3.0.7.tar.gz'
+REDIS_DIR = '%s/redis-3.0.7' % vm_util.VM_TMP_DIR
 REDIS_URL = 'http://download.redis.io/releases/' + REDIS_TAR
 
 
