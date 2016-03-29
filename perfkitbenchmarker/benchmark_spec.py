@@ -195,34 +195,36 @@ class BenchmarkSpec(object):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
     vm_group_specs = self.config.vm_groups
 
-    os_type = vm_group_specs[vm_group_specs.keys()[0]].os_type
-    if os_type == os_types.JUJU:
-        """
-        The Juju VM needs to be created first, so that subsequent units can
-        be properly added under its control.
-        """
-
-        juju_spec = copy.copy(vm_group_specs[vm_group_specs.keys()[0]])
-        juju_spec.vm_count = 1
-        jujuvms = self.ConstructVirtualMachine('juju', juju_spec)
-        if len(jujuvms):
-            jujuvm = jujuvms.pop()
-            jujuvm.isController = True
-
-    for group_name, group_spec in vm_group_specs.iteritems():
+    clouds = {}
+    for idx, (group_name, group_spec) in enumerate(vm_group_specs.iteritems()):
       vms = self.ConstructVirtualMachine(group_name, group_spec)
+
+      if group_spec.os_type == os_types.JUJU:
+          """
+          The Juju VM needs to be created first, so that subsequent units can
+          be properly added under its control.
+          """
+          if group_spec.cloud in clouds:
+            jujuvm = clouds[group_spec.cloud]
+          else:
+            juju_spec = copy.copy(group_spec)
+            juju_spec.vm_count = 1
+            jujuvms = self.ConstructVirtualMachine('juju', juju_spec)
+            if len(jujuvms):
+              jujuvm = jujuvms.pop()
+              jujuvm.isController = True
+
+              clouds[group_spec.cloud] = jujuvm
+
+          for vm in vms:
+            vm.controller = clouds[group_spec.cloud]
+
+          jujuvm.units.extend(vms)
+          if jujuvm and jujuvm not in self.vms:
+            vms.extend([jujuvm])
 
       self.vm_groups[group_name] = vms
       self.vms.extend(vms)
-
-    # Append the Juju VM to the end of the vm list
-    if os_type == os_types.JUJU and jujuvm is not None:
-        for vm in self.vms:
-            vm.controller = jujuvm
-
-        jujuvm.units = list(self.vms)
-
-        self.vms.extend([jujuvm])
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
