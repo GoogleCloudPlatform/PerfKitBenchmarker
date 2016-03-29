@@ -986,7 +986,7 @@ class JujuMixin(DebianMixin):
   https://jujucharms.com/docs/stable/config-manual
   """
 
-  OS_TYPE = 'juju'
+  OS_TYPE = os_types.JUJU
 
   isController = False
 
