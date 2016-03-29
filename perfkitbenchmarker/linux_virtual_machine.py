@@ -979,168 +979,156 @@ class ContainerizedDebianMixin(DebianMixin):
 
 
 class JujuMixin(DebianMixin):
+  """
+  Class to allow running juju-deployed workloads
+
+  Bootstraps a Juju environment using the manual provider:
+  https://jujucharms.com/docs/stable/config-manual
+  """
+
+  OS_TYPE = 'juju'
+
+  isController = False
+
+  """
+  A reference to the juju controller, useful when operations occur against
+  a unit's VM but need to be preformed from the controller.
+  """
+  controller = None
+
+  units = []
+
+  environments_yaml = """
+  default: perfkit
+
+  environments:
+      perfkit:
+          type: manual
+          bootstrap-host: {0}
+  """
+
+  def _Bootstrap(self):
+    resp, _ = self.RemoteHostCommand("juju bootstrap")
+
+  def JujuAddMachine(self, ip):
+    resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" % ip)
+
+  def JujuConfigureEnvironment(self):
+    if self.isController:
+      resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
+      f = tempfile.NamedTemporaryFile(delete=False)
+      f.write(self.environments_yaml.format(self.internal_ip))
+      f.close()
+      self.RemoteCopy(f.name, "~/.juju/environments.yaml")
+      os.unlink(f.name)
+
+  def JujuEnvironment(self):
+    output, _ = self.RemoteHostCommand('juju switch')
+    return output.strip()
+
+  def JujuRun(self, cmd):
+    output, _ = self.RemoteHostCommand(cmd)
+    return output.strip()
+
+  def JujuStatus(self):
     """
-    Class to allow running juju-deployed workloads
+    Return the status of the Juju environment.
+    """
+    output, _ = self.RemoteHostCommand('juju status --format=json')
+    logging.warn(output)
 
-    Bootstraps a Juju environment using the manual provider:
-    https://jujucharms.com/docs/stable/config-manual
+    return output.strip()
+
+  def JujuVersion(self):
+    output, _ = self.RemoteHostCommand('juju version')
+    return output.strip()
+
+  def JujuSet(self, service, params=[]):
+    ' '.join(params)
+    output, _ = self.RemoteHostCommand(
+        'juju set %s %s' % (service, ' '.join(params)))
+    return output.strip()
+
+  def JujuWait(self, timeout=900):
+    """
+    Wait until all services are deployed, related or idle
     """
 
-    OS_TYPE = 'juju'
+    start = time.time()
+    while True:
+      ready = True
+      status = yaml.load(self.JujuStatus())
+      for service in status['services']:
+        ss = status['services'][service]['service-status']['current']
 
-    isController = False
+        # Accept blocked because the service may be waiting on relation
+        if ss not in ['active', 'unknown']:
+          ready = False
 
-    """
-    A reference to the juju controller, useful when operations occur against
-    a unit's VM but need to be preformed from the controller.
-    """
-    controller = None
+        if ss in ['error']:
+          # The service has failed to deploy.
+          debuglog = self.JujuRun('juju debug-log --limit 200')
+          logging.warn(debuglog)
+          return False
 
-    units = []
+        for unit in status['services'][service]['units']:
+          unit_data = status['services'][service]['units'][unit]
+          ag = unit_data['agent-state']
+          if ready and ag != 'started':
+            ready = False
 
-    environments_yaml = """
-    default: perfkit
+          ws = unit_data['workload-status']['current']
+          if ready and ws not in ['active', 'unknown']:
+            ready = False
 
-    environments:
-        perfkit:
-            type: manual
-            bootstrap-host: {0}
-    """
+      if start + timeout < time.time():
+          ready = False
 
-    def JujuBootstrap(self):
-        resp, _ = self.RemoteHostCommand("juju bootstrap")
+      if ready:
+          return True
 
-    def JujuAddMachine(self, ip):
-        resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" % ip)
+      time.sleep(30)
 
-    def JujuConfigureEnvironment(self):
-        if self.isController:
+    return True
 
-            resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
+  def JujuDeploy(self, charm, units=1):
+    resp, _ = self.RemoteHostCommand(
+        "juju deploy %s --num-units=%d" % (charm, units))
+    return True
 
-            f = tempfile.NamedTemporaryFile(delete=False)
-            f.write(self.environments_yaml.format(self.internal_ip))
-            f.close()
-            self.RemoteCopy(f.name, "~/.juju/environments.yaml")
-            os.unlink(f.name)
+  def JujuRelate(self, a, b):
+    resp, _ = self.RemoteHostCommand(
+        "juju add-relation %s %s" % (a, b))
 
-    def JujuEnvironment(self):
-        output, _ = self.RemoteHostCommand('juju switch')
-        return output.strip()
+  def AuthenticateVm(self):
+    super(JujuMixin, self).AuthenticateVm()
 
-    def JujuRun(self, cmd):
-        output, _ = self.RemoteHostCommand(cmd)
-        return output.strip()
+  def Install(self, package_name):
+    """Installs a PerfKit package on the VM."""
+    if package_name not in self._installed_packages:
+      package = linux_packages.PACKAGES[package_name]
+      package.JujuInstall(self)
+      self._installed_packages.add(package_name)
 
-    def JujuStatus(self):
-        """
-        Return the status of the Juju environment.
-        """
-        output, _ = self.RemoteHostCommand('juju status --format=json')
-        logging.warn(output)
+  def SetupPackageManager(self):
+    if self.isController:
+      resp, _ = self.RemoteHostCommand(
+          "sudo add-apt-repository ppa:juju/stable"
+      )
+    super(JujuMixin, self).SetupPackageManager()
 
-        return output.strip()
+  def PrepareVMEnvironment(self):
+    super(JujuMixin, self).PrepareVMEnvironment()
+    if self.isController:
+      self.InstallPackages('juju')
 
-    def JujuVersion(self):
-        output, _ = self.RemoteHostCommand('juju version')
-        return output.strip()
+      self.JujuConfigureEnvironment()
 
-    def JujuSet(self, service, params=[]):
-        ' '.join(params)
-        output, _ = self.RemoteHostCommand(
-            'juju set %s %s' % (service, ' '.join(params)))
-        return output.strip()
+      self.AuthenticateVm()
 
-    def JujuWait(self, timeout=900):
-        """
-        Wait until all services are deployed, related or idle
-        """
+      self._Bootstrap()
 
-        start = time.time()
-        while True:
-            ready = True
-            status = yaml.load(self.JujuStatus())
-            for service in status['services']:
-                ss = status['services'][service]['service-status']['current']
-
-                # Accept blocked because the service may be waiting on relation
-                if ss not in ['active', 'unknown']:
-                    ready = False
-
-                if ss in ['error']:
-                    # The service has failed to deploy.
-                    debuglog = self.JujuRun('juju debug-log --limit 200')
-                    logging.warn(debuglog)
-                    return False
-
-                for unit in status['services'][service]['units']:
-                    unit_data = status['services'][service]['units'][unit]
-                    ag = unit_data['agent-state']
-                    if ready and ag != 'started':
-                        ready = False
-
-                    ws = unit_data['workload-status']['current']
-                    if ready and ws not in ['active', 'unknown']:
-                        ready = False
-
-            if start + timeout < time.time():
-                ready = False
-
-            if ready:
-                return True
-
-            time.sleep(30)
-
-        return True
-
-    def JujuDeploy(self, charm, units=1):
-        if self.isController:
-            # Check if the charm is already deployed?
-            resp, _ = self.RemoteHostCommand(
-                "juju deploy %s --num-units=%d" % (charm, units))
-
-            return True
-
-    def JujuRelate(self, a, b):
-        resp, _ = self.RemoteHostCommand("juju add-relation %s %s" % (a, b))
-
-    def AuthenticateVm(self):
-        super(JujuMixin, self).AuthenticateVm()
-
-    def Install(self, package_name):
-        """Installs a PerfKit package on the VM."""
-        if package_name not in self._installed_packages:
-            package = linux_packages.PACKAGES[package_name]
-            package.JujuInstall(self)
-            self._installed_packages.add(package_name)
-
-    def SetupPackageManager(self):
-        if self.isController:
-            resp, _ = self.RemoteHostCommand(
-                "sudo add-apt-repository ppa:juju/stable"
-            )
-        super(JujuMixin, self).SetupPackageManager()
-
-    def PrepareVMEnvironment(self):
-        super(JujuMixin, self).PrepareVMEnvironment()
-        if self.isController:
-            try:
-                self.InstallPackages('juju')
-
-                self.JujuConfigureEnvironment()
-
-                self.AuthenticateVm()
-
-                self.JujuBootstrap()
-
-                # Install the Juju agent on the other VMs
-                for unit in self.units:
-                    unit.controller = self
-                    self.JujuAddMachine(unit.internal_ip)
-
-            except errors.VirtualMachine.RemoteCommandError as e:
-                raise e
-
-    # @vm_util.Retry(log_errors=False, poll_interval=1)
-    # def WaitForBootCompletion(self):
-    #     super(JujuMixin, self).WaitForBootCompletion()
+      # Install the Juju agent on the other VMs
+      for unit in self.units:
+        unit.controller = self
+        self.JujuAddMachine(unit.internal_ip)
