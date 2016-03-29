@@ -62,7 +62,7 @@ aerospike:
 
 AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
 CLIENT_DIR = 'aerospike-client-c'
-CLIENT_VERSION = '3.0.84'
+CLIENT_VERSION = '4.0.4'
 PATCH_FILE = 'aerospike.patch'
 
 
@@ -96,8 +96,8 @@ def _PrepareClient(client):
                    '&& make')
   client.RemoteCommand(build_command % (CLIENT_DIR, CLIENT_VERSION))
 
-  # Apply a patch to the client benchmark so we have access to average latency
-  # of requests. Switching over to YCSB should obviate this.
+# Apply a patch to the client benchmark so we have access to average latency
+# of requests. Switching over to YCSB should obviate this.
   client.PushDataFile(PATCH_FILE)
   benchmark_dir = '%s/benchmarks/src/main' % CLIENT_DIR
   client.RemoteCommand('cp aerospike.patch %s' % benchmark_dir)
