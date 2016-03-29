@@ -1035,8 +1035,6 @@ class JujuMixin(DebianMixin):
     Return the status of the Juju environment.
     """
     output, _ = self.RemoteHostCommand('juju status --format=json')
-    logging.warn(output)
-
     return output.strip()
 
   def JujuVersion(self):
@@ -1099,9 +1097,6 @@ class JujuMixin(DebianMixin):
   def JujuRelate(self, a, b):
     resp, _ = self.RemoteHostCommand(
         "juju add-relation %s %s" % (a, b))
-
-  def AuthenticateVm(self):
-    super(JujuMixin, self).AuthenticateVm()
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
