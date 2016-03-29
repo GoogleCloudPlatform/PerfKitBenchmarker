@@ -355,9 +355,6 @@ def RunTestOnLoader(vm, loader_index, operations_per_vm, data_node_ips,
     population_dist: string. The population distribution.
     population_params: string. Representing additional population parameters.
   """
-
-  command = FLAGS.cassandra_stress_command
-
   if command == USER_COMMAND:
     command += ' profile={profile} ops\({ops}\)'.format(
         profile=TEMP_PROFILE_PATH, ops=user_operations)
