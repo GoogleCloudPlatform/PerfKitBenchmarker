@@ -1107,7 +1107,11 @@ class JujuMixin(DebianMixin):
     """Installs a PerfKit package on the VM."""
     if package_name not in self._installed_packages:
       package = linux_packages.PACKAGES[package_name]
-      package.JujuInstall(self)
+      try:
+        package.JujuInstall(self)
+      except AttributeError:
+        package.AptInstall(self)
+
       self._installed_packages.add(package_name)
 
   def SetupPackageManager(self):
