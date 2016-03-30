@@ -445,15 +445,16 @@ class BaseOsMixin(object):
     """
     self.RemoteCopy(source_path, remote_path)
 
-  def PullFile(self, source_path, remote_path=''):
-    """Copies a file or a directory from the VM.
+  def PullFile(self, local_path, remote_path):
+    """Copies a file or a directory from the VM to the local machine.
 
     Args:
-      source_path: The location of the file or directory on the REMOTE machine.
-      remote_path: The destination of the file on the LOCAL machine, default
-          is the home directory.
+      local_path: string. The destination path of the file or directory on the
+          local machine.
+      remote_path: string. The source path of the file or directory on the
+          remote machine.
     """
-    self.RemoteCopy(source_path, remote_path, copy_to=False)
+    self.RemoteCopy(local_path, remote_path, copy_to=False)
 
   def PushDataFile(self, data_file, remote_path=''):
     """Upload a file in perfkitbenchmarker.data directory to the VM.
