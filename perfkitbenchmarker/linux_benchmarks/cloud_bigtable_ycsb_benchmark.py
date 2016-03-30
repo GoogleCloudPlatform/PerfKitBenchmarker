@@ -64,8 +64,8 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'google_bigtable_hbase_jar_url',
     'https://oss.sonatype.org/service/local/repositories/releases/content/'
-    'com/google/cloud/bigtable/bigtable-hbase-1.0/'
-    '0.2.1/bigtable-hbase-1.0-0.2.1.jar',
+    'com/google/cloud/bigtable/bigtable-hbase-1.1/'
+    '0.2.3/bigtable-hbase-1.1-0.2.3.jar',
     'URL for the Bigtable-HBase client JAR.')
 
 BENCHMARK_NAME = 'cloud_bigtable_ycsb'
