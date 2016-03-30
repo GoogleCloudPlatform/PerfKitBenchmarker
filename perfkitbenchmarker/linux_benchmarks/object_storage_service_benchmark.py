@@ -41,7 +41,7 @@ import time
 
 import pandas as pd
 
-from perfkitbenchmarker import analyze
+from perfkitbenchmarker import object_storage_multistream_analysis as analysis
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -376,9 +376,9 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
   records_json = json.loads(raw_result)
   records = pd.DataFrame(records_json)
 
-  any_streams_active, all_streams_active = analyze.AnyAndAllStreamsIntervals(
+  any_streams_active, all_streams_active = analysis.AnyAndAllStreamsIntervals(
       records['start_time'], records['latency'], records['stream_num'])
-  start_gap, stop_gap = analyze.StreamStartAndEndGaps(
+  start_gap, stop_gap = analysis.StreamStartAndEndGaps(
       records['start_time'], records['latency'], all_streams_active)
   if ((start_gap + stop_gap) / any_streams_active.duration <
       MULTISTREAM_STREAM_GAP_THRESHOLD):
@@ -395,9 +395,9 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
     metadata['stream_gap_above_threshold'] = True
 
   records_in_interval = records[
-      analyze.FullyInInterval(records['start_time'],
-                              records['latency'],
-                              all_streams_active)]
+      analysis.FullyInInterval(records['start_time'],
+                               records['latency'],
+                               all_streams_active)]
 
   # Don't publish the full distribution in the metadata because doing
   # so might break regexp-based parsers that assume that all metadata
@@ -420,13 +420,13 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
 
   logging.info('Processing %s multi-stream %s results for net throughput',
                len(records), operation)
-  throughput_stats = analyze.ThroughputStats(
+  throughput_stats = analysis.ThroughputStats(
       records_in_interval['start_time'],
       records_in_interval['latency'],
       records_in_interval['size'],
       records_in_interval['stream_num'],
       num_streams)
-  gap_stats = analyze.GapStats(
+  gap_stats = analysis.GapStats(
       records['start_time'],
       records['latency'],
       records['stream_num'],
@@ -1466,7 +1466,7 @@ def Run(benchmark_spec):
 
   results = OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Run(vms[0],
                                                                    metadata)
-  # print results
+  print results
   return results
 
 
