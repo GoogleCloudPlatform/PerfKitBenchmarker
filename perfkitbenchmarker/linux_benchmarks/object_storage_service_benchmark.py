@@ -90,7 +90,10 @@ flags.DEFINE_string('boto_file_location', None,
 flags.DEFINE_string('azure_lib_version', None,
                     'Use a particular version of azure client lib, e.g.: 1.0.2')
 
-flags.DEFINE_string('google_cloud_sdk_version', None,
+# TODO: set default to None (latest version) once
+# https://www.google.com/url?q=https://github.com/GoogleCloudPlatform/gsutil/issues/348
+# is resolved.
+flags.DEFINE_string('google_cloud_sdk_version', '96.0.0',
                     'Use a particular version of the Google Cloud SDK, e.g.: '
                     '103.0.0')
 
