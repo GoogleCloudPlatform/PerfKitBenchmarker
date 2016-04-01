@@ -116,7 +116,7 @@ class BenchmarkSpec(object):
     with flag_util.FlagDictSubstitution(FLAGS, lambda: self.config.flags):
       yield
 
-  def ConstructVirtualMachine(self, group_name, group_spec):
+  def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """
     Construct the virtual machine(s) needed for a group
     """
@@ -197,7 +197,7 @@ class BenchmarkSpec(object):
 
     clouds = {}
     for group_name, group_spec in vm_group_specs.iteritems():
-      vms = self.ConstructVirtualMachine(group_name, group_spec)
+      vms = self.ConstructVirtualMachineGroup(group_name, group_spec)
 
       if group_spec.os_type == os_types.JUJU:
           """
@@ -209,7 +209,7 @@ class BenchmarkSpec(object):
           else:
             juju_spec = copy.copy(group_spec)
             juju_spec.vm_count = 1
-            jujuvms = self.ConstructVirtualMachine('juju', juju_spec)
+            jujuvms = self.ConstructVirtualMachineGroup('juju', juju_spec)
             if len(jujuvms):
               jujuvm = jujuvms.pop()
               jujuvm.isController = True
