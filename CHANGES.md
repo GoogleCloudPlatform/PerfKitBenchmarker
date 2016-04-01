@@ -15,6 +15,7 @@ Improvements and fixes:
 * openstack: Wait until VM deletion has been completed (thanks @meteorfox, GH-904)
 * openstack: Fix floating IP allocation and deallocation (thanks @meteorfox, GH-862)
 * rackspace: Fix missing flags bug (thanks @meteorfox, GH-903)
+* Allow user to specify a flag when they run object storage benchmark on GCP, and default that flag to the latest known working version. (GH-925)
 * Update mechanism used to get iperf server process id. (GH-921)
 * Rename variables and improve documentation of BaseOsMixin.PullFile. (GH-923)
 * Fix WindowsMixin._GetNumCpus when more than one Win32_processor exists. (GH-920)
