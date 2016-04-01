@@ -180,5 +180,6 @@ class Juju(object):
   """Errors related to the Juju OS_TYPE"""
   class TimeoutException(Error):
     pass
+
   class UnitErrorException(Error):
     pass
