@@ -90,6 +90,10 @@ flags.DEFINE_string('boto_file_location', None,
 flags.DEFINE_string('azure_lib_version', None,
                     'Use a particular version of azure client lib, e.g.: 1.0.2')
 
+flags.DEFINE_string('google_cloud_sdk_version', None,
+                    'Use a particular version of the Google Cloud SDK, e.g.: '
+                    '103.0.0')
+
 flags.DEFINE_boolean('openstack_swift_insecure', False,
                      'Allow swiftclient to access Swift service without \n'
                      'having to verify the SSL certificate')
@@ -1055,10 +1059,19 @@ class GoogleCloudStorageBenchmark(object):
       vm: The vm being used to run the benchmark.
     """
     vm.Install('wget')
-    vm.RemoteCommand(
-        'wget '
-        'https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz')
-    vm.RemoteCommand('tar xvf google-cloud-sdk.tar.gz')
+    # Unfortunately there isn't one URL scheme that works for both
+    # versioned archives and "always get the latest version".
+    if FLAGS.google_cloud_sdk_version is not None:
+      sdk_file = ('google-cloud-sdk-%s-linux-x86_64.tar.gz' %
+                  FLAGS.google_cloud_sdk_version)
+      sdk_url = 'https://storage.googleapis.com/cloud-sdk-release/' + sdk_file
+    else:
+      sdk_file = 'google-cloud-sdk.tar.gz'
+      sdk_url = 'https://dl.google.com/dl/cloudsdk/release/' + sdk_file
+    vm.RemoteCommand('wget ' + sdk_url)
+    vm.RemoteCommand('tar xvf ' + sdk_file)
+    # Versioned and unversioned archives both unzip to a folder called
+    # 'google-cloud-sdk'.
     vm.RemoteCommand('bash ./google-cloud-sdk/install.sh '
                      '--disable-installation-options '
                      '--usage-report=false '
