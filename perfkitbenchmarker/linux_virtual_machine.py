@@ -31,7 +31,6 @@ import os
 import pipes
 import posixpath
 import re
-import tempfile
 import threading
 import time
 import uuid
