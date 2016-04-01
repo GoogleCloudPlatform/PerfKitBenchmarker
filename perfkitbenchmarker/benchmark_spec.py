@@ -196,7 +196,7 @@ class BenchmarkSpec(object):
     vm_group_specs = self.config.vm_groups
 
     clouds = {}
-    for idx, (group_name, group_spec) in enumerate(vm_group_specs.iteritems()):
+    for group_name, group_spec in vm_group_specs.iteritems():
       vms = self.ConstructVirtualMachine(group_name, group_spec)
 
       if group_spec.os_type == os_types.JUJU:
