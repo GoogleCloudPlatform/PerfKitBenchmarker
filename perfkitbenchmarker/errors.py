@@ -174,3 +174,11 @@ class Config(object):
   class UnrecognizedOption(Error):
     """User provided a value for an unrecognized config option."""
     pass
+
+
+class Juju(object):
+  """Errors related to the Juju OS_TYPE"""
+  class TimeoutException(Error):
+    pass
+  class UnitErrorException(Error):
+    pass
