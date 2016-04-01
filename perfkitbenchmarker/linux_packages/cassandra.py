@@ -232,7 +232,7 @@ def StartCluster(seed_vm, vms):
       started.
   """
 
-  if vm.OS_TYPE == os_types.JUJU:
+  if seed_vm.OS_TYPE == os_types.JUJU:
     """
     Juju automatically configures and starts the Cassandra cluster.
     """
