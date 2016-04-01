@@ -1047,47 +1047,39 @@ class JujuMixin(DebianMixin):
         'juju set %s %s' % (service, ' '.join(params)))
     return output.strip()
 
-  def JujuWait(self, timeout=900):
+  @vm_util.Retry(poll_interval=30, timeout=3600)
+  def JujuWait(self):
     """
-    Wait until all services are deployed, related or idle
+    Waits for all deployed services to be installed, configured, and idle.
     """
+    status = yaml.load(self.JujuStatus())
+    for service in status['services']:
+      ss = status['services'][service]['service-status']['current']
 
-    start = time.time()
-    while True:
-      ready = True
-      status = yaml.load(self.JujuStatus())
-      for service in status['services']:
-        ss = status['services'][service]['service-status']['current']
+      # Accept blocked because the service may be waiting on relation
+      if ss not in ['active', 'unknown']:
+          raise errors.Juju.TimeoutException(
+              'Service %s is not ready; status is %s' % (service, ss))
 
-        # Accept blocked because the service may be waiting on relation
-        if ss not in ['active', 'unknown']:
-          ready = False
+      if ss in ['error']:
+        # The service has failed to deploy.
+        debuglog = self.JujuRun('juju debug-log --limit 200')
+        logging.warn(debuglog)
+        raise errors.Juju.UnitErrorException(
+            'Service %s is in an error state' % service)
 
-        if ss in ['error']:
-          # The service has failed to deploy.
-          debuglog = self.JujuRun('juju debug-log --limit 200')
-          logging.warn(debuglog)
-          return False
+      for unit in status['services'][service]['units']:
+        unit_data = status['services'][service]['units'][unit]
+        ag = unit_data['agent-state']
+        if ag != 'started':
+          raise errors.Juju.TimeoutException(
+              'Service %s is not ready; agent-state is %s' % (service, ag))
 
-        for unit in status['services'][service]['units']:
-          unit_data = status['services'][service]['units'][unit]
-          ag = unit_data['agent-state']
-          if ready and ag != 'started':
-            ready = False
+        ws = unit_data['workload-status']['current']
+        if ws not in ['active', 'unknown']:
+          raise errors.Juju.TimeoutException(
+              'Service %s is not ready; workload-state is %s' % (service, ws))
 
-          ws = unit_data['workload-status']['current']
-          if ready and ws not in ['active', 'unknown']:
-            ready = False
-
-      if start + timeout < time.time():
-          ready = False
-
-      if ready:
-          return True
-
-      time.sleep(30)
-
-    return True
 
   def JujuDeploy(self, charm, units=1):
     resp, _ = self.RemoteHostCommand(
