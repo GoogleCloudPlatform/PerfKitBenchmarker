@@ -1042,7 +1042,6 @@ class JujuMixin(DebianMixin):
     return output.strip()
 
   def JujuSet(self, service, params=[]):
-    ' '.join(params)
     output, _ = self.RemoteHostCommand(
         'juju set %s %s' % (service, ' '.join(params)))
     return output.strip()
