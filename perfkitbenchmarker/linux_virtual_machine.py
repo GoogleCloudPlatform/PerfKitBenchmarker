@@ -1016,11 +1016,11 @@ class JujuMixin(DebianMixin):
   def JujuConfigureEnvironment(self):
     if self.isController:
       resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
-      f = tempfile.NamedTemporaryFile(delete=False)
-      f.write(self.environments_yaml.format(self.internal_ip))
-      f.close()
-      self.RemoteCopy(f.name, "~/.juju/environments.yaml")
-      os.unlink(f.name)
+
+      with vm_util.NamedTemporaryFile() as tf:
+        tf.write(self.environments_yaml.format(self.internal_ip))
+        tf.close()
+        self.PushFile(tf.name, "~/.juju/environments.yaml")
 
   def JujuEnvironment(self):
     output, _ = self.RemoteHostCommand('juju switch')
