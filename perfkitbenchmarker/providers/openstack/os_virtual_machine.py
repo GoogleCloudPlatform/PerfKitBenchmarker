@@ -25,7 +25,6 @@ Images:
 import json
 import logging
 import threading
-import time
 
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import errors
@@ -39,6 +38,7 @@ from perfkitbenchmarker.providers.openstack import utils as os_utils
 RHEL_IMAGE = 'rhel-7.2'
 UBUNTU_IMAGE = 'ubuntu-14.04'
 NONE = 'None'
+REMOTE_BOOT_DISK_SIZE_GB = 50
 
 FLAGS = flags.FLAGS
 
@@ -54,6 +54,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   validated_resources_set = set()
   uploaded_keypair_set = set()
   deleted_keypair_set = set()
+  created_server_group_dict = {}
+  deleted_server_group_set = set()
 
   def __init__(self, vm_spec):
     """Initialize an OpenStack virtual machine.
@@ -72,16 +74,11 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.floating_ip_pool_name = (FLAGS.openstack_floating_ip_pool or
                                   FLAGS.openstack_public_network)
     self.id = None
-    self.pk = None
-    self.boot_wait_time = None
-    self.public_net = None
-    self.private_net = None
+    self.boot_volume_id = None
+    self.server_group_id = None
     self.floating_ip = None
-
     self._CheckCanaryCommand()
-    self.client = os_utils.NovaClient()
     self.firewall = os_network.OpenStackFirewall.GetFirewall()
-    self.firewall.AllowICMP(self)  # Allowing ICMP traffic (i.e. ping)
     self.public_network = os_network.OpenStackFloatingIPPool(
         self.floating_ip_pool_name)
 
@@ -94,114 +91,30 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Validate and Create dependencies prior creating the VM."""
     self._CheckPrerequisites()
     self._UploadSSHPublicKey()
+    self.firewall.AllowICMP(self)  # Allowing ICMP traffic (i.e. ping)
     self.AllowRemoteAccessPorts()
 
   def _Create(self):
-    image = self.client.images.findall(name=self.image)[0]
-    flavor = self.client.flavors.findall(name=self.machine_type)[0]
-    self.private_net = self.client.networks.find(label=self.network_name)
-    if self.floating_ip_pool_name:
-      self.public_net = self.client.networks.find(
-          label=self.floating_ip_pool_name)
-
-    if not self.private_net:
-      if self.public_net:
-        raise errors.Error(
-            'Cannot associate floating-ip address from pool %s without '
-            'an internally routable network. Make sure '
-            '--openstack_network flag is set.')
-      else:
-        raise errors.Error(
-            'Cannot build instance without a network. Make sure to set '
-            'either just --openstack_network or both '
-            '--openstack_network and --openstack_floating_ip_pool flags.')
-
-    nics = [{'net-id': self.private_net.id}]
-
-    image_id = image.id
-    boot_from_vol = []
-    scheduler_hints = self._GetSchedulerHints()
-
+    """Creates an OpenStack VM instance and waits until it is ACTIVE."""
     if FLAGS.openstack_boot_from_volume:
-      volume_size = FLAGS.openstack_volume_size or flavor.disk
-      image_id = None
-      boot_from_vol = [{'boot_index': 0,
-                        'uuid': image.id,
-                        'volume_size': volume_size,
-                        'source_type': 'image',
-                        'destination_type': 'volume',
-                        'delete_on_termination': True}]
-
-    vm = self.client.servers.create(
-        name=self.name,
-        image=image_id,
-        flavor=flavor.id,
-        key_name=self.key_name,
-        security_groups=['perfkit_sc_group'],
-        nics=nics,
-        availability_zone=self.zone,
-        block_device_mapping_v2=boot_from_vol,
-        scheduler_hints=scheduler_hints,
-        config_drive=FLAGS.openstack_config_drive)
-    self.id = vm.id
-
-  def _GetSchedulerHints(self):
-    scheduler_hints = None
-    if FLAGS.openstack_scheduler_policy != NONE:
-      group_name = 'perfkit_%s' % FLAGS.run_uri
-      try:
-        group = self.client.server_groups.findall(name=group_name)[0]
-      except IndexError:
-        group = self.client.server_groups.create(
-            policies=[FLAGS.openstack_scheduler_policy],
-            name=group_name)
-        scheduler_hints = {'group': group.id}
-    return scheduler_hints
+      self._CreateBootableVolume()
+      self._WaitForVolumeCreation()
+    self._CreateInstance()
 
   @vm_util.Retry(max_retries=4, poll_interval=2)
   def _PostCreate(self):
-    status = 'BUILD'
-    instance = None
-    while status == 'BUILD':
-      time.sleep(5)
-      instance = self.client.servers.get(self.id)
-      status = instance.status
-    # Unlikely to be false, previously checked to be true in self._Create()
-    assert self.private_net is not None, '--openstack_network must be set.'
-    show_cmd = os_utils.OpenStackCLICommand(self, 'server', 'show', self.name)
-    stdout, stderr, _ = show_cmd.Issue()
-    server_dict = json.loads(stdout)
-    self.ip_address = self._GetNetworkIPAddress(server_dict, self.network_name)
-    if self.public_net:
-      self.floating_ip = self._AllocateFloatingIP()
-      self.ip_address = self.floating_ip['ip']
-
-  def _GetNetworkIPAddress(self, server_dict, network_name):
-    addresses = server_dict['addresses'].split(',')
-    for address in addresses:
-      if network_name in address:
-        _, ip = address.split('=')
-        return ip
-
-  def _AllocateFloatingIP(self):
-    floating_ip = self.public_network.get_or_create(self)
-    cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'add',
-                                       floating_ip['ip'], self.id)
-    del cmd.flags['format']  # Command does not support json output format
-    stdout, stderr, _ = cmd.Issue()
-    logging.info('floating-ip associated: {}'.format(floating_ip['ip']))
-    return floating_ip
+    self._SetIPAddresses()
 
   def _Delete(self):
-    from novaclient.exceptions import NotFound
-    try:
-      self.client.servers.delete(self.id)
-      self._WaitForDeleteCompletion()
-    except NotFound:
-      logging.info('Instance not found, may have been already deleted')
-
+    if self.id is None:
+      return
+    self._DeleteInstance()
     if self.floating_ip:
       self.public_network.release(self, self.floating_ip)
+    if self.server_group_id:
+      self._DeleteServerGroup()
+    if self.boot_volume_id:
+      self._DeleteBootableVolume()
 
   def _DeleteDependencies(self):
     """Delete dependencies that were needed for the VM after the VM has been
@@ -209,11 +122,17 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._DeleteSSHPublicKey()
 
   def _Exists(self):
-    from novaclient.exceptions import NotFound
-    try:
-      return self.client.servers.get(self.id) is not None
-    except NotFound:
+    if self.id is None:
       return False
+
+    show_cmd = os_utils.OpenStackCLICommand(self, 'server', 'show', self.id)
+    stdout, _, _ = show_cmd.Issue(suppress_warning=True)
+    try:
+      resp = json.loads(stdout)
+    except ValueError:
+      return False
+
+    return resp is not None
 
   def _CheckCanaryCommand(self):
     if self.command_works:  # fast path before locking
@@ -265,25 +184,40 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CheckNetworks(self):
     """Tries to get network, if found continues execution otherwise aborts."""
+    if not self.network_name:
+      if self.floating_ip_pool_name:
+        msg = ('Cannot associate floating-ip address from pool %s without '
+               'an internally routable network. Make sure '
+               '--openstack_network flag is set.')
+        raise errors.Error(msg)
+      else:
+        msg = ('Cannot build instance without a network. Make sure to set '
+               'either just --openstack_network or both '
+               '--openstack_network and --openstack_floating_ip_pool flags.')
+        raise errors.Error(msg)
+
     cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',
                                        self.network_name)
     stdout, stderr, _ = cmd.Issue()
     if stderr:
-      raise errors.Config.InvalidValue(' '.join(
-          ('Network %s could not be found.' % self.network_name,
-           'For valid network IDs/names run "openstack network list".',)))
+      msg = ' '.join(('Network %s could not be found.' % self.network_name,
+                      'For valid network IDs/names',
+                      'run "openstack network list".',))
+      raise errors.Config.InvalidValue(msg)
+
     if self.floating_ip_pool_name:
       cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'pool', 'list')
       stdout, stderr, _ = cmd.Issue()
       resp = json.loads(stdout)
       for flip_pool in resp:
         if flip_pool['Name'] == self.floating_ip_pool_name:
-          return
-      raise errors.Config.InvalidValue(' '.join(
-          ('Floating IP pool %s could not be found.'
-           % self.floating_ip_pool_name,
-           'For valid floating IP pools run '
-           '"openstack ip floating pool list".')))
+          break
+      else:
+        msg = ' '.join(('Floating IP pool %s could not be found.'
+                        % self.floating_ip_pool_name,
+                        'For valid floating IP pools run',
+                        '"openstack ip floating pool list".',))
+        raise errors.Config.InvalidValue(msg)
 
   def _UploadSSHPublicKey(self):
     """Uploads SSH public key to the VM's region."""
@@ -311,26 +245,153 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       if self.zone in self.uploaded_keypair_set:
         self.uploaded_keypair_set.remove(self.zone)
 
-  def WaitForBootCompletion(self):
-    # Do one longer sleep, then check at shorter intervals.
-    if self.boot_wait_time is None:
-      self.boot_wait_time = 15
-    time.sleep(self.boot_wait_time)
-    self.boot_wait_time = 5
-    resp, _ = self.RemoteCommand('hostname', retries=1)
-    if self.bootable_time is None:
-      self.bootable_time = time.time()
-    if self.hostname is None:
-      self.hostname = resp[:-1]
+  def _CreateBootableVolume(self):
+    """Creates bootable volume from image"""
+    vol_name = '%s_volume' % self.name
+    vol_cmd = os_utils.OpenStackCLICommand(self, 'volume', 'create', vol_name)
+    vol_cmd.flags['image'] = self.image
+    vol_cmd.flags['size'] = self._GetImageMinDiskSize()
+    stdout, _, _ = vol_cmd.Issue()
+    vol_resp = json.loads(stdout)
+    self.boot_volume_id = vol_resp['id']
 
-  @vm_util.Retry(poll_interval=5, max_retries=-1, timeout=300,
-                 log_errors=False,
-                 retryable_exceptions=(errors.Resource.RetryableDeletionError,))
-  def _WaitForDeleteCompletion(self):
-    instance = self.client.servers.get(self.id)
-    if instance and instance.status == 'ACTIVE':
-      raise errors.Resource.RetryableDeletionError(
-          'VM: %s has not been deleted. Retrying to check status.' % self.name)
+  def _DeleteBootableVolume(self):
+    """Deletes bootable volume."""
+    vol_cmd = os_utils.OpenStackCLICommand(self, 'volume', 'delete',
+                                           self.boot_volume_id)
+    del vol_cmd.flags['format']  # volume delete does not support json output
+    vol_cmd.Issue()
+    self.boot_volume_id = None
+
+  def _GetImageMinDiskSize(self):
+    """Returns minimum disk size required by the image."""
+    image_cmd = os_utils.OpenStackCLICommand(
+        self, 'image', 'show', self.image)
+    stdout, _, _ = image_cmd.Issue()
+    image_resp = json.loads(stdout)
+    if FLAGS.openstack_volume_size:
+      volume_size = FLAGS.openstack_volume_size
+    else:
+      volume_size = max(
+          (int(image_resp['min_disk']), REMOTE_BOOT_DISK_SIZE_GB,))
+    return volume_size
+
+  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
+                 retryable_exceptions=errors.Resource.RetryableCreationError)
+  def _WaitForVolumeCreation(self):
+    """Waits until boot volume is available"""
+    vol_cmd = os_utils.OpenStackCLICommand(self, 'volume', 'show',
+                                           self.boot_volume_id)
+    vol_cmd.flags['availability-zone'] = self.zone
+    stdout, stderr, _ = vol_cmd.Issue()
+    if stderr:
+      msg = ('An error occurred while trying to create boot volume for %s.'
+             % self.name)
+      raise errors.Error(msg)
+    resp = json.loads(stdout)
+    if resp['status'] != 'available':
+      msg = ('Boot volume for %s is not ready. Retrying to check status.'
+             % self.name)
+      raise errors.Resource.RetryableCreationError(msg)
+
+  def _CreateInstance(self):
+    """Execute command for creating an OpenStack VM instance."""
+    create_cmd = self._GetCreateCommand()
+    stdout, stderr, _ = create_cmd.Issue()
+    if stderr:
+      raise errors.Error(stderr)
+    resp = json.loads(stdout)
+    self.id = resp['id']
+
+  def _GetCreateCommand(self):
+    cmd = os_utils.OpenStackCLICommand(self, 'server', 'create', self.name)
+    cmd.flags['flavor'] = self.machine_type
+    cmd.flags['security-group'] = self.group_id
+    cmd.flags['key-name'] = self.key_name
+    cmd.flags['availability-zone'] = self.zone
+    cmd.flags['nic'] = 'net-id=%s' % self.network_name
+    cmd.flags['wait'] = True
+    if FLAGS.openstack_config_drive:
+      cmd.flags['config-drive'] = 'True'
+
+    hints = self._GetSchedulerHints()
+    if hints:
+      cmd.flags['hint'] = hints
+
+    if FLAGS.openstack_boot_from_volume:
+      cmd.flags['volume'] = self.boot_volume_id
+    else:
+      cmd.flags['image'] = self.image
+
+    return cmd
+
+  def _GetSchedulerHints(self):
+    if FLAGS.openstack_scheduler_policy == NONE:
+      return None
+
+    with self._lock:
+      group_name = 'perfkit_server_group_%s' % FLAGS.run_uri
+      hint_temp = 'group=%s'
+      if self.zone in self.created_server_group_dict:
+        hint = hint_temp % self.created_server_group_dict[self.zone]['id']
+        return hint
+      server_group = self._CreateServerGroup(group_name)
+      self.server_group_id = server_group['id']
+      self.created_server_group_dict[self.zone] = server_group
+      if self.zone in self.deleted_server_group_set:
+        self.deleted_server_group_set.remove(self.zone)
+
+      return hint_temp % server_group['id']
+
+  def _CreateServerGroup(self, group_name):
+    nova_cmd = [FLAGS.openstack_nova_path, 'server-group-create',
+                group_name, FLAGS.openstack_scheduler_policy]
+    stdout, _, _ = vm_util.IssueCommand(nova_cmd, suppress_warning=True)
+    server_group = os_utils.ParseServerGroupTable(stdout)
+    return server_group
+
+  def _DeleteServerGroup(self):
+    with self._lock:
+      if self.zone in self.deleted_server_group_set:
+        return
+      nova_cmd = [FLAGS.openstack_nova_path, 'server-group-delete',
+                  self.server_group_id]
+      vm_util.IssueCommand(nova_cmd, suppress_warning=True)
+      self.deleted_server_group_set.add(self.zone)
+      if self.zone in self.created_server_group_dict:
+        del self.created_server_group_dict[self.zone]
+
+  def _DeleteInstance(self):
+    cmd = os_utils.OpenStackCLICommand(self, 'server', 'delete', self.id)
+    del cmd.flags['format']  # delete does not support json output
+    cmd.flags['wait'] = True
+    cmd.Issue(suppress_warning=True)
+
+  def _SetIPAddresses(self):
+    show_cmd = os_utils.OpenStackCLICommand(self, 'server', 'show', self.name)
+    stdout, _, _ = show_cmd.Issue()
+    server_dict = json.loads(stdout)
+    self.ip_address = self._GetNetworkIPAddress(server_dict, self.network_name)
+    if self.floating_ip_pool_name:
+      self.floating_ip = self._AllocateFloatingIP()
+      self.internal_ip = self.ip_address
+      self.ip_address = self.floating_ip['ip']
+
+  def _GetNetworkIPAddress(self, server_dict, network_name):
+    addresses = server_dict['addresses'].split(',')
+    for address in addresses:
+      if network_name in address:
+        _, ip = address.split('=')
+        return ip
+
+  def _AllocateFloatingIP(self):
+    floating_ip = self.public_network.get_or_create(self)
+    cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'add',
+                                       floating_ip['ip'], self.id)
+    del cmd.flags['format']  # Command does not support json output format
+    stdout, stderr, _ = cmd.Issue()
+    logging.info('floating-ip associated: {}'.format(floating_ip['ip']))
+    return floating_ip
 
   def CreateScratchDisk(self, disk_spec):
     disks_names = ('%s-data-%d-%d'

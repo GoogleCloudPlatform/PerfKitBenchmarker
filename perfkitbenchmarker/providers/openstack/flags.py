@@ -20,6 +20,10 @@ flags.DEFINE_string('openstack_cli_path',
                     default='openstack',
                     help='The path to the OpenStack CLI binary.')
 
+flags.DEFINE_string('openstack_nova_path',
+                    default='nova',
+                    help='the path to the Nova CLI binary.')
+
 flags.DEFINE_string('openstack_neutron_path',
                     default='neutron',
                     help='The path to the Neutron CLI binary.')

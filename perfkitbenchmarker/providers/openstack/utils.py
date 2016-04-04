@@ -17,11 +17,32 @@ from collections import OrderedDict
 
 import logging
 import os
+import re
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
+
+PROPERTY_VALUE_ROW_REGEX = r'\|\s+(:?\S+\s\S+|\S+)\s+\|\s+(.*?)\s+\|.*\|$'
+PROP_VAL_PATTERN = re.compile(PROPERTY_VALUE_ROW_REGEX)
+
+
+def ParseServerGroupTable(output):
+  """Returns a dict with key/values returned from a Nova CLI formatted table.
+
+  Returns:
+    dict with key/value of the server-group. Keys are 'id' and 'name'.
+  """
+  stdout_lines = output.split('\n')
+  groups = (PROP_VAL_PATTERN.match(line) for line in stdout_lines)
+  tuples = (g.groups() for g in groups if g)
+  filtered_tuples = [(key, val) for (key, val) in tuples
+                     if key and key not in ('', 'Id',)]
+  assert len(filtered_tuples) == 1, 'Server group is not unique.'
+  server_group_id, server_group_name = filtered_tuples[0]
+  d = {'id': server_group_id, 'name': server_group_name}
+  return d
 
 
 class OpenStackCLICommand(object):
