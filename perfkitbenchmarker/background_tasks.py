@@ -13,6 +13,9 @@
 # limitations under the License.
 """Background tasks that propagate PKB thread context.
 
+TODO(skschneider): Many of the threading module flaws have been corrected in
+Python 3. When PKB switches to Python 3, this module can be simplified.
+
 PKB tries its best to clean up provisioned resources upon SIGINT. By default,
 Python raises a KeyboardInterrupt upon a SIGINT, but none of the built-in
 threading module classes are designed to handle a KeyboardInterrupt very well:
@@ -74,6 +77,10 @@ _LONG_TIMEOUT = 1000.
 _WAIT_MIN_RECHECK_DELAY = 0.001  # 1 ms
 _WAIT_MAX_RECHECK_DELAY = 0.050  # 50 ms
 
+# Values sent to child threads that have special meanings.
+_THREAD_STOP_PROCESSING = 0
+_THREAD_WAIT_FOR_KEYBOARD_INTERRUPT = 1
+
 
 def _GetCallString(target_arg_tuple):
   """Returns the string representation of a function call."""
@@ -127,6 +134,8 @@ class _SingleReaderQueue(object):
 
   A lightweight substitute for the Queue.Queue class that does not use
   internal Locks.
+
+  Gets are interruptable but depend on polling.
   """
 
   def __init__(self):
@@ -139,6 +148,42 @@ class _SingleReaderQueue(object):
 
   def Put(self, item):
     self._deque.append(item)
+
+
+class _NonPollingSingleReaderQueue(object):
+  """Queue to which multiple threads write but from which only one thread reads.
+
+  Uses a threading.Lock to implement a non-interruptable Get that does not poll
+  and is therefore easier on CPU usage. The reader waits for items by acquiring
+  the Lock, and writers release the Lock to signal that items have been written.
+  """
+
+  def __init__(self):
+    self._deque = deque()
+    self._lock = threading.Lock()
+    self._lock.acquire()
+
+  def _WaitForItem(self):
+    self._lock.acquire()
+
+  def _SignalAvailableItem(self):
+    try:
+      self._lock.release()
+    except threading.ThreadError:
+      pass
+
+  def Get(self):
+    while True:
+      self._WaitForItem()
+      if self._deque:
+        item = self._deque.popleft()
+        if self._deque:
+          self._SignalAvailableItem()
+        return item
+
+  def Put(self, item):
+    self._deque.append(item)
+    self._SignalAvailableItem()
 
 
 class _BackgroundTaskThreadContext(object):
@@ -253,10 +298,12 @@ def _ExecuteBackgroundThreadTasks(worker_id, task_queue, response_queue):
   Args:
     worker_id: int. Identifier for the child thread relative to other child
         threads.
-    task_queue: _SingleReaderQueue. Queue from which input is read. Each value
-        in the queue is either (task_id, _BackgroundTask) pair to signal a task
-        to be executed on this thread, or None to signal that this thread
-        should stop executing.
+    task_queue: _NonPollingSingleReaderQueue. Queue from which input is read.
+        Each value in the queue can be one of three types of values. If it is a
+        (task_id, _BackgroundTask) pair, the task is executed on this thread.
+        If it is _THREAD_STOP_PROCESSING, the thread stops executing. If it is
+        _THREAD_WAIT_FOR_KEYBOARD_INTERRUPT, the thread waits for a
+        KeyboardInterrupt.
     response_queue: _SingleReaderQueue. Queue to which output is written. It
         receives worker_id when this thread's bootstrap code has completed and
         receives a (worker_id, task_id) pair for each task completed on this
@@ -266,8 +313,11 @@ def _ExecuteBackgroundThreadTasks(worker_id, task_queue, response_queue):
     response_queue.Put(worker_id)
     while True:
       task_tuple = task_queue.Get()
-      if task_tuple is None:
+      if task_tuple == _THREAD_STOP_PROCESSING:
         break
+      elif task_tuple == _THREAD_WAIT_FOR_KEYBOARD_INTERRUPT:
+        while True:
+          time.sleep(_WAIT_MAX_RECHECK_DELAY)
       task_id, task = task_tuple
       task.Run()
       response_queue.Put((worker_id, task_id))
@@ -287,7 +337,7 @@ class _BackgroundThreadTaskManager(_BackgroundTaskManager):
     self._available_worker_ids = range(self._max_concurrency)
     uninitialized_worker_ids = set(self._available_worker_ids)
     for worker_id in self._available_worker_ids:
-      task_queue = _SingleReaderQueue()
+      task_queue = _NonPollingSingleReaderQueue()
       self._task_queues.append(task_queue)
       thread = threading.Thread(
           target=_ExecuteBackgroundThreadTasks,
@@ -306,7 +356,7 @@ class _BackgroundThreadTaskManager(_BackgroundTaskManager):
   def __exit__(self, *unused_args, **unused_kwargs):
     # Shut down worker threads.
     for task_queue in self._task_queues:
-      task_queue.Put(None)
+      task_queue.Put(_THREAD_STOP_PROCESSING)
     for thread in self._threads:
       _WaitForCondition(lambda: not thread.is_alive())
 
@@ -325,9 +375,14 @@ class _BackgroundThreadTaskManager(_BackgroundTaskManager):
     return task_id
 
   def HandleKeyboardInterrupt(self):
+    # Raise a KeyboardInterrupt in each child thread.
     for thread in self._threads:
       ctypes.pythonapi.PyThreadState_SetAsyncExc(
           ctypes.c_long(thread.ident), ctypes.py_object(KeyboardInterrupt))
+    # Wake threads up from possible non-interruptable wait states so they can
+    # actually see the KeyboardInterrupt.
+    for task_queue, thread in zip(self._task_queues, self._threads):
+      task_queue.Put(_THREAD_WAIT_FOR_KEYBOARD_INTERRUPT)
     for thread in self._threads:
       _WaitForCondition(lambda: not thread.is_alive())
 
