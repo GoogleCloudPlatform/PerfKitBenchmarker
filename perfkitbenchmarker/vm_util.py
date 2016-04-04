@@ -14,13 +14,10 @@
 
 """Set of utility functions for working with virtual machines."""
 
-from collections import namedtuple
-from concurrent import futures
 import contextlib
 import functools
 import logging
 import os
-import Queue
 import random
 import re
 import string
@@ -28,15 +25,13 @@ import subprocess
 import tempfile
 import threading
 import time
-import traceback
 
 import jinja2
 
-from perfkitbenchmarker import context
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import log_util
 from perfkitbenchmarker import regex_util
 
 FLAGS = flags.FLAGS
@@ -209,228 +204,9 @@ def _GetCallString(target_arg_tuple):
                            ', '.join(arg_strings))
 
 
-# Result of a call executed by RunParallelThreads.
-#
-# Attributes:
-#   call_id: int. Index corresponding to the call in the target_arg_tuples
-#       argument of RunParallelThreads.
-#   return_value: Return value if the call was executed successfully, or None if
-#       an exception was raised.
-#   traceback: None if the call was executed successfully, or the traceback
-#       string if the call raised an exception.
-ThreadCallResult = namedtuple('ThreadCallResult', [
-    'call_id', 'return_value', 'traceback'])
-
-
-def _ExecuteThreadCall(target_arg_tuple, call_id, queue, parent_log_context,
-                       parent_benchmark_spec):
-  """Function invoked in another thread by RunParallelThreads.
-
-  Executes a specified function call and captures the traceback upon exception.
-
-  Args:
-    target_arg_tuple: (target, args, kwargs) tuple containing the function to
-        call and the arguments to pass it.
-    call_id: int. Index corresponding to the call in the thread_params argument
-        of RunParallelThreads.
-    queue: Queue. Receives a ThreadCallResult.
-    parent_log_context: ThreadLogContext of the parent thread.
-    parent_benchmark_spec: BenchmarkSpec of the parent thread.
-  """
-  target, args, kwargs = target_arg_tuple
-  try:
-    log_context = log_util.ThreadLogContext(parent_log_context)
-    log_util.SetThreadLogContext(log_context)
-    context.SetThreadBenchmarkSpec(parent_benchmark_spec)
-    queue.put(ThreadCallResult(call_id, target(*args, **kwargs), None))
-  except:
-    queue.put(ThreadCallResult(call_id, None, traceback.format_exc()))
-
-
-def RunParallelThreads(target_arg_tuples, max_concurrency):
-  """Executes function calls concurrently in separate threads.
-
-  Args:
-    target_arg_tuples: list of (target, args, kwargs) tuples. Each tuple
-        contains the function to call and the arguments to pass it.
-    max_concurrency: int or None. The maximum number of concurrent new
-        threads.
-
-  Returns:
-    list of function return values in the order corresponding to the order of
-    target_arg_tuples.
-
-  Raises:
-    errors.VmUtil.ThreadException: When an exception occurred in any of the
-        called functions.
-  """
-  queue = Queue.Queue()
-  log_context = log_util.GetThreadLogContext()
-  benchmark_spec = context.GetThreadBenchmarkSpec()
-  max_concurrency = min(max_concurrency, len(target_arg_tuples))
-  results = [None] * len(target_arg_tuples)
-  error_strings = []
-  for call_id in xrange(max_concurrency):
-    target_arg_tuple = target_arg_tuples[call_id]
-    thread = threading.Thread(
-        target=_ExecuteThreadCall,
-        args=(target_arg_tuple, call_id, queue, log_context, benchmark_spec))
-    thread.daemon = True
-    thread.start()
-  active_thread_count = max_concurrency
-  next_call_id = max_concurrency
-  while active_thread_count:
-    try:
-      # Using a timeout makes this wait interruptable.
-      call_id, result, stacktrace = queue.get(block=True, timeout=1000)
-    except Queue.Empty:
-      continue
-    results[call_id] = result
-    if stacktrace:
-      msg = ('Exception occurred while calling {0}:{1}{2}'.format(
-          _GetCallString(target_arg_tuples[call_id]), os.linesep, stacktrace))
-      logging.error(msg)
-      error_strings.append(msg)
-    if next_call_id == len(target_arg_tuples):
-      active_thread_count -= 1
-    else:
-      target_arg_tuple = target_arg_tuples[next_call_id]
-      thread = threading.Thread(
-          target=_ExecuteThreadCall,
-          args=(target_arg_tuple, next_call_id, queue, log_context,
-                benchmark_spec))
-      thread.daemon = True
-      thread.start()
-      next_call_id += 1
-  if error_strings:
-    raise errors.VmUtil.ThreadException(
-        'The following exceptions occurred during threaded execution:'
-        '{0}{1}'.format(os.linesep, os.linesep.join(error_strings)))
-  return results
-
-
-def RunThreaded(target, thread_params, max_concurrent_threads=200):
-  """Runs the target method in parallel threads.
-
-  The method starts up threads with one arg from thread_params as the first arg.
-
-  Args:
-    target: The method to invoke in the thread.
-    thread_params: A thread is launched for each value in the list. The items
-        in the list can either be a singleton or a (args, kwargs) tuple/list.
-        Usually this is a list of VMs.
-    max_concurrent_threads: The maximum number of concurrent threads to allow.
-
-  Returns:
-    List of the same length as thread_params. Contains the return value from
-    each threaded function call in the corresponding order as thread_params.
-
-  Raises:
-    ValueError: when thread_params is not valid.
-    errors.VmUtil.ThreadException: When an exception occurred in any of the
-        called functions.
-
-  Example 1: # no args other than list.
-    args = [self.CreateVm()
-            for x in range(0, 10)]
-    RunThreaded(MyThreadedTargetMethod, args)
-
-  Example 2: # using args only to pass to the thread:
-    args = [((self.CreateVm(), i, 'somestring'), {})
-            for i in range(0, 10)]
-    RunThreaded(MyThreadedTargetMethod, args)
-
-  Example 3: # using args & kwargs to pass to the thread:
-    args = [((self.CreateVm(),), {'num': i, 'name': 'somestring'})
-            for i in range(0, 10)]
-    RunThreaded(MyThreadedTargetMethod, args)
-  """
-  if not isinstance(thread_params, list):
-    raise ValueError('Param "thread_params" must be a list')
-
-  if not thread_params:
-    # Nothing to do.
-    return []
-
-  if not isinstance(thread_params[0], tuple):
-    target_arg_tuples = [(target, (arg,), {}) for arg in thread_params]
-  elif (not isinstance(thread_params[0][0], tuple) or
-        not isinstance(thread_params[0][1], dict)):
-    raise ValueError('If Param is a tuple, the tuple must be (tuple, dict)')
-  else:
-    target_arg_tuples = [(target, args, kwargs)
-                         for args, kwargs in thread_params]
-
-  return RunParallelThreads(target_arg_tuples,
-                            max_concurrency=max_concurrent_threads)
-
-
-def _ExecuteProcCall(target_arg_tuple):
-  """Function invoked in another process by RunParallelProcesses.
-
-  Executes a specified function call and captures the traceback upon exception.
-  TODO(skschneider): Remove this helper function when moving to Python 3.5 or
-  when the backport of concurrent.futures.ProcessPoolExecutor is able to
-  preserve original traceback.
-
-  Args:
-    target_arg_tuple: (target, args, kwargs) tuple containing the function to
-        call and the arguments to pass it.
-
-  Returns:
-    (result, traceback) tuple. The first element is the return value from the
-    called function, or None if the function raised an exception. The second
-    element is the exception traceback string, or None if the function
-    succeeded.
-  """
-  target, args, kwargs = target_arg_tuple
-  try:
-    return target(*args, **kwargs), None
-  except:
-    return None, traceback.format_exc()
-
-
-def RunParallelProcesses(target_arg_tuples, max_concurrency=None):
-  """Executes function calls concurrently in separate processes.
-
-  Args:
-    target_arg_tuples: list of (target, args, kwargs) tuples. Each tuple
-        contains the function to call and the arguments to pass it.
-    max_concurrency: int or None. The maximum number of concurrent new
-        processes. If None, it will default to the number of processors on the
-        machine.
-
-  Returns:
-    list of function return values in the order corresponding to the order of
-    target_arg_tuples.
-
-  Raises:
-    errors.VmUtil.CalledProcessException: When an exception occurred in any
-        of the called functions.
-  """
-  call_futures = []
-  results = []
-  error_strings = []
-  with futures.ProcessPoolExecutor(max_workers=max_concurrency) as executor:
-    for target_arg_tuple in target_arg_tuples:
-      call_futures.append(executor.submit(_ExecuteProcCall, target_arg_tuple))
-    for index, future in enumerate(call_futures):
-      try:
-        result, stacktrace = future.result()
-      except:
-        result = None
-        stacktrace = traceback.format_exc()
-      results.append(result)
-      if stacktrace:
-        msg = ('Exception occurred while calling {0}:{1}{2}'.format(
-            _GetCallString(target_arg_tuples[index]), os.linesep, stacktrace))
-        logging.error(msg)
-        error_strings.append(msg)
-  if error_strings:
-    msg = ('The following exceptions occurred during parallel execution:'
-           '{0}{1}'.format(os.linesep, os.linesep.join(error_strings)))
-    raise errors.VmUtil.CalledProcessException(msg)
-  return results
+RunParallelProcesses = background_tasks.RunParallelProcesses
+RunParallelThreads = background_tasks.RunParallelThreads
+RunThreaded = background_tasks.RunThreaded
 
 
 def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
