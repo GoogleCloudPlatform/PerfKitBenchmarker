@@ -96,16 +96,16 @@ def AptInstall(vm):
 
 def JujuInstall(vm):
   if vm.isController is True:
-    # TODO: The number of units deployed should match
-    # those in the benchmark_spec
-    vm.JujuDeploy('cs:trusty/cassandra', 3)
-    vm.JujuSet('cassandra', ['authenticator=AllowAllAuthenticator'])
-    vm.JujuDeploy('cs:~marcoceppi/trusty/cassandra-stress')
-    vm.JujuRelate('cassandra', 'cassandra-stress')
+    if vm.vm_group_specs and 'workers' in vm.vm_group_specs:
+      vm.JujuDeploy('cs:trusty/cassandra',
+                    vm.vm_group_specs['workers'].vm_count)
+      vm.JujuSet('cassandra', ['authenticator=AllowAllAuthenticator'])
+      vm.JujuDeploy('cs:~marcoceppi/trusty/cassandra-stress')
+      vm.JujuRelate('cassandra', 'cassandra-stress')
 
-    # This will wait for the cassandra cluster and cassandra-stress vms
-    # to fully deploy and be ready for benchmarking
-    vm.JujuWait()
+      # This will wait for the cassandra cluster and cassandra-stress vms
+      # to fully deploy and be ready for benchmarking
+      vm.JujuWait()
 
   # Make sure the cassandra/conf dir is created, since we're skipping
   # the manual installation to /tmp/pkb.

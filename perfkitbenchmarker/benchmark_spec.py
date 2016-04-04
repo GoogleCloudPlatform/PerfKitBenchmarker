@@ -213,6 +213,7 @@ class BenchmarkSpec(object):
             if len(jujuvms):
               jujuvm = jujuvms.pop()
               jujuvm.isController = True
+              jujuvm.vm_group_specs = vm_group_specs
 
               clouds[group_spec.cloud] = jujuvm
 
