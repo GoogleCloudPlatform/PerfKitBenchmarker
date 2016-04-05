@@ -44,10 +44,28 @@ flags.DEFINE_string('openstack_nova_endpoint_type',
                     'defaults to $NOVA_ENDPOINT_TYPE.')
 
 flags.DEFINE_string('openstack_public_network', None,
-                    'Name of OpenStack public network')
+                    '(DEPRECATED: Use openstack_floating_ip_pool) '
+                    'Name of OpenStack public network.')
 
 flags.DEFINE_string('openstack_private_network', 'private',
-                    'Name of OpenStack private network')
+                    '(DEPRECATED: Use openstack_network) '
+                    'Name of OpenStack private network.')
+
+flags.DEFINE_string('openstack_network', 'private',
+                    'Name of OpenStack network. This network provides '
+                    'automatically allocated fixed-IP addresses to attached '
+                    'instances. Typically, this network is used for internal '
+                    'communication between instances. '
+                    'If openstack_floating_ip_pool is not '
+                    'set then this network will be used to communicate with '
+                    'the instance.')
+
+flags.DEFINE_string('openstack_floating_ip_pool', None,
+                    'Name of OpenStack floating IP-address pool. If set, '
+                    'a floating-ip address from this pool will be associated'
+                    'to each instance and will be used for communicating '
+                    'with it. To use this flag, an internally routable network '
+                    'must also be specified via the openstack_network flag.')
 
 flags.DEFINE_boolean('openstack_config_drive', False,
                      'Add possibilities to get metadata from external drive')

@@ -1,3 +1,28 @@
+# 1.3.0
+
+External contributions:
+* Add RHEL based virtual machines to OpenStack provider. (thanks @akrzos;
+  GH-858)
+* Change rackspace provider information to use official CLI (thanks @meteorfox; GH-844)
+* Add rackspace requirements (thanks @meteorfox; GH-805)
+
+New features:
+* Support flags in YAML format. (GH-857)
+* Check version of required packages at runtime (GH-834)
+* User-specified multiregion for GCS benchmarking (GH-845)
+* Support metadata for gcp instances (GH-859)
+
+Bugfixes and maintenance updates:
+* Change rackspace's AllowPort to enable UDP (thanks @meteorfox; GH-805)
+* Allow most recent verison gcs-oauth2-boto-plugin (GH-849)
+* Require Pint >= 0.7 (GH-850)
+* Update PIP (GH-842)
+* Fix windows log message (GH-832)
+* Properly Pickle Pint Quantities (GH-830)
+* os_type added to boot benchmark metadata (GH-826)
+* Better handle Azure timeouts (GH-825)
+* Better handling of AWS integration tests. (GH-869, GH-868)
+
 # 1.2.0
 
 New features:

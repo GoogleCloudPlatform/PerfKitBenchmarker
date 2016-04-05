@@ -21,7 +21,7 @@ import random
 import os
 try:
     import paramiko
-except:
+except ImportError:
     paramiko = None
 
 from perfkitbenchmarker import flags
