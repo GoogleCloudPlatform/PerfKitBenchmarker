@@ -222,7 +222,8 @@ class BenchmarkSpec(object):
 
           jujuvm.units.extend(vms)
           if jujuvm and jujuvm not in self.vms:
-            vms.extend([jujuvm])
+            self.vms.extend([jujuvm])
+            self.vm_groups['%s_juju_controller' % group_spec.cloud] = [jujuvm]
 
       self.vm_groups[group_name] = vms
       self.vms.extend(vms)
