@@ -14,9 +14,6 @@
 
 """Tests for perfkitbenchmarker.vm_util."""
 
-import functools
-import multiprocessing
-import multiprocessing.managers
 import os
 import psutil
 import subprocess
@@ -26,7 +23,6 @@ import unittest
 
 import mock
 
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 
 
@@ -122,127 +118,6 @@ class WaitUntilSleepTimer(threading.Thread):
     if not self.finished.is_set():
       self.function()
     self.finished.set()
-
-
-def _ReturnArgs(a, b=None):
-  return b, a
-
-
-def _RaiseValueError():
-  raise ValueError('ValueError')
-
-
-def _IncrementCounter(lock, counter):
-  with lock:
-    counter.value += 1
-
-
-def _AppendLength(int_list):
-  int_list.append(len(int_list))
-
-
-class GetCallStringTestCase(unittest.TestCase):
-
-  def testNoArgs(self):
-    result = vm_util._GetCallString((_ReturnArgs, (), {}))
-    self.assertEqual(result, '_ReturnArgs()')
-
-  def testArgs(self):
-    result = vm_util._GetCallString((_ReturnArgs, ('blue', 5), {}))
-    self.assertEqual(result, '_ReturnArgs(blue, 5)')
-
-  def testKwargs(self):
-    result = vm_util._GetCallString((_ReturnArgs, (), {'x': 8}))
-    self.assertEqual(result, '_ReturnArgs(x=8)')
-
-  def testArgsAndKwargs(self):
-    result = vm_util._GetCallString((_ReturnArgs, ('blue', 5), {'x': 8}))
-    self.assertEqual(result, '_ReturnArgs(blue, 5, x=8)')
-
-  def testSinglePartial(self):
-    _ReturnArgs2 = functools.partial(_ReturnArgs, 1, x=2)
-    result = vm_util._GetCallString((_ReturnArgs2, (), {}))
-    self.assertEqual(result, '_ReturnArgs(1, x=2)')
-    result = vm_util._GetCallString((_ReturnArgs2, ('blue', 5), {'x': 8}))
-    self.assertEqual(result, '_ReturnArgs(1, blue, 5, x=8)')
-
-  def testDoublePartial(self):
-    _ReturnArgs2 = functools.partial(_ReturnArgs, 1, x=2)
-    _ReturnArgs3 = functools.partial(_ReturnArgs2, 3, x=4)
-    result = vm_util._GetCallString((_ReturnArgs3, (), {}))
-    self.assertEqual(result, '_ReturnArgs(1, 3, x=4)')
-    result = vm_util._GetCallString((_ReturnArgs3, ('blue', 5), {'x': 8}))
-    self.assertEqual(result, '_ReturnArgs(1, 3, blue, 5, x=8)')
-
-
-class RunParallelThreadsTestCase(unittest.TestCase):
-
-  def testFewerThreadsThanConcurrencyLimit(self):
-    calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(2)]
-    result = vm_util.RunParallelThreads(calls, max_concurrency=4)
-    self.assertEqual(result, [(0, 'a'), (1, 'a')])
-
-  def testMoreThreadsThanConcurrencyLimit(self):
-    calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(10)]
-    result = vm_util.RunParallelThreads(calls, max_concurrency=4)
-    self.assertEqual(result, [(i, 'a') for i in range(10)])
-
-  def testException(self):
-    int_list = []
-    calls = [(_AppendLength, (int_list,), {}), (_RaiseValueError, (), {}),
-             (_AppendLength, (int_list,), {})]
-    with self.assertRaises(errors.VmUtil.ThreadException):
-      vm_util.RunParallelThreads(calls, max_concurrency=1)
-    self.assertEqual(int_list, [0, 1])
-
-
-class RunThreadedTestCase(unittest.TestCase):
-
-  def testNonListParams(self):
-    with self.assertRaises(ValueError):
-      vm_util.RunThreaded(_ReturnArgs, 'blue')
-
-  def testNoParams(self):
-    result = vm_util.RunThreaded(_ReturnArgs, [])
-    self.assertEqual(result, [])
-
-  def testInvalidTupleParams(self):
-    with self.assertRaises(ValueError):
-      vm_util.RunThreaded(_ReturnArgs, [('blue', 'red')])
-
-  def testSimpleListParams(self):
-    result = vm_util.RunThreaded(_ReturnArgs, ['blue', 'red'])
-    self.assertEqual(result, [(None, 'blue'), (None, 'red')])
-
-  def testListOfTupleParams(self):
-    result = vm_util.RunThreaded(
-        _ReturnArgs, [(('red',), {}), (('green',), {'b': 'blue'})])
-    self.assertEqual(result, [(None, 'red'), ('blue', 'green')])
-
-
-class RunParallelProcessesTestCase(unittest.TestCase):
-
-  def testFewerThreadsThanConcurrencyLimit(self):
-    calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(2)]
-    result = vm_util.RunParallelProcesses(calls, max_concurrency=4)
-    self.assertEqual(result, [(0, 'a'), (1, 'a')])
-
-  def testMoreThreadsThanConcurrencyLimit(self):
-    calls = [(_ReturnArgs, ('a',), {'b': i}) for i in range(10)]
-    result = vm_util.RunParallelProcesses(calls, max_concurrency=4)
-    self.assertEqual(result, [(i, 'a') for i in range(10)])
-
-  def testException(self):
-    manager = multiprocessing.managers.SyncManager()
-    manager.start()
-    lock = manager.Lock()
-    counter = manager.Value('i', 0)
-    calls = [(_IncrementCounter, (lock, counter), {}),
-             (_RaiseValueError, (), {}),
-             (_IncrementCounter, (lock, counter), {})]
-    with self.assertRaises(errors.VmUtil.CalledProcessException):
-      vm_util.RunParallelProcesses(calls, max_concurrency=1)
-    self.assertEqual(counter.value, 2)
 
 
 class IssueCommandTestCase(unittest.TestCase):
