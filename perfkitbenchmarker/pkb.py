@@ -355,17 +355,17 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
       benchmark_name, sequence_number, total_benchmarks)
   log_context = log_util.GetThreadLogContext()
   with log_context.ExtendLabel(label_extension):
-    # Optional prerequisite checking.
-    check_prereqs = getattr(benchmark, 'CheckPrerequisites', None)
-    if check_prereqs:
-      try:
-        check_prereqs()
-      except:
-        logging.exception('Prerequisite check failed for %s', benchmark_name)
-        raise
 
     spec = _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid)
     with spec.RedirectGlobalFlags():
+      # Optional prerequisite checking.
+      check_prereqs = getattr(benchmark, 'CheckPrerequisites', None)
+      if check_prereqs:
+        try:
+          check_prereqs()
+        except:
+          logging.exception('Prerequisite check failed for %s', benchmark_name)
+          raise
       end_to_end_timer = timing_util.IntervalTimer()
       detailed_timer = timing_util.IntervalTimer()
       try:
