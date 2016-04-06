@@ -1131,7 +1131,7 @@ class JujuMixin(DebianMixin):
     """
     machines = []
     if vm_group:
-        """Deploy (and scale) this service to the machines in its vm group."""
+      """Deploy (and scale) this service to the machines in its vm group."""
 
       for unit in self.units:
         """Find all machines in this vm_group"""
