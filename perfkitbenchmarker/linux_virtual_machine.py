@@ -995,6 +995,8 @@ class JujuMixin(DebianMixin):
   """
   controller = None
 
+  vm_group = None
+
   units = []
 
   environments_yaml = """
@@ -1007,12 +1009,21 @@ class JujuMixin(DebianMixin):
   """
 
   def _Bootstrap(self):
+    """Bootstrap a Juju environment"""
     resp, _ = self.RemoteHostCommand("juju bootstrap")
 
-  def JujuAddMachine(self, ip):
-    resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" % ip)
+  def JujuAddMachine(self, unit):
+    """
+    Adds a manually-created virtual machine to Juju
+
+    Args:
+      unit: An object representing the unit's BaseVirtualMachine
+    """
+    resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" %
+                                     unit.internal_ip)
 
   def JujuConfigureEnvironment(self):
+    """Configure a bootstrapped Juju environment"""
     if self.isController:
       resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
 
@@ -1022,25 +1033,41 @@ class JujuMixin(DebianMixin):
         self.PushFile(tf.name, "~/.juju/environments.yaml")
 
   def JujuEnvironment(self):
+    """Get the name of the current environment"""
     output, _ = self.RemoteHostCommand('juju switch')
     return output.strip()
 
   def JujuRun(self, cmd):
+    """Run a command on the virtual machine
+
+    Args:
+      cmd: The command to run
+    """
     output, _ = self.RemoteHostCommand(cmd)
     return output.strip()
 
-  def JujuStatus(self):
+  def JujuStatus(self, pattern=''):
+    """Return the status of the Juju environment.
+
+    Args:
+      pattern: Optionally match machines/services with a pattern
     """
-    Return the status of the Juju environment.
-    """
-    output, _ = self.RemoteHostCommand('juju status --format=json')
+    output, _ = self.RemoteHostCommand('juju status %s --format=json' %
+                                       pattern)
     return output.strip()
 
   def JujuVersion(self):
+    """Return the Juju version"""
     output, _ = self.RemoteHostCommand('juju version')
     return output.strip()
 
   def JujuSet(self, service, params=[]):
+    """Set the configuration options on a deployed service.
+
+    Args:
+      service: The name of the service
+      params: A list of key=values pairs
+    """
     output, _ = self.RemoteHostCommand(
         'juju set %s %s' % (service, ' '.join(params)))
     return output.strip()
@@ -1049,6 +1076,10 @@ class JujuMixin(DebianMixin):
   def JujuWait(self):
     """
     Waits for all deployed services to be installed, configured, and idle.
+
+    Args:
+      poll_interval: How long to wait between checking the current status.
+      timeout: How long to wait for the environment to settle.
     """
     status = yaml.load(self.JujuStatus())
     for service in status['services']:
@@ -1078,13 +1109,59 @@ class JujuMixin(DebianMixin):
           raise errors.Juju.TimeoutException(
               'Service %s is not ready; workload-state is %s' % (service, ws))
 
+  def _FindUnit(self, ip):
+    """
+    Find the machine id assigned to a particular IP address
 
-  def JujuDeploy(self, charm, units=1):
-    resp, _ = self.RemoteHostCommand(
-        "juju deploy %s --num-units=%d" % (charm, units))
-    return True
+    Args:
+      ip: The IP address of the unit to find
+    """
+    status = yaml.load(self.JujuStatus(ip))
+    if 'machines' in status:
+      return status['machines'].keys()[0]
+    return None
+
+  def JujuDeploy(self, charm, units=1, vm_group=None):
+    """Deploy a charm in a Juju environment
+
+    Args:
+      charm: The charm to deploy, i.e., cs:trusty/ubuntu
+      units: Optional number of units to create.
+      vm_group: The name of vm_group the unit(s) should be deployed to.
+    """
+    machines = []
+    if vm_group:
+        """Deploy (and scale) this service to the machines in its vm group."""
+
+      for unit in self.units:
+        """Find all machines in this vm_group"""
+        if unit.vm_group == vm_group:
+          machines.append(self._FindUnit(unit.internal_ip))
+
+      # Deploy the first machine
+      resp, _ = self.RemoteHostCommand(
+          "juju deploy %s --to %s" % (charm, machines.pop()))
+
+      # Get the name of the service
+      service = charm[charm.rindex('/') + 1:]
+
+      # Deploy to the remaining machine(s)
+      for machine in machines:
+        resp, _ = self.RemoteHostCommand(
+            "juju add-unit %s --to %s" % (service, machine))
+    else:
+      # If the vm_group isn't specified,
+      # automatically assign to available machines
+      resp, _ = self.RemoteHostCommand(
+          "juju deploy %s --num-units=%d" % (charm, units))
 
   def JujuRelate(self, a, b):
+    """Create a relation between two services
+
+    Args:
+      a: The first service to relate.
+      b: The second service to relate.
+    """
     resp, _ = self.RemoteHostCommand(
         "juju add-relation %s %s" % (a, b))
 
@@ -1107,6 +1184,9 @@ class JujuMixin(DebianMixin):
     super(JujuMixin, self).SetupPackageManager()
 
   def PrepareVMEnvironment(self):
+    """
+    Install and configure a Juju environment.
+    """
     super(JujuMixin, self).PrepareVMEnvironment()
     if self.isController:
       self.InstallPackages('juju')
@@ -1120,4 +1200,4 @@ class JujuMixin(DebianMixin):
       # Install the Juju agent on the other VMs
       for unit in self.units:
         unit.controller = self
-        self.JujuAddMachine(unit.internal_ip)
+        self.JujuAddMachine(unit)
