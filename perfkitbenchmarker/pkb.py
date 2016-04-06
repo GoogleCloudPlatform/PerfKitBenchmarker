@@ -345,7 +345,6 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
       benchmark_name, sequence_number, total_benchmarks)
   log_context = log_util.GetThreadLogContext()
   with log_context.ExtendLabel(label_extension):
-
     spec = _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid)
     with spec.RedirectGlobalFlags():
       # Optional prerequisite checking.
