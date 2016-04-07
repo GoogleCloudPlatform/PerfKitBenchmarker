@@ -22,6 +22,7 @@ import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
 flags.DEFINE_string('cloudsuite_in_memory_analytics_dataset',
                     '/data/ml-latest-small',
@@ -68,32 +69,35 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
   master = benchmark_spec.vm_groups['master'][0]
   workers = benchmark_spec.vm_groups['workers']
 
-  for vm in vms:
+  def PrepareCommon(vm):
     if not _HasDocker(vm):
       vm.Install('docker')
     vm.RemoteCommand('sudo docker pull cloudsuite/spark')
     vm.RemoteCommand('sudo docker pull cloudsuite/movielens-dataset')
-
-  master.RemoteCommand('sudo docker pull cloudsuite/in-memory-analytics')
-
-  for vm in vms:
     vm.RemoteCommand('sudo docker create --name data '
                      'cloudsuite/movielens-dataset')
 
-  master_cmd = ('sudo docker run -d --net host -e SPARK_MASTER_IP=%s '
-                '--name spark-master cloudsuite/spark master' %
-                master.internal_ip)
-  master.RemoteCommand(master_cmd)
+  def PrepareMaster(vm):
+    PrepareCommon(vm)
+    vm.RemoteCommand('sudo docker pull cloudsuite/in-memory-analytics')
+    start_master_cmd = ('sudo docker run -d --net host -e SPARK_MASTER_IP=%s '
+                        '--name spark-master cloudsuite/spark master' %
+                        master.internal_ip)
+    vm.RemoteCommand(start_master_cmd)
 
-  worker_cmd = ('sudo docker run -d --net host --volumes-from data '
-                '--name spark-worker cloudsuite/spark worker '
-                'spark://%s:7077' % master.internal_ip)
-  for vm in workers:
-    vm.RemoteCommand(worker_cmd)
+  def PrepareWorker(vm):
+    PrepareCommon(vm)
+    start_worker_cmd = ('sudo docker run -d --net host --volumes-from data '
+                        '--name spark-worker cloudsuite/spark worker '
+                        'spark://%s:7077' % master.internal_ip)
+    vm.RemoteCommand(start_worker_cmd)
+
+  target_arg_tuples = ([(PrepareWorker, (vm,), {}) for vm in workers] +
+                       [(PrepareMaster, (master,), {})])
+  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
 def Run(benchmark_spec):
@@ -131,20 +135,25 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
   master = benchmark_spec.vm_groups['master'][0]
   workers = benchmark_spec.vm_groups['workers']
 
-  for vm in workers:
-    vm.RemoteCommand('sudo docker stop spark-worker')
-    vm.RemoteCommand('sudo docker rm spark-worker')
-
-  master.RemoteCommand('sudo docker stop spark-master')
-  master.RemoteCommand('sudo docker rm spark-master')
-
-  for vm in vms:
+  def CleanupCommon(vm):
     vm.RemoteCommand('sudo docker rm -v data')
     vm.RemoteCommand('sudo docker rmi cloudsuite/movielens-dataset')
     vm.RemoteCommand('sudo docker rmi cloudsuite/spark')
 
-  master.RemoteCommand('sudo docker rmi cloudsuite/in-memory-analytics')
+  def CleanupMaster(vm):
+    vm.RemoteCommand('sudo docker stop spark-master')
+    vm.RemoteCommand('sudo docker rm spark-master')
+    vm.RemoteCommand('sudo docker rmi cloudsuite/in-memory-analytics')
+    CleanupCommon(vm)
+
+  def CleanupWorker(vm):
+    vm.RemoteCommand('sudo docker stop spark-worker')
+    vm.RemoteCommand('sudo docker rm spark-worker')
+    CleanupCommon(vm)
+
+  target_arg_tuples = ([(CleanupWorker, (vm,), {}) for vm in workers] +
+                       [(CleanupMaster, (master,), {})])
+  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
