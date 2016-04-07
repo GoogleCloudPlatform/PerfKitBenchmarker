@@ -32,6 +32,7 @@ import logging
 import os
 import pipes
 import posixpath
+import re
 import subprocess
 
 from perfkitbenchmarker import configs
@@ -44,6 +45,10 @@ from perfkitbenchmarker.linux_packages import hbase
 from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
+
+HBASE_VERSION = re.match(r'(\d+\.\d+)\.?\d*', hbase.HBASE_VERSION).group(1)
+
+BIGTABLE_CLIENT_VERSION = '0.2.4'
 
 flags.DEFINE_string('google_bigtable_endpoint', 'bigtable.googleapis.com',
                     'Google API endpoint for Cloud Bigtable.')
@@ -58,8 +63,10 @@ flags.DEFINE_string('google_bigtable_cluster_name', None,
 flags.DEFINE_string(
     'google_bigtable_hbase_jar_url',
     'https://oss.sonatype.org/service/local/repositories/releases/content/'
-    'com/google/cloud/bigtable/bigtable-hbase-1.1/'
-    '0.2.4/bigtable-hbase-1.1-0.2.4.jar',
+    'com/google/cloud/bigtable/bigtable-hbase-{0}/'
+    '{1}/bigtable-hbase-{0}-{1}.jar'.format(
+        HBASE_VERSION,
+        BIGTABLE_CLIENT_VERSION),
     'URL for the Bigtable-HBase client JAR.')
 
 BENCHMARK_NAME = 'cloud_bigtable_ycsb'
@@ -72,7 +79,10 @@ cloud_bigtable_ycsb:
     default:
       vm_spec: *default_single_core
       vm_count: null
-"""
+  flags:
+    gcloud_scopes: >
+      https://www.googleapis.com/auth/bigtable.admin
+      https://www.googleapis.com/auth/bigtable.data"""
 
 TCNATIVE_BORINGSSL_URL = (
     'http://search.maven.org/remotecontent?filepath='
@@ -196,6 +206,7 @@ def _Install(vm):
       'project': FLAGS.project or _GetDefaultProject(),
       'cluster': FLAGS.google_bigtable_cluster_name,
       'zone': FLAGS.google_bigtable_zone_name,
+      'hbase_version': HBASE_VERSION.replace('.', '_')
   }
 
   for file_name in HBASE_CONF_FILES:
