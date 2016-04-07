@@ -1022,9 +1022,11 @@ class JujuMixin(DebianMixin):
     """
     resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" %
                                      unit.internal_ip)
+
     # We don't know what the machine's going to be used for yet,
     # but track it's placement for easier access later.
-    machine_id = resp[resp.rindex(' '):].strip()
+    # We're looking for the output: created machine %d
+    machine_id = _[_.rindex(' '):].strip()
     self.machines[machine_id] = unit
 
   def JujuConfigureEnvironment(self):
