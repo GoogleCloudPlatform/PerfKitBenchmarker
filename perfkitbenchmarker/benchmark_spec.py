@@ -27,7 +27,6 @@ import uuid
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
@@ -113,7 +112,7 @@ class BenchmarkSpec(object):
     are redirected to a copy that has been merged with config-provided flag
     overrides specific to this benchmark run.
     """
-    with flag_util.FlagDictSubstitution(FLAGS, lambda: self.config.flags):
+    with self.config.RedirectFlags(FLAGS):
       yield
 
   def _CheckBenchmarkSupport(self, cloud):
