@@ -997,6 +997,7 @@ class JujuMixin(DebianMixin):
 
   vm_group = None
 
+  machines = {}
   units = []
 
   environments_yaml = """
@@ -1021,6 +1022,10 @@ class JujuMixin(DebianMixin):
     """
     resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" %
                                      unit.internal_ip)
+    # We don't know what the machine's going to be used for yet,
+    # but track it's placement for easier access later.
+    machine_id = resp[resp.rindex(' '):].strip()
+    self.machines[machine_id] = unit
 
   def JujuConfigureEnvironment(self):
     """Configure a bootstrapped Juju environment"""
@@ -1109,51 +1114,32 @@ class JujuMixin(DebianMixin):
           raise errors.Juju.TimeoutException(
               'Service %s is not ready; workload-state is %s' % (service, ws))
 
-  def _FindUnit(self, ip):
-    """
-    Find the machine id assigned to a particular IP address
-
-    Args:
-      ip: The IP address of the unit to find
-    """
-    status = yaml.load(self.JujuStatus(ip))
-    if 'machines' in status:
-      return status['machines'].keys()[0]
-    return None
-
-  def JujuDeploy(self, charm, units=1, vm_group=None):
-    """Deploy a charm in a Juju environment
+  def JujuDeploy(self, charm, vm_group, units=1):
+    """Deploy (and scale) this service to the machines in its vm group.
 
     Args:
       charm: The charm to deploy, i.e., cs:trusty/ubuntu
       units: Optional number of units to create.
       vm_group: The name of vm_group the unit(s) should be deployed to.
     """
+
+    # Find the already-deployed machines belonging to this vm_group
     machines = []
-    if vm_group:
-      """Deploy (and scale) this service to the machines in its vm group."""
+    for machine_id, unit in self.machines.iteritems():
+      if unit.vm_group == vm_group:
+        machines.append(machine_id)
 
-      for unit in self.units:
-        """Find all machines in this vm_group"""
-        if unit.vm_group == vm_group:
-          machines.append(self._FindUnit(unit.internal_ip))
+    # Deploy the first machine
+    resp, _ = self.RemoteHostCommand(
+        "juju deploy %s --to %s" % (charm, machines.pop()))
 
-      # Deploy the first machine
+    # Get the name of the service
+    service = charm[charm.rindex('/') + 1:]
+
+    # Deploy to the remaining machine(s)
+    for machine in machines:
       resp, _ = self.RemoteHostCommand(
-          "juju deploy %s --to %s" % (charm, machines.pop()))
-
-      # Get the name of the service
-      service = charm[charm.rindex('/') + 1:]
-
-      # Deploy to the remaining machine(s)
-      for machine in machines:
-        resp, _ = self.RemoteHostCommand(
-            "juju add-unit %s --to %s" % (service, machine))
-    else:
-      # If the vm_group isn't specified,
-      # automatically assign to available machines
-      resp, _ = self.RemoteHostCommand(
-          "juju deploy %s --num-units=%d" % (charm, units))
+          "juju add-unit %s --to %s" % (service, machine))
 
   def JujuRelate(self, a, b):
     """Create a relation between two services
