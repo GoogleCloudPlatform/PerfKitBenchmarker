@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,26 +23,26 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
-flags.DEFINE_string('ima_dataset',
+flags.DEFINE_string('cloudsuite_in_memory_analytics_dataset',
                     '/data/ml-latest-small',
                     'Dataset to use for training.')
-flags.DEFINE_string('ima_ratings_file',
+flags.DEFINE_string('cloudsuite_in_memory_analytics_ratings_file',
                     '/data/myratings.csv',
                     'Ratings file to give the recommendation for.')
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'cloudsuite_inmemory_analytics'
+BENCHMARK_NAME = 'cloudsuite_in_memory_analytics'
 BENCHMARK_CONFIG = """
-cloudsuite_inmemory_analytics:
+cloudsuite_in_memory_analytics:
   description: >
     Run Cloudsuite in-memory analytics benchmark. Specify the number of worker
     VMs with --num_vms.
   vm_groups:
     master:
       vm_spec: *default_single_core
+      vm_count: 1
     workers:
       vm_spec: *default_single_core
-      vm_count: 1
 """
 
 
@@ -57,10 +57,7 @@ def _HasDocker(vm):
   resp, _ = vm.RemoteCommand('command -v docker',
                              ignore_failure=True,
                              suppress_warning=True)
-  if resp.rstrip() == "":
-    return False
-  else:
-    return True
+  return bool(resp.rstrip())
 
 
 def Prepare(benchmark_spec):
@@ -115,8 +112,8 @@ def Run(benchmark_spec):
   benchmark_cmd = ('sudo docker run --rm --net host --volumes-from data '
                    'cloudsuite/in-memory-analytics %s %s '
                    '--master spark://%s:7077' %
-                   (FLAGS.ima_dataset,
-                    FLAGS.ima_ratings_file,
+                   (FLAGS.cloudsuite_in_memory_analytics_dataset,
+                    FLAGS.cloudsuite_in_memory_analytics_ratings_file,
                     master.internal_ip))
   stdout, _ = master.RemoteCommand(benchmark_cmd, should_log=True)
 
