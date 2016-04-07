@@ -98,11 +98,12 @@ def JujuInstall(vm):
   if vm.isController is True:
     if vm.vm_group_specs and 'workers' in vm.vm_group_specs:
       vm.JujuDeploy('cs:trusty/cassandra',
-                    vm.vm_group_specs['workers'].vm_count,
-                    'workers')
+                    'workers',
+                    vm.vm_group_specs['workers'].vm_count)
       vm.JujuSet('cassandra', ['authenticator=AllowAllAuthenticator'])
       vm.JujuDeploy('cs:~marcoceppi/trusty/cassandra-stress',
-                    vm_group='client')
+                    'client',
+                    vm.vm_group_specs['client'].vm_count)
       vm.JujuRelate('cassandra', 'cassandra-stress')
 
       # This will wait for the cassandra cluster and cassandra-stress vms
