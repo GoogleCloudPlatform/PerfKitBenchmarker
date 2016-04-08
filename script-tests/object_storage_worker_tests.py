@@ -15,28 +15,55 @@
 """Tests for the object_storage_service benchmark worker process."""
 
 import itertools
+import random
 import unittest
+
+import mock
 
 import object_storage_api_tests
 
 
 class TestSizeDistributionIterator(unittest.TestCase):
   def testPointDistribution(self):
-    dist = {}
-    dist[10] = 100.0
+    dist = {10: 100.0}
 
     iter = object_storage_api_tests.SizeDistributionIterator(dist)
 
-    lst = list(itertools.islice(iter, 5))
+    values = list(itertools.islice(iter, 5))
 
-    self.assertEqual(lst, [10, 10, 10, 10, 10])
+    self.assertEqual(values, [10, 10, 10, 10, 10])
+
+  def testTwoElementDistribution(self):
+    dist = {1: 50.0, 10: 50.0}
+    iter = object_storage_api_tests.SizeDistributionIterator(dist)
+
+    with mock.patch(random.__name__ + '.random') as rand:
+      rand.side_effect = [0.2, 0.7, 0.2]
+      values = list(itertools.islice(iter, 3))
+      self.assertTrue(values == [1, 10, 1])
+
+  def testNonTerminatingBinaryPercent(self):
+    # 20/100 = 1/5 does not terminate in binary
+    dist = {1: 20.0, 10: 80.0}
+    iter = object_storage_api_tests.SizeDistributionIterator(dist)
+
+    with mock.patch(random.__name__ + '.random') as rand:
+      rand.side_effect = [0.1, 0.9]
+      values = list(itertools.islice(iter, 2))
+
+      self.assertTrue(values == [1, 10])
 
 
 class TestMaxSizeInDistribution(unittest.TestCase):
   def testPointDistribution(self):
-    dist = {}
+    dist = {10: 100.0}
     dist[10] = 100.0
 
+    self.assertEqual(object_storage_api_tests.MaxSizeInDistribution(dist),
+                     10)
+
+  def testTwoElementDistribution(self):
+    dist = {1: 50.0, 10: 50.0}
     self.assertEqual(object_storage_api_tests.MaxSizeInDistribution(dist),
                      10)
 

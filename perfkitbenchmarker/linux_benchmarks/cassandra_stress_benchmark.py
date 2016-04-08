@@ -310,13 +310,15 @@ def Prepare(benchmark_spec):
   """
   vm_dict = benchmark_spec.vm_groups
   cassandra_vms = vm_dict[CASSANDRA_GROUP]
+  client_vms = vm_dict[CLIENT_GROUP]
   logging.info('VM dictionary %s', vm_dict)
 
   logging.info('Authorizing loader[0] permission to access all other vms.')
-  vm_dict[CLIENT_GROUP][0].AuthenticateVm()
+  client_vms[0].AuthenticateVm()
 
   logging.info('Preparing data files and Java on all vms.')
-  vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
+  vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), cassandra_vms)
+  vm_util.RunThreaded(lambda vm: vm.Install('cassandra_stress'), client_vms)
   seed_vm = cassandra_vms[0]
   configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
   vm_util.RunThreaded(configure, cassandra_vms)
@@ -324,7 +326,7 @@ def Prepare(benchmark_spec):
   cassandra.StartCluster(seed_vm, cassandra_vms[1:])
 
   if FLAGS.cassandra_stress_command == USER_COMMAND:
-    for vm in vm_dict[CLIENT_GROUP]:
+    for vm in client_vms:
       vm.PushFile(FLAGS.cassandra_stress_profile,
                   TEMP_PROFILE_PATH)
   metadata = GenerateMetadataFromFlags(benchmark_spec)

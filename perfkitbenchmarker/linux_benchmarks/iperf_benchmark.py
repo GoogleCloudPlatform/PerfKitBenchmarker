@@ -74,9 +74,8 @@ def Prepare(benchmark_spec):
     vm.Install('iperf')
     if vm_util.ShouldRunOnExternalIpAddress():
       vm.AllowPort(IPERF_PORT)
-    vm.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
-                     IPERF_PORT)
-    stdout, _ = vm.RemoteCommand('pgrep -n iperf')
+    stdout, _ = vm.RemoteCommand(('nohup iperf --server --port %s &> /dev/null'
+                                  '& echo $!') % IPERF_PORT)
     # TODO store this in a better place once we have a better place
     vm.iperf_server_pid = stdout.strip()
 
@@ -193,4 +192,4 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   for vm in vms:
-    vm.RemoteCommand('kill -9 ' + vm.iperf_server_pid)
+    vm.RemoteCommand('kill -9 ' + vm.iperf_server_pid, ignore_failure=True)

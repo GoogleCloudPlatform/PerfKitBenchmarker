@@ -195,11 +195,16 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     """Returns the number of logical CPUs on the VM.
 
     This method does not cache results (unlike "num_cpus").
+
+    Returns:
+      int. Number of logical CPUs.
     """
     stdout, _ = self.RemoteCommand(
         'Get-WmiObject -class Win32_processor | '
-        'select -exp NumberOfLogicalProcessors')
-    return int(stdout)
+        'Select-Object -ExpandProperty NumberOfLogicalProcessors')
+    # In the case that there are multiple Win32_processor instances, the result
+    # of this command can be a string like '4  4  '.
+    return sum(int(i) for i in stdout.split())
 
   def _GetTotalMemoryKb(self):
     """Returns the amount of physical memory on the VM in Kilobytes.

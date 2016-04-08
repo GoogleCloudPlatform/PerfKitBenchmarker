@@ -17,6 +17,7 @@ See perfkitbenchmarker/configs/__init__.py for more information about
 configuration files.
 """
 
+import contextlib
 import copy
 import os
 
@@ -333,6 +334,17 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     decoders = decoders.copy()
     self.flags = decoders.pop('flags').Decode(config.pop('flags', None),
                                               component_full_name, flag_values)
-    with flag_util.FlagDictSubstitution(flag_values, lambda: self.flags):
+    with self.RedirectFlags(flag_values):
       super(BenchmarkConfigSpec, self)._DecodeAndInit(
           component_full_name, config, decoders, flag_values)
+
+  @contextlib.contextmanager
+  def RedirectFlags(self, flag_values):
+    """Redirects flag reads and writes to the benchmark-specific flags object.
+
+    Args:
+      flag_values: flags.FlagValues object. Within the enclosed code block,
+          reads and writes to this object are redirected to self.flags.
+    """
+    with flag_util.FlagDictSubstitution(flag_values, lambda: self.flags):
+      yield

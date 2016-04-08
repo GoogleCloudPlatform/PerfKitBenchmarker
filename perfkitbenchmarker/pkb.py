@@ -75,6 +75,7 @@ from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import requirements
+from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import traces
@@ -84,12 +85,6 @@ from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.publisher import SampleCollector
 
-STAGE_ALL = 'all'
-STAGE_PROVISION = 'provision'
-STAGE_PREPARE = 'prepare'
-STAGE_RUN = 'run'
-STAGE_CLEANUP = 'cleanup'
-STAGE_TEARDOWN = 'teardown'
 LOG_FILE_NAME = 'pkb.log'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
@@ -135,11 +130,6 @@ flags.DEFINE_enum(
 flags.DEFINE_enum(
     'file_log_level', log_util.DEBUG, [log_util.DEBUG, log_util.INFO],
     'Anything logged at this level or higher will be written to the log file.')
-flags.DEFINE_enum(
-    'run_stage', STAGE_ALL,
-    [STAGE_ALL, STAGE_PROVISION, STAGE_PREPARE,
-     STAGE_RUN, STAGE_CLEANUP, STAGE_TEARDOWN],
-    'The stage of perfkitbenchmarker to run. By default it runs all stages.')
 flags.DEFINE_integer('duration_in_seconds', None,
                      'duration of benchmarks. '
                      '(only valid for mesh_benchmark)')
@@ -317,7 +307,7 @@ def _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid):
   Returns:
     The created or loaded BenchmarkSpec.
   """
-  if FLAGS.run_stage in (STAGE_ALL, STAGE_PROVISION):
+  if stages.PROVISION in FLAGS.run_stage:
     return benchmark_spec.BenchmarkSpec(benchmark_config, benchmark_name,
                                         benchmark_uid)
   else:
@@ -325,7 +315,7 @@ def _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid):
       return benchmark_spec.BenchmarkSpec.GetSpecFromFile(benchmark_uid,
                                                           benchmark_config)
     except IOError:
-      if FLAGS.run_stage == STAGE_PREPARE:
+      if FLAGS.run_stage == [stages.PREPARE]:
         logging.error(
             'We were unable to load the BenchmarkSpec. This may be related '
             'to two additional run stages which have recently been added. '
@@ -355,42 +345,43 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
       benchmark_name, sequence_number, total_benchmarks)
   log_context = log_util.GetThreadLogContext()
   with log_context.ExtendLabel(label_extension):
-    # Optional prerequisite checking.
-    check_prereqs = getattr(benchmark, 'CheckPrerequisites', None)
-    if check_prereqs:
-      try:
-        check_prereqs()
-      except:
-        logging.exception('Prerequisite check failed for %s', benchmark_name)
-        raise
 
     spec = _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid)
     with spec.RedirectGlobalFlags():
+      # Optional prerequisite checking.
+      check_prereqs = getattr(benchmark, 'CheckPrerequisites', None)
+      if check_prereqs:
+        try:
+          check_prereqs()
+        except:
+          logging.exception('Prerequisite check failed for %s', benchmark_name)
+          raise
       end_to_end_timer = timing_util.IntervalTimer()
       detailed_timer = timing_util.IntervalTimer()
       try:
         with end_to_end_timer.Measure('End to End'):
-          if FLAGS.run_stage in (STAGE_ALL, STAGE_PROVISION):
+          if stages.PROVISION in FLAGS.run_stage:
             DoProvisionPhase(benchmark_name, spec, detailed_timer)
 
-          if FLAGS.run_stage in (STAGE_ALL, STAGE_PREPARE):
+          if stages.PREPARE in FLAGS.run_stage:
             DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
 
-          if FLAGS.run_stage in (STAGE_ALL, STAGE_RUN):
+          if stages.RUN in FLAGS.run_stage:
             DoRunPhase(benchmark, benchmark_name, spec, collector,
                        detailed_timer)
 
-          if FLAGS.run_stage in (STAGE_ALL, STAGE_CLEANUP):
+          if stages.CLEANUP in FLAGS.run_stage:
             DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
 
-          if FLAGS.run_stage in (STAGE_ALL, STAGE_TEARDOWN):
+          if stages.TEARDOWN in FLAGS.run_stage:
             DoTeardownPhase(benchmark_name, spec, detailed_timer)
 
         # Add samples for any timed interval that was measured.
         include_end_to_end = timing_util.EndToEndRuntimeMeasurementEnabled()
         include_runtimes = timing_util.RuntimeMeasurementsEnabled()
         include_timestamps = timing_util.TimestampMeasurementsEnabled()
-        if FLAGS.run_stage == STAGE_ALL:
+        if FLAGS.run_stage == stages.STAGES:
+          # Ran all stages.
           collector.AddSamples(
               end_to_end_timer.GenerateSamples(
                   include_runtime=include_end_to_end or include_runtimes,
@@ -406,16 +397,14 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
         logging.exception('Error during benchmark %s', benchmark_name)
         # If the particular benchmark requests us to always call cleanup, do it
         # here.
-        if (FLAGS.run_stage in [STAGE_ALL, STAGE_CLEANUP] and spec and
-            spec.always_call_cleanup):
+        if stages.CLEANUP in FLAGS.run_stage and spec.always_call_cleanup:
           DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
         raise
       finally:
-        if spec:
-          if FLAGS.run_stage in (STAGE_ALL, STAGE_TEARDOWN):
-            spec.Delete()
-          # Pickle spec to save final resource state.
-          spec.PickleSpec()
+        if stages.TEARDOWN in FLAGS.run_stage:
+          spec.Delete()
+        # Pickle spec to save final resource state.
+        spec.PickleSpec()
 
 
 def _LogCommandLineFlags():
@@ -444,19 +433,20 @@ def SetUpPKB():
           'Could not find required executable "%s"', executable)
 
   if FLAGS.run_uri is None:
-    if FLAGS.run_stage not in [STAGE_ALL, STAGE_PROVISION]:
+    if stages.PROVISION in FLAGS.run_stage:
+      FLAGS.run_uri = str(uuid.uuid4())[-8:]
+    else:
       # Attempt to get the last modified run directory.
       run_uri = vm_util.GetLastRunUri()
       if run_uri:
         FLAGS.run_uri = run_uri
         logging.warning(
-            'No run_uri specified. Attempting to run "%s" with --run_uri=%s.',
-            FLAGS.run_stage, FLAGS.run_uri)
+            'No run_uri specified. Attempting to run the following stages with '
+            '--run_uri=%s: %s', FLAGS.run_uri, ', '.join(FLAGS.run_stage))
       else:
         raise errors.Setup.NoRunURIError(
-            'No run_uri specified. Could not run "%s"', FLAGS.run_stage)
-    else:
-      FLAGS.run_uri = str(uuid.uuid4())[-8:]
+            'No run_uri specified. Could not run the following stages: %s' %
+            ', '.join(FLAGS.run_stage))
   elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
     raise errors.Setup.BadRunURIError('run_uri must be alphanumeric and less '
                                       'than or equal to 8 characters in '
@@ -549,7 +539,7 @@ def RunBenchmarks(publish=True):
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
 
-  if FLAGS.run_stage not in [STAGE_ALL, STAGE_TEARDOWN]:
+  if stages.TEARDOWN not in FLAGS.run_stage:
     logging.info(
         'To run again with this setup, please use --run_uri=%s', FLAGS.run_uri)
 

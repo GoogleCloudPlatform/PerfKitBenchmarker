@@ -1,3 +1,57 @@
+# 1.4.0
+
+New features:
+
+* openstack: Add support for optional floating ip pool (thanks @meteorfox, GH-861)
+* openstack: Use Keystone session for handling authentication (thanks @meteorfox, GH-870) 
+* Support object storage classes in object storage service benchmarks (GH-895)
+* Add Object Size Distributions in object storage service benchmarks (GH-888)
+* Add MultiStreamThroughput benchmark to object storage benchmarks (GH-840)
+* Adds a SPEC SFS 2014 benchmark which runs against GlusterFS (GH-876)
+* gce_virtual_machine: Support user provided instance metadata (GH-859)
+
+Improvements and fixes:
+
+* openstack: Wait until VM deletion has been completed (thanks @meteorfox, GH-904)
+* openstack: Fix floating IP allocation and deallocation (thanks @meteorfox, GH-862)
+* rackspace: Fix missing flags bug (thanks @meteorfox, GH-903)
+* Allow user to specify a flag when they run object storage benchmark on GCP, and default that flag to the latest known working version. (GH-925)
+* Update mechanism used to get iperf server process id. (GH-921)
+* Rename variables and improve documentation of BaseOsMixin.PullFile. (GH-923)
+* Fix WindowsMixin._GetNumCpus when more than one Win32_processor exists. (GH-920)
+* Add exception types to except clauses. (GH-893)
+* Add Flag for List Consistency Iterations (GH-889)
+* Add unit tests for scripts (GH-882)
+* Add disk type examples to README.md (GH-871)
+* Copy-edit the README (GH-877)
+* Turn off selinux for mongodb. (thanks @akrzos, GH-867)
+* Use temp files for Popen stdout and stderr in IssueCommand. (GH-878)
+
+# 1.3.0
+
+External contributions:
+* Add RHEL based virtual machines to OpenStack provider. (thanks @akrzos;
+  GH-858)
+* Change rackspace provider information to use official CLI (thanks @meteorfox; GH-844)
+* Add rackspace requirements (thanks @meteorfox; GH-805)
+
+New features:
+* Support flags in YAML format. (GH-857)
+* Check version of required packages at runtime (GH-834)
+* User-specified multiregion for GCS benchmarking (GH-845)
+* Support metadata for gcp instances (GH-859)
+
+Bugfixes and maintenance updates:
+* Change rackspace's AllowPort to enable UDP (thanks @meteorfox; GH-805)
+* Allow most recent verison gcs-oauth2-boto-plugin (GH-849)
+* Require Pint >= 0.7 (GH-850)
+* Update PIP (GH-842)
+* Fix windows log message (GH-832)
+* Properly Pickle Pint Quantities (GH-830)
+* os_type added to boot benchmark metadata (GH-826)
+* Better handle Azure timeouts (GH-825)
+* Better handling of AWS integration tests. (GH-869, GH-868)
+
 # 1.2.0
 
 New features:

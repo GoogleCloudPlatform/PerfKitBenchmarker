@@ -263,7 +263,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_cmd.flags['name'] = self.name
     create_cmd.flags['keypair'] = self.name
     create_cmd.flags['flavor-id'] = self.machine_type
-    if FLAGS.boot_from_cbs_volume:
+    if FLAGS.rackspace_boot_from_cbs_volume:
       blk_flag = RenderBlockDeviceTemplate(self.image, REMOTE_BOOT_DISK_SIZE_GB)
       create_cmd.flags['block-device'] = blk_flag
     else:

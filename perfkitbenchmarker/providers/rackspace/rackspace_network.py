@@ -301,13 +301,12 @@ class RackspaceFirewall(network.BaseFirewall):
     self._lock = threading.Lock()  # Guards security-group creation/deletion
     self.firewall_rules = {}
 
-
   def AllowPort(self, vm, port, to_port=None, source_range=None):
-    if FLAGS.use_security_group:
-      # At Rackspace all ports are open by default
-      # TODO(meteorfox) Implement security groups support
+    # At Rackspace all ports are open by default
+    # TODO(meteorfox) Implement security groups support
+    if FLAGS.rackspace_use_security_group:
       raise NotImplementedError()
 
   def DisallowAllPorts(self):
-    if FLAGS.use_security_group:
+    if FLAGS.rackspace_use_security_group:
       raise NotImplementedError()

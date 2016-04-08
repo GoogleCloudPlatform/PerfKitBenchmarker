@@ -20,8 +20,7 @@ with an HBase-compatible API.
 Compared to hbase_ycsb, this benchmark:
   * Modifies hbase-site.xml to work with Cloud Bigtable.
   * Adds the Bigtable client JAR.
-  * Adds alpn-boot-7.0.0.v20140317.jar to the bootclasspath, required to
-    operate.
+  * Adds netty-tcnative-boringssl, used for communication with Bigtable.
 
 This benchmark requires a Cloud Bigtable cluster to be provisioned before
 running.
@@ -33,6 +32,7 @@ import logging
 import os
 import pipes
 import posixpath
+import re
 import subprocess
 
 from perfkitbenchmarker import configs
@@ -46,6 +46,10 @@ from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
 
+HBASE_VERSION = re.match(r'(\d+\.\d+)\.?\d*', hbase.HBASE_VERSION).group(1)
+
+BIGTABLE_CLIENT_VERSION = '0.2.4'
+
 flags.DEFINE_string('google_bigtable_endpoint', 'bigtable.googleapis.com',
                     'Google API endpoint for Cloud Bigtable.')
 flags.DEFINE_string('google_bigtable_admin_endpoint',
@@ -57,15 +61,12 @@ flags.DEFINE_string('google_bigtable_zone_name', 'us-central1-b',
 flags.DEFINE_string('google_bigtable_cluster_name', None,
                     'Bigtable cluster name.')
 flags.DEFINE_string(
-    'google_bigtable_alpn_jar_url',
-    'http://central.maven.org/maven2/org/mortbay/jetty/alpn/'
-    'alpn-boot/7.1.3.v20150130/alpn-boot-7.1.3.v20150130.jar',
-    'URL for the ALPN boot JAR, required for HTTP2')
-flags.DEFINE_string(
     'google_bigtable_hbase_jar_url',
     'https://oss.sonatype.org/service/local/repositories/releases/content/'
-    'com/google/cloud/bigtable/bigtable-hbase-1.0/'
-    '0.2.1/bigtable-hbase-1.0-0.2.1.jar',
+    'com/google/cloud/bigtable/bigtable-hbase-{0}/'
+    '{1}/bigtable-hbase-{0}-{1}.jar'.format(
+        HBASE_VERSION,
+        BIGTABLE_CLIENT_VERSION),
     'URL for the Bigtable-HBase client JAR.')
 
 BENCHMARK_NAME = 'cloud_bigtable_ycsb'
@@ -78,8 +79,16 @@ cloud_bigtable_ycsb:
     default:
       vm_spec: *default_single_core
       vm_count: null
-"""
+  flags:
+    gcloud_scopes: >
+      https://www.googleapis.com/auth/bigtable.admin
+      https://www.googleapis.com/auth/bigtable.data"""
 
+TCNATIVE_BORINGSSL_URL = (
+    'http://search.maven.org/remotecontent?filepath='
+    'io/netty/netty-tcnative-boringssl-static/'
+    '1.1.33.Fork13/'
+    'netty-tcnative-boringssl-static-1.1.33.Fork13-linux-x86_64.jar')
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
 YCSB_HBASE_LIB = posixpath.join(ycsb.YCSB_DIR, 'hbase-binding', 'lib')
@@ -122,13 +131,6 @@ def CheckPrerequisites():
                                    FLAGS.google_bigtable_zone_name,
                                    FLAGS.google_bigtable_cluster_name)
   logging.info('Found cluster: %s', cluster)
-
-
-def _GetALPNLocalPath():
-  bn = os.path.basename(FLAGS.google_bigtable_alpn_jar_url)
-  if not bn.endswith('.jar'):
-    bn = 'alpn.jar'
-  return posixpath.join(vm_util.VM_TMP_DIR, bn)
 
 
 def _GetClusterDescription(project, zone, cluster_name):
@@ -189,19 +191,14 @@ def _Install(vm):
   vm.Install('curl')
 
   hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
-  for url in [FLAGS.google_bigtable_hbase_jar_url]:
+  for url in [FLAGS.google_bigtable_hbase_jar_url, TCNATIVE_BORINGSSL_URL]:
     jar_name = os.path.basename(url)
     jar_path = posixpath.join(YCSB_HBASE_LIB, jar_name)
     vm.RemoteCommand('curl -Lo {0} {1}'.format(jar_path, url))
     vm.RemoteCommand('cp {0} {1}'.format(jar_path, hbase_lib))
 
-  vm.RemoteCommand('curl -Lo {0} {1}'.format(
-      _GetALPNLocalPath(),
-      FLAGS.google_bigtable_alpn_jar_url))
-  vm.RemoteCommand(('echo "export JAVA_HOME=/usr\n'
-                    'export HBASE_OPTS=-Xbootclasspath/p:{0}"'
-                    ' >> {1}/hbase-env.sh').format(_GetALPNLocalPath(),
-                                                   hbase.HBASE_CONF_DIR))
+  vm.RemoteCommand('echo "export JAVA_HOME=/usr" >> {0}/hbase-env.sh'.format(
+      hbase.HBASE_CONF_DIR))
 
   context = {
       'google_bigtable_endpoint': FLAGS.google_bigtable_endpoint,
@@ -209,6 +206,7 @@ def _Install(vm):
       'project': FLAGS.project or _GetDefaultProject(),
       'cluster': FLAGS.google_bigtable_cluster_name,
       'zone': FLAGS.google_bigtable_zone_name,
+      'hbase_version': HBASE_VERSION.replace('.', '_')
   }
 
   for file_name in HBASE_CONF_FILES:
@@ -252,10 +250,9 @@ def Run(benchmark_spec):
 
   table_name = _GetTableName()
 
-  # Add hbase conf dir to the classpath, ALPN to the bootclasspath.
+  # Add hbase conf dir to the classpath.
   ycsb_memory = ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
-  jvm_args = pipes.quote('-Xmx{0}m -Xbootclasspath/p:{1}'.format(
-      ycsb_memory, _GetALPNLocalPath()))
+  jvm_args = pipes.quote(' -Xmx{0}m'.format(ycsb_memory))
 
   executor_flags = {'cp': hbase.HBASE_CONF_DIR,
                     'jvm-args': jvm_args,
