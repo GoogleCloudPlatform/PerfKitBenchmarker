@@ -77,10 +77,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.boot_volume_id = None
     self.server_group_id = None
     self.floating_ip = None
-    self._CheckCanaryCommand()
-    self.firewall = os_network.OpenStackFirewall.GetFirewall()
-    self.public_network = os_network.OpenStackFloatingIPPool(
-        self.floating_ip_pool_name)
+    self.firewall = None
+    self.public_network = None
 
   @property
   def group_id(self):
@@ -90,6 +88,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _CreateDependencies(self):
     """Validate and Create dependencies prior creating the VM."""
     self._CheckPrerequisites()
+    self.firewall = os_network.OpenStackFirewall.GetFirewall()
+    self.public_network = os_network.OpenStackFloatingIPPool(
+        self.floating_ip_pool_name)
     self._UploadSSHPublicKey()
     self.firewall.AllowICMP(self)  # Allowing ICMP traffic (i.e. ping)
     self.AllowRemoteAccessPorts()
@@ -135,10 +136,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     return resp is not None
 
   def _CheckCanaryCommand(self):
-    if self.command_works:  # fast path before locking
-        return
-    if self._lock:
-      if self.command_works:
+    if OpenStackVirtualMachine.command_works:  # fast path
+      return
+    with self._lock:
+      if OpenStackVirtualMachine.command_works:
         return
       logging.info('Testing OpenStack CLI command is installed and working')
       cmd = os_utils.OpenStackCLICommand(self, 'image', 'list')
@@ -147,10 +148,11 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Config.InvalidValue(
             'OpenStack CLI test command failed. Please make sure the OpenStack '
             'CLI client is installed and properly configured')
-      self.command_works = True
+      OpenStackVirtualMachine.command_works = True
 
   def _CheckPrerequisites(self):
     """Checks prerequisites are met otherwise aborts execution."""
+    self._CheckCanaryCommand()
     if self.zone in self.validated_resources_set:
       return  # No need to check again
     with self._lock:
