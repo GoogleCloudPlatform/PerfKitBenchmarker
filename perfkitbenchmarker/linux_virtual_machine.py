@@ -1164,7 +1164,8 @@ class JujuMixin(DebianMixin):
           package.JujuInstall(self.controller, self.vm_group)
           self.controller._installed_packages.add(package_name)
     except AttributeError as e:
-      logging.warn("Failed to install package %s, falling back to Apt (%s)" % (package_name, e))
+      logging.warn("Failed to install package %s, falling back to Apt (%s)"
+                   % (package_name, e))
       if package_name not in self._installed_packages:
         package.AptInstall(self)
         self._installed_packages.add(package_name)
