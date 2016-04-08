@@ -196,41 +196,17 @@ $ gcloud auth login
 
 For help, see [`gcloud` docs](https://cloud.google.com/sdk/gcloud/).
 
-### Install OpenStack Nova client and setup authentication
+### Install OpenStack CLI client and setup authentication
 Make sure you have installed pip (see the section above).
 
-Install `python-novaclient` via the following command:
+Install OpenStack CLI utilities via the following command:
 
 ```bash
 $ sudo pip install -r perfkitbenchmarker/providers/openstack/requirements.txt
 ```
 
-You must specify authentication information for test execution, including user
-name (``--openstack_username` flag or `OS_USERNAME` environment variable), tenant name
-(`--openstack_tenant` flag or `OS_TENANT_NAME` environment variable), and
-authentication URL (`--openstack_auth_url` flag or `OS_AUTH_URL` environment
-variable).
-
-The password cannot be set through a flag. You can specify it through the
-`OS_PASSWORD` environment variable, or alternatively you can save it in a file
-and specify the file location with the `--openstack_password_file` flag or
-`OPENSTACK_PASSWORD_FILE` environment variable.
-
-Example using environment variables:
-
-```bash
-export OS_USERNAME=admin
-export OS_TENANT=myproject
-export OS_AUTH_URL=http://localhost:5000
-export OS_PASSWORD=<password>
-```
-
-Example using a password file at the default file location:
-
-```bash
-$ echo topsecretpassword > ~/.config/openstack-password.txt
-$ ./pkb.py --cloud=OpenStack --benchmarks=ping
-```
+To setup credentials and endpoint information simply set the environment
+variables using an OpenStack RC file. For help, see [`OpenStack` docs](http://docs.openstack.org/cli-reference/common/cli_set_environment_variables_using_openstack_rc.html)
 
 ### Kubernetes configuration and credentials
 Perfkit uses the `kubectl` binary in order to communicate with a Kubernetes cluster - you need to pass the path to the `kubectl` binary using the `--kubectl` flag. It's recommended to use [version 1.0.1](https://storage.googleapis.com/kubernetes-release/release/v1.0.1/bin/linux/amd64/kubectl).
@@ -612,7 +588,8 @@ $ ./pkb.py --cloud=DigitalOcean --machine_type=16gb --benchmarks=iperf
 ## Example run on OpenStack
 
 ```bash
-$ ./pkb.py --cloud=OpenStack --benchmarks=iperf --os_auth_url=http://localhost:5000/v2.0/
+$ ./pkb.py --cloud=OpenStack --machine_type=m1.medium \
+           --openstack_network=private --benchmarks=iperf
 ```
 
 ## Example run on Kubernetes
