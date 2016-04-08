@@ -38,7 +38,6 @@ from perfkitbenchmarker.providers.openstack import utils as os_utils
 RHEL_IMAGE = 'rhel-7.2'
 UBUNTU_IMAGE = 'ubuntu-14.04'
 NONE = 'None'
-REMOTE_BOOT_DISK_SIZE_GB = 50
 
 FLAGS = flags.FLAGS
 
@@ -98,8 +97,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Create(self):
     """Creates an OpenStack VM instance and waits until it is ACTIVE."""
     if FLAGS.openstack_boot_from_volume:
-      self._CreateBootableVolume()
-      self._WaitForVolumeCreation()
+      vol_name = '%s_volume' % self.name
+      disk_resp = os_disk.CreateVolume(self, vol_name, self.image)
+      self.boot_volume_id = disk_resp['id']
+      os_disk.WaitForVolumeCreation(self, self.boot_volume_id)
     self._CreateInstance()
 
   @vm_util.Retry(max_retries=4, poll_interval=2)
@@ -115,7 +116,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.server_group_id:
       self._DeleteServerGroup()
     if self.boot_volume_id:
-      self._DeleteBootableVolume()
+      os_disk.DeleteVolume(self, self.boot_volume_id)
+      self.boot_volume_id = None
 
   def _DeleteDependencies(self):
     """Delete dependencies that were needed for the VM after the VM has been
@@ -247,54 +249,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       if self.zone in self.uploaded_keypair_set:
         self.uploaded_keypair_set.remove(self.zone)
 
-  def _CreateBootableVolume(self):
-    """Creates bootable volume from image"""
-    vol_name = '%s_volume' % self.name
-    vol_cmd = os_utils.OpenStackCLICommand(self, 'volume', 'create', vol_name)
-    vol_cmd.flags['image'] = self.image
-    vol_cmd.flags['size'] = self._GetImageMinDiskSize()
-    stdout, _, _ = vol_cmd.Issue()
-    vol_resp = json.loads(stdout)
-    self.boot_volume_id = vol_resp['id']
-
-  def _DeleteBootableVolume(self):
-    """Deletes bootable volume."""
-    vol_cmd = os_utils.OpenStackCLICommand(self, 'volume', 'delete',
-                                           self.boot_volume_id)
-    del vol_cmd.flags['format']  # volume delete does not support json output
-    vol_cmd.Issue()
-    self.boot_volume_id = None
-
-  def _GetImageMinDiskSize(self):
-    """Returns minimum disk size required by the image."""
-    image_cmd = os_utils.OpenStackCLICommand(
-        self, 'image', 'show', self.image)
-    stdout, _, _ = image_cmd.Issue()
-    image_resp = json.loads(stdout)
-    if FLAGS.openstack_volume_size:
-      volume_size = FLAGS.openstack_volume_size
-    else:
-      volume_size = max(
-          (int(image_resp['min_disk']), REMOTE_BOOT_DISK_SIZE_GB,))
-    return volume_size
-
-  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
-                 retryable_exceptions=errors.Resource.RetryableCreationError)
-  def _WaitForVolumeCreation(self):
-    """Waits until boot volume is available"""
-    vol_cmd = os_utils.OpenStackCLICommand(self, 'volume', 'show',
-                                           self.boot_volume_id)
-    stdout, stderr, _ = vol_cmd.Issue()
-    if stderr:
-      msg = ('An error occurred while trying to create boot volume for %s.'
-             % self.name)
-      raise errors.Error(msg)
-    resp = json.loads(stdout)
-    if resp['status'] != 'available':
-      msg = ('Boot volume for %s is not ready. Retrying to check status.'
-             % self.name)
-      raise errors.Resource.RetryableCreationError(msg)
-
   def _CreateInstance(self):
     """Execute command for creating an OpenStack VM instance."""
     create_cmd = self._GetCreateCommand()
@@ -391,7 +345,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     return floating_ip
 
   def CreateScratchDisk(self, disk_spec):
-    disks_names = ('%s-data-%d-%d'
+    disks_names = ('%s_data_%d_%d'
                    % (self.name, len(self.scratch_disks), i)
                    for i in range(disk_spec.num_striped_disks))
     disks = [os_disk.OpenStackDisk(disk_spec, name, self.zone)
