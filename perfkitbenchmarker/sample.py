@@ -25,7 +25,8 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
 
   Args:
     numbers: The set of numbers to compute percentiles for.
-    percentiles: If given, a list of percentiles to compute.
+    percentiles: If given, a list of percentiles to compute. Can be
+      floats, ints or longs.
 
   Returns:
     A dictionary of percentiles.
@@ -35,10 +36,12 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
   total = sum(numbers_sorted)
   result = {}
   for percentile in percentiles:
+    if percentile < 0.0 or percentile > 100.0:
+      raise ValueError('Invalid percentile %s' % percentile)
+
     percentile_string = 'p%s' % str(percentile)
     index = int(count * float(percentile) / 100.0)
-    if index == count:
-      index = count - 1
+    index = min(index, count - 1)  # Correction to handle 100th percentile.
     result[percentile_string] = numbers_sorted[index]
 
   if count > 0:
