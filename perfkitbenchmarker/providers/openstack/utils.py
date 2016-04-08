@@ -33,8 +33,12 @@ def ParseNovaTable(output, regex_pattern, key_names):
   stdout_lines = output.split('\n')
   groups = (regex_pattern.match(line) for line in stdout_lines)
   tuples = (g.groups() for g in groups if g)
-  next(tuples)  # Skip table header
-  dict_list = [dict(zip(key_names, t)) for t in tuples]
+  dict_list = []
+  try:
+    next(tuples)  # Skip table header
+    dict_list = [dict(zip(key_names, t)) for t in tuples]
+  except StopIteration:
+    pass  # Empty list
   return dict_list
 
 
