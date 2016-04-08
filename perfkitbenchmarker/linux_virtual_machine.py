@@ -1000,6 +1000,8 @@ class JujuMixin(DebianMixin):
   machines = {}
   units = []
 
+  installation_lock = threading.Lock()
+
   environments_yaml = """
   default: perfkit
 
@@ -1155,14 +1157,17 @@ class JujuMixin(DebianMixin):
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
-    if package_name not in self._installed_packages:
-      package = linux_packages.PACKAGES[package_name]
-      try:
-        package.JujuInstall(self)
-      except AttributeError:
+    package = linux_packages.PACKAGES[package_name]
+    try:
+      with self.controller.installation_lock: # Make sure another unit doesn't try to install the charm at the same time
+        if package_name not in self.controller._installed_packages:
+          package.JujuInstall(self.controller, self.vm_group)
+          self.controller._installed_packages.add(package_name)
+    except AttributeError as e:
+      logging.warn("Failed to install package %s, falling back to Apt (%s)" % (package_name, e))
+      if package_name not in self._installed_packages:
         package.AptInstall(self)
-
-      self._installed_packages.add(package_name)
+        self._installed_packages.add(package_name)
 
   def SetupPackageManager(self):
     if self.isController:
