@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import copy_reg
 import gflags as flags  # NOQA
 import gflags_validators as flags_validators  # NOQA
@@ -39,3 +40,13 @@ def _UnPickleQuantity(inp):
 
 
 copy_reg.pickle(UNIT_REGISTRY.Quantity, _PickleQuantity)
+
+
+# The following monkey-patch has been submitted to upstream Pint as
+# pull request 357. TODO: once that PR is merged, get rid of this
+# workaround.
+def unit_deepcopy(self, memo):
+  ret = self.__class__(copy.deepcopy(self._units))
+  return ret
+
+UNIT_REGISTRY.Unit.__deepcopy__ = unit_deepcopy

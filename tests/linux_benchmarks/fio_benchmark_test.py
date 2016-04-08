@@ -18,6 +18,7 @@ import unittest
 
 import mock
 
+import perfkitbenchmarker
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import fio_benchmark
 
@@ -62,7 +63,7 @@ size=100%
             self.filename,
             ['sequential_read'],
             [1, 2],
-            None),
+            None, None),
         expected_jobfile)
 
   def testMultipleScenarios(self):
@@ -103,8 +104,16 @@ size=100%
             self.filename,
             ['sequential_read', 'sequential_write'],
             [1],
-            None),
+            None, None),
         expected_jobfile)
+
+  def testCustomBlocksize(self):
+    job_file = fio_benchmark.GenerateJobFileString(
+        self.filename,
+        ['sequential_read'],
+        [1], None, perfkitbenchmarker.UNIT_REGISTRY.megabyte * 2)
+
+    self.assertIn('blocksize=2000000B', job_file)
 
 
 class TestProcessedJobFileString(unittest.TestCase):
