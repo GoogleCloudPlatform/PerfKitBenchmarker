@@ -284,7 +284,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Waits until boot volume is available"""
     vol_cmd = os_utils.OpenStackCLICommand(self, 'volume', 'show',
                                            self.boot_volume_id)
-    vol_cmd.flags['availability-zone'] = self.zone
     stdout, stderr, _ = vol_cmd.Issue()
     if stderr:
       msg = ('An error occurred while trying to create boot volume for %s.'
