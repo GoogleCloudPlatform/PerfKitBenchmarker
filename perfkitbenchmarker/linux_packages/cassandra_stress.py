@@ -19,7 +19,12 @@ cassandra-stress documentation:
 https://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStress_t.html
 """
 
+import posixpath
+
 from perfkitbenchmarker.linux_packages import cassandra
+from perfkitbenchmarker import vm_util
+
+CASSANDRA_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'cassandra')
 
 
 def YumInstall(vm):
@@ -30,3 +35,23 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs cassandra-stress on the VM."""
   cassandra.AptInstall(vm)
+
+
+def JujuInstall(vm, vm_group_name):
+  if vm.isController is True:
+    if vm.vm_group_specs and vm_group_name in vm.vm_group_specs:
+      vm.JujuDeploy('cs:~marcoceppi/trusty/cassandra-stress',
+                    vm_group_name,
+                    vm.vm_group_specs[vm_group_name].vm_count)
+      # The assumption is that cassandra-stress will always be installed
+      # alongside cassandra
+      vm.JujuRelate('cassandra', 'cassandra-stress')
+
+      # Wait for the cassandra-stress to install and configure
+      vm.JujuWait()
+
+      for unit in vm.units:
+        # Make sure the cassandra/conf dir is created, since we're skipping
+        # the manual installation to /tmp/pkb.
+        remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
+        unit.RemoteCommand('mkdir -p %s' % remote_path)

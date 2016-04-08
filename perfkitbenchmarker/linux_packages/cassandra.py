@@ -94,26 +94,22 @@ def AptInstall(vm):
   _Install(vm)
 
 
-def JujuInstall(vm):
+def JujuInstall(vm, vm_group_name):
   if vm.isController is True:
-    if vm.vm_group_specs and 'workers' in vm.vm_group_specs:
+    if vm.vm_group_specs and vm_group_name in vm.vm_group_specs:
       vm.JujuDeploy('cs:trusty/cassandra',
-                    'workers',
-                    vm.vm_group_specs['workers'].vm_count)
+                    vm_group_name,
+                    vm.vm_group_specs[vm_group_name].vm_count)
       vm.JujuSet('cassandra', ['authenticator=AllowAllAuthenticator'])
-      vm.JujuDeploy('cs:~marcoceppi/trusty/cassandra-stress',
-                    'client',
-                    vm.vm_group_specs['client'].vm_count)
-      vm.JujuRelate('cassandra', 'cassandra-stress')
 
-      # This will wait for the cassandra cluster and cassandra-stress vms
-      # to fully deploy and be ready for benchmarking
+      # Wait for cassandra to be installed and configured
       vm.JujuWait()
 
-  # Make sure the cassandra/conf dir is created, since we're skipping
-  # the manual installation to /tmp/pkb.
-  remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
-  vm.RemoteCommand('mkdir -p %s' % remote_path)
+      for unit in vm.units:
+        # Make sure the cassandra/conf dir is created, since we're skipping
+        # the manual installation to /tmp/pkb.
+        remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
+        unit.RemoteCommand('mkdir -p %s' % remote_path)
 
 
 def Configure(vm, seed_vms):
