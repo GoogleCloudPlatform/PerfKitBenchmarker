@@ -1159,7 +1159,9 @@ class JujuMixin(DebianMixin):
     """Installs a PerfKit package on the VM."""
     package = linux_packages.PACKAGES[package_name]
     try:
-      with self.controller.installation_lock: # Make sure another unit doesn't try to install the charm at the same time
+      # Make sure another unit doesn't try
+      # to install the charm at the same time
+      with self.controller.installation_lock:
         if package_name not in self.controller._installed_packages:
           package.JujuInstall(self.controller, self.vm_group)
           self.controller._installed_packages.add(package_name)
