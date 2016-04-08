@@ -24,25 +24,42 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-PROPERTY_VALUE_ROW_REGEX = r'\|\s+(:?\S+\s\S+|\S+)\s+\|\s+(.*?)\s+\|.*\|$'
-PROP_VAL_PATTERN = re.compile(PROPERTY_VALUE_ROW_REGEX)
+FIVE_COLUMNS_ROW_REGEX = (r'\|\s+(\S+)\s+\|\s+(\S+)\s+\|\s+(\S+)\s+'
+                          r'\|\s+(\S+)\s+\|\s+(\S+)\s+\|')
+FIVE_COLUMNS_PATTERN = re.compile(FIVE_COLUMNS_ROW_REGEX)
+
+
+def ParseNovaTable(output, regex_pattern, key_names):
+  stdout_lines = output.split('\n')
+  groups = (regex_pattern.match(line) for line in stdout_lines)
+  tuples = (g.groups() for g in groups if g)
+  next(tuples)  # Skip table header
+  dict_list = [dict(zip(key_names, t)) for t in tuples]
+  return dict_list
 
 
 def ParseServerGroupTable(output):
   """Returns a dict with key/values returned from a Nova CLI formatted table.
 
   Returns:
-    dict with key/value of the server-group. Keys are 'id' and 'name'.
+    dict with key/value of the server-group.
   """
-  stdout_lines = output.split('\n')
-  groups = (PROP_VAL_PATTERN.match(line) for line in stdout_lines)
-  tuples = (g.groups() for g in groups if g)
-  filtered_tuples = [(key, val) for (key, val) in tuples
-                     if key and key not in ('', 'Id',)]
-  assert len(filtered_tuples) == 1, 'Server group is not unique.'
-  server_group_id, server_group_name = filtered_tuples[0]
-  d = {'id': server_group_id, 'name': server_group_name}
-  return d
+  keys = ('id', 'name', 'policies', 'members', 'metadata',)
+  server_group_list = ParseNovaTable(output, FIVE_COLUMNS_PATTERN, keys)
+  assert len(server_group_list) == 1, 'Server group is not unique.'
+  return server_group_list[0]
+
+
+def ParseFloatingIPTable(output):
+  """Returns a list of dicts with floating IPs."""
+  keys = ('id', 'ip', 'instance_id', 'fixed_ip', 'pool',)
+  floating_ip_list = ParseNovaTable(output, FIVE_COLUMNS_PATTERN, keys)
+  for floating_ip in floating_ip_list:
+    if floating_ip['instance_id'] == '-':
+      floating_ip['instance_id'] = None
+    if floating_ip['fixed_ip'] == '-':
+      floating_ip['fixed_ip'] = None
+  return floating_ip_list
 
 
 class OpenStackCLICommand(object):

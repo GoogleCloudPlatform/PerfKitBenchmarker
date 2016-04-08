@@ -112,19 +112,26 @@ class OpenStackFloatingIPPool(object):
   def __init__(self, pool_name):
     self.ip_pool_name = pool_name
 
-  def get_or_create(self, vm):
+  def associate(self, vm):
     with self._floating_ip_lock:
-      cmd = utils.OpenStackCLICommand(vm, 'ip', 'floating', 'list')
-      stdout, stderr, _ = cmd.Issue()
-      floating_ip_dict_list = json.loads(stdout)
-      for flip_dict in floating_ip_dict_list:
-        if flip_dict['Pool'] == self.ip_pool_name and flip_dict['ID'] is None:
-          d = {}
-          for k, v in flip_dict.iteritems():
-            new_key = k.lower.replace(' ', '_')  # Transforms keys
-            d[new_key] = v
-          return d
-      return self._allocate(vm)
+      floating_ip = self._get_or_create(vm)
+      cmd = utils.OpenStackCLICommand(vm, 'ip', 'floating', 'add',
+                                      floating_ip['ip'], vm.id)
+      del cmd.flags['format']  # Command does not support json output format
+      _, stderr, _ = cmd.Issue()
+      if stderr:
+        raise errors.Error(stderr)
+      return floating_ip
+
+  def _get_or_create(self, vm):
+    list_cmd = [FLAGS.openstack_nova_path, 'floating-ip-list']
+    stdout, stderr, _ = vm_util.IssueCommand(list_cmd)
+    floating_ip_dict_list = utils.ParseFloatingIPTable(stdout)
+    for flip_dict in floating_ip_dict_list:
+      if (flip_dict['pool'] == self.ip_pool_name and
+              flip_dict['instance_id'] is None):
+        return flip_dict
+    return self._allocate(vm)
 
   def _allocate(self, vm):
     cmd = utils.OpenStackCLICommand(vm, 'ip', 'floating', 'create',
@@ -150,7 +157,8 @@ class OpenStackFloatingIPPool(object):
       delete_cmd = [FLAGS.openstack_neutron_path,
                     'floatingip-delete', updated_flip_dict['id'],
                     '--format', 'json']
-      stdout, stderr, _ = vm_util.IssueCommand(delete_cmd)
+      stdout, stderr, _ = vm_util.IssueCommand(delete_cmd,
+                                               suppress_warning=True)
 
   def is_attached(self, floating_ip_dict):
     with self._floating_ip_lock:

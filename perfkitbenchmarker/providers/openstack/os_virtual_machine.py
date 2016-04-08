@@ -385,11 +385,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         return ip
 
   def _AllocateFloatingIP(self):
-    floating_ip = self.public_network.get_or_create(self)
-    cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'add',
-                                       floating_ip['ip'], self.id)
-    del cmd.flags['format']  # Command does not support json output format
-    stdout, stderr, _ = cmd.Issue()
+    floating_ip = self.public_network.associate(self)
     logging.info('floating-ip associated: {}'.format(floating_ip['ip']))
     return floating_ip
 
