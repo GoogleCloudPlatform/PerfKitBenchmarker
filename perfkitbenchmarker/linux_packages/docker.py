@@ -38,3 +38,11 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the docker package on the VM."""
   vm.RemoteHostCommand('curl -sSL https://get.docker.com/ | sh')
+
+
+def IsInstalled(vm):
+  """Checks whether docker is installed on the VM."""
+  resp, _ = vm.RemoteCommand('command -v docker',
+                             ignore_failure=True,
+                             suppress_warning=True)
+  return bool(resp.rstrip())
