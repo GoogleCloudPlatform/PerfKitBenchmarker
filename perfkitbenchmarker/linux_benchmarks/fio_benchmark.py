@@ -127,8 +127,8 @@ flags.DEFINE_integer('fio_run_for_minutes', 10,
                      lower_bound=0)
 flag_util.DEFINE_units('fio_blocksize', None,
                        'The block size for fio operations. Default is given by '
-                       'the scenario when using --generate_scenarios and the '
-                       'job file when using --fio_jobfile.',
+                       'the scenario when using --generate_scenarios. This '
+                       'flag does not apply when using --fio_jobfile.',
                        convertible_to=perfkitbenchmarker.UNIT_REGISTRY.byte)
 
 

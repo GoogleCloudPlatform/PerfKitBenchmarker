@@ -43,8 +43,8 @@ copy_reg.pickle(UNIT_REGISTRY.Quantity, _PickleQuantity)
 
 
 # The following monkey-patch has been submitted to upstream Pint as
-# pull request 357. TODO: once that PR is merged, get rid of this
-# workaround.
+# pull request 357.
+# TODO: once that PR is merged, get rid of this workaround.
 def unit_deepcopy(self, memo):
   ret = self.__class__(copy.deepcopy(self._units))
   return ret

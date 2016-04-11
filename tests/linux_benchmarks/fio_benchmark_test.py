@@ -108,12 +108,19 @@ size=100%
         expected_jobfile)
 
   def testCustomBlocksize(self):
+    orig_blocksize = fio_benchmark.SCENARIOS['sequential_write']['blocksize']
+
     job_file = fio_benchmark.GenerateJobFileString(
         self.filename,
         ['sequential_read'],
         [1], None, perfkitbenchmarker.UNIT_REGISTRY.megabyte * 2)
 
     self.assertIn('blocksize=2000000B', job_file)
+
+    # Test that generating a job file doesn't modify the global
+    # SCENARIOS variable.
+    self.assertEqual(fio_benchmark.SCENARIOS['sequential_write']['blocksize'],
+                     orig_blocksize)
 
 
 class TestProcessedJobFileString(unittest.TestCase):
