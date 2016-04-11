@@ -138,6 +138,11 @@ class OpenStackDisk(disk.BaseDisk):
       raise errors.Error(stderr)
     resp = json.loads(stdout)
     attachments = resp['attachments']
+    self.device_path = self._GetDeviceFromAttachment(attachments)
+    msg = 'Remote volume %s has been attached to %s.' % (self.name, vm.name)
+    logging.info(msg)
+
+  def _GetDeviceFromAttachment(self, attachments):
     device = None
     for attachment in attachments:
       if attachment['volume_id'] == self.id:
@@ -145,9 +150,7 @@ class OpenStackDisk(disk.BaseDisk):
     if not device:
       msg = '%s is not yet attached. Retrying to check status.' % self.name
       raise errors.Resource.RetryableCreationError(msg)
-    self.device_path = device
-    msg = 'Remote volume %s has been attached to %s.' % (self.name, vm.name)
-    logging.info(msg)
+    return device
 
   def _DetachVolume(self):
     if self.id is None:

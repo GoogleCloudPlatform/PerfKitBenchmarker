@@ -200,6 +200,26 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                '--openstack_network and --openstack_floating_ip_pool flags.')
         raise errors.Error(msg)
 
+    self._CheckNetworkExists()
+
+    if self.floating_ip_pool_name:
+      self._CheckFloatingIPNetworkExists()
+
+  def _CheckFloatingIPNetworkExists(self):
+    cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'pool', 'list')
+    stdout, stderr, _ = cmd.Issue()
+    resp = json.loads(stdout)
+    for flip_pool in resp:
+      if flip_pool['Name'] == self.floating_ip_pool_name:
+        break
+    else:
+      msg = ' '.join(('Floating IP pool %s could not be found.'
+                      % self.floating_ip_pool_name,
+                      'For valid floating IP pools run',
+                      '"openstack ip floating pool list".',))
+      raise errors.Config.InvalidValue(msg)
+
+  def _CheckNetworkExists(self):
     cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',
                                        self.network_name)
     stdout, stderr, _ = cmd.Issue()
@@ -208,20 +228,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                       'For valid network IDs/names',
                       'run "openstack network list".',))
       raise errors.Config.InvalidValue(msg)
-
-    if self.floating_ip_pool_name:
-      cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'pool', 'list')
-      stdout, stderr, _ = cmd.Issue()
-      resp = json.loads(stdout)
-      for flip_pool in resp:
-        if flip_pool['Name'] == self.floating_ip_pool_name:
-          break
-      else:
-        msg = ' '.join(('Floating IP pool %s could not be found.'
-                        % self.floating_ip_pool_name,
-                        'For valid floating IP pools run',
-                        '"openstack ip floating pool list".',))
-        raise errors.Config.InvalidValue(msg)
 
   def _UploadSSHPublicKey(self):
     """Uploads SSH public key to the VM's region."""
