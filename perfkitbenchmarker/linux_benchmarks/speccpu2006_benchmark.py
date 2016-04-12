@@ -12,120 +12,301 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs SpecCPU2006.
+"""Runs SPEC CPU2006.
 
-From SpecCPU2006's documentation:
-The SPEC CPU2006 benchmark is SPEC's industry-standardized, CPU-intensive
-benchmark suite, stressing a system's processor, memory subsystem and compiler.
+From the SPEC CPU2006 documentation:
+"The SPEC CPU 2006 benchmark is SPEC's next-generation, industry-standardized,
+CPU-intensive benchmark suite, stressing a system's processor, memory subsystem
+and compiler."
 
-SpecCPU2006 homepage: http://www.spec.org/cpu2006/
+SPEC CPU2006 homepage: http://www.spec.org/cpu2006/
 """
 
+import itertools
 import logging
+import os
 import posixpath
 import re
+import tarfile
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import stages
+from perfkitbenchmarker.configs import benchmark_config_spec
+
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('benchmark_subset', 'int', ['int', 'fp', 'all'],
-                  'specify a subset of benchmarks to run: int, fp, all')
-
-flags.DEFINE_string('runspec_config', 'linux64-x64-gcc47.cfg',
-                    'name of the cpu2006 configuration to use (runspec --config'
-                    ' argument)')
-
-flags.DEFINE_integer('runspec_iterations', 3,
-                     'number of benchmark iterations to execute - default 3 '
-                     '(runspec --iterations argument)')
-
-flags.DEFINE_string('runspec_define', '',
-                    'optional comma separated list of preprocessor macros: '
-                    'SYMBOL[=VALUE] - e.g. numa,smt,sse=SSE4.2 (runspec '
-                    '--define arguments)')
-
-flags.DEFINE_boolean('runspec_enable_32bit', default=False,
-                     help='setting this flag will result in installation of '
-                     'multilib packages to enable use of 32-bit cpu2006 '
-                     'binaries (useful when running on memory constrained '
-                     'instance types where 64-bit execution may be problematic '
-                     ' - i.e. < 1.5-2GB/core)')
-
-flags.DEFINE_boolean('runspec_keep_partial_results', False,
-                     'speccpu will report an aggregate score even if some of '
-                     'the component tests failed with a "NR" status. If this '
-                     'flag is set to true, save the available results and '
-                     'mark metadata with partial=true. If unset, partial '
-                     'failures are treated as errors.')
+flags.DEFINE_enum(
+    'benchmark_subset', 'int', ['int', 'fp', 'all'],
+    'Used by the PKB speccpu2006 benchmark. Specifies a subset of SPEC CPU2006 '
+    'benchmarks to run.')
+flags.DEFINE_string(
+    'runspec_config', 'linux64-x64-gcc47.cfg',
+    'Used by the PKB speccpu2006 benchmark. Name of the cfg file to use as the '
+    'SPEC CPU2006 config file provided to the runspec binary via its --config '
+    'flag. If the benchmark is run using the cpu2006-1.2.iso file, then the '
+    'cfg file must be placed in the local PKB data directory and will be '
+    'copied to the remote machine prior to executing runspec. See README.md '
+    'for instructions if running with a repackaged cpu2006v1.2.tgz file.')
+flags.DEFINE_integer(
+    'runspec_iterations', 3,
+    'Used by the PKB speccpu2006 benchmark. The number of benchmark iterations '
+    'to execute, provided to the runspec binary via its --iterations flag.')
+flags.DEFINE_string(
+    'runspec_define', '',
+    'Used by the PKB speccpu2006 benchmark. Optional comma-separated list of '
+    'SYMBOL[=VALUE] preprocessor macros provided to the runspec binary via '
+    'repeated --define flags. Example: numa,smt,sse=SSE4.2')
+flags.DEFINE_boolean(
+    'runspec_enable_32bit', False,
+    'Used by the PKB speccpu2006 benchmark. If set, multilib packages will be '
+    'installed on the remote machine to enable use of 32-bit SPEC CPU2006 '
+    'binaries. This may be useful when running on memory-constrained instance '
+    'types (i.e. less than 2 GiB memory/core), where 64-bit execution may be '
+    'problematic.')
+flags.DEFINE_boolean(
+    'runspec_keep_partial_results', False,
+    'Used by the PKB speccpu2006 benchmark. If set, the benchmark will report '
+    'an aggregate score even if some of the SPEC CPU2006 component tests '
+    'failed with status "NR". Available results will be saved, and PKB samples '
+    'will be marked with a metadata value of partial=true. If unset, partial '
+    'failures are treated as errors.')
 
 BENCHMARK_NAME = 'speccpu2006'
 BENCHMARK_CONFIG = """
 speccpu2006:
-  description: Run Spec CPU2006
+  description: Runs SPEC CPU2006
   vm_groups:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
 """
 
-SPECCPU2006_TAR = 'cpu2006v1.2.tgz'
-SPECCPU2006_DIR = 'cpu2006'
+_BENCHMARK_SPECIFIC_VM_STATE_ATTR = 'speccpu2006_vm_state'
+_MOUNT_DIR = 'cpu2006_mnt'
+_SPECCPU2006_DIR = 'cpu2006'
+_SPECCPU2006_ISO = 'cpu2006-1.2.iso'
+_SPECCPU2006_TAR = 'cpu2006v1.2.tgz'
+_TAR_REQUIRED_MEMBERS = 'cpu2006', 'cpu2006/bin/runspec'
 
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites():
-  """Verifies that the required resources are present.
+class SpecCpu2006ConfigSpec(benchmark_config_spec.BenchmarkConfigSpec):
+
+  def __init__(self, *args, **kwargs):
+    super(SpecCpu2006ConfigSpec, self).__init__(*args, **kwargs)
+    with self.RedirectFlags(FLAGS):
+      try:
+        # Peeking into the tar file is slow. If running in stages, it's
+        # reasonable to do this only once and assume that the contents of the
+        # tar file will not change between stages.
+        _CheckTarFile(FLAGS.runspec_config,
+                      examine_members=stages.PROVISION in FLAGS.run_stage)
+      except data.ResourceNotFound:
+        _CheckIsoAndCfgFile(FLAGS.runspec_config)
+
+
+BENCHMARK_CONFIG_SPEC_CLASS = SpecCpu2006ConfigSpec
+
+
+def _CheckTarFile(runspec_config, examine_members):
+  """Searches for the tar file and performs preliminary checks on its format.
+
+  Args:
+    runspec_config: string. User-specified name of the config file that is
+        expected to be in the tar file.
+    examine_members: boolean. If True, this function will examine the tar file's
+        members to verify that certain required members are present.
 
   Raises:
-    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+    data.ResourcePath: If the tar file cannot be found.
+    errors.Benchmarks.PrepareException: If the tar file does not contain a
+        required member.
+    errors.Config.InvalidValue: If the tar file is found, and runspec_config is
+        not a valid file name.
   """
-  data.ResourcePath(SPECCPU2006_TAR)
+  tar_file_path = data.ResourcePath(_SPECCPU2006_TAR)
+  logging.info('Found tar file at %s. Skipping search for %s.', tar_file_path,
+               _SPECCPU2006_ISO)
+  if posixpath.basename(runspec_config) != runspec_config:
+    raise errors.Config.InvalidValue(
+        'Invalid runspec_config value: {0}{1}When running speccpu2006 with a '
+        'tar file, runspec_config cannot specify a file in a sub-directory. '
+        'See README.md for information about running speccpu2006 with a tar '
+        'file.'.format(runspec_config, os.linesep))
+  if not examine_members:
+    return
+
+  with tarfile.open(tar_file_path, 'r') as tf:
+    members = tf.getnames()
+  cfg_member = 'cpu2006/config/{0}'.format(runspec_config)
+  required_members = itertools.chain(_TAR_REQUIRED_MEMBERS, [cfg_member])
+  for member in required_members:
+    if member not in members:
+      raise errors.Benchmarks.PrepareException(
+          '{0} was not found within {1}. See README.md for information about '
+          'the expected format of the tar file.'.format(member, tar_file_path))
+
+
+def _CheckIsoAndCfgFile(runspec_config):
+  """Searches for the iso file and cfg file.
+
+  Args:
+    runspec_config: string. Name of the config file to provide to runspec.
+
+  Raises:
+    data.ResourcePath: If one of the required files could not be found.
+  """
+  # Search for the iso.
+  try:
+    data.ResourcePath(_SPECCPU2006_ISO)
+  except data.ResourceNotFound:
+    logging.error(
+        '%(iso)s not found. To run the speccpu2006 benchmark, %(iso)s must be '
+        'in the perfkitbenchmarker/data directory (or one of the specified '
+        'data directories if the --data_search_paths flag is used). Visit '
+        'https://www.spec.org/cpu2006/ to learn more about purchasing %(iso)s.',
+        {'iso': _SPECCPU2006_ISO})
+    raise
+
+  # Search for the cfg.
+  try:
+    data.ResourcePath(runspec_config)
+  except data.ResourceNotFound:
+    logging.error(
+        '%s not found. To run the speccpu2006 benchmark, the config file '
+        'specified by the --runspec_config flag must be in the '
+        'perfkitbenchmarker/data directory (or one of the specified data '
+        'directories if the --data_search_paths flag is used). Visit '
+        'https://www.spec.org/cpu2006/docs/runspec.html#about_config to learn '
+        'more about config files.', runspec_config)
+    raise
+
+
+class _SpecCpu2006SpecificState(object):
+  """State specific to this benchmark that must be preserved between PKB stages.
+
+  An instance of this class is attached to the VM as an attribute and is
+  therefore preserved as part of the pickled BenchmarkSpec between PKB stages.
+
+  Each attribute represents a possible file or directory that may be created on
+  the remote machine as part of running the benchmark.
+
+  Attributes:
+    cfg_file_path: Optional string. Path of the cfg file on the remote machine.
+    iso_file_path: Optional string. Path of the iso file on the remote machine.
+    mount_dir: Optional string. Path where the iso file is mounted on the
+        remote machine.
+    spec_dir: Optional string. Path of a created directory on the remote machine
+        where the SPEC files are stored.
+    tar_file_path: Optional string. Path of the tar file on the remote machine.
+  """
+  def __init__(self):
+    self.cfg_file_path = None
+    self.iso_file_path = None
+    self.mount_dir = None
+    self.spec_dir = None
+    self.tar_file_path = None
 
 
 def Prepare(benchmark_spec):
-  """Install SpecCPU2006 on the target vm.
+  """Installs SPEC CPU2006 on the target vm.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
-  logging.info('prepare SpecCPU2006 on %s', vm)
+  vm = benchmark_spec.vms[0]
+  speccpu_vm_state = _SpecCpu2006SpecificState()
+  setattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR, speccpu_vm_state)
   vm.Install('wget')
   vm.Install('build_tools')
   vm.Install('fortran')
-  if (FLAGS.runspec_enable_32bit):
+  if FLAGS.runspec_enable_32bit:
     vm.Install('multilib')
   vm.Install('numactl')
+  scratch_dir = vm.GetScratchDir()
+  vm.RemoteCommand('chmod 777 {0}'.format(scratch_dir))
+  speccpu_vm_state.spec_dir = posixpath.join(scratch_dir, _SPECCPU2006_DIR)
   try:
-    local_tar_file_path = data.ResourcePath(SPECCPU2006_TAR)
-  except data.ResourceNotFound as e:
-    logging.error('Please provide %s under perfkitbenchmarker/data directory '
-                  'before running SpecCPU2006 benchmark.', SPECCPU2006_TAR)
-    raise errors.Benchmarks.PrepareException(str(e))
-  vm.tar_file_path = posixpath.join(vm.GetScratchDir(), SPECCPU2006_TAR)
-  vm.spec_dir = posixpath.join(vm.GetScratchDir(), SPECCPU2006_DIR)
-  vm.RemoteCommand('chmod 777 %s' % vm.GetScratchDir())
-  vm.PushFile(local_tar_file_path, vm.GetScratchDir())
-  vm.RemoteCommand('cd %s && tar xvfz %s' % (vm.GetScratchDir(),
-                                             SPECCPU2006_TAR))
+    _PrepareWithTarFile(vm, speccpu_vm_state)
+  except data.ResourceNotFound:
+    _PrepareWithIsoFile(vm, speccpu_vm_state)
 
 
-def ExtractScore(stdout, vm, keep_partial_results):
-  """Exact the Spec (int|fp) score from stdout.
+def _PrepareWithTarFile(vm, speccpu_vm_state):
+  """Prepares the VM to run using the tar file.
+
+  Args:
+    vm: BaseVirtualMachine. Recipient of the tar file.
+    speccpu_vm_state: _SpecCpu2006SpecificState. Modified by this function to
+        reflect any changes to the VM that may need to be cleaned up.
+  """
+  scratch_dir = vm.GetScratchDir()
+  local_tar_file_path = data.ResourcePath(_SPECCPU2006_TAR)
+  speccpu_vm_state.tar_file_path = posixpath.join(scratch_dir, _SPECCPU2006_TAR)
+  vm.PushFile(local_tar_file_path, scratch_dir)
+  vm.RemoteCommand('cd {dir} && tar xvfz {tar}'.format(dir=scratch_dir,
+                                                       tar=_SPECCPU2006_TAR))
+  speccpu_vm_state.cfg_file_path = posixpath.join(
+      speccpu_vm_state.spec_dir, 'config', FLAGS.runspec_config)
+
+
+def _PrepareWithIsoFile(vm, speccpu_vm_state):
+  """Prepares the VM to run using the iso file.
+
+  Copies the iso to the VM, mounts it, and extracts the contents. Copies the
+  config file to the VM. Runs the SPEC install.sh script on the VM.
+
+  Args:
+    vm: BaseVirtualMachine. Recipient of the iso file.
+    speccpu_vm_state: _SpecCpu2006SpecificState. Modified by this function to
+        reflect any changes to the VM that may need to be cleaned up.
+  """
+  scratch_dir = vm.GetScratchDir()
+
+  # Make cpu2006 directory on the VM.
+  vm.RemoteCommand('mkdir {0}'.format(speccpu_vm_state.spec_dir))
+
+  # Copy the iso to the VM.
+  local_iso_file_path = data.ResourcePath(_SPECCPU2006_ISO)
+  speccpu_vm_state.iso_file_path = posixpath.join(scratch_dir, _SPECCPU2006_ISO)
+  vm.PushFile(local_iso_file_path, scratch_dir)
+
+  # Extract files from the iso to the cpu2006 directory.
+  speccpu_vm_state.mount_dir = posixpath.join(scratch_dir, _MOUNT_DIR)
+  vm.RemoteCommand('mkdir {0}'.format(speccpu_vm_state.mount_dir))
+  vm.RemoteCommand('sudo mount -t iso9660 -o loop {0} {1}'.format(
+      speccpu_vm_state.iso_file_path, speccpu_vm_state.mount_dir))
+  vm.RemoteCommand('cp -r {0}/* {1}'.format(speccpu_vm_state.mount_dir,
+                                            speccpu_vm_state.spec_dir))
+  vm.RemoteCommand('chmod -R 777 {0}'.format(speccpu_vm_state.spec_dir))
+
+  # Copy the cfg to the VM.
+  local_cfg_file_path = data.ResourcePath(FLAGS.runspec_config)
+  cfg_file_name = os.path.basename(local_cfg_file_path)
+  speccpu_vm_state.cfg_file_path = posixpath.join(
+      speccpu_vm_state.spec_dir, 'config', cfg_file_name)
+  vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
+
+  # Run SPEC CPU2006 installation.
+  install_script_path = posixpath.join(speccpu_vm_state.spec_dir, 'install.sh')
+  vm.RobustRemoteCommand('yes | {0}'.format(install_script_path))
+
+
+def _ExtractScore(stdout, vm, keep_partial_results):
+  """Extracts the SPEC(int|fp) score from stdout.
 
   Args:
     stdout: stdout from running RemoteCommand.
-    vm: The vm instance where Spec CPU2006 was run.
+    vm: The vm instance where SPEC CPU2006 was run.
     keep_partial_results: A boolean indicating whether partial results should
         be extracted in the event that not all benchmarks were successfully
         run. See the "runspec_keep_partial_results" flag for more info.
@@ -214,7 +395,7 @@ def ExtractScore(stdout, vm, keep_partial_results):
     # Skip over failed runs, but count them since they make the overall
     # result invalid.
     if 'NR' in benchmark:
-      logging.warning('SpecCPU2006 missing result: %s', benchmark)
+      logging.warning('SPEC CPU2006 missing result: %s', benchmark)
       missing_results.append(str(benchmark.split()[0]))
       continue
     # name, ref_time, time, score, misc
@@ -238,11 +419,13 @@ def ExtractScore(stdout, vm, keep_partial_results):
   return results
 
 
-def ParseOutput(vm):
-  """Parses the output from Spec CPU2006.
+def _ParseOutput(vm, spec_dir):
+  """Retrieves the SPEC CPU2006 output from the VM and parses it.
 
   Args:
-    vm: The vm instance where Spec CPU2006 was run.
+    vm: The vm instance where SPEC CPU2006 was run.
+    spec_dir: string. Path of the directory on the remote machine where the SPEC
+        files, including binaries and logs, are located.
 
   Returns:
     A list of samples to be published (in the same format as Run() returns).
@@ -252,7 +435,7 @@ def ParseOutput(vm):
   log_files = []
   # FIXME(liquncheng): Only reference runs generate SPEC scores. The log
   # id is hardcoded as 001, which might change with different runspec
-  # parameters. Spec CPU 2006 will generate different logs for build, test
+  # parameters. SPEC CPU2006 will generate different logs for build, test
   # run, training run and ref run.
   if FLAGS.benchmark_subset in ('int', 'all'):
     log_files.append('CINT2006.001.ref.txt')
@@ -260,15 +443,16 @@ def ParseOutput(vm):
     log_files.append('CFP2006.001.ref.txt')
 
   for log in log_files:
-    stdout, _ = vm.RemoteCommand('cat %s/result/%s' % (vm.spec_dir, log),
+    stdout, _ = vm.RemoteCommand('cat %s/result/%s' % (spec_dir, log),
                                  should_log=True)
-    results.extend(ExtractScore(stdout, vm, FLAGS.runspec_keep_partial_results))
+    results.extend(_ExtractScore(stdout, vm,
+                                 FLAGS.runspec_keep_partial_results))
 
   return results
 
 
 def Run(benchmark_spec):
-  """Run SpecCPU2006 on the target vm.
+  """Runs SPEC CPU2006 on the target vm.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -277,32 +461,41 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
-  logging.info('SpecCPU2006 running on %s', vm)
+  vm = benchmark_spec.vms[0]
+  speccpu_vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR)
   num_cpus = vm.num_cpus
-  iterations = ' --iterations=' + repr(FLAGS.runspec_iterations) if \
-               FLAGS.runspec_iterations != 3 else ''
-  defines = ' --define ' + ' --define '.join(FLAGS.runspec_define.split(','))\
-            if FLAGS.runspec_define != '' else ''
-  cmd = ('cd %s; . ./shrc; ./bin/relocate; . ./shrc; rm -rf result; '
-         'runspec --config=%s --tune=base '
-         '--size=ref --noreportable --rate %s%s%s %s'
-         % (vm.spec_dir, FLAGS.runspec_config, num_cpus, iterations,
-            defines, FLAGS.benchmark_subset))
+
+  runspec_flags = [
+      ('config', posixpath.basename(speccpu_vm_state.cfg_file_path)),
+      ('tune', 'base'), ('size', 'ref'), ('rate', num_cpus),
+      ('iterations', FLAGS.runspec_iterations)]
+  if FLAGS.runspec_define:
+    for runspec_define in FLAGS.runspec_define.split(','):
+      runspec_flags.append(('define', runspec_define))
+  runspec_cmd = 'runspec --noreportable {flags} {subset}'.format(
+      flags=' '.join('--{0}={1}'.format(k, v) for k, v in runspec_flags),
+      subset=FLAGS.benchmark_subset)
+
+  cmd = ' && '.join((
+      'cd {0}'.format(speccpu_vm_state.spec_dir), '. ./shrc', './bin/relocate',
+      '. ./shrc', 'rm -rf result', runspec_cmd))
   vm.RobustRemoteCommand(cmd)
-  logging.info('SpecCPU2006 Results:')
-  return ParseOutput(vm)
+
+  logging.info('SPEC CPU2006 Results:')
+  return _ParseOutput(vm, speccpu_vm_state.spec_dir)
 
 
 def Cleanup(benchmark_spec):
-  """Cleanup SpecCPU2006 on the target vm.
+  """Cleans up SPEC CPU2006 from the target vm.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vm = vms[0]
-  vm.RemoteCommand('rm -rf %s' % vm.spec_dir)
-  vm.RemoteCommand('rm -f %s' % vm.tar_file_path)
+  vm = benchmark_spec.vms[0]
+  speccpu_vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR, None)
+  if speccpu_vm_state:
+    if speccpu_vm_state.mount_dir:
+      vm.RemoteCommand('sudo umount {0}'.format(speccpu_vm_state.mount_dir))
+    targets = ' '.join(p for p in speccpu_vm_state.__dict__.values() if p)
+    vm.RemoteCommand('rm -rf {0}'.format(targets))
