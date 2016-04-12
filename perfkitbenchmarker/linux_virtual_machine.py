@@ -1044,7 +1044,7 @@ class JujuMixin(DebianMixin):
     return output.strip()
 
   def JujuRun(self, cmd):
-    """Run a command on the virtual machine
+    """Run a command on the virtual machine.
 
     Args:
       cmd: The command to run.
@@ -1063,7 +1063,7 @@ class JujuMixin(DebianMixin):
     return output.strip()
 
   def JujuVersion(self):
-    """Return the Juju version"""
+    """Return the Juju version."""
     output, _ = self.RemoteHostCommand('juju version')
     return output.strip()
 
