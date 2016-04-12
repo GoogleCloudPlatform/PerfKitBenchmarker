@@ -98,6 +98,10 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
+# TODO(skschneider): This class exists to perform checks on the required files
+# prior to provisioning resources for any benchmark. If CheckPrerequisites is
+# moved earlier, or some other functionality is added to achieve the same
+# effect, that should be used instead.
 class SpecCpu2006ConfigSpec(benchmark_config_spec.BenchmarkConfigSpec):
 
   def __init__(self, *args, **kwargs):
@@ -148,11 +152,15 @@ def _CheckTarFile(runspec_config, examine_members):
     members = tf.getnames()
   cfg_member = 'cpu2006/config/{0}'.format(runspec_config)
   required_members = itertools.chain(_TAR_REQUIRED_MEMBERS, [cfg_member])
-  for member in required_members:
-    if member not in members:
-      raise errors.Benchmarks.PrepareException(
-          '{0} was not found within {1}. See README.md for information about '
-          'the expected format of the tar file.'.format(member, tar_file_path))
+  missing_members = set(required_members).difference(members)
+  if missing_members:
+    raise errors.Benchmarks.PrepareException(
+        'The following files were not found within {tar}:{linesep}{members}'
+        '{linesep}This is an indication that the tar file is formatted '
+        'incorrectly. See README.md for information about the expected format '
+        'of the tar file.'.format(
+            linesep=os.linesep, tar=tar_file_path,
+            members=os.linesep.join(sorted(missing_members))))
 
 
 def _CheckIsoAndCfgFile(runspec_config):
@@ -496,6 +504,10 @@ def Cleanup(benchmark_spec):
   speccpu_vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR, None)
   if speccpu_vm_state:
     if speccpu_vm_state.mount_dir:
-      vm.RemoteCommand('sudo umount {0}'.format(speccpu_vm_state.mount_dir))
+      try:
+        vm.RemoteCommand('sudo umount {0}'.format(speccpu_vm_state.mount_dir))
+      except errors.VirtualMachine.RemoteCommandError:
+        # Even if umount failed, continue to clean up.
+        logging.exception('umount failed.')
     targets = ' '.join(p for p in speccpu_vm_state.__dict__.values() if p)
     vm.RemoteCommand('rm -rf {0}'.format(targets))
