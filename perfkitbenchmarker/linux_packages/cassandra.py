@@ -100,7 +100,26 @@ def JujuInstall(vm, vm_group_name):
       vm.JujuDeploy('cs:trusty/cassandra',
                     vm_group_name,
                     vm.vm_group_specs[vm_group_name].vm_count)
-      vm.JujuSet('cassandra', ['authenticator=AllowAllAuthenticator'])
+
+      # The charm defaults to Cassandra 2.2.x, which has deprecated
+      # cassandra-cli. Specify the sources to downgrade to Cassandra 2.1.x
+      # to match the cassandra benchmark(s) expectations.
+      sources = ['deb http://www.apache.org/dist/cassandra/debian 21x main',
+                 'ppa:openjdk-r/ppa',
+                 'ppa:stub/cassandra']
+
+      keys = ["F758CE318D77295D",
+              'null',
+              'null']
+
+      vm.JujuSet('cassandra', [
+                 # Allow authentication from all units
+                 'authenticator=AllowAllAuthenticator',
+                 'install_sources="[%s]"' %
+                 ", ".join(map(lambda x: "'" + x + "'", sources)),
+                 'install_keys="[%s]"'
+                 % ", ".join(keys)
+                 ])
 
       # Wait for cassandra to be installed and configured
       vm.JujuWait()
@@ -198,7 +217,7 @@ def _StartCassandraIfNotRunning(vm):
 def GetCassandraCliPath(vm):
   if vm.OS_TYPE == os_types.JUJU:
     """
-    Replace the stock CASSANDRA_STRESS so that it uses the binary
+    Replace the stock CASSANDRA_CLI so that it uses the binary
     installed by the cassandra-stress charm.
     """
     return '/usr/bin/cassandra-cli'
