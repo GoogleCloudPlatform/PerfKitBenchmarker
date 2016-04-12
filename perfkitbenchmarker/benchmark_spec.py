@@ -116,9 +116,7 @@ class BenchmarkSpec(object):
       yield
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
-    """
-    Construct the virtual machine(s) needed for a group
-    """
+    """Construct the virtual machine(s) needed for a group."""
     vms = []
     zone_index = 0
 
@@ -191,7 +189,7 @@ class BenchmarkSpec(object):
                            self.name))
 
   def _ConstructJujuController(self, group_spec):
-    """Construct a VirtualMachine object for a Juju controller"""
+    """Construct a VirtualMachine object for a Juju controller."""
     vm_group_specs = self.config.vm_groups
 
     juju_spec = copy.copy(group_spec)
@@ -213,10 +211,8 @@ class BenchmarkSpec(object):
       vms = self.ConstructVirtualMachineGroup(group_name, group_spec)
 
       if group_spec.os_type == os_types.JUJU:
-          """
-          The Juju VM needs to be created first, so that subsequent units can
-          be properly added under its control.
-          """
+          # The Juju VM needs to be created first, so that subsequent units can
+          # be properly added under its control.
           if group_spec.cloud in clouds:
             jujuvm = clouds[group_spec.cloud]
           else:

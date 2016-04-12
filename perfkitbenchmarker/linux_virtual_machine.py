@@ -978,8 +978,7 @@ class ContainerizedDebianMixin(DebianMixin):
 
 
 class JujuMixin(DebianMixin):
-  """
-  Class to allow running juju-deployed workloads
+  """Class to allow running juju-deployed workloads.
 
   Bootstraps a Juju environment using the manual provider:
   https://jujucharms.com/docs/stable/config-manual
@@ -989,10 +988,8 @@ class JujuMixin(DebianMixin):
 
   isController = False
 
-  """
-  A reference to the juju controller, useful when operations occur against
-  a unit's VM but need to be preformed from the controller.
-  """
+  # A reference to the juju controller, useful when operations occur against
+  # a unit's VM but need to be preformed from the controller.
   controller = None
 
   vm_group = None
@@ -1012,15 +1009,15 @@ class JujuMixin(DebianMixin):
   """
 
   def _Bootstrap(self):
-    """Bootstrap a Juju environment"""
+    """Bootstrap a Juju environment."""
     resp, _ = self.RemoteHostCommand("juju bootstrap")
 
   def JujuAddMachine(self, unit):
     """
-    Adds a manually-created virtual machine to Juju
+    Adds a manually-created virtual machine to Juju.
 
     Args:
-      unit: An object representing the unit's BaseVirtualMachine
+      unit: An object representing the unit's BaseVirtualMachine.
     """
     resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" %
                                      unit.internal_ip)
@@ -1032,7 +1029,7 @@ class JujuMixin(DebianMixin):
     self.machines[machine_id] = unit
 
   def JujuConfigureEnvironment(self):
-    """Configure a bootstrapped Juju environment"""
+    """Configure a bootstrapped Juju environment."""
     if self.isController:
       resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
 
@@ -1042,7 +1039,7 @@ class JujuMixin(DebianMixin):
         self.PushFile(tf.name, "~/.juju/environments.yaml")
 
   def JujuEnvironment(self):
-    """Get the name of the current environment"""
+    """Get the name of the current environment."""
     output, _ = self.RemoteHostCommand('juju switch')
     return output.strip()
 
@@ -1050,7 +1047,7 @@ class JujuMixin(DebianMixin):
     """Run a command on the virtual machine
 
     Args:
-      cmd: The command to run
+      cmd: The command to run.
     """
     output, _ = self.RemoteHostCommand(cmd)
     return output.strip()
@@ -1059,7 +1056,7 @@ class JujuMixin(DebianMixin):
     """Return the status of the Juju environment.
 
     Args:
-      pattern: Optionally match machines/services with a pattern
+      pattern: Optionally match machines/services with a pattern.
     """
     output, _ = self.RemoteHostCommand('juju status %s --format=json' %
                                        pattern)
@@ -1074,8 +1071,8 @@ class JujuMixin(DebianMixin):
     """Set the configuration options on a deployed service.
 
     Args:
-      service: The name of the service
-      params: A list of key=values pairs
+      service: The name of the service.
+      params: A list of key=values pairs.
     """
     output, _ = self.RemoteHostCommand(
         'juju set %s %s' % (service, ' '.join(params)))
@@ -1083,13 +1080,7 @@ class JujuMixin(DebianMixin):
 
   @vm_util.Retry(poll_interval=30, timeout=3600)
   def JujuWait(self):
-    """
-    Waits for all deployed services to be installed, configured, and idle.
-
-    Args:
-      poll_interval: How long to wait between checking the current status.
-      timeout: How long to wait for the environment to settle.
-    """
+    """Wait for all deployed services to be installed, configured, and idle."""
     status = yaml.load(self.JujuStatus())
     for service in status['services']:
       ss = status['services'][service]['service-status']['current']
@@ -1122,7 +1113,7 @@ class JujuMixin(DebianMixin):
     """Deploy (and scale) this service to the machines in its vm group.
 
     Args:
-      charm: The charm to deploy, i.e., cs:trusty/ubuntu
+      charm: The charm to deploy, i.e., cs:trusty/ubuntu.
       units: Optional number of units to create.
       vm_group: The name of vm_group the unit(s) should be deployed to.
     """
@@ -1145,15 +1136,15 @@ class JujuMixin(DebianMixin):
       resp, _ = self.RemoteHostCommand(
           "juju add-unit %s --to %s" % (service, machine))
 
-  def JujuRelate(self, a, b):
-    """Create a relation between two services
+  def JujuRelate(self, service1, service2):
+    """Create a relation between two services.
 
     Args:
-      a: The first service to relate.
-      b: The second service to relate.
+      service1: The first service to relate.
+      service2: The second service to relate.
     """
     resp, _ = self.RemoteHostCommand(
-        "juju add-relation %s %s" % (a, b))
+        "juju add-relation %s %s" % (service1, service2))
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
@@ -1180,9 +1171,7 @@ class JujuMixin(DebianMixin):
     super(JujuMixin, self).SetupPackageManager()
 
   def PrepareVMEnvironment(self):
-    """
-    Install and configure a Juju environment.
-    """
+    """Install and configure a Juju environment."""
     super(JujuMixin, self).PrepareVMEnvironment()
     if self.isController:
       self.InstallPackages('juju')
