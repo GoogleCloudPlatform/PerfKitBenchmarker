@@ -44,6 +44,7 @@ PROPAGATION_WAIT_TIME = 30
 WRITE_COMMAND = 'write'
 COUNTER_WRITE_COMMAND = 'counter_write'
 USER_COMMAND = 'user'
+
 READ_COMMAND = 'read'
 COUNTER_READ_COMMAND = 'counter_read'
 MIXED_COMMAND = 'mixed'
@@ -166,8 +167,6 @@ CLIENT_GROUP = 'client'
 SLEEP_BETWEEN_CHECK_IN_SECONDS = 5
 TEMP_PROFILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'profile.yaml')
 
-CASSANDRA_STRESS = posixpath.join(cassandra.CASSANDRA_DIR, 'tools', 'bin',
-                                  'cassandra-stress')
 # Results documentation:
 # http://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStressOutput_c.html
 RESULTS_METRICS = (
@@ -311,20 +310,23 @@ def Prepare(benchmark_spec):
   """
   vm_dict = benchmark_spec.vm_groups
   cassandra_vms = vm_dict[CASSANDRA_GROUP]
+  client_vms = vm_dict[CLIENT_GROUP]
   logging.info('VM dictionary %s', vm_dict)
 
   logging.info('Authorizing loader[0] permission to access all other vms.')
-  vm_dict[CLIENT_GROUP][0].AuthenticateVm()
+  client_vms[0].AuthenticateVm()
 
   logging.info('Preparing data files and Java on all vms.')
-  vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), benchmark_spec.vms)
+  vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), cassandra_vms)
+  vm_util.RunThreaded(lambda vm: vm.Install('cassandra_stress'), client_vms)
   seed_vm = cassandra_vms[0]
   configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
   vm_util.RunThreaded(configure, cassandra_vms)
+
   cassandra.StartCluster(seed_vm, cassandra_vms[1:])
 
   if FLAGS.cassandra_stress_command == USER_COMMAND:
-    for vm in vm_dict[CLIENT_GROUP]:
+    for vm in client_vms:
       vm.PushFile(FLAGS.cassandra_stress_profile,
                   TEMP_PROFILE_PATH)
   metadata = GenerateMetadataFromFlags(benchmark_spec)
@@ -358,6 +360,7 @@ def RunTestOnLoader(vm, loader_index, operations_per_vm, data_node_ips,
   if command == USER_COMMAND:
     command += ' profile={profile} ops\({ops}\)'.format(
         profile=TEMP_PROFILE_PATH, ops=user_operations)
+
     schema_option = ''
   else:
     if command == MIXED_COMMAND:
@@ -383,7 +386,7 @@ def RunTestOnLoader(vm, loader_index, operations_per_vm, data_node_ips,
       '-node {nodes} {schema} {population_dist} '
       '-log file={result_file} -rate threads={threads} '
       '-errors retries={retries}'.format(
-          cassandra=CASSANDRA_STRESS,
+          cassandra=cassandra.GetCassandraStressPath(vm),
           command=command,
           consistency_level=FLAGS.cassandra_stress_consistency_level,
           num_keys=operations_per_vm,
@@ -498,6 +501,7 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   metadata = GenerateMetadataFromFlags(benchmark_spec)
+
   RunCassandraStressTest(
       benchmark_spec.vm_groups[CASSANDRA_GROUP],
       benchmark_spec.vm_groups[CLIENT_GROUP],

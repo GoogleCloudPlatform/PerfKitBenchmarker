@@ -17,11 +17,12 @@ from perfkitbenchmarker import flags
 
 
 DEBIAN = 'debian'
+JUJU = 'juju'
 RHEL = 'rhel'
 UBUNTU_CONTAINER = 'ubuntu_container'
 WINDOWS = 'windows'
 
-ALL = DEBIAN, RHEL, UBUNTU_CONTAINER, WINDOWS
+ALL = DEBIAN, JUJU, RHEL, UBUNTU_CONTAINER, WINDOWS
 
 
 flags.DEFINE_enum(

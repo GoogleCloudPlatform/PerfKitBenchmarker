@@ -332,6 +332,11 @@ class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-*'
 
 
+class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
+                                 linux_virtual_machine.JujuMixin):
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-*'
+
+
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.RhelMixin):
   pass

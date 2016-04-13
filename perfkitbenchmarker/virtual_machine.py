@@ -171,7 +171,7 @@ class BaseVirtualMachine(resource.BaseResource):
   Attributes:
     image: The disk image used to boot.
     internal_ip: Internal IP address.
-    ip: Public (external) IP address.
+    ip_address: Public (external) IP address.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     project: The provider-specific project associated with the VM (e.g.
       artisanal-lightbulb-883).

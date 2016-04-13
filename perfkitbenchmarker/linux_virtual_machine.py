@@ -34,6 +34,7 @@ import re
 import threading
 import time
 import uuid
+import yaml
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -974,3 +975,215 @@ class ContainerizedDebianMixin(DebianMixin):
 
     # Copies the file to its final destination in the container
     target.ContainerCopy(file_name, remote_path)
+
+
+class JujuMixin(DebianMixin):
+  """Class to allow running Juju-deployed workloads.
+
+  Bootstraps a Juju environment using the manual provider:
+  https://jujucharms.com/docs/stable/config-manual
+  """
+
+  # TODO: Add functionality to tear down and uninstall Juju
+  # (for pre-provisioned) machines + JujuUninstall for packages using charms.
+
+  OS_TYPE = os_types.JUJU
+
+  is_controller = False
+
+  # A reference to the juju controller, useful when operations occur against
+  # a unit's VM but need to be preformed from the controller.
+  controller = None
+
+  vm_group = None
+
+  machines = {}
+  units = []
+
+  installation_lock = threading.Lock()
+
+  environments_yaml = """
+  default: perfkit
+
+  environments:
+      perfkit:
+          type: manual
+          bootstrap-host: {0}
+  """
+
+  def _Bootstrap(self):
+    """Bootstrap a Juju environment."""
+    resp, _ = self.RemoteHostCommand('juju bootstrap')
+
+  def JujuAddMachine(self, unit):
+    """Adds a manually-created virtual machine to Juju.
+
+    Args:
+      unit: An object representing the unit's BaseVirtualMachine.
+    """
+    resp, _ = self.RemoteHostCommand('juju add-machine ssh:%s' %
+                                     unit.internal_ip)
+
+    # We don't know what the machine's going to be used for yet,
+    # but track it's placement for easier access later.
+    # We're looking for the output: created machine %d
+    machine_id = _[_.rindex(' '):].strip()
+    self.machines[machine_id] = unit
+
+  def JujuConfigureEnvironment(self):
+    """Configure a bootstrapped Juju environment."""
+    if self.is_controller:
+      resp, _ = self.RemoteHostCommand('mkdir -p ~/.juju')
+
+      with vm_util.NamedTemporaryFile() as tf:
+        tf.write(self.environments_yaml.format(self.internal_ip))
+        tf.close()
+        self.PushFile(tf.name, '~/.juju/environments.yaml')
+
+  def JujuEnvironment(self):
+    """Get the name of the current environment."""
+    output, _ = self.RemoteHostCommand('juju switch')
+    return output.strip()
+
+  def JujuRun(self, cmd):
+    """Run a command on the virtual machine.
+
+    Args:
+      cmd: The command to run.
+    """
+    output, _ = self.RemoteHostCommand(cmd)
+    return output.strip()
+
+  def JujuStatus(self, pattern=''):
+    """Return the status of the Juju environment.
+
+    Args:
+      pattern: Optionally match machines/services with a pattern.
+    """
+    output, _ = self.RemoteHostCommand('juju status %s --format=json' %
+                                       pattern)
+    return output.strip()
+
+  def JujuVersion(self):
+    """Return the Juju version."""
+    output, _ = self.RemoteHostCommand('juju version')
+    return output.strip()
+
+  def JujuSet(self, service, params=[]):
+    """Set the configuration options on a deployed service.
+
+    Args:
+      service: The name of the service.
+      params: A list of key=values pairs.
+    """
+    output, _ = self.RemoteHostCommand(
+        'juju set %s %s' % (service, ' '.join(params)))
+    return output.strip()
+
+  @vm_util.Retry(poll_interval=30, timeout=3600)
+  def JujuWait(self):
+    """Wait for all deployed services to be installed, configured, and idle."""
+    status = yaml.load(self.JujuStatus())
+    for service in status['services']:
+      ss = status['services'][service]['service-status']['current']
+
+      # Accept blocked because the service may be waiting on relation
+      if ss not in ['active', 'unknown']:
+          raise errors.Juju.TimeoutException(
+              'Service %s is not ready; status is %s' % (service, ss))
+
+      if ss in ['error']:
+        # The service has failed to deploy.
+        debuglog = self.JujuRun('juju debug-log --limit 200')
+        logging.warn(debuglog)
+        raise errors.Juju.UnitErrorException(
+            'Service %s is in an error state' % service)
+
+      for unit in status['services'][service]['units']:
+        unit_data = status['services'][service]['units'][unit]
+        ag = unit_data['agent-state']
+        if ag != 'started':
+          raise errors.Juju.TimeoutException(
+              'Service %s is not ready; agent-state is %s' % (service, ag))
+
+        ws = unit_data['workload-status']['current']
+        if ws not in ['active', 'unknown']:
+          raise errors.Juju.TimeoutException(
+              'Service %s is not ready; workload-state is %s' % (service, ws))
+
+  def JujuDeploy(self, charm, vm_group):
+    """Deploy (and scale) this service to the machines in its vm group.
+
+    Args:
+      charm: The charm to deploy, i.e., cs:trusty/ubuntu.
+      vm_group: The name of vm_group the unit(s) should be deployed to.
+    """
+
+    # Find the already-deployed machines belonging to this vm_group
+    machines = []
+    for machine_id, unit in self.machines.iteritems():
+      if unit.vm_group == vm_group:
+        machines.append(machine_id)
+
+    # Deploy the first machine
+    resp, _ = self.RemoteHostCommand(
+        'juju deploy %s --to %s' % (charm, machines.pop()))
+
+    # Get the name of the service
+    service = charm[charm.rindex('/') + 1:]
+
+    # Deploy to the remaining machine(s)
+    for machine in machines:
+      resp, _ = self.RemoteHostCommand(
+          'juju add-unit %s --to %s' % (service, machine))
+
+  def JujuRelate(self, service1, service2):
+    """Create a relation between two services.
+
+    Args:
+      service1: The first service to relate.
+      service2: The second service to relate.
+    """
+    resp, _ = self.RemoteHostCommand(
+        'juju add-relation %s %s' % (service1, service2))
+
+  def Install(self, package_name):
+    """Installs a PerfKit package on the VM."""
+    package = linux_packages.PACKAGES[package_name]
+    try:
+      # Make sure another unit doesn't try
+      # to install the charm at the same time
+      with self.controller.installation_lock:
+        if package_name not in self.controller._installed_packages:
+          package.JujuInstall(self.controller, self.vm_group)
+          self.controller._installed_packages.add(package_name)
+    except AttributeError as e:
+      logging.warn('Failed to install package %s, falling back to Apt (%s)'
+                   % (package_name, e))
+      if package_name not in self._installed_packages:
+        package.AptInstall(self)
+        self._installed_packages.add(package_name)
+
+  def SetupPackageManager(self):
+    if self.is_controller:
+      resp, _ = self.RemoteHostCommand(
+          'sudo add-apt-repository ppa:juju/stable'
+      )
+    super(JujuMixin, self).SetupPackageManager()
+
+  def PrepareVMEnvironment(self):
+    """Install and configure a Juju environment."""
+    super(JujuMixin, self).PrepareVMEnvironment()
+    if self.is_controller:
+      self.InstallPackages('juju')
+
+      self.JujuConfigureEnvironment()
+
+      self.AuthenticateVm()
+
+      self._Bootstrap()
+
+      # Install the Juju agent on the other VMs
+      for unit in self.units:
+        unit.controller = self
+        self.JujuAddMachine(unit)
