@@ -20,32 +20,45 @@ PERCENTILES_LIST = [0.1, 1, 5, 10, 50, 90, 95, 99, 99.9]
 _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 
 
-def PercentileCalculator(numbers):
+def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
   """Computes percentiles, stddev and mean on a set of numbers
 
   Args:
     numbers: The set of numbers to compute percentiles for.
+    percentiles: If given, a list of percentiles to compute. Can be
+      floats, ints or longs.
 
   Returns:
     A dictionary of percentiles.
+
+  Raises:
+    ValueError, if numbers is empty or if a percentile is outside of
+    [0, 100].
   """
+
+  if not numbers:
+    raise ValueError("Can't compute percentiles of empty list.")
+
   numbers_sorted = sorted(numbers)
   count = len(numbers_sorted)
   total = sum(numbers_sorted)
   result = {}
-  for percentile in PERCENTILES_LIST:
-    percentile_string = 'p%s' % str(percentile)
-    result[percentile_string] = numbers_sorted[
-        int(count * float(percentile) / 100)]
+  for percentile in percentiles:
+    if percentile < 0.0 or percentile > 100.0:
+      raise ValueError('Invalid percentile %s' % percentile)
 
-  if count > 0:
-    average = total / float(count)
-    result['average'] = average
-    if count > 1:
-      total_of_squares = sum([(i - average) ** 2 for i in numbers])
-      result['stddev'] = (total_of_squares / (count - 1)) ** 0.5
-    else:
-      result['stddev'] = 0
+    percentile_string = 'p%s' % str(percentile)
+    index = int(count * float(percentile) / 100.0)
+    index = min(index, count - 1)  # Correction to handle 100th percentile.
+    result[percentile_string] = numbers_sorted[index]
+
+  average = total / float(count)
+  result['average'] = average
+  if count > 1:
+    total_of_squares = sum([(i - average) ** 2 for i in numbers])
+    result['stddev'] = (total_of_squares / (count - 1)) ** 0.5
+  else:
+    result['stddev'] = 0
 
   return result
 

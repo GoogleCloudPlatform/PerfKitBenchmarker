@@ -28,3 +28,31 @@ class SampleTestCase(unittest.TestCase):
     instance = sample.Sample(metric='Test', value=1.0, unit='Mbps',
                              metadata=metadata.copy())
     self.assertDictEqual(metadata, instance.metadata)
+
+
+class TestPercentileCalculator(unittest.TestCase):
+  def testPercentileCalculator(self):
+    numbers = range(0, 1001)
+    percentiles = sample.PercentileCalculator(numbers,
+                                              percentiles=[0, 1, 99.9, 100])
+
+    self.assertEqual(percentiles['p0'], 0)
+    self.assertEqual(percentiles['p1'], 10)
+    self.assertEqual(percentiles['p99.9'], 999)
+    self.assertEqual(percentiles['p100'], 1000)
+    self.assertEqual(percentiles['average'], 500)
+
+    # 4 percentiles we requested, plus average and stddev
+    self.assertEqual(len(percentiles), 6)
+
+  def testNoNumbers(self):
+    with self.assertRaises(ValueError):
+      sample.PercentileCalculator([], percentiles=[0, 1, 99])
+
+  def testOutOfRangePercentile(self):
+    with self.assertRaises(ValueError):
+      sample.PercentileCalculator([3], percentiles=[-1])
+
+  def testWrongTypePercentile(self):
+    with self.assertRaises(ValueError):
+      sample.PercentileCalculator([3], percentiles=["a"])
