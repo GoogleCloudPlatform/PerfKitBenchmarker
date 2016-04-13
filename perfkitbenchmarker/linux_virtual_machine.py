@@ -984,6 +984,9 @@ class JujuMixin(DebianMixin):
   https://jujucharms.com/docs/stable/config-manual
   """
 
+  # TODO: Add functionality to tear down and uninstall Juju
+  # (for pre-provisioned) machines
+
   OS_TYPE = os_types.JUJU
 
   is_controller = False
