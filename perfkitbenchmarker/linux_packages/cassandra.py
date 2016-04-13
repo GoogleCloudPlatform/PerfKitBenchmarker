@@ -269,8 +269,7 @@ def StartCluster(seed_vm, vms):
   time.sleep(NODE_START_SLEEP)
   for i in xrange(5):
     if not IsRunning(seed_vm):
-      logging.warn('Seed %s: Cassandra not running yet (try %d). " \
-                   "Waiting %ds.',
+      logging.warn('Seed %s: Cassandra not running yet (try %d). Waiting %ds.',
                    seed_vm, i, NODE_START_SLEEP)
       time.sleep(NODE_START_SLEEP)
     else:
