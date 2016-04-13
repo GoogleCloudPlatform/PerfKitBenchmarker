@@ -105,7 +105,7 @@ def JujuInstall(vm, vm_group_name):
              'ppa:openjdk-r/ppa',
              'ppa:stub/cassandra']
 
-  keys = ["F758CE318D77295D",
+  keys = ['F758CE318D77295D',
           'null',
           'null']
 
@@ -113,9 +113,9 @@ def JujuInstall(vm, vm_group_name):
              # Allow authentication from all units
              'authenticator=AllowAllAuthenticator',
              'install_sources="[%s]"' %
-             ", ".join(map(lambda x: "'" + x + "'", sources)),
+             ', '.join(map(lambda x: "'" + x + "'", sources)),
              'install_keys="[%s]"'
-             % ", ".join(keys)
+             % ', '.join(keys)
              ])
 
   # Wait for cassandra to be installed and configured
