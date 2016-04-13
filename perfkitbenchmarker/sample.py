@@ -30,7 +30,15 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
 
   Returns:
     A dictionary of percentiles.
+
+  Raises:
+    ValueError, if numbers is empty or if a percentile is outside of
+    [0, 100].
   """
+
+  if not numbers:
+    raise ValueError("Can't compute percentiles of empty list.")
+
   numbers_sorted = sorted(numbers)
   count = len(numbers_sorted)
   total = sum(numbers_sorted)
@@ -44,14 +52,13 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
     index = min(index, count - 1)  # Correction to handle 100th percentile.
     result[percentile_string] = numbers_sorted[index]
 
-  if count > 0:
-    average = total / float(count)
-    result['average'] = average
-    if count > 1:
-      total_of_squares = sum([(i - average) ** 2 for i in numbers])
-      result['stddev'] = (total_of_squares / (count - 1)) ** 0.5
-    else:
-      result['stddev'] = 0
+  average = total / float(count)
+  result['average'] = average
+  if count > 1:
+    total_of_squares = sum([(i - average) ** 2 for i in numbers])
+    result['stddev'] = (total_of_squares / (count - 1)) ** 0.5
+  else:
+    result['stddev'] = 0
 
   return result
 

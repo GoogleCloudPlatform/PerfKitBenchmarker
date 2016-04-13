@@ -44,3 +44,15 @@ class TestPercentileCalculator(unittest.TestCase):
 
     # 4 percentiles we requested, plus average and stddev
     self.assertEqual(len(percentiles), 6)
+
+  def testNoNumbers(self):
+    with self.assertRaises(ValueError):
+      sample.PercentileCalculator([], percentiles=[0, 1, 99])
+
+  def testOutOfRangePercentile(self):
+    with self.assertRaises(ValueError):
+      sample.PercentileCalculator([3], percentiles=[-1])
+
+  def testWrongTypePercentile(self):
+    with self.assertRaises(ValueError):
+      sample.PercentileCalculator([3], percentiles=["a"])
