@@ -97,9 +97,7 @@ def AptInstall(vm):
 def JujuInstall(vm, vm_group_name):
   """Installs the Cassandra charm on the VM."""
   if vm.vm_group_specs and vm_group_name in vm.vm_group_specs:
-    vm.JujuDeploy('cs:trusty/cassandra',
-                  vm_group_name,
-                  vm.vm_group_specs[vm_group_name].vm_count)
+    vm.JujuDeploy('cs:trusty/cassandra', vm_group_name)
 
     # The charm defaults to Cassandra 2.2.x, which has deprecated
     # cassandra-cli. Specify the sources to downgrade to Cassandra 2.1.x

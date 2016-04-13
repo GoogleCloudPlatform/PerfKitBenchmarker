@@ -1109,12 +1109,11 @@ class JujuMixin(DebianMixin):
           raise errors.Juju.TimeoutException(
               'Service %s is not ready; workload-state is %s' % (service, ws))
 
-  def JujuDeploy(self, charm, vm_group, units=1):
+  def JujuDeploy(self, charm, vm_group):
     """Deploy (and scale) this service to the machines in its vm group.
 
     Args:
       charm: The charm to deploy, i.e., cs:trusty/ubuntu.
-      units: Optional number of units to create.
       vm_group: The name of vm_group the unit(s) should be deployed to.
     """
 
