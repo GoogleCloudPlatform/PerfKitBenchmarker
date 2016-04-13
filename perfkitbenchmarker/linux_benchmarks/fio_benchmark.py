@@ -26,6 +26,7 @@ import re
 
 import jinja2
 
+import perfkitbenchmarker
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -124,10 +125,16 @@ flags.DEFINE_integer('fio_run_for_minutes', 10,
                      'given number of minutes. Time will be rounded up to the '
                      'next multiple of %s minutes.' % MINUTES_PER_JOB,
                      lower_bound=0)
+flag_util.DEFINE_units('fio_blocksize', None,
+                       'The block size for fio operations. Default is given by '
+                       'the scenario when using --generate_scenarios. This '
+                       'flag does not apply when using --fio_jobfile.',
+                       convertible_to=perfkitbenchmarker.UNIT_REGISTRY.byte)
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
-    'fio_generate_scenarios', 'fio_io_depths', 'fio_run_for_minutes'}
+    'fio_generate_scenarios', 'fio_io_depths', 'fio_run_for_minutes',
+    'fio_blocksize'}
 
 
 def AgainstDevice():
@@ -204,7 +211,7 @@ SECONDS_PER_MINUTE = 60
 
 
 def GenerateJobFileString(filename, scenario_strings,
-                          io_depths, working_set_size):
+                          io_depths, working_set_size, block_size):
   """Make a string with our fio job file.
 
   Args:
@@ -212,6 +219,7 @@ def GenerateJobFileString(filename, scenario_strings,
     scenario_strings: list of strings with names in SCENARIOS.
     io_depths: iterable of integers. The IO queue depths to test.
     working_set_size: int or None. If int, the size of the working set in GB.
+    block_size: Quantity or None. If quantity, the block size to use.
 
   Returns:
     The contents of a fio job file, as a string.
@@ -226,6 +234,13 @@ def GenerateJobFileString(filename, scenario_strings,
     scenarios = (SCENARIOS[name] for name in scenario_strings)
 
   size_string = str(working_set_size) + 'G' if working_set_size else '100%'
+  if block_size is not None:
+    byte = perfkitbenchmarker.UNIT_REGISTRY.byte
+    # If we don't make a copy here, this will modify the global
+    # SCENARIOS variable.
+    scenarios = [scenario.copy() for scenario in scenarios]
+    for scenario in scenarios:
+      scenario['blocksize'] = str(long(block_size.m_as(byte))) + 'B'
 
   job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
                                       undefined=jinja2.StrictUndefined)
@@ -262,7 +277,7 @@ def ProcessedJobFileString(fio_jobfile, remove_filename):
 
 def GetOrGenerateJobFileString(job_file_path, scenario_strings,
                                against_device, disk,
-                               io_depths, working_set_size):
+                               io_depths, working_set_size, block_size):
   """Get the contents of the fio job file we're working with.
 
   This will either read the user's job file, if given, or generate a
@@ -279,6 +294,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
     io_depths: iterable of integers. The IO queue depths to test.
     working_set_size: int or None. If int, the size of the working set
       in GB.
+    block_size: Quantity or None. If Quantity, the block size to use.
 
   Returns:
     A string containing a fio job file.
@@ -299,7 +315,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
       filename = DEFAULT_TEMP_FILE_NAME
 
     return GenerateJobFileString(filename, scenario_strings,
-                                 io_depths, working_set_size)
+                                 io_depths, working_set_size, block_size)
 
 
 NEED_SIZE_MESSAGE = ('You must specify the working set size when using '
@@ -422,7 +438,8 @@ def Run(benchmark_spec):
       AgainstDevice(),
       disk,
       FLAGS.fio_io_depths,
-      FLAGS.fio_working_set_size)
+      FLAGS.fio_working_set_size,
+      FLAGS.fio_blocksize)
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
     job_file.write(job_file_string)
