@@ -1013,7 +1013,7 @@ class JujuMixin(DebianMixin):
 
   def _Bootstrap(self):
     """Bootstrap a Juju environment."""
-    resp, _ = self.RemoteHostCommand("juju bootstrap")
+    resp, _ = self.RemoteHostCommand('juju bootstrap')
 
   def JujuAddMachine(self, unit):
     """Adds a manually-created virtual machine to Juju.
@@ -1021,7 +1021,7 @@ class JujuMixin(DebianMixin):
     Args:
       unit: An object representing the unit's BaseVirtualMachine.
     """
-    resp, _ = self.RemoteHostCommand("juju add-machine ssh:%s" %
+    resp, _ = self.RemoteHostCommand('juju add-machine ssh:%s' %
                                      unit.internal_ip)
 
     # We don't know what the machine's going to be used for yet,
@@ -1033,12 +1033,12 @@ class JujuMixin(DebianMixin):
   def JujuConfigureEnvironment(self):
     """Configure a bootstrapped Juju environment."""
     if self.is_controller:
-      resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
+      resp, _ = self.RemoteHostCommand('mkdir -p ~/.juju')
 
       with vm_util.NamedTemporaryFile() as tf:
         tf.write(self.environments_yaml.format(self.internal_ip))
         tf.close()
-        self.PushFile(tf.name, "~/.juju/environments.yaml")
+        self.PushFile(tf.name, '~/.juju/environments.yaml')
 
   def JujuEnvironment(self):
     """Get the name of the current environment."""
@@ -1127,7 +1127,7 @@ class JujuMixin(DebianMixin):
 
     # Deploy the first machine
     resp, _ = self.RemoteHostCommand(
-        "juju deploy %s --to %s" % (charm, machines.pop()))
+        'juju deploy %s --to %s' % (charm, machines.pop()))
 
     # Get the name of the service
     service = charm[charm.rindex('/') + 1:]
@@ -1135,7 +1135,7 @@ class JujuMixin(DebianMixin):
     # Deploy to the remaining machine(s)
     for machine in machines:
       resp, _ = self.RemoteHostCommand(
-          "juju add-unit %s --to %s" % (service, machine))
+          'juju add-unit %s --to %s' % (service, machine))
 
   def JujuRelate(self, service1, service2):
     """Create a relation between two services.
@@ -1145,7 +1145,7 @@ class JujuMixin(DebianMixin):
       service2: The second service to relate.
     """
     resp, _ = self.RemoteHostCommand(
-        "juju add-relation %s %s" % (service1, service2))
+        'juju add-relation %s %s' % (service1, service2))
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
@@ -1158,7 +1158,7 @@ class JujuMixin(DebianMixin):
           package.JujuInstall(self.controller, self.vm_group)
           self.controller._installed_packages.add(package_name)
     except AttributeError as e:
-      logging.warn("Failed to install package %s, falling back to Apt (%s)"
+      logging.warn('Failed to install package %s, falling back to Apt (%s)'
                    % (package_name, e))
       if package_name not in self._installed_packages:
         package.AptInstall(self)
@@ -1167,7 +1167,7 @@ class JujuMixin(DebianMixin):
   def SetupPackageManager(self):
     if self.is_controller:
       resp, _ = self.RemoteHostCommand(
-          "sudo add-apt-repository ppa:juju/stable"
+          'sudo add-apt-repository ppa:juju/stable'
       )
     super(JujuMixin, self).SetupPackageManager()
 
