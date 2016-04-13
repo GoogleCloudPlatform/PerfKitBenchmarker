@@ -41,7 +41,7 @@ def JujuInstall(vm, vm_group_name):
   """Installs the cassandra-stress charm on the VM."""
   if vm.vm_group_specs and vm_group_name in vm.vm_group_specs:
     vm.JujuDeploy('cs:~marcoceppi/trusty/cassandra-stress', vm_group_name)
-    
+
     # The assumption is that cassandra-stress will always be installed
     # alongside cassandra
     vm.JujuRelate('cassandra', 'cassandra-stress')
