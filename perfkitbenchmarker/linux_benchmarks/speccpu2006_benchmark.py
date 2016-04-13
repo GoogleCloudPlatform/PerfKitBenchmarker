@@ -35,7 +35,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
-from perfkitbenchmarker.configs import benchmark_config_spec
 
 
 FLAGS = flags.FLAGS
@@ -98,26 +97,16 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-# TODO(skschneider): This class exists to perform checks on the required files
-# prior to provisioning resources for any benchmark. If CheckPrerequisites is
-# moved earlier, or some other functionality is added to achieve the same
-# effect, that should be used instead.
-class SpecCpu2006ConfigSpec(benchmark_config_spec.BenchmarkConfigSpec):
-
-  def __init__(self, *args, **kwargs):
-    super(SpecCpu2006ConfigSpec, self).__init__(*args, **kwargs)
-    with self.RedirectFlags(FLAGS):
-      try:
-        # Peeking into the tar file is slow. If running in stages, it's
-        # reasonable to do this only once and assume that the contents of the
-        # tar file will not change between stages.
-        _CheckTarFile(FLAGS.runspec_config,
-                      examine_members=stages.PROVISION in FLAGS.run_stage)
-      except data.ResourceNotFound:
-        _CheckIsoAndCfgFile(FLAGS.runspec_config)
-
-
-BENCHMARK_CONFIG_SPEC_CLASS = SpecCpu2006ConfigSpec
+def CheckPrerequisites():
+  """Verifies that the required input files are present."""
+  try:
+    # Peeking into the tar file is slow. If running in stages, it's
+    # reasonable to do this only once and assume that the contents of the
+    # tar file will not change between stages.
+    _CheckTarFile(FLAGS.runspec_config,
+                  examine_members=stages.PROVISION in FLAGS.run_stage)
+  except data.ResourceNotFound:
+    _CheckIsoAndCfgFile(FLAGS.runspec_config)
 
 
 def _CheckTarFile(runspec_config, examine_members):

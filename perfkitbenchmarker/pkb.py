@@ -195,6 +195,51 @@ MAX_RUN_URI_LENGTH = 8
 events.initialization_complete.connect(traces.RegisterAll)
 
 
+def _CreateBenchmarkRunList():
+  """Create a list of configs and states for each benchmark run to be scheduled.
+
+  Returns:
+    list of (args, run_status_list) pairs. Contains one pair per benchmark run
+    to be scheduled, including multiple pairs for benchmarks that will be run
+    multiple times. args is a tuple of the first five arguments to pass to
+    RunBenchmark, and run_status_list is a list of strings in the order of
+    [benchmark_name, benchmark_uid, benchmark_status].
+  """
+  result = []
+  benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+  total_benchmarks = len(benchmark_tuple_list)
+  benchmark_counts = collections.defaultdict(itertools.count)
+  for i, benchmark_tuple in enumerate(benchmark_tuple_list):
+    # Construct benchmark config object.
+    benchmark_module, user_config = benchmark_tuple
+    name = benchmark_module.BENCHMARK_NAME
+    config_dict = benchmark_module.GetConfig(user_config)
+    config_spec_class = getattr(
+        benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
+        benchmark_config_spec.BenchmarkConfigSpec)
+    config = config_spec_class(name, flag_values=FLAGS, **config_dict)
+
+    # Assign a unique ID to each benchmark run. This differs even between two
+    # runs of the same benchmark within a single PKB run.
+    uid = name + str(benchmark_counts[name].next())
+
+    # Optional step to check flag values and verify files exist.
+    check_prereqs = getattr(benchmark_module, 'CheckPrerequisites', None)
+    if check_prereqs:
+      try:
+        with config.RedirectFlags(FLAGS):
+          check_prereqs()
+      except:
+        logging.exception('Prerequisite check failed for %s', name)
+        raise
+
+    result.append((
+        (benchmark_module, i + 1, total_benchmarks, config, uid),
+        [name, uid, benchmark_status.SKIPPED]))
+
+  return result
+
+
 def DoProvisionPhase(name, spec, timer):
   """Performs the Provision phase of benchmark execution.
 
@@ -324,19 +369,19 @@ def _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid):
       raise
 
 
-def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
-                 benchmark_config, benchmark_uid):
+def RunBenchmark(benchmark, sequence_number, total_benchmarks, benchmark_config,
+                 benchmark_uid, collector):
   """Runs a single benchmark and adds the results to the collector.
 
   Args:
     benchmark: The benchmark module to be run.
-    collector: The SampleCollector object to add samples to.
     sequence_number: The sequence number of when the benchmark was started
-      relative to the other benchmarks in the suite.
+        relative to the other benchmarks in the suite.
     total_benchmarks: The total number of benchmarks in the suite.
     benchmark_config: BenchmarkConfigSpec. The config to run the benchmark with.
     benchmark_uid: An identifier unique to this run of the benchmark even
-      if the same benchmark is run multiple times with different configs.
+        if the same benchmark is run multiple times with different configs.
+    collector: The SampleCollector object to add samples to.
   """
   benchmark_name = benchmark.BENCHMARK_NAME
 
@@ -345,17 +390,8 @@ def RunBenchmark(benchmark, collector, sequence_number, total_benchmarks,
       benchmark_name, sequence_number, total_benchmarks)
   log_context = log_util.GetThreadLogContext()
   with log_context.ExtendLabel(label_extension):
-
     spec = _GetBenchmarkSpec(benchmark_config, benchmark_name, benchmark_uid)
     with spec.RedirectGlobalFlags():
-      # Optional prerequisite checking.
-      check_prereqs = getattr(benchmark, 'CheckPrerequisites', None)
-      if check_prereqs:
-        try:
-          check_prereqs()
-        except:
-          logging.exception('Prerequisite check failed for %s', benchmark_name)
-          raise
       end_to_end_timer = timing_util.IntervalTimer()
       detailed_timer = timing_util.IntervalTimer()
       try:
@@ -465,11 +501,8 @@ def SetUpPKB():
   events.initialization_complete.send(parsed_flags=FLAGS)
 
 
-def RunBenchmarks(publish=True):
+def RunBenchmarks():
   """Runs all benchmarks in PerfKitBenchmarker.
-
-  Args:
-    publish: A boolean indicating whether results should be published.
 
   Returns:
     Exit status for the process.
@@ -492,38 +525,19 @@ def RunBenchmarks(publish=True):
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp)
 
-  run_status_lists = []
-  benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
-  total_benchmarks = len(benchmark_tuple_list)
-  benchmark_counts = collections.defaultdict(itertools.count)
-  args = []
-  for i, benchmark_tuple in enumerate(benchmark_tuple_list):
-    benchmark_module, user_config = benchmark_tuple
-    benchmark_name = benchmark_module.BENCHMARK_NAME
-    benchmark_config_dict = benchmark_module.GetConfig(user_config)
-    benchmark_config_spec_class = getattr(
-        benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
-        benchmark_config_spec.BenchmarkConfigSpec)
-    benchmark_config = benchmark_config_spec_class(
-        benchmark_name, flag_values=FLAGS, **benchmark_config_dict)
-    benchmark_uid = benchmark_name + str(
-        benchmark_counts[benchmark_name].next())
-    run_status_lists.append([benchmark_name, benchmark_uid,
-                             benchmark_status.SKIPPED])
-    args.append((benchmark_module, collector, i + 1, total_benchmarks,
-                 benchmark_config, benchmark_uid))
-
+  benchmark_run_list = _CreateBenchmarkRunList()
   try:
-    for run_args, run_status_list in zip(args, run_status_lists):
-      benchmark_module, _, sequence_number, _, _, benchmark_uid = run_args
+    for run_args, run_status_list in benchmark_run_list:
+      benchmark_module, sequence_number, _, _, benchmark_uid = run_args
       benchmark_name = benchmark_module.BENCHMARK_NAME
       try:
         run_status_list[2] = benchmark_status.FAILED
-        RunBenchmark(*run_args)
+        RunBenchmark(*run_args, collector=collector)
         run_status_list[2] = benchmark_status.SUCCEEDED
       except BaseException as e:
         msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
-            sequence_number, total_benchmarks, benchmark_name, benchmark_uid)
+            sequence_number, len(benchmark_run_list), benchmark_name,
+            benchmark_uid)
         if (isinstance(e, KeyboardInterrupt) or
             FLAGS.stop_after_benchmark_failure):
           logging.error('%s Execution will not continue.', msg)
@@ -534,7 +548,8 @@ def RunBenchmarks(publish=True):
     if collector.samples:
       collector.PublishSamples()
 
-    if run_status_lists:
+    if benchmark_run_list:
+      run_status_lists = tuple(r for _, r in benchmark_run_list)
       logging.info(benchmark_status.CreateSummary(run_status_lists))
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
