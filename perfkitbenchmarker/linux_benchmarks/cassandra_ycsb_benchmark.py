@@ -50,10 +50,9 @@ cassandra_ycsb:
 
 # TODO: Add flags.
 REPLICATION_FACTOR = 3
+YCSB_FIELD_COUNT = 10
 WRITE_CONSISTENCY = 'QUORUM'
 READ_CONSISTENCY = 'QUORUM'
-KEYSPACE_NAME = 'usertable'
-COLUMN_FAMILY = 'data'
 
 CREATE_TABLE_SCRIPT = 'cassandra/create-ycsb-table.cql.j2'
 
@@ -86,21 +85,27 @@ def _InstallCassandra(vm, seed_vms):
   cassandra.Configure(vm, seed_vms=seed_vms)
 
 
-def _CreateYCSBTable(vm, keyspace=KEYSPACE_NAME, column_family=COLUMN_FAMILY,
-                     replication_factor=REPLICATION_FACTOR):
+def _CreateYCSBTable(vm, replication_factor=REPLICATION_FACTOR,
+                     ycsb_field_count=YCSB_FIELD_COUNT):
   """Creates a Cassandra table for use with YCSB."""
   template_path = data.ResourcePath(CREATE_TABLE_SCRIPT)
   remote_path = os.path.join(
       cassandra.CASSANDRA_DIR,
       os.path.basename(os.path.splitext(template_path)[0]))
-  vm.RenderTemplate(template_path, remote_path,
-                    context={'keyspace': keyspace,
-                             'column_family': column_family,
-                             'replication_factor': replication_factor})
 
-  cassandra_cli = os.path.join(cassandra.CASSANDRA_DIR, 'bin', 'cassandra-cli')
-  command = '{0} -f {1} -h {2}'.format(cassandra_cli, remote_path,
-                                       vm.internal_ip)
+  for pv in FLAGS.ycsb_load_parameters:
+    param, value = pv.split('=', 1)
+    if param == 'fieldcount':
+      ycsb_field_count = value
+
+  vm.RenderTemplate(template_path, remote_path,
+                    context={
+                        'replication_factor': replication_factor,
+                        'ycsb_field_count': int(ycsb_field_count)})
+
+  cassandra_cli = os.path.join(cassandra.CASSANDRA_DIR, 'bin', 'cqlsh')
+  command = '{0} -f {1} {2}'.format(cassandra_cli, remote_path,
+                                    vm.internal_ip)
   vm.RemoteCommand(command, should_log=True)
 
 
@@ -162,11 +167,10 @@ def Run(benchmark_spec):
   logging.debug('Loaders: %s', loaders)
 
   executor = ycsb.YCSBExecutor(
-      'cassandra-10',
+      'cassandra2-cql',
       hosts=','.join(vm.internal_ip for vm in cassandra_vms))
 
   kwargs = {'hosts': ','.join(vm.internal_ip for vm in cassandra_vms),
-            'columnfamily': COLUMN_FAMILY,
             'cassandra.readconsistencylevel': READ_CONSISTENCY,
             'cassandra.scanconsistencylevel': READ_CONSISTENCY,
             'cassandra.writeconsistencylevel': WRITE_CONSISTENCY,

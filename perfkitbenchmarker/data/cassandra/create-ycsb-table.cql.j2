@@ -12,10 +12,14 @@
  # See the License for the specific language governing permissions and
  # limitations under the License. #}
 {# Create a table for YCSB benchmark. #}
-create keyspace {{ keyspace }}
-  with placement_strategy = 'SimpleStrategy'
-  and strategy_options = {replication_factor: {{ replication_factor }} };
-
-use {{ keyspace }};
-
-create column family {{ column_family }};
+create keyspace ycsb WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': {{replication_factor}} };
+USE ycsb;
+create table usertable (
+y_id varchar primary key,
+{% for i in range(0, ycsb_field_count) -%}
+{% if loop.last -%}
+    field{{i}} varchar);
+{% else -%}
+    field{{i}} varchar,
+{% endif %}
+{%- endfor %}
