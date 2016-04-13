@@ -190,15 +190,12 @@ class BenchmarkSpec(object):
 
   def _ConstructJujuController(self, group_spec):
     """Construct a VirtualMachine object for a Juju controller."""
-    vm_group_specs = self.config.vm_groups
-
     juju_spec = copy.copy(group_spec)
     juju_spec.vm_count = 1
     jujuvms = self.ConstructVirtualMachineGroup('juju', juju_spec)
     if len(jujuvms):
       jujuvm = jujuvms.pop()
       jujuvm.is_controller = True
-      jujuvm.vm_group_specs = vm_group_specs
       return jujuvm
     return None
 

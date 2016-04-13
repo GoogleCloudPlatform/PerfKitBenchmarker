@@ -96,37 +96,36 @@ def AptInstall(vm):
 
 def JujuInstall(vm, vm_group_name):
   """Installs the Cassandra charm on the VM."""
-  if vm.vm_group_specs and vm_group_name in vm.vm_group_specs:
-    vm.JujuDeploy('cs:trusty/cassandra', vm_group_name)
+  vm.JujuDeploy('cs:trusty/cassandra', vm_group_name)
 
-    # The charm defaults to Cassandra 2.2.x, which has deprecated
-    # cassandra-cli. Specify the sources to downgrade to Cassandra 2.1.x
-    # to match the cassandra benchmark(s) expectations.
-    sources = ['deb http://www.apache.org/dist/cassandra/debian 21x main',
-               'ppa:openjdk-r/ppa',
-               'ppa:stub/cassandra']
+  # The charm defaults to Cassandra 2.2.x, which has deprecated
+  # cassandra-cli. Specify the sources to downgrade to Cassandra 2.1.x
+  # to match the cassandra benchmark(s) expectations.
+  sources = ['deb http://www.apache.org/dist/cassandra/debian 21x main',
+             'ppa:openjdk-r/ppa',
+             'ppa:stub/cassandra']
 
-    keys = ["F758CE318D77295D",
-            'null',
-            'null']
+  keys = ["F758CE318D77295D",
+          'null',
+          'null']
 
-    vm.JujuSet('cassandra', [
-               # Allow authentication from all units
-               'authenticator=AllowAllAuthenticator',
-               'install_sources="[%s]"' %
-               ", ".join(map(lambda x: "'" + x + "'", sources)),
-               'install_keys="[%s]"'
-               % ", ".join(keys)
-               ])
+  vm.JujuSet('cassandra', [
+             # Allow authentication from all units
+             'authenticator=AllowAllAuthenticator',
+             'install_sources="[%s]"' %
+             ", ".join(map(lambda x: "'" + x + "'", sources)),
+             'install_keys="[%s]"'
+             % ", ".join(keys)
+             ])
 
-    # Wait for cassandra to be installed and configured
-    vm.JujuWait()
+  # Wait for cassandra to be installed and configured
+  vm.JujuWait()
 
-    for unit in vm.units:
-      # Make sure the cassandra/conf dir is created, since we're skipping
-      # the manual installation to /tmp/pkb.
-      remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
-      unit.RemoteCommand('mkdir -p %s' % remote_path)
+  for unit in vm.units:
+    # Make sure the cassandra/conf dir is created, since we're skipping
+    # the manual installation to /tmp/pkb.
+    remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
+    unit.RemoteCommand('mkdir -p %s' % remote_path)
 
 
 def Configure(vm, seed_vms):

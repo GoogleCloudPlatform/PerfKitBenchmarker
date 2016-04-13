@@ -985,7 +985,7 @@ class JujuMixin(DebianMixin):
   """
 
   # TODO: Add functionality to tear down and uninstall Juju
-  # (for pre-provisioned) machines
+  # (for pre-provisioned) machines + JujuUninstall for packages using charms.
 
   OS_TYPE = os_types.JUJU
 

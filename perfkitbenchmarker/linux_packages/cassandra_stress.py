@@ -39,18 +39,17 @@ def AptInstall(vm):
 
 def JujuInstall(vm, vm_group_name):
   """Installs the cassandra-stress charm on the VM."""
-  if vm.vm_group_specs and vm_group_name in vm.vm_group_specs:
-    vm.JujuDeploy('cs:~marcoceppi/trusty/cassandra-stress', vm_group_name)
+  vm.JujuDeploy('cs:~marcoceppi/trusty/cassandra-stress', vm_group_name)
 
-    # The assumption is that cassandra-stress will always be installed
-    # alongside cassandra
-    vm.JujuRelate('cassandra', 'cassandra-stress')
+  # The assumption is that cassandra-stress will always be installed
+  # alongside cassandra
+  vm.JujuRelate('cassandra', 'cassandra-stress')
 
-    # Wait for the cassandra-stress to install and configure
-    vm.JujuWait()
+  # Wait for the cassandra-stress to install and configure
+  vm.JujuWait()
 
-    for unit in vm.units:
-      # Make sure the cassandra/conf dir is created, since we're skipping
-      # the manual installation to /tmp/pkb.
-      remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
-      unit.RemoteCommand('mkdir -p %s' % remote_path)
+  for unit in vm.units:
+    # Make sure the cassandra/conf dir is created, since we're skipping
+    # the manual installation to /tmp/pkb.
+    remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
+    unit.RemoteCommand('mkdir -p %s' % remote_path)
