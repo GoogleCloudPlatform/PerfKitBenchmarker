@@ -191,6 +191,12 @@ class SampleCollectorTestCase(unittest.TestCase):
     self.benchmark = 'test!'
     self.benchmark_spec = mock.MagicMock()
 
+    p = mock.patch(publisher.__name__ + '.FLAGS')
+    self.mock_flags = p.start()
+    self.addCleanup(p.stop)
+
+    self.mock_flags.product_name = 'PerfKitBenchmarker'
+
   def _VerifyResult(self, contains_metadata=True):
     self.assertEqual(1, len(self.instance.samples))
     collector_sample = self.instance.samples[0]
@@ -291,6 +297,19 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     expected.update(scratch_disk_size=20,
                     scratch_disk_type='disk-type',
                     data_disk_0_size=20,
+                    data_disk_0_type='disk-type',
+                    data_disk_0_num_stripes=1)
+    self._RunTest(self.mock_spec, expected)
+
+  def testAddMetadata_DiskSizeNone(self):
+    # This situation can happen with static VMs
+    self.mock_disk.configure_mock(disk_type='disk-type',
+                                  disk_size=None)
+    self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
+    expected = self.default_meta.copy()
+    expected.update(scratch_disk_size=None,
+                    scratch_disk_type='disk-type',
+                    data_disk_0_size=None,
                     data_disk_0_type='disk-type',
                     data_disk_0_num_stripes=1)
     self._RunTest(self.mock_spec, expected)

@@ -154,20 +154,22 @@ class DefaultMetadataProvider(MetadataProvider):
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
+        disk_type = data_disk.disk_type
+        disk_size = data_disk.disk_size
+        num_stripes = data_disk.num_striped_disks
         # Legacy metadata keys
-        metadata[name_prefix + 'scratch_disk_type'] = data_disk.disk_type
-        metadata[name_prefix + 'scratch_disk_size'] = data_disk.disk_size
+        metadata[name_prefix + 'scratch_disk_type'] = disk_type
+        metadata[name_prefix + 'scratch_disk_size'] = disk_size
         metadata[name_prefix + 'num_striped_disks'] = (
             data_disk.num_striped_disks)
         if getattr(data_disk, 'iops', None) is not None:
           metadata[name_prefix + 'scratch_disk_iops'] = data_disk.iops
           metadata[name_prefix + 'aws_provisioned_iops'] = data_disk.iops
         # Modern metadata keys
-        metadata[name_prefix + 'data_disk_0_type'] = data_disk.disk_type
+        metadata[name_prefix + 'data_disk_0_type'] = disk_type
         metadata[name_prefix + 'data_disk_0_size'] = (
-            data_disk.disk_size * data_disk.num_striped_disks)
-        metadata[name_prefix + 'data_disk_0_num_stripes'] = (
-            data_disk.num_striped_disks)
+            disk_size * num_stripes if disk_size else disk_size)
+        metadata[name_prefix + 'data_disk_0_num_stripes'] = num_stripes
         if getattr(data_disk, 'metadata', None) is not None:
           if disk.LEGACY_DISK_TYPE in data_disk.metadata:
             metadata[name_prefix + 'scratch_disk_type'] = (
