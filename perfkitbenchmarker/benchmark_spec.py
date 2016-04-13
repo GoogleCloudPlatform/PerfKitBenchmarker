@@ -197,7 +197,7 @@ class BenchmarkSpec(object):
     jujuvms = self.ConstructVirtualMachineGroup('juju', juju_spec)
     if len(jujuvms):
       jujuvm = jujuvms.pop()
-      jujuvm.isController = True
+      jujuvm.is_controller = True
       jujuvm.vm_group_specs = vm_group_specs
       return jujuvm
     return None

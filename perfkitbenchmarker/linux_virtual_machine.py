@@ -978,7 +978,7 @@ class ContainerizedDebianMixin(DebianMixin):
 
 
 class JujuMixin(DebianMixin):
-  """Class to allow running juju-deployed workloads.
+  """Class to allow running Juju-deployed workloads.
 
   Bootstraps a Juju environment using the manual provider:
   https://jujucharms.com/docs/stable/config-manual
@@ -986,7 +986,7 @@ class JujuMixin(DebianMixin):
 
   OS_TYPE = os_types.JUJU
 
-  isController = False
+  is_controller = False
 
   # A reference to the juju controller, useful when operations occur against
   # a unit's VM but need to be preformed from the controller.
@@ -1030,7 +1030,7 @@ class JujuMixin(DebianMixin):
 
   def JujuConfigureEnvironment(self):
     """Configure a bootstrapped Juju environment."""
-    if self.isController:
+    if self.is_controller:
       resp, _ = self.RemoteHostCommand("mkdir -p ~/.juju")
 
       with vm_util.NamedTemporaryFile() as tf:
@@ -1163,7 +1163,7 @@ class JujuMixin(DebianMixin):
         self._installed_packages.add(package_name)
 
   def SetupPackageManager(self):
-    if self.isController:
+    if self.is_controller:
       resp, _ = self.RemoteHostCommand(
           "sudo add-apt-repository ppa:juju/stable"
       )
@@ -1172,7 +1172,7 @@ class JujuMixin(DebianMixin):
   def PrepareVMEnvironment(self):
     """Install and configure a Juju environment."""
     super(JujuMixin, self).PrepareVMEnvironment()
-    if self.isController:
+    if self.is_controller:
       self.InstallPackages('juju')
 
       self.JujuConfigureEnvironment()
