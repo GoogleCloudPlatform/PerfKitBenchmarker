@@ -57,7 +57,7 @@ In its current release these are the benchmarks that are executed:
   - `ping`: No license needed.
   - `silo`: MIT License
   - `scimark2`: [public domain](http://math.nist.gov/scimark2/credits.html)
-  - `speccpu2006`: [Spec CPU2006](http://www.spec.org/cpu2006/)
+  - `speccpu2006`: [SPEC CPU2006](http://www.spec.org/cpu2006/)
   - `sysbench_oltp`: [GPL v2](https://github.com/akopytov/sysbench)
   - [`tomcat`](https://github.com/apache/tomcat):
     [Apache v2](https://github.com/apache/tomcat/blob/trunk/LICENSE)
@@ -76,9 +76,27 @@ Some of the benchmarks invoked require Java. You must also agree with the follow
 Benchmarker users must manually download the CoreMark tarball from their website and save it under the
 `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/coremark_v1.0.tgz`)
 
-[SpecCPU2006](https://www.spec.org/cpu2006/) benchmark setup cannot be automated. SPEC requires users to purchase a license and agree with their terms and conditions.
-PerfKit Benchmarker users must manually download SpecCPU2006 tarball from their website and save it under
-the `perfkitbenchmarker/data` folder (e.g. `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`)
+[SPEC CPU2006](https://www.spec.org/cpu2006/) benchmark setup cannot be
+automated. SPEC requires that users purchase a license and agree with their
+terms and conditions. PerfKit Benchmarker users must manually download
+`cpu2006-1.2.iso` from the SPEC website, save it under the
+`perfkitbenchmarker/data` folder (e.g.
+`~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006-1.2.iso`), and also
+supply a runspec cfg file (e.g.
+`~/PerfKitBenchmarker/perfkitbenchmarker/data/linux64-x64-gcc47.cfg`).
+Alternately, PerfKit Benchmarker can accept a tar file that can be generated
+with the following steps:
+
+* Extract the contents of `cpu2006-1.2.iso` into a directory named `cpu2006`
+* Run `cpu2006/install.sh`
+* Copy the cfg file into `cpu2006/config`
+* Create a tar file containing the `cpu2006` directory, and place it under the
+  `perfkitbenchmarker/data` folder (e.g.
+  `~/PerfKitBenchmarker/perfkitbenchmarker/data/cpu2006v1.2.tgz`).
+
+PerfKit Benchmarker will use the tar file if it is present. Otherwise, it will
+search for the iso and cfg files.
+
 
 Installing PerfKit Benchmarker and Prerequisites
 ================================================
