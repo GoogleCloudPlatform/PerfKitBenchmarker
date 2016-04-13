@@ -17,6 +17,7 @@ Clusters can be created and deleted.
 """
 
 import json
+import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
@@ -52,13 +53,11 @@ class GcpBigtableCluster(resource.BaseResource):
     cmd.flags['project'] = self.project
     cmd.Issue()
 
-
   def _Delete(self):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'alpha', 'bigtable', 'clusters', 'delete',
                              self.name)
     cmd.Issue()
-
 
   def _Exists(self):
     """Returns true if the cluster exists."""
@@ -67,17 +66,19 @@ class GcpBigtableCluster(resource.BaseResource):
     cmd.flags['project'] = self.project
     # The zone flag makes this command fail.
     cmd.flags['zone'] = []
-    stdout, stderr, _ = cmd.Issue(suppress_warning=True)
-    try:
-      result = json.loads(stdout)
-      clusters = {cluster['name']: cluster for cluster in result['clusters']}
-      expected_cluster_name = 'projects/{0}/zones/{1}/clusters/{2}'.format(
-          self.project, self.zone, self.name)
-      try:
-        clusters[expected_cluster_name]
-        return True
-      except KeyError:
-        return False
-    except ValueError:
+    stdout, stderr, retcode = cmd.Issue(suppress_warning=True)
+    if retcode != 0:
+      # This is not ideal, as we're returning false not because we know
+      # the table isn't there, but because we can't figure out whether
+      # it is there.  This behavior is consistent without other
+      # _Exists methods.
+      logging.error('Unable to list GCP Bigtable clusters. Return code %s '
+                    'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
       return False
-    return True
+    result = json.loads(stdout)
+    if 'clusters' not in result:
+      return False
+    clusters = {cluster['name']: cluster for cluster in result['clusters']}
+    expected_cluster_name = 'projects/{0}/zones/{1}/clusters/{2}'.format(
+        self.project, self.zone, self.name)
+    return expected_cluster_name in clusters
