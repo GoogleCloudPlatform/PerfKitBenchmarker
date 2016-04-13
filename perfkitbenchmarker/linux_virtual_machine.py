@@ -1013,8 +1013,7 @@ class JujuMixin(DebianMixin):
     resp, _ = self.RemoteHostCommand("juju bootstrap")
 
   def JujuAddMachine(self, unit):
-    """
-    Adds a manually-created virtual machine to Juju.
+    """Adds a manually-created virtual machine to Juju.
 
     Args:
       unit: An object representing the unit's BaseVirtualMachine.
