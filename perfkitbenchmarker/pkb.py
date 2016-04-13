@@ -563,7 +563,7 @@ def RunBenchmarks():
                        gsutil_path=FLAGS.gsutil_path,
                        prefix=FLAGS.run_uri + '_')
   all_benchmarks_succeeded = all(r[2] == benchmark_status.SUCCEEDED
-                                 for r in run_status_lists)
+                                 for _, r in benchmark_run_list)
   return 0 if all_benchmarks_succeeded else 1
 
 
