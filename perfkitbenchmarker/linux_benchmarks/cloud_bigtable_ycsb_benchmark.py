@@ -235,7 +235,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
 
   # TODO: in the future, it might be nice to chagne this so that
-  # a gcp_bigtable.GceBigtableCluster can be created with an
+  # a gcp_bigtable.GcpBigtableCluster can be created with an
   # flag that says don't create/delete the cluster.  That would
   # reduce the code paths here.
   if FLAGS.google_bigtable_cluster_name is None:
@@ -243,7 +243,7 @@ def Prepare(benchmark_spec):
     project = FLAGS.project or _GetDefaultProject()
     logging.info('Creating bigtable cluster %s', cluster_name)
     zone = FLAGS.google_bigtable_zone_name
-    benchmark_spec.bigtable_cluster = gcp_bigtable.GceBigtableCluster(
+    benchmark_spec.bigtable_cluster = gcp_bigtable.GcpBigtableCluster(
         cluster_name, CLUSTER_SIZE, project, zone)
     benchmark_spec.bigtable_cluster.Create()
     cluster = _GetClusterDescription(project,

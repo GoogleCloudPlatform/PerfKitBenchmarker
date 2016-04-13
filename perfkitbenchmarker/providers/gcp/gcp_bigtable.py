@@ -25,8 +25,8 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 
 
-class GceBigtableCluster(resource.BaseResource):
-  """Object representing a GCE Bigtable Cluster.
+class GcpBigtableCluster(resource.BaseResource):
+  """Object representing a GCP Bigtable Cluster.
 
   Attributes:
     name: Cluster name.
@@ -36,7 +36,7 @@ class GceBigtableCluster(resource.BaseResource):
   """
 
   def __init__(self, name, num_nodes, project, zone):
-    super(GceBigtableCluster, self).__init__()
+    super(GcpBigtableCluster, self).__init__()
     self.num_nodes = num_nodes
     self.name = name
     self.zone = zone
