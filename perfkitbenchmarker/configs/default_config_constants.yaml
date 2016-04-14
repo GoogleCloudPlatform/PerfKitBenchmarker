@@ -14,6 +14,10 @@ default_single_core: &default_single_core
     machine_type: m3.medium
     zone: us-east-1
     image: null
+  SoftLayer:
+    machine_type: Small
+    zone: Washington
+    image: null
   AliCloud:
     machine_type: ecs.s2.large
     zone: us-west-1a

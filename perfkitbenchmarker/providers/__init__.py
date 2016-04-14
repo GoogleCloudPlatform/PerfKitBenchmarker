@@ -28,6 +28,7 @@ import_util.LoadModulesWithName(__path__, __name__, 'flags')
 GCP = 'GCP'
 AZURE = 'Azure'
 AWS = 'AWS'
+SOFTLAYER = 'SoftLayer'
 ALICLOUD = 'AliCloud'
 KUBERNETES = 'Kubernetes'
 DIGITALOCEAN = 'DigitalOcean'
@@ -36,7 +37,7 @@ CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 MESOS = 'Mesos'
 
-VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK, SOFTLAYER,
                 RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS]
 
 
