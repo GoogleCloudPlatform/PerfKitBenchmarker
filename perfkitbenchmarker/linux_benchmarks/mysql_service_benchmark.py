@@ -298,8 +298,7 @@ def _IssueSysbenchCommand(vm, duration):
   """
   stdout = ''
   stderr = ''
-  oltp_script_path = '%s%s' % (_GetSysbenchCommandPrefix(vm.OS_TYPE),
-                               OLTP_SCRIPT_PATH)
+  oltp_script_path = _GetSysbenchCommandPrefix(vm.OS_TYPE) + OLTP_SCRIPT_PATH
   if duration > 0:
     run_cmd_tokens = ['sysbench',
                       '--test=%s' % oltp_script_path,
@@ -363,8 +362,8 @@ def _RunSysbench(vm, metadata):
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
-  prepare_script_path = '%s%s' % (_GetSysbenchCommandPrefix(vm.OS_TYPE),
-                                  PREPARE_SCRIPT_PATH)
+  prepare_script_path = (_GetSysbenchCommandPrefix(vm.OS_TYPE) +
+                         PREPARE_SCRIPT_PATH)
   data_load_cmd_tokens = ['sysbench',
                           '--test=%s' % prepare_script_path,
                           '--mysql_svc_oltp_tables_count=%d' %
