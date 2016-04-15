@@ -214,7 +214,7 @@ def _CreateBenchmarkRunList():
     benchmark_module, user_config = benchmark_tuple
     name = benchmark_module.BENCHMARK_NAME
     expected_os_types = (
-        os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPE
+        os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPES
         else os_types.LINUX_OS_TYPES)
     config_dict = benchmark_module.GetConfig(user_config)
     config_spec_class = getattr(
