@@ -25,6 +25,7 @@
 -rrequirements-cloudstack.txt
 
 # Test requirements
+contextlib2>=0.5.1
 mock>=1.0.1
 nose>=1.3
 flake8>=2.1.0
