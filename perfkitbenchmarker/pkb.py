@@ -213,11 +213,15 @@ def _CreateBenchmarkRunList():
     # Construct benchmark config object.
     benchmark_module, user_config = benchmark_tuple
     name = benchmark_module.BENCHMARK_NAME
+    expected_os_types = (
+        os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPE
+        else os_types.LINUX_OS_TYPES)
     config_dict = benchmark_module.GetConfig(user_config)
     config_spec_class = getattr(
         benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
         benchmark_config_spec.BenchmarkConfigSpec)
-    config = config_spec_class(name, flag_values=FLAGS, **config_dict)
+    config = config_spec_class(name, expected_os_types=expected_os_types,
+                               flag_values=FLAGS, **config_dict)
 
     # Assign a unique ID to each benchmark run. This differs even between two
     # runs of the same benchmark within a single PKB run.
