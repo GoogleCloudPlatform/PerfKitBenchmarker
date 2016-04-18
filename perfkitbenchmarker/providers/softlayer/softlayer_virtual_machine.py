@@ -67,8 +67,8 @@ NUM_LOCAL_VOLUMES = {
     'd2.8xlarge': 24,
 }
 DRIVE_START_LETTER = 'b'
-INSTANCE_EXISTS_STATES = frozenset(['Running', 'Halted', 'HALTED', 'RUNNING'])
-INSTANCE_DELETED_STATES = frozenset(['shutting-down', 'terminated'])
+INSTANCE_EXISTS_STATES = frozenset(['Running', 'RUNNING'])
+INSTANCE_DELETED_STATES = frozenset(['shutting-down', 'HALTED'])
 INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATES | INSTANCE_DELETED_STATES
 
 
@@ -163,21 +163,16 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def ImportKeyfile(self):
     """Imports the public keyfile to SoftLayer."""
-    print "Not importing key" 
-    return
-    with self._lock:
-      if self.region in self.imported_keyfile_set:
-        return
     
-      cat_cmd = ['cat',
-                 vm_util.GetPublicKeyPath()]
-      keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
-      import_cmd = util.SoftLayer_PREFIX + [
-          'ec2', '--region=%s' % self.region,
-          'import-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri,
-          '--public-key-material=%s' % keyfile]
-      util.IssueRetryableCommand(import_cmd)
+    with self._lock:
+      
+        import_cmd = util.SoftLayer_PREFIX + [
+          'sshkey',
+          'add',
+          '--in-file', 
+          vm_util.GetPublicKeyPath(),
+          self.keyLabel]
+        util.IssueRetryableCommand(import_cmd)
       self.imported_keyfile_set.add(self.region)
       if self.region in self.deleted_keyfile_set:
         self.deleted_keyfile_set.remove(self.region)
@@ -205,31 +200,20 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         'vs',
         'detail',
         '%s' % self.id]
-    logging.info('Getting instance %s public IP.', self.id)
+    
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     self.ip_address = response['public_ip']
+    transaction = response['active_transaction']
     
-    if self.ip_address == None:
-        logging.info('Getting instance %s public IP. Not found.', self.id)
+    if transaction != None:
+        logging.info('Checking instance %s is active. Active transaction: %s. Raising Exception', self.id, transaction)
         raise Exception
     
-    logging.info('Getting instance %s public IP %s.', self.id, self.ip_address)
     self.internal_ip = response['private_ip']
-    """if response['state'] != "RUNNING":
-        logging.info('Instance %s state=%s.', self.id, response['state'])
-        while self.active_try_count < 20:
-            self.active_try_count = self.active_try_count + 1
-            logging.info('Sleeping for 30 seconds before retrying state')
-            time.sleep(30)
-            self._PostCreate()
-    else:
-        logging.info('Instance %s state=%s.', self.id, response['state'])
-    """    
             
     #util.AddDefaultTags(self.id, self.region)
 
-    
         
   
   def id_generator(self, size=6, chars=string.ascii_uppercase + string.digits):
@@ -238,6 +222,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
+    self.keyLabel  = "pefkit-" + self.id_generator()
+    
     self.ImportKeyfile()
     # _GetDefaultImage calls the SoftLayer CLI.
     self.image = self.image or self._GetDefaultImage(self.machine_type,
@@ -263,7 +249,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     placement = ','.join(placement)
     block_device_map = GetBlockDeviceMap(self.machine_type)
 
-
+   
+      
     create_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json',                                          
@@ -281,7 +268,10 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--cpu',
         '1',
           '--os',
-        'UBUNTU_LATEST_64']
+        'UBUNTU_LATEST_64',
+        '--key',
+         keyfile
+        ]
     
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
