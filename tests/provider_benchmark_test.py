@@ -24,7 +24,7 @@ class ProviderBenchmarkChecks(unittest.TestCase):
 
   def testPingSupported(self):
     for cloud in providers.VALID_CLOUDS:
-      providers.LoadProvider(cloud.lower())
+      providers.LoadProvider(cloud)
       ThisProviderInfoClass = provider_info.GetProviderInfoClass(cloud)
       self.assertTrue(ThisProviderInfoClass.IsBenchmarkSupported('iperf'),
                       'provider {0} does not support iperf'.format(
@@ -32,7 +32,7 @@ class ProviderBenchmarkChecks(unittest.TestCase):
 
   def testMYSQLSupport(self):
     for cloud in providers.VALID_CLOUDS:
-      providers.LoadProvider(cloud.lower())
+      providers.LoadProvider(cloud)
       ThisProviderInfoClass = provider_info.GetProviderInfoClass(cloud)
       if (cloud == providers.AWS or cloud == providers.GCP):
         self.assertTrue(ThisProviderInfoClass.IsBenchmarkSupported(
