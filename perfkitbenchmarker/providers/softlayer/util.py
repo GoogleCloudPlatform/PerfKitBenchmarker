@@ -21,14 +21,14 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
-SoftLayer_PATH = 'smcli'
+SoftLayer_PATH = 'slcli'
 SoftLayer_PREFIX = [SoftLayer_PATH]
 FLAGS = flags.FLAGS
 
 
 def IsRegion(zone_or_region):
   """Returns whether "zone_or_region" is a region."""
-  if not re.match(r'[a-z]{2}-[a-z]+-[0-9][a-z]?$', zone_or_region):
+  if not re.match(r'[a-z]{3}[0-9]{2}$', zone_or_region):
     raise ValueError(
         '%s is not a valid SoftLayer zone or region name' % zone_or_region)
   return zone_or_region[-1] in string.digits
@@ -53,11 +53,8 @@ def AddTags(resource_id, region, **kwargs):
     return
 
   tag_cmd = SoftLayer_PREFIX + [
-      'ec2',
-      'create-tags',
-      '--region=%s' % region,
-      '--resources', resource_id,
-      '--tags']
+      'vs',
+      'edit']
   for key, value in kwargs.iteritems():
     tag_cmd.append('Key={0},Value={1}'.format(key, value))
   IssueRetryableCommand(tag_cmd)
@@ -81,10 +78,6 @@ def AddDefaultTags(resource_id, region):
 @vm_util.Retry()
 def IssueRetryableCommand(cmd, env=None):
   """Tries running the provided command until it succeeds or times out.
-
-  On Windows, the SoftLayer CLI doesn't correctly set the return code when it
-  has an error (at least on version 1.7.28). By retrying the command if
-  we get output on stderr, we can work around this issue.
 
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
