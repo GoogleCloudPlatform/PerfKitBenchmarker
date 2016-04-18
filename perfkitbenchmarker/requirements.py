@@ -55,10 +55,12 @@ def CheckBasicRequirements():
   The basic requirements include packages used by modules that are imported
   regardless of the specified cloud providers. The list of required packages
   and versions is found in the requirements.txt file in the git branch's root
-  directory.
+  directory. If such a file does not exist, then the requirements check is
+  skipped.
   """
   requirements_file_path = os.path.join(_BRANCH_ROOT_DIR, 'requirements.txt')
-  _CheckRequirements(requirements_file_path)
+  if os.path.isfile(requirements_file_path):
+    _CheckRequirements(requirements_file_path)
 
 
 def CheckProviderRequirements(provider):
