@@ -15,23 +15,26 @@
 """Utilities for working with Azure resources."""
 
 import logging
+import sys
 
+from perfkitbenchmarker import events
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 
 AZURE_PATH = 'azure'
 EXPECTED_VERSION = '0.9.9'
 
 
-def CheckAzureVersion():
+def _CheckAzureVersion():
   """Warns the user if the Azure CLI isn't the expected version."""
   version_cmd = [AZURE_PATH, '-v']
   try:
     stdout, _, _ = vm_util.IssueCommand(version_cmd)
   except OSError:
-    # IssueCommand will raise an OSError if the CLI is not installed on the
-    # system. Since we don't want to warn users if they are doing nothing
-    # related to Azure, just do nothing if this is the case.
-    return
+    err_msg = ('Unable to execute the Azure CLI. See log for more details. See '
+               'README.md for information about how to set up PKB for Azure.')
+    logging.debug(err_msg, exc_info=True)
+    sys.exit(err_msg)
   version = stdout.strip()
   if version != EXPECTED_VERSION:
     logging.warning('The version of the Azure CLI (%s) does not match the '
@@ -39,3 +42,13 @@ def CheckAzureVersion():
                     'incompatibilities which will cause commands to fail. '
                     'Please install the reccomended version to ensure '
                     'compatibility.', version, EXPECTED_VERSION)
+
+
+def _HandleProviderImported(sender):
+  assert sender == providers.AZURE, sender
+  _CheckAzureVersion()
+
+
+# Register handler to call _CheckAzureVersion after Azure modules are imported.
+events.provider_imported.connect(_HandleProviderImported, providers.AZURE,
+                                 weak=False)
