@@ -49,12 +49,12 @@ def LoadProvider(provider_name, ignore_package_requirements=True):
   these modules, relevant classes (e.g. VMs) will register themselves.
 
   Args:
-    provider_name: The name of the package whose modules should be loaded.
-        Usually the name of the provider in lower case (e.g. the package name
-        for the 'GCP' provider is 'gcp'.
+    provider_name: string chosen from VALID_CLOUDS. The name of the provider
+        whose modules should be loaded.
     ignore_package_requirements: boolean. If True, the provider's Python package
         requirements file is ignored.
   """
+  provider_name = provider_name.lower()
   if not ignore_package_requirements:
     requirements.CheckProviderRequirements(provider_name)
   provider_package_path = os.path.join(__path__[0], provider_name)

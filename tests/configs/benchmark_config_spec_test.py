@@ -372,14 +372,14 @@ class VmGroupSpecTestCase(unittest.TestCase):
     flag_values.ignore_package_requirements = False
     with mock.patch(providers.__name__ + '.LoadProvider'):
       self._spec_class(_COMPONENT, flag_values, **self._kwargs)
-      providers.LoadProvider.assert_called_once_with('gcp', False)
+      providers.LoadProvider.assert_called_once_with('GCP', False)
 
   def testCallsLoadProviderAndIgnoresRequirements(self):
     flag_values = self.createNonPresentFlags()
     flag_values.ignore_package_requirements = True
     with mock.patch(providers.__name__ + '.LoadProvider'):
       self._spec_class(_COMPONENT, flag_values, **self._kwargs)
-      providers.LoadProvider.assert_called_once_with('gcp', True)
+      providers.LoadProvider.assert_called_once_with('GCP', True)
 
 
 class VmGroupsDecoderTestCase(unittest.TestCase):

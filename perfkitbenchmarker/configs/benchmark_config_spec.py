@@ -185,7 +185,7 @@ class _VmGroupSpec(spec.BaseSpec):
     ignore_package_requirements = (
         getattr(flag_values, 'ignore_package_requirements', True) if flag_values
         else True)
-    providers.LoadProvider(self.cloud.lower(), ignore_package_requirements)
+    providers.LoadProvider(self.cloud, ignore_package_requirements)
     if self.disk_spec:
       disk_config = getattr(self.disk_spec, self.cloud, None)
       if disk_config is None:

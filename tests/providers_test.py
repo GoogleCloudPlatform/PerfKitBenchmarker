@@ -28,7 +28,7 @@ class LoadProvidersTestCase(unittest.TestCase):
 
   def testLoadAllProviders(self):
     for cloud in providers.VALID_CLOUDS:
-      providers.LoadProvider(cloud.lower())
+      providers.LoadProvider(cloud)
 
   def testLoadInvalidProvider(self):
     with self.assertRaises(ImportError):
@@ -36,12 +36,12 @@ class LoadProvidersTestCase(unittest.TestCase):
 
   def testLoadProviderChecksRequirements(self):
     with mock.patch(requirements.__name__ + '.CheckProviderRequirements'):
-      providers.LoadProvider('gcp', ignore_package_requirements=False)
+      providers.LoadProvider('GCP', ignore_package_requirements=False)
       requirements.CheckProviderRequirements.assert_called_once_with('gcp')
 
   def testLoadProviderIgnoresRequirements(self):
     with mock.patch(requirements.__name__ + '.CheckProviderRequirements'):
-      providers.LoadProvider('gcp')
+      providers.LoadProvider('GCP')
       requirements.CheckProviderRequirements.assert_not_called()
 
   def testBenchmarkConfigSpecLoadsProvider(self):
@@ -61,4 +61,4 @@ class LoadProvidersTestCase(unittest.TestCase):
     with mock_flags.PatchFlags() as mocked_flags:
       benchmark_config_spec.BenchmarkConfigSpec(
           'name', flag_values=mocked_flags, **config)
-    providers.LoadProvider.assert_called_with('aws', True)
+    providers.LoadProvider.assert_called_with('AWS', True)
