@@ -21,7 +21,6 @@ import abc
 import logging
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -274,17 +273,15 @@ class BaseDisk(resource.BaseResource):
 
   def GetDevicePath(self):
     """Returns the path to the device inside a Linux VM."""
-    if FLAGS.os_type != os_types.WINDOWS:
-      return self.device_path
-    else:
-      raise ValueError('Windows disks do not have device paths.')
+    if self.device_path is None:
+      raise ValueError('device_path is None.')
+    return self.device_path
 
   def GetDeviceId(self):
     """Return the Windows DeviceId of this disk."""
-    if FLAGS.os_type == os_types.WINDOWS:
-      return r'\\.\PHYSICALDRIVE%s' % self.disk_number
-    else:
-      raise ValueError('DeviceIds only exist on Windows.')
+    if self.disk_number is None:
+      raise ValueError('disk_number is None.')
+    return r'\\.\PHYSICALDRIVE%s' % self.disk_number
 
 
 class StripedDisk(BaseDisk):
