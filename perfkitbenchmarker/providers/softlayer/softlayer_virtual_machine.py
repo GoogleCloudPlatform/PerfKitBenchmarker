@@ -1,4 +1,3 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +21,9 @@ import base64
 import json
 import logging
 import threading
+import string
+import random
+import time
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -30,9 +32,9 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
+from perfkitbenchmarker.providers.softlayer import util
 from perfkitbenchmarker.providers.softlayer import softlayer_disk
 from perfkitbenchmarker.providers.softlayer import softlayer_network
-from perfkitbenchmarker.providers.softlayer import util
 from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
@@ -65,10 +67,9 @@ NUM_LOCAL_VOLUMES = {
     'd2.8xlarge': 24,
 }
 DRIVE_START_LETTER = 'b'
-INSTANCE_EXISTS_STATUSES = frozenset(
-    ['pending', 'running', 'stopping', 'stopped'])
-INSTANCE_DELETED_STATUSES = frozenset(['shutting-down', 'terminated'])
-INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
+INSTANCE_EXISTS_STATES = frozenset(['Running', 'Halted', 'HALTED', 'RUNNING'])
+INSTANCE_DELETED_STATES = frozenset(['shutting-down', 'terminated'])
+INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATES | INSTANCE_DELETED_STATES
 
 
 def GetBlockDeviceMap(machine_type):
@@ -101,7 +102,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an SoftLayer Virtual Machine."""
 
   CLOUD = providers.SOFTLAYER
-  IMAGE_NAME_FILTER = None
+  IMAGE_NAME_FILTER = 'Ubuntu'
   DEFAULT_ROOT_DISK_TYPE = 'standard'
 
   _lock = threading.Lock()
@@ -116,12 +117,12 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     super(SoftLayerVirtualMachine, self).__init__(vm_spec)
     self.region = util.GetRegionFromZone(self.zone)
-    self.user_name = FLAGS.SoftLayer_user_name
+    self.user_name = FLAGS.softlayer_user_name
     if self.machine_type in NUM_LOCAL_VOLUMES:
       self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
-    self.network = softLayer_network.SoftLayerNetwork.GetNetwork(self)
-    self.firewall = SoftLayer_network.SoftLayerFirewall.GetFirewall()
+    #self.network = softLayer_network.SoftLayerNetwork.GetNetwork(self)              
+    #self.firewall = softLayer_network.SoftLayerFirewall.GetFirewall() 
 
   @property
   def group_id(self):
@@ -130,6 +131,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @classmethod
   def _GetDefaultImage(cls, machine_type, region):
+    print "By pass get default image"  
+    return
     """Returns the default image given the machine type and region.
 
     If no default is configured, this will return None.
@@ -141,15 +144,12 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     virt_type = 'paravirtual' if prefix in NON_HVM_PREFIXES else 'hvm'
 
     describe_cmd = util.SoftLayer_PREFIX + [
-        '--region=%s' % region,
-        'ec2',
-        'describe-images',
-        '--query', 'Images[*].{Name:Name,ImageId:ImageId}',
-        '--filters',
-        'Name=name,Values=%s' % cls.IMAGE_NAME_FILTER,
-        'Name=block-device-mapping.volume-type,Values=%s' %
-        cls.DEFAULT_ROOT_DISK_TYPE,
-        'Name=virtualization-type,Values=%s' % virt_type]
+        'image',
+        'list',
+        '--public',
+        '--name', 
+        '*%s*' % cls.IMAGE_NAME_FILTER]
+    
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
 
     if not stdout:
@@ -163,9 +163,12 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def ImportKeyfile(self):
     """Imports the public keyfile to SoftLayer."""
+    print "Not importing key" 
+    return
     with self._lock:
       if self.region in self.imported_keyfile_set:
         return
+    
       cat_cmd = ['cat',
                  vm_util.GetPublicKeyPath()]
       keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
@@ -197,23 +200,41 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _PostCreate(self):
     """Get the instance's data and tag it."""
     describe_cmd = util.SoftLayer_PREFIX + [
-        'ec2',
-        'describe-instances',
-        '--region=%s' % self.region,
-        '--instance-ids=%s' % self.id]
-    logging.info('Getting instance %s public IP. This will fail until '
-                 'a public IP is available, but will be retried.', self.id)
+        '--format',
+        'json',
+        'vs',
+        'detail',
+        '%s' % self.id]
+    logging.info('Getting instance %s public IP.', self.id)
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
-    instance = response['Reservations'][0]['Instances'][0]
-    self.ip_address = instance['PublicIpAddress']
-    self.internal_ip = instance['PrivateIpAddress']
-    if util.IsRegion(self.zone):
-      self.zone = str(instance['Placement']['AvailabilityZone'])
-    util.AddDefaultTags(self.id, self.region)
+    self.ip_address = response['public_ip']
+    
+    if self.ip_address == None:
+        logging.info('Getting instance %s public IP. Not found.', self.id)
+        raise Exception
+    
+    logging.info('Getting instance %s public IP %s.', self.id, self.ip_address)
+    self.internal_ip = response['private_ip']
+    """if response['state'] != "RUNNING":
+        logging.info('Instance %s state=%s.', self.id, response['state'])
+        while self.active_try_count < 20:
+            self.active_try_count = self.active_try_count + 1
+            logging.info('Sleeping for 30 seconds before retrying state')
+            time.sleep(30)
+            self._PostCreate()
+    else:
+        logging.info('Instance %s state=%s.', self.id, response['state'])
+    """    
+            
+    #util.AddDefaultTags(self.id, self.region)
 
-    assert self.group_id == instance['SecurityGroups'][0]['GroupId'], (
-        self.group_id, instance['SecurityGroups'][0]['GroupId'])
+    
+        
+  
+  def id_generator(self, size=6, chars=string.ascii_uppercase + string.digits):
+      return ''.join(random.choice(chars) for _ in range(size))
+
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -221,7 +242,12 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     # _GetDefaultImage calls the SoftLayer CLI.
     self.image = self.image or self._GetDefaultImage(self.machine_type,
                                                      self.region)
+    
+    self.hostname = "pefkithost-" + self.id_generator() 
     self.AllowRemoteAccessPorts()
+
+    self.active_try_count = 0
+  
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
@@ -237,53 +263,59 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     placement = ','.join(placement)
     block_device_map = GetBlockDeviceMap(self.machine_type)
 
+
     create_cmd = util.SoftLayer_PREFIX + [
-        'ec2',
-        'run-instances',
-        '--region=%s' % self.region,
-        '--subnet-id=%s' % self.network.subnet.id,
-        '--associate-public-ip-address',
-        '--image-id=%s' % self.image,
-        '--instance-type=%s' % self.machine_type,
-        '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
-    if block_device_map:
-      create_cmd.append('--block-device-mappings=%s' % block_device_map)
-    if placement:
-      create_cmd.append('--placement=%s' % placement)
-    if self.user_data:
-      create_cmd.append('--user-data=%s' % self.user_data)
+        '--format',
+        'json',                                          
+        '-y',
+        'vs',
+        'create',
+        '--datacenter',
+        '%s' % self.region,
+        '--memory', 
+        '1024', 
+        '--hostname',
+        '%s' % self.hostname,
+        '--domain',
+        'perfkit.org',
+        '--cpu',
+        '1',
+          '--os',
+        'UBUNTU_LATEST_64']
+    
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
-    self.id = response['Instances'][0]['InstanceId']
+    self.id = response['id']
 
   def _Delete(self):
     """Delete a VM instance."""
     delete_cmd = util.SoftLayer_PREFIX + [
-        'ec2',
-        'terminate-instances',
-        '--region=%s' % self.region,
-        '--instance-ids=%s' % self.id]
+        '-y',
+        'vs',
+        'cancel',
+        '%s' % self.id]
+    
     vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the VM exists."""
     describe_cmd = util.SoftLayer_PREFIX + [
-        'ec2',
-        'describe-instances',
-        '--region=%s' % self.region,
-        '--filter=Name=instance-id,Values=%s' % self.id]
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
-    reservations = response['Reservations']
-    assert len(reservations) < 2, 'Too many reservations.'
-    if not reservations:
-      return False
-    instances = reservations[0]['Instances']
-    assert len(instances) == 1, 'Wrong number of instances.'
-    status = instances[0]['State']['Name']
-    assert status in INSTANCE_KNOWN_STATUSES, status
-    return status in INSTANCE_EXISTS_STATUSES
-
+        '--format',
+        'json', 
+        'vs', 
+        'detail',
+        '%s' % self.id]
+    try:
+        stdout, _ = util.IssueRetryableCommand(describe_cmd)
+        response = json.loads(stdout)
+        state = response['state']
+      
+        print "state= %s" % state  
+        assert state in INSTANCE_KNOWN_STATUSES, state
+        return state in INSTANCE_EXISTS_STATES
+    except errors.VmUtil.CalledProcessException as e:
+        return False
+            
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
 
@@ -293,22 +325,21 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Instantiate the disk(s) that we want to create.
     disks = []
     for _ in range(disk_spec.num_striped_disks):
-      data_disk = SoftLayer_disk.SoftLayerDisk(disk_spec, self.zone, self.machine_type)
-      if disk_spec.disk_type == disk.LOCAL:
-        data_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
+        data_disk = softLayer_disk.SoftLayerDisk(disk_spec, self.zone, self.machine_type)
+        if disk_spec.disk_type == disk.LOCAL:
+            data_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
                                       self.local_disk_counter)
         # Local disk numbers start at 1 (0 is the system disk).
-        data_disk.disk_number = self.local_disk_counter + 1
-        self.local_disk_counter += 1
-        if self.local_disk_counter > self.max_local_disks:
-          raise errors.Error('Not enough local disks.')
-      else:
-        # Remote disk numbers start at 1 + max_local disks (0 is the system disk
-        # and local disks occupy [1, max_local_disks]).
-        data_disk.disk_number = (self.remote_disk_counter +
-                                 1 + self.max_local_disks)
-        self.remote_disk_counter += 1
-      disks.append(data_disk)
+            data_disk.disk_number = self.local_disk_counter + 1
+            self.local_disk_counter += 1
+            if self.local_disk_counter > self.max_local_disks:
+                raise errors.Error('Not enough local disks.')
+            else:
+                # Remote disk numbers start at 1 + max_local disks (0 is the system disk
+                # and local disks occupy [1, max_local_disks]).
+                data_disk.disk_number = (self.remote_disk_counter + 1 + self.max_local_disks)
+                self.remote_disk_counter += 1
+                disks.append(data_disk)
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 

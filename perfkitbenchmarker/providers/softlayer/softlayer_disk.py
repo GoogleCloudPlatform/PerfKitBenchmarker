@@ -12,13 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing classes related to AWS disks.
+"""Module containing classes related to SoftLayer disks.
 
 Disks can be created, deleted, attached to VMs, and detached from VMs.
-See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html to
-determine valid disk types.
-See http://aws.amazon.com/ebs/details/ for more information about AWS (EBS)
-disks.
 """
 
 import json
@@ -30,7 +26,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker.providers.softlayer import util
 
 VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
@@ -85,18 +81,18 @@ def LocalDiskIsHDD(machine_type):
   return machine_type[:2].lower() in LOCAL_HDD_PREFIXES
 
 
-AWS = 'AWS'
-disk.RegisterDiskTypeMap(AWS, DISK_TYPE)
+SoftLayer = 'SoftLayer'
+disk.RegisterDiskTypeMap(SoftLayer, DISK_TYPE)
 
 
-class AwsDiskSpec(disk.BaseDiskSpec):
-  """Object holding the information needed to create an AwsDisk.
+class SoftLayerDiskSpec(disk.BaseDiskSpec):
+  """Object holding the information needed to create an SoftLayerDisk.
 
   Attributes:
-    iops: None or int. IOPS for Provisioned IOPS (SSD) volumes in AWS.
+    iops: None or int. IOPS for Provisioned IOPS (SSD) volumes in SoftLayer.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = providers.SOFTLAYER
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -110,9 +106,9 @@ class AwsDiskSpec(disk.BaseDiskSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
-    super(AwsDiskSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['aws_provisioned_iops'].present:
-      config_values['iops'] = flag_values.aws_provisioned_iops
+    super(SoftLayerDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['SoftLayer_provisioned_iops'].present:
+      config_values['iops'] = flag_values.SoftLayer_provisioned_iops
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -123,20 +119,20 @@ class AwsDiskSpec(disk.BaseDiskSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(AwsDiskSpec, cls)._GetOptionDecoderConstructions()
+    result = super(SoftLayerDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({'iops': (option_decoders.IntDecoder, {'default': None,
                                                          'none_ok': True})})
     return result
 
 
-class AwsDisk(disk.BaseDisk):
-  """Object representing an Aws Disk."""
+class SoftLayerDisk(disk.BaseDisk):
+  """Object representing an SoftLayer Disk."""
 
   _lock = threading.Lock()
   vm_devices = {}
 
   def __init__(self, disk_spec, zone, machine_type):
-    super(AwsDisk, self).__init__(disk_spec)
+    super(SoftLayerDisk, self).__init__(disk_spec)
     self.iops = disk_spec.iops
     self.id = None
     self.zone = zone
@@ -153,7 +149,7 @@ class AwsDisk(disk.BaseDisk):
 
   def _Create(self):
     """Creates the disk."""
-    create_cmd = util.AWS_PREFIX + [
+    create_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'create-volume',
         '--region=%s' % self.region,
@@ -170,18 +166,18 @@ class AwsDisk(disk.BaseDisk):
 
   def _Delete(self):
     """Deletes the disk."""
-    delete_cmd = util.AWS_PREFIX + [
+    delete_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'delete-volume',
         '--region=%s' % self.region,
         '--volume-id=%s' % self.id]
-    logging.info('Deleting AWS volume %s. This may fail if the disk is not '
+    logging.info('Deleting SoftLayer volume %s. This may fail if the disk is not '
                  'yet detached, but will be retried.', self.id)
     vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the disk exists."""
-    describe_cmd = util.AWS_PREFIX + [
+    describe_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'describe-volumes',
         '--region=%s' % self.region,
@@ -200,30 +196,30 @@ class AwsDisk(disk.BaseDisk):
     """Attaches the disk to a VM.
 
     Args:
-      vm: The AwsVirtualMachine instance to which the disk will be attached.
+      vm: The SoftLayerVirtualMachine instance to which the disk will be attached.
     """
     with self._lock:
       self.attached_vm_id = vm.id
-      if self.attached_vm_id not in AwsDisk.vm_devices:
-        AwsDisk.vm_devices[self.attached_vm_id] = set(
+      if self.attached_vm_id not in SoftLayerDisk.vm_devices:
+        SoftLayerDisk.vm_devices[self.attached_vm_id] = set(
             string.ascii_lowercase)
-      self.device_letter = min(AwsDisk.vm_devices[self.attached_vm_id])
-      AwsDisk.vm_devices[self.attached_vm_id].remove(self.device_letter)
+      self.device_letter = min(SoftLayerDisk.vm_devices[self.attached_vm_id])
+      SoftLayerDisk.vm_devices[self.attached_vm_id].remove(self.device_letter)
 
-    attach_cmd = util.AWS_PREFIX + [
+    attach_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'attach-volume',
         '--region=%s' % self.region,
         '--instance-id=%s' % self.attached_vm_id,
         '--volume-id=%s' % self.id,
         '--device=%s' % self.GetDevicePath()]
-    logging.info('Attaching AWS volume %s. This may fail if the disk is not '
+    logging.info('Attaching SoftLayer volume %s. This may fail if the disk is not '
                  'ready, but will be retried.', self.id)
     util.IssueRetryableCommand(attach_cmd)
 
   def Detach(self):
     """Detaches the disk from a VM."""
-    detach_cmd = util.AWS_PREFIX + [
+    detach_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'detach-volume',
         '--region=%s' % self.region,
@@ -232,8 +228,8 @@ class AwsDisk(disk.BaseDisk):
     util.IssueRetryableCommand(detach_cmd)
 
     with self._lock:
-      assert self.attached_vm_id in AwsDisk.vm_devices
-      AwsDisk.vm_devices[self.attached_vm_id].add(self.device_letter)
+      assert self.attached_vm_id in SoftLayerDisk.vm_devices
+      SoftLayerDisk.vm_devices[self.attached_vm_id].add(self.device_letter)
       self.attached_vm_id = None
       self.device_letter = None
 

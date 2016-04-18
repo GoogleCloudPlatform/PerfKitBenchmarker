@@ -14,9 +14,9 @@
 
 from perfkitbenchmarker import flags
 
-flags.DEFINE_string('aws_user_name', 'ubuntu',
+flags.DEFINE_string('softlayer_user_name', 'root',
                     'This determines the user name that Perfkit will '
                     'attempt to use. This must be changed in order to '
                     'use any image other than ubuntu.')
-flags.DEFINE_integer('aws_provisioned_iops', None,
-                     'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
+flags.DEFINE_integer('softlayer_provisioned_iops', None,
+                     'IOPS for Provisioned IOPS (SSD) volumes in SoftLayer.')

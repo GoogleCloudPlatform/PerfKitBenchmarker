@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing classes related to AWS VM networking.
+"""Module containing classes related to SoftLayer VM networking.
 
 The Firewall class provides a way of opening VM ports. The Network class allows
 VMs to communicate via internal ips and isolates PerfKitBenchmarker VMs from
@@ -43,52 +43,52 @@ ZONE = 'zone'
 
 
 class SoftLayerFirewall(network.BaseFirewall):
-  """An object representing the AWS Firewall."""
+    """An object representing the AWS Firewall."""
 
-  CLOUD = providers.AWS
+    CLOUD = providers.SOFTLAYER
+    
+    def __init__(self):
+        self.firewall_set = set()
+        self._lock = threading.Lock()
 
-  def __init__(self):
-    self.firewall_set = set()
-    self._lock = threading.Lock()
+    def AllowPort(self, vm, port):
+        """Opens a port on the firewall.
 
-  def AllowPort(self, vm, port):
-    """Opens a port on the firewall.
+        Args:
+          vm: The BaseVirtualMachine object to open the port for.
+          port: The local port to open.
+        """
+        if vm.is_static:
+          return
+        entry = (port, vm.group_id)
+        if entry in self.firewall_set:
+          return
+        with self._lock:
+          if entry in self.firewall_set:
+            return
+          authorize_cmd = util.SoftLayer_PREFIX + [
+              'ec2',
+              'authorize-security-group-ingress',
+              '--region=%s' % vm.region,
+              '--group-id=%s' % vm.group_id,
+              '--port=%s' % port,
+              '--cidr=0.0.0.0/0']
+          util.IssueRetryableCommand(
+              authorize_cmd + ['--protocol=tcp'])
+          util.IssueRetryableCommand(
+              authorize_cmd + ['--protocol=udp'])
+          self.firewall_set.add(entry)
 
-    Args:
-      vm: The BaseVirtualMachine object to open the port for.
-      port: The local port to open.
-    """
-    if vm.is_static:
-      return
-    entry = (port, vm.group_id)
-    if entry in self.firewall_set:
-      return
-    with self._lock:
-      if entry in self.firewall_set:
-        return
-      authorize_cmd = util.SoftLayer_PREFIX + [
-          'ec2',
-          'authorize-security-group-ingress',
-          '--region=%s' % vm.region,
-          '--group-id=%s' % vm.group_id,
-          '--port=%s' % port,
-          '--cidr=0.0.0.0/0']
-      util.IssueRetryableCommand(
-          authorize_cmd + ['--protocol=tcp'])
-      util.IssueRetryableCommand(
-          authorize_cmd + ['--protocol=udp'])
-      self.firewall_set.add(entry)
-
-  def DisallowAllPorts(self):
-    """Closes all ports on the firewall."""
+    def DisallowAllPorts(self):
+        """Closes all ports on the firewall."""
     pass
 
 
-class AwsVpc(resource.BaseResource):
+class SoftLayerVpc(resource.BaseResource):
   """An object representing an Aws VPC."""
 
   def __init__(self, region):
-    super(AwsVpc, self).__init__()
+    super(SoftLayerVpc, self).__init__()
     self.region = region
     self.id = None
 
@@ -101,7 +101,7 @@ class AwsVpc(resource.BaseResource):
 
   def _Create(self):
     """Creates the VPC."""
-    create_cmd = util.AWS_PREFIX + [
+    create_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'create-vpc',
         '--region=%s' % self.region,
@@ -114,7 +114,7 @@ class AwsVpc(resource.BaseResource):
 
   def _PostCreate(self):
     """Looks up the VPC default security group."""
-    cmd = util.AWS_PREFIX + [
+    cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'describe-security-groups',
         '--region', self.region,
@@ -132,17 +132,7 @@ class AwsVpc(resource.BaseResource):
                  self.default_security_group_id)
 
   def _Exists(self):
-    """Returns true if the VPC exists."""
-    describe_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-vpcs',
-        '--region=%s' % self.region,
-        '--filter=Name=vpc-id,Values=%s' % self.id]
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
-    vpcs = response['Vpcs']
-    assert len(vpcs) < 2, 'Too many VPCs.'
-    return len(vpcs) > 0
+    return False
 
   def _EnableDnsHostnames(self):
     """Sets the enableDnsHostnames attribute of this VPC to True.
@@ -152,7 +142,7 @@ class AwsVpc(resource.BaseResource):
     enableDnsHostnames attribute to 'true' on the VPC resolves this. See:
     http://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/VPC_DHCP_Options.html
     """
-    enable_hostnames_command = util.AWS_PREFIX + [
+    enable_hostnames_command = util.SoftLayer_PREFIX + [
         'ec2',
         'modify-vpc-attribute',
         '--region=%s' % self.region,
@@ -164,7 +154,7 @@ class AwsVpc(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the VPC."""
-    delete_cmd = util.AWS_PREFIX + [
+    delete_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'delete-vpc',
         '--region=%s' % self.region,
@@ -206,7 +196,7 @@ class AwsSubnet(resource.BaseResource):
   def _Create(self):
     """Creates the subnet."""
 
-    create_cmd = util.AWS_PREFIX + [
+    create_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'create-subnet',
         '--region=%s' % self.region,
@@ -225,7 +215,7 @@ class AwsSubnet(resource.BaseResource):
     logging.info('Deleting subnet %s. This may fail if all instances in the '
                  'subnet have not completed termination, but will be retried.',
                  self.id)
-    delete_cmd = util.AWS_PREFIX + [
+    delete_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'delete-subnet',
         '--region=%s' % self.region,
@@ -234,7 +224,7 @@ class AwsSubnet(resource.BaseResource):
 
   def _Exists(self):
     """Returns true if the subnet exists."""
-    describe_cmd = util.AWS_PREFIX + [
+    describe_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'describe-subnets',
         '--region=%s' % self.region,
@@ -258,7 +248,7 @@ class AwsInternetGateway(resource.BaseResource):
 
   def _Create(self):
     """Creates the internet gateway."""
-    create_cmd = util.AWS_PREFIX + [
+    create_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'create-internet-gateway',
         '--region=%s' % self.region]
@@ -269,7 +259,7 @@ class AwsInternetGateway(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the internet gateway."""
-    delete_cmd = util.AWS_PREFIX + [
+    delete_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'delete-internet-gateway',
         '--region=%s' % self.region,
@@ -278,7 +268,7 @@ class AwsInternetGateway(resource.BaseResource):
 
   def _Exists(self):
     """Returns true if the internet gateway exists."""
-    describe_cmd = util.AWS_PREFIX + [
+    describe_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'describe-internet-gateways',
         '--region=%s' % self.region,
@@ -293,7 +283,7 @@ class AwsInternetGateway(resource.BaseResource):
     """Attaches the internetgateway to the VPC."""
     if not self.attached:
       self.vpc_id = vpc_id
-      attach_cmd = util.AWS_PREFIX + [
+      attach_cmd = util.SoftLayer_PREFIX + [
           'ec2',
           'attach-internet-gateway',
           '--region=%s' % self.region,
@@ -305,7 +295,7 @@ class AwsInternetGateway(resource.BaseResource):
   def Detach(self):
     """Detaches the internetgateway from the VPC."""
     if self.attached:
-      detach_cmd = util.AWS_PREFIX + [
+      detach_cmd = util.SoftLayer_PREFIX + [
           'ec2',
           'detach-internet-gateway',
           '--region=%s' % self.region,
@@ -340,7 +330,7 @@ class AwsRouteTable(resource.BaseResource):
   @vm_util.Retry()
   def _PostCreate(self):
     """Gets data about the route table."""
-    describe_cmd = util.AWS_PREFIX + [
+    describe_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'describe-route-tables',
         '--region=%s' % self.region,
@@ -351,7 +341,7 @@ class AwsRouteTable(resource.BaseResource):
 
   def CreateRoute(self, internet_gateway_id):
     """Adds a route to the internet gateway."""
-    create_cmd = util.AWS_PREFIX + [
+    create_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'create-route',
         '--region=%s' % self.region,
@@ -382,7 +372,7 @@ class AwsPlacementGroup(resource.BaseResource):
 
   def _Create(self):
     """Creates the Placement Group."""
-    create_cmd = util.AWS_PREFIX + [
+    create_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'create-placement-group',
         '--region=%s' % self.region,
@@ -392,7 +382,7 @@ class AwsPlacementGroup(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the Placement Group."""
-    delete_cmd = util.AWS_PREFIX + [
+    delete_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'delete-placement-group',
         '--region=%s' % self.region,
@@ -401,7 +391,7 @@ class AwsPlacementGroup(resource.BaseResource):
 
   def _Exists(self):
     """Returns true if the Placement Group exists."""
-    describe_cmd = util.AWS_PREFIX + [
+    describe_cmd = util.SoftLayer_PREFIX + [
         'ec2',
         'describe-placement-groups',
         '--region=%s' % self.region,
@@ -428,7 +418,7 @@ class _SoftLayerRegionalNetwork(network.BaseNetwork):
 
   def __init__(self, region):
     self.region = region
-    self.vpc = AwsVpc(self.region)
+    self.vpc = SoftLayerVpc(self.region)
     self.internet_gateway = AwsInternetGateway(region)
     self.route_table = None
     self.created = False
@@ -445,15 +435,15 @@ class _SoftLayerRegionalNetwork(network.BaseNetwork):
 
   @classmethod
   def GetForRegion(cls, region):
-    """Retrieves or creates an _AwsRegionalNetwork.
+    """Retrieves or creates an _SoftLayerRegionalNetwork.
 
     Args:
-      region: string. AWS region name.
+      region: string. SoftLayer region name.
 
     Returns:
-      _AwsRegionalNetwork. If an _AwsRegionalNetwork for the same region already
+      _SoftLayerRegionalNetwork. If an _SoftLayerRegionalNetwork for the same region already
       exists in the benchmark spec, that instance is returned. Otherwise, a new
-      _AwsRegionalNetwork is created and returned.
+      _SoftLayerRegionalNetwork is created and returned.
     """
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
@@ -526,7 +516,7 @@ class SoftLayerNetwork(network.BaseNetwork):
     """
     super(SoftLayerNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
-    self.regional_network = _AwsRegionalNetwork.GetForRegion(self.region)
+    self.regional_network = _SoftLayerRegionalNetwork.GetForRegion(self.region)
     self.subnet = None
     self.placement_group = AwsPlacementGroup(self.region)
 
