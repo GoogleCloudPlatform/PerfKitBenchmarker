@@ -26,12 +26,12 @@ import re
 
 import jinja2
 
-import perfkitbenchmarker
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import pint_registry
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
 
@@ -129,7 +129,7 @@ flag_util.DEFINE_units('fio_blocksize', None,
                        'The block size for fio operations. Default is given by '
                        'the scenario when using --generate_scenarios. This '
                        'flag does not apply when using --fio_jobfile.',
-                       convertible_to=perfkitbenchmarker.UNIT_REGISTRY.byte)
+                       convertible_to=pint_registry.UNIT_REGISTRY.byte)
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -235,7 +235,7 @@ def GenerateJobFileString(filename, scenario_strings,
 
   size_string = str(working_set_size) + 'G' if working_set_size else '100%'
   if block_size is not None:
-    byte = perfkitbenchmarker.UNIT_REGISTRY.byte
+    byte = pint_registry.UNIT_REGISTRY.byte
     # If we don't make a copy here, this will modify the global
     # SCENARIOS variable.
     scenarios = [scenario.copy() for scenario in scenarios]

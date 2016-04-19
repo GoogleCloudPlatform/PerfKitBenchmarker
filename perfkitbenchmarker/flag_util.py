@@ -20,8 +20,8 @@ import re
 import pint
 import yaml
 
-import perfkitbenchmarker
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import pint_registry
 
 
 FLAGS = flags.FLAGS
@@ -242,7 +242,7 @@ class UnitsParser(flags.ArgumentParser):
     """Initialize the UnitsParser.
 
     Args:
-      convertible_to: perfkitbenchmarker.UNIT_REGISTRY.Unit or
+      convertible_to: pint_registry.UNIT_REGISTRY.Unit or
         None. If a unit, the input must be convertible to this unit or
         the Parse() method will raise a ValueError.
     """
@@ -253,21 +253,21 @@ class UnitsParser(flags.ArgumentParser):
     """Parse the input.
 
     Args:
-      inp: a string or a perfkitbenchmarker.UNIT_REGISTRY.Quantity. If a string,
+      inp: a string or a pint_registry.UNIT_REGISTRY.Quantity. If a string,
         string has the format "<number><units>", as in "12KB", or "2.5GB".
 
     Returns:
-      A perfkitbenchmarker.UNIT_REGISTRY.Quantity.
+      A pint_registry.UNIT_REGISTRY.Quantity.
 
     Raises:
       ValueError if it can't parse its input.
     """
 
-    if isinstance(inp, perfkitbenchmarker.UNIT_REGISTRY.Quantity):
+    if isinstance(inp, pint_registry.UNIT_REGISTRY.Quantity):
       quantity = inp
     else:
       try:
-        quantity = perfkitbenchmarker.UNIT_REGISTRY.parse_expression(inp)
+        quantity = pint_registry.UNIT_REGISTRY.parse_expression(inp)
       except Exception as e:
         raise ValueError("Couldn't parse unit expresion %s: %s" %
                          (inp, e.message))
@@ -293,9 +293,9 @@ def DEFINE_units(name, default, help, convertible_to=None,
 
   Args:
     name: string. The name of the flag.
-    default: perfkitbenchmarker.UNIT_REGISTRY.Quantity. The default value.
+    default: pint_registry.UNIT_REGISTRY.Quantity. The default value.
     help: string. A help message for the user.
-    convertible_to: perfkitbenchmarker.UNIT_REGISTRY.Unit or None. If
+    convertible_to: pint_registry.UNIT_REGISTRY.Unit or None. If
       a unit is provided, the input must be convertible to this unit
       to be considered valid.
     flag_values: the gflags.FlagValues object to define the flag in.
@@ -322,7 +322,7 @@ def StringToBytes(string):
   """
 
   try:
-    quantity = perfkitbenchmarker.UNIT_REGISTRY.parse_expression(string)
+    quantity = pint_registry.UNIT_REGISTRY.parse_expression(string)
   except Exception:
     # Catching all exceptions is ugly, but we don't know what sort of
     # exception pint might throw, and we want to turn any of them into
@@ -330,7 +330,7 @@ def StringToBytes(string):
     raise ValueError("Couldn't parse size %s" % string)
 
   try:
-    bytes = quantity.m_as(perfkitbenchmarker.UNIT_REGISTRY.bytes)
+    bytes = quantity.m_as(pint_registry.UNIT_REGISTRY.bytes)
   except pint.DimensionalityError:
     raise ValueError("Quantity %s is not a size" % string)
 

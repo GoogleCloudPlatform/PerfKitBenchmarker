@@ -17,9 +17,9 @@
 import copy
 import unittest
 
-import perfkitbenchmarker
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import pint_registry
 
 
 class TestIntegerList(unittest.TestCase):
@@ -139,10 +139,10 @@ class TestUnitsParser(unittest.TestCase):
 
   def testParser(self):
     self.assertEqual(self.up.Parse('10KiB'),
-                     10 * 1024 * perfkitbenchmarker.UNIT_REGISTRY.bytes)
+                     10 * 1024 * pint_registry.UNIT_REGISTRY.bytes)
 
   def testQuantity(self):
-    quantity = 1.0 * perfkitbenchmarker.UNIT_REGISTRY.meter
+    quantity = 1.0 * pint_registry.UNIT_REGISTRY.meter
     self.assertEqual(self.up.Parse(quantity),
                      quantity)
 
@@ -156,19 +156,17 @@ class TestUnitsParser(unittest.TestCase):
     self.assertEqual(q.units, {'byte': 1.0})
 
   def testBytesWithPrefix(self):
-    q = self.up.Parse('2KB').to(perfkitbenchmarker.UNIT_REGISTRY.byte)
+    q = self.up.Parse('2KB').to(pint_registry.UNIT_REGISTRY.byte)
     self.assertEqual(q.magnitude, 2000.0)
     self.assertEqual(q.units, {'byte': 1.0})
 
   def testConvertibleTo(self):
-    up = flag_util.UnitsParser(
-        convertible_to=perfkitbenchmarker.UNIT_REGISTRY.byte)
+    up = flag_util.UnitsParser(convertible_to=pint_registry.UNIT_REGISTRY.byte)
     self.assertEqual(up.Parse('10KiB'),
-                     10 * 1024 * perfkitbenchmarker.UNIT_REGISTRY.bytes)
+                     10 * 1024 * pint_registry.UNIT_REGISTRY.bytes)
 
   def testConvertibleToWrongUnit(self):
-    up = flag_util.UnitsParser(
-        convertible_to=perfkitbenchmarker.UNIT_REGISTRY.byte)
+    up = flag_util.UnitsParser(convertible_to=pint_registry.UNIT_REGISTRY.byte)
     with self.assertRaises(ValueError):
       up.Parse('1m')
 
