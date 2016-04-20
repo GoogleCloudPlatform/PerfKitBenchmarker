@@ -268,8 +268,10 @@ class UnitsParser(flags.ArgumentParser):
       try:
         quantity = units.ParseExpression(inp)
       except Exception as e:
-        raise ValueError("Couldn't parse unit expresion %s: %s" %
+        raise ValueError("Couldn't parse unit expression %r: %s" %
                          (inp, e.message))
+      if not isinstance(quantity, units.Quantity):
+        raise ValueError('Expression %r evaluates to a unitless value.' % inp)
 
     if self.convertible_to is not None:
       try:
