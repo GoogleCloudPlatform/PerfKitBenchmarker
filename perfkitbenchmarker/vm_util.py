@@ -182,8 +182,6 @@ def GetSshOptions(ssh_key_filename):
       '-i', ssh_key_filename
   ]
   options.extend(FLAGS.ssh_options)
-  if FLAGS.log_level == 'debug':
-    options.append('-v')
 
   return options
 
