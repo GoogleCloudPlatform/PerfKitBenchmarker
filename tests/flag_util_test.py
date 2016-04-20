@@ -134,8 +134,9 @@ class FlagDictSubstitutionTestCase(unittest.TestCase):
 
 
 class TestUnitsParser(unittest.TestCase):
+
   def setUp(self):
-    self.up = flag_util.UnitsParser()
+    self.up = flag_util.UnitsParser('byte')
 
   def testParser(self):
     self.assertEqual(self.up.Parse('10KiB'), 10 * 1024 * units.byte)
@@ -162,21 +163,22 @@ class TestUnitsParser(unittest.TestCase):
     self.assertEqual(q.magnitude, 2000.0)
     self.assertEqual(q.units, {'byte': 1.0})
 
-  def testPercent(self):
-    q = self.up.Parse('10%')
-    self.assertEqual(q.magnitude, 10)
-    self.assertEqual(q.units, units.percent)
+  def testWrongUnit(self):
+    with self.assertRaises(ValueError):
+      self.up.Parse('1m')
 
-  def testConvertibleTo(self):
+  def testConvertibleToUnit(self):
     up = flag_util.UnitsParser(convertible_to=units.byte)
     self.assertEqual(up.Parse('10KiB'), 10 * 1024 * units.byte)
 
-  def testConvertibleToWrongUnit(self):
-    up = flag_util.UnitsParser(convertible_to=units.byte)
+  def testConvertibleToSeries(self):
+    up = flag_util.UnitsParser(convertible_to=(units.byte, 'second'))
+    self.assertEqual(up.Parse('10 MB'), 10 * units.Unit('megabyte'))
+    self.assertEqual(up.Parse('10 minutes'), 10 * units.Unit('minute'))
     with self.assertRaises(ValueError):
-      up.Parse('1m')
+      up.Parse('1 meter')
 
-  def testConvertibleToPercent(self):
+  def testPercent(self):
     up = flag_util.UnitsParser(convertible_to=units.percent)
     self.assertEqual(up.Parse('100%'), 100 * units.percent)
     with self.assertRaises(ValueError):
