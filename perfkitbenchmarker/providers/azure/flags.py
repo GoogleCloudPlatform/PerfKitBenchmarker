@@ -13,6 +13,8 @@
 # limitations under the License.
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.providers import azure
+
 
 NONE = 'None'
 READ_ONLY = 'ReadOnly'
@@ -38,3 +40,8 @@ flags.DEFINE_enum(
     'information. To use remote ssd scratch disks, you must use PLRS. If you '
     'use PLRS, you must use the DS series of machines, or else VM creation '
     'will fail.')
+
+flags.DEFINE_boolean(
+    'azure_ignore_cli_version', False,
+    'Unless set, PKB will require a specific version (%s) of the Azure CLI in '
+    'order to execute benchmarks using Azure VMs.' % azure.EXPECTED_CLI_VERSION)

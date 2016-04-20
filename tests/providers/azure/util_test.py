@@ -18,7 +18,9 @@ import unittest
 import mock
 
 from perfkitbenchmarker import providers
+from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import util
+from tests import mock_flags
 
 
 class CheckAzureVersionTestCase(unittest.TestCase):
@@ -45,6 +47,32 @@ class CheckAzureVersionTestCase(unittest.TestCase):
     with mock.patch.object(util.vm_util, 'IssueCommand', side_effect=OSError):
       with self.assertRaises(SystemExit):
         providers.LoadProvider(providers.AZURE)
+
+  def testAzureFailed(self):
+    ret = '', '', 1
+    with mock.patch.object(util.vm_util, 'IssueCommand', return_value=ret):
+      with self.assertRaises(SystemExit):
+        util._CheckAzureVersion()
+
+  def testIncorrectVersion(self):
+    ret = '0.9.3', '', 0
+    with mock.patch.object(util.vm_util, 'IssueCommand', return_value=ret):
+      with self.assertRaises(SystemExit):
+        util._CheckAzureVersion()
+
+  def testIgnoreCliVersionFlag(self):
+    mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    mocked_flags['azure_ignore_cli_version'].Parse(True)
+    ret = '0.9.3', '', 0
+    with mock.patch.object(util.vm_util, 'IssueCommand', return_value=ret):
+      util._CheckAzureVersion()
+
+  def testCorrectVersion(self):
+    mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    mocked_flags['azure_ignore_cli_version'].Parse(True)
+    ret = azure.EXPECTED_CLI_VERSION, '', 0
+    with mock.patch.object(util.vm_util, 'IssueCommand', return_value=ret):
+      util._CheckAzureVersion()
 
 
 if __name__ == '__main__':
