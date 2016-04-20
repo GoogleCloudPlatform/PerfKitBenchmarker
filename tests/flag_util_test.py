@@ -172,6 +172,12 @@ class TestUnitsParser(unittest.TestCase):
     with self.assertRaises(ValueError):
       up.Parse('1m')
 
+  def testConvertibleToPercent(self):
+    up = flag_util.UnitsParser(convertible_to=units.percent)
+    self.assertEqual(up.Parse('100%'), 100 * units.percent)
+    with self.assertRaises(ValueError):
+      up.Parse('10KiB')
+
 
 class TestStringToBytes(unittest.TestCase):
   def testValidString(self):
