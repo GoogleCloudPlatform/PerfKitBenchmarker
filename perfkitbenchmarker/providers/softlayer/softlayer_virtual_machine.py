@@ -68,9 +68,9 @@ NUM_LOCAL_VOLUMES = {
     'd2.8xlarge': 24,
 }
 DRIVE_START_LETTER = 'b'
-INSTANCE_EXISTS_STATES = frozenset(['HALTED', 'RUNNING'])
-INSTANCE_DELETED_STATES = frozenset(['HALTED'])
-INSTANCE_KNOWN_STATES = INSTANCE_EXISTS_STATES | INSTANCE_DELETED_STATES
+INSTANCE_EXISTS_STATUSES = frozenset(['ACTIVE'])
+INSTANCE_DELETED_STATUSES = frozenset(['DISCONNECTED'])
+INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 
 
 
@@ -104,6 +104,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an SoftLayer Virtual Machine."""
 
   keyLabel = None
+  delete_issued = False
 
   CLOUD = providers.SOFTLAYER
   IMAGE_NAME_FILTER = 'Ubuntu'
@@ -201,7 +202,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         if self.region in self.imported_keyfile_set:
             self.imported_keyfile_set.remove(self.region)
 
-  @vm_util.Retry()
+  @vm_util.Retry(log_errors=False)
   def _PostCreate(self):
     """Get the instance's data and tag it."""
     describe_cmd = util.SoftLayer_PREFIX + [
@@ -252,14 +253,6 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a VM instance."""
-    placement = []
-    if not util.IsRegion(self.zone):
-      placement.append('AvailabilityZone=%s' % self.zone)
-    if IsPlacementGroupCompatible(self.machine_type):
-      placement.append('GroupName=%s' % self.network.placement_group.name)
-    placement = ','.join(placement)
-    block_device_map = GetBlockDeviceMap(self.machine_type)
-
       
     create_cmd = util.SoftLayer_PREFIX + [
         '--format',
@@ -323,13 +316,15 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         'cancel',
         '%s' % self.id]
     
-    vm_util.IssueCommand(delete_cmd)
-    self._WaitForDeleteToComplete()
+    if self.delete_issued == False:
+        self.delete_issued = True
+        vm_util.IssueCommand(delete_cmd)
+        sleep(45)
         
 
   def _Exists(self):
     """Returns true if the VM exists."""
-    """
+    
     describe_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json', 
@@ -338,20 +333,20 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--columns',
         'id',
         '--sortby',
-        'id']
+        'id',
+        '--domain',
+        'perfkit.org']
     
     found = False
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     for system in response:
-        print system['id']
         if system['id'] == self.id:
             found = True
             break
     
     if found == False:
         return False
-    """
     
     describe_cmd = util.SoftLayer_PREFIX + [
         '--format',
@@ -362,11 +357,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     try:
         stdout, _ = util.IssueRetryableCommand(describe_cmd)
         response = json.loads(stdout)
-        state = response['state']
-      
-        print "state= %s" % state  
-        assert state in INSTANCE_KNOWN_STATES, state
-        return state in INSTANCE_EXISTS_STATES
+        status = response['status']
+        assert status in INSTANCE_KNOWN_STATUSES, status
+        return status in INSTANCE_EXISTS_STATUSES
     except errors.VmUtil.CalledProcessException as e:
         return False
             
