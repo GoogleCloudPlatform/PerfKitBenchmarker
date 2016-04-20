@@ -12,26 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for perfkitbenchmarker.pint_registry."""
+"""Tests for perfkitbenchmarker.units."""
 
 import pickle
 import unittest
 
-from perfkitbenchmarker import pint_registry
+from perfkitbenchmarker import units
 
 
 class UnitRegistryTestCase(unittest.TestCase):
 
   def testKB(self):
-    self.assertEqual(
-        pint_registry.UNIT_REGISTRY.parse_expression('12KB'),
-        pint_registry.UNIT_REGISTRY.parse_expression('12000 bytes'))
+    self.assertEqual(units.ParseExpression('12KB'),
+                     units.ParseExpression('12000 bytes'))
 
 
 class TestPintPickling(unittest.TestCase):
 
   def testSameUnitRegistry(self):
-    q_prepickle = 1.0 * pint_registry.UNIT_REGISTRY.second
+    q_prepickle = 1.0 * units.Unit('second')
     q_pickled = pickle.dumps(q_prepickle)
     q_postpickle = pickle.loads(q_pickled)
 
@@ -42,14 +41,14 @@ class TestPintPickling(unittest.TestCase):
     # need all of your Quantities to point to the same UnitRegistry
     # object, and when we close and reopen PKB, we create a new
     # UnitRegistry. So to test it, we create a new UnitRegistry.
-    q_prepickle = 1.0 * pint_registry.UNIT_REGISTRY.second
+    q_prepickle = 1.0 * units.Unit('second')
     q_pickled = pickle.dumps(q_prepickle)
 
-    pint_registry.UNIT_REGISTRY = pint_registry.UnitRegistry()
+    units._UNIT_REGISTRY = units._UnitRegistry()
 
     q_postpickle = pickle.loads(q_pickled)
 
-    new_second = 1.0 * pint_registry.UNIT_REGISTRY.second
+    new_second = 1.0 * units.Unit('second')
     self.assertEqual(q_postpickle, new_second)
     # This next line checks that q_postpickle is in the same "Pint
     # universe" as new_second, because we can convert q_postpickle to
@@ -59,7 +58,7 @@ class TestPintPickling(unittest.TestCase):
   def testPickleKB(self):
     # Make sure we can pickle and unpickle quantities with the unit we
     # defined ourselves.
-    q_prepickle = pint_registry.UNIT_REGISTRY.parse_expression('1KB')
+    q_prepickle = units.ParseExpression('1KB')
     q_pickled = pickle.dumps(q_prepickle)
     q_postpickle = pickle.loads(q_pickled)
 

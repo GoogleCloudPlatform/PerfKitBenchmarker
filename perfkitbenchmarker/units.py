@@ -11,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module that instantiates a customized pint UnitRegistry."""
+"""Module that provides access to pint functionality.
+
+Forwards access to pint Quantity and Unit classes built around a customized
+unit registry.
+"""
 
 import copy
 import copy_reg
@@ -19,20 +23,20 @@ import copy_reg
 import pint
 
 
-class UnitRegistry(pint.UnitRegistry):
+class _UnitRegistry(pint.UnitRegistry):
   """A customized pint.UnitRegistry used by PerfKit Benchmarker.
 
   Supports 'K' prefix for 'kilo' (in addition to pint's default 'k').
   """
 
   def __init__(self):
-    super(UnitRegistry, self).__init__()
+    super(_UnitRegistry, self).__init__()
     self.define('K- = 1000')
 
 
 # Pint recommends one global UnitRegistry for the entire program, so
 # we create it here.
-UNIT_REGISTRY = UnitRegistry()
+_UNIT_REGISTRY = _UnitRegistry()
 
 
 # The Pint documentation suggests serializing Quantities as tuples. We
@@ -43,17 +47,25 @@ def _PickleQuantity(q):
 
 
 def _UnPickleQuantity(inp):
-  return UNIT_REGISTRY.Quantity.from_tuple(inp)
+  return _UNIT_REGISTRY.Quantity.from_tuple(inp)
 
 
-copy_reg.pickle(UNIT_REGISTRY.Quantity, _PickleQuantity)
+copy_reg.pickle(_UNIT_REGISTRY.Quantity, _PickleQuantity)
 
 
 # The following monkey-patch has been submitted to upstream Pint as
 # pull request 357.
 # TODO: once that PR is merged, get rid of this workaround.
-def unit_deepcopy(self, memo):
+def _unit_deepcopy(self, memo):
   ret = self.__class__(copy.deepcopy(self._units))
   return ret
 
-UNIT_REGISTRY.Unit.__deepcopy__ = unit_deepcopy
+_UNIT_REGISTRY.Unit.__deepcopy__ = _unit_deepcopy
+
+
+# Forward access to pint's classes and functions.
+DimensionalityError = pint.DimensionalityError
+ParseExpression = _UNIT_REGISTRY.parse_expression
+Quantity = _UNIT_REGISTRY.Quantity
+Unit = _UNIT_REGISTRY.Unit
+byte = Unit('byte')

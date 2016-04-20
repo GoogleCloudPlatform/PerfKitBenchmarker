@@ -18,7 +18,7 @@ import unittest
 
 import mock
 
-from perfkitbenchmarker import pint_registry
+from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import fio_benchmark
 
@@ -113,7 +113,7 @@ size=100%
     job_file = fio_benchmark.GenerateJobFileString(
         self.filename,
         ['sequential_read'],
-        [1], None, pint_registry.UNIT_REGISTRY.megabyte * 2)
+        [1], None, units.Unit('megabyte') * 2)
 
     self.assertIn('blocksize=2000000B', job_file)
 
