@@ -148,6 +148,10 @@ class TestUnitsParser(unittest.TestCase):
     with self.assertRaises(ValueError):
       self.up.Parse('asdf')
 
+  def testUnitlessExpression(self):
+    with self.assertRaises(ValueError):
+      self.up.Parse('10')
+
   def testBytes(self):
     q = self.up.Parse('1B')
     self.assertEqual(q.magnitude, 1.0)
