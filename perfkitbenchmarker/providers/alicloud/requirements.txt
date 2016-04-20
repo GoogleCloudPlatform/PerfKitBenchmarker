@@ -12,5 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file is deprecated. Use the forwarded file location:
--rperfkitbenchmarker/providers/cloudstack/requirements.txt
+# Requirements for running PerfKit Benchmarker on AliCloud.
+-r../../../requirements.txt
+aliyuncli>=2.1
+aliyun-python-sdk-ecs>=0.1.4
+paramiko>=1.15

@@ -21,8 +21,8 @@
 # imported.
 # Other cloud provider requirements are either conditionally imported
 # or install command-line tools, and are not needed for unit tests.
--rrequirements-alicloud.txt
--rrequirements-cloudstack.txt
+-rperfkitbenchmarker/providers/alicloud/requirements.txt
+-rperfkitbenchmarker/providers/cloudstack/requirements.txt
 
 # Test requirements
 contextlib2>=0.5.1

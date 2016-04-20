@@ -12,7 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Additional requirements (beyond those in requirements.txt) for running
-# PerfKitBenchmarker on OpenStack.
-python-keystoneclient==2.1.1
-python-novaclient==2.35.0
+# This file is deprecated. Use the forwarded file location:
+-rperfkitbenchmarker/providers/openstack/requirements.txt

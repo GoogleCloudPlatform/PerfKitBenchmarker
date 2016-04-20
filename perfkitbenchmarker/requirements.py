@@ -13,6 +13,7 @@
 # limitations under the License.
 """Functions for checking that required Python packages are installed."""
 
+from collections import deque
 import os
 
 import pkg_resources
@@ -30,10 +31,20 @@ def _CheckRequirements(requirements_file_path):
   Args:
     requirements_file_path: string. Path to a pip requirements file.
   """
+  with open(requirements_file_path, 'rb') as fp:
+    requirements_to_check = [(requirements_file_path, deque(fp.readlines()))]
   try:
-    with open(requirements_file_path, 'rb') as fp:
-      for line in fp:
-        pkg_resources.require(line)
+    while requirements_to_check:
+      file_path, lines = requirements_to_check.pop()
+      while lines:
+        line = lines.popleft().strip()
+        if line.startswith('-r'):
+          requirements_to_check.append((file_path, lines))
+          file_path = os.path.join(os.path.dirname(file_path), line[2:])
+          with open(file_path, 'rb') as fp:
+            lines = deque(fp.readlines())
+        elif line:
+          pkg_resources.require(line)
   except (pkg_resources.DistributionNotFound,
           pkg_resources.VersionConflict) as e:
     # In newer versions of setuptools, these exception classes have a report
@@ -75,7 +86,8 @@ def CheckProviderRequirements(provider):
   Args:
     provider: string. Lowercase name of the cloud provider (e.g. 'gcp').
   """
-  requirements_file_path = os.path.join(_BRANCH_ROOT_DIR,
-                                        'requirements-{0}.txt'.format(provider))
+  requirements_file_path = os.path.join(
+      _BRANCH_ROOT_DIR, 'perfkitbenchmarker', 'providers', provider,
+      'requirements.txt')
   if os.path.isfile(requirements_file_path):
     _CheckRequirements(requirements_file_path)
