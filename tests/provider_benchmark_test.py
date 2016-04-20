@@ -16,29 +16,35 @@
 
 import unittest
 
+import mock
+
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
 
 
 class ProviderBenchmarkChecks(unittest.TestCase):
 
-  def testPingSupported(self):
-    for cloud in providers.VALID_CLOUDS:
-      providers.LoadProvider(cloud)
-      ThisProviderInfoClass = provider_info.GetProviderInfoClass(cloud)
-      self.assertTrue(ThisProviderInfoClass.IsBenchmarkSupported('iperf'),
-                      'provider {0} does not support iperf'.format(
-                          cloud))
+  def setUp(self):
+    p = mock.patch.object(providers, '_imported_providers', new=set())
+    p.start()
+    self.addCleanup(p.stop)
+
+  def _VerifyProviderBenchmarkSupport(self, cloud, benchmark, support_expected):
+    providers.LoadProvider(cloud)
+    provider_info_class = provider_info.GetProviderInfoClass(cloud)
+    supported = provider_info_class.IsBenchmarkSupported(benchmark)
+    fmt_args = ('', ' not') if support_expected else (' not', '')
+    self.assertEqual(supported, support_expected, (
+        'Expected provider {provider} {0}to support benchmark {benchmark}, but '
+        'it did{1}.'.format(*fmt_args, provider=cloud, benchmark=benchmark)))
+
+  def testIperfSupport(self):
+    expected = {providers.GCP: True, providers.DIGITALOCEAN: True}
+    for cloud, support_expected in expected.iteritems():
+      self._VerifyProviderBenchmarkSupport(cloud, 'iperf', support_expected)
 
   def testMYSQLSupport(self):
-    for cloud in providers.VALID_CLOUDS:
-      providers.LoadProvider(cloud)
-      ThisProviderInfoClass = provider_info.GetProviderInfoClass(cloud)
-      if (cloud == providers.AWS or cloud == providers.GCP):
-        self.assertTrue(ThisProviderInfoClass.IsBenchmarkSupported(
-            'mysql_service'))
-      else:
-        self.assertFalse(ThisProviderInfoClass.IsBenchmarkSupported(
-            'mysql_service'),
-            'Cloud {0} is not supposed to support mysql_service {1}'
-            .format(cloud, ThisProviderInfoClass.__name__))
+    expected = {providers.GCP: True, providers.DIGITALOCEAN: False}
+    for cloud, support_expected in expected.iteritems():
+      self._VerifyProviderBenchmarkSupport(cloud, 'mysql_service',
+                                           support_expected)

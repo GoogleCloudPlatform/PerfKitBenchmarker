@@ -26,9 +26,17 @@ from tests import mock_flags
 
 class LoadProvidersTestCase(unittest.TestCase):
 
-  def testLoadAllProviders(self):
-    for cloud in providers.VALID_CLOUDS:
-      providers.LoadProvider(cloud)
+  def setUp(self):
+    p = mock.patch.object(providers, '_imported_providers', new=set())
+    p.start()
+    self.addCleanup(p.stop)
+
+  def testImportAllProviders(self):
+    # Test that all modules can be imported successfully, but mock out the call
+    # to provider_imported event handlers.
+    with mock.patch.object(providers.events.provider_imported, 'send'):
+      for cloud in providers.VALID_CLOUDS:
+        providers.LoadProvider(cloud)
 
   def testLoadInvalidProvider(self):
     with self.assertRaises(ImportError):

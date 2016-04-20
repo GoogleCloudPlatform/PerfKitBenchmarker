@@ -12,18 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib
 import logging
 import os
 
+from perfkitbenchmarker import events
 from perfkitbenchmarker import import_util
 from perfkitbenchmarker import requirements
 
-# This unconditionally loads any modules in any provider
-# directory with the name 'flags'. It is expected that providers
-# add all flags into a separate file called 'flags.py'. This enables
-# us to correctly show the flags as part of the help text without
-# actually loading any other provider specific modules.
-import_util.LoadModulesWithName(__path__, __name__, 'flags')
 
 GCP = 'GCP'
 AZURE = 'Azure'
@@ -36,8 +32,31 @@ CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 MESOS = 'Mesos'
 
-VALID_CLOUDS = [GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS]
+VALID_CLOUDS = (GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS)
+
+
+_imported_providers = set()
+
+
+def LoadProviderFlags(providers):
+  """Imports just the flags module for each provider.
+
+  This allows PKB to load flag definitions from each provider to include in the
+  help text without actually loading any other provider-specific modules.
+
+  Args:
+    providers: series of strings. Each element is a value from VALID_CLOUDS
+        indicating a cloud provider for which to import the flags module.
+  """
+  for provider_name in providers:
+    normalized_name = provider_name.lower()
+    flags_module_name = '.'.join((__name__, normalized_name, 'flags'))
+    importlib.import_module(flags_module_name)
+
+
+# Import flag definitions for all cloud providers.
+LoadProviderFlags(VALID_CLOUDS)
 
 
 def LoadProvider(provider_name, ignore_package_requirements=True):
@@ -54,19 +73,27 @@ def LoadProvider(provider_name, ignore_package_requirements=True):
     ignore_package_requirements: boolean. If True, the provider's Python package
         requirements file is ignored.
   """
-  provider_name = provider_name.lower()
+  if provider_name in _imported_providers:
+    return
+
+  # Check package requirements from the provider's pip requirements file.
+  normalized_name = provider_name.lower()
   if not ignore_package_requirements:
-    requirements.CheckProviderRequirements(provider_name)
-  provider_package_path = os.path.join(__path__[0], provider_name)
+    requirements.CheckProviderRequirements(normalized_name)
+
+  # Load all modules in the provider's directory. Simply loading those modules
+  # will cause relevant classes (e.g. VM and disk classes) to register
+  # themselves so that they can be instantiated during resource provisioning.
+  provider_package_path = os.path.join(__path__[0], normalized_name)
   try:
-    # Iterating through this generator will load all modules in the provider
-    # directory. Simply loading those modules will cause relevant classes
-    # to register themselves so that we can run with that provider.
-    modules = [module for module in
-               import_util.LoadModulesForPath([provider_package_path],
-                                              __name__ + '.' + provider_name)]
+    modules = tuple(import_util.LoadModulesForPath(
+        [provider_package_path], __name__ + '.' + normalized_name))
     if not modules:
-      raise ImportError('No modules found for provider.')
+      raise ImportError('No modules found for provider %s.' % provider_name)
   except Exception:
     logging.error('Unable to load provider %s.', provider_name)
     raise
+
+  # Signal that the provider's modules have been imported.
+  _imported_providers.add(provider_name)
+  events.provider_imported.send(provider_name)
