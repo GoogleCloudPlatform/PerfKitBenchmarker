@@ -10,6 +10,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from time import sleep
 
 """Class to represent a SoftLayer Virtual Machine object.
 
@@ -67,9 +68,10 @@ NUM_LOCAL_VOLUMES = {
     'd2.8xlarge': 24,
 }
 DRIVE_START_LETTER = 'b'
-INSTANCE_EXISTS_STATES = frozenset(['Running', 'RUNNING'])
-INSTANCE_DELETED_STATES = frozenset(['shutting-down', 'HALTED'])
-INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATES | INSTANCE_DELETED_STATES
+INSTANCE_EXISTS_STATES = frozenset(['HALTED', 'RUNNING'])
+INSTANCE_DELETED_STATES = frozenset(['HALTED'])
+INSTANCE_KNOWN_STATES = INSTANCE_EXISTS_STATES | INSTANCE_DELETED_STATES
+
 
 
 def GetBlockDeviceMap(machine_type):
@@ -100,6 +102,8 @@ def IsPlacementGroupCompatible(machine_type):
 
 class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an SoftLayer Virtual Machine."""
+
+  keyLabel = None
 
   CLOUD = providers.SOFTLAYER
   IMAGE_NAME_FILTER = 'Ubuntu'
@@ -165,6 +169,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Imports the public keyfile to SoftLayer."""
     
     with self._lock:
+        
+        if self.region in self.imported_keyfile_set:
+            return
       
         import_cmd = util.SoftLayer_PREFIX + [
           'sshkey',
@@ -173,23 +180,26 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
           vm_util.GetPublicKeyPath(),
           self.keyLabel]
         util.IssueRetryableCommand(import_cmd)
-      self.imported_keyfile_set.add(self.region)
-      if self.region in self.deleted_keyfile_set:
-        self.deleted_keyfile_set.remove(self.region)
+        self.imported_keyfile_set.add(self.region)
+        if self.region in self.deleted_keyfile_set:
+            self.deleted_keyfile_set.remove(self.region)
 
   def DeleteKeyfile(self):
     """Deletes the imported keyfile for a region."""
     with self._lock:
-      if self.region in self.deleted_keyfile_set:
-        return
-      delete_cmd = util.SoftLayer_PREFIX + [
-          'ec2', '--region=%s' % self.region,
-          'delete-key-pair',
-          '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
-      util.IssueRetryableCommand(delete_cmd)
-      self.deleted_keyfile_set.add(self.region)
-      if self.region in self.imported_keyfile_set:
-        self.imported_keyfile_set.remove(self.region)
+        if self.region in self.deleted_keyfile_set:
+            return
+    
+        delete_cmd = util.SoftLayer_PREFIX + [
+          '-y',                                    
+          'sshkey', 
+          'remove',
+          self.keyLabel]
+        
+        util.IssueRetryableCommand(delete_cmd)
+        self.deleted_keyfile_set.add(self.region)
+        if self.region in self.imported_keyfile_set:
+            self.imported_keyfile_set.remove(self.region)
 
   @vm_util.Retry()
   def _PostCreate(self):
@@ -203,33 +213,34 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
-    self.ip_address = response['public_ip']
     transaction = response['active_transaction']
     
     if transaction != None:
-        logging.info('Checking instance %s is active. Active transaction: %s. Raising Exception', self.id, transaction)
+        logging.info('Post create check for instance %s. Not ready. Active transaction in progress: %s.', self.id, transaction)
+        sleep(10)
         raise Exception
     
     self.internal_ip = response['private_ip']
+    self.ip_address = response['public_ip']
             
     #util.AddDefaultTags(self.id, self.region)
 
         
   
-  def id_generator(self, size=6, chars=string.ascii_uppercase + string.digits):
+  def IdGenerator(self, size=6, chars=string.ascii_uppercase + string.digits):
       return ''.join(random.choice(chars) for _ in range(size))
-
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
-    self.keyLabel  = "pefkit-" + self.id_generator()
+    if SoftLayerVirtualMachine.keyLabel == None:
+        SoftLayerVirtualMachine.keyLabel  = "Perfkit-Key-" + self.IdGenerator()
     
     self.ImportKeyfile()
     # _GetDefaultImage calls the SoftLayer CLI.
     self.image = self.image or self._GetDefaultImage(self.machine_type,
                                                      self.region)
     
-    self.hostname = "pefkithost-" + self.id_generator() 
+    self.hostname = "Pefkit-Host-" + self.IdGenerator(); 
     self.AllowRemoteAccessPorts()
 
     self.active_try_count = 0
@@ -249,7 +260,6 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     placement = ','.join(placement)
     block_device_map = GetBlockDeviceMap(self.machine_type)
 
-   
       
     create_cmd = util.SoftLayer_PREFIX + [
         '--format',
@@ -257,6 +267,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '-y',
         'vs',
         'create',
+        '--wait',
+        '60',
         '--datacenter',
         '%s' % self.region,
         '--memory', 
@@ -270,13 +282,39 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--os',
         'UBUNTU_LATEST_64',
         '--key',
-         keyfile
+         SoftLayerVirtualMachine.keyLabel
         ]
     
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['id']
 
+  @vm_util.Retry()
+  def _WaitForDeleteToComplete(self):
+    sleep(10)
+    
+    describe_cmd = util.SoftLayer_PREFIX + [
+        '--format',
+        'json',
+        'vs',
+        'detail',
+        '%s' % self.id]
+    
+    transaction = None
+    
+    try:
+        stdout, _ = util.IssueRetryableCommand(describe_cmd)
+        response = json.loads(stdout)
+        transaction = response['active_transaction']
+    except Exception as e:
+        print "Error({0}): {1}".format(e.errno, e.strerror)
+        return 
+    
+    if transaction != None:
+        logging.info('WaitForDeleteToComplete %s. Not ready. Active transaction in progress: %s.', self.id, transaction)
+        raise Exception
+    
+      
   def _Delete(self):
     """Delete a VM instance."""
     delete_cmd = util.SoftLayer_PREFIX + [
@@ -286,9 +324,35 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '%s' % self.id]
     
     vm_util.IssueCommand(delete_cmd)
+    self._WaitForDeleteToComplete()
+        
 
   def _Exists(self):
     """Returns true if the VM exists."""
+    """
+    describe_cmd = util.SoftLayer_PREFIX + [
+        '--format',
+        'json', 
+        'vs', 
+        'list',
+        '--columns',
+        'id',
+        '--sortby',
+        'id']
+    
+    found = False
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    for system in response:
+        print system['id']
+        if system['id'] == self.id:
+            found = True
+            break
+    
+    if found == False:
+        return False
+    """
+    
     describe_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json', 
@@ -301,7 +365,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         state = response['state']
       
         print "state= %s" % state  
-        assert state in INSTANCE_KNOWN_STATUSES, state
+        assert state in INSTANCE_KNOWN_STATES, state
         return state in INSTANCE_EXISTS_STATES
     except errors.VmUtil.CalledProcessException as e:
         return False

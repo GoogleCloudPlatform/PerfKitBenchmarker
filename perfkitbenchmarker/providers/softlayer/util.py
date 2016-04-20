@@ -48,7 +48,7 @@ def AddTags(resource_id, region, **kwargs):
     resource_id: An extant SoftLayer resource to operate on.
     region: The SoftLayer region 'resource_id' was created in.
     **kwargs: dict. Key-value pairs to set on the instance.
-  """
+      """
   if not kwargs:
     return
 
@@ -56,8 +56,10 @@ def AddTags(resource_id, region, **kwargs):
       'vs',
       'edit']
   for key, value in kwargs.iteritems():
-    tag_cmd.append('Key={0},Value={1}'.format(key, value))
-  IssueRetryableCommand(tag_cmd)
+    tag_cmd.append('--tag {0}:{1}'.format(key, value))
+  tag_cmd.append('{0}'.format(resource_id))
+  print "skipping tag in util"
+  #IssueRetryableCommand(tag_cmd)
 
 
 def AddDefaultTags(resource_id, region):
