@@ -19,6 +19,7 @@ unit registry.
 
 import copy
 import copy_reg
+import numbers
 
 import pint
 
@@ -27,11 +28,21 @@ class _UnitRegistry(pint.UnitRegistry):
   """A customized pint.UnitRegistry used by PerfKit Benchmarker.
 
   Supports 'K' prefix for 'kilo' (in addition to pint's default 'k').
+  Supports '%' as a unit, whereas pint tokenizes it as an operator.
   """
 
   def __init__(self):
     super(_UnitRegistry, self).__init__()
     self.define('K- = 1000')
+    self.define('% = [percent] = percent')
+
+  def parse_expression(self, input_string, *args, **kwargs):
+    result = super(_UnitRegistry, self).parse_expression(input_string, *args,
+                                                         **kwargs)
+    if (isinstance(result, numbers.Number) and
+        input_string.strip().endswith('%')):
+      return self.Quantity(result, self.Unit('percent'))
+    return result
 
 
 # Pint recommends one global UnitRegistry for the entire program, so
@@ -69,3 +80,4 @@ ParseExpression = _UNIT_REGISTRY.parse_expression
 Quantity = _UNIT_REGISTRY.Quantity
 Unit = _UNIT_REGISTRY.Unit
 byte = Unit('byte')
+percent = Unit('percent')

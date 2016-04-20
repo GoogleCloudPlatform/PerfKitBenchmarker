@@ -162,6 +162,11 @@ class TestUnitsParser(unittest.TestCase):
     self.assertEqual(q.magnitude, 2000.0)
     self.assertEqual(q.units, {'byte': 1.0})
 
+  def testPercent(self):
+    q = self.up.Parse('10%')
+    self.assertEqual(q.magnitude, 10)
+    self.assertEqual(q.units, units.percent)
+
   def testConvertibleTo(self):
     up = flag_util.UnitsParser(convertible_to=units.byte)
     self.assertEqual(up.Parse('10KiB'), 10 * 1024 * units.byte)
@@ -170,6 +175,12 @@ class TestUnitsParser(unittest.TestCase):
     up = flag_util.UnitsParser(convertible_to=units.byte)
     with self.assertRaises(ValueError):
       up.Parse('1m')
+
+  def testConvertibleToPercent(self):
+    up = flag_util.UnitsParser(convertible_to=units.percent)
+    self.assertEqual(up.Parse('100%'), 100 * units.percent)
+    with self.assertRaises(ValueError):
+      up.Parse('10KiB')
 
 
 class TestStringToBytes(unittest.TestCase):

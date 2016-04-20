@@ -26,6 +26,16 @@ class UnitRegistryTestCase(unittest.TestCase):
     self.assertEqual(units.ParseExpression('12KB'),
                      units.ParseExpression('12000 bytes'))
 
+  def testIntPercent(self):
+    q = units.ParseExpression('10%')
+    self.assertEqual(q.magnitude, 10)
+    self.assertEqual(q.units, units.percent)
+
+  def testFloatPercent(self):
+    q = units.ParseExpression('12.5%')
+    self.assertEqual(q.magnitude, 12.5)
+    self.assertEqual(q.units, units.percent)
+
 
 class TestPintPickling(unittest.TestCase):
 
@@ -63,6 +73,10 @@ class TestPintPickling(unittest.TestCase):
     q_postpickle = pickle.loads(q_pickled)
 
     self.assertEqual(q_prepickle, q_postpickle)
+
+  def testPicklePercent(self):
+    q = units.ParseExpression('10%')
+    self.assertEqual(q, pickle.loads(pickle.dumps(q)))
 
 
 if __name__ == '__main__':
