@@ -75,8 +75,6 @@ flags.DEFINE_integer('background_network_mbits_per_sec', None,
                      'Number of megabits per second of background '
                      'network traffic to generate during the run phase '
                      'of the benchmark')
-flags.DEFINE_boolean('verbose_ssh', False,
-                     'Request verbose output from SSH commands run by PKB.')
 
 
 class IpAddressSubset(object):
@@ -184,8 +182,6 @@ def GetSshOptions(ssh_key_filename):
       '-i', ssh_key_filename
   ]
   options.extend(FLAGS.ssh_options)
-  if FLAGS.verbose_ssh:
-    options.append('-v')
 
   return options
 
