@@ -12,8 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Additional requirements (beyond those in requirements.txt) for running
-# PerfKitBenchmarker on AliCloud.
-aliyuncli>=2.1
-aliyun-python-sdk-ecs>=0.1.4
-paramiko>=1.15
+# This file is deprecated. Use the forwarded file location:
+-rperfkitbenchmarker/providers/alicloud/requirements.txt

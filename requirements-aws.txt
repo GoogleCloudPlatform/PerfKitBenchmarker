@@ -14,5 +14,6 @@
 # limitations under the License.
 # Additional requirements (beyond those in requirements.txt) for running
 # PerfKitBenchmarker on AWS.
-awscli
-colorama==0.3.3
+
+# This file is deprecated. Use the forwarded file location:
+-rperfkitbenchmarker/providers/aws/requirements.txt
