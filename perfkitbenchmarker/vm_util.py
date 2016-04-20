@@ -119,7 +119,7 @@ def SSHKeyGen():
   """Create PerfKitBenchmarker SSH keys in the tmp dir of the current run."""
   if not os.path.isdir(GetTempDir()):
     GenTempDir()
-
+    
   if not os.path.isfile(GetPrivateKeyPath()):
     create_cmd = ['ssh-keygen',
                   '-t',
@@ -129,6 +129,7 @@ def SSHKeyGen():
                   '-q',
                   '-f',
                   PrependTempDir(PRIVATE_KEYFILE)]
+    print create_cmd
     shell_value = RunningOnWindows()
     create_process = subprocess.Popen(create_cmd,
                                       shell=shell_value,
