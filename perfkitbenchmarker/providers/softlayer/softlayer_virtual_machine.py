@@ -191,6 +191,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     cpus = '1'
     os = 'UBUNTU_LATEST_64'
     nic = '10'
+    private_vlan_id = None
+    public_vlan_id = None
     
     try: 
         vm_attributes = json.loads(self.machine_type)
@@ -205,6 +207,12 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         
         if 'nic' in vm_attributes:
             nic = vm_attributes['nic']
+            
+        if 'private_vlan_id' in vm_attributes:
+            private_vlan_id = vm_attributes['private_vlan_id']
+            
+        if 'public_vlan_id' in vm_attributes:
+            public_vlan_id = vm_attributes['public_vlan_id']
     except:
         logging.warning("Using default values for VM. Error in machine type JSON: %s" % self.machine_type)
         
@@ -233,7 +241,15 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--key',
          SoftLayerVirtualMachine.keyLabel
         ]
+
+    if public_vlan_id != None:
+        create_cmd = create_cmd + ['--vlan-public', '%s' % public_vlan_id]
+        
+    if private_vlan_id != None:
+        create_cmd = create_cmd + ['--vlan-private', '%s' % private_vlan_id]    
     
+  
+  
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['id']

@@ -5,9 +5,25 @@
 2) Run SoftLayer setup program
 	slcli setup
 
-
+3) Display system create options
+   slcli vs  create-options
+   
 3) Run benchmarks
+
 Examples:
+Simple benchmark with defaults 
 >python pkb.py --cloud=SoftLayer --benchmarks=iperf
+
+
+Benchmark with 1Gib Nic card specified
+>python pkb.py --cloud=SoftLayer --benchmarks=ping  --machine_type="{ \"nic\": 1000}"
+
+Benchmark with the Toronto 1 datacenter specified and machine type 4 cpus, 4G memory, Redhat OS, 1Gib NIC card
 >python pkb.py --cloud=SoftLayer --benchmarks=iperf --zone=tor01 --machine_type="{\"cpus\": 4, \"memory\": 4096, \"os\": \"REDHAT_LATEST_64\", \"nic\": 1000}"
+
+The Redis Benchmark with a Redis parameter and datacenter specified
 >python pkb.py --cloud=SoftLayer --benchmarks=redis --redis_clients=2  --zone=tor01
+
+A private & public VLAN id specified to ensure VMs are located on the same vlan. 
+VLAN ids can be queried with: slcli vlan list
+>python pkb.py --cloud=SoftLayer --benchmarks=ping  --machine_type="{ \"nic\": 1000, \"public_vlan_id\": 1205613, \"private_vlan_id\": 1205615}"
