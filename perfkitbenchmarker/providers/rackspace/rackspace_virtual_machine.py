@@ -74,11 +74,11 @@ LSBLK_PATTERN = re.compile(LSBLK_REGEX)
 UBUNTU_IMAGE = '09de0a66-3156-48b4-90a5-1cf25a905207'
 RHEL_IMAGE = '92f8a8b8-6019-4c27-949b-cf9910b84ffb'
 
-INSTANCE_EXISTS_STATUSES = frozenset(
+INSTANCE_EXISTS_STATES = frozenset(
     ['BUILD', 'ACTIVE', 'PAUSED', 'SHUTOFF', 'ERROR'])
-INSTANCE_DELETED_STATUSES = frozenset(
+INSTANCE_DELETED_STATES = frozenset(
     ['DELETED'])
-INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
+INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATES | INSTANCE_DELETED_STATES
 
 REMOTE_BOOT_DISK_SIZE_GB = 50
 
@@ -204,7 +204,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     except ValueError:
       return False
     status = resp['Status']
-    return status in INSTANCE_EXISTS_STATUSES
+    return status in INSTANCE_EXISTS_STATES
 
   def _Delete(self):
     """Deletes a Rackspace VM instance and waits until API returns 404."""
