@@ -1,17 +1,13 @@
-slcli setup
 
-Username []: jdiamond
-API Key or Password []:
-Endpoint (public|private|custom) [public]:
-Timeout [0]:
-:..............:..................................................................:
-:         name : value                                                            :
-:..............:..................................................................:
-:     Username : jdiamond                                                         :
-:      API Key : 3aeed4784e634fc8e2448ce9097548337760f79e749ce8154dfbfa5de9a1a2c5 :
-: Endpoint URL : https://api.softlayer.com/xmlrpc/v3.1/                           :
-:      Timeout : not set                                                          :
-:..............:..................................................................:
-Are you sure you want to write settings to "C:\Users\IBM_ADMIN\AppData\Roaming\softlayer"? [Y/n]: Y
-Configuration Updated Successfully
+1) Install SoftLayer requirements
+	sudo pip install -r requirements-softlayer.txt
 
+2) Run SoftLayer setup program
+	slcli setup
+
+
+3) Run benchmarks
+Examples:
+>python pkb.py --cloud=SoftLayer --benchmarks=iperf
+>python pkb.py --cloud=SoftLayer --benchmarks=iperf --zone=tor01 --machine_type="{\"cpus\": 4, \"memory\": 4096, \"os\": \"REDHAT_LATEST_64\", \"nic\": 1000}"
+>python pkb.py --cloud=SoftLayer --benchmarks=redis --redis_clients=2  --zone=tor01

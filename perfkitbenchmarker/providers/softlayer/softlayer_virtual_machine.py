@@ -40,64 +40,38 @@ from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
-HVM = 'HVM'
-PV = 'PV'
-NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
-US_EAST_1 = 'us-east-1'
-US_WEST_1 = 'us-west-1'
-US_WEST_2 = 'us-west-2'
-EU_WEST_1 = 'eu-west-1'
-AP_NORTHEAST_1 = 'ap-northeast-1'
-AP_SOUTHEAST_1 = 'ap-southeast-1'
-AP_SOUTHEAST_2 = 'ap-southeast-2'
-SA_EAST_1 = 'sa-east-1'
-PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['c3', 'c4', 'cc2', 'cg1', 'g2', 'cr1', 'r3', 'hi1', 'i2'])
-NUM_LOCAL_VOLUMES = {
-    'c1.medium': 1, 'c1.xlarge': 4,
-    'c3.large': 2, 'c3.xlarge': 2, 'c3.2xlarge': 2, 'c3.4xlarge': 2,
-    'c3.8xlarge': 2, 'cc2.8xlarge': 4,
-    'cg1.4xlarge': 2, 'cr1.8xlarge': 2, 'g2.2xlarge': 1,
-    'hi1.4xlarge': 2, 'hs1.8xlarge': 24,
-    'i2.xlarge': 1, 'i2.2xlarge': 2, 'i2.4xlarge': 4, 'i2.8xlarge': 8,
-    'm1.small': 1, 'm1.medium': 1, 'm1.large': 2, 'm1.xlarge': 4,
-    'm2.xlarge': 1, 'm2.2xlarge': 1, 'm2.4xlarge': 2,
-    'm3.medium': 1, 'm3.large': 1, 'm3.xlarge': 2, 'm3.2xlarge': 2,
-    'r3.large': 1, 'r3.xlarge': 1, 'r3.2xlarge': 1, 'r3.4xlarge': 1,
-    'r3.8xlarge': 2, 'd2.xlarge': 3, 'd2.2xlarge': 6, 'd2.4xlarge': 12,
-    'd2.8xlarge': 24,
-}
-DRIVE_START_LETTER = 'b'
+#HVM = 'HVM'
+#PV = 'PV'
+#NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
+#US_EAST_1 = 'us-east-1'
+#US_WEST_1 = 'us-west-1'
+#US_WEST_2 = 'us-west-2'
+#EU_WEST_1 = 'eu-west-1'
+#AP_NORTHEAST_1 = 'ap-northeast-1'
+#AP_SOUTHEAST_1 = 'ap-southeast-1'
+#AP_SOUTHEAST_2 = 'ap-southeast-2'
+#SA_EAST_1 = 'sa-east-1'
+#PLACEMENT_GROUP_PREFIXES = frozenset(['c3', 'c4', 'cc2', 'cg1', 'g2', 'cr1', 'r3', 'hi1', 'i2'])
+#NUM_LOCAL_VOLUMES = {
+#    'c1.medium': 1, 'c1.xlarge': 4,
+#    'c3.large': 2, 'c3.xlarge': 2, 'c3.2xlarge': 2, 'c3.4xlarge': 2,
+#    'c3.8xlarge': 2, 'cc2.8xlarge': 4,
+#    'cg1.4xlarge': 2, 'cr1.8xlarge': 2, 'g2.2xlarge': 1,
+#    'hi1.4xlarge': 2, 'hs1.8xlarge': 24,
+#    'i2.xlarge': 1, 'i2.2xlarge': 2, 'i2.4xlarge': 4, 'i2.8xlarge': 8,
+#    'm1.small': 1, 'm1.medium': 1, 'm1.large': 2, 'm1.xlarge': 4,
+#    'm2.xlarge': 1, 'm2.2xlarge': 1, 'm2.4xlarge': 2,
+#    'm3.medium': 1, 'm3.large': 1, 'm3.xlarge': 2, 'm3.2xlarge': 2,
+#    'r3.large': 1, 'r3.xlarge': 1, 'r3.2xlarge': 1, 'r3.4xlarge': 1,
+#    'r3.8xlarge': 2, 'd2.xlarge': 3, 'd2.2xlarge': 6, 'd2.4xlarge': 12,
+#    'd2.8xlarge': 24,
+#}
+#DRIVE_START_LETTER = 'b'
+
 INSTANCE_EXISTS_STATUSES = frozenset(['ACTIVE'])
 INSTANCE_DELETED_STATUSES = frozenset(['DISCONNECTED'])
 INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 
-
-
-def GetBlockDeviceMap(machine_type):
-  """Returns the block device map to expose all devices for a given machine.
-
-  Args:
-    machine_type: The machine type to create a block device map for.
-
-  Returns:
-    The json representation of the block device map for a machine compatible
-    with the SoftLayer CLI, or if the machine type has no local disks, it will
-    return None.
-  """
-  if machine_type in NUM_LOCAL_VOLUMES:
-    mappings = [{'VirtualName': 'ephemeral%s' % i,
-                 'DeviceName': '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)}
-                for i in xrange(NUM_LOCAL_VOLUMES[machine_type])]
-    return json.dumps(mappings)
-  else:
-    return None
-
-
-def IsPlacementGroupCompatible(machine_type):
-  """Returns True if VMs of 'machine_type' can be put in a placement group."""
-  prefix = machine_type.split('.')[0]
-  return prefix in PLACEMENT_GROUP_PREFIXES
 
 
 class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -107,8 +81,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
   delete_issued = False
 
   CLOUD = providers.SOFTLAYER
-  IMAGE_NAME_FILTER = 'Ubuntu'
-  DEFAULT_ROOT_DISK_TYPE = 'standard'
+  #IMAGE_NAME_FILTER = 'Ubuntu'
+  #DEFAULT_ROOT_DISK_TYPE = 'standard'
 
   _lock = threading.Lock()
   imported_keyfile_set = set()
@@ -123,48 +97,11 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     super(SoftLayerVirtualMachine, self).__init__(vm_spec)
     self.region = util.GetRegionFromZone(self.zone)
     self.user_name = FLAGS.softlayer_user_name
-    if self.machine_type in NUM_LOCAL_VOLUMES:
-      self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
+#    if self.machine_type in NUM_LOCAL_VOLUMES:
+#      self.max_local_disks = NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
     #self.network = softLayer_network.SoftLayerNetwork.GetNetwork(self)              
     #self.firewall = softLayer_network.SoftLayerFirewall.GetFirewall() 
-
-  @property
-  def group_id(self):
-    """Returns the security group ID of this VM."""
-    return self.network.regional_network.vpc.default_security_group_id
-
-  @classmethod
-  def _GetDefaultImage(cls, machine_type, region):
-    print "By pass get default image"  
-    return
-    """Returns the default image given the machine type and region.
-
-    If no default is configured, this will return None.
-    """
-    if cls.IMAGE_NAME_FILTER is None:
-      return None
-
-    prefix = machine_type.split('.')[0]
-    virt_type = 'paravirtual' if prefix in NON_HVM_PREFIXES else 'hvm'
-
-    describe_cmd = util.SoftLayer_PREFIX + [
-        'image',
-        'list',
-        '--public',
-        '--name', 
-        '*%s*' % cls.IMAGE_NAME_FILTER]
-    
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-
-    if not stdout:
-      return None
-
-    images = json.loads(stdout)
-    # We want to return the latest version of the image, and since the wildcard
-    # portion of the image name is the image's creation date, we can just take
-    # the image with the 'largest' name.
-    return max(images, key=lambda image: image['Name'])['ImageId']
 
   def ImportKeyfile(self):
     """Imports the public keyfile to SoftLayer."""
@@ -237,23 +174,40 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         SoftLayerVirtualMachine.keyLabel  = "Perfkit-Key-" + self.IdGenerator()
     
     self.ImportKeyfile()
-    # _GetDefaultImage calls the SoftLayer CLI.
-    self.image = self.image or self._GetDefaultImage(self.machine_type,
-                                                     self.region)
     
     self.hostname = "Pefkit-Host-" + self.IdGenerator(); 
     self.AllowRemoteAccessPorts()
 
     self.active_try_count = 0
   
-
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
     self.DeleteKeyfile()
 
   def _Create(self):
     """Create a VM instance."""
-      
+    
+    memory = '1024'
+    cpus = '1'
+    os = 'UBUNTU_LATEST_64'
+    nic = '10'
+    
+    try: 
+        vm_attributes = json.loads(self.machine_type)
+        if 'cpus' in vm_attributes:
+            cpus = vm_attributes['cpus']
+                        
+        if 'memory' in vm_attributes:
+            memory = vm_attributes['memory']
+        
+        if 'os' in vm_attributes:
+            os = vm_attributes['os']
+        
+        if 'nic' in vm_attributes:
+            nic = vm_attributes['nic']
+    except:
+        logging.warning("Using default values for VM. Error in machine type JSON: %s" % self.machine_type)
+        
     create_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json',                                          
@@ -265,15 +219,17 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--datacenter',
         '%s' % self.region,
         '--memory', 
-        '1024', 
+        '%s' % memory, 
         '--hostname',
         '%s' % self.hostname,
         '--domain',
         'perfkit.org',
         '--cpu',
-        '1',
+        '%s' % cpus,
           '--os',
-        'UBUNTU_LATEST_64',
+        '%s' % os,
+        '--network',
+        '%s' % nic,
         '--key',
          SoftLayerVirtualMachine.keyLabel
         ]
@@ -281,33 +237,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['id']
-
-  @vm_util.Retry()
-  def _WaitForDeleteToComplete(self):
-    sleep(10)
     
-    describe_cmd = util.SoftLayer_PREFIX + [
-        '--format',
-        'json',
-        'vs',
-        'detail',
-        '%s' % self.id]
-    
-    transaction = None
-    
-    try:
-        stdout, _ = util.IssueRetryableCommand(describe_cmd)
-        response = json.loads(stdout)
-        transaction = response['active_transaction']
-    except Exception as e:
-        print "Error({0}): {1}".format(e.errno, e.strerror)
-        return 
-    
-    if transaction != None:
-        logging.info('WaitForDeleteToComplete %s. Not ready. Active transaction in progress: %s.', self.id, transaction)
-        raise Exception
-    
-      
   def _Delete(self):
     """Delete a VM instance."""
     delete_cmd = util.SoftLayer_PREFIX + [
@@ -316,10 +246,10 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         'cancel',
         '%s' % self.id]
     
-    if self.delete_issued == False:
-        self.delete_issued = True
-        vm_util.IssueCommand(delete_cmd)
-        sleep(45)
+    vm_util.IssueCommand(delete_cmd)
+    logging.info("Sleeping so that delete command has time to register")
+    sleep(60)
+    #self._WaitForDeleteToComplete()
         
 
   def _Exists(self):
@@ -363,43 +293,6 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     except errors.VmUtil.CalledProcessException as e:
         return False
             
-  def CreateScratchDisk(self, disk_spec):
-    """Create a VM's scratch disk.
-
-    Args:
-      disk_spec: virtual_machine.BaseDiskSpec object of the disk.
-    """
-    # Instantiate the disk(s) that we want to create.
-    disks = []
-    for _ in range(disk_spec.num_striped_disks):
-        data_disk = softLayer_disk.SoftLayerDisk(disk_spec, self.zone, self.machine_type)
-        if disk_spec.disk_type == disk.LOCAL:
-            data_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
-                                      self.local_disk_counter)
-        # Local disk numbers start at 1 (0 is the system disk).
-            data_disk.disk_number = self.local_disk_counter + 1
-            self.local_disk_counter += 1
-            if self.local_disk_counter > self.max_local_disks:
-                raise errors.Error('Not enough local disks.')
-            else:
-                # Remote disk numbers start at 1 + max_local disks (0 is the system disk
-                # and local disks occupy [1, max_local_disks]).
-                data_disk.disk_number = (self.remote_disk_counter + 1 + self.max_local_disks)
-                self.remote_disk_counter += 1
-                disks.append(data_disk)
-
-    self._CreateScratchDiskFromDisks(disk_spec, disks)
-
-  def GetLocalDisks(self):
-    """Returns a list of local disks on the VM.
-
-    Returns:
-      A list of strings, where each string is the absolute path to the local
-          disks on the VM (e.g. '/dev/sdb').
-    """
-    return ['/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
-            for i in xrange(NUM_LOCAL_VOLUMES[self.machine_type])]
-
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
