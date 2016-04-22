@@ -33,8 +33,10 @@ def main(argv):
       for file_name in file_names:
         if not file_name.endswith('.pyc'):
           zip_file.write(os.path.join(dir_path, file_name))
+    for file_name in ('AUTHORS', 'CHANGES.md', 'CONTRIBUTING.md', 'LICENSE',
+                      'README.md', 'requirements.txt'):
+      zip_file.write(file_name)
     zip_file.write('pkb.py', '__main__.py')
-    zip_file.write('requirements.txt')
     zip_file.writestr('perfkitbenchmarker/version.txt', version)
 
 
