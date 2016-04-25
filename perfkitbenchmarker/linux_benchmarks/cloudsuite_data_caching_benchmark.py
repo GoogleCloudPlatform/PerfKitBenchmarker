@@ -27,9 +27,9 @@ from perfkitbenchmarker.linux_packages import docker
 flags.DEFINE_string('cloudsuite_data_caching_memcached_flags',
                     '-t 1 -m 2048 -n 550',
                     'Flags to be given to memcached.')
-flags.DEFINE_string('cloudsuite_data_caching_rps',
-                    '18000',
-                    'Number of requests per second.')
+flags.DEFINE_integer('cloudsuite_data_caching_rps',
+                     18000,
+                     'Number of requests per second.')
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'cloudsuite_data_caching'
@@ -56,12 +56,11 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
   server_vm = benchmark_spec.vm_groups['server'][0]
   client_vm = benchmark_spec.vm_groups['client'][0]
 
 # Make sure docker is installed on all VMs.
-  for vm in vms:
+  for vm in (server_vm, client_vm):
     if not docker.IsInstalled(vm):
       vm.Install('docker')
 
@@ -98,7 +97,7 @@ def _ParseOutput(output_str):
     req_rems = numbers[15:-1]
 
     results.append(sample.Sample("Average outstanding requests per requester",
-                                 float(sum(req_rems)) / len(req_rems), "reqs"))
+                                 sum(req_rems) / len(req_rems), "reqs"))
 
     return results
 
@@ -118,7 +117,7 @@ def Run(benchmark_spec):
 
   benchmark_cmd = ('sudo docker run --rm --name dc-client --net host'
                    ' cloudsuite/data-caching:client -rps %d' %
-                   int(FLAGS.cloudsuite_data_caching_rps))
+                   FLAGS.cloudsuite_data_caching_rps)
 
   stdout, _ = client_vm.RemoteCommand(benchmark_cmd, should_log=True)
 
