@@ -112,6 +112,11 @@ class PkbLogFilter(logging.Filter):
     return True
 
 
+def ConfigureBasicLogging():
+  """Initializes basic python logging before a log file is available."""
+  logging.basicConfig(format='%(levelname)-8s %(message)s', level=logging.INFO)
+
+
 def ConfigureLogging(stderr_log_level, log_path, run_uri,
                      file_log_level=logging.DEBUG):
   """Configure logging.
