@@ -43,6 +43,7 @@ from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark \
     as hbase_ycsb
 from perfkitbenchmarker.linux_packages import hbase
 from perfkitbenchmarker.linux_packages import ycsb
+from perfkitbenchmarker.providers.gcp import gcp_bigtable
 
 FLAGS = flags.FLAGS
 
@@ -101,6 +102,9 @@ REQUIRED_SCOPES = (
 # TODO(connormccoy): Make table parameters configurable.
 COLUMN_FAMILY = 'cf'
 
+# Only used when we need to create the cluster.
+CLUSTER_SIZE = 3
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -123,14 +127,13 @@ def CheckPrerequisites():
       raise ValueError('Scope {0} required.'.format(scope))
 
   # TODO: extract from gcloud config if available.
-  if not FLAGS.google_bigtable_cluster_name:
-    raise ValueError('Missing --google_bigtable_cluster_name')
-  if not FLAGS.google_bigtable_zone_name:
-    raise ValueError('Missing --google_bigtable_zone_name')
-  cluster = _GetClusterDescription(FLAGS.project or _GetDefaultProject(),
-                                   FLAGS.google_bigtable_zone_name,
-                                   FLAGS.google_bigtable_cluster_name)
-  logging.info('Found cluster: %s', cluster)
+  if FLAGS.google_bigtable_cluster_name:
+    cluster = _GetClusterDescription(FLAGS.project or _GetDefaultProject(),
+                                     FLAGS.google_bigtable_zone_name,
+                                     FLAGS.google_bigtable_cluster_name)
+    logging.info('Found cluster: %s', cluster)
+  else:
+    logging.info('No cluster; will create in Prepare.')
 
 
 def _GetClusterDescription(project, zone, cluster_name):
@@ -190,6 +193,8 @@ def _Install(vm):
   vm.Install('ycsb')
   vm.Install('curl')
 
+  cluster_name = (FLAGS.google_bigtable_cluster_name or
+                  'pkb-bigtable-{0}'.format(FLAGS.run_uri))
   hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
   for url in [FLAGS.google_bigtable_hbase_jar_url, TCNATIVE_BORINGSSL_URL]:
     jar_name = os.path.basename(url)
@@ -204,7 +209,7 @@ def _Install(vm):
       'google_bigtable_endpoint': FLAGS.google_bigtable_endpoint,
       'google_bigtable_admin_endpoint': FLAGS.google_bigtable_admin_endpoint,
       'project': FLAGS.project or _GetDefaultProject(),
-      'cluster': FLAGS.google_bigtable_cluster_name,
+      'cluster': cluster_name,
       'zone': FLAGS.google_bigtable_zone_name,
       'hbase_version': HBASE_VERSION.replace('.', '_')
   }
@@ -228,6 +233,23 @@ def Prepare(benchmark_spec):
   """
   benchmark_spec.always_call_cleanup = True
   vms = benchmark_spec.vms
+
+  # TODO: in the future, it might be nice to chagne this so that
+  # a gcp_bigtable.GcpBigtableCluster can be created with an
+  # flag that says don't create/delete the cluster.  That would
+  # reduce the code paths here.
+  if FLAGS.google_bigtable_cluster_name is None:
+    cluster_name = 'pkb-bigtable-{0}'.format(FLAGS.run_uri)
+    project = FLAGS.project or _GetDefaultProject()
+    logging.info('Creating bigtable cluster %s', cluster_name)
+    zone = FLAGS.google_bigtable_zone_name
+    benchmark_spec.bigtable_cluster = gcp_bigtable.GcpBigtableCluster(
+        cluster_name, CLUSTER_SIZE, project, zone)
+    benchmark_spec.bigtable_cluster.Create()
+    cluster = _GetClusterDescription(project,
+                                     FLAGS.google_bigtable_zone_name,
+                                     cluster_name)
+    logging.info('Cluster %s created successfully', cluster)
 
   vm_util.RunThreaded(_Install, vms)
 
@@ -259,9 +281,11 @@ def Run(benchmark_spec):
                     'table': table_name}
 
   executor = ycsb.YCSBExecutor('hbase-10', **executor_flags)
+  cluster_name = (FLAGS.google_bigtable_cluster_name or
+                  'pkb-bigtable-{0}'.format(FLAGS.run_uri))
   cluster_info = _GetClusterDescription(FLAGS.project or _GetDefaultProject(),
                                         FLAGS.google_bigtable_zone_name,
-                                        FLAGS.google_bigtable_cluster_name)
+                                        cluster_name)
 
   metadata = {'ycsb_client_vms': len(vms),
               'bigtable_nodes': cluster_info.get('serveNodes')}
@@ -296,8 +320,12 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vm = benchmark_spec.vms[0]
-  # Delete table
-  command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
-             """{1}/hbase shell""").format(_GetTableName(), hbase.HBASE_BIN)
-  vm.RemoteCommand(command, should_log=True, ignore_failure=True)
+ # Delete table
+  if FLAGS.google_bigtable_cluster_name is None:
+    benchmark_spec.bigtable_cluster.Delete()
+  else:
+    # Only need to drop the tables if we're not deleting the cluster.
+    vm = benchmark_spec.vms[0]
+    command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
+               """{1}/hbase shell""").format(_GetTableName(), hbase.HBASE_BIN)
+    vm.RemoteCommand(command, should_log=True, ignore_failure=True)
