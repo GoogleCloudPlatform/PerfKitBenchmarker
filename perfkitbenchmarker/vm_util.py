@@ -32,13 +32,13 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import temp_dir
 
 FLAGS = flags.FLAGS
 
 PRIVATE_KEYFILE = 'perfkitbenchmarker_keyfile'
 PUBLIC_KEYFILE = 'perfkitbenchmarker_keyfile.pub'
 CERT_FILE = 'perfkitbenchmarker.pem'
-TEMP_DIR = os.path.join(tempfile.gettempdir(), 'perfkitbenchmarker')
 
 # The temporary directory on VMs. We cannot reuse GetTempDir()
 # because run_uri will not be available at time of module load and we need
@@ -101,7 +101,7 @@ flags.DEFINE_enum('background_network_ip_type', IpAddressSubset.EXTERNAL,
 
 def GetTempDir():
   """Returns the tmp dir of the current run."""
-  return os.path.join(TEMP_DIR, 'run_{0}'.format(FLAGS.run_uri))
+  return temp_dir.GetRunDirPath()
 
 
 def PrependTempDir(file_name):
@@ -111,8 +111,7 @@ def PrependTempDir(file_name):
 
 def GenTempDir():
   """Creates the tmp dir for the current run if it does not already exist."""
-  if not os.path.exists(GetTempDir()):
-    os.makedirs(GetTempDir())
+  temp_dir.CreateTemporaryDirectories()
 
 
 def SSHKeyGen():
@@ -405,11 +404,12 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
 
 def GetLastRunUri():
   """Returns the last run_uri used (or None if it can't be determined)."""
+  runs_dir_path = temp_dir.GetAllRunsDirPath()
   if RunningOnWindows():
     cmd = ['powershell', '-Command',
-           'gci %s | sort LastWriteTime | select -last 1' % TEMP_DIR]
+           'gci %s | sort LastWriteTime | select -last 1' % runs_dir_path]
   else:
-    cmd = ['bash', '-c', 'ls -1t %s | head -1' % TEMP_DIR]
+    cmd = ['bash', '-c', 'ls -1t %s | head -1' % runs_dir_path]
   stdout, _, _ = IssueCommand(cmd)
   try:
     return regex_util.ExtractGroup('run_([^\s]*)', stdout)
