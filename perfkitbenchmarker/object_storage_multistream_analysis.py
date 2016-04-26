@@ -19,7 +19,7 @@ frames, because that seems to be the most standard Python statistical
 data format.
 """
 
-import perfkitbenchmarker
+from perfkitbenchmarker import units
 
 
 class Interval(object):
@@ -175,8 +175,8 @@ def ThroughputStats(start_times, durations, sizes, stream_ids, num_streams):
   assert start_times.index.equals(sizes.index)
   assert start_times.index.equals(stream_ids.index)
 
-  bit = perfkitbenchmarker.UNIT_REGISTRY.bit
-  sec = perfkitbenchmarker.UNIT_REGISTRY.second
+  bit = units.bit
+  sec = units.second
 
   end_times = start_times + durations
 
@@ -215,8 +215,8 @@ def GapStats(start_times, durations, stream_ids, interval, num_streams):
   assert start_times.index.equals(durations.index)
   assert start_times.index.equals(stream_ids.index)
 
-  sec = perfkitbenchmarker.UNIT_REGISTRY.second
-  percent = perfkitbenchmarker.UNIT_REGISTRY.percent
+  sec = units.second
+  percent = units.percent
 
   end_times = start_times + durations
 

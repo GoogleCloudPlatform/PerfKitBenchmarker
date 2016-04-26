@@ -19,7 +19,7 @@ import unittest
 import pandas as pd
 
 from perfkitbenchmarker import object_storage_multistream_analysis as analysis
-import perfkitbenchmarker
+from perfkitbenchmarker import units
 
 # The first stream starts at 0.0 and the last one ends at 14.0. All
 # streams were active from time 4.0 to time 8.0.
@@ -93,12 +93,12 @@ class TestFullyInInterval(unittest.TestCase):
         (overlaps == pd.Series([False, False, True, False, False, True])).all())
 
 
-class TestAllStreamsThroughputStats(unittest.TestCase):
+class TestThroughputStats(unittest.TestCase):
 
   def setUp(self):
-    self.byte = perfkitbenchmarker.UNIT_REGISTRY.byte
-    self.sec = perfkitbenchmarker.UNIT_REGISTRY.second
-    self.percent = perfkitbenchmarker.UNIT_REGISTRY.percent
+    self.byte = units.byte
+    self.sec = units.second
+    self.percent = units.percent
 
   def doTest(self, data, num_streams, correct_answer):
     output = analysis.ThroughputStats(
@@ -108,7 +108,7 @@ class TestAllStreamsThroughputStats(unittest.TestCase):
 
     for name, value in output.iteritems():
       if name not in correct_answer:
-        raise KeyError('IntervalThroughputStats produced key %s not in correct '
+        raise KeyError('ThroughputStats produced key %s not in correct '
                        'output %s' % (name, str(correct_answer)))
 
       self.assertEqual(value, correct_answer[name])
@@ -121,7 +121,7 @@ class TestAllStreamsThroughputStats(unittest.TestCase):
                            'stream_num': [0]})
     self.doTest(one_op, 1,
                 {'net throughput': 2.0 * self.byte / self.sec,
-                 'net throughput (experimental)': 2.0 * self.byte / self.sec})
+                 'net throughput (with gap)': 2.0 * self.byte / self.sec})
 
   def testSecondObjectSameSpeed(self):
     # Adding a second object at same speed has no effect on any metric.
@@ -131,7 +131,7 @@ class TestAllStreamsThroughputStats(unittest.TestCase):
                            'stream_num': [0, 0]})
     self.doTest(no_gap, 1,
                 {'net throughput': 2.0 * self.byte / self.sec,
-                 'net throughput (experimental)': 2.0 * self.byte / self.sec})
+                 'net throughput (with gap)': 2.0 * self.byte / self.sec})
 
   def testSecondObjectDifferentSpeed(self):
     # Adding a second object at a different speed yields a different throughput.
@@ -141,7 +141,7 @@ class TestAllStreamsThroughputStats(unittest.TestCase):
                                      'stream_num': [0, 0]})
     self.doTest(different_speeds, 1,
                 {'net throughput': 2.5 * self.byte / self.sec,
-                 'net throughput (experimental)': 2.5 * self.byte / self.sec})
+                 'net throughput (with gap)': 2.5 * self.byte / self.sec})
 
   def testGapBetweenObjects(self):
     # Adding a gap affects throughput with overheads, but not without.
@@ -151,7 +151,7 @@ class TestAllStreamsThroughputStats(unittest.TestCase):
                              'stream_num': [0, 0]})
     self.doTest(with_gap, 1,
                 {'net throughput': 2.0 * self.byte / self.sec,
-                 'net throughput (experimental)': 1.0 * self.byte / self.sec})
+                 'net throughput (with gap)': 1.0 * self.byte / self.sec})
 
   def testSimultaneousObjects(self):
     # With two simultaneous objects, throughput adds.
@@ -161,7 +161,7 @@ class TestAllStreamsThroughputStats(unittest.TestCase):
                                 'stream_num': [0, 1]})
     self.doTest(two_streams, 2,
                 {'net throughput': 4.0 * self.byte / self.sec,
-                 'net throughput (experimental)': 4.0 * self.byte / self.sec})
+                 'net throughput (with gap)': 4.0 * self.byte / self.sec})
 
   def testTwoStreamGaps(self):
     # With two streams, overhead is compared to 2 * interval length.
@@ -171,14 +171,14 @@ class TestAllStreamsThroughputStats(unittest.TestCase):
                                          'stream_num': [0, 0, 1, 1]})
     self.doTest(two_streams_with_gap, 2,
                 {'net throughput': 4.0 * self.byte / self.sec,
-                 'net throughput (experimental)': 2.0 * self.byte / self.sec})
+                 'net throughput (with gap)': 2.0 * self.byte / self.sec})
 
 
 class TestGapStats(unittest.TestCase):
 
   def setUp(self):
-    self.sec = perfkitbenchmarker.UNIT_REGISTRY.second
-    self.percent = perfkitbenchmarker.UNIT_REGISTRY.percent
+    self.sec = units.second
+    self.percent = units.percent
 
   def doTest(self, data, num_streams, interval, correct_answer):
     output = analysis.GapStats(
