@@ -191,7 +191,7 @@ def GetBenchmarksFromFlags():
     else:
       benchmark_names.add(benchmark)
 
-# Expand recursive sets
+  # Expand recursive sets
   expanded = set()
   did_expansion = True
   while did_expansion:
@@ -208,7 +208,7 @@ def GetBenchmarksFromFlags():
 
   valid_benchmarks = _GetValidBenchmarks()
 
-# create a list of module, config tuples to return
+  # create a list of module, config tuples to return
   benchmark_config_list = []
   for benchmark_name in benchmark_names:
     if benchmark_name in valid_benchmarks:
