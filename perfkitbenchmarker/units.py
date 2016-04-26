@@ -74,6 +74,10 @@ def _unit_deepcopy(self, memo):
 _UNIT_REGISTRY.Unit.__deepcopy__ = _unit_deepcopy
 
 
+# Fix for https://github.com/hgrecco/pint/issues/372
+_UNIT_REGISTRY.Unit.__ne__ = lambda self, other: not self.__eq__(other)
+
+
 # Forward access to pint's classes and functions.
 DimensionalityError = pint.DimensionalityError
 ParseExpression = _UNIT_REGISTRY.parse_expression
