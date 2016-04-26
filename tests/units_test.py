@@ -22,6 +22,10 @@ from perfkitbenchmarker import units
 
 class UnitRegistryTestCase(unittest.TestCase):
 
+  def testUnitNotEqual(self):
+    # See https://github.com/hgrecco/pint/issues/372
+    self.assertFalse(units.byte != units.Unit('byte'))
+
   def testKB(self):
     self.assertEqual(units.ParseExpression('12KB'),
                      units.ParseExpression('12000 bytes'))
