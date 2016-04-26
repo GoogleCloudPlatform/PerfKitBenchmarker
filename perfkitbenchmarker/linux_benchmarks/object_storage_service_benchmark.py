@@ -376,7 +376,7 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
   records_json = json.loads(raw_result)
   records = pd.DataFrame(records_json)
 
-  any_streams_active, all_streams_active = analysis.AnyAndAllStreamsIntervals(
+  any_streams_active, all_streams_active = analysis.GetStreamActiveIntervals(
       records['start_time'], records['latency'], records['stream_num'])
   start_gap, stop_gap = analysis.StreamStartAndEndGaps(
       records['start_time'], records['latency'], all_streams_active)
@@ -415,7 +415,7 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
       results,
       records_in_interval['latency'],
       latency_prefix,
-      'sec',
+      LATENCY_UNIT,
       distribution_metadata)
 
   logging.info('Processing %s multi-stream %s results for net throughput',
@@ -426,6 +426,10 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
       records_in_interval['size'],
       records_in_interval['stream_num'],
       num_streams)
+  # A special throughput statistic that uses all the records, not
+  # restricted to the interval.
+  throughput_stats['net throughput (simplified)'] = (
+      records['size'].sum() / any_streams_active.duration)
   gap_stats = analysis.GapStats(
       records['start_time'],
       records['latency'],
@@ -454,7 +458,7 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
         results,
         this_size_records['latency'],
         latency_prefix,
-        'sec',
+        LATENCY_UNIT,
         this_size_metadata)
 
 

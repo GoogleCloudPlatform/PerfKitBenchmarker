@@ -55,10 +55,14 @@ class TestInterval(unittest.TestCase):
     with self.assertRaises(ValueError):
       analysis.Interval(2, duration=5, end=8)
 
+  def testEndBeforeStart(self):
+    with self.assertRaises(ValueError):
+      analysis.Interval(2, end=1)
 
-class TestAnyAndAllStreamsIntervals(unittest.TestCase):
-  def testAnyAndAllStreamsInterval(self):
-    any_stream, all_streams = analysis.AnyAndAllStreamsIntervals(
+
+class TestGetStreamActiveIntervals(unittest.TestCase):
+  def testGetStreamActiveIntervals(self):
+    any_stream, all_streams = analysis.GetStreamActiveIntervals(
         SAMPLE_TABLE['start_time'],
         SAMPLE_TABLE['duration'],
         SAMPLE_TABLE['stream_num'])

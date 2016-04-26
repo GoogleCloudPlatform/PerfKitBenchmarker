@@ -43,6 +43,8 @@ class Interval(object):
             (start, duration, end))
       self.duration = duration
     elif end is not None:
+      if end < start:
+        raise ValueError('Interval (%s, %s) is not valid' % (start, end))
       self.duration = end - start
 
 
@@ -61,8 +63,12 @@ class Interval(object):
     return 'Interval(%s, %s, %s)' % (self.start, self.duration, self.end)
 
 
-def AnyAndAllStreamsIntervals(start_times, durations, stream_ids):
+def GetStreamActiveIntervals(start_times, durations, stream_ids):
   """Compute when all streams were active and when any streams were active.
+
+  This function computes two intervals based on the input: 1) the
+  interval when *all* streams were doing work, and 2) the interval
+  where *any one* of the streams was doing work.
 
   Args:
     start_times: a pd.Series of POSIX timestamps, as floats.
@@ -157,9 +163,12 @@ def ThroughputStats(start_times, durations, sizes, stream_ids, num_streams):
   the overall net throughput. Operations from the same stream cannot
   overlap, but operations from different streams may overlap.
 
-  Returns: a dictionary whose keys are metric names and whose values
-  are Quantity objects holding the metric values with appropriate
-  units.
+  Returns: a dictionary with keys and values
+    - 'net throughput': the net throughput of all streams in the input
+    - 'net throughput (with gap)':  net throughput including some benchmark
+      overhead
+
+  The values are Quantity objects with appropriate units.
   """
 
   assert start_times.index.equals(durations.index)
@@ -181,7 +190,7 @@ def ThroughputStats(start_times, durations, sizes, stream_ids, num_streams):
   return {
       'net throughput':
       (total_bytes_by_stream / active_time_by_stream).sum() * 8 * bit / sec,
-      'net throughput (experimental)':
+      'net throughput (with gap)':
       (total_bytes_by_stream /
        overall_duration_by_stream).sum() * 8 * bit / sec}
 
@@ -196,8 +205,11 @@ def GapStats(start_times, durations, stream_ids, interval, num_streams):
     interval: the interval to compute statistics for.
     num_streams: the total number of streams.
 
-  Returns: a dictionary whose keys are metric names and whose values
-  are Quantity objects holding metric values with appropriate units.
+  Returns: a dictionary with keys and values
+    - 'total gap time': total time spent not transmitting or receiving data
+    - 'gap time proportion': time spent in gaps / total time in benchmark
+
+  The values are Quantity objects with appropriate units.
   """
 
   assert start_times.index.equals(durations.index)
