@@ -143,7 +143,8 @@ BENCHMARK_SETS = {
         MESSAGE: 'CloudSuite benchmark set.',
         BENCHMARK_LIST: ['cloudsuite_in_memory_analytics',
                          'cloudsuite_data_caching',
-                         'cloudsuite_media_streaming']
+                         'cloudsuite_media_streaming',
+                         'cloudsuite_graph_analytics']
     }
 }
 
@@ -209,7 +210,7 @@ def GetBenchmarksFromFlags():
 
   valid_benchmarks = _GetValidBenchmarks()
 
-  # create a list of module, config tuples to return
+# create a list of module, config tuples to return
   benchmark_config_list = []
   for benchmark_name in benchmark_names:
     if benchmark_name in valid_benchmarks:
