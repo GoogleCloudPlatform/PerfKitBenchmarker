@@ -64,7 +64,7 @@ aerospike:
 
 AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
 CLIENT_DIR = 'aerospike-client-c'
-CLIENT_VERSION = '3.0.84'
+CLIENT_VERSION = '4.0.4'
 PATCH_FILE = 'aerospike.patch'
 
 
