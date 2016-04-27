@@ -13,4 +13,7 @@
 # limitations under the License.
 
 import gflags as flags  # NOQA
-from gflags import validators as flags_validators  # NOQA
+try:
+  from gflags import validators as flags_validators  # NOQA
+except ImportError:
+  from gflags import gflags_validators as flags_validators  # NOQA
