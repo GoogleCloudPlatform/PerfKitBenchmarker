@@ -84,4 +84,6 @@ ParseExpression = _UNIT_REGISTRY.parse_expression
 Quantity = _UNIT_REGISTRY.Quantity
 Unit = _UNIT_REGISTRY.Unit
 byte = Unit('byte')
+bit = Unit('bit')
+second = Unit('second')
 percent = Unit('percent')
