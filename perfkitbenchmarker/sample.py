@@ -24,7 +24,8 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
   """Computes percentiles, stddev and mean on a set of numbers
 
   Args:
-    numbers: The set of numbers to compute percentiles for.
+    numbers: The set of numbers to compute percentiles for. Can be a
+      list or a Pandas Series.
     percentiles: If given, a list of percentiles to compute. Can be
       floats, ints or longs.
 
@@ -34,9 +35,10 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
   Raises:
     ValueError, if numbers is empty or if a percentile is outside of
     [0, 100].
+
   """
 
-  if not numbers:
+  if not len(numbers):  # 'if not numbers' will fail if numbers is a pd.Series.
     raise ValueError("Can't compute percentiles of empty list.")
 
   numbers_sorted = sorted(numbers)

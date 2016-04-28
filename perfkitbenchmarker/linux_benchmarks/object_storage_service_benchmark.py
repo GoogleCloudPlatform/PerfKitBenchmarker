@@ -49,6 +49,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.sample import PercentileCalculator  # noqa
 
@@ -429,7 +430,8 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
   # A special throughput statistic that uses all the records, not
   # restricted to the interval.
   throughput_stats['net throughput (simplified)'] = (
-      records['size'].sum() / any_streams_active.duration)
+      records['size'].sum() * 8 / any_streams_active.duration
+      * units.bit / units.second)
   gap_stats = analysis.GapStats(
       records['start_time'],
       records['latency'],
