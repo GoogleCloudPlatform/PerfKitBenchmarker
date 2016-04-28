@@ -59,12 +59,12 @@ def Prepare(benchmark_spec):
   server_vm = benchmark_spec.vm_groups['server'][0]
   client_vm = benchmark_spec.vm_groups['client'][0]
 
-# Make sure docker is installed on all VMs.
+  # Make sure docker is installed on all VMs.
   for vm in (server_vm, client_vm):
     if not docker.IsInstalled(vm):
       vm.Install('docker')
 
-    # Prepare and start the server VM.
+  # Prepare and start the server VM.
   server_vm.RemoteCommand('sudo docker pull cloudsuite/data-caching:server')
   server_vm.RemoteCommand("echo '%s    dc-client' | sudo tee -a /etc/hosts >"
                           " /dev/null" % client_vm.internal_ip)
@@ -72,7 +72,7 @@ def Prepare(benchmark_spec):
                           'cloudsuite/data-caching:server %s' %
                           FLAGS.cloudsuite_data_caching_memcached_flags)
 
-# Prepare the client.
+  # Prepare the client.
   client_vm.RemoteCommand('sudo docker pull cloudsuite/data-caching:client')
   client_vm.RemoteCommand("echo '%s    dc-server' | sudo tee -a /etc/hosts >"
                           " /dev/null" % server_vm.internal_ip)
@@ -112,7 +112,6 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-
   client_vm = benchmark_spec.vm_groups['client'][0]
 
   benchmark_cmd = ('sudo docker run --rm --name dc-client --net host'
@@ -131,7 +130,6 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-
   server_vm = benchmark_spec.vm_groups['server'][0]
   client_vm = benchmark_spec.vm_groups['client'][0]
 
