@@ -1,7 +1,7 @@
 
 1) Install SoftLayer requirements
 	sudo pip install -r requirements-softlayer.txt
-
+	
 2) Run SoftLayer setup program
 	slcli setup
 
@@ -26,4 +26,9 @@ The Redis Benchmark with a Redis parameter and datacenter specified
 
 A private & public VLAN id specified to ensure VMs are located on the same vlan. 
 VLAN ids can be queried with: slcli vlan list
+The risk of specifing a VLAN is there is a chance no resources will be available for that VLAN 
 >python pkb.py --cloud=SoftLayer --benchmarks=ping  --machine_type="{ \"nic\": 1000, \"public_vlan_id\": 1205613, \"private_vlan_id\": 1205615}"
+
+Storage
+Work in progress
+>python pkb.py --cloud=SoftLayer --benchmarks=fio  --machine_type="{ \"nic\": 1000}" --softlayer_provisioned_iops=500
