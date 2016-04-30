@@ -32,31 +32,19 @@ VOLUME_EXISTS_STATUSES = frozenset(['creating', 'available', 'in-use', 'error'])
 VOLUME_DELETED_STATUSES = frozenset(['deleting', 'deleted'])
 VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
 
-STANDARD = 'standard'
-GP2 = 'gp2'
-IO1 = 'io1'
+LOCAL = 'local'
+
 
 DISK_TYPE = {
-    disk.STANDARD: STANDARD,
-    disk.REMOTE_SSD: GP2,
-    disk.PIOPS: IO1
+    disk.LOCAL: LOCAL,
+    
 }
 
 DISK_METADATA = {
-    STANDARD: {
+    LOCAL: {
         disk.MEDIA: disk.HDD,
         disk.REPLICATION: disk.ZONE,
         disk.LEGACY_DISK_TYPE: disk.STANDARD
-    },
-    GP2: {
-        disk.MEDIA: disk.SSD,
-        disk.REPLICATION: disk.ZONE,
-        disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD
-    },
-    IO1: {
-        disk.MEDIA: disk.SSD,
-        disk.REPLICATION: disk.ZONE,
-        disk.LEGACY_DISK_TYPE: disk.PIOPS
     }
 }
 
@@ -78,7 +66,7 @@ LOCAL_HDD_PREFIXES = ['d2', 'hs']
 def LocalDiskIsHDD(machine_type):
   """Check whether the local disks use spinning magnetic storage."""
 
-  return machine_type[:2].lower() in LOCAL_HDD_PREFIXES
+  return True
 
 
 SoftLayer = 'SoftLayer'
@@ -106,9 +94,10 @@ class SoftLayerDiskSpec(disk.BaseDiskSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
+    
     super(SoftLayerDiskSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['SoftLayer_provisioned_iops'].present:
-      config_values['iops'] = flag_values.SoftLayer_provisioned_iops
+    if flag_values['softlayer_provisioned_iops'].present:
+      config_values['iops'] = 500 #flag_values.softLayer_provisioned_iops
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -137,7 +126,7 @@ class SoftLayerDisk(disk.BaseDisk):
     self.id = None
     self.zone = zone
     self.region = util.GetRegionFromZone(zone)
-    self.device_letter = None
+    self.device_letter = 'c'
     self.attached_vm_id = None
 
     if self.disk_type != disk.LOCAL:
@@ -149,48 +138,16 @@ class SoftLayerDisk(disk.BaseDisk):
 
   def _Create(self):
     """Creates the disk."""
-    create_cmd = util.SoftLayer_PREFIX + [
-        'ec2',
-        'create-volume',
-        '--region=%s' % self.region,
-        '--size=%s' % self.disk_size,
-        '--volume-type=%s' % self.disk_type]
-    if not util.IsRegion(self.zone):
-      create_cmd.append('--availability-zone=%s' % self.zone)
-    if self.disk_type == IO1:
-      create_cmd.append('--iops=%s' % self.iops)
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
-    response = json.loads(stdout)
-    self.id = response['VolumeId']
-    util.AddDefaultTags(self.id, self.region)
+    print "create disk"
 
   def _Delete(self):
     """Deletes the disk."""
-    delete_cmd = util.SoftLayer_PREFIX + [
-        'ec2',
-        'delete-volume',
-        '--region=%s' % self.region,
-        '--volume-id=%s' % self.id]
-    logging.info('Deleting SoftLayer volume %s. This may fail if the disk is not '
-                 'yet detached, but will be retried.', self.id)
-    vm_util.IssueCommand(delete_cmd)
+    print "delete disk"
 
   def _Exists(self):
     """Returns true if the disk exists."""
-    describe_cmd = util.SoftLayer_PREFIX + [
-        'ec2',
-        'describe-volumes',
-        '--region=%s' % self.region,
-        '--filter=Name=volume-id,Values=%s' % self.id]
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
-    volumes = response['Volumes']
-    assert len(volumes) < 2, 'Too many volumes.'
-    if not volumes:
-      return False
-    status = volumes[0]['State']
-    assert status in VOLUME_KNOWN_STATUSES, status
-    return status in VOLUME_EXISTS_STATUSES
+    return True
+
 
   def Attach(self, vm):
     """Attaches the disk to a VM.
@@ -198,40 +155,13 @@ class SoftLayerDisk(disk.BaseDisk):
     Args:
       vm: The SoftLayerVirtualMachine instance to which the disk will be attached.
     """
-    with self._lock:
-      self.attached_vm_id = vm.id
-      if self.attached_vm_id not in SoftLayerDisk.vm_devices:
-        SoftLayerDisk.vm_devices[self.attached_vm_id] = set(
-            string.ascii_lowercase)
-      self.device_letter = min(SoftLayerDisk.vm_devices[self.attached_vm_id])
-      SoftLayerDisk.vm_devices[self.attached_vm_id].remove(self.device_letter)
-
-    attach_cmd = util.SoftLayer_PREFIX + [
-        'ec2',
-        'attach-volume',
-        '--region=%s' % self.region,
-        '--instance-id=%s' % self.attached_vm_id,
-        '--volume-id=%s' % self.id,
-        '--device=%s' % self.GetDevicePath()]
-    logging.info('Attaching SoftLayer volume %s. This may fail if the disk is not '
-                 'ready, but will be retried.', self.id)
-    util.IssueRetryableCommand(attach_cmd)
+    print "attach disk"
 
   def Detach(self):
     """Detaches the disk from a VM."""
-    detach_cmd = util.SoftLayer_PREFIX + [
-        'ec2',
-        'detach-volume',
-        '--region=%s' % self.region,
-        '--instance-id=%s' % self.attached_vm_id,
-        '--volume-id=%s' % self.id]
-    util.IssueRetryableCommand(detach_cmd)
+    print "detach"
 
-    with self._lock:
-      assert self.attached_vm_id in SoftLayerDisk.vm_devices
-      SoftLayerDisk.vm_devices[self.attached_vm_id].add(self.device_letter)
-      self.attached_vm_id = None
-      self.device_letter = None
+    
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""

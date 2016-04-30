@@ -86,3 +86,8 @@ default_500_gb: &default_500_gb
     disk_type: local
     disk_size: 500
     mount_point: /scratch
+  SoftLayer:
+    disk_type: local
+    disk_size: 500
+    mount_point: /scratch
+    
