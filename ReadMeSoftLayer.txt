@@ -31,4 +31,4 @@ The risk of specifing a VLAN is there is a chance no resources will be available
 
 Storage
 Work in progress
->python pkb.py --cloud=SoftLayer --benchmarks=fio  --machine_type="{ \"nic\": 1000}" --softlayer_provisioned_iops=500
+>python pkb.py --cloud=SoftLayer --benchmarks=fio  --machine_type="{ \"nic\": 1000 \"san\": "true" }" --softlayer_provisioned_iops=500
