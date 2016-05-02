@@ -92,6 +92,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.user_name = FLAGS.softlayer_user_name
     self.user_data = None
     self.max_local_disks = 5
+    self.num_local_disks = 1
 
   def ImportKeyfile(self):
     """Imports the public keyfile to SoftLayer."""
@@ -183,7 +184,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     nic = '10'
     private_vlan_id = None
     public_vlan_id = None
-
+    san = False
+    
     try:
         vm_attributes = json.loads(self.machine_type)
         if 'cpus' in vm_attributes:
@@ -194,6 +196,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
         if 'os' in vm_attributes:
             os = vm_attributes['os']
+
+        if 'san' in vm_attributes:
+            san = vm_attributes['san'].upper() in ['TRUE', 'T']
 
         if 'nic' in vm_attributes:
             nic = vm_attributes['nic']
@@ -230,12 +235,15 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '%s' % nic,
          '--disk',
          '25',
-         '--disk',
-         '25',
         '--key',
          SoftLayerVirtualMachine.keyLabel
-    
         ]
+    
+    if self.max_local_disks > 1:
+        create_cmd = create_cmd + ['--disk', '25']
+           
+    if san == True:
+        create_cmd = create_cmd + ['--san']       
 
     if public_vlan_id != None:
         create_cmd = create_cmd + ['--vlan-public', '%s' % public_vlan_id]

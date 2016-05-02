@@ -138,7 +138,8 @@ class SoftLayerDisk(disk.BaseDisk):
 
   def _Create(self):
     """Creates the disk."""
-    print "create disk"
+    logging.warn("create disk")
+    
 
   def _Delete(self):
     """Deletes the disk."""
@@ -146,6 +147,7 @@ class SoftLayerDisk(disk.BaseDisk):
 
   def _Exists(self):
     """Returns true if the disk exists."""
+    logging.warn("exists ")
     return True
 
 
@@ -155,7 +157,8 @@ class SoftLayerDisk(disk.BaseDisk):
     Args:
       vm: The SoftLayerVirtualMachine instance to which the disk will be attached.
     """
-    print "attach disk"
+    logging.info("attach disk")
+    vm.num_local_disks = vm.num_local_disks + 1
 
   def Detach(self):
     """Detaches the disk from a VM."""
