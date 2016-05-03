@@ -966,8 +966,10 @@ class S3StorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    remove_content_cmd = 'aws s3 rm s3://%s --recursive' % vm.bucket_name
-    remove_bucket_cmd = 'aws s3 rb s3://%s' % vm.bucket_name
+    remove_content_cmd = 'aws s3 rm s3://%s --recursive --region %s' % (
+        vm.bucket_name, vm.storage_region)
+    remove_bucket_cmd = 'aws s3 rb s3://%s --region %s' % (
+        vm.bucket_name, vm.storage_region)
     DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
