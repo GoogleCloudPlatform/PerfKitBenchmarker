@@ -31,7 +31,6 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import temp_dir
 
 FLAGS = flags.FLAGS
@@ -405,16 +404,19 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
 def GetLastRunUri():
   """Returns the last run_uri used (or None if it can't be determined)."""
   runs_dir_path = temp_dir.GetAllRunsDirPath()
-  if RunningOnWindows():
-    cmd = ['powershell', '-Command',
-           'gci %s | sort LastWriteTime | select -last 1' % runs_dir_path]
-  else:
-    cmd = ['bash', '-c', 'ls -1t %s | head -1' % runs_dir_path]
-  stdout, _, _ = IssueCommand(cmd)
   try:
-    return regex_util.ExtractGroup('run_([^\s]*)', stdout)
-  except regex_util.NoMatchError:
+    dir_names = next(os.walk(runs_dir_path))[1]
+  except StopIteration:
+    # The runs directory was not found.
     return None
+
+  if not dir_names:
+    # No run subdirectories were found in the runs directory.
+    return None
+
+  # Return the subdirectory with the most recent modification time.
+  return max(dir_names,
+             key=lambda d: os.path.getmtime(os.path.join(runs_dir_path, d)))
 
 
 @contextlib.contextmanager
