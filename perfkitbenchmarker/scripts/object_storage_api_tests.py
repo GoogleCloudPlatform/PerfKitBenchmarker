@@ -279,6 +279,8 @@ class ObjectStorageBackend(object):
     # an exception if the flags are invalid for its particular
     # provider.
 
+    pass
+
 
   @abc.abstractmethod
   def ListObjects(self, bucket, prefix):
