@@ -23,51 +23,53 @@ import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import docker
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('cs_websearch_client_heap_size',
+flags.DEFINE_string('cloudsuite_web_search_client_heap_size',
                     '2g',
                     'Java heap size for Faban client in the usual java format.'
                     ' Default: 2g.')
 
-flags.DEFINE_string('cs_websearch_server_heap_size',
+flags.DEFINE_string('cloudsuite_web_search_server_heap_size',
                     '3g',
                     'Java heap size for Solr server in the usual java format.'
                     ' Default: 3g.')
-flags.DEFINE_enum('cs_websearch_query_distr',
+flags.DEFINE_enum('cloudsuite_web_search_query_distr',
                   'Random',
                   ['Random', 'Ziphian'],
                   'Distribution of query terms. '
                   'Random and Ziphian distributions are available. '
                   'Default: Random.')
-flags.DEFINE_integer('cs_websearch_num_clients',
+flags.DEFINE_integer('cloudsuite_web_search_num_clients',
                      1,
                      'Number of client machines.',
                      lower_bound=1)
-flags.DEFINE_integer('cs_websearch_ramp_up',
+flags.DEFINE_integer('cloudsuite_web_search_ramp_up',
                      90,
                      'Benchmark ramp up time in seconds.',
                      lower_bound=1)
-flags.DEFINE_integer('cs_websearch_ramp_down',
+flags.DEFINE_integer('cloudsuite_web_search_ramp_down',
                      60,
                      'Benchmark ramp down time in seconds.',
                      lower_bound=1)
-flags.DEFINE_integer('cs_websearch_steady_state',
+flags.DEFINE_integer('cloudsuite_web_search_steady_state',
                      60,
                      'Benchmark steady state time in seconds.',
                      lower_bound=1)
-flags.DEFINE_integer('cs_websearch_scale',
+flags.DEFINE_integer('cloudsuite_web_search_scale',
                      50,
                      'Number of simulated web search users.',
                      lower_bound=1)
 
-BENCHMARK_NAME = 'cloudsuite_websearch'
+BENCHMARK_NAME = 'cloudsuite_web_search'
 BENCHMARK_CONFIG = """
-cloudsuite_websearch:
+cloudsuite_web_search:
   description: >
-    Run Cloudsuite Web Search benchmark. Specify the number of worker
-    VMs with --num_vms.
+    Run Cloudsuite Web Search benchmark. Specify the number of
+    clients with --num_vms.
   vm_groups:
     servers:
       vm_spec: *default_single_core
@@ -87,50 +89,47 @@ def GetConfig(user_config):
   return config
 
 
-def _HasDocker(vm):
-  resp, _ = vm.RemoteCommand('command -v docker',
-                             ignore_failure=True,
-                             suppress_warning=True)
-  if resp.rstrip() == "":
-    return False
-  else:
-    return True
-
-
 def Prepare(benchmark_spec):
   """Install docker. Pull the required images from DockerHub.
+
   Start Solr index node and client.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vms = benchmark_spec.vms
   servers = benchmark_spec.vm_groups['servers'][0]
   clients = benchmark_spec.vm_groups['clients']
 
-  for vm in vms:
-    if not _HasDocker(vm):
+  def PrepareCommon(vm):
+    if not docker.IsInstalled(vm):
       vm.Install('docker')
 
-  server_cmd = ('sudo echo \'DOCKER_OPTS="-g %s"\''
-                '| sudo tee /etc/default/docker > /dev/null' % (DISK_PATH))
-  stdout, _ = servers.RemoteCommand(server_cmd, should_log=True)
+  def PrepareServer(vm):
+    PrepareCommon(vm)
+    server_cmd = ('sudo echo \'DOCKER_OPTS="-g %s"\''
+                  '| sudo tee /etc/default/docker > /dev/null' % (DISK_PATH))
+    stdout, _ = vm.RemoteCommand(server_cmd, should_log=True)
 
-  server_cmd = ('sudo service docker restart')
-  stdout, _ = servers.RemoteCommand(server_cmd, should_log=True)
+    server_cmd = 'sudo service docker restart'
+    stdout, _ = vm.RemoteCommand(server_cmd, should_log=True)
 
-  for vm in clients:
+    vm.RemoteCommand('sudo docker pull cloudsuite/web-search:server')
+
+    server_cmd = ('sudo docker run -d --net host '
+                  '--name server cloudsuite/web-search:server %s 1' %
+                  (FLAGS.cloudsuite_web_search_server_heap_size))
+
+    stdout, _ = servers.RemoteCommand(server_cmd, should_log=True)
+
+  def PrepareClient(vm):
+    PrepareCommon(vm)
     vm.RemoteCommand('sudo docker pull cloudsuite/web-search:client')
+    time.sleep(120)
 
-  servers.RemoteCommand('sudo docker pull cloudsuite/web-search:server')
-
-  server_cmd = ('sudo docker run -d --net host '
-                '--name server cloudsuite/web-search:server %s 1' %
-                (FLAGS.cs_websearch_server_heap_size))
-  stdout, _ = servers.RemoteCommand(server_cmd, should_log=True)
-
-  time.sleep(60)
+  target_arg_tuples = ([(PrepareClient, [vm], {}) for vm in clients] +
+                       [(PrepareServer, [servers], {})])
+  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
 def Run(benchmark_spec):
@@ -150,24 +149,18 @@ def Run(benchmark_spec):
   benchmark_cmd = ('sudo docker run --rm --net host --name client '
                    'cloudsuite/web-search:client %s %d %d %d %d ' %
                    (servers.internal_ip,
-                    FLAGS.cs_websearch_scale,
-                    FLAGS.cs_websearch_ramp_up,
-                    FLAGS.cs_websearch_steady_state,
-                    FLAGS.cs_websearch_ramp_down))
+                    FLAGS.cloudsuite_web_search_scale,
+                    FLAGS.cloudsuite_web_search_ramp_up,
+                    FLAGS.cloudsuite_web_search_steady_state,
+                    FLAGS.cloudsuite_web_search_ramp_down))
   stdout, _ = clients.RemoteCommand(benchmark_cmd, should_log=True)
 
   ops_per_sec = re.findall(r'\<metric unit="ops/sec"\>(\d+\.?\d*)', stdout)
-  sum_ops_per_sec = 0.0
-  for value in ops_per_sec:
-     sum_ops_per_sec += float(value)
+  sum_ops_per_sec = float(ops_per_sec[0])
   p90 = re.findall(r'\<p90th\>(\d+\.?\d*)', stdout)
-  sum_p90 = 0.0
-  for value in p90:
-     sum_p90 += float(value)
+  sum_p90 = float(p90[0])
   p99 = re.findall(r'\<p99th\>(\d+\.?\d*)', stdout)
-  sum_p99 = 0.0
-  for value in p99:
-     sum_p99 += float(value)
+  sum_p99 = float(p99[0])
 
   results = []
   results.append(sample.Sample('Operations per second', sum_ops_per_sec,
@@ -187,14 +180,16 @@ def Cleanup(benchmark_spec):
   servers = benchmark_spec.vm_groups['servers'][0]
   clients = benchmark_spec.vm_groups['clients']
 
-  for vm in clients:
+  def CleanupClient(vm):
     vm.RemoteCommand('sudo docker stop client')
     vm.RemoteCommand('sudo docker rm client')
-
-  servers.RemoteCommand('sudo docker stop server')
-  servers.RemoteCommand('sudo docker rm server')
-
-  for vm in clients:
     vm.RemoteCommand('sudo docker rmi cloudsuite/web-search:client')
 
-  servers.RemoteCommand('sudo docker rmi cloudsuite/web-search:server')
+  def CleanupServer(vm):
+    vm.RemoteCommand('sudo docker stop server')
+    vm.RemoteCommand('sudo docker rm server')
+    vm.RemoteCommand('sudo docker rmi cloudsuite/web-search:server')
+
+  target_arg_tuples = ([(CleanupClient, [vm], {}) for vm in clients] +
+                       [(CleanupServer, [servers], {})])
+  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
