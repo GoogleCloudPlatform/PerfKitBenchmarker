@@ -31,14 +31,13 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import temp_dir
 
 FLAGS = flags.FLAGS
 
 PRIVATE_KEYFILE = 'perfkitbenchmarker_keyfile'
 PUBLIC_KEYFILE = 'perfkitbenchmarker_keyfile.pub'
 CERT_FILE = 'perfkitbenchmarker.pem'
-TEMP_DIR = os.path.join(tempfile.gettempdir(), 'perfkitbenchmarker')
 
 # The temporary directory on VMs. We cannot reuse GetTempDir()
 # because run_uri will not be available at time of module load and we need
@@ -101,7 +100,7 @@ flags.DEFINE_enum('background_network_ip_type', IpAddressSubset.EXTERNAL,
 
 def GetTempDir():
   """Returns the tmp dir of the current run."""
-  return os.path.join(TEMP_DIR, 'run_{0}'.format(FLAGS.run_uri))
+  return temp_dir.GetRunDirPath()
 
 
 def PrependTempDir(file_name):
@@ -111,8 +110,7 @@ def PrependTempDir(file_name):
 
 def GenTempDir():
   """Creates the tmp dir for the current run if it does not already exist."""
-  if not os.path.exists(GetTempDir()):
-    os.makedirs(GetTempDir())
+  temp_dir.CreateTemporaryDirectories()
 
 
 def SSHKeyGen():
@@ -183,8 +181,6 @@ def GetSshOptions(ssh_key_filename):
       '-i', ssh_key_filename
   ]
   options.extend(FLAGS.ssh_options)
-  if FLAGS.log_level == 'debug':
-    options.append('-v')
 
   return options
 
@@ -408,16 +404,20 @@ def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
 
 def GetLastRunUri():
   """Returns the last run_uri used (or None if it can't be determined)."""
-  if RunningOnWindows():
-    cmd = ['powershell', '-Command',
-           'gci %s | sort LastWriteTime | select -last 1' % TEMP_DIR]
-  else:
-    cmd = ['bash', '-c', 'ls -1t %s | head -1' % TEMP_DIR]
-  stdout, _, _ = IssueCommand(cmd)
+  runs_dir_path = temp_dir.GetAllRunsDirPath()
   try:
-    return regex_util.ExtractGroup('run_([^\s]*)', stdout)
-  except regex_util.NoMatchError:
+    dir_names = next(os.walk(runs_dir_path))[1]
+  except StopIteration:
+    # The runs directory was not found.
     return None
+
+  if not dir_names:
+    # No run subdirectories were found in the runs directory.
+    return None
+
+  # Return the subdirectory with the most recent modification time.
+  return max(dir_names,
+             key=lambda d: os.path.getmtime(os.path.join(runs_dir_path, d)))
 
 
 @contextlib.contextmanager
@@ -442,18 +442,19 @@ def NamedTemporaryFile(prefix='tmp', suffix='', dir=None, delete=True):
       os.unlink(f.name)
 
 
-def GenerateSSHConfig(benchmark_spec):
-  """Generates an SSH config file to simplify connecting to "vms".
+def GenerateSSHConfig(vms, vm_groups):
+  """Generates an SSH config file to simplify connecting to the specified VMs.
 
-  Writes a file to GetTempDir()/ssh_config with SSH configuration for each VM in
-  'vms'.  Users can then SSH with any of the following:
+  Writes a file to GetTempDir()/ssh_config with an SSH configuration for each VM
+  provided in the arguments. Users can then SSH with any of the following:
 
       ssh -F <ssh_config_path> <vm_name>
       ssh -F <ssh_config_path> vm<vm_index>
       ssh -F <ssh_config_path> <group_name>-<index>
 
   Args:
-    benchmark_spec: Benchmark specification.
+    vms: list of BaseVirtualMachines.
+    vm_groups: dict mapping VM group name string to list of BaseVirtualMachines.
   """
   target_file = os.path.join(GetTempDir(), 'ssh_config')
   template_path = data.ResourcePath('ssh_config.j2')
@@ -461,8 +462,7 @@ def GenerateSSHConfig(benchmark_spec):
   with open(template_path) as fp:
     template = environment.from_string(fp.read())
   with open(target_file, 'w') as ofp:
-    ofp.write(template.render({'vms': benchmark_spec.vms,
-                               'vm_groups': benchmark_spec.vm_groups}))
+    ofp.write(template.render({'vms': vms, 'vm_groups': vm_groups}))
 
   ssh_options = ['  ssh -F {0} {1}'.format(target_file, pattern)
                  for pattern in ('<vm_name>', 'vm<index>',

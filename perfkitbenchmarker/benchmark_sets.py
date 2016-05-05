@@ -141,7 +141,8 @@ BENCHMARK_SETS = {
     },
     'cloudsuite_set': {
         MESSAGE: 'CloudSuite benchmark set.',
-        BENCHMARK_LIST: ['cloudsuite_in_memory_analytics']
+        BENCHMARK_LIST: ['cloudsuite_in_memory_analytics',
+                         'cloudsuite_data_caching']
     }
 }
 

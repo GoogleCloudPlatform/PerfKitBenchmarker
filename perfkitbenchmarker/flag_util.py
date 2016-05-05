@@ -17,11 +17,10 @@
 import logging
 import re
 
-import pint
 import yaml
 
-import perfkitbenchmarker
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import units
 
 
 FLAGS = flags.FLAGS
@@ -228,56 +227,66 @@ class FlagDictSubstitution(object):
 class UnitsParser(flags.ArgumentParser):
   """Parse a flag containing a unit expression.
 
-  The user may require that the provided expression is convertible to
-  a particular unit. The parser will throw an error if the condition
-  is not satisfied. For instance, if a unit parser requires that its
-  arguments are convertible to bits, then KiB and GB are valid units
-  to input, but meters are not. If the user does not require this,
-  than *any* unit expression is allowed.
+  Attributes:
+    convertible_to: list of units.Unit instances. A parsed expression must be
+        convertible to at least one of the Units in this list. For example,
+        if the parser requires that its inputs are convertible to bits, then
+        values expressed in KiB and GB are valid, but values expressed in meters
+        are not.
   """
 
   syntactic_help = ('A quantity with a unit. Ex: 12.3MB.')
 
-  def __init__(self, convertible_to=None):
+  def __init__(self, convertible_to):
     """Initialize the UnitsParser.
 
     Args:
-      convertible_to: perfkitbenchmarker.UNIT_REGISTRY.Unit or
-        None. If a unit, the input must be convertible to this unit or
-        the Parse() method will raise a ValueError.
+      convertible_to: Either an individual unit specification or a series of
+          unit specifications, where each unit specification is either a string
+          (e.g. 'byte') or a units.Unit. The parser input must be convertible to
+          at least one of the specified Units, or the Parse() method will raise
+          a ValueError.
     """
-
-    self.convertible_to = convertible_to
+    if isinstance(convertible_to, (basestring, units.Unit)):
+      self.convertible_to = [units.Unit(convertible_to)]
+    else:
+      self.convertible_to = [units.Unit(u) for u in convertible_to]
 
   def Parse(self, inp):
     """Parse the input.
 
     Args:
-      inp: a string or a perfkitbenchmarker.UNIT_REGISTRY.Quantity. If a string,
-        string has the format "<number><units>", as in "12KB", or "2.5GB".
+      inp: a string or a units.Quantity. If a string, it has the format
+          "<number><units>", as in "12KB", or "2.5GB".
 
     Returns:
-      A perfkitbenchmarker.UNIT_REGISTRY.Quantity.
+      A units.Quantity.
 
     Raises:
-      ValueError if it can't parse its input.
+      ValueError: If the input cannot be parsed, or if it parses to a value with
+          improper units.
     """
-
-    if isinstance(inp, perfkitbenchmarker.UNIT_REGISTRY.Quantity):
+    if isinstance(inp, units.Quantity):
       quantity = inp
     else:
       try:
-        quantity = perfkitbenchmarker.UNIT_REGISTRY.parse_expression(inp)
+        quantity = units.ParseExpression(inp)
       except Exception as e:
-        raise ValueError("Couldn't parse unit expresion %s: %s" %
+        raise ValueError("Couldn't parse unit expression %r: %s" %
                          (inp, e.message))
+      if not isinstance(quantity, units.Quantity):
+        raise ValueError('Expression %r evaluates to a unitless value.' % inp)
 
-    if self.convertible_to is not None:
+    for unit in self.convertible_to:
       try:
-        quantity.to(self.convertible_to)
-      except pint.DimensionalityError:
-        raise ValueError("Expression %s is not convertible to %s" %
-                         (inp, self.convertible_to))
+        quantity.to(unit)
+        break
+      except units.DimensionalityError:
+        pass
+    else:
+      raise ValueError(
+          'Expression {0!r} is not convertible to an acceptable unit '
+          '({1}).'.format(inp, ', '.join(str(u) for u in self.convertible_to)))
 
     return quantity
 
@@ -287,23 +296,22 @@ class UnitsSerializer(flags.ArgumentSerializer):
     return str(units)
 
 
-def DEFINE_units(name, default, help, convertible_to=None,
+def DEFINE_units(name, default, help, convertible_to,
                  flag_values=flags.FLAGS, **kwargs):
   """Register a flag whose value is a units expression.
 
   Args:
     name: string. The name of the flag.
-    default: perfkitbenchmarker.UNIT_REGISTRY.Quantity. The default value.
+    default: units.Quantity. The default value.
     help: string. A help message for the user.
-    convertible_to: perfkitbenchmarker.UNIT_REGISTRY.Unit or None. If
-      a unit is provided, the input must be convertible to this unit
-      to be considered valid.
+    convertible_to: Either an individual unit specification or a series of unit
+        specifications, where each unit specification is either a string (e.g.
+        'byte') or a units.Unit. The flag value must be convertible to at least
+        one of the specified Units to be considered valid.
     flag_values: the gflags.FlagValues object to define the flag in.
   """
-
   parser = UnitsParser(convertible_to=convertible_to)
   serializer = UnitsSerializer()
-
   flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)
 
 
@@ -322,7 +330,7 @@ def StringToBytes(string):
   """
 
   try:
-    quantity = perfkitbenchmarker.UNIT_REGISTRY.parse_expression(string)
+    quantity = units.ParseExpression(string)
   except Exception:
     # Catching all exceptions is ugly, but we don't know what sort of
     # exception pint might throw, and we want to turn any of them into
@@ -330,8 +338,8 @@ def StringToBytes(string):
     raise ValueError("Couldn't parse size %s" % string)
 
   try:
-    bytes = quantity.m_as(perfkitbenchmarker.UNIT_REGISTRY.bytes)
-  except pint.DimensionalityError:
+    bytes = quantity.m_as(units.byte)
+  except units.DimensionalityError:
     raise ValueError("Quantity %s is not a size" % string)
 
   if bytes != int(bytes):

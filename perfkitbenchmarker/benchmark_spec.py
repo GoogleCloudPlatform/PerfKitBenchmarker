@@ -204,7 +204,7 @@ class BenchmarkSpec(object):
     vm_group_specs = self.config.vm_groups
 
     clouds = {}
-    for group_name, group_spec in vm_group_specs.iteritems():
+    for group_name, group_spec in sorted(vm_group_specs.iteritems()):
       vms = self.ConstructVirtualMachineGroup(group_name, group_spec)
 
       if group_spec.os_type == os_types.JUJU:
@@ -248,8 +248,12 @@ class BenchmarkSpec(object):
 
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
-      if FLAGS.os_type != os_types.WINDOWS:
-        vm_util.GenerateSSHConfig(self)
+      sshable_vms = [vm for vm in self.vms if vm.OS_TYPE != os_types.WINDOWS]
+      sshable_vm_groups = {}
+      for group_name, group_vms in self.vm_groups.iteritems():
+        sshable_vm_groups[group_name] = [vm for vm in group_vms
+                                         if vm.OS_TYPE != os_types.WINDOWS]
+      vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
 
 
   def Delete(self):

@@ -24,11 +24,13 @@ Users can specify additional paths to search for required data files using the
 
 import abc
 import logging
-import os.path
+import os
+import shutil
 
 import pkg_resources
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import temp_dir
 
 FLAGS = flags.FLAGS
 
@@ -36,6 +38,8 @@ flags.DEFINE_multistring('data_search_paths', ['.'],
                          'Additional paths to search for data files. '
                          'These paths will be searched prior to using files '
                          'bundled with PerfKitBenchmarker')
+
+_RESOURCES = 'resources'
 
 
 class ResourceNotFound(ValueError):
@@ -123,7 +127,24 @@ class PackageResourceLoader(ResourceLoader):
   def ResourcePath(self, name):
     if not self.ResourceExists(name):
       raise ResourceNotFound(name)
-    return pkg_resources.resource_filename(self.package, name)
+    try:
+      path = pkg_resources.resource_filename(self.package, name)
+    except NotImplementedError:
+      # This can happen if PerfKit Benchmarker is executed from a zip file.
+      # Extract the resource to the version-specific temporary directory.
+      path = os.path.join(temp_dir.GetVersionDirPath(), _RESOURCES, name)
+      if not os.path.exists(path):
+        dir_path = os.path.dirname(path)
+        try:
+          os.makedirs(dir_path)
+        except OSError:
+          if not os.path.isdir(dir_path):
+            raise
+        with open(path, 'wb') as extracted_file:
+          shutil.copyfileobj(pkg_resources.resource_stream(self.package, name),
+                             extracted_file)
+    return path
+
 
 DATA_PACKAGE_NAME = 'perfkitbenchmarker.data'
 SCRIPT_PACKAGE_NAME = 'perfkitbenchmarker.scripts'

@@ -14,8 +14,10 @@
 
 """Tests for background network workload"""
 
+import itertools
 import unittest
 
+import contextlib2
 from mock import patch
 
 from perfkitbenchmarker import benchmark_spec
@@ -80,6 +82,10 @@ ping:
             machine_type: n1-standard-1
 """
 
+_GROUP_1 = 'vm_1'
+_GROUP_2 = 'vm_2'
+_MOCKED_VM_FUNCTIONS = 'AllowPort', 'Install', 'RemoteCommand'
+
 
 class TestBackgroundNetworkWorkload(unittest.TestCase):
 
@@ -90,32 +96,47 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     self.mocked_flags.cloud = providers.GCP
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
-  def _CheckVMFromSpec(self, spec, num_working):
-    vm0 = spec.vms[0]
-    with patch.object(vm0.__class__, 'RemoteCommand'):
-      with patch.object(vm0.__class__, 'Install'):
-        with patch.object(vm0.__class__, 'AllowPort'):
-          expected_install_post_prepare = num_working
-          # one call for client, one call for server, one call for each pid
-          expected_remote_post_start = 4 * num_working
-          # all the start calls, plus stop server and stop client
-          expected_remote_post_stop = (expected_remote_post_start +
-                                       2 * num_working)
-          side_effect_list = []
-          for i in range(expected_remote_post_stop):
-            side_effect_list.append((str(i), ' '))
-          vm0.RemoteCommand.side_effect = side_effect_list
-          spec.Prepare()
-          self.assertEqual(vm0.Install.call_count,
-                           expected_install_post_prepare)
-          spec.StartBackgroundWorkload()
-          self.assertEqual(vm0.RemoteCommand.call_count,
-                           expected_remote_post_start)
-          self.assertEqual(vm0.AllowPort.call_count,
-                           num_working)
-          spec.StopBackgroundWorkload()
-          self.assertEqual(vm0.RemoteCommand.call_count,
-                           expected_remote_post_stop)
+  def _CheckVmCallCounts(self, spec, working_groups, working_expected_counts,
+                         non_working_groups, non_working_expected_counts):
+    # TODO(skschneider): This is also used in TestBackgroundNetworkWorkload.
+    # Consider moving to a shared function or base class.
+    expected_call_counts = {group: working_expected_counts
+                            for group in working_groups}
+    expected_call_counts.update({group: non_working_expected_counts
+                                 for group in non_working_groups})
+    for group_name, vm_expected_call_counts in expected_call_counts.iteritems():
+      group_vms = spec.vm_groups[group_name]
+      self.assertEqual(len(group_vms), 1,
+                       msg='VM group "{0}" had {1} VMs'.format(group_name,
+                                                               len(group_vms)))
+      vm = group_vms[0]
+      iter_mocked_functions = itertools.izip_longest(_MOCKED_VM_FUNCTIONS,
+                                                     vm_expected_call_counts)
+      for function_name, expected_call_count in iter_mocked_functions:
+        call_count = getattr(vm, function_name).call_count
+        self.assertEqual(call_count, expected_call_count, msg=(
+            'Expected {0} from VM group "{1}" to be called {2} times, but it '
+            'was called {3} times.'.format(function_name, group_name,
+                                           expected_call_count, call_count)))
+
+  def _CheckVMFromSpec(self, spec, working_groups=(), non_working_groups=()):
+    with contextlib2.ExitStack() as stack:
+      for vm in spec.vms:
+        for function_name in _MOCKED_VM_FUNCTIONS:
+          stack.enter_context(patch.object(vm, function_name))
+        vm.RemoteCommand.side_effect = itertools.repeat(('0', ''))
+
+      working, non_working = working_groups, non_working_groups
+      self._CheckVmCallCounts(spec, working, (0, 0, 0), non_working, (0, 0, 0))
+
+      spec.Prepare()
+      self._CheckVmCallCounts(spec, working, (0, 1, 0), non_working, (0, 0, 0))
+
+      spec.StartBackgroundWorkload()
+      self._CheckVmCallCounts(spec, working, (1, 1, 4), non_working, (0, 0, 0))
+
+      spec.StopBackgroundWorkload()
+      self._CheckVmCallCounts(spec, working, (1, 1, 6), non_working, (0, 0, 0))
 
   def makeSpec(self, yaml_benchmark_config=ping_benchmark.BENCHMARK_CONFIG):
     config = configs.LoadConfig(yaml_benchmark_config, {}, NAME)
@@ -141,7 +162,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     """ Check that the vm background workload calls work """
     self.mocked_flags['background_network_mbits_per_sec'].Parse(200)
     spec = self.makeSpec()
-    self._CheckVMFromSpec(spec, 2)
+    self._CheckVMFromSpec(spec, working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadVanillaConfig(self):
     """ Test that nothing happens with the vanilla config """
@@ -149,7 +170,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     spec = self.makeSpec()
     for vm in spec.vms:
       self.assertIsNone(vm.background_network_mbits_per_sec)
-    self._CheckVMFromSpec(spec, 0)
+    self._CheckVMFromSpec(spec, non_working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadWindows(self):
     """ Test that nothing happens with the vanilla config """
@@ -159,7 +180,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
 
     for vm in spec.vms:
       self.assertIsNone(vm.background_network_mbits_per_sec)
-    self._CheckVMFromSpec(spec, 0)
+    self._CheckVMFromSpec(spec, non_working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadVanillaConfigFlag(self):
     """ Check that the flag overrides the config """
@@ -168,7 +189,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     for vm in spec.vms:
       self.assertEqual(vm.background_network_mbits_per_sec, 200)
       self.assertEqual(vm.background_network_ip_type, 'EXTERNAL')
-    self._CheckVMFromSpec(spec, 2)
+    self._CheckVMFromSpec(spec, working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadVanillaConfigFlagIpType(self):
     """ Check that the flag overrides the config """
@@ -178,7 +199,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     for vm in spec.vms:
       self.assertEqual(vm.background_network_mbits_per_sec, 200)
       self.assertEqual(vm.background_network_ip_type, 'INTERNAL')
-    self._CheckVMFromSpec(spec, 2)
+    self._CheckVMFromSpec(spec, working_groups=(_GROUP_1, _GROUP_2))
 
   def testBackgroundWorkloadVanillaConfigBadIpTypeFlag(self):
     """ Check that the flag overrides the config """
@@ -193,12 +214,13 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     """ Check that the config can be used to set the background iperf """
     spec = self.makeSpec(
         yaml_benchmark_config=CONFIG_WITH_BACKGROUND_NETWORK)
-    for vm in spec.vm_groups['vm_1']:
+    for vm in spec.vm_groups[_GROUP_1]:
       self.assertIsNone(vm.background_network_mbits_per_sec)
-    for vm in spec.vm_groups['vm_2']:
+    for vm in spec.vm_groups[_GROUP_2]:
       self.assertEqual(vm.background_network_mbits_per_sec, 300)
     self.assertEqual(vm.background_network_ip_type, 'EXTERNAL')
-    self._CheckVMFromSpec(spec, 1)
+    self._CheckVMFromSpec(spec, working_groups=[_GROUP_2],
+                          non_working_groups=[_GROUP_1])
 
   def testBackgroundWorkloadConfigBadIp(self):
     """ Check that the config with invalid ip type gets an error """
@@ -212,12 +234,13 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     """ Check that the config can be used with an internal ip address """
     spec = self.makeSpec(
         yaml_benchmark_config=CONFIG_WITH_BACKGROUND_NETWORK_IPFLAG)
-    for vm in spec.vm_groups['vm_1']:
+    for vm in spec.vm_groups[_GROUP_1]:
       self.assertIsNone(vm.background_network_mbits_per_sec)
-    for vm in spec.vm_groups['vm_2']:
+    for vm in spec.vm_groups[_GROUP_2]:
       self.assertEqual(vm.background_network_mbits_per_sec, 300)
       self.assertEqual(vm.background_network_ip_type, 'INTERNAL')
-    self._CheckVMFromSpec(spec, 1)
+    self._CheckVMFromSpec(spec, working_groups=[_GROUP_2],
+                          non_working_groups=[_GROUP_1])
 
 
 if __name__ == '__main__':

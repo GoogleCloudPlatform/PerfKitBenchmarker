@@ -31,6 +31,7 @@ category:
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
 """
 
+import itertools
 import json
 import logging
 import os
@@ -38,6 +39,9 @@ import posixpath
 import re
 import time
 
+import pandas as pd
+
+from perfkitbenchmarker import object_storage_multistream_analysis as analysis
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -45,6 +49,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.sample import PercentileCalculator  # noqa
 
@@ -249,6 +254,12 @@ MULTISTREAM_DELAY_PER_STREAM = 0.1
 # benchmark. This is the filename.
 OBJECTS_WRITTEN_FILE = 'pkb-objects-written'
 
+# If the gap between different stream starts and ends is above a
+# certain proportion of the total time, we log a warning because we
+# are throwing out a lot of information. We also put the warning in
+# the sample metadata.
+MULTISTREAM_STREAM_GAP_THRESHOLD = 0.2
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -353,48 +364,104 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
     sizes: the object sizes used in the benchmark, in bytes.
     results: a list to append Sample objects to.
     metadata: dict. Base sample metadata
-
   """
+
+  num_streams = FLAGS.object_storage_multistream_num_streams
 
   if metadata is None:
     metadata = {}
-
-  records = json.loads(raw_result)
-  metric_name = 'Multi-stream %s latency' % operation
-
-  metadata = metadata.copy()
-  metadata['num_streams'] = FLAGS.object_storage_multistream_num_streams
+  metadata['num_streams'] = num_streams
   metadata['objects_per_stream'] = (
       FLAGS.object_storage_multistream_objects_per_stream)
 
-  overall_metadata = metadata.copy()
+  records_json = json.loads(raw_result)
+  records = pd.DataFrame(records_json)
+
+  any_streams_active, all_streams_active = analysis.GetStreamActiveIntervals(
+      records['start_time'], records['latency'], records['stream_num'])
+  start_gap, stop_gap = analysis.StreamStartAndEndGaps(
+      records['start_time'], records['latency'], all_streams_active)
+  if ((start_gap + stop_gap) / any_streams_active.duration <
+      MULTISTREAM_STREAM_GAP_THRESHOLD):
+    logging.info(
+        'First stream started %s seconds before last stream started', start_gap)
+    logging.info(
+        'Last stream ended %s seconds after first stream ended', stop_gap)
+  else:
+    logging.warning(
+        'Difference between first and last stream start/end times was %s and '
+        '%s, which is more than %s of the benchmark time %s.',
+        start_gap, stop_gap, MULTISTREAM_STREAM_GAP_THRESHOLD,
+        any_streams_active.duration)
+    metadata['stream_gap_above_threshold'] = True
+
+  records_in_interval = records[
+      analysis.FullyInInterval(records['start_time'],
+                               records['latency'],
+                               all_streams_active)]
+
   # Don't publish the full distribution in the metadata because doing
   # so might break regexp-based parsers that assume that all metadata
   # values are simple Python objects. However, do add an
   # 'object_size_B' metadata field even for the full results because
   # searching metadata is easier when all records with the same metric
   # name have the same set of metadata fields.
-  overall_metadata['object_size_B'] = 'distribution'
+  distribution_metadata = metadata.copy()
+  distribution_metadata['object_size_B'] = 'distribution'
+
+  latency_prefix = 'Multi-stream %s latency' % operation
   logging.info('Processing %s multi-stream %s results for the full '
-               'distribution.', len(records), operation)
+               'distribution.', len(records_in_interval), operation)
   _AppendPercentilesToResults(
       results,
-      (record['latency'] for record in records),
-      metric_name,
-      'sec',
-      overall_metadata)
+      records_in_interval['latency'],
+      latency_prefix,
+      LATENCY_UNIT,
+      distribution_metadata)
 
+  logging.info('Processing %s multi-stream %s results for net throughput',
+               len(records), operation)
+  throughput_stats = analysis.ThroughputStats(
+      records_in_interval['start_time'],
+      records_in_interval['latency'],
+      records_in_interval['size'],
+      records_in_interval['stream_num'],
+      num_streams)
+  # A special throughput statistic that uses all the records, not
+  # restricted to the interval.
+  throughput_stats['net throughput (simplified)'] = (
+      records['size'].sum() * 8 / any_streams_active.duration
+      * units.bit / units.second)
+  gap_stats = analysis.GapStats(
+      records['start_time'],
+      records['latency'],
+      records['stream_num'],
+      all_streams_active,
+      num_streams)
+  logging.info('Benchmark overhead was %s percent of total benchmark time',
+               gap_stats['gap time proportion'].magnitude)
+
+  for name, value in itertools.chain(throughput_stats.iteritems(),
+                                     gap_stats.iteritems()):
+    results.append(sample.Sample(
+        'Multi-stream ' + operation + ' ' + name,
+        value.magnitude, str(value.units), metadata=distribution_metadata))
+
+  # Publish by-size and full-distribution stats even if there's only
+  # one size in the distribution, because it simplifies postprocessing
+  # of results.
   for size in sizes:
-    metadata = metadata.copy()
-    metadata['object_size_B'] = size
+    this_size_records = records_in_interval[records_in_interval['size'] == size]
+    this_size_metadata = metadata.copy()
+    this_size_metadata['object_size_B'] = size
     logging.info('Processing %s multi-stream %s results for object size %s',
                  len(records), operation, size)
     _AppendPercentilesToResults(
         results,
-        (record['latency'] for record in records if record['size'] == size),
-        metric_name,
-        'sec',
-        metadata)
+        this_size_records['latency'],
+        latency_prefix,
+        LATENCY_UNIT,
+        this_size_metadata)
 
 
 def _DistributionToBackendFormat(dist):
@@ -899,8 +966,10 @@ class S3StorageBenchmark(object):
     Args:
       vm: The vm needs cleanup.
     """
-    remove_content_cmd = 'aws s3 rm s3://%s --recursive' % vm.bucket_name
-    remove_bucket_cmd = 'aws s3 rb s3://%s' % vm.bucket_name
+    remove_content_cmd = 'aws s3 rm s3://%s --recursive --region %s' % (
+        vm.bucket_name, vm.storage_region)
+    remove_bucket_cmd = 'aws s3 rb s3://%s --region %s' % (
+        vm.bucket_name, vm.storage_region)
     DeleteBucketWithRetry(vm, remove_content_cmd, remove_bucket_cmd)
 
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')

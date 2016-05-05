@@ -12,6 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Additional requirements (beyond those in requirements.txt) for running
-# PerfKitBenchmarker on CloudStack.
-csapi>=0.0.7
+# This file is deprecated. Use the forwarded file location:
+-rperfkitbenchmarker/providers/cloudstack/requirements.txt
