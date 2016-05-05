@@ -195,6 +195,67 @@ MAX_RUN_URI_LENGTH = 8
 events.initialization_complete.connect(traces.RegisterAll)
 
 
+def _InjectBenchmarkInfoIntoDocumentation():
+  """Appends each benchmark's information to the main module's docstring."""
+  # TODO: Verify if there is other way of appending additional help
+  # message.
+  # Inject more help documentation
+  # The following appends descriptions of the benchmarks and descriptions of
+  # the benchmark sets to the help text.
+  benchmark_sets_list = [
+      '%s:  %s' %
+      (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
+      for set_name in benchmark_sets.BENCHMARK_SETS]
+  sys.modules['__main__'].__doc__ = (
+      'PerfKitBenchmarker version: {version}\n\n{doc}\n'
+      'Benchmarks (default requirements):\n'
+      '\t{benchmark_doc}').format(
+          version=version.VERSION,
+          doc=__doc__,
+          benchmark_doc=_GenerateBenchmarkDocumentation())
+  sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
+                                      % '\n\t'.join(benchmark_sets_list))
+
+
+def _ParseFlags(argv=sys.argv):
+  """Parses the command-line flags."""
+  try:
+    argv = FLAGS(argv)
+  except flags.FlagsError as e:
+    logging.error('%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
+    sys.exit(1)
+
+
+def CheckVersionFlag():
+  """If the --version flag was specified, prints the version and exits."""
+  if FLAGS.version:
+    print version.VERSION
+    sys.exit(0)
+
+
+def _InitializeRunUri():
+  """Determines the PKB run URI and sets FLAGS.run_uri."""
+  if FLAGS.run_uri is None:
+    if stages.PROVISION in FLAGS.run_stage:
+      FLAGS.run_uri = str(uuid.uuid4())[-8:]
+    else:
+      # Attempt to get the last modified run directory.
+      run_uri = vm_util.GetLastRunUri()
+      if run_uri:
+        FLAGS.run_uri = run_uri
+        logging.warning(
+            'No run_uri specified. Attempting to run the following stages with '
+            '--run_uri=%s: %s', FLAGS.run_uri, ', '.join(FLAGS.run_stage))
+      else:
+        raise errors.Setup.NoRunURIError(
+            'No run_uri specified. Could not run the following stages: %s' %
+            ', '.join(FLAGS.run_stage))
+  elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
+    raise errors.Setup.BadRunURIError('run_uri must be alphanumeric and less '
+                                      'than or equal to 8 characters in '
+                                      'length.')
+
+
 def _CreateBenchmarkRunList():
   """Create a list of configs and states for each benchmark run to be scheduled.
 
@@ -213,11 +274,15 @@ def _CreateBenchmarkRunList():
     # Construct benchmark config object.
     benchmark_module, user_config = benchmark_tuple
     name = benchmark_module.BENCHMARK_NAME
+    expected_os_types = (
+        os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPES
+        else os_types.LINUX_OS_TYPES)
     config_dict = benchmark_module.GetConfig(user_config)
     config_spec_class = getattr(
         benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
         benchmark_config_spec.BenchmarkConfigSpec)
-    config = config_spec_class(name, flag_values=FLAGS, **config_dict)
+    config = config_spec_class(name, expected_os_types=expected_os_types,
+                               flag_values=FLAGS, **config_dict)
 
     # Assign a unique ID to each benchmark run. This differs even between two
     # runs of the same benchmark within a single PKB run.
@@ -460,34 +525,13 @@ def SetUpPKB():
   SetUpPKB() also modifies the local file system by creating a temp
   directory and storing new SSH keys.
   """
-  if not FLAGS.ignore_package_requirements:
-    requirements.CheckBasicRequirements()
+  try:
+    _InitializeRunUri()
+  except errors.Error as e:
+    logging.error(e)
+    sys.exit(1)
 
-  for executable in REQUIRED_EXECUTABLES:
-    if not vm_util.ExecutableOnPath(executable):
-      raise errors.Setup.MissingExecutableError(
-          'Could not find required executable "%s"', executable)
-
-  if FLAGS.run_uri is None:
-    if stages.PROVISION in FLAGS.run_stage:
-      FLAGS.run_uri = str(uuid.uuid4())[-8:]
-    else:
-      # Attempt to get the last modified run directory.
-      run_uri = vm_util.GetLastRunUri()
-      if run_uri:
-        FLAGS.run_uri = run_uri
-        logging.warning(
-            'No run_uri specified. Attempting to run the following stages with '
-            '--run_uri=%s: %s', FLAGS.run_uri, ', '.join(FLAGS.run_stage))
-      else:
-        raise errors.Setup.NoRunURIError(
-            'No run_uri specified. Could not run the following stages: %s' %
-            ', '.join(FLAGS.run_stage))
-  elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
-    raise errors.Setup.BadRunURIError('run_uri must be alphanumeric and less '
-                                      'than or equal to 8 characters in '
-                                      'length.')
-
+  # Initialize logging.
   vm_util.GenTempDir()
   log_util.ConfigureLogging(
       stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
@@ -496,7 +540,30 @@ def SetUpPKB():
       file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
 
+  # Translate deprecated flags and log all provided flag values.
+  disk.WarnAndTranslateDiskFlags()
+  _LogCommandLineFlags()
+
+  # Check environment.
+  if not FLAGS.ignore_package_requirements:
+    requirements.CheckBasicRequirements()
+
+  if FLAGS.os_type == os_types.WINDOWS and not vm_util.RunningOnWindows():
+    logging.error('In order to run benchmarks on Windows VMs, you must be '
+                  'running on Windows.')
+    sys.exit(1)
+
+  for executable in REQUIRED_EXECUTABLES:
+    if not vm_util.ExecutableOnPath(executable):
+      raise errors.Setup.MissingExecutableError(
+          'Could not find required executable "%s"', executable)
+
   vm_util.SSHKeyGen()
+
+  if FLAGS.static_vm_file:
+    with open(FLAGS.static_vm_file) as fp:
+      static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
+          fp)
 
   events.initialization_complete.send(parsed_flags=FLAGS)
 
@@ -507,25 +574,8 @@ def RunBenchmarks():
   Returns:
     Exit status for the process.
   """
-  if FLAGS.version:
-    print version.VERSION
-    return
-
-  _LogCommandLineFlags()
-
-  if FLAGS.os_type == os_types.WINDOWS and not vm_util.RunningOnWindows():
-    logging.error('In order to run benchmarks on Windows VMs, you must be '
-                  'running on Windows.')
-    return 1
-
-  collector = SampleCollector()
-
-  if FLAGS.static_vm_file:
-    with open(FLAGS.static_vm_file) as fp:
-      static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
-          fp)
-
   benchmark_run_list = _CreateBenchmarkRunList()
+  collector = SampleCollector()
   try:
     for run_args, run_status_list in benchmark_run_list:
       benchmark_module, sequence_number, _, _, benchmark_uid = run_args
@@ -599,37 +649,10 @@ def _GenerateBenchmarkDocumentation():
   return '\n\t'.join(benchmark_docs)
 
 
-def Main(argv=sys.argv):
-  logging.basicConfig(level=logging.INFO)
-
-  # TODO: Verify if there is other way of appending additional help
-  # message.
-  # Inject more help documentation
-  # The following appends descriptions of the benchmarks and descriptions of
-  # the benchmark sets to the help text.
-  benchmark_sets_list = [
-      '%s:  %s' %
-      (set_name, benchmark_sets.BENCHMARK_SETS[set_name]['message'])
-      for set_name in benchmark_sets.BENCHMARK_SETS]
-  sys.modules['__main__'].__doc__ = (
-      'PerfKitBenchmarker version: {version}\n\n{doc}\n'
-      'Benchmarks (default requirements):\n'
-      '\t{benchmark_doc}').format(
-          version=version.VERSION,
-          doc=__doc__,
-          benchmark_doc=_GenerateBenchmarkDocumentation())
-  sys.modules['__main__'].__doc__ += ('\n\nBenchmark Sets:\n\t%s'
-                                      % '\n\t'.join(benchmark_sets_list))
-
-  try:
-    argv = FLAGS(argv)  # parse flags
-  except flags.FlagsError as e:
-    logging.error(
-        '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
-    sys.exit(1)
-
-  disk.WarnAndTranslateDiskFlags()
-
+def Main():
+  log_util.ConfigureBasicLogging()
+  _InjectBenchmarkInfoIntoDocumentation()
+  _ParseFlags()
+  CheckVersionFlag()
   SetUpPKB()
-
   return RunBenchmarks()

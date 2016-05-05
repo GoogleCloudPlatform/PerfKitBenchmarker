@@ -16,8 +16,8 @@
 
 set -euo pipefail
 
-if [[ -z "$(command -v flake8)" ]]; then
-  >&2 echo "Missing flake8. Install it via 'pip' to enable linting."
+if [[ -z "$(command -v tox)" ]]; then
+  >&2 echo "Missing tox. Install it via 'pip' to enable linting."
   exit 1
 fi
 
@@ -28,9 +28,15 @@ modified_py=($(printf -- '%s\n' "$@" | grep '\.py$' || [[ $? -le 1 ]]))
 if [[ "${#modified_py[@]}" -ne 0 ]]; then
   # First, run flake with normal output so that the user sees errors.
   # If there are problems, re-run flake8, printing filenames only.
-  if ! flake8 "${modified_py[@]}" >&2; then
-    flake8 -q "${modified_py[@]}" || true
+  # flake8 output is redirected to a temporary file so that it can be printed
+  # independently, with verbose tox output suppressed.
+  tmpfile=$(mktemp)
+  if ! tox -e flake8 -- --output-file=$tmpfile ${modified_py[@]} &>/dev/null; then
+    cat $tmpfile >&2
+    tox -e flake8 -- -q --exit-zero --output-file=$tmpfile ${modified_py[@]} &>/dev/null
+    cat $tmpfile
   fi
+  rm $tmpfile
 fi
 
 exit 0

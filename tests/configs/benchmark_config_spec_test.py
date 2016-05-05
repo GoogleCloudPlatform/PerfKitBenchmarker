@@ -372,14 +372,14 @@ class VmGroupSpecTestCase(unittest.TestCase):
     flag_values.ignore_package_requirements = False
     with mock.patch(providers.__name__ + '.LoadProvider'):
       self._spec_class(_COMPONENT, flag_values, **self._kwargs)
-      providers.LoadProvider.assert_called_once_with('gcp', False)
+      providers.LoadProvider.assert_called_once_with('GCP', False)
 
   def testCallsLoadProviderAndIgnoresRequirements(self):
     flag_values = self.createNonPresentFlags()
     flag_values.ignore_package_requirements = True
     with mock.patch(providers.__name__ + '.LoadProvider'):
       self._spec_class(_COMPONENT, flag_values, **self._kwargs)
-      providers.LoadProvider.assert_called_once_with('gcp', True)
+      providers.LoadProvider.assert_called_once_with('GCP', True)
 
 
 class VmGroupsDecoderTestCase(unittest.TestCase):
@@ -455,6 +455,21 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
         'Invalid test_component.vm_groups.default.static_vms[0].disk_specs[0]'
         '.disk_size value: "0.5" (of type "float"). Value must be one of the '
         'following types: NoneType, int.'))
+
+  def testMismatchedOsTypes(self):
+    self._kwargs['vm_groups'] = {
+        os_type + '_group': {'os_type': os_type, 'vm_spec': _GCP_AWS_VM_CONFIG}
+        for os_type in (os_types.DEBIAN, os_types.RHEL, os_types.WINDOWS)}
+    expected_os_types = os_types.JUJU, os_types.WINDOWS
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      self._spec_class(_COMPONENT, expected_os_types=expected_os_types,
+                       flag_values=flags.FLAGS, **self._kwargs)
+    self.assertEqual(str(cm.exception), (
+        "VM groups in test_component may only have the following OS types: "
+        "'juju', 'windows'. The following VM group options are invalid:{sep}"
+        "test_component.vm_groups['debian_group'].os_type: 'debian'{sep}"
+        "test_component.vm_groups['rhel_group'].os_type: 'rhel'".format(
+            sep=os.linesep)))
 
   def testFlagOverridesPropagate(self):
     self._kwargs['flags'] = {'cloud': providers.AWS,

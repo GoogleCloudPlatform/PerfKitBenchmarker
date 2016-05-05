@@ -13,26 +13,28 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.requirements."""
 
+from collections import deque
 import contextlib
 import StringIO
 import unittest
 
 import mock
+import pkg_resources
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import requirements
 
 
-_PATH = 'path'
+_PATH = 'dir/file'
 
 
 class _MockOpenRequirementsFile(object):
 
-  def __init__(self, file_content):
-    self._io = StringIO.StringIO(file_content)
+  def __init__(self, *args):
+    self._io = deque(StringIO.StringIO(a) for a in args)
 
   def __enter__(self):
-    return self._io
+    return self._io.popleft()
 
   def __exit__(self, *unused_args, **unused_kwargs):
     pass
@@ -41,10 +43,10 @@ class _MockOpenRequirementsFile(object):
 class CheckRequirementsTestCase(unittest.TestCase):
 
   @contextlib.contextmanager
-  def _MockOpen(self, file_content):
-    mocked_open = _MockOpenRequirementsFile(file_content)
-    with mock.patch(requirements.__name__ + '.open', return_value=mocked_open):
-      yield
+  def _MockOpen(self, *args):
+    mocked_file = _MockOpenRequirementsFile(*args)
+    with mock.patch.object(requirements, 'open', return_value=mocked_file) as m:
+      yield m
 
   def testFulfilledRequirement(self):
     requirements_content = """
@@ -52,35 +54,68 @@ class CheckRequirementsTestCase(unittest.TestCase):
 
     python-gflags>=2.0
     """
-    with self._MockOpen(requirements_content):
+    with self._MockOpen(requirements_content) as mocked_open:
       requirements._CheckRequirements(_PATH)
+    mocked_open.assert_called_once_with('dir/file', 'rb')
 
   def testMissingPackage(self):
     requirements_content = """
     # This is not a real package.
     perfkitbenchmarker-fake-package>=1.2
     """
-    with self._MockOpen(requirements_content):
+    with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
+    mocked_open.assert_called_once_with('dir/file', 'rb')
 
   def testInstalledVersionLowerThanRequirement(self):
     requirements_content = """
     # The version of the installed python-gflags will be less than 42.
     python-gflags>=42
     """
-    with self._MockOpen(requirements_content):
+    with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
+    mocked_open.assert_called_once_with('dir/file', 'rb')
 
   def testInstalledVersionGreaterThanRequirement(self):
     requirements_content = """
     # The version of the installed python-gflags will be greater than 0.5.
     python-gflags==0.5
     """
-    with self._MockOpen(requirements_content):
+    with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
+    mocked_open.assert_called_once_with('dir/file', 'rb')
+
+  def testIncludedFiles(self):
+    top_file = """
+    package-0
+    -rsubfile0
+    package-1>=2.0
+    -rsubfile1
+    package-2
+    """
+    subfile0 = """
+    package-3
+    -rsubdir/subfile2
+    package-4
+    -r../subfile3
+    package-5
+    """
+    subfile1 = """
+    package-6
+    """
+    with self._MockOpen(top_file, subfile0, '', '', subfile1) as mocked_open:
+      with mock.patch.object(pkg_resources, 'require') as mocked_require:
+        requirements._CheckRequirements(_PATH)
+    mocked_open.assert_has_calls((
+        mock.call('dir/file', 'rb'), mock.call('dir/subfile0', 'rb'),
+        mock.call('dir/subdir/subfile2', 'rb'),
+        mock.call('dir/../subfile3', 'rb'), mock.call('dir/subfile1', 'rb')))
+    mocked_require.assert_has_calls(map(mock.call, (
+        'package-0', 'package-3', 'package-4', 'package-5',
+        'package-1>=2.0', 'package-6', 'package-2')))
 
 
 class CheckBasicRequirementsTestCase(unittest.TestCase):

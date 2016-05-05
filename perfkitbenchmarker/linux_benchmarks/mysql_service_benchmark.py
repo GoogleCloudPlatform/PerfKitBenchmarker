@@ -268,14 +268,17 @@ def ParseSysbenchOutput(sysbench_output, results, metadata):
         metadata))
 
 
-def _GetSysbenchCommandPrefix():
-  """ Decides what the prefix is for sysbench command based on os type.
+def _GetSysbenchCommandPrefix(os_type):
+  """Determines the prefix for a sysbench command based on the operating system.
+
   Args:
-    None.
+    os_type: string. Operating system of the machine on which the sysbench
+        command will be executed. Chosen from os_types.ALL.
+
   Returns:
     A string representing the sysbench command prefix.
   """
-  if FLAGS.os_type == os_types.RHEL:
+  if os_type == os_types.RHEL:
     return vm_util.VM_TMP_DIR
   else:
     return NORMAL_SYSBENCH_PATH_PREFIX
@@ -295,7 +298,7 @@ def _IssueSysbenchCommand(vm, duration):
   """
   stdout = ''
   stderr = ''
-  oltp_script_path = '%s%s' % (_GetSysbenchCommandPrefix(), OLTP_SCRIPT_PATH)
+  oltp_script_path = _GetSysbenchCommandPrefix(vm.OS_TYPE) + OLTP_SCRIPT_PATH
   if duration > 0:
     run_cmd_tokens = ['sysbench',
                       '--test=%s' % oltp_script_path,
@@ -359,8 +362,8 @@ def _RunSysbench(vm, metadata):
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
-  prepare_script_path = '%s%s' % (_GetSysbenchCommandPrefix(),
-                                  PREPARE_SCRIPT_PATH)
+  prepare_script_path = (_GetSysbenchCommandPrefix(vm.OS_TYPE) +
+                         PREPARE_SCRIPT_PATH)
   data_load_cmd_tokens = ['sysbench',
                           '--test=%s' % prepare_script_path,
                           '--mysql_svc_oltp_tables_count=%d' %

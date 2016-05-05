@@ -60,60 +60,6 @@ class TestBuildCommands(unittest.TestCase):
                   should_log=True))
 
 
-class TestProcessMultiStreamResults(unittest.TestCase):
-  def setUp(self):
-    self.raw_result = """
-[{"latency": 0.1, "operation": "upload", "stream_num": 1, "start_time": 5.0, "size": 1},
- {"latency": 0.1, "operation": "upload", "stream_num": 1, "start_time": 10.0, "size": 1}]"""  # noqa: line too long
-
-    mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    mocked_flags.object_storage_scenario = 'api_multistream'
-    mocked_flags.object_storage_multistream_objects_per_stream = 100
-    mocked_flags.object_storage_object_sizes = '1B'
-    mocked_flags.object_storage_multistream_num_streams = 10
-
-
-  def testProcessResults(self):
-    with mock.patch(object_storage_service_benchmark.__name__ +
-                    '._AppendPercentilesToResults',
-                    return_value=[3]) as append_percentiles:
-      object_storage_service_benchmark._ProcessMultiStreamResults(
-          self.raw_result, 'upload', [1], [])
-
-      # Can't use append_percentiles.assert_called_once_with when one
-      # of the arguments is a generator, because it compares
-      # generators by object identity, not by the objects they
-      # generate.
-      positional_args = append_percentiles.call_args[0]
-      self.assertEqual(positional_args[0], [])
-      self.assertEqual(list(positional_args[1]), [0.1, 0.1])
-      self.assertEqual(positional_args[2],
-                       'Multi-stream upload latency')
-      self.assertEqual(positional_args[3], 'sec')
-      self.assertEqual(positional_args[4], {'object_size_B': 1,
-                                            'num_streams': 10,
-                                            'objects_per_stream': 100})
-
-  def testPreservesBaseMetadata(self):
-    results = []
-    object_storage_service_benchmark._ProcessMultiStreamResults(
-        self.raw_result, 'upload', [1], results, metadata={'foo': 'bar'})
-
-    self.assertEqual(results[0].metadata['foo'],
-                     'bar')
-
-  def testObjectSizeMetadata(self):
-    results = []
-    object_storage_service_benchmark._ProcessMultiStreamResults(
-        self.raw_result, 'upload', [1], results)
-
-    # Testing with [0] and [-1] makes this test independent of exactly
-    # how many percentiles _AppendPercentilesToResults adds to
-    # results for each object size.
-    self.assertEqual(results[0].metadata['object_size_B'], 'distribution')
-    self.assertEqual(results[-1].metadata['object_size_B'], 1)
-
-
 class TestDistributionToBackendFormat(unittest.TestCase):
   def testPointDistribution(self):
     dist = {'100KB': '100%'}

@@ -185,7 +185,7 @@ class _VmGroupSpec(spec.BaseSpec):
     ignore_package_requirements = (
         getattr(flag_values, 'ignore_package_requirements', True) if flag_values
         else True)
-    providers.LoadProvider(self.cloud.lower(), ignore_package_requirements)
+    providers.LoadProvider(self.cloud, ignore_package_requirements)
     if self.disk_spec:
       disk_config = getattr(self.disk_spec, self.cloud, None)
       if disk_config is None:
@@ -296,6 +296,34 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     vm_groups: dict mapping VM group name string to _VmGroupSpec. Configurable
         options for each VM group used by the benchmark.
   """
+
+  def __init__(self, component_full_name, expected_os_types=None, **kwargs):
+    """Initializes a BenchmarkConfigSpec.
+
+    Args:
+      component_full_name: string. Fully qualified name of the benchmark config
+          dict within the config file.
+      expected_os_types: Optional series of strings from os_types.ALL.
+      **kwargs: Keyword arguments for the BaseSpec constructor.
+
+    Raises:
+      errors.Config.InvalidValue: If expected_os_types is provided and any of
+          the VM groups are configured with an OS type that is not included.
+    """
+    super(BenchmarkConfigSpec, self).__init__(component_full_name, **kwargs)
+    if expected_os_types is not None:
+      mismatched_os_types = []
+      for group_name, group_spec in sorted(self.vm_groups.iteritems()):
+        if group_spec.os_type not in expected_os_types:
+          mismatched_os_types.append('{0}.vm_groups[{1}].os_type: {2}'.format(
+              component_full_name, repr(group_name), repr(group_spec.os_type)))
+      if mismatched_os_types:
+        raise errors.Config.InvalidValue(
+            'VM groups in {0} may only have the following OS types: {1}. The '
+            'following VM group options are invalid:{2}{3}'.format(
+                component_full_name,
+                ', '.join(repr(os_type) for os_type in expected_os_types),
+                os.linesep, os.linesep.join(mismatched_os_types)))
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
