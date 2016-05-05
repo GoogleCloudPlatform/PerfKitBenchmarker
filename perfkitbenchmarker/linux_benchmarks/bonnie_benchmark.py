@@ -263,15 +263,14 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('Bonnie++ running on %s', vm)
-  print "user: %s" % vm.user_name
+  
+  bonnie_command = ('/usr/sbin/bonnie++ -q -d %s -s %d -n 100 -f' %
+                    (vm.GetScratchDir(),
+                     2 * vm.total_memory_kb / 1024))
+  
   if vm.user_name == 'root':
-      bonnie_command = ('/usr/sbin/bonnie++ -u -q -d %s -s %d -n 100 -f' %
-                    (vm.GetScratchDir(),
-                     2 * vm.total_memory_kb / 1024))
-  else:
-      bonnie_command = ('/usr/sbin/bonnie++ -q -d %s -s %d -n 100 -f' %
-                    (vm.GetScratchDir(),
-                     2 * vm.total_memory_kb / 1024))
+      bonnie_command += ' -u root'
+  
   logging.info('Bonnie++ Results:')
   out, _ = vm.RemoteCommand(bonnie_command, should_log=True)
   return ParseCSVResults(out.strip())
