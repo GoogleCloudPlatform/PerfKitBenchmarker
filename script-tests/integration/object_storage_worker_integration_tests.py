@@ -83,7 +83,13 @@ class TestScenarios(unittest.TestCase):
   """
 
   def setUp(self):
-    object_storage_api_tests.FLAGS([])
+    self.FLAGS = object_storage_api_tests.FLAGS
+    self.FLAGS([])
+    self.objects_written_file = self.FLAGS.objects_written_file
+    self.FLAGS.objects_written_file = '/tmp/objects-written'
+
+  def tearDown(self):
+    self.FLAGS.objects_written_file = self.objects_written_file
 
   def testOneByteRW(self):
     object_storage_api_tests.OneByteRWBenchmark(MockObjectStorageBackend())
@@ -99,11 +105,14 @@ class TestScenarios(unittest.TestCase):
   def testCleanupBucket(self):
     object_storage_api_tests.CleanupBucket(MockObjectStorageBackend())
 
-  def testMultiStreamWrite(self):
-    object_storage_api_tests.MultiStreamWrites(MockObjectStorageBackend())
+  def testMultiStreamWriteAndRead(self):
+    backend = MockObjectStorageBackend()
 
-  # Can't test MultiStreamRead this way because it depends on a file
-  # with a list of objects written by MultiStreamWrites.
+    # Have to sequence MultiStreamWrites and MultiStreamReads because
+    # MultiStreamReads will read from the objects_written_file that
+    # MultiStreamWrites generates.
+    object_storage_api_tests.MultiStreamWrites(backend)
+    object_storage_api_tests.MultiStreamReads(backend)
 
   def testTestBackend(self):
     object_storage_api_tests.TestBackend(MockObjectStorageBackend())
