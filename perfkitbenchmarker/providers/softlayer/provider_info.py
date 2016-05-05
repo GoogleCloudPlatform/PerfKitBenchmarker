@@ -23,4 +23,4 @@ from perfkitbenchmarker import provider_info
 
 class SoftLayerProviderInfo(provider_info.BaseProviderInfo):
 
-  CLOUD = providers.AWS
+  CLOUD = providers.SOFTLAYER
