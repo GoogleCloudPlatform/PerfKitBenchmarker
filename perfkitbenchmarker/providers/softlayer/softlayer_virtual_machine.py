@@ -25,7 +25,7 @@ import threading
 import string
 import random
 import time
-
+import sys
 
 
 from perfkitbenchmarker import disk
@@ -185,6 +185,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     private_vlan_id = None
     public_vlan_id = None
     san = False
+    disk_size = '25'
+    
     
     try:
         vm_attributes = json.loads(self.machine_type)
@@ -208,9 +210,17 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
         if 'public_vlan_id' in vm_attributes:
             public_vlan_id = vm_attributes['public_vlan_id']
-    except:
-        logging.warning("Using default values for VM. Error in machine type JSON: %s" % self.machine_type)
+    except ValueError as detail:
+        logging.error('JSON error: ' , detail, ' in ' , self.machine_type)
+        raise Exception("Error in JSON: " + self.machine_type)
 
+    if isinstance(self, WindowsSoftLayerVirtualMachine):
+        os = 'WINDOWS_LATEST_64'
+        self.hostname = "pefkithost-" + self.IdGenerator(2);
+        disk_size = '100'
+    
+    
+    
     create_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json',
@@ -234,7 +244,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--network',
         '%s' % nic,
          '--disk',
-         '25',
+         '%s' % disk_size,
         '--key',
          SoftLayerVirtualMachine.keyLabel
         ]
