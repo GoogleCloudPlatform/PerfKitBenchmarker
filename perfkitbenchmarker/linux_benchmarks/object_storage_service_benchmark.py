@@ -231,6 +231,7 @@ AWS_S3_REGION_TO_ENDPOINT_TABLE = {
     'ap-southeast-1': 's3-ap-southeast-1',
     'ap-southeast-2': 's3-ap-southeast-2',
     'ap-northeast-1': 's3-ap-northeast-1',
+    'ap-northeast-2': 's3-ap-northeast-2',
     'sa-east-1': 's3-sa-east-1'
 }
 AWS_S3_ENDPOINT_SUFFIX = '.amazonaws.com'
