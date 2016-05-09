@@ -215,8 +215,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise Exception("Error in JSON: " + self.machine_type)
 
     if isinstance(self, WindowsSoftLayerVirtualMachine):
-        os = 'WINDOWS_LATEST_64'
-        self.hostname = "pefkithost-" + self.IdGenerator(2);
+        os = 'WIN_LATEST_64'
+        self.hostname = "pefkithost" + self.IdGenerator(3).lower();
         disk_size = '100'
     
     
@@ -408,7 +408,7 @@ class WindowsSoftLayerVirtualMachine(SoftLayerVirtualMachine,
         '%s' % self.id]
     stdout, _ = util.IssueRetryableCommand(get_password_cmd)
     response = json.loads(stdout)
-    password_data = response['password']
+    password_data = response[0]['password']
 
     # SoftLayer may not populate the password data until some time after
     # the VM shows as running. Simply retry until the data shows up.
