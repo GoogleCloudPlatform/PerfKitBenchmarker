@@ -25,7 +25,7 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/aerospike-server.git'
-GIT_TAG = '3.3.19'
+GIT_TAG = '3.7.5'
 AEROSPIKE_DIR = '%s/aerospike-server' % vm_util.VM_TMP_DIR
 AEROSPIKE_CONF_PATH = '%s/as/etc/aerospike_dev.conf' % AEROSPIKE_DIR
 
