@@ -50,6 +50,8 @@ In its current release these are the benchmarks that are executed:
   - `mesh_network`: [HP license](http://www.calculate-linux.org/packages/licenses/netperf)
   - `mongodb`: **Deprecated**. [GNU AGPL v3.0](http://www.mongodb.org/about/licensing/)
   - `mongodb_ycsb`: [GNU AGPL v3.0](http://www.mongodb.org/about/licensing/)
+  - [`multichase`](https://github.com/google/multichase):
+    [Apache v2](https://github.com/google/multichase/blob/master/LICENSE)
   - `netperf`: [HP license](http://www.calculate-linux.org/packages/licenses/netperf)
   - [`oldisim`](https://github.com/GoogleCloudPlatform/oldisim):
     [Apache v2](https://github.com/GoogleCloudPlatform/oldisim/blob/master/LICENSE.txt)
