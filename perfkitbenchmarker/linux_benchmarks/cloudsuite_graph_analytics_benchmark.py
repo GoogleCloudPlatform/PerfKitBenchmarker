@@ -48,7 +48,7 @@ cloudsuite_graph_analytics:
 
 
 def GetConfig(user_config):
-  """ Reads the config file and overwrites vm_count with num_vms"""
+  """Reads the config file and overwrites vm_count with num_vms."""
 
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['num_vms'].present:
