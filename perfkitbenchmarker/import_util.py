@@ -22,7 +22,7 @@ def LoadModulesForPath(path, package_prefix=None):
   """Load all modules on 'path', with prefix 'package_prefix'.
 
   Example usage:
-    _LoadModulesForPath(__path__, __name__)
+    LoadModulesForPath(__path__, __name__)
 
   Args:
     path: Path containing python modules.
@@ -31,10 +31,13 @@ def LoadModulesForPath(path, package_prefix=None):
   Yields:
     Imported modules.
   """
-  prefix = ''
-  if package_prefix:
-    prefix = package_prefix + '.'
-  module_iter = pkgutil.iter_modules(path, prefix=prefix)
-  for _, modname, ispkg in module_iter:
-    if not ispkg:
-      yield importlib.import_module(modname)
+  prefix = package_prefix + '.' if package_prefix else ''
+  # If iter_modules is invoked within a zip file, the zipimporter adds the
+  # prefix to the names of archived modules, but not archived packages. Because
+  # the prefix is necessary to correctly import a package, this behavior is
+  # undesirable, so do not pass the prefix to iter_modules. Instead, apply it
+  # explicitly afterward.
+  for _, modname, _ in pkgutil.iter_modules(path):
+    # Skip recursively listed modules (e.g. 'subpackage.module').
+    if '.' not in modname:
+      yield importlib.import_module(prefix + modname)
