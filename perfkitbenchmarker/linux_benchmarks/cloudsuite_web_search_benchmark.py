@@ -18,7 +18,6 @@ More info: http://cloudsuite.ch/websearch/
 """
 
 import re
-import time
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -28,25 +27,9 @@ from perfkitbenchmarker.linux_packages import docker
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('cloudsuite_web_search_client_heap_size',
-                    '2g',
-                    'Java heap size for Faban client in the usual java format.'
-                    ' Default: 2g.')
-
 flags.DEFINE_string('cloudsuite_web_search_server_heap_size',
                     '3g',
-                    'Java heap size for Solr server in the usual java format.'
-                    ' Default: 3g.')
-flags.DEFINE_enum('cloudsuite_web_search_query_distr',
-                  'Random',
-                  ['Random', 'Ziphian'],
-                  'Distribution of query terms. '
-                  'Random and Ziphian distributions are available. '
-                  'Default: Random.')
-flags.DEFINE_integer('cloudsuite_web_search_num_clients',
-                     1,
-                     'Number of client machines.',
-                     lower_bound=1)
+                    'Java heap size for Solr server in the usual java format.')
 flags.DEFINE_integer('cloudsuite_web_search_ramp_up',
                      90,
                      'Benchmark ramp up time in seconds.',
@@ -125,10 +108,10 @@ def Prepare(benchmark_spec):
   def PrepareClient(vm):
     PrepareCommon(vm)
     vm.RemoteCommand('sudo docker pull cloudsuite/web-search:client')
-    time.sleep(120)
 
-  target_arg_tuples = ([(PrepareClient, [vm], {}) for vm in clients] +
-                       [(PrepareServer, [servers], {})])
+  PrepareServer(servers)
+
+  target_arg_tuples = ([(PrepareClient, [vm], {}) for vm in clients])
   vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
@@ -144,7 +127,6 @@ def Run(benchmark_spec):
   """
   clients = benchmark_spec.vm_groups['clients'][0]
   servers = benchmark_spec.vm_groups['servers'][0]
-  results = []
 
   benchmark_cmd = ('sudo docker run --rm --net host --name client '
                    'cloudsuite/web-search:client %s %d %d %d %d ' %
@@ -156,17 +138,17 @@ def Run(benchmark_spec):
   stdout, _ = clients.RemoteCommand(benchmark_cmd, should_log=True)
 
   ops_per_sec = re.findall(r'\<metric unit="ops/sec"\>(\d+\.?\d*)', stdout)
-  sum_ops_per_sec = float(ops_per_sec[0])
+  num_ops_per_sec = float(ops_per_sec[0])
   p90 = re.findall(r'\<p90th\>(\d+\.?\d*)', stdout)
-  sum_p90 = float(p90[0])
+  num_p90 = float(p90[0])
   p99 = re.findall(r'\<p99th\>(\d+\.?\d*)', stdout)
-  sum_p99 = float(p99[0])
+  num_p99 = float(p99[0])
 
   results = []
-  results.append(sample.Sample('Operations per second', sum_ops_per_sec,
+  results.append(sample.Sample('Operations per second', num_ops_per_sec,
                                'ops/s'))
-  results.append(sample.Sample('90th percentile latency', sum_p90, 's'))
-  results.append(sample.Sample('99th percentile latency', sum_p99, 's'))
+  results.append(sample.Sample('90th percentile latency', num_p90, 's'))
+  results.append(sample.Sample('99th percentile latency', num_p99, 's'))
   return results
 
 
