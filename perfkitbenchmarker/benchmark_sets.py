@@ -210,7 +210,7 @@ def GetBenchmarksFromFlags():
 
   valid_benchmarks = _GetValidBenchmarks()
 
-# create a list of module, config tuples to return
+  # create a list of module, config tuples to return
   benchmark_config_list = []
   for benchmark_name in benchmark_names:
     if benchmark_name in valid_benchmarks:

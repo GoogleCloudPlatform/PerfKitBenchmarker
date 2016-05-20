@@ -28,8 +28,7 @@ from perfkitbenchmarker.linux_packages import docker
 
 flags.DEFINE_integer('cloudsuite_graph_analytics_worker_mem',
                      2,
-                     'Amount of memory for the worker, in gigabytes,'
-                     'use 0 to ignore this option')
+                     'Amount of memory for the worker, in gigabytes')
 
 FLAGS = flags.FLAGS
 
@@ -49,9 +48,8 @@ cloudsuite_graph_analytics:
 
 
 def GetConfig(user_config):
-  """ Reads the config file and spawns overwrites the  number of worker vms
-  config file option with num_vms
-  """
+  """ Reads the config file and overwrites vm_count with num_vms"""
+
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['num_vms'].present:
     config['vm_groups']['workers']['vm_count'] = FLAGS.num_vms
@@ -59,8 +57,10 @@ def GetConfig(user_config):
 
 
 def Prepare(benchmark_spec):
-  """Install docker. Pull the required images from DockerHub. Create datasets.
-  Start Spark master and workers.
+  """Install docker.
+
+  Pull the required images from DockerHub, create datasets, and
+  start Spark master and workers.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
