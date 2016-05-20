@@ -143,7 +143,8 @@ BENCHMARK_SETS = {
         MESSAGE: 'CloudSuite benchmark set.',
         BENCHMARK_LIST: ['cloudsuite_in_memory_analytics',
                          'cloudsuite_data_caching',
-                         'cloudsuite_media_streaming']
+                         'cloudsuite_media_streaming',
+                         'cloudsuite_graph_analytics']
     }
 }
 
