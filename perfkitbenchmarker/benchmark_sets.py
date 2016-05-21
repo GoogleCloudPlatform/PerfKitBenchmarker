@@ -140,7 +140,8 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: ['cloudsuite_in_memory_analytics',
                          'cloudsuite_data_caching',
                          'cloudsuite_media_streaming',
-                         'cloudsuite_web_search']
+                         'cloudsuite_web_search',
+                         'cloudsuite_graph_analytics']
     }
 }
 
