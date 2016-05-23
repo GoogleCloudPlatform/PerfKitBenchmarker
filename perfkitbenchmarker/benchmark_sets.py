@@ -71,10 +71,6 @@ BENCHMARK_SETS = {
         MESSAGE: 'CloudSpectator benchmark set.',
         BENCHMARK_LIST: [STANDARD_SET]
     },
-    'ecocloud_epfl_set': {
-        MESSAGE: 'EcoCloud/EPFL benchmark set.',
-        BENCHMARK_LIST: [STANDARD_SET]
-    },
     'google_set': {
         MESSAGE: ('This benchmark set is maintained by Google Cloud Platform '
                   'Performance Team.'),
@@ -144,6 +140,7 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: ['cloudsuite_in_memory_analytics',
                          'cloudsuite_data_caching',
                          'cloudsuite_media_streaming',
+                         'cloudsuite_web_search',
                          'cloudsuite_graph_analytics']
     }
 }
