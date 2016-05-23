@@ -16,3 +16,4 @@
 # PerfKitBenchmarker on SoftLayer.
 softlayer
 colorama==0.3.3
+requests[security] 
