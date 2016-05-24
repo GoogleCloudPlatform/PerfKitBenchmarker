@@ -24,7 +24,6 @@ from perfkitbenchmarker.providers.openstack import utils
 from perfkitbenchmarker import providers
 
 
-
 NEUTRON_FLOAT_IP_SHOW_CMD = 'floatingip-show'
 NEUTRON_FLOAT_IP_DELETE_CMD = 'floatingip-delete'
 NOVA_FLOAT_IP_LIST_CMD = 'floating-ip-list'
@@ -158,6 +157,9 @@ class OpenStackFloatingIPPool(object):
           'Could not allocate a floating ip from the pool "%s".'
           % self.ip_pool_name)
     floating_ip_dict = json.loads(stdout)
+    # Convert OSC format to nova's format
+    floating_ip_dict['ip'] = floating_ip_dict['floating_ip_address']
+    del floating_ip_dict['floating_ip_address']
     return floating_ip_dict
 
   def release(self, vm, floating_ip_dict):
