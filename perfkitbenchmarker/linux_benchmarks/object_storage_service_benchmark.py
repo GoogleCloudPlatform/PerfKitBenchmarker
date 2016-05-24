@@ -1422,6 +1422,7 @@ def Prepare(benchmark_spec):
   if FLAGS.azure_lib_version is not None:
     azure_version_string = '==%s' % FLAGS.azure_lib_version
   vms[0].RemoteCommand('sudo pip install azure%s' % azure_version_string)
+  vms[0].Install('openssl')
   vms[0].Install('gcs_boto_plugin')
 
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
