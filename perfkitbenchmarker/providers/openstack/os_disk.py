@@ -23,8 +23,6 @@ from perfkitbenchmarker.providers.openstack import utils as os_utils
 
 FLAGS = flags.FLAGS
 
-REMOTE_BOOT_DISK_SIZE_GB = 50
-
 
 def CreateVolume(resource, name, image=None):
   """Creates a remote (Cinder) block volume."""
@@ -36,7 +34,7 @@ def CreateVolume(resource, name, image=None):
   if FLAGS.openstack_volume_size:
     vol_cmd.flags['size'] = FLAGS.openstack_volume_size
   else:
-    vol_cmd.flags['size'] = REMOTE_BOOT_DISK_SIZE_GB
+    vol_cmd.flags['size'] = resource.disk_size
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
   return vol_resp
@@ -47,7 +45,7 @@ def GetImageMinDiskSize(resource, image):
   image_cmd = os_utils.OpenStackCLICommand(resource, 'image', 'show', image)
   stdout, _, _ = image_cmd.Issue()
   image_resp = json.loads(stdout)
-  volume_size = max((int(image_resp['min_disk']), REMOTE_BOOT_DISK_SIZE_GB,))
+  volume_size = max((int(image_resp['min_disk']), resource.disk_size,))
   return volume_size
 
 
