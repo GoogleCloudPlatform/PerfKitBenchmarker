@@ -23,6 +23,22 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import utils
 from perfkitbenchmarker import providers
 
+
+
+NEUTRON_FLOAT_IP_SHOW_CMD = 'floatingip-show'
+NEUTRON_FLOAT_IP_DELETE_CMD = 'floatingip-delete'
+NOVA_FLOAT_IP_LIST_CMD = 'floating-ip-list'
+OSC_IP_CMD = 'ip'
+OSC_FLOATING_SUBCMD = 'floating'
+OSC_SEC_GROUP_CMD = 'security group'
+OSC_SEC_GROUP_RULE_CMD = 'security group rule'
+
+SC_GROUP_NAME = 'perfkit_sc_group'
+
+ICMP = 'icmp'
+TCP = 'tcp'
+UDP = 'udp'
+
 FLAGS = flags.FLAGS
 
 MAX_PORT = 65535
@@ -40,12 +56,12 @@ class OpenStackFirewall(network.BaseFirewall):
     self.sec_group_rules_set = set()
 
     with self._lock:
-      cmd = utils.OpenStackCLICommand(self, 'security group', 'show',
-                                      'perfkit_sc_group')
+      cmd = utils.OpenStackCLICommand(self, OSC_SEC_GROUP_CMD, 'show',
+                                      SC_GROUP_NAME)
       stdout, stderr, _ = cmd.Issue(suppress_warning=True)
       if stderr:
-        cmd = utils.OpenStackCLICommand(self, 'security group', 'create',
-                                        'perfkit_sc_group')
+        cmd = utils.OpenStackCLICommand(self, OSC_SEC_GROUP_CMD, 'create',
+                                        SC_GROUP_NAME)
         cmd.Issue()
 
   def AllowICMP(self, vm, icmp_type=-1, icmp_code=-1):
@@ -60,12 +76,12 @@ class OpenStackFirewall(network.BaseFirewall):
     if vm.is_static:
       return
 
-    sec_group_rule = ('icmp', icmp_type, icmp_code, vm.group_id)
+    sec_group_rule = (ICMP, icmp_type, icmp_code, vm.group_id)
     with self._lock:
-      cmd = utils.OpenStackCLICommand(vm, 'security group rule', 'create',
+      cmd = utils.OpenStackCLICommand(vm, OSC_SEC_GROUP_RULE_CMD, 'create',
                                       vm.group_id)
       cmd.flags['dst-port'] = str(icmp_type)
-      cmd.flags['proto'] = 'icmp'
+      cmd.flags['proto'] = ICMP
       if sec_group_rule in self.sec_group_rules_set:
         return
       cmd.Issue(suppress_warning=True)
@@ -90,12 +106,12 @@ class OpenStackFirewall(network.BaseFirewall):
     sec_group_rule = (port, to_port, vm.group_id)
 
     with self._lock:
-      cmd = utils.OpenStackCLICommand(vm, 'security group rule', 'create',
+      cmd = utils.OpenStackCLICommand(vm, OSC_SEC_GROUP_RULE_CMD, 'create',
                                       vm.group_id)
       cmd.flags['dst-port'] = '%d:%d' % (port, to_port)
       if sec_group_rule in self.sec_group_rules_set:
         return
-      for prot in ('tcp', 'udp',):
+      for prot in (TCP, UDP,):
         cmd.flags['proto'] = prot
         cmd.Issue(suppress_warning=True)
       self.sec_group_rules_set.add(sec_group_rule)
@@ -115,8 +131,8 @@ class OpenStackFloatingIPPool(object):
   def associate(self, vm):
     with self._floating_ip_lock:
       floating_ip = self._get_or_create(vm)
-      cmd = utils.OpenStackCLICommand(vm, 'ip', 'floating', 'add',
-                                      floating_ip['ip'], vm.id)
+      cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD, OSC_FLOATING_SUBCMD,
+                                      'add', floating_ip['ip'], vm.id)
       del cmd.flags['format']  # Command does not support json output format
       _, stderr, _ = cmd.Issue()
       if stderr:
@@ -124,7 +140,7 @@ class OpenStackFloatingIPPool(object):
       return floating_ip
 
   def _get_or_create(self, vm):
-    list_cmd = [FLAGS.openstack_nova_path, 'floating-ip-list']
+    list_cmd = [FLAGS.openstack_nova_path, NOVA_FLOAT_IP_LIST_CMD]
     stdout, stderr, _ = vm_util.IssueCommand(list_cmd)
     floating_ip_dict_list = utils.ParseFloatingIPTable(stdout)
     for flip_dict in floating_ip_dict_list:
@@ -134,8 +150,8 @@ class OpenStackFloatingIPPool(object):
     return self._allocate(vm)
 
   def _allocate(self, vm):
-    cmd = utils.OpenStackCLICommand(vm, 'ip', 'floating', 'create',
-                                    self.ip_pool_name)
+    cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD, OSC_FLOATING_SUBCMD,
+                                    'create', self.ip_pool_name)
     stdout, stderr, _ = cmd.Issue()
     if stderr.strip():  # Strip spaces
       raise errors.Config.InvalidValue(
@@ -148,21 +164,23 @@ class OpenStackFloatingIPPool(object):
     # TODO(meteorfox): Change floating IP commands to OpenStack CLI once
     # support for them is added.
     show_cmd = [FLAGS.openstack_neutron_path,
-                'floatingip-show', floating_ip_dict['id'], '--format', 'json']
+                NEUTRON_FLOAT_IP_SHOW_CMD,
+                floating_ip_dict['id'], '--format', 'json']
     stdout, stderr, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
     if stderr:
       return  # Not found, moving on
     updated_flip_dict = json.loads(stdout)
     with self._floating_ip_lock:
       delete_cmd = [FLAGS.openstack_neutron_path,
-                    'floatingip-delete', updated_flip_dict['id'],
+                    NEUTRON_FLOAT_IP_DELETE_CMD, updated_flip_dict['id'],
                     '--format', 'json']
       stdout, stderr, _ = vm_util.IssueCommand(delete_cmd,
                                                suppress_warning=True)
 
   def is_attached(self, floating_ip_dict):
     with self._floating_ip_lock:
-      show_cmd = ['neutron', 'floatingip-show', floating_ip_dict['id'],
+      show_cmd = [FLAGS.openstack_neutron_path,
+                  NEUTRON_FLOAT_IP_SHOW_CMD, floating_ip_dict['id'],
                   '--format', 'json']
       stdout, stderr, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
       if stderr:
