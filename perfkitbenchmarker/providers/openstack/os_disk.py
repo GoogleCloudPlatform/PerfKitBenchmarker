@@ -59,7 +59,7 @@ def DeleteVolume(resource, volume_id):
   vol_cmd.Issue()
 
 
-@vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
+@vm_util.Retry(poll_interval=5, max_retries=-1, timeout=300, log_errors=False,
                retryable_exceptions=errors.Resource.RetryableCreationError)
 def WaitForVolumeCreation(resource, volume_id):
   """Waits until volume is available"""
