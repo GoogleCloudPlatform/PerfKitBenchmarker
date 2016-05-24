@@ -111,6 +111,7 @@ Before you can run the PerfKit Benchmarker, you need account(s) on the cloud pro
 * [AliCloud](http://www.alicloud.com)
 * [DigitalOcean](https://www.digitalocean.com)
 * [Rackspace Cloud](https://www.rackspace.com)
+* [SoftLayer](http://www.softlayer.com)
 
 You also need the software dependencies, which are mostly command line tools and credentials to access your
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
@@ -164,6 +165,8 @@ This section describes the setup steps needed for each cloud system.
 * [AliCloud](#install-alicloud-cli-and-setup-authentication)
 * [DigitalOcean](#digitalocean-configuration-and-credentials)
 * [RackSpace](#installing-clis-and-credentials-for-rackspace)
+* [SoftLayer](#installing-clis-and-credentials-for-softlayer)
+
 
 After configuring the clouds you intend to use, skip to [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks).
 
@@ -519,11 +522,11 @@ override the path.
 
 ### Installing CLIs and credentials for Rackspace
 
-In order to interact with the Rackspace Public Cloud, PerfKitBenchmarker makes
+In order to interact with the SoftLayer Public Cloud, PerfKitBenchmarker makes
 use of RackCLI. You can find the instructions to install and configure
-RackCLI here: https://developer.rackspace.com/docs/rack-cli/
+RackCLI here: http://softlayer-python.readthedocs.io/en/latest/index.html
 
-To run PerfKit Benchmarker against Rackspace is very easy. Simply make sure
+To run PerfKit Benchmarker against SoftLayer is very easy. Simply make sure
 Rack CLI is installed and available in your PATH, optionally use the flag
 `--rack_path` to indicate the path to the binary.
 
@@ -532,8 +535,19 @@ profile then it's recommended that you create a profile for your UK account.
 Once configured, use flag `--profile` to specify which RackCLI profile to use.
 You can find more details here: https://developer.rackspace.com/docs/rack-cli/configuration/#config-file
 
-**Note:** Not all flavors are supported on every region. Always check first
-if the flavor is supported in the region.
+### Installing CLIs and credentials for SoftLayer
+
+Make sure you have installed pip (see the section above).
+
+run the following command (omit the 'sudo' on Windows)
+
+```bash
+$ sudo pip install -r perfkitbenchmarker/providers/softlayer/requirements.txt
+```
+
+```bash
+$slcli setup
+```
 
 
 ## Image prerequisites for Docker based clouds
