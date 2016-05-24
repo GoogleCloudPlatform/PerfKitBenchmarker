@@ -132,10 +132,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     stdout, _, _ = show_cmd.Issue(suppress_warning=True)
     try:
       resp = json.loads(stdout)
+      return resp
     except ValueError:
       return False
-
-    return resp is not None
 
   def _CheckCanaryCommand(self):
     if OpenStackVirtualMachine.command_works:  # fast path
