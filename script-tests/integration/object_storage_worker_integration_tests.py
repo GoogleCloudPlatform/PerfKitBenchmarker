@@ -17,10 +17,13 @@
 import time
 import unittest
 
-import object_storage_api_tests
+import object_storage_interface
+import object_storage_api_tests  # noqa: importing for flags
+
+import validate_service
 
 
-class MockObjectStorageBackend(object_storage_api_tests.ObjectStorageBackend):
+class MockObjectStorageService(object_storage_interface.ObjectStorageServiceBase):  # noqa
   def __init__(self):
     self.bucket = None
     self.objects = {}
@@ -39,7 +42,7 @@ class MockObjectStorageBackend(object_storage_api_tests.ObjectStorageBackend):
       self.bucket = bucket
     elif self.bucket != bucket:
       raise ValueError(
-          'MockObjectStorageBackend passed two bucket names: %s and %s' %
+          'MockObjectStorageService passed two bucket names: %s and %s' %
           (self.bucket, bucket))
 
   def ListObjects(self, bucket, prefix):
@@ -77,9 +80,9 @@ class MockObjectStorageBackend(object_storage_api_tests.ObjectStorageBackend):
 class TestScenarios(unittest.TestCase):
   """Test that the benchmark scenarios complete.
 
-  Specifically, given a correctly operating backend
-  (MockObjectStorageBackend), verify that every scenario except
-  MultiStreamRead runs to completion without raising an exception.
+  Specifically, given a correctly operating service
+  (MockObjectStorageService), verify that the benchmarking scenarios
+  run to completion without raising an exception.
   """
 
   def setUp(self):
@@ -92,30 +95,40 @@ class TestScenarios(unittest.TestCase):
     self.FLAGS.objects_written_file = self.objects_written_file
 
   def testOneByteRW(self):
-    object_storage_api_tests.OneByteRWBenchmark(MockObjectStorageBackend())
+    object_storage_api_tests.OneByteRWBenchmark(MockObjectStorageService())
 
   def testListConsistency(self):
     object_storage_api_tests.ListConsistencyBenchmark(
-        MockObjectStorageBackend())
+        MockObjectStorageService())
 
   def testSingleStreamThroughput(self):
     object_storage_api_tests.SingleStreamThroughputBenchmark(
-        MockObjectStorageBackend())
+        MockObjectStorageService())
 
   def testCleanupBucket(self):
-    object_storage_api_tests.CleanupBucket(MockObjectStorageBackend())
+    object_storage_api_tests.CleanupBucket(MockObjectStorageService())
 
   def testMultiStreamWriteAndRead(self):
-    backend = MockObjectStorageBackend()
+    service = MockObjectStorageService()
 
     # Have to sequence MultiStreamWrites and MultiStreamReads because
     # MultiStreamReads will read from the objects_written_file that
     # MultiStreamWrites generates.
-    object_storage_api_tests.MultiStreamWrites(backend)
-    object_storage_api_tests.MultiStreamReads(backend)
+    object_storage_api_tests.MultiStreamWrites(service)
+    object_storage_api_tests.MultiStreamReads(service)
 
-  def testTestBackend(self):
-    object_storage_api_tests.TestBackend(MockObjectStorageBackend())
+
+class TestValidateService(unittest.TestCase):
+  """Validate the ValidateService script."""
+
+  def setUp(self):
+    self.FLAGS = object_storage_api_tests.FLAGS
+    self.FLAGS([])
+    self.objects_written_file = self.FLAGS.objects_written_file
+    self.FLAGS.objects_written_file = '/tmp/objects-written'
+
+  def testValidateService(self):
+    validate_service.ValidateService(MockObjectStorageService())
 
 
 

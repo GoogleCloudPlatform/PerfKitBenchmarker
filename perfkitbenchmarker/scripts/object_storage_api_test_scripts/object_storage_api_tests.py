@@ -22,7 +22,6 @@
    run this script.
 """
 
-import abc
 import cStringIO
 import json
 import logging
@@ -37,10 +36,12 @@ import time
 
 import yaml
 
-import boto
 import gflags as flags
 import gcs_oauth2_boto_plugin  # noqa
-from azure.storage.blob import BlobService
+
+import azure_service
+import gcs
+import s3
 
 FLAGS = flags.FLAGS
 
@@ -48,32 +49,22 @@ flags.DEFINE_enum(
     'storage_provider', 'GCS', ['GCS', 'S3', 'AZURE'],
     'The target storage provider to test.')
 
-flags.DEFINE_string('host', None, 'The hostname of the storage endpoint.')
-
 flags.DEFINE_string('bucket', None,
                     'The name of the bucket to test with. Caller is '
                     'responsible to create an empty bucket for a particular '
                     'invocation of this test and then clean-up the bucket '
                     'after this test returns.')
 
-flags.DEFINE_string('azure_account', None,
-                    'The name of the storage account for Azure.')
-
-flags.DEFINE_string('azure_key', None,
-                    'The key of the storage account for Azure.')
-
 flags.DEFINE_enum(
     'scenario', 'OneByteRW', ['OneByteRW', 'ListConsistency',
                               'SingleStreamThroughput', 'CleanupBucket',
-                              'MultiStreamWrite', 'MultiStreamRead',
-                              'TestBackend'],
+                              'MultiStreamWrite', 'MultiStreamRead'],
     'The various scenarios to run. OneByteRW: read and write of single byte. '
     'ListConsistency: List-after-write and list-after-update consistency. '
     'SingleStreamThroughput: Throughput of single stream large object RW. '
     'CleanupBucket: Cleans up everything in a given bucket.'
     'MultiStreamWrite: Write objects with many streams at once.'
-    'MultiStreamRead: Read objects with many streams at once.'
-    'TestBackend: Check that a backend works. For debugging only.')
+    'MultiStreamRead: Read objects with many streams at once.')
 
 flags.DEFINE_integer('iterations', 1, 'The number of iterations to run for the '
                      'particular test scenario. Currently only applicable to '
@@ -154,9 +145,6 @@ LARGE_OBJECT_SIZE_BYTES = 100 * 1024 * 1024
 LARGE_OBJECT_COUNT = 100
 
 LARGE_OBJECT_FAILURE_TOLERANCE = 0.1
-
-# A global variable initialized once for Azure Blob Service
-_AZURE_BLOB_SERVICE = None
 
 BYTES_PER_KILOBYTE = 1024
 
@@ -262,238 +250,20 @@ def PercentileCalculator(numbers):
   return result
 
 
-# ### Backends ###
-
-class ObjectStorageBackend(object):
-  """Our interface to an object storage service."""
-
-  __metaclass__ = abc.ABCMeta
-
-  @abc.abstractmethod
-  def __init__(self):
-    """Create the backend object."""
-
-    # __init__ takes no arguments because there are no universal
-    # arguments that apply to all backends. Instead, each backend
-    # should look at FLAGS, get the configuration it needs, and raise
-    # an exception if the flags are invalid for its particular
-    # provider.
-
-    pass
-
-
-  @abc.abstractmethod
-  def ListObjects(self, bucket, prefix):
-    """List the objects in a bucket given a prefix.
-
-    Args:
-      bucket: the name of the bucket.
-      prefix: a prefix to list from.
-
-    Returns:
-      A list of object names.
-    """
-
-    pass
-
-
-  @abc.abstractmethod
-  def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
-    """Delete a list of objects.
-
-    Args:
-      bucket: the name of the bucket.
-      objects_to_delete: a list of names of objects to delete.
-      objects_deleted: if given, a list to record the objects that
-        have been successfully deleted.
-    """
-
-    pass
-
-
-  @abc.abstractmethod
-  def WriteObjectFromBuffer(self, bucket, object, stream, size):
-    """Write an object to a bucket.
-
-    Exceptions are propagated to the caller, which can decide whether
-    to tolerate them or not. This function will seek() to the
-    beginning of stream before sending.
-
-    Args:
-      bucket: the name of the bucket to write to.
-      object: the name of the object.
-      stream: a read()-able and seek()-able stream to transfer.
-      size: the number of bytes to transfer.
-
-    Returns:
-      a tuple of (start_time, latency).
-    """
-
-    pass
-
-
-  @abc.abstractmethod
-  def ReadObject(self, bucket, object):
-    """Read an object.
-
-    Exceptions are propagated to the caller, which can decide whether
-    to tolerate them or not.
-
-    Args:
-      bucket: the name of the bucket.
-      object: the name of the object.
-
-    Returns:
-      A tuple of (start_time, latency)
-    """
-
-    pass
-
-
-class AzureBackend(ObjectStorageBackend):
-  def __init__(self):
-    if FLAGS.azure_key is None or FLAGS.azure_account is None:
-      raise ValueError('Must specify azure account and key.')
-    self.blobService = BlobService(FLAGS.azure_account, FLAGS.azure_key)
-
-  def ListObjects(self, bucket, prefix):
-    return [obj.name
-            for obj in self.blobService.list_blobs(bucket, prefix=prefix)]
-
-  def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
-    for object_name in objects_to_delete:
-      try:
-        self.blobService.delete_blob(bucket, object_name)
-        if objects_deleted is not None:
-          objects_deleted.append(object_name)
-      except:
-        logging.exception('Caught exception while deleting object %s.',
-                          object_name)
-
-  def WriteObjectFromBuffer(self, bucket, object, stream, size):
-    stream.seek(0)
-    start_time = time.time()
-    self.blobService.put_block_blob_from_file(
-        bucket, object, stream, count=size)
-    latency = time.time() - start_time
-    return start_time, latency
-
-  def ReadObject(self, bucket, object):
-    start_time = time.time()
-    self.blobService.get_blob_to_bytes(bucket, object)
-    latency = time.time() - start_time
-    return start_time, latency
-
-
-class BotoBackend(ObjectStorageBackend):
-  def __init__(self, storage_schema, host_to_connect=None):
-    self.storage_schema = storage_schema
-    self.host_to_connect = host_to_connect
-
-  def _StorageURI(self, bucket, object=None):
-    """Return a storage_uri for the given resource.
-
-    Args:
-      bucket: the name of a bucket.
-      object: the name of an object, if given.
-
-    Returns: a storage_uri. If object is given, the uri will be for
-    the bucket-object combination. If object is not given, the uri
-    will be for the bucket.
-    """
-
-    if object is not None:
-      path = '%s/%s' % (bucket, object)
-    else:
-      path = bucket
-    storage_uri = boto.storage_uri(path, self.storage_schema)
-    if self.host_to_connect is not None:
-      storage_uri.connect(host=self.host_to_connect)
-    return storage_uri
-
-  def ListObjects(self, bucket, prefix):
-    bucket_uri = self._StorageURI(bucket)
-    return [obj.name for obj in bucket_uri.list_bucket(prefix=prefix)]
-
-  def DeleteObjects(self, bucket, objects_to_delete, objects_deleted=None):
-    for object_name in objects_to_delete:
-      try:
-        object_uri = self._StorageURI(bucket, object_name)
-        object_uri.delete_key()
-        if objects_deleted is not None:
-          objects_deleted.append(object_name)
-      except:
-        logging.exception('Caught exception while deleting object %s.',
-                          object_name)
-
-  # Not implementing WriteObjectFromBuffer because the implementation
-  # is different for GCS and S3.
-
-  def ReadObject(self, bucket, object):
-    start_time = time.time()
-    object_uri = self._StorageURI(bucket, object)
-    object_uri.new_key().get_contents_as_string()
-    latency = time.time() - start_time
-    return start_time, latency
-
-
-class GCSBackend(BotoBackend):
-  def __init__(self):
-    # GCS does not use separate endpoints, so host_to_connect makes no sense.
-    if FLAGS.host is not None:
-      logging.warning('GCSBackend ignoring --host=%s', FLAGS.host)
-    super(GCSBackend, self).__init__('gs', host_to_connect=None)
-
-  def WriteObjectFromBuffer(self, bucket, object, stream, size):
-    stream.seek(0)
-    start_time = time.time()
-    object_uri = self._StorageURI(bucket, object)
-    object_uri.set_contents_from_file(stream, size=size)
-    latency = time.time() - start_time
-    return start_time, latency
-
-
-class S3Backend(BotoBackend):
-  def __init__(self):
-    if FLAGS.host is not None:
-      logging.info('Will use user-specified host endpoint: %s', FLAGS.host)
-    super(S3Backend, self).__init__('s3', host_to_connect=FLAGS.host)
-
-  def WriteObjectFromBuffer(self, bucket, object, stream, size):
-    stream.seek(0)
-    start_time = time.time()
-    object_uri = self._StorageURI(bucket, object)
-    # We need to access the raw key object so we can set its storage
-    # class
-    key = object_uri.new_key()
-    if FLAGS.object_storage_class is not None:
-      key._set_storage_class(FLAGS.object_storage_class)
-    key.set_contents_from_file(stream, size=size)
-    latency = time.time() - start_time
-    return start_time, latency
-
-
-STORAGE_TO_BACKEND_DICT = {
-    'AZURE': AzureBackend,
-    'GCS': GCSBackend,
-    'S3': S3Backend}
-
-
 # ### Utilities for benchmarking ###
 
-
-def CleanupBucket(backend):
+def CleanupBucket(service):
   """ Cleans-up EVERYTHING under a given bucket as specified by FLAGS.bucket.
 
   Args:
-    backend: the ObjectStorageBackend to use.
+    service: the ObjectStorageServiceBase to use.
   """
 
-  objects_to_cleanup = backend.ListObjects(FLAGS.bucket, prefix=None)
+  objects_to_cleanup = service.ListObjects(FLAGS.bucket, prefix=None)
   while len(objects_to_cleanup) > 0:
     logging.info('Will delete %d objects.', len(objects_to_cleanup))
-    backend.DeleteObjects(FLAGS.bucket, objects_to_cleanup)
-    objects_to_cleanup = backend.ListObjects(FLAGS.bucket, prefix=None)
+    service.DeleteObjects(FLAGS.bucket, objects_to_cleanup)
+    objects_to_cleanup = service.ListObjects(FLAGS.bucket, prefix=None)
 
 
 def GenerateWritePayload(size):
@@ -516,13 +286,13 @@ def GenerateWritePayload(size):
   return payload_bytes.decode('ascii')
 
 
-def WriteObjects(backend, bucket, object_prefix, count,
+def WriteObjects(service, bucket, object_prefix, count,
                  size, objects_written, latency_results=None,
                  bandwidth_results=None):
-  """Write a number of objects to a storage provider.
+  """Write a number of objects to a storage service.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
     bucket: Name of the bucket to write to.
     object_prefix: The prefix of names of objects to be written.
     count: The total number of objects that need to be written.
@@ -545,7 +315,7 @@ def WriteObjects(backend, bucket, object_prefix, count,
     object_name = '%s_%d' % (object_prefix, i)
 
     try:
-      _, latency = backend.WriteObjectFromBuffer(
+      _, latency = service.WriteObjectFromBuffer(
           bucket, object_name, handle, size)
 
       objects_written.append(object_name)
@@ -558,13 +328,13 @@ def WriteObjects(backend, bucket, object_prefix, count,
                    (e, object_name))
 
 
-def ReadObjects(backend, bucket, objects_to_read, latency_results=None,
+def ReadObjects(service, bucket, objects_to_read, latency_results=None,
                 bandwidth_results=None, object_size=None,
                 start_times=None):
   """Read a bunch of objects.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
     bucket: Name of the bucket.
     objects_to_read: A list of names of objects to read.
     latency_results: An optional list to receive latency results.
@@ -575,7 +345,7 @@ def ReadObjects(backend, bucket, objects_to_read, latency_results=None,
 
   for object_name in objects_to_read:
     try:
-      start_time, latency = backend.ReadObject(bucket, object_name)
+      start_time, latency = service.ReadObject(bucket, object_name)
 
       if start_times is not None:
         start_times.append(start_time)
@@ -590,19 +360,19 @@ def ReadObjects(backend, bucket, objects_to_read, latency_results=None,
       logging.exception('Failed to read object %s', object_name)
 
 
-def DeleteObjectsConcurrently(backend, per_thread_objects_to_delete,
+def DeleteObjectsConcurrently(service, per_thread_objects_to_delete,
                               per_thread_objects_deleted):
   """Delete a bunch of objects concurrently.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
     per_thread_objects_to_delete: A 2-d list of objects to delete per thread.
     per_thread_objects_deleted: A 2-d list to record the objects that have been
         successfully deleted per thread.
   """
   threads = []
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
-    thread = Thread(target=backend.DeleteObjects,
+    thread = Thread(target=service.DeleteObjects,
                     args=(FLAGS.bucket,
                           per_thread_objects_to_delete[i],
                           per_thread_objects_deleted[i]))
@@ -620,12 +390,12 @@ def DeleteObjectsConcurrently(backend, per_thread_objects_to_delete,
   logging.info('Finished deleting')
 
 
-def ListAndWaitForObjects(backend, counting_start_time,
+def ListAndWaitForObjects(service, counting_start_time,
                           expected_set_of_objects, object_prefix):
   """List objects and wait for consistency.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
     counting_start_time: The start time used to count for the inconsistency
         window.
     expected_set_of_objects: The set of expectation.
@@ -644,7 +414,7 @@ def ListAndWaitForObjects(backend, counting_start_time,
   list_latency = 0
   while total_wait_time < LIST_CONSISTENCY_WAIT_TIME_LIMIT:
     list_start_time = time.time()
-    list_result = backend.ListObjects(FLAGS.bucket, object_prefix)
+    list_result = service.ListObjects(FLAGS.bucket, object_prefix)
     list_count += 1
     list_latency = time.time() - list_start_time
 
@@ -696,14 +466,14 @@ def AnalyzeListResults(final_result, result_consistent, list_count,
         LIST_CONSISTENCY_WAIT_TIME_LIMIT)
 
 
-def SingleStreamThroughputBenchmark(backend):
+def SingleStreamThroughputBenchmark(service):
   """ A benchmark test for single stream upload and download throughput.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
 
   Raises:
-    LowAvailabilityError: when the storage provider has failed a high number of
+    LowAvailabilityError: when the storage service has failed a high number of
         our RW requests that exceeds a threshold (>5%), we raise this error
         instead of collecting performance numbers from this run.
   """
@@ -711,7 +481,7 @@ def SingleStreamThroughputBenchmark(backend):
   write_bandwidth = []
   objects_written = []
 
-  WriteObjects(backend, FLAGS.bucket, object_prefix,
+  WriteObjects(service, FLAGS.bucket, object_prefix,
                LARGE_OBJECT_COUNT, LARGE_OBJECT_SIZE_BYTES, objects_written,
                bandwidth_results=write_bandwidth)
 
@@ -729,7 +499,7 @@ def SingleStreamThroughputBenchmark(backend):
                             sort_keys=True))
 
     read_bandwidth = []
-    ReadObjects(backend, FLAGS.bucket, objects_written,
+    ReadObjects(service, FLAGS.bucket, objects_written,
                 bandwidth_results=read_bandwidth,
                 object_size=LARGE_OBJECT_SIZE_BYTES)
     if len(read_bandwidth) < len(objects_written) * (
@@ -745,7 +515,7 @@ def SingleStreamThroughputBenchmark(backend):
                             sort_keys=True))
 
   finally:
-    backend.DeleteObjects(FLAGS.bucket, objects_written)
+    service.DeleteObjects(FLAGS.bucket, objects_written)
 
 
 def RunThreadedWorkers(worker, worker_args, per_thread_args=None):
@@ -803,13 +573,13 @@ def RunThreadedWorkers(worker, worker_args, per_thread_args=None):
   return results
 
 
-def MultiStreamWrites(backend):
+def MultiStreamWrites(service):
   """Run multi-stream write benchmark.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
 
-  This function writes objects to the storage backend, potentially
+  This function writes objects to the storage service, potentially
   using multiple threads.
 
   It doesn't return anything, but it outputs two sets of results in
@@ -841,7 +611,7 @@ def MultiStreamWrites(backend):
 
   results = RunThreadedWorkers(
       WriteWorker,
-      (backend,
+      (service,
        payload,
        size_distribution,
        FLAGS.objects_per_stream,
@@ -890,16 +660,16 @@ def MultiStreamWrites(backend):
   json.dump(operation_records, sys.stdout, indent=0)
 
 
-def MultiStreamReads(backend):
+def MultiStreamReads(service):
   """Run multi-stream read benchmark.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
 
   This function reads a list of object names and sizes from
   FLAGS.objects_written_file (in the format written by
   MultiStreamWrites and then reads the objects from the storage
-  backend, potentially using multiple threads.
+  service, potentially using multiple threads.
 
   It doesn't directly return anything, but it writes its results to
   sys.stdout in the following format:
@@ -926,7 +696,7 @@ def MultiStreamReads(backend):
 
   results = RunThreadedWorkers(
       ReadWorker,
-      (backend,
+      (service,
        FLAGS.start_time),
       per_thread_args=objects_by_worker)
 
@@ -971,13 +741,13 @@ def SleepUntilTime(when):
     logging.info('Sleep time %s was too small', sleep_time)
 
 
-def WriteWorker(backend, payload,
+def WriteWorker(service, payload,
                 size_distribution, num_objects,
                 start_time, result_queue, worker_num):
   """Upload objects for the multi-stream writes benchmark.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
     payload: a string. The bytes to upload.
     size_distribution: the distribution of object sizes to use.
     num_objects: the number of objects to upload.
@@ -1004,7 +774,7 @@ def WriteWorker(backend, payload,
     object_size = size_iterator.next()
 
     try:
-      start_time, latency = backend.WriteObjectFromBuffer(
+      start_time, latency = service.WriteObjectFromBuffer(
           FLAGS.bucket, object_name,
           payload_handle, object_size)
 
@@ -1024,7 +794,7 @@ def WriteWorker(backend, payload,
                     'stream_num': worker_num})
 
 
-def ReadWorker(backend, start_time, object_records,
+def ReadWorker(service, start_time, object_records,
                result_queue, worker_num):
 
   start_times = []
@@ -1036,7 +806,7 @@ def ReadWorker(backend, start_time, object_records,
 
   for name, size in object_records:
     try:
-      start_time, latency = backend.ReadObject(FLAGS.bucket, name)
+      start_time, latency = service.ReadObject(FLAGS.bucket, name)
 
       start_times.append(start_time)
       latencies.append(latency)
@@ -1053,17 +823,17 @@ def ReadWorker(backend, start_time, object_records,
                     'stream_num': worker_num})
 
 
-def OneByteRWBenchmark(backend):
+def OneByteRWBenchmark(service):
   """ A benchmark test for one byte object read and write. It uploads and
   downloads ONE_BYTE_OBJECT_COUNT number of 1-byte objects to the storage
-  provider, keeps track of the latency of these operations, and print out the
+  service, keeps track of the latency of these operations, and print out the
   result in JSON format at the end of the test.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
 
   Raises:
-    LowAvailabilityError: when the storage provider has failed a high number of
+    LowAvailabilityError: when the storage service has failed a high number of
         our RW requests that exceeds a threshold (>5%), we raise this error
         instead of collecting performance numbers from this run.
   """
@@ -1074,7 +844,7 @@ def OneByteRWBenchmark(backend):
   one_byte_write_latency = []
   one_byte_objects_written = []
 
-  WriteObjects(backend, FLAGS.bucket, object_prefix,
+  WriteObjects(service, FLAGS.bucket, object_prefix,
                ONE_BYTE_OBJECT_COUNT, 1, one_byte_objects_written,
                latency_results=one_byte_write_latency)
 
@@ -1093,7 +863,7 @@ def OneByteRWBenchmark(backend):
 
     # Now download these objects and measure the latencies.
     one_byte_read_latency = []
-    ReadObjects(backend, FLAGS.bucket, one_byte_objects_written,
+    ReadObjects(service, FLAGS.bucket, one_byte_objects_written,
                 one_byte_read_latency)
 
     success_count = len(one_byte_read_latency)
@@ -1108,10 +878,10 @@ def OneByteRWBenchmark(backend):
                  json.dumps(PercentileCalculator(one_byte_read_latency),
                             sort_keys=True))
   finally:
-    backend.DeleteObjects(FLAGS.bucket, one_byte_objects_written)
+    service.DeleteObjects(FLAGS.bucket, one_byte_objects_written)
 
 
-def ListConsistencyBenchmark(backend):
+def ListConsistencyBenchmark(service):
   """ A benchmark test to measure list-after-write consistency. It uploads
   a large number of 1-byte objects in a short amount of time, and then issues
   a list request. If the first list request returns all objects as expected,
@@ -1121,7 +891,7 @@ def ListConsistencyBenchmark(backend):
   consistent result.
 
   Args:
-    backend: the ObjectStorageBackend object to use.
+    service: the ObjectStorageServiceBase object to use.
 
   Returns:
     A dictionary that contains the test results:
@@ -1131,7 +901,7 @@ def ListConsistencyBenchmark(backend):
           reach consistency.
 
   Raises:
-    LowAvailabilityError: when the storage provider has failed a high number of
+    LowAvailabilityError: when the storage service has failed a high number of
         our RW requests that exceeds a threshold (>5%), we raise this error
         instead of collecting performance numbers from this run.
   """
@@ -1148,7 +918,7 @@ def ListConsistencyBenchmark(backend):
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     my_prefix = '%s_%d' % (object_prefix, i)
     thread = Thread(target=WriteObjects,
-                    args=(backend, FLAGS.bucket, my_prefix,
+                    args=(service, FLAGS.bucket, my_prefix,
                           LIST_CONSISTENCY_OBJECT_COUNT /
                           LIST_CONSISTENCY_THREAD_COUNT,
                           1,
@@ -1181,7 +951,7 @@ def ListConsistencyBenchmark(backend):
   # objects_written. If they are not the same, keep doing it until they
   # are the same.
   result_consistent, list_count, list_latency, total_wait_time = (
-      ListAndWaitForObjects(backend, write_finish_time,
+      ListAndWaitForObjects(service, write_finish_time,
                             set(final_objects_written), object_prefix))
 
   final_result = {}
@@ -1215,7 +985,7 @@ def ListConsistencyBenchmark(backend):
   per_thread_objects_deleted = [
       [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)]
 
-  DeleteObjectsConcurrently(backend,
+  DeleteObjectsConcurrently(service,
                             per_thread_objects_to_delete,
                             per_thread_objects_deleted)
 
@@ -1227,7 +997,7 @@ def ListConsistencyBenchmark(backend):
     final_expectation += per_thread_objects_written[i]
 
   result_consistent, list_count, list_latency, total_wait_time = (
-      ListAndWaitForObjects(backend, delete_finish_time,
+      ListAndWaitForObjects(service, delete_finish_time,
                             set(final_expectation), object_prefix))
 
   AnalyzeListResults(final_result, result_consistent, list_count, list_latency,
@@ -1237,47 +1007,22 @@ def ListConsistencyBenchmark(backend):
                final_result)
 
   # Final clean up: delete the objects still remaining.
-  DeleteObjectsConcurrently(backend,
+  DeleteObjectsConcurrently(service,
                             per_thread_objects_written,
                             per_thread_objects_deleted)
   return final_result
 
 
-def TestBackend(backend):
-  object_names = ['object_' + str(i) for i in range(10)]
-  payload = GenerateWritePayload(100)
-  handle = cStringIO.StringIO(payload)
-
-  logging.info('Starting test.')
-
-  # Write objects
-  for name in object_names:
-    backend.WriteObjectFromBuffer(FLAGS.bucket, name, handle, 100)
-
-  logging.info('Wrote 10 100B objects to %s.', FLAGS.bucket)
-
-  # Read the objects back
-  for name in object_names:
-    backend.ReadObject(FLAGS.bucket, name)
-
-  logging.info('Read objects back.')
-
-  # List the objects
-  names = backend.ListObjects(FLAGS.bucket, 'object_')
-  if sorted(names) != object_names:
-    logging.error('ListObjects returned %s, but should have returned %s',
-                  names, object_names)
-
-  logging.info('Listed object names.')
-
-  # Delete the objects
-  deleted = []
-  backend.DeleteObjects(FLAGS.bucket, object_names, objects_deleted=deleted)
-  if sorted(deleted) != object_names:
-    logging.error('DeleteObjects returned %s, but should have returned %s',
-                  deleted, object_names)
-
-  logging.info('Deleted objects. Test is complete.')
+# Although this dictionary does not really fit in this file, moving it
+# out of this file would require either adding a registry to
+# object_storage_interface.py or adding a new module. The improvement
+# in organization of moving it doesn't seem worth the extra
+# complexity.
+_STORAGE_TO_SERVICE_DICT = {
+    'AZURE': azure_service.AzureService,
+    'GCS': gcs.GCSService,
+    'S3': s3.S3Service
+}
 
 
 def Main(argv=sys.argv):
@@ -1299,7 +1044,7 @@ def Main(argv=sys.argv):
                FLAGS.bucket,
                FLAGS.scenario)
 
-  backend = STORAGE_TO_BACKEND_DICT[FLAGS.storage_provider]()
+  service = _STORAGE_TO_SERVICE_DICT[FLAGS.storage_provider]()
 
   if FLAGS.storage_provider == 'AZURE':
       # There are DNS lookup issues with the provider Azure when doing
@@ -1314,7 +1059,7 @@ def Main(argv=sys.argv):
       LIST_CONSISTENCY_OBJECT_COUNT = 1000
 
   if FLAGS.scenario == 'OneByteRW':
-    return OneByteRWBenchmark(backend)
+    return OneByteRWBenchmark(service)
   elif FLAGS.scenario == 'ListConsistency':
     list_latency = {}
     list_inconsistency_window = {}
@@ -1327,7 +1072,7 @@ def Main(argv=sys.argv):
     logging.info('Running list consistency tests for %d iterations...',
                  FLAGS.iterations)
     for _ in range(FLAGS.iterations):
-      result = ListConsistencyBenchmark(backend)
+      result = ListConsistencyBenchmark(service)
       # Analyze the result for both scenarios.
       for scenario in [LIST_AFTER_WRITE_SCENARIO, LIST_AFTER_UPDATE_SCENARIO]:
         result_consistent = '%s%s' % (scenario, LIST_RESULT_SUFFIX_CONSISTENT)
@@ -1361,15 +1106,13 @@ def Main(argv=sys.argv):
 
     return 0
   elif FLAGS.scenario == 'SingleStreamThroughput':
-    return SingleStreamThroughputBenchmark(backend)
+    return SingleStreamThroughputBenchmark(service)
   elif FLAGS.scenario == 'CleanupBucket':
-    return CleanupBucket(backend)
+    return CleanupBucket(service)
   elif FLAGS.scenario == 'MultiStreamWrite':
-    return MultiStreamWrites(backend)
+    return MultiStreamWrites(service)
   elif FLAGS.scenario == 'MultiStreamRead':
-    return MultiStreamReads(backend)
-  elif FLAGS.scenario == 'TestBackend':
-    return TestBackend(backend)
+    return MultiStreamReads(service)
 
 if __name__ == '__main__':
   sys.exit(Main())
