@@ -5,7 +5,7 @@
 2) Run SoftLayer setup program
 	slcli setup
 
-3) Display system create options
+3) To view system create options used below issue the following commands
    slcli vs  create-options
    
 3) Run benchmarks
@@ -30,10 +30,13 @@ The risk of specifing a VLAN is there is a chance no resources will be available
 >python pkb.py --cloud=SoftLayer --benchmarks=ping  --machine_type="{ \"nic\": 1000, \"public_vlan_id\": 1205613, \"private_vlan_id\": 1205615}"
 
 Storage benchmark with SAN attached
->python pkb.py --cloud=SoftLayer --benchmarks=fio  --machine_type="{ \"nic\": 1000 \"san\": "true" }" --softlayer_provisioned_iops=500
+>python pkb.py --cloud=SoftLayer --benchmarks=fio  --machine_type="{ \"nic\": 1000 \"san\": "true" }" 
 
 Disk IO benchmark
 >python pkb.py --cloud=SoftLayer --benchmarks=bonnie++ --zones=tor01 --machine_type="{\"cpus\": 4, \"memory\": 4096, \"nic\": 1000}"
 
-Windows
+
+>python pkb.py --cloud=SoftLayer --benchmarks=unixbench --machine_type="{\"cpus\": 4, \"memory\": 4096, \"nic\": 1000}"
+
+Windows (in progress)
 >python pkb.py --cloud=SoftLayer --default_timeout=2400 --benchmarks=ntttcp --os_type=windows --zones=tor01 --machine_type="{\"cpus\": 4, \"memory\": 4096, \"nic\": 1000}"
