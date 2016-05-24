@@ -106,11 +106,11 @@ class OpenStackFirewall(network.BaseFirewall):
     sec_group_rule = (port, to_port, vm.group_id)
 
     with self._lock:
+      if sec_group_rule in self.sec_group_rules_set:
+        return
       cmd = utils.OpenStackCLICommand(vm, OSC_SEC_GROUP_RULE_CMD, 'create',
                                       vm.group_id)
       cmd.flags['dst-port'] = '%d:%d' % (port, to_port)
-      if sec_group_rule in self.sec_group_rules_set:
-        return
       for prot in (TCP, UDP,):
         cmd.flags['proto'] = prot
         cmd.Issue(suppress_warning=True)
