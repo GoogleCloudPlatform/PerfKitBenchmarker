@@ -35,6 +35,11 @@ flags.DEFINE_integer('iperf_sending_thread_count', 1,
 flags.DEFINE_integer('iperf_runtime_in_seconds', 60,
                      'Number of seconds to run iperf.',
                      lower_bound=1)
+flags.DEFINE_integer('iperf_timeout', None,
+                     'Number of seconds to wait in '
+                     'addition to iperf runtime before '
+                     'killing iperf client command.',
+                     lower_bound=1)
 
 FLAGS = flags.FLAGS
 
@@ -98,7 +103,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, ip_type):
                 FLAGS.iperf_sending_thread_count))
   # the additional time on top of the iperf runtime is to account for the
   # time it takes for the iperf process to start and exit
-  timeout_buffer = 30 + FLAGS.iperf_sending_thread_count
+  timeout_buffer = FLAGS.iperf_timeout or 30 + FLAGS.iperf_sending_thread_count
   stdout, _ = sending_vm.RemoteCommand(iperf_cmd, should_log=True,
                                        timeout=FLAGS.iperf_runtime_in_seconds +
                                        timeout_buffer)
