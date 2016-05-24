@@ -546,7 +546,7 @@ $ sudo pip install -r perfkitbenchmarker/providers/softlayer/requirements.txt
 ```
 
 ```bash
-$slcli setup
+$ slcli setup
 ```
 
 
@@ -651,6 +651,13 @@ $ ./pkb.py --cloud=Mesos --benchmarks=iperf --marathon_address=localhost:8080 --
 
 ```bash
 $ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
+```
+
+## Example run on SoftLayer
+
+```bash
+$ ./pkb --cloud=SoftLayer --benchmarks=iperf --zones=tor01 --machine_type="{\"cpus\": 4, \"memory\": 4096, \"os\": \"UBUNTU_LATEST_64\", \"nic\": 1000 }"
+
 ```
 
 How to Run Windows Benchmarks
