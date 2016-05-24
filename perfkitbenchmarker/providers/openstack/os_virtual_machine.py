@@ -242,7 +242,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.deleted_keypair_set.remove(self.zone)
 
   def _DeleteSSHPublicKey(self):
-    """Deletes SSH publick key used for the VM."""
+    """Deletes SSH public key used for the VM."""
     with self._lock:
       if self.zone in self.deleted_keypair_set:
         return
