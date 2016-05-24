@@ -143,10 +143,10 @@ class OpenStackFloatingIPPool(object):
     list_cmd = [FLAGS.openstack_nova_path, NOVA_FLOAT_IP_LIST_CMD]
     stdout, stderr, _ = vm_util.IssueCommand(list_cmd)
     floating_ip_dict_list = utils.ParseFloatingIPTable(stdout)
-    for flip_dict in floating_ip_dict_list:
-      if (flip_dict['pool'] == self.ip_pool_name and
-              flip_dict['instance_id'] is None):
-        return flip_dict
+    for floating_ip_dict in floating_ip_dict_list:
+      if (floating_ip_dict['pool'] == self.ip_pool_name and
+              floating_ip_dict['instance_id'] is None):
+        return floating_ip_dict
     return self._allocate(vm)
 
   def _allocate(self, vm):
@@ -169,10 +169,10 @@ class OpenStackFloatingIPPool(object):
     stdout, stderr, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
     if stderr:
       return  # Not found, moving on
-    updated_flip_dict = json.loads(stdout)
+    updated_floating_ip_dict = json.loads(stdout)
     with self._floating_ip_lock:
       delete_cmd = [FLAGS.openstack_neutron_path,
-                    NEUTRON_FLOAT_IP_DELETE_CMD, updated_flip_dict['id'],
+                    NEUTRON_FLOAT_IP_DELETE_CMD, updated_floating_ip_dict['id'],
                     '--format', 'json']
       stdout, stderr, _ = vm_util.IssueCommand(delete_cmd,
                                                suppress_warning=True)
@@ -185,5 +185,5 @@ class OpenStackFloatingIPPool(object):
       stdout, stderr, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
       if stderr:
         return  # Not found, moving on
-      updated_flip_dict = json.loads(stdout)
-      return updated_flip_dict['port_id']
+      updated_floating_ip_dict = json.loads(stdout)
+      return updated_floating_ip_dict['port_id']
