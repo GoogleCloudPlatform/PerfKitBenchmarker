@@ -43,10 +43,8 @@ network {
 		port 3002                   # port on which this node is listening to
 
 {%- for address in seed_addresses|default([], true) %}
-		mesh-address {{ address }}  # IP address for seed node in the cluster
+		mesh-seed-address-port {{ address }}  3002 # IP address for seed node in the cluster
 {% endfor %}
-		mesh-port 3002
-
 		interval 150
 		timeout 10
 	}

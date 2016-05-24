@@ -39,6 +39,7 @@ In its current release these are the benchmarks that are executed:
   - `bonnie++`: [GPL v2](http://www.coker.com.au/bonnie++/readme.html)
   - `cassandra_ycsb`: [Apache v2](http://cassandra.apache.org/)
   - `cassandra_stress`: [Apache v2](http://cassandra.apache.org/)
+  - `cloudsuite3.0`: [CloudSuite 3.0 license](http://cloudsuite.ch/licenses/)
   - `cluster_boot`: MIT License
   - `coremark`: [EEMBC](https://www.eembc.org/)
   - `copy_throughput`: Apache v2
@@ -50,6 +51,8 @@ In its current release these are the benchmarks that are executed:
   - `mesh_network`: [HP license](http://www.calculate-linux.org/packages/licenses/netperf)
   - `mongodb`: **Deprecated**. [GNU AGPL v3.0](http://www.mongodb.org/about/licensing/)
   - `mongodb_ycsb`: [GNU AGPL v3.0](http://www.mongodb.org/about/licensing/)
+  - [`multichase`](https://github.com/google/multichase):
+    [Apache v2](https://github.com/google/multichase/blob/master/LICENSE)
   - `netperf`: [HP license](http://www.calculate-linux.org/packages/licenses/netperf)
   - [`oldisim`](https://github.com/GoogleCloudPlatform/oldisim):
     [Apache v2](https://github.com/GoogleCloudPlatform/oldisim/blob/master/LICENSE.txt)
