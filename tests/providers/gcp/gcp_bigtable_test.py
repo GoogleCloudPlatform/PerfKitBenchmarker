@@ -25,24 +25,25 @@ NUM_NODES = 3
 PROJECT = 'testproject'
 ZONE = 'testzone'
 
-VALID_JSON_BASE = """{{
-  "clusters": [
+VALID_JSON_BASE = """[
     {{
+      "clusterId": "{2}",
       "defaultStorageType": "STORAGE_SSD",
       "displayName": "testing cluster",
       "name": "projects/{0}/zones/{1}/clusters/not{2}",
+      "zoneId": "{1}",
       "serveNodes": 3
     }},
     {{
+      "clusterId": "{2}",
       "defaultStorageType": "STORAGE_HDD",
       "displayName": "HDD Cluster",
       "hddBytes": "1099511627776",
       "name": "projects/{0}/zones/{1}/clusters/{2}",
+      "zoneId": "{1}",
       "serveNodes": 3
     }}
-  ]
-}}
-"""
+]"""
 
 
 class GcpBigtableTestCase(unittest.TestCase):
