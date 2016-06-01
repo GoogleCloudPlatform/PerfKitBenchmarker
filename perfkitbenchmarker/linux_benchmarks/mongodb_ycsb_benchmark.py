@@ -22,7 +22,7 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
 import functools
-import os
+import posixpath
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -57,7 +57,7 @@ def GetConfig(user_config):
 
 
 def _GetDataDir(vm):
-  return os.path.join(vm.GetScratchDir(), 'mongodb-data')
+  return posixpath.join(vm.GetScratchDir(), 'mongodb-data')
 
 
 def _PrepareServer(vm):

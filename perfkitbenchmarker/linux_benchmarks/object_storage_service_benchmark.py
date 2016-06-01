@@ -177,6 +177,7 @@ LARGE_DATA_SIZE_IN_BYTES = 3 * 1024 * 1024 * 1024
 LARGE_DATA_SIZE_IN_MBITS = 8 * LARGE_DATA_SIZE_IN_BYTES / 1000 / 1000
 
 API_TEST_SCRIPT = 'object_storage_api_tests.py'
+API_TEST_SCRIPTS_DIR = 'object_storage_api_test_scripts'
 
 # Various constants to name the result metrics.
 THROUGHPUT_UNIT = 'Mbps'
@@ -1422,6 +1423,7 @@ def Prepare(benchmark_spec):
   if FLAGS.azure_lib_version is not None:
     azure_version_string = '==%s' % FLAGS.azure_lib_version
   vms[0].RemoteCommand('sudo pip install azure%s' % azure_version_string)
+  vms[0].Install('openssl')
   vms[0].Install('gcs_boto_plugin')
 
   OBJECT_STORAGE_BENCHMARK_DICTIONARY[FLAGS.storage].Prepare(vms[0])
@@ -1441,8 +1443,14 @@ def Prepare(benchmark_spec):
   file_path = data.ResourcePath(DATA_FILE)
   vms[0].PushFile(file_path, '%s/run/' % scratch_dir)
 
-  api_test_script_path = data.ResourcePath(API_TEST_SCRIPT)
-  vms[0].PushFile(api_test_script_path, '%s/run/' % scratch_dir)
+  api_test_scripts_path = data.ResourcePath(API_TEST_SCRIPTS_DIR)
+  logging.info('api_test_scripts_path: %s, %s',
+               API_TEST_SCRIPTS_DIR,
+               api_test_scripts_path)
+  for path in os.listdir(api_test_scripts_path):
+    logging.info('Uploading %s', path)
+    vms[0].PushFile('%s/%s' % (api_test_scripts_path, path),
+                    '%s/run/' % scratch_dir)
 
 
 def Run(benchmark_spec):

@@ -159,14 +159,12 @@ def _GetClusterDescription(project, zone, cluster_name):
     raise IOError('Command "{0}" failed:\nSTDOUT:\n{1}\nSTDERR:\n{2}'.format(
         ' '.join(cmd), stdout, stderr))
   result = json.loads(stdout)
-  clusters = {cluster['name']: cluster for cluster in result['clusters']}
-  expected_cluster_name = 'projects/{0}/zones/{1}/clusters/{2}'.format(
-      project, zone, cluster_name)
+  clusters = {cluster['clusterId']: cluster for cluster in result}
   try:
-    return clusters[expected_cluster_name]
+    return clusters[cluster_name]
   except KeyError:
     raise KeyError('Cluster {0} not found in {1}'.format(
-        expected_cluster_name, list(clusters)))
+        cluster_name, list(clusters)))
 
 
 def _GetTableName():
