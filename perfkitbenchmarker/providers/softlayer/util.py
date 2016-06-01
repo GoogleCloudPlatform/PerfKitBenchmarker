@@ -56,10 +56,12 @@ def AddTags(resource_id, region, **kwargs):
       'vs',
       'edit']
   for key, value in kwargs.iteritems():
-    tag_cmd.append('--tag {0}:{1}'.format(key, value))
-  tag_cmd.append('{0}'.format(resource_id))
+    tag_cmd = tag_cmd + ['--tag', '{0}:{1}'.format(key, value)]
+  tag_cmd = tag_cmd + ['{0}'.format(resource_id)]
+  
+  
   print "skipping tag in util"
-  #IssueRetryableCommand(tag_cmd)
+  IssueRetryableCommand(tag_cmd)
 
 
 def AddDefaultTags(resource_id, region):
