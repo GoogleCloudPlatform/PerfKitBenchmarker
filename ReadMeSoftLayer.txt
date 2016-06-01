@@ -14,7 +14,6 @@ Examples:
 Simple benchmark with defaults 
 >python pkb.py --cloud=SoftLayer --benchmarks=iperf
 
-
 Benchmark with 1Gib Nic card specified
 >python pkb.py --cloud=SoftLayer --benchmarks=ping  --machine_type="{ \"nic\": 1000}"
 
@@ -40,3 +39,6 @@ Disk IO benchmark
 
 Windows (in progress)
 >python pkb.py --cloud=SoftLayer --default_timeout=2400 --benchmarks=ntttcp --os_type=windows --zones=tor01 --machine_type="{\"cpus\": 4, \"memory\": 4096, \"nic\": 1000}"
+
+A benchmark with two zones
+>python pkb.py --cloud=SoftLayer --benchmarks=iperf --zones=tor01,wdc04

@@ -121,11 +121,15 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
         delete_cmd = util.SoftLayer_PREFIX + [
           '-y',
+          '--format',
+          'json',    
           'sshkey',
           'remove',
           self.keyLabel]
 
-        util.IssueRetryableCommand(delete_cmd)
+        stdout, _ = util.IssueRetryableCommand(delete_cmd)
+        print stdout
+        
         self.deleted_keyfile_set.add(self.region)
         if self.region in self.imported_keyfile_set:
             self.imported_keyfile_set.remove(self.region)
@@ -152,7 +156,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.internal_ip = response['private_ip']
     self.ip_address = response['public_ip']
 
-    #util.AddDefaultTags(self.id, self.region)
+    util.AddDefaultTags(self.id, self.region)
 
 
 
@@ -219,8 +223,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.hostname = "pefkithost" + self.IdGenerator(3).lower();
         disk_size = '100'
     
-    
-    
+     
     create_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json',
@@ -230,7 +233,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--wait',
         '60',
         '--datacenter',
-        '%s' % self.region,
+        '%s' % self.zone,
         '--memory',
         '%s' % memory,
         '--hostname',
@@ -249,6 +252,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
          SoftLayerVirtualMachine.keyLabel
         ]
     
+    
+    
+    # TODO: HANDLE ADDITIONAL DISKS BETTER 
     if self.max_local_disks > 1:
         create_cmd = create_cmd + ['--disk', '25']
            
@@ -260,7 +266,6 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if private_vlan_id != None:
         create_cmd = create_cmd + ['--vlan-private', '%s' % private_vlan_id]
-
 
 
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
