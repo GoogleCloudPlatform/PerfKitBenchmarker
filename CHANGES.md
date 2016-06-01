@@ -1,3 +1,58 @@
+# 1.5.0
+
+New features:
+* Add cloudsuite graph analytics benchmark (thanks @mdrumond; GH-986)
+* Add initial implementation of multichase benchmark (GH-977)
+* Add cloudsuite media streaming benchmark (thanks @ivonindza; GH-993)
+* Add analysis functions for processing multistream object storage benchmark data (GH-905)
+* Add CloudSuite Data-caching benchmark (thanks @neo-apz; GH-970)
+* Add ability to bundle PKB into a python-executable zip file (GH-971)
+* Add os_type for Juju Mixin (thanks @AdamIsrael; GH-764)
+* Add CloudSuite in-memory analytics benchmark (thanks @ivonindza; GH-934)
+
+Breaking changes:
+* Replace the old CloudSuite Web Search benchmark with the docker version (thanks @javpicorel; GH-931)
+* Update Aerospike version (GH-978)
+
+Enhancements:
+* Add --fio_blocksize option (GH-943)
+* Update speccpu2006 benchmark to support iso file (GH-944)
+* Allow --run_stage to specify multiple stages (GH-935)
+* Add flag to control iperf timeout (GH-994)
+
+Bugfixes and maintenance updates:
+* Fix cloud bigtable and hbase (GH-1001)
+* Install openssl for the object storage benchmark (GH-1000)
+* Fix bug in MongoDB YCSB benchmark (GH-999)
+* Change import_util.LoadModulesForPath to also load packages (GH-983)
+* Add 'ap-northeast-2' to the S3 regions table (GH-990)
+* Change check-lint.sh to invoke flake8 via tox (GH-979)
+* Change GetLastRunUri to handle the new temp directory structure (GH-985)
+* Support S3 Signature Version 4 (GH-984)
+* Add back support for python-gflags version 2. (GH-973)
+* Define units.Unit.\_\_ne\_\_ (GH-976)
+* Reorder some PKB initialization steps (GH-965)
+* Move to gflags version 3.0.4 (GH-969)
+* Modify semantics of UnitsParser's convertible_to parameter (GH-968)
+* Add percent (%) as a recognized pint unit (GH-964)
+* Improve Azure CLI version check (GH-967, GH-958)
+* Don't request SSH verbose output when --log_level=debug (GH-962)
+* Move per-provider package requirement files (GH-961)
+* Move pint unit registry code into a separate module (GH-960)
+* Only check python package requirements if requirements.txt exists (GH-959)
+* Changed LoadProvider to accept un-lowered cloud provider name (GH-957)
+* Change bg tests to patch and verify call counts for each VM separately (GH-954)
+* Make BenchmarkSpec.vms order consistent across runs (GH-953)
+* Fix os type related issues and bugs (GH-950, GH-955, GH-952, GH-951, GH-949)
+* Call CheckPrerequisites earlier (GH-947)
+* Add percentiles option to PercentilesCalculator (GH-910)
+* Fix publisher bug when disk_size is None (GH-946)
+* Handle unset PYTHONPATH in tox.ini (GH-941)
+* Add a helper function to BenchmarkConfigSpec to redirect flags (GH-936)
+* Add support for interrupting child threads created by RunThreaded (GH-926)
+* Fix bugs and improve the Cloud Bigtable benchmark (GH-937, GH-933, GH-932)
+* Add a helpful error message if a UnitsParser parses a unitless value (GH-963)
+
 # 1.4.0
 
 New features:

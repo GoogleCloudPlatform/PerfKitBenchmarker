@@ -76,9 +76,5 @@ class GcpBigtableCluster(resource.BaseResource):
                     'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
       return False
     result = json.loads(stdout)
-    if 'clusters' not in result:
-      return False
-    clusters = {cluster['name']: cluster for cluster in result['clusters']}
-    expected_cluster_name = 'projects/{0}/zones/{1}/clusters/{2}'.format(
-        self.project, self.zone, self.name)
-    return expected_cluster_name in clusters
+    clusters = {cluster['clusterId'] for cluster in result}
+    return self.name in clusters

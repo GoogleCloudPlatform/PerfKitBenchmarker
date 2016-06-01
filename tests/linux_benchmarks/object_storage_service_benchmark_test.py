@@ -31,6 +31,7 @@ class TestGenerateJobFileString(unittest.TestCase):
   def testRunCountTest(self):
     with mock.patch('os.path.isfile', return_value=True),\
         mock.patch(PKB + '.data.ResourcePath', return_value=['a', 'b']),\
+        mock.patch('os.listdir', return_value=[]),\
         mock.patch(MOD_PATH + '.S3StorageBenchmark.Prepare') as Prepare,\
         mock.patch(MOD_PATH
                    + '.S3StorageBenchmark.Run') as Run, mock.patch(
