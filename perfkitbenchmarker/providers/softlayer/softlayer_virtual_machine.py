@@ -184,6 +184,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     
     memory = '1024'
     cpus = '1'
+    dedicated = False
     os = 'UBUNTU_LATEST_64'
     nic = '10'
     private_vlan_id = None
@@ -196,6 +197,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         vm_attributes = json.loads(self.machine_type)
         if 'cpus' in vm_attributes:
             cpus = vm_attributes['cpus']
+
+        if 'dedicated' in vm_attributes:
+            dedicated = vm_attributes['dedicated'].upper() in ['TRUE', 'T']
 
         if 'memory' in vm_attributes:
             memory = vm_attributes['memory']
@@ -242,7 +246,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         'perfkit.org',
         '--cpu',
         '%s' % cpus,
-          '--os',
+        '--os',
         '%s' % os,
         '--network',
         '%s' % nic,
@@ -260,6 +264,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
            
     if san == True:
         create_cmd = create_cmd + ['--san']       
+
+    if dedicated == True:
+        create_cmd = create_cmd + ['--dedicated']       
 
     if public_vlan_id != None:
         create_cmd = create_cmd + ['--vlan-public', '%s' % public_vlan_id]
