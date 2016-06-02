@@ -83,6 +83,8 @@ flags.DEFINE_string('object_sizes', "{1024: 100.0}", 'The size of the objects '
 flags.DEFINE_integer('num_streams', 10, 'The number of streams to use. Only '
                      'applies to the MultiStreamThroughput scenario.',
                      lower_bound=1)
+flags.DEFINE_integer('stream_num_start', 1, 'The number of the first thread in '
+                     'this process.')
 flags.DEFINE_string('objects_written_file', None, 'The path where the '
                     'multistream write benchmark will save a list of the '
                     'objects it wrote, and the multistream read benchmark will '
@@ -791,7 +793,7 @@ def WriteWorker(service, payload,
                     'start_times': start_times,
                     'latencies': latencies,
                     'sizes': sizes,
-                    'stream_num': worker_num})
+                    'stream_num': worker_num + FLAGS.stream_num_start})
 
 
 def ReadWorker(service, start_time, object_records,
@@ -820,7 +822,7 @@ def ReadWorker(service, start_time, object_records,
                     'start_times': start_times,
                     'latencies': latencies,
                     'sizes': sizes,
-                    'stream_num': worker_num})
+                    'stream_num': worker_num + FLAGS.stream_num_start})
 
 
 def OneByteRWBenchmark(service):

@@ -37,6 +37,7 @@ import logging
 import os
 import posixpath
 import re
+import threading
 import time
 
 import pandas as pd
@@ -242,11 +243,13 @@ GCS_MULTIREGION_LOCATION = 'gcs_multiregion_location'
 DEFAULT = 'default'
 
 # This accounts for the overhead of running RemoteCommand() on a VM.
-MULTISTREAM_DELAY_PER_VM = 5.0
+MULTISTREAM_DELAY_PER_VM = 10.0
 # We wait this many seconds for each stream. Note that this is
 # multiplied by the number of streams per VM, not the total number of
 # streams.
-MULTISTREAM_DELAY_PER_STREAM = 0.1
+MULTISTREAM_DELAY_PER_STREAM = 15.0
+# And add a constant factor for PKB-side processing
+MULTISTREAM_DELAY_CONSTANT = 150.0
 
 # The multistream write benchmark writes a file in the VM's /tmp with
 # the objects it has written, which is used by the multistream read
@@ -358,7 +361,7 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
   objects.
 
   Args:
-    raw_result: string. The stdout of the worker process.
+    raw_result: list of strings. The stdouts of the worker processes.
     operation: 'upload' or 'download'. The operation the results are from.
     sizes: the object sizes used in the benchmark, in bytes.
     results: a list to append Sample objects to.
@@ -373,8 +376,19 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
   metadata['objects_per_stream'] = (
       FLAGS.object_storage_multistream_objects_per_stream)
 
-  records_json = json.loads(raw_result)
-  records = pd.DataFrame(records_json)
+  records = pd.DataFrame({'operation': [],
+                          'start_time': [],
+                          'latency': [],
+                          'size': [],
+                          'stream_num': []})
+  for proc_result in raw_result:
+    proc_json = json.loads(proc_result)
+    records = records.append(pd.DataFrame(proc_json))
+  records = records.reset_index()
+
+  logging.info('Records:\n%s', records)
+  logging.info('All latencies positive:%s',
+               (records['latency'] > 0).all())
 
   any_streams_active, all_streams_active = analysis.GetStreamActiveIntervals(
       records['start_time'], records['latency'], records['stream_num'])
@@ -671,25 +685,50 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
       size_distribution = _DistributionToBackendFormat(
           FLAGS.object_storage_object_sizes)
 
+      def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
+        # vm_idx = proc_idx // PROCESSES_PER_VM
+        cmd = BuildBenchmarkScriptCommand(
+            cmd_args + ['--stream_num_start=%s' % proc_idx])
+        # out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
+        out, _ = vm.RobustRemoteCommand(cmd, should_log=True)
+        out_array[proc_idx] = out
+
+      def RunMultiStreamProcesses(command):
+        output = [None] * FLAGS.object_storage_multistream_num_streams
+        # Each process has a thread managing it.
+        threads = [
+            threading.Thread(target=StartMultiStreamProcess,
+                             args=(command, i, output))
+            for i in xrange(FLAGS.object_storage_multistream_num_streams)]
+        for thread in threads:
+          thread.start()
+        logging.info('Started %s processes.',
+                     FLAGS.object_storage_multistream_num_streams)
+        for thread in threads:
+          thread.join()
+        logging.info('All processes complete.')
+        return output
+
       write_start_time = (
           time.time() +
-          MULTISTREAM_DELAY_PER_VM +
+          MULTISTREAM_DELAY_CONSTANT +
+          MULTISTREAM_DELAY_PER_VM * FLAGS.num_vms +
           MULTISTREAM_DELAY_PER_STREAM *
           FLAGS.object_storage_multistream_num_streams)
 
       logging.info('Write start time is %s', write_start_time)
 
-      multi_stream_write_cmd = BuildBenchmarkScriptCommand([
+      multi_stream_write_args = [
           '--bucket=%s' % bucket_name,
           '--objects_per_stream=%s' % (
               FLAGS.object_storage_multistream_objects_per_stream),
           '--object_sizes="%s"' % size_distribution,
-          '--num_streams=%s' % FLAGS.object_storage_multistream_num_streams,
+          '--num_streams=1',
           '--start_time=%s' % write_start_time,
           '--objects_written_file=%s' % objects_written_file,
-          '--scenario=MultiStreamWrite'])
-      write_out, _ = vm.RobustRemoteCommand(
-          multi_stream_write_cmd, should_log=True)
+          '--scenario=MultiStreamWrite']
+
+      write_out = RunMultiStreamProcesses(multi_stream_write_args)
       _ProcessMultiStreamResults(write_out, 'upload',
                                  size_distribution.iterkeys(), results,
                                  metadata=metadata)
@@ -699,23 +738,23 @@ def ApiBasedBenchmarks(results, metadata, vm, storage, test_script_path,
 
       read_start_time = (
           time.time() +
-          MULTISTREAM_DELAY_PER_VM +
+          MULTISTREAM_DELAY_CONSTANT +
+          MULTISTREAM_DELAY_PER_VM * FLAGS.num_vms +
           MULTISTREAM_DELAY_PER_STREAM *
           FLAGS.object_storage_multistream_num_streams)
 
       logging.info('Read start time is %s', read_start_time)
 
-      multi_stream_read_cmd = BuildBenchmarkScriptCommand([
+      multi_stream_read_args = [
           '--bucket=%s' % bucket_name,
           '--objects_per_stream=%s' % (
               FLAGS.object_storage_multistream_objects_per_stream),
-          '--num_streams=%s' % FLAGS.object_storage_multistream_num_streams,
+          '--num_streams=1',
           '--start_time=%s' % read_start_time,
           '--objects_written_file=%s' % objects_written_file,
-          '--scenario=MultiStreamRead'])
+          '--scenario=MultiStreamRead']
       try:
-        read_out, _ = vm.RobustRemoteCommand(
-            multi_stream_read_cmd, should_log=True)
+        read_out = RunMultiStreamProcesses(multi_stream_read_args)
         _ProcessMultiStreamResults(read_out, 'download',
                                    size_distribution.iterkeys(), results,
                                    metadata=metadata)
