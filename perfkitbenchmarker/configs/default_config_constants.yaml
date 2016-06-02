@@ -15,6 +15,7 @@ default_single_core: &default_single_core
     zone: us-east-1
     image: null
   SoftLayer:
+#    machine_type: '{"cpus": 4, "memory": 4096, "os": "UBUNTU_LATEST_64", "nic": 1000}'
     machine_type: '{"cpus": 2, "memory": 1024, "os": "UBUNTU_LATEST_64", "nic": 10}'
     zone: wdc01
     image: null
