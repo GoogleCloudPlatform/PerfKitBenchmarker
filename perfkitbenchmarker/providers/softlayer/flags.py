@@ -14,8 +14,7 @@
 
 from perfkitbenchmarker import flags
 
-flags.DEFINE_string('softlayer_user_name', 'root',
+#TEST
+flags.DEFINE_string('softlayer_user_name', 'perfkit',
                     'This determines the user name that Perfkit will '
                     'attempt to use.')
-flags.DEFINE_integer('softlayer_provisioned_iops', None,
-                     'IOPS for Provisioned IOPS (SSD) volumes in SoftLayer.')

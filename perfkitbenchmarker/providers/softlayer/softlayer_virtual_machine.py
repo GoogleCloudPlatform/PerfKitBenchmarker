@@ -44,6 +44,7 @@ FLAGS = flags.FLAGS
 
 
 INSTANCE_EXISTS_STATUSES = frozenset(['ACTIVE'])
+INSTANCE_QUIESCING_TRANSACTION = frozenset(['CLOUD_RECLAIM_PREP'])
 INSTANCE_DELETED_STATUSES = frozenset(['DISCONNECTED'])
 INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 DRIVE_START_LETTER = 'c'
@@ -136,7 +137,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(log_errors=False)
   def _PostCreate(self):
-    """Get the instance's data and tag it."""
+    """Check the status of the system to ensure that it is active"""
+    
     describe_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json',
@@ -150,16 +152,30 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if transaction != None:
         logging.info('Post create check for instance %s. Not ready. Active transaction in progress: %s.', self.id, transaction)
-        sleep(10)
+        sleep(20)
         raise Exception
 
     self.internal_ip = response['private_ip']
     self.ip_address = response['public_ip']
-
+    logging.info("IP addr %s" % self.ip_address)
+     
     util.AddDefaultTags(self.id, self.region)
 
+    #Add user and move the key to the non root user    
+    self.user_name = "root"
+    stdout, _ = self.RemoteCommand('useradd -m %s' % FLAGS.softlayer_user_name)
+    stdout, _ = self.RemoteCommand('echo "%s  ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers' %  FLAGS.softlayer_user_name)
+    stdout, _ = self.RemoteCommand('mkdir /home/%s/.ssh' % FLAGS.softlayer_user_name)
+    stdout, _ = self.RemoteCommand('chmod 700 /home/%s/.ssh/' % FLAGS.softlayer_user_name)
+    stdout, _ = self.RemoteCommand('cp ~/.ssh/*  /home/%s/.ssh/' % FLAGS.softlayer_user_name)
+    stdout, _ = self.RemoteCommand('cp /root/.ssh/authorized_keys /home/%s/authorized_keys' % FLAGS.softlayer_user_name, True)
+    stdout, _ = self.RemoteCommand('chown -R %s /home/perfkit/.ssh/' % (FLAGS.softlayer_user_name, FLAGS.softlayer_user_name))
+    
+    stdout, _ = self.RemoteCommand('rm -rf /root/.ssh')
+    self.user_name = FLAGS.softlayer_user_name
 
-
+    
+    
   def IdGenerator(self, size=6, chars=string.ascii_uppercase + string.digits):
       return ''.join(random.choice(chars) for _ in range(size))
 
@@ -289,13 +305,14 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     vm_util.IssueCommand(delete_cmd)
     logging.info("Sleeping so that delete command has time to register")
-    sleep(60)
+    sleep(90)
     #self._WaitForDeleteToComplete()
 
 
   def _Exists(self):
     """Returns true if the VM exists."""
-
+    
+    # first look for VM in VM list 
     describe_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json',
@@ -318,7 +335,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if found == False:
         return False
-
+    
     describe_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json',
@@ -329,7 +346,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         stdout, _ = util.IssueRetryableCommand(describe_cmd)
         response = json.loads(stdout)
         status = response['status']
-        assert status in INSTANCE_KNOWN_STATUSES, status
+        active_transaction = response['active_transaction']
+        if active_transaction in INSTANCE_QUIESCING_TRANSACTION:
+            return False
         return status in INSTANCE_EXISTS_STATUSES
     except errors.VmUtil.CalledProcessException as e:
         return False

@@ -59,8 +59,6 @@ def AddTags(resource_id, region, **kwargs):
     tag_cmd = tag_cmd + ['--tag', '{0}:{1}'.format(key, value)]
   tag_cmd = tag_cmd + ['{0}'.format(resource_id)]
   
-  
-  print "skipping tag in util"
   IssueRetryableCommand(tag_cmd)
 
 
