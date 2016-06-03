@@ -141,7 +141,7 @@ class DBStatusQueryError(Exception):
 
 
 def _GenerateRandomPassword():
-  """ Generates a random password to be used by the DB instance.
+  """Generates a random password to be used by the DB instance.
   Args:
     None
   Returns:
@@ -285,7 +285,7 @@ def _GetSysbenchCommandPrefix(os_type):
 
 
 def _IssueSysbenchCommand(vm, duration):
-  """ Issues a sysbench run command given a vm and a duration.
+  """Issues a sysbench run command given a vm and a duration.
 
       Does nothing if duration is <= 0
 
@@ -330,7 +330,7 @@ def _IssueSysbenchCommand(vm, duration):
 
 
 def _RunSysbench(vm, metadata):
-  """ Runs the Sysbench OLTP test.
+  """Runs the Sysbench OLTP test.
 
   The test is run on the DB instance as indicated by the vm.db_instance_address.
 
@@ -678,7 +678,7 @@ class GoogleCloudSQLBenchmark(object):
   """MySQL benchmark based on the Google Cloud SQL service."""
 
   def Prepare(self, vm):
-    """Prepares the DB and everything for the provider GCP (Cloud SQL)
+    """Prepares the DB and everything for the provider GCP (Cloud SQL).
 
     Args:
       vm: The VM to be used as the test client

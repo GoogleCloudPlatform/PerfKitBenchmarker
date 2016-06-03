@@ -31,6 +31,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -86,6 +87,7 @@ class BenchmarkSpec(object):
       benchmark_name: string. Name of the benchmark.
       benchmark_uid: An identifier unique to this run of the benchmark even
           if the same benchmark is run multiple times with different configs.
+      spark_service: The spark service configured for this benchmark.
     """
     self.config = benchmark_config
     self.name = benchmark_name
@@ -100,6 +102,7 @@ class BenchmarkSpec(object):
     self.file_name = os.path.join(vm_util.GetTempDir(), self.uid)
     self.uuid = str(uuid.uuid4())
     self.always_call_cleanup = False
+    self.spark_service = None
 
     # Set the current thread's BenchmarkSpec object to this one.
     context.SetThreadBenchmarkSpec(self)
@@ -228,6 +231,24 @@ class BenchmarkSpec(object):
       self.vm_groups[group_name] = vms
       self.vms.extend(vms)
 
+  def ConstructSparkService(self):
+    if self.config.spark_service is None:
+      return
+
+    providers.LoadProvider(self.config.spark_service.cloud)
+    spark_service_spec = self.config.spark_service
+    service_type = spark_service_spec.spark_service_type
+    spark_service_class = spark_service.GetSparkServiceClass(
+        spark_service_spec.cloud, service_type)
+    if self.config.spark_service.static_cluster_name:
+      name = self.config.spark_service.static_cluster_name
+      static_cluster = True
+    else:
+      name = 'pkb-' + FLAGS.run_uri
+      static_cluster = False
+    self.spark_service = spark_service_class(name, static_cluster,
+                                             spark_service_spec)
+
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
@@ -254,11 +275,15 @@ class BenchmarkSpec(object):
         sshable_vm_groups[group_name] = [vm for vm in group_vms
                                          if vm.OS_TYPE != os_types.WINDOWS]
       vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
-
+    if self.spark_service:
+      self.spark_service.Create()
 
   def Delete(self):
     if self.deleted:
       return
+
+    if self.spark_service:
+      self.spark_service.Delete()
 
     if self.vms:
       try:
