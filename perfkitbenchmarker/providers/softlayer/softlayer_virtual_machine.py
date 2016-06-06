@@ -94,6 +94,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.user_data = None
     self.max_local_disks = 5
     self.num_local_disks = 1
+   
 
   def ImportKeyfile(self):
     """Imports the public keyfile to SoftLayer."""
@@ -139,6 +140,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _PostCreate(self):
     """Check the status of the system to ensure that it is active"""
     
+    """Get the instance's data and tag it."""
     describe_cmd = util.SoftLayer_PREFIX + [
         '--format',
         'json',
@@ -154,25 +156,28 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         logging.info('Post create check for instance %s. Not ready. Active transaction in progress: %s.', self.id, transaction)
         sleep(20)
         raise Exception
-
+    
     self.internal_ip = response['private_ip']
     self.ip_address = response['public_ip']
-    logging.info("IP addr %s" % self.ip_address)
-     
+    
+    if self.ip_address == None:
+        logging.info('Did not find an IP address')
+        raise Exception
+
     util.AddDefaultTags(self.id, self.region)
 
-    #Add user and move the key to the non root user    
-    self.user_name = "root"
-    stdout, _ = self.RemoteCommand('useradd -m %s' % FLAGS.softlayer_user_name)
-    stdout, _ = self.RemoteCommand('echo "%s  ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers' %  FLAGS.softlayer_user_name)
-    stdout, _ = self.RemoteCommand('mkdir /home/%s/.ssh' % FLAGS.softlayer_user_name)
-    stdout, _ = self.RemoteCommand('chmod 700 /home/%s/.ssh/' % FLAGS.softlayer_user_name)
-    stdout, _ = self.RemoteCommand('cp ~/.ssh/*  /home/%s/.ssh/' % FLAGS.softlayer_user_name)
-    stdout, _ = self.RemoteCommand('cp /root/.ssh/authorized_keys /home/%s/authorized_keys' % FLAGS.softlayer_user_name, True)
-    stdout, _ = self.RemoteCommand('chown -R %s /home/perfkit/.ssh/' % (FLAGS.softlayer_user_name, FLAGS.softlayer_user_name))
-    
-    stdout, _ = self.RemoteCommand('rm -rf /root/.ssh')
-    self.user_name = FLAGS.softlayer_user_name
+    #Add user and move the key to the non root user  
+    if  self.user_name != "root":
+        self.user_name = "root"
+        stdout, _ = self.RemoteCommand('useradd -m --groups root %s' % FLAGS.softlayer_user_name)
+        stdout, _ = self.RemoteCommand('echo "%s  ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers' %  FLAGS.softlayer_user_name)
+        stdout, _ = self.RemoteCommand('mkdir /home/%s/.ssh' % FLAGS.softlayer_user_name)
+        stdout, _ = self.RemoteCommand('chmod 700 /home/%s/.ssh/' % FLAGS.softlayer_user_name)
+        stdout, _ = self.RemoteCommand('cp ~/.ssh/*  /home/%s/.ssh/' % FLAGS.softlayer_user_name)
+        stdout, _ = self.RemoteCommand('cp /root/.ssh/authorized_keys /home/%s/authorized_keys' % FLAGS.softlayer_user_name, True)
+        stdout, _ = self.RemoteCommand('chown -R %s /home/%s/' % (FLAGS.softlayer_user_name, FLAGS.softlayer_user_name))
+        #stdout, _ = self.RemoteCommand('rm -rf /root/.ssh')
+        self.user_name = FLAGS.softlayer_user_name
 
     
     
@@ -181,6 +186,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
+    
     if SoftLayerVirtualMachine.keyLabel == None:
         SoftLayerVirtualMachine.keyLabel  = "Perfkit-Key-" + self.IdGenerator()
 

@@ -96,8 +96,9 @@ class SoftLayerDiskSpec(disk.BaseDiskSpec):
     """
     
     super(SoftLayerDiskSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['softlayer_provisioned_iops'].present:
-      config_values['iops'] = 500 #flag_values.softLayer_provisioned_iops
+    # TODO: IOPS based storage
+    #if flag_values['softlayer_provisioned_iops'].present:
+    #  config_values['iops'] = 500 #flag_values.softLayer_provisioned_iops
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
