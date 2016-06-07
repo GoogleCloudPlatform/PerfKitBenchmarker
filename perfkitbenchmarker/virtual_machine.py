@@ -578,16 +578,16 @@ class BaseOsMixin(object):
     raise NotImplementedError()
 
   def StartBackgroundWorkload(self):
-    """Start the background workload"""
+    """Start the background workload."""
     if self.background_cpu_threads or self.background_network_mbits_per_sec:
       raise NotImplementedError()
 
   def StopBackgroundWorkload(self):
-    """Stop the background workoad"""
+    """Stop the background workoad."""
     if self.background_cpu_threads or self.background_network_mbits_per_sec:
       raise NotImplementedError()
 
   def PrepareBackgroundWorkload(self):
-    """Prepare for the background workload"""
+    """Prepare for the background workload."""
     if self.background_cpu_threads or self.background_network_mbits_per_sec:
       raise NotImplementedError()
