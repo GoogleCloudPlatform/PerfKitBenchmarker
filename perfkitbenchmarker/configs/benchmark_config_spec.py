@@ -28,6 +28,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine
+from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -163,6 +164,73 @@ class _StaticVmListDecoder(option_decoders.ListDecoder):
         default=list, item_decoder=_StaticVmDecoder(), **kwargs)
 
 
+class _SparkServiceSpec(spec.BaseSpec):
+  """Configurable options of an Apache Spark Service.
+
+  We may add more options here, such as disk specs, as necessary.
+
+  Attributes:
+    spark_service_type: string.  pkb_managed or managed_service
+    num_workers: number of workers.
+    machine_type: machine type to use.
+    cloud: cloud to use.
+    project: project to use.
+  """
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_SparkServiceSpec, self).__init__(component_full_name,
+                                            flag_values=flag_values,
+                                            **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments
+      to construct in order to decode the named option.
+    """
+    result = super(_SparkServiceSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'static_cluster_name': (option_decoders.StringDecoder,
+                                {'default': None, 'none_ok': True}),
+        'spark_service_type': (option_decoders.EnumDecoder, {
+            'default': spark_service.PROVIDER_MANAGED,
+            'valid_values': [spark_service.PROVIDER_MANAGED,
+                             spark_service.PKB_MANAGED]}),
+        'num_workers': (option_decoders.IntDecoder, {
+            'default': 3, 'min': 1}),
+        'cloud': (option_decoders.EnumDecoder, {
+            'valid_values': providers.VALID_CLOUDS}),
+        'project': (option_decoders.StringDecoder, {'default': None,
+                                                    'none_ok': True}),
+        'machine_type': (option_decoders.StringDecoder, {'default': None,
+                                                         'none_ok': True})})
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(_SparkServiceSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
+    if flag_values['project'].present or 'project' not in config_values:
+      config_values['project'] = flag_values.project
+    if flag_values['spark_static_cluster_name'].present:
+      config_values['static_cluster_name'] = (
+          flag_values.spark_static_cluster_name)
+
+
 class _VmGroupSpec(spec.BaseSpec):
   """Configurable options of a VM group.
 
@@ -286,6 +354,33 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _SparkServiceDecoder(option_decoders.TypeVerifier):
+  """Validates the spark_service dictionary of a benchmark config object."""
+  def __init__(self, **kwargs):
+    super(_SparkServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies spark_service dictionary of a benchmark config object.
+
+    Args:
+      value: dict Spark Service config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+      component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+    Returns:
+      _SparkServiceSpec Build from the config passed in in value.
+    Raises:
+      errors.Config.InvalidateValue upon invalid input value.
+    """
+    spark_service_config = super(_SparkServiceDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    result = _SparkServiceSpec(self._GetOptionFullName(component_full_name),
+                               flag_values, **spark_service_config)
+    return result
+
+
+
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -316,7 +411,8 @@ class BenchmarkConfigSpec(spec.BaseSpec):
       for group_name, group_spec in sorted(self.vm_groups.iteritems()):
         if group_spec.os_type not in expected_os_types:
           mismatched_os_types.append('{0}.vm_groups[{1}].os_type: {2}'.format(
-              component_full_name, repr(group_name), repr(group_spec.os_type)))
+              component_full_name, repr(group_name),
+              repr(group_spec.os_type)))
       if mismatched_os_types:
         raise errors.Config.InvalidValue(
             'VM groups in {0} may only have the following OS types: {1}. The '
@@ -341,7 +437,8 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     result.update({
         'description': (option_decoders.StringDecoder, {'default': None}),
         'flags': (_FlagsDecoder, {}),
-        'vm_groups': (_VmGroupsDecoder, {})})
+        'vm_groups': (_VmGroupsDecoder, {'default': {}}),
+        'spark_service': (_SparkServiceDecoder, {'default': None})})
     return result
 
   def _DecodeAndInit(self, component_full_name, config, decoders, flag_values):

@@ -21,7 +21,7 @@ _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 
 
 def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
-  """Computes percentiles, stddev and mean on a set of numbers
+  """Computes percentiles, stddev and mean on a set of numbers.
 
   Args:
     numbers: The set of numbers to compute percentiles for. Can be a

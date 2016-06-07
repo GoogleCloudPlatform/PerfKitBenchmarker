@@ -566,7 +566,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand('pkill -9 sysbench')
 
   def PrepareBackgroundWorkload(self):
-    """Install packages needed for the background workload """
+    """Install packages needed for the background workload."""
     if self.background_cpu_threads:
       self.Install('sysbench')
     if self.background_network_mbits_per_sec:

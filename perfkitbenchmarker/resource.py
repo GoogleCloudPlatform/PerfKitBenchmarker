@@ -27,13 +27,19 @@ from perfkitbenchmarker import vm_util
 
 
 class BaseResource(object):
-  """An object representing a cloud resource."""
+  """An object representing a cloud resource.
+
+  Attributes:
+    created: True if the resource has been created.
+    pkb_managed: Whether the resource is managed (created and deleted) by PKB.
+  """
 
   __metaclass__ = abc.ABCMeta
 
-  def __init__(self):
+  def __init__(self, user_managed=False):
     super(BaseResource, self).__init__()
-    self.created = False
+    self.created = user_managed
+    self.user_managed = user_managed
 
     # Creation and deletion time information
     # that we may make use of later.
@@ -126,11 +132,15 @@ class BaseResource(object):
 
   def Create(self):
     """Creates a resource and its dependencies."""
+    if self.user_managed:
+      return
     self._CreateDependencies()
     self._CreateResource()
     self._PostCreate()
 
   def Delete(self):
     """Deletes a resource and its dependencies."""
+    if self.user_managed:
+      return
     self._DeleteResource()
     self._DeleteDependencies()

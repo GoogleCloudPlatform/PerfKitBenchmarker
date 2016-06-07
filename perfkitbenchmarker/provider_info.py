@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing class for provider data
+"""Module containing class for provider data.
 
 This contains the BaseProviderInfo class which is
 used for IsBenchmarkSupported
@@ -23,12 +23,12 @@ _PROVIDER_INFO_REGISTRY = {}
 
 
 def GetProviderInfoClass(cloud):
-  """Returns the provider info class corresponding to the cloud"""
+  """Returns the provider info class corresponding to the cloud."""
   return _PROVIDER_INFO_REGISTRY.get(cloud, BaseProviderInfo)
 
 
 class AutoRegisterProviderInfoMeta(type):
-  """Metaclass which allows ProviderInfos to automatically be registered"""
+  """Metaclass which allows ProviderInfos to automatically be registered."""
 
   def __init__(cls, name, bases, dct):
     super(AutoRegisterProviderInfoMeta, cls).__init__(name, bases, dct)
@@ -37,7 +37,7 @@ class AutoRegisterProviderInfoMeta(type):
 
 
 class BaseProviderInfo():
-  """Class that holds provider-related data ."""
+  """Class that holds provider-related data."""
   __metaclass__ = AutoRegisterProviderInfoMeta
 
   CLOUD = None

@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for Google Cloud Platform
-
-"""
+""" Provider info for Google Cloud Platform."""
 
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
