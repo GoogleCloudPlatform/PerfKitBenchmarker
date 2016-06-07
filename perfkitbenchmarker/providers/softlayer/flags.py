@@ -14,7 +14,6 @@
 
 from perfkitbenchmarker import flags
 
-#TEST
 flags.DEFINE_string('softlayer_user_name', 'perfkit',
                     'This determines the user name that Perfkit will '
                     'attempt to use.')
