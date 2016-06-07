@@ -214,10 +214,10 @@ def _StartCassandraIfNotRunning(vm):
 def GetCassandraCliPath(vm):
   if vm.OS_TYPE == os_types.JUJU:
     # Replace the stock CASSANDRA_CLI so that it uses the binary
-    # installed by the cassandra-stress charm.
+    # installed by the cassandra charm.
     return '/usr/bin/cassandra-cli'
 
-  return posixpath.join(CASSANDRA_DIR, 'tools', 'bin',
+  return posixpath.join(CASSANDRA_DIR, 'bin',
                         'cassandra-cli')
 
 
