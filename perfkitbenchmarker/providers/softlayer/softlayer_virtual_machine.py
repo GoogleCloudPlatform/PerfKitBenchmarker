@@ -37,7 +37,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.providers.softlayer import util
 from perfkitbenchmarker.providers.softlayer import softlayer_disk
-from perfkitbenchmarker.providers.softlayer import softlayer_network
 from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
@@ -57,14 +56,13 @@ def GetBlockDeviceMap(machine_type):
 
   Returns:
     The json representation of the block device map for a machine compatible
-    with the AWS CLI, or if the machine type has no local disks, it will
-    return None.
+    with SoftLayer
   """
-  print machine_type
+  
   mappings = [{'VirtualName': 'ephemeral%s' % i,
                  'DeviceName': '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)}
                 for i in range(1)]
-  print mappings
+  
   return json.dumps(mappings)
   
 
@@ -230,7 +228,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
             os = vm_attributes['os']
 
         if 'san' in vm_attributes:
-            san = vm_attributes['san'].upper() in ['TRUE', 'T']
+            san = vm_attributes['san']
 
         if 'nic' in vm_attributes:
             nic = vm_attributes['nic']
@@ -400,7 +398,7 @@ def GetLocalDisks(self):
           disks on the VM (e.g. '/dev/sdb').
     """
     return ['/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
-            for i in xrange(NUM_LOCAL_VOLUMES[self.machine_type])]
+            for i in range(1)]
 
 def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
