@@ -167,7 +167,6 @@ This section describes the setup steps needed for each cloud system.
 * [RackSpace](#installing-clis-and-credentials-for-rackspace)
 * [SoftLayer](#installing-clis-and-credentials-for-softlayer)
 
-
 After configuring the clouds you intend to use, skip to [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks).
 
 ### Install `gcloud` and setup authentication
@@ -522,11 +521,11 @@ override the path.
 
 ### Installing CLIs and credentials for Rackspace
 
-In order to interact with the SoftLayer Public Cloud, PerfKitBenchmarker makes
+In order to interact with the Rackspace Public Cloud, PerfKitBenchmarker makes
 use of RackCLI. You can find the instructions to install and configure
-RackCLI here: http://softlayer-python.readthedocs.io/en/latest/index.html
+RackCLI here: https://developer.rackspace.com/docs/rack-cli/
 
-To run PerfKit Benchmarker against SoftLayer is very easy. Simply make sure
+To run PerfKit Benchmarker against Rackspace is very easy. Simply make sure
 Rack CLI is installed and available in your PATH, optionally use the flag
 `--rack_path` to indicate the path to the binary.
 
@@ -535,6 +534,9 @@ profile then it's recommended that you create a profile for your UK account.
 Once configured, use flag `--profile` to specify which RackCLI profile to use.
 You can find more details here: https://developer.rackspace.com/docs/rack-cli/configuration/#config-file
 
+**Note:** Not all flavors are supported on every region. Always check first
+if the flavor is supported in the region.
+
 ### Installing CLIs and credentials for SoftLayer
 
 Make sure you have installed pip (see the section above).
@@ -542,13 +544,12 @@ Make sure you have installed pip (see the section above).
 run the following command (omit the 'sudo' on Windows)
 
 ```bash
-$ sudo pip install -r perfkitbenchmarker/providers/softlayer/requirements.txt
+$ sudo pip install -r requirements-softlayer.txt
 ```
 
 ```bash
 $ slcli setup
 ```
-
 
 ## Image prerequisites for Docker based clouds
 Docker instances by default don't allow to SSH into them. Thus it is important to configure your Docker image so that it has SSH server installed. You can use your own image or build a new one based on a Dockerfile placed in `tools/docker_images` directory - in this case please refer to [Docker images document](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tools/docker_images).
@@ -659,6 +660,7 @@ $ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
 $ ./pkb --cloud=SoftLayer --benchmarks=iperf --zones=tor01 --machine_type="{\"cpus\": 4, \"memory\": 4096, \"os\": \"UBUNTU_LATEST_64\", \"nic\": 1000 }"
 
 ```
+
 
 How to Run Windows Benchmarks
 ==================
