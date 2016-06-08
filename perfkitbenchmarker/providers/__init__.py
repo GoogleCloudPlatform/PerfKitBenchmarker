@@ -42,7 +42,7 @@ _imported_providers = set()
 
 def LoadProviderFlags(providers):
     """Imports just the flags module for each provider.
-    This allows PKB to load flag definitions from each provider to include in 
+    This allows PKB to load flag definitions from each provider to include in
     the help text without actually loading any other provider-specific modules.
     Args:
       providers: series of strings. Each element is a value from VALID_CLOUDS
@@ -61,13 +61,13 @@ LoadProviderFlags(VALID_CLOUDS)
 def LoadProvider(provider_name, ignore_package_requirements=True):
     """Loads the all modules in the 'provider_name' package.
     This function first checks the specified provider's Python package
-    requirements file, if one exists, and verifies that all requirements are 
-    met. Next, it loads all modules in the specified provider's package. By 
+    requirements file, if one exists, and verifies that all requirements are
+    met. Next, it loads all modules in the specified provider's package. By
     loading these modules, relevant classes (e.g. VMs) will register themselves.
     Args:
       provider_name: string chosen from VALID_CLOUDS. The name of the provider
           whose modules should be loaded.
-      ignore_package_requirements: boolean. If True, the provider's Python 
+      ignore_package_requirements: boolean. If True, the provider's Python
       package requirements file is ignored.
     """
     if provider_name in _imported_providers:
