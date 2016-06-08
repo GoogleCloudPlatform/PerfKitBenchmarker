@@ -173,9 +173,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
                                % FLAGS.softlayer_user_name)
             self.RemoteCommand('cp ~/.ssh/*  /home/%s/.ssh/'
                                % FLAGS.softlayer_user_name)
-            self.RemoteCommand('cp /root/.ssh/authorized_keys',
-                               ' /home/%s/authorized_keys'
-                               % FLAGS.softlayer_user_name)
+            self.RemoteCommand(
+                'cp /root/.ssh/authorized_keys /home/%s/authorized_keys'
+                % FLAGS.softlayer_user_name)
             self.RemoteCommand('chown -R %s /home/%s/'
                                % (FLAGS.softlayer_user_name,
                                   FLAGS.softlayer_user_name))
