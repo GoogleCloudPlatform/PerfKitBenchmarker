@@ -17,14 +17,11 @@
 Disks can be created, deleted, attached to VMs, and detached from VMs.
 """
 
-import json
 import logging
-import string
 import threading
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.softlayer import util
 
@@ -37,7 +34,7 @@ LOCAL = 'local'
 
 DISK_TYPE = {
     disk.LOCAL: LOCAL,
-    
+
 }
 
 DISK_METADATA = {
@@ -94,11 +91,9 @@ class SoftLayerDiskSpec(disk.BaseDiskSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
-    
+
     super(SoftLayerDiskSpec, cls)._ApplyFlags(config_values, flag_values)
-    # TODO: IOPS based storage
-    #if flag_values['softlayer_provisioned_iops'].present:
-    #  config_values['iops'] = 500 #flag_values.softLayer_provisioned_iops
+
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -140,7 +135,7 @@ class SoftLayerDisk(disk.BaseDisk):
   def _Create(self):
     """Creates the disk."""
     logging.warn("create disk")
-    
+
 
   def _Delete(self):
     """Deletes the disk."""
@@ -156,16 +151,14 @@ class SoftLayerDisk(disk.BaseDisk):
     """Attaches the disk to a VM.
 
     Args:
-      vm: The SoftLayerVirtualMachine instance to which the disk will be attached.
+      vm: The SoftLayer VM instance to which the disk will be attached.
     """
-    logging.info("attach disk")
     vm.num_local_disks = vm.num_local_disks + 1
 
   def Detach(self):
     """Detaches the disk from a VM."""
-    print "detach"
 
-    
+
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
