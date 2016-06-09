@@ -72,6 +72,18 @@ class BaseResource(object):
     """
     raise NotImplementedError()
 
+  def _WaitUntilReady(self):
+    """Return true if the underlying resource is ready.
+
+    Supplying this method is optional.  Use it when a resource can exist
+    without being ready.  If the subclass does not implement
+    it then it just returns true.
+
+    Returns:
+      True if the resource was ready in time, False if the wait timed out.
+    """
+    return True
+
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.
 
@@ -136,6 +148,9 @@ class BaseResource(object):
       return
     self._CreateDependencies()
     self._CreateResource()
+    ready = self._WaitUntilReady()
+    if not ready:
+      raise Exception('Wait for resource to be read timed out, giving up')
     self._PostCreate()
 
   def Delete(self):

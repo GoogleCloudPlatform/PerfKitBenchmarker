@@ -26,7 +26,6 @@ For more on Apache Spark, see: http://spark.apache.org/
 """
 
 import datetime
-import logging
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -39,7 +38,7 @@ BENCHMARK_CONFIG = """
 spark:
   description: Run a jar on a spark cluster.
   spark_service:
-    spark_service_type: managed
+    service_type: managed
     num_workers: 4
 """
 
@@ -51,9 +50,6 @@ flags.DEFINE_string('spark_jarfile', DEFAULT_JARFILE,
                     'Jarfile to submit.')
 flags.DEFINE_string('spark_classname', DEFAULT_CLASSNAME,
                     'Classname to be used')
-flags.DEFINE_string('spark_static_cluster_name', None,
-                    'If set, the name of the Spark cluster, assumed to be '
-                    'ready.')
 
 FLAGS = flags.FLAGS
 
@@ -78,9 +74,11 @@ def Run(benchmark_spec):
   """
   spark_cluster = benchmark_spec.spark_service
   jar_start = datetime.datetime.now()
-  stdout, stderr, retcode = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
-                                                    FLAGS.spark_classname)
-  logging.info('Jar result is ' + stdout)
+  success = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
+                                    FLAGS.spark_classname)
+  if not success:
+    raise Exception('Class {0} from jar {1} did not run'.format(
+        FLAGS.spark_classname, FLAGS.spark_jarfile))
   jar_end = datetime.datetime.now()
 
   metadata = spark_cluster.GetMetadata().update(
