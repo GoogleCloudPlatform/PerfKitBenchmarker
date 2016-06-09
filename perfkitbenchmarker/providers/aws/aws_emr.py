@@ -53,8 +53,6 @@ class AwsEMR(spark_service.BaseSparkService):
 
   CLOUD = providers.AWS
   SERVICE_NAME = 'emr'
-  debug = True
-
 
   def __init__(self, spark_service_spec):
     super(AwsEMR, self).__init__(spark_service_spec)

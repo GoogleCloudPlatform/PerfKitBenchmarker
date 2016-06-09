@@ -99,7 +99,7 @@ class BaseSparkService(resource.BaseResource):
       class_name: Name of the main class.
       job_poll_interval: integer saying how often to poll for job
         completion.  Not used by providers for which submit job is a
-        synchronous operations.
+        synchronous operation.
 
     Returns:
       True if the job submission was successful, false otherwise.
