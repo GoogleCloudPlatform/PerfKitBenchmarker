@@ -39,6 +39,7 @@ JOB_WAIT_SLEEP = 30
 
 DELETED_STATES = ['TERMINATING', 'TERMINATED_WITH_ERRORS', 'TERMINATED']
 
+
 class AwsEMR(spark_service.BaseSparkService):
   """Object representing a AWS EMR cluster.
 
@@ -69,12 +70,12 @@ class AwsEMR(spark_service.BaseSparkService):
     """Creates the cluster."""
     name = 'pkb_' + FLAGS.run_uri
     # we need to store the cluster id.
-    cmd = self.cmd_prefix + ['create-cluster',
-        '--name', name, '--release-label', RELEASE_LABEL,
-        '--use-default-roles',
-        '--instance-count', str(self.num_workers),
-        '--instance-type', self.machine_type,
-        '--application', 'Name=SPARK']
+    cmd = self.cmd_prefix + ['create-cluster', '--name', name,
+                             '--release-label', RELEASE_LABEL,
+                             '--use-default-roles',
+                             '--instance-count', str(self.num_workers),
+                             '--instance-type', self.machine_type,
+                             '--application', 'Name=SPARK']
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     self.cluster_id = result['ClusterId']
@@ -82,7 +83,8 @@ class AwsEMR(spark_service.BaseSparkService):
 
   def _Delete(self):
     """Deletes the cluster."""
-    cmd = self.cmd_prefix + ['terminate-clusters', '--cluster-ids', self.cluster_id]
+    cmd = self.cmd_prefix + ['terminate-clusters', '--cluster-ids',
+                             self.cluster_id]
     vm_util.IssueCommand(cmd)
 
   def _Exists(self):
@@ -100,24 +102,22 @@ class AwsEMR(spark_service.BaseSparkService):
 
   def _WaitUntilReady(self):
     """Check to see if the cluster is ready."""
-    cmd = self.cmd_prefix + ['describe-cluster', '--cluster-id', self.cluster_id]
+    cmd = self.cmd_prefix + ['describe-cluster', '--cluster-id',
+                             self.cluster_id]
     tries = 0
     while tries < READY_CHECK_TRIES:
       tries += 1
-      stdout , _, rc = vm_util.IssueCommand(cmd)
+      stdout, _, rc = vm_util.IssueCommand(cmd)
       result = json.loads(stdout)
       if result['Cluster']['Status']['State'] == READY_STATE:
         return True
       time.sleep(READY_CHECK_SLEEP)
     return False
 
-  def _SetClusterIdFromName():
-    self.cluster_id = None
-
   def SubmitJob(self, jarfile, classname, job_poll_interval=JOB_WAIT_SLEEP):
     arg_list = ['--class', classname, jarfile]
     arg_string = '[' + ','.join(arg_list) + ']'
-    step_list = ['Type=Spark', 'Args='+arg_string]
+    step_list = ['Type=Spark', 'Args=' + arg_string]
     step_string = ','.join(step_list)
     cmd = self.cmd_prefix + ['add-steps', '--cluster-id',
                              self.cluster_id, '--steps', step_string]

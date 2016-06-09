@@ -16,8 +16,6 @@
 Spark clusters can be created and deleted.
 """
 
-import logging
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service

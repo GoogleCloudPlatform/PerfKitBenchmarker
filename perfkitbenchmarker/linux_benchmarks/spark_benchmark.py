@@ -26,7 +26,6 @@ For more on Apache Spark, see: http://spark.apache.org/
 """
 
 import datetime
-import logging
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -77,6 +76,9 @@ def Run(benchmark_spec):
   jar_start = datetime.datetime.now()
   success = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
                                     FLAGS.spark_classname)
+  if not success:
+    raise Exception('Class {0} from jar {1} did not run'.format(
+        FLAGS.spark_classname, FLAGS.spark_jarfile))
   jar_end = datetime.datetime.now()
 
   metadata = spark_cluster.GetMetadata().update(

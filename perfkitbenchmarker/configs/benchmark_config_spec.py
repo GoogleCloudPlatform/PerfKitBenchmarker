@@ -199,7 +199,7 @@ class _SparkServiceSpec(spec.BaseSpec):
     result = super(_SparkServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'static_cluster_id': (option_decoders.StringDecoder,
-                                {'default': None, 'none_ok': True}),
+                              {'default': None, 'none_ok': True}),
         'service_type': (option_decoders.EnumDecoder, {
             'default': spark_service.PROVIDER_MANAGED,
             'valid_values': [spark_service.PROVIDER_MANAGED,

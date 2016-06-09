@@ -20,7 +20,6 @@ reliably.
 """
 
 import abc
-import logging
 import time
 
 from perfkitbenchmarker import errors
