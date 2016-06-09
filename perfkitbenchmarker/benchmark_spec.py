@@ -237,17 +237,10 @@ class BenchmarkSpec(object):
 
     providers.LoadProvider(self.config.spark_service.cloud)
     spark_service_spec = self.config.spark_service
-    service_type = spark_service_spec.spark_service_type
+    service_type = spark_service_spec.service_type
     spark_service_class = spark_service.GetSparkServiceClass(
         spark_service_spec.cloud, service_type)
-    if self.config.spark_service.static_cluster_name:
-      name = self.config.spark_service.static_cluster_name
-      static_cluster = True
-    else:
-      name = 'pkb-' + FLAGS.run_uri
-      static_cluster = False
-    self.spark_service = spark_service_class(name, static_cluster,
-                                             spark_service_spec)
+    self.spark_service = spark_service_class(spark_service_spec)
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]

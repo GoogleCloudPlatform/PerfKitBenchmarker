@@ -168,9 +168,14 @@ class _SparkServiceSpec(spec.BaseSpec):
   """Configurable options of an Apache Spark Service.
 
   We may add more options here, such as disk specs, as necessary.
+  When there are flags for these attributes, the convention is that
+  the flag is prefixed with spark.  For example, the static_cluster_id
+  is overriden by the flag spark_static_cluster_id
 
   Attributes:
-    spark_service_type: string.  pkb_managed or managed_service
+    service_type: string.  pkb_managed or managed_service
+    static_cluster_id: if user has created a cluster, the id of the
+      cluster.
     num_workers: number of workers.
     machine_type: machine type to use.
     cloud: cloud to use.
@@ -193,9 +198,9 @@ class _SparkServiceSpec(spec.BaseSpec):
     """
     result = super(_SparkServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'static_cluster_name': (option_decoders.StringDecoder,
+        'static_cluster_id': (option_decoders.StringDecoder,
                                 {'default': None, 'none_ok': True}),
-        'spark_service_type': (option_decoders.EnumDecoder, {
+        'service_type': (option_decoders.EnumDecoder, {
             'default': spark_service.PROVIDER_MANAGED,
             'valid_values': [spark_service.PROVIDER_MANAGED,
                              spark_service.PKB_MANAGED]}),
@@ -226,9 +231,9 @@ class _SparkServiceSpec(spec.BaseSpec):
       config_values['cloud'] = flag_values.cloud
     if flag_values['project'].present or 'project' not in config_values:
       config_values['project'] = flag_values.project
-    if flag_values['spark_static_cluster_name'].present:
-      config_values['static_cluster_name'] = (
-          flag_values.spark_static_cluster_name)
+    if flag_values['spark_static_cluster_id'].present:
+      config_values['static_cluster_id'] = (
+          flag_values.spark_static_cluster_id)
 
 
 class _VmGroupSpec(spec.BaseSpec):

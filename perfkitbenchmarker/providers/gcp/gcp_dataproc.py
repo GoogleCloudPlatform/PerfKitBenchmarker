@@ -31,10 +31,9 @@ class GcpDataproc(spark_service.BaseSparkService):
   """Object representing a GCP Dataproc cluster.
 
   Attributes:
-    name: Cluster name.
-    num_nodes: Number of nodes in the cluster.
+    cluster_id: ID of the cluster.
+    num_workers: Number of nodes in the cluster.
     project: Enclosing project for the cluster.
-    zone: zone of the cluster.
   """
 
   CLOUD = providers.GCP
@@ -42,8 +41,11 @@ class GcpDataproc(spark_service.BaseSparkService):
 
   def _Create(self):
     """Creates the cluster."""
+
+    if self.cluster_id is None:
+      self.cluster_id = 'pkb-' + FLAGS.run_uri
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'create',
-                             self.name)
+                             self.cluster_id)
     if self.project is not None:
       cmd.flags['project'] = self.project
     cmd.flags['num-workers'] = self.num_workers
@@ -55,26 +57,23 @@ class GcpDataproc(spark_service.BaseSparkService):
   def _Delete(self):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
-                             self.name)
+                             self.cluster_id)
     cmd.Issue()
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
-                             self.name)
+                             self.cluster_id)
     stdout, stderr, retcode = cmd.Issue()
     return retcode == 0
 
-  def SubmitJob(self, jarfile, classname):
+  def SubmitJob(self, jarfile, classname, job_poll_interval=None):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'spark')
-    cmd.flags['cluster'] = self.name
+    cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = jarfile
     cmd.flags['class'] = classname
     stdout, stderr, retcode = cmd.Issue()
-    if retcode != 0:
-      logging.error('Submit job returned code %s STDOUT: %s STDERR: %s',
-                    retcode, stdout, stderr)
-    return stdout, stderr, retcode
+    return retcode == 0
 
   def SetClusterProperty(self):
     pass

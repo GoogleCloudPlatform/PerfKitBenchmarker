@@ -30,7 +30,11 @@ import abc
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
-FLAGS = flags.FLAGS
+
+flags.DEFINE_string('spark_static_cluster_id', None,
+                    'If set, the name of the Spark cluster, assumed to be '
+                    'ready.')
+
 
 # Cloud to use for pkb-created Spark service.
 PKB_MANAGED = 'pkb_managed'
@@ -70,20 +74,35 @@ class BaseSparkService(resource.BaseResource):
 
   __metaclass__ = AutoRegisterSparkServiceMeta
 
-  def __init__(self, name, static_cluster, spark_service_spec):
-    super(BaseSparkService, self).__init__(user_managed=static_cluster)
-    self.name = name
+  def __init__(self, spark_service_spec):
+    """Initialize the Apache Spark Service object.
+
+    Args:
+      spark_service_spec: spec of the spark service.
+    """
+    is_user_managed = spark_service_spec.static_cluster_id is not None
+    super(BaseSparkService, self).__init__(user_managed=is_user_managed)
+    self.spec = spark_service_spec
+    self.cluster_id = spark_service_spec.static_cluster_id
     self.num_workers = spark_service_spec.num_workers
     self.machine_type = spark_service_spec.machine_type
     self.project = spark_service_spec.project
 
   @abc.abstractmethod
-  def SubmitJob(self, job_jar, class_name):
+  def SubmitJob(self, job_jar, class_name, job_poll_interval=None):
     """Submit a job to the spark service.
 
-    What this returns is not currently defined.  Platforms have their
-    own output from job submission, but users will typically want to
-    access the output from the job itself.
+    Submits a job and waits for it to complete.
+
+    Args:
+      job_jar: Jar file to execute.
+      class_name: Name of the main class.
+      job_poll_interval: integer saying how often to poll for job
+        completion.  Not used by providers for which submit job is a
+        synchronous operations.
+
+    Returns:
+      True if the job submission was successful, false otherwise.
     """
     # TODO(hildrum) determine what the return value from this will be
     # and provide a way to access the job's output
@@ -94,7 +113,7 @@ class BaseSparkService(resource.BaseResource):
     return {'spark_service': self.SERVICE_NAME,
             'num_workers': self.num_workers,
             'machine_type': self.machine_type,
-            'spark_cluster_name': self.name}
+            'spark_cluster_id': self.cluster_id}
 
 
 
@@ -109,9 +128,8 @@ class PkbSparkService(BaseSparkService):
   CLOUD = PKB_MANAGED
   SERVICE_NAME = 'pkb-managed'
 
-  def __init__(self, name, static_cluster, spark_service_spec):
-    super(PkbSparkService, self).__init__(name, static_cluster,
-                                          spark_service_spec)
+  def __init__(self, spark_service_spec):
+    super(PkbSparkService, self).__init__(spark_service_spec)
     self.vms = []
 
   def _Create(self):
