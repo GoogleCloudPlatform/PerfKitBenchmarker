@@ -541,7 +541,7 @@ if the flavor is supported in the region.
 
 Make sure you have installed pip (see the section above).
 
-run the following command (omit the 'sudo' on Windows)
+Run the following command (omit the 'sudo' on Windows)
 
 ```bash
 $ sudo pip install -r requirements-softlayer.txt
