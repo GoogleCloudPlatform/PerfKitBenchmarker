@@ -20,8 +20,9 @@ Benchmark with 1Gib Nic card specified
 Benchmark with the Toronto 1 datacenter specified and machine type 4 cpus, 4G memory,  1Gib NIC card
 >python pkb.py --cloud=SoftLayer --benchmarks=iperf --zones=tor01 --machine_type="{\"cpus\": 4, \"memory\": 4096, \"nic\": 1000}"
 
-The Redis Benchmark with a Redis parameter and datacenter specified
->python pkb.py --cloud=SoftLayer --benchmarks=redis --redis_clients=2  --zones=tor01
+The Redis Benchmark with a Redis parameter and datacenter specified 
+NOTE: currnently needs to be run as root
+>python pkb.py --cloud=SoftLayer --benchmarks=redis --redis_clients=2  --zones=tor01 --softlayer_user_name=root
 
 A private & public VLAN id specified to ensure VMs are located on the same vlan. 
 VLAN ids can be queried with: slcli vlan list
