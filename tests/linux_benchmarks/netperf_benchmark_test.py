@@ -65,21 +65,29 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
          ('TCP_RR_Latency_p50', 683.0, 'us'),
          ('TCP_RR_Latency_p90', 735.0, 'us'),
          ('TCP_RR_Latency_p99', 841.0, 'us'),
+         ('TCP_RR_Latency_min', 600.0, 'us'),
+         ('TCP_RR_Latency_max', 900.0, 'us'),
          ('TCP_RR_Latency_stddev', 783.80, 'us'),
          ('TCP_RR_Transaction_Rate', 3545.77, tps),
          ('TCP_RR_Latency_p50', 274.0, 'us'),
          ('TCP_RR_Latency_p90', 309.0, 'us'),
          ('TCP_RR_Latency_p99', 371.0, 'us'),
+         ('TCP_RR_Latency_min', 200.0, 'us'),
+         ('TCP_RR_Latency_max', 400.0, 'us'),
          ('TCP_RR_Latency_stddev', 189.82, 'us'),
          ('TCP_CRR_Transaction_Rate', 343.35, tps),
          ('TCP_CRR_Latency_p50', 2048.0, 'us'),
          ('TCP_CRR_Latency_p90', 2372.0, 'us'),
          ('TCP_CRR_Latency_p99', 30029.0, 'us'),
+         ('TCP_CRR_Latency_min', 2000.0, 'us'),
+         ('TCP_CRR_Latency_max', 35000.0, 'us'),
          ('TCP_CRR_Latency_stddev', 8147.88, 'us'),
          ('TCP_CRR_Transaction_Rate', 1078.07, tps),
          ('TCP_CRR_Latency_p50', 871.0, 'us'),
          ('TCP_CRR_Latency_p90', 996.0, 'us'),
          ('TCP_CRR_Latency_p99', 2224.0, 'us'),
+         ('TCP_CRR_Latency_min', 800.0, 'us'),
+         ('TCP_CRR_Latency_max', 2500.0, 'us'),
          ('TCP_CRR_Latency_stddev', 551.07, 'us'),
          ('TCP_STREAM_Throughput', 1187.94, mbps),
          ('TCP_STREAM_Throughput', 1973.37, mbps),
@@ -87,20 +95,24 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
          ('UDP_RR_Latency_p50', 700.0, 'us'),
          ('UDP_RR_Latency_p90', 757.0, 'us'),
          ('UDP_RR_Latency_p99', 891.0, 'us'),
+         ('UDP_RR_Latency_min', 600.0, 'us'),
+         ('UDP_RR_Latency_max', 1000.0, 'us'),
          ('UDP_RR_Latency_stddev', 808.44, 'us'),
          ('UDP_RR_Transaction_Rate', 3313.49, tps),
          ('UDP_RR_Latency_p50', 295.0, 'us'),
          ('UDP_RR_Latency_p90', 330.0, 'us'),
          ('UDP_RR_Latency_p99', 406.0, 'us'),
+         ('UDP_RR_Latency_min', 200.0, 'us'),
+         ('UDP_RR_Latency_max', 500.0, 'us'),
          ('UDP_RR_Latency_stddev', 214.64, 'us')],
         [i[:3] for i in result])
 
     external_meta = {'ip_type': 'external'}
     internal_meta = {'ip_type': 'internal'}
-    expected_meta = (([external_meta] * 5 + [internal_meta] * 5) * 2 +
+    expected_meta = (([external_meta] * 7 + [internal_meta] * 7) * 2 +
                      [external_meta, internal_meta] +
-                     [external_meta] * 5 +
-                     [internal_meta] * 5)
+                     [external_meta] * 7 +
+                     [internal_meta] * 7)
 
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)
