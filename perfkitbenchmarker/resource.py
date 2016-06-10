@@ -47,6 +47,7 @@ class BaseResource(object):
     self.delete_start_time = None
     self.create_end_time = None
     self.delete_end_time = None
+    self.resource_ready_time = None
 
   @abc.abstractmethod
   def _Create(self):
@@ -149,6 +150,8 @@ class BaseResource(object):
     self._CreateDependencies()
     self._CreateResource()
     ready = self._WaitUntilReady()
+    if not self.resource_ready_time:
+      self.resource_ready_time = time.time()
     if not ready:
       raise Exception('Wait for resource to be read timed out, giving up')
     self._PostCreate()

@@ -20,12 +20,19 @@ supplied by a cloud provider, such as Google's Dataproc.
 
 By default, it runs SparkPi.
 
-It records how long the job takes to run.
+It records how long the job takes to run.  Note that these numbers
+should be used with caution--AWS's EMR uses polling to determine when
+the job is done, so that adds extra time.  Furthermore, if the standard
+output of the job is retrieved, AWS EMR's time is again inflated because
+it takes extra time to get the output.
 
 For more on Apache Spark, see: http://spark.apache.org/
 """
 
 import datetime
+import logging
+import os
+import tempfile
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -50,6 +57,10 @@ flags.DEFINE_string('spark_jarfile', DEFAULT_JARFILE,
                     'Jarfile to submit.')
 flags.DEFINE_string('spark_classname', DEFAULT_CLASSNAME,
                     'Classname to be used')
+flags.DEFINE_bool('spark_print_stdout', True, 'Print the standard '
+                  'output of the job')
+flags.DEFINE_list('spark_job_arguments', [], 'Arguments to be passed '
+                  'to the class given by spark_classname')
 
 FLAGS = flags.FLAGS
 
@@ -74,15 +85,34 @@ def Run(benchmark_spec):
   """
   spark_cluster = benchmark_spec.spark_service
   jar_start = datetime.datetime.now()
+
+  stdout_path = None
+  if FLAGS.spark_print_stdout:
+    # We need to get a name for a temporary file, so we create
+    # a file, then close it, and use that path name.
+    stdout_file = tempfile.NamedTemporaryFile(suffix='.stdout',
+                                              prefix='spark_benchmark',
+                                              delete=False)
+    stdout_path = stdout_file.name
+    stdout_file.close()
+    logging.info('job standard out will be written to ' + stdout_path)
   success = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
-                                    FLAGS.spark_classname)
+                                    FLAGS.spark_classname,
+                                    job_arguments=FLAGS.spark_job_arguments,
+                                    job_stdout_file=stdout_path)
   if not success:
     raise Exception('Class {0} from jar {1} did not run'.format(
         FLAGS.spark_classname, FLAGS.spark_jarfile))
   jar_end = datetime.datetime.now()
-
-  metadata = spark_cluster.GetMetadata().update(
-      {'jarfile': FLAGS.spark_jarfile, 'class': FLAGS.spark_classname})
+  if stdout_path:
+    with open(stdout_path, 'r') as f:
+      logging.info('The output of the job is ' + f.read())
+    os.remove(stdout_path)
+  metadata = spark_cluster.GetMetadata()
+  metadata.update({'jarfile': FLAGS.spark_jarfile,
+                   'class': FLAGS.spark_classname,
+                   'job_arguments': str(FLAGS.spark_job_arguments),
+                   'print_stdout': str(FLAGS.spark_print_stdout)})
 
   results = []
   results.append(sample.Sample('jar_time',
@@ -90,7 +120,7 @@ def Run(benchmark_spec):
                                'seconds', metadata))
 
   if not spark_cluster.user_managed:
-    create_time = (spark_cluster.create_end_time -
+    create_time = (spark_cluster.resource_ready_time -
                    spark_cluster.create_start_time)
     results.append(sample.Sample('cluster_create_time', create_time, 'seconds',
                                  metadata))

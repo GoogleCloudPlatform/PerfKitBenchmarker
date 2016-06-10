@@ -20,3 +20,7 @@ flags.DEFINE_string('aws_user_name', 'ubuntu',
                     'use any image other than ubuntu.')
 flags.DEFINE_integer('aws_provisioned_iops', None,
                      'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
+
+flags.DEFINE_string('aws_emr_loguri', None,
+                    'The log-uri parameter to pass to AWS when creating a '
+                    'cluster.  If not set, a bucket will be created.')

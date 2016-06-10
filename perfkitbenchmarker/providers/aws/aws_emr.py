@@ -49,6 +49,7 @@ class AwsEMR(spark_service.BaseSparkService):
     machine_type: Machine type to use.
     project: Enclosing project for the cluster.
     cmd_prefix: emr prefix, including region
+    region: region in which cluster is located.
   """
 
   CLOUD = providers.AWS
@@ -61,19 +62,31 @@ class AwsEMR(spark_service.BaseSparkService):
       self.machine_type = DEFAULT_MACHINE_TYPE
     self.cmd_prefix = util.AWS_PREFIX + ['emr']
     if FLAGS.zones:
-      region = util.GetRegionFromZone(FLAGS.zones[0])
-      self.cmd_prefix += ['--region', region]
+      self.region = util.GetRegionFromZone(FLAGS.zones[0])
+      self.cmd_prefix += ['--region', self.region]
+    self.bucket_to_delete = None
+
+  def _CreateLogBucket(self):
+    bucket_name = 's3://pkb-' + FLAGS.run_uri + '-emr-' + self.region
+    cmd = ['aws', 's3', 'mb', '--region', self.region, bucket_name]
+    _, _, rc = vm_util.IssueCommand(cmd)
+    if rc != 0:
+      raise Exception('Error creating logs bucket')
+    self.bucket_to_delete = bucket_name
+    return bucket_name
 
   def _Create(self):
     """Creates the cluster."""
     name = 'pkb_' + FLAGS.run_uri
+    logs_bucket = FLAGS.aws_emr_loguri or self._CreateLogBucket()
     # we need to store the cluster id.
     cmd = self.cmd_prefix + ['create-cluster', '--name', name,
                              '--release-label', RELEASE_LABEL,
                              '--use-default-roles',
                              '--instance-count', str(self.num_workers),
                              '--instance-type', self.machine_type,
-                             '--application', 'Name=SPARK']
+                             '--application', 'Name=SPARK',
+                             '--log-uri', logs_bucket]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     self.cluster_id = result['ClusterId']
@@ -84,6 +97,9 @@ class AwsEMR(spark_service.BaseSparkService):
     cmd = self.cmd_prefix + ['terminate-clusters', '--cluster-ids',
                              self.cluster_id]
     vm_util.IssueCommand(cmd)
+    if self.bucket_to_delete is not None:
+      bucket_del_cmd = ['aws', 's3', 'rb', '--force', self.bucket_to_delete]
+      vm_util.IssueCommand(bucket_del_cmd)
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
@@ -112,8 +128,43 @@ class AwsEMR(spark_service.BaseSparkService):
       time.sleep(READY_CHECK_SLEEP)
     return False
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=JOB_WAIT_SLEEP):
+  def _GetLogBase(self):
+    """Gets the base uri for the logs."""
+    cmd = self.cmd_prefix + ['describe-cluster', '--cluster-id',
+                             self.cluster_id]
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    result = json.loads(stdout)
+    if 'LogUri' in result['Cluster']:
+      self.logging_enabled = True
+      log_uri = result['Cluster']['LogUri']
+      if log_uri.startswith('s3n'):
+        log_uri = 's3' + log_uri[3:]
+      return log_uri
+    else:
+      return None
+
+  def _WaitForFile(self, filename, poll_interval=10):
+    """Wait for file to appear on s3."""
+    cmd = ['aws', 's3', 'ls', filename]
+
+    tries = 0
+    while tries < 30:
+      _, _, rc = vm_util.IssueCommand(cmd)
+      if rc == 0:
+        return True
+      else:
+        time.sleep(poll_interval)
+        tries += 1
+    return False
+
+
+
+
+  def SubmitJob(self, jarfile, classname, job_poll_interval=JOB_WAIT_SLEEP,
+                job_arguments=None, job_stdout_file=None):
     arg_list = ['--class', classname, jarfile]
+    if job_arguments:
+      arg_list += job_arguments
     arg_string = '[' + ','.join(arg_list) + ']'
     step_list = ['Type=Spark', 'Args=' + arg_string]
     step_string = ','.join(step_list)
@@ -122,6 +173,7 @@ class AwsEMR(spark_service.BaseSparkService):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     step_id = result['StepIds'][0]
+    step_success = None
     # Now, we wait for the step to be completed.
     while True:
       cmd = self.cmd_prefix + ['describe-step', '--cluster-id',
@@ -130,13 +182,33 @@ class AwsEMR(spark_service.BaseSparkService):
       stdout, _, _ = vm_util.IssueCommand(cmd)
       result = json.loads(stdout)
       state = result['Step']['Status']['State']
-      if state == "COMPLETED":
-        return True
-      elif state == "FAILED":
-        return False
+      if state == "COMPLETED" or state == "FAILED":
+        step_success = state == "COMPLETED"
+        break
       else:
         logging.info('Waiting %s seconds for job to finish', job_poll_interval)
         time.sleep(job_poll_interval)
+    # Now we need to take the standard out and put it in the designated path,
+    # if appropriate.
+    if job_stdout_file:
+      log_base = self._GetLogBase()
+      if log_base is None:
+        logging.warn('SubmitJob requested output, but EMR cluster was not '
+                     'created with logging')
+        return step_success
+
+      # log_base ends in a slash.
+      s3_stdout = '{0}{1}/steps/{2}/stdout.gz'.format(log_base,
+                                                      self.cluster_id,
+                                                      step_id)
+      self._WaitForFile(s3_stdout)
+      dest_file = '{0}.gz'.format(job_stdout_file)
+      cp_cmd = ['aws', 's3', 'cp', s3_stdout, dest_file]
+      stdout, stderr, rc = vm_util.IssueCommand(cp_cmd)
+      if rc == 0:
+        uncompress_cmd = ['gunzip', '-f', dest_file]
+        vm_util.IssueCommand(uncompress_cmd)
+    return step_success
 
   def SetClusterProperty(self):
     pass

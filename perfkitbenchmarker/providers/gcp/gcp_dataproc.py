@@ -16,6 +16,8 @@
 Spark clusters can be created and deleted.
 """
 
+import logging
+
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
@@ -65,13 +67,37 @@ class GcpDataproc(spark_service.BaseSparkService):
     stdout, stderr, retcode = cmd.Issue()
     return retcode == 0
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=None):
+  def SubmitJob(self, jarfile, classname, job_poll_interval=None,
+                job_arguments=None, job_stdout_file=None):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'spark')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = jarfile
     cmd.flags['class'] = classname
+    # Dataproc gives as stdout an object describing job execution.
+    # Its stderr contains a mix of the stderr of the job, and the
+    # stdout of the job.  We set the driver log level to FATAL
+    # to supress those messages, and we can then separate, hopefully
+    # the job standard out from the log messages.
+    cmd.flags['driver-log-levels'] = 'root=FATAL'
+    if job_arguments:
+      cmd.additional_flags = job_arguments
     stdout, stderr, retcode = cmd.Issue()
-    return retcode == 0
+    logging.debug('STDOUT: {0}\nSTDERR: {1}\n'.format(stdout, stderr))
+    if retcode != 0:
+      return False
+    if job_stdout_file:
+      with open(job_stdout_file, 'w') as f:
+        # dataproc prints progress lines that end with a cr and so
+        # overwrite themselves.  We need to move past that.
+        last_cr_index = stderr.rfind('\r')
+        lines = stderr[last_cr_index + 1:].split('\n')
+        # the visible line says the job is done, and the
+        # then the split leaves an empty line.
+        good_lines = lines[:-2]
+        for l in good_lines:
+          f.write(l)
+          f.write('\n')
+    return True
 
   def SetClusterProperty(self):
     pass
