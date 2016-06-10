@@ -117,6 +117,7 @@ def RunNetperf(vm, benchmark_name, server_ip):
                  '-P {data_port} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
                  'P99_LATENCY,STDDEV_LATENCY,'
+                 'MIN_LATENCY,MAX_LATENCY,'
                  'CONFIDENCE_ITERATION,THROUGHPUT_CONFID').format(
                      netperf_path=netperf.NETPERF_PATH,
                      benchmark_name=benchmark_name,
@@ -160,6 +161,8 @@ def RunNetperf(vm, benchmark_name, server_ip):
       ('50th Percentile Latency Microseconds', 'p50'),
       ('90th Percentile Latency Microseconds', 'p90'),
       ('99th Percentile Latency Microseconds', 'p99'),
+      ('Minimum Latency Microseconds', 'min'),
+      ('Maximum Latency Microseconds', 'max'),
       ('Stddev Latency Microseconds', 'stddev')]:
     samples.append(
         sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
