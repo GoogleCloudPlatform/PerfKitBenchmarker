@@ -101,6 +101,7 @@ class OpenStackDisk(disk.BaseDisk):
       logging.info('Volume %s was not created. Skipping deletion.' % self.name)
       return
     DeleteVolume(self, self.id)
+    self._WaitForVolumeDeletion()
 
   def _Exists(self):
     if self.id is None:
@@ -171,3 +172,18 @@ class OpenStackDisk(disk.BaseDisk):
     _, stderr, _ = cmd.Issue()
     if stderr:
       raise errors.Error(stderr)
+
+  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
+                 retryable_exceptions=errors.Resource.RetryableDeletionError)
+  def _WaitForVolumeDeletion(self):
+    if self.id is None:
+      return
+    cmd = os_utils.OpenStackCLICommand(self, 'volume', 'show', self.id)
+    stdout, stderr, _ = cmd.Issue()
+    if stderr.strip():
+      return  # Volume could not be found, inferred that has been deleted.
+    resp = json.loads(stdout)
+    if resp['status'] in ('building', 'available', 'in-use', 'deleting',):
+      msg = ('Volume %s has not yet been deleted. Retrying to check status.'
+             % self.id)
+      raise errors.Resource.RetryableDeletionError(msg)
