@@ -26,17 +26,24 @@ REMOTE_VOLUME_DEFAULT_SIZE_GB = 50
 FLAGS = flags.FLAGS
 
 
-def CreateVolume(resource, name, image=None):
+def CreateVolume(resource, name):
   """Creates a remote (Cinder) block volume."""
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
-  if image:
-    vol_cmd.flags['image'] = image
-    vol_cmd.flags['size'] = GetImageMinDiskSize(resource, image)
-  if FLAGS.openstack_volume_size:
-    vol_cmd.flags['size'] = FLAGS.openstack_volume_size
-  else:
-    vol_cmd.flags['size'] = REMOTE_VOLUME_DEFAULT_SIZE_GB
+  vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
+                           REMOTE_VOLUME_DEFAULT_SIZE_GB)
+  stdout, _, _ = vol_cmd.Issue()
+  vol_resp = json.loads(stdout)
+  return vol_resp
+
+
+def CreateBootVolume(resource, name, image):
+  """Creates a remote (Cinder) block volume with a boot image."""
+  vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
+  vol_cmd.flags['availability-zone'] = resource.zone
+  vol_cmd.flags['image'] = image
+  vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
+                           GetImageMinDiskSize(resource, image))
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
   return vol_resp
@@ -85,7 +92,7 @@ class OpenStackDisk(disk.BaseDisk):
     self.id = None
 
   def _Create(self):
-    vol_resp = CreateVolume(self, self.name, self.image)
+    vol_resp = CreateVolume(self, self.name)
     self.id = vol_resp['id']
     WaitForVolumeCreation(self, self.id)
 

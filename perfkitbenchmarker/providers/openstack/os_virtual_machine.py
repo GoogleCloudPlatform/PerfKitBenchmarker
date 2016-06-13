@@ -98,7 +98,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Creates an OpenStack VM instance and waits until it is ACTIVE."""
     if FLAGS.openstack_boot_from_volume:
       vol_name = '%s_volume' % self.name
-      disk_resp = os_disk.CreateVolume(self, vol_name, self.image)
+      disk_resp = os_disk.CreateBootVolume(self, vol_name, self.image)
       self.boot_volume_id = disk_resp['id']
       os_disk.WaitForVolumeCreation(self, self.boot_volume_id)
     self._CreateInstance()
