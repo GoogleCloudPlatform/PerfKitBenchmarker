@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,16 @@ import os
 
 from perfkitbenchmarker import flags
 
+
+# Locations
+US_LAS = 'us/las'
+DE_FKB = 'de/fkb'
+DE_FRA = 'de/fra'
+
+# Zones
+ZONE_1 = 'ZONE_1'
+ZONE_2 = 'ZONE_2'
+
 flags.DEFINE_string('profitbricks_config',
                     os.getenv('PROFITBRICKS_CONFIG',
                               '~/.config/profitbricks-auth.cfg'),
@@ -23,17 +33,18 @@ flags.DEFINE_string('profitbricks_config',
                      'Can also be set via $PROFITBRICKS_CONFIG environment '
                      "variable.\n(File format: email:password)"))
 
-flags.DEFINE_string('location',
-                    'us/las',
-                    ('Location of data center to be provisioned (us/las, '
-                     'de/fkb, de/fra)'))
+flags.DEFINE_enum('location',
+                  US_LAS,
+                  [US_LAS, DE_FKB, DE_FRA],
+                  ('Location of data center to be provisioned (us/las, '
+                  'de/fkb, de/fra)'))
 
-flags.DEFINE_string('profitbricks_ram',
+flags.DEFINE_integer('profitbricks_ram',
                     None,
                     ('Amount of RAM for the new server in multiples '
                      'of 256 MB.'))
 
-flags.DEFINE_string('profitbricks_cores',
+flags.DEFINE_integer('profitbricks_cores',
                     None,
                     ('Number of cores for the new server.'))
 
@@ -41,10 +52,11 @@ flags.DEFINE_string('profitbricks_disk_type',
                     'HDD',
                     ('Choose between HDD or SSD disk types.'))
 
-flags.DEFINE_string('profitbricks_disk_size',
+flags.DEFINE_integer('profitbricks_disk_size',
                     20,
                     ('Choose the disk size in GB.'))
 
-flags.DEFINE_string('zone',
-                    'ZONE_1',
-                    ('Choose availability ZONE_1 or ZONE_2.'))
+flags.DEFINE_enum('zone',
+                  ZONE_1,
+                  [ZONE_1, ZONE_2],
+                  ('Choose availability ZONE_1 or ZONE_2.'))
