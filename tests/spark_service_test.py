@@ -99,6 +99,7 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
 
   def testEMRConfig(self):
     self._mocked_flags.cloud = providers.AWS
+    self._mocked_flags.zones = ['us-west-2']
     spec = self._CreateBenchmarkSpecFromYaml(EMR_CONFIG)
     spec.ConstructVirtualMachines()
     spec.ConstructSparkService()
