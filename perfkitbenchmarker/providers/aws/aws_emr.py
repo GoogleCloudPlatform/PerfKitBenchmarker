@@ -63,7 +63,11 @@ class AwsEMR(spark_service.BaseSparkService):
     self.cmd_prefix = util.AWS_PREFIX + ['emr']
     if FLAGS.zones:
       self.region = util.GetRegionFromZone(FLAGS.zones[0])
-      self.cmd_prefix += ['--region', self.region]
+    else:
+      cmd = ['aws', 'configure', 'get', 'region']
+      stdout, _, _ = vm_util.IssueCommand(cmd)
+      self.region = stdout.strip()
+    self.cmd_prefix += ['--region', self.region]
     self.bucket_to_delete = None
 
   def _CreateLogBucket(self):
@@ -157,9 +161,6 @@ class AwsEMR(spark_service.BaseSparkService):
         tries += 1
     return False
 
-
-
-
   def SubmitJob(self, jarfile, classname, job_poll_interval=JOB_WAIT_SLEEP,
                 job_arguments=None, job_stdout_file=None):
     arg_list = ['--class', classname, jarfile]
@@ -173,7 +174,7 @@ class AwsEMR(spark_service.BaseSparkService):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     step_id = result['StepIds'][0]
-    step_success = None
+    metrics = {}
     # Now, we wait for the step to be completed.
     while True:
       cmd = self.cmd_prefix + ['describe-step', '--cluster-id',
@@ -183,7 +184,12 @@ class AwsEMR(spark_service.BaseSparkService):
       result = json.loads(stdout)
       state = result['Step']['Status']['State']
       if state == "COMPLETED" or state == "FAILED":
-        step_success = state == "COMPLETED"
+        pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
+        start_time = result['Step']['Status']['Timeline']['StartDateTime']
+        end_time = result['Step']['Status']['Timeline']['EndDateTime']
+        metrics[spark_service.WAITING] = start_time - pending_time
+        metrics[spark_service.RUNTIME] = end_time - start_time
+        metrics[spark_service.SUCCESS] = state == "COMPLETED"
         break
       else:
         logging.info('Waiting %s seconds for job to finish', job_poll_interval)
@@ -195,7 +201,7 @@ class AwsEMR(spark_service.BaseSparkService):
       if log_base is None:
         logging.warn('SubmitJob requested output, but EMR cluster was not '
                      'created with logging')
-        return step_success
+        return metrics
 
       # log_base ends in a slash.
       s3_stdout = '{0}{1}/steps/{2}/stdout.gz'.format(log_base,
@@ -204,11 +210,11 @@ class AwsEMR(spark_service.BaseSparkService):
       self._WaitForFile(s3_stdout)
       dest_file = '{0}.gz'.format(job_stdout_file)
       cp_cmd = ['aws', 's3', 'cp', s3_stdout, dest_file]
-      stdout, stderr, rc = vm_util.IssueCommand(cp_cmd)
+      _, _, rc = vm_util.IssueCommand(cp_cmd)
       if rc == 0:
         uncompress_cmd = ['gunzip', '-f', dest_file]
         vm_util.IssueCommand(uncompress_cmd)
-    return step_success
+    return metrics
 
   def SetClusterProperty(self):
     pass

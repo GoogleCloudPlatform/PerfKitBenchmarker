@@ -20,11 +20,16 @@ supplied by a cloud provider, such as Google's Dataproc.
 
 By default, it runs SparkPi.
 
-It records how long the job takes to run.  Note that these numbers
-should be used with caution--AWS's EMR uses polling to determine when
-the job is done, so that adds extra time.  Furthermore, if the standard
+It records how long the job takes to run.  It always reports the
+wall clock time, but this number should be used with caution, as it
+some platforms (such as AWS's EMR) use polling to determine when
+the job is done, so the wall time is inflated.  Furthermore, if the standard
 output of the job is retrieved, AWS EMR's time is again inflated because
 it takes extra time to get the output.
+
+If available, it will also report a pending time (the time between when the
+job was received by the platform and when it ran), and a runtime, which is
+the time the job took to run, as reported by the underlying cluster.
 
 For more on Apache Spark, see: http://spark.apache.org/
 """
@@ -36,6 +41,7 @@ import tempfile
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import flags
 
 
@@ -96,11 +102,11 @@ def Run(benchmark_spec):
     stdout_path = stdout_file.name
     stdout_file.close()
     logging.info('job standard out will be written to ' + stdout_path)
-  success = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
-                                    FLAGS.spark_classname,
-                                    job_arguments=FLAGS.spark_job_arguments,
-                                    job_stdout_file=stdout_path)
-  if not success:
+  stats = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
+                                  FLAGS.spark_classname,
+                                  job_arguments=FLAGS.spark_job_arguments,
+                                  job_stdout_file=stdout_path)
+  if not stats[spark_service.SUCCESS]:
     raise Exception('Class {0} from jar {1} did not run'.format(
         FLAGS.spark_classname, FLAGS.spark_jarfile))
   jar_end = datetime.datetime.now()
@@ -115,9 +121,18 @@ def Run(benchmark_spec):
                    'print_stdout': str(FLAGS.spark_print_stdout)})
 
   results = []
-  results.append(sample.Sample('jar_time',
+  results.append(sample.Sample('wall_time',
                                (jar_end - jar_start).total_seconds(),
                                'seconds', metadata))
+  if spark_service.RUNTIME in stats:
+    results.append(sample.Sample('runtime',
+                                 stats[spark_service.RUNTIME],
+                                 'seconds', metadata))
+  if spark_service.WAITING in stats:
+    results.append(sample.Sample('pending_time',
+                                 stats[spark_service.WAITING],
+                                 'seconds', metadata))
+
 
   if not spark_cluster.user_managed:
     create_time = (spark_cluster.resource_ready_time -

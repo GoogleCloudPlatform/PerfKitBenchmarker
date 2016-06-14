@@ -16,6 +16,8 @@
 Spark clusters can be created and deleted.
 """
 
+import datetime
+import json
 import logging
 
 from perfkitbenchmarker import flags
@@ -25,6 +27,8 @@ from perfkitbenchmarker.providers.gcp import util
 
 
 FLAGS = flags.FLAGS
+
+GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 
 class GcpDataproc(spark_service.BaseSparkService):
@@ -38,6 +42,29 @@ class GcpDataproc(spark_service.BaseSparkService):
 
   CLOUD = providers.GCP
   SERVICE_NAME = 'dataproc'
+
+  @staticmethod
+  def _GetStats(stdout):
+    results = json.loads(stdout)
+    stats = {}
+    done_time = datetime.datetime.strptime(
+        results['status']['stateStartTime'], GCP_TIME_FORMAT)
+    pending_time = None
+    start_time = None
+    for state in results['statusHistory']:
+      if state['state'] == 'PENDING':
+        pending_time = datetime.datetime.strptime(state['stateStartTime'],
+                                                  GCP_TIME_FORMAT)
+      elif state['state'] == 'RUNNING':
+        start_time = datetime.datetime.strptime(state['stateStartTime'],
+                                                GCP_TIME_FORMAT)
+
+    if done_time and start_time:
+      stats[spark_service.RUNTIME] = (done_time - start_time).total_seconds()
+    if start_time and pending_time:
+      stats[spark_service.WAITING] = (
+          (start_time - pending_time).total_seconds())
+    return stats
 
   def _Create(self):
     """Creates the cluster."""
@@ -84,7 +111,11 @@ class GcpDataproc(spark_service.BaseSparkService):
     stdout, stderr, retcode = cmd.Issue()
     logging.debug('STDOUT: {0}\nSTDERR: {1}\n'.format(stdout, stderr))
     if retcode != 0:
-      return False
+      return {spark_service.SUCCESS: False}
+
+    stats = self._GetStats(stdout)
+    stats[spark_service.SUCCESS] = True
+
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
         # dataproc prints progress lines that end with a cr and so
@@ -97,7 +128,7 @@ class GcpDataproc(spark_service.BaseSparkService):
         for l in good_lines:
           f.write(l)
           f.write('\n')
-    return True
+    return stats
 
   def SetClusterProperty(self):
     pass

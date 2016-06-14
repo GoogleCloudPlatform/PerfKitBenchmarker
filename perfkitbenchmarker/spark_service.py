@@ -40,6 +40,10 @@ flags.DEFINE_string('spark_static_cluster_id', None,
 PKB_MANAGED = 'pkb_managed'
 PROVIDER_MANAGED = 'managed'
 
+SUCCESS = 'success'
+RUNTIME = 'running_time'
+WAITING = 'pending_time'
+
 # This is used for error messages.
 
 _SPARK_SERVICE_REGISTRY = {}
@@ -108,7 +112,10 @@ class BaseSparkService(resource.BaseResource):
         job.
 
     Returns:
-      True if the job submission was successful, false otherwise.
+      dictionary, where success is true if the job succeeded,
+      false otherwise.  The dictionary may also contain an entry for
+      running_time and pending_time if the platform reports those
+      metrics.
     """
     pass
 
