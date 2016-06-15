@@ -196,7 +196,7 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     private_vlan_id = None
     public_vlan_id = None
     san = False
-    disk_size = '25'
+    disk_size = 25
 
     try:
       vm_attributes = json.loads(self.machine_type)
@@ -208,6 +208,9 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
       if 'memory' in vm_attributes:
         memory = vm_attributes['memory']
+        
+      if 'disk_size' in vm_attributes:
+        disk_size = vm_attributes['disk_size']
 
       if 'os' in vm_attributes:
         os = vm_attributes['os']
@@ -231,7 +234,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     if isinstance(self, WindowsSoftLayerVirtualMachine):
       os = 'WIN_LATEST_64'
       self.hostname = "pefkithost" + self.IdGenerator(3).lower()
-      disk_size = '100'
+      if disk_size < 100:
+        disk_size = 100
 
     create_cmd = util.SoftLayer_PREFIX + [
         '--format',
@@ -254,14 +258,14 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--os',
         '%s' % os,
         '--network',
-        '%s' % nic,
+        '%d' % nic,
         '--disk',
         '%s' % disk_size,
         '--key',
         SoftLayerVirtualMachine.key_label]
 
     # additional disk for disk benchmarks
-    create_cmd = create_cmd + ['--disk', '25']
+    create_cmd = create_cmd + ['--disk', '%s' % disk_size]
 
     if san is True:
         create_cmd = create_cmd + ['--san']
@@ -395,7 +399,7 @@ class WindowsSoftLayerVirtualMachine(SoftLayerVirtualMachine,
   def __init__(self, vm_spec):
     super(WindowsSoftLayerVirtualMachine, self).__init__(vm_spec)
     self.user_name = 'Administrator'
-    self.user_data = ('<powershell>%s</powershell>' %
+    self.user_data = ('<powershell>%s</powershell>' % 
                       windows_virtual_machine.STARTUP_SCRIPT)
 
   @vm_util.Retry()
