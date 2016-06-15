@@ -196,7 +196,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     private_vlan_id = None
     public_vlan_id = None
     san = False
-    disk_size = 25
+    disk_size0 = 25
+    disk_size1 = 25
 
     try:
       vm_attributes = json.loads(self.machine_type)
@@ -209,8 +210,11 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
       if 'memory' in vm_attributes:
         memory = vm_attributes['memory']
         
-      if 'disk_size' in vm_attributes:
-        disk_size = vm_attributes['disk_size']
+      if 'disk_size0' in vm_attributes:
+        disk_size0 = vm_attributes['disk_size0']
+        
+      if 'disk_size1' in vm_attributes:
+        disk_size1 = vm_attributes['disk_size1']
 
       if 'os' in vm_attributes:
         os = vm_attributes['os']
@@ -234,8 +238,8 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
     if isinstance(self, WindowsSoftLayerVirtualMachine):
       os = 'WIN_LATEST_64'
       self.hostname = "pefkithost" + self.IdGenerator(3).lower()
-      if disk_size < 100:
-        disk_size = 100
+      if disk_size0 < 100:
+        disk_size0 = 100
 
     create_cmd = util.SoftLayer_PREFIX + [
         '--format',
@@ -260,12 +264,12 @@ class SoftLayerVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--network',
         '%d' % nic,
         '--disk',
-        '%s' % disk_size,
+        '%s' % disk_size0,
         '--key',
         SoftLayerVirtualMachine.key_label]
 
     # additional disk for disk benchmarks
-    create_cmd = create_cmd + ['--disk', '%s' % disk_size]
+    create_cmd = create_cmd + ['--disk', '%s' % disk_size1]
 
     if san is True:
         create_cmd = create_cmd + ['--san']

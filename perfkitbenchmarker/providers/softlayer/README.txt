@@ -29,8 +29,8 @@ VLAN ids can be queried with: slcli vlan list
 The risk of specifing a VLAN is there is a chance no resources will be available for that VLAN 
 >python pkb.py --cloud=SoftLayer --benchmarks=ping  --machine_type="{ \"nic\": 1000, \"public_vlan_id\": 1205613, \"private_vlan_id\": 1205615}"
 
-Storage benchmark with SAN attached and disk size specified
->python pkb.py --cloud=SoftLayer --benchmarks=fio  --machine_type="{ \"nic\": 1000, \"san\": "true",  \"disk_size\": 500 }" 
+Storage benchmark with SAN attached and disk sizes specified
+>python pkb.py --cloud=SoftLayer --benchmarks=fio  --machine_type="{ \"nic\": 1000, \"san\": "true", \"disk_size0\": 100, \"disk_size1\": 200 }" 
 
 Disk IO benchmark
 >python pkb.py --cloud=SoftLayer --benchmarks=bonnie++ --zones=tor01 --machine_type="{\"cpus\": 4, \"memory\": 4096, \"nic\": 1000}"
