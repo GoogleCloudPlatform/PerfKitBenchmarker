@@ -77,10 +77,10 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: [
             'aerospike_ycsb', 'block_storage_workload', 'cassandra_stress',
             'cassandra_ycsb', 'cluster_boot', 'copy_throughput',
-            'fio', 'hadoop_terasort', 'hpcc', 'iperf', 'mesh_network',
-            'mongodb_ycsb', 'netperf', 'object_storage_service', 'oldisim',
-            'ping', 'redis_ycsb', 'speccpu2006', 'sysbench_oltp', 'tomcat_wrk',
-            'unixbench']
+            'fio', 'hadoop_terasort', 'hpcc', 'iperf', 'multichase',
+            'mesh_network', 'mongodb_ycsb', 'netperf', 'object_storage_service',
+            'oldisim', 'ping', 'redis_ycsb', 'speccpu2006', 'sysbench_oltp',
+            'tomcat_wrk', 'unixbench']
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',
