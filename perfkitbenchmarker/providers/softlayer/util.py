@@ -14,6 +14,8 @@
 
 """Utilities for working with SoftLayer resources."""
 
+import json
+
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -24,15 +26,34 @@ FLAGS = flags.FLAGS
 
 
 def AddTags(resource_id, region, **kwargs):
-  """Adds tags to an SoftLayer resource created by PerfKitBenchmarker."""
+  """Adds tags to an SoftLayer resource created by PerfKitBenchmarker.
+     Read existing tags first and add existing tags with new ones
+  """
   if not kwargs:
       return
+
+  describe_cmd = SoftLayer_PREFIX + [
+      '--format',
+      'json',
+      'vs',
+      'detail',
+      '%s' % resource_id]
+
+  stdout, _ = IssueRetryableCommand(describe_cmd)
+  response = json.loads(stdout)
+  tags = response['tags']
 
   tag_cmd = SoftLayer_PREFIX + [
       'vs',
       'edit']
+
+  if tags is not None:
+    for tag in tags:
+      tag_cmd = tag_cmd + ['--tag', '{0}'.format(tag)]
+
   for key, value in kwargs.iteritems():
       tag_cmd = tag_cmd + ['--tag', '{0}:{1}'.format(key, value)]
+
   tag_cmd = tag_cmd + ['{0}'.format(resource_id)]
   IssueRetryableCommand(tag_cmd)
 
