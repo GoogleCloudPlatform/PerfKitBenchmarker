@@ -136,8 +136,8 @@ def Run(benchmark_spec):
     if not spark_cluster.user_managed:
       create_time = (spark_cluster.resource_ready_time -
                      spark_cluster.create_start_time)
-      results.append(sample.Sample('cluster_create_time', create_time, 'seconds',
-                                   metadata))
+      results.append(sample.Sample('cluster_create_time', create_time,
+                                   'seconds', metadata))
   finally:
     if stdout_path and os.path.isfile(stdout_path):
       os.remove(stdout_path)
