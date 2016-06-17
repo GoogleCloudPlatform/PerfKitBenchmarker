@@ -98,7 +98,7 @@ class GcpDataproc(spark_service.BaseSparkService):
                 job_arguments=None, job_stdout_file=None):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'spark')
     cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['jar'] = jarfile
+    cmd.flags['jars'] = jarfile
     cmd.flags['class'] = classname
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the

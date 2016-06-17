@@ -101,44 +101,46 @@ def Run(benchmark_spec):
                                               delete=False)
     stdout_path = stdout_file.name
     stdout_file.close()
-    logging.info('job standard out will be written to ' + stdout_path)
-  stats = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
-                                  FLAGS.spark_classname,
-                                  job_arguments=FLAGS.spark_job_arguments,
-                                  job_stdout_file=stdout_path)
-  if not stats[spark_service.SUCCESS]:
-    raise Exception('Class {0} from jar {1} did not run'.format(
-        FLAGS.spark_classname, FLAGS.spark_jarfile))
-  jar_end = datetime.datetime.now()
-  if stdout_path:
-    with open(stdout_path, 'r') as f:
-      logging.info('The output of the job is ' + f.read())
-    os.remove(stdout_path)
-  metadata = spark_cluster.GetMetadata()
-  metadata.update({'jarfile': FLAGS.spark_jarfile,
-                   'class': FLAGS.spark_classname,
-                   'job_arguments': str(FLAGS.spark_job_arguments),
-                   'print_stdout': str(FLAGS.spark_print_stdout)})
-
   results = []
-  results.append(sample.Sample('wall_time',
-                               (jar_end - jar_start).total_seconds(),
-                               'seconds', metadata))
-  if spark_service.RUNTIME in stats:
-    results.append(sample.Sample('runtime',
-                                 stats[spark_service.RUNTIME],
+  try:
+    stats = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
+                                    FLAGS.spark_classname,
+                                    job_arguments=FLAGS.spark_job_arguments,
+                                    job_stdout_file=stdout_path)
+    if not stats[spark_service.SUCCESS]:
+      raise Exception('Class {0} from jar {1} did not run'.format(
+          FLAGS.spark_classname, FLAGS.spark_jarfile))
+    jar_end = datetime.datetime.now()
+    if stdout_path:
+      with open(stdout_path, 'r') as f:
+        logging.info('The output of the job is ' + f.read())
+    metadata = spark_cluster.GetMetadata()
+    metadata.update({'jarfile': FLAGS.spark_jarfile,
+                     'class': FLAGS.spark_classname,
+                     'job_arguments': str(FLAGS.spark_job_arguments),
+                     'print_stdout': str(FLAGS.spark_print_stdout)})
+
+    results.append(sample.Sample('wall_time',
+                                 (jar_end - jar_start).total_seconds(),
                                  'seconds', metadata))
-  if spark_service.WAITING in stats:
-    results.append(sample.Sample('pending_time',
-                                 stats[spark_service.WAITING],
-                                 'seconds', metadata))
+    if spark_service.RUNTIME in stats:
+      results.append(sample.Sample('runtime',
+                                   stats[spark_service.RUNTIME],
+                                   'seconds', metadata))
+    if spark_service.WAITING in stats:
+      results.append(sample.Sample('pending_time',
+                                   stats[spark_service.WAITING],
+                                   'seconds', metadata))
 
 
-  if not spark_cluster.user_managed:
-    create_time = (spark_cluster.resource_ready_time -
-                   spark_cluster.create_start_time)
-    results.append(sample.Sample('cluster_create_time', create_time, 'seconds',
-                                 metadata))
+    if not spark_cluster.user_managed:
+      create_time = (spark_cluster.resource_ready_time -
+                     spark_cluster.create_start_time)
+      results.append(sample.Sample('cluster_create_time', create_time, 'seconds',
+                                   metadata))
+  finally:
+    if stdout_path and os.path.isfile(stdout_path):
+      os.remove(stdout_path)
 
   return results
 
