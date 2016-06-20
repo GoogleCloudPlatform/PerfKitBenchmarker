@@ -93,16 +93,17 @@ def Run(benchmark_spec):
   jar_start = datetime.datetime.now()
 
   stdout_path = None
-  if FLAGS.spark_print_stdout:
-    # We need to get a name for a temporary file, so we create
-    # a file, then close it, and use that path name.
-    stdout_file = tempfile.NamedTemporaryFile(suffix='.stdout',
-                                              prefix='spark_benchmark',
-                                              delete=False)
-    stdout_path = stdout_file.name
-    stdout_file.close()
   results = []
   try:
+    if FLAGS.spark_print_stdout:
+      # We need to get a name for a temporary file, so we create
+      # a file, then close it, and use that path name.
+      stdout_file = tempfile.NamedTemporaryFile(suffix='.stdout',
+                                                prefix='spark_benchmark',
+                                                delete=False)
+      stdout_path = stdout_file.name
+      stdout_file.close()
+
     stats = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
                                     FLAGS.spark_classname,
                                     job_arguments=FLAGS.spark_job_arguments,
