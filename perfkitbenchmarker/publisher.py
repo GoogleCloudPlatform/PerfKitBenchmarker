@@ -47,6 +47,12 @@ flags.DEFINE_boolean(
     'default is False. Official test results are treated and queried '
     'differently from non-official test results.')
 
+flags.DEFINE_boolean(
+    'hostname_metadata',
+    False,
+    'A boolean indicating whether to publish VM hostnames as part of sample '
+    'metadata.')
+
 flags.DEFINE_string(
     'json_path',
     None,
@@ -138,6 +144,9 @@ class DefaultMetadataProvider(MetadataProvider):
   def AddMetadata(self, metadata, benchmark_spec):
     metadata = metadata.copy()
     metadata['perfkitbenchmarker_version'] = version.VERSION
+    if FLAGS.hostname_metadata:
+      metadata['hostnames'] = ','.join([vm.hostname
+                                        for vm in benchmark_spec.vms])
     for name, vms in benchmark_spec.vm_groups.iteritems():
       if len(vms) == 0:
         continue
