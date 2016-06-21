@@ -37,24 +37,24 @@ flags.DEFINE_enum('location',
                   US_LAS,
                   [US_LAS, DE_FKB, DE_FRA],
                   ('Location of data center to be provisioned (us/las, '
-                  'de/fkb, de/fra)'))
+                   'de/fkb, de/fra)'))
 
 flags.DEFINE_integer('profitbricks_ram',
-                    None,
-                    ('Amount of RAM for the new server in multiples '
-                     'of 256 MB.'))
+                     None,
+                     ('Amount of RAM for the new server in multiples '
+                      'of 256 MB.'))
 
 flags.DEFINE_integer('profitbricks_cores',
-                    None,
-                    ('Number of cores for the new server.'))
+                     None,
+                     ('Number of cores for the new server.'))
 
 flags.DEFINE_string('profitbricks_disk_type',
                     'HDD',
                     ('Choose between HDD or SSD disk types.'))
 
 flags.DEFINE_integer('profitbricks_disk_size',
-                    20,
-                    ('Choose the disk size in GB.'))
+                     20,
+                     ('Choose the disk size in GB.'))
 
 flags.DEFINE_enum('zone',
                   ZONE_1,
