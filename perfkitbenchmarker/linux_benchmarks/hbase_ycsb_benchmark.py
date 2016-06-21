@@ -223,7 +223,7 @@ def Run(benchmark_spec):
   loaders = by_role['clients']
   logging.info('Loaders: %s', loaders)
 
-  executor = ycsb.YCSBExecutor('hbase-10')
+  executor = ycsb.YCSBExecutor('hbase10')
 
   metadata = {'ycsb_client_vms': len(loaders),
               'hbase_cluster_size': len(by_role['hbase_vms']),
