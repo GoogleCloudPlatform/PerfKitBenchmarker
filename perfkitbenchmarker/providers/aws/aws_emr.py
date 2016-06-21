@@ -61,18 +61,16 @@ class AwsEMR(spark_service.BaseSparkService):
     if self.machine_type is None:
       self.machine_type = DEFAULT_MACHINE_TYPE
     self.cmd_prefix = util.AWS_PREFIX + ['emr']
+    self.bucket_prefix = util.AWS_PREFIX + ['s3']
     if FLAGS.zones:
-      self.region = util.GetRegionFromZone(FLAGS.zones[0])
-    else:
-      cmd = ['aws', 'configure', 'get', 'region']
-      stdout, _, _ = vm_util.IssueCommand(cmd)
-      self.region = stdout.strip()
-    self.cmd_prefix += ['--region', self.region]
+      region = util.GetRegionFromZone(FLAGS.zones[0])
+      self.cmd_prefix += ['--region', region]
+      self.bucket_prefix += ['--region', region]
     self.bucket_to_delete = None
 
   def _CreateLogBucket(self):
-    bucket_name = 's3://pkb-' + FLAGS.run_uri + '-emr-' + self.region
-    cmd = ['aws', 's3', 'mb', '--region', self.region, bucket_name]
+    bucket_name = 's3://pkb-{0}-emr'.format(FLAGS.run_uri)
+    cmd = self.bucket_prefix + ['mb', bucket_name]
     _, _, rc = vm_util.IssueCommand(cmd)
     if rc != 0:
       raise Exception('Error creating logs bucket')
@@ -102,7 +100,8 @@ class AwsEMR(spark_service.BaseSparkService):
                              self.cluster_id]
     vm_util.IssueCommand(cmd)
     if self.bucket_to_delete is not None:
-      bucket_del_cmd = ['aws', 's3', 'rb', '--force', self.bucket_to_delete]
+      bucket_del_cmd = self.bucket_prefix + ['rb', '--force',
+                                             self.bucket_to_delete]
       vm_util.IssueCommand(bucket_del_cmd)
 
   def _Exists(self):
@@ -118,19 +117,16 @@ class AwsEMR(spark_service.BaseSparkService):
     else:
       return True
 
-  def _WaitUntilReady(self):
+  def _IsReady(self):
     """Check to see if the cluster is ready."""
     cmd = self.cmd_prefix + ['describe-cluster', '--cluster-id',
                              self.cluster_id]
-    tries = 0
-    while tries < READY_CHECK_TRIES:
-      tries += 1
-      stdout, _, rc = vm_util.IssueCommand(cmd)
-      result = json.loads(stdout)
-      if result['Cluster']['Status']['State'] == READY_STATE:
-        return True
-      time.sleep(READY_CHECK_SLEEP)
-    return False
+    stdout, _, rc = vm_util.IssueCommand(cmd)
+    result = json.loads(stdout)
+    if result['Cluster']['Status']['State'] == READY_STATE:
+      return True
+    else:
+      return False
 
   def _GetLogBase(self):
     """Gets the base uri for the logs."""
@@ -147,19 +143,13 @@ class AwsEMR(spark_service.BaseSparkService):
     else:
       return None
 
+  @vm_util.Retry()
   def _WaitForFile(self, filename, poll_interval=10):
     """Wait for file to appear on s3."""
     cmd = ['aws', 's3', 'ls', filename]
-
-    tries = 0
-    while tries < 30:
-      _, _, rc = vm_util.IssueCommand(cmd)
-      if rc == 0:
-        return True
-      else:
-        time.sleep(poll_interval)
-        tries += 1
-    return False
+    _, _, rc = vm_util.IssueCommand(cmd)
+    if rc != 0:
+      raise Exception('File not found yet')
 
   def SubmitJob(self, jarfile, classname, job_poll_interval=JOB_WAIT_SLEEP,
                 job_arguments=None, job_stdout_file=None):

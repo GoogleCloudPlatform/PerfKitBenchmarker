@@ -73,7 +73,7 @@ class BaseResource(object):
     """
     raise NotImplementedError()
 
-  def _WaitUntilReady(self):
+  def _IsReady(self):
     """Return true if the underlying resource is ready.
 
     Supplying this method is optional.  Use it when a resource can exist
@@ -145,15 +145,18 @@ class BaseResource(object):
 
   def Create(self):
     """Creates a resource and its dependencies."""
+    @vm_util.Retry()
+    def WaitUntilReady():
+      if not self._IsReady():
+        raise Exception('Not yet ready')
+
     if self.user_managed:
       return
     self._CreateDependencies()
     self._CreateResource()
-    ready = self._WaitUntilReady()
+    WaitUntilReady()
     if not self.resource_ready_time:
       self.resource_ready_time = time.time()
-    if not ready:
-      raise Exception('Wait for resource to be read timed out, giving up')
     self._PostCreate()
 
   def Delete(self):

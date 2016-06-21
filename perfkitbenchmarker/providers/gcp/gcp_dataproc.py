@@ -19,6 +19,7 @@ Spark clusters can be created and deleted.
 import datetime
 import json
 import logging
+import re
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -118,16 +119,24 @@ class GcpDataproc(spark_service.BaseSparkService):
 
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
-        # dataproc prints progress lines that end with a cr and so
-        # overwrite themselves.  We need to move past that.
-        last_cr_index = stderr.rfind('\r')
-        lines = stderr[last_cr_index + 1:].split('\n')
-        # the visible line says the job is done, and the
-        # then the split leaves an empty line.
-        good_lines = lines[:-2]
-        for l in good_lines:
-          f.write(l)
-          f.write('\n')
+        lines = stderr.splitlines(True)
+        if (not re.match(r'Job \[.*\] submitted.', lines[0]) or
+            not re.match(r'Waiting for job output...', lines[1]) or
+            not re.match(r'\r', lines[2])):
+          raise Exception('Dataproc output in unexpected format.')
+        i = 3
+        # Eat these status lines.  The end in \r, so they overwrite themselves
+        # at the console or when you cat a file.  But they are part of this
+        # string.
+        while re.match(r'\[Stage \d+:', lines[i]):
+          i += 1
+        if not re.match(r' *\r$', lines[i]):
+          raise Exception('Dataproc output in unexpected format.')
+        while i < len(lines) and not re.match(r'Job \[.*\]', lines[i]):
+          f.write(lines[i])
+          i += 1
+        if i != len(lines) - 1:
+          raise Exception('Dataproc output in unexpected format.')
     return stats
 
   def SetClusterProperty(self):
