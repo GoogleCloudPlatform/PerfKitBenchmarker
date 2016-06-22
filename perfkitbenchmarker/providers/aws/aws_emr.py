@@ -23,7 +23,6 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
-import time
 import util
 
 
