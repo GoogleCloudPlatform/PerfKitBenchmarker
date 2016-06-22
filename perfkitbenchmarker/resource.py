@@ -110,6 +110,7 @@ class BaseResource(object):
     """
     pass
 
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
   def _CreateResource(self):
     """Reliably creates the underlying resource."""
     if self.created:
@@ -142,27 +143,20 @@ class BaseResource(object):
     if not self.delete_end_time:
       self.delete_end_time = time.time()
 
-  def Create(self, **kwargs):
-    """Creates a resource and its dependencies.
+  def Create(self):
+    """Creates a resource and its dependencies."""
 
-    Args:
-      kwargs: Arguments to pass to retry for Create and
-          _IsReady checks.
-    """
-    @vm_util.Retry(**kwargs)
+    # A more general solution would allow the retry interval to be set as a
+    # property of the class.  We don't currently need that.
+    @vm_util.Retry(poll_interval=5, fuzz=0)
     def WaitUntilReady():
       if not self._IsReady():
         raise Exception('Not yet ready')
 
-    @vm_util.Retry(retryable_exceptions=(
-        errors.Resource.RetryableDeletionError,), **kwargs)
-    def CreateResourceWithRetry():
-      self._CreateResource()
-
     if self.user_managed:
       return
     self._CreateDependencies()
-    CreateResourceWithRetry()
+    self._CreateResource()
     WaitUntilReady()
     if not self.resource_ready_time:
       self.resource_ready_time = time.time()
