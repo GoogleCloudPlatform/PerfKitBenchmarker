@@ -110,7 +110,6 @@ class BaseResource(object):
     """
     pass
 
-  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def _CreateResource(self):
     """Reliably creates the underlying resource."""
     if self.created:
@@ -143,36 +142,27 @@ class BaseResource(object):
     if not self.delete_end_time:
       self.delete_end_time = time.time()
 
-  def Create(self, ready_poll_interval=vm_util.POLL_INTERVAL,
-             ready_max_retries=vm_util.MAX_RETRIES, ready_timeout=None,
-             ready_fuzz=vm_util.FUZZ,
-             ready_log_errors=True):
+  def Create(self, **kwargs):
     """Creates a resource and its dependencies.
 
     Args:
-      ready_poll_interval: Time between _IsReady checks.  Only
-          useful if the subclass implements _IsReady.
-      ready_max_retires: Maximum number of _IsReady retries.
-      ready_timeout: Maximum time to wait for the object to be
-          ready.
-      ready_fuzz: The fuzz on the _IsReady checks.  Only useful
-          if the subclass implements _IsReady.  See vm_util.Retry
-          for details.
-      ready_log_errors: A boolean describing whether errors should
-          be logged for the _IsReady check.
+      kwargs: Arguments to pass to retry for Create and
+          _IsReady checks.
     """
-    @vm_util.Retry(poll_interval=ready_poll_interval,
-                   fuzz=ready_fuzz, timeout=ready_timeout,
-                   max_retries=ready_max_retries,
-                   log_errors=ready_log_errors)
+    @vm_util.Retry(**kwargs)
     def WaitUntilReady():
       if not self._IsReady():
         raise Exception('Not yet ready')
 
+    @vm_util.Retry(retryable_exceptions=(
+        errors.Resource.RetryableDeletionError,), **kwargs)
+    def CreateResourceWithRetry():
+      self._CreateResource()
+
     if self.user_managed:
       return
     self._CreateDependencies()
-    self._CreateResource()
+    CreateResourceWithRetry()
     WaitUntilReady()
     if not self.resource_ready_time:
       self.resource_ready_time = time.time()

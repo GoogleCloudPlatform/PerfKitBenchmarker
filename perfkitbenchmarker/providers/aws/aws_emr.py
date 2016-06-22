@@ -122,10 +122,7 @@ class AwsEMR(spark_service.BaseSparkService):
                              self.cluster_id]
     stdout, _, rc = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
-    if result['Cluster']['Status']['State'] == READY_STATE:
-      return True
-    else:
-      return False
+    return result['Cluster']['Status']['State'] == READY_STATE
 
   def _GetLogBase(self):
     """Gets the base uri for the logs."""
@@ -142,8 +139,6 @@ class AwsEMR(spark_service.BaseSparkService):
     else:
       return None
 
-
-  @vm_util.Retry()
   def _CheckForFile(self, filename):
     """Wait for file to appear on s3."""
     cmd = self.bucket_prefix + ['ls', filename]
