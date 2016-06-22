@@ -18,17 +18,12 @@ import logging
 import time
 
 import gflags as flags
+
 import azure.storage.blob
 
 import object_storage_interface
 
 FLAGS = flags.FLAGS
-
-flags.DEFINE_string('azure_account', None,
-                    'The name of the storage account for Azure.')
-
-flags.DEFINE_string('azure_key', None,
-                    'The key of the storage account for Azure.')
 
 
 class AzureService(object_storage_interface.ObjectStorageServiceBase):

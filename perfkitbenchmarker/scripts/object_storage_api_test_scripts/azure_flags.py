@@ -12,26 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""An interface to Google Cloud Storage, using the boto library."""
-
-import time
+"""Flags for the Azure Blob Storage interface."""
 
 import gflags as flags
-import gcs_oauth2_boto_plugin  # noqa
 
-import boto_service
+flags.DEFINE_string('azure_account', None,
+                    'The name of the storage account for Azure.')
 
-FLAGS = flags.FLAGS
-
-
-class GCSService(boto_service.BotoService):
-  def __init__(self):
-    super(GCSService, self).__init__('gs', host_to_connect=None)
-
-  def WriteObjectFromBuffer(self, bucket, object, stream, size):
-    stream.seek(0)
-    start_time = time.time()
-    object_uri = self._StorageURI(bucket, object)
-    object_uri.set_contents_from_file(stream, size=size)
-    latency = time.time() - start_time
-    return start_time, latency
+flags.DEFINE_string('azure_key', None,
+                    'The key of the storage account for Azure.')

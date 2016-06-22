@@ -37,11 +37,9 @@ import time
 import yaml
 
 import gflags as flags
-import gcs_oauth2_boto_plugin  # noqa
 
-import azure_service
-import gcs
-import s3
+import azure_flags  # noqa
+import s3_flags  # noqa
 
 FLAGS = flags.FLAGS
 
@@ -1015,20 +1013,7 @@ def ListConsistencyBenchmark(service):
   return final_result
 
 
-# Although this dictionary does not really fit in this file, moving it
-# out of this file would require either adding a registry to
-# object_storage_interface.py or adding a new module. The improvement
-# in organization of moving it doesn't seem worth the extra
-# complexity.
-_STORAGE_TO_SERVICE_DICT = {
-    'AZURE': azure_service.AzureService,
-    'GCS': gcs.GCSService,
-    'S3': s3.S3Service
-}
-
-
 def Main(argv=sys.argv):
-
   logging.basicConfig(level=logging.INFO)
 
   try:
@@ -1046,7 +1031,20 @@ def Main(argv=sys.argv):
                FLAGS.bucket,
                FLAGS.scenario)
 
-  service = _STORAGE_TO_SERVICE_DICT[FLAGS.storage_provider]()
+  # This is essentially a dictionary lookup implemented in if
+  # statements, but doing it this way allows us to not import the
+  # modules of storage providers we're not using.
+  if FLAGS.storage_provider == 'AZURE':
+    import azure_service
+    service = azure_service.AzureService()
+  elif FLAGS.storage_provider == 'GCS':
+    import gcs
+    service = gcs.GCSService()
+  elif FLAGS.storage_provider == 'S3':
+    import s3
+    service = s3.S3Service()
+  else:
+    raise ValueError('Invalid storage provider %s' % FLAGS.storage_provider)
 
   if FLAGS.storage_provider == 'AZURE':
       # There are DNS lookup issues with the provider Azure when doing

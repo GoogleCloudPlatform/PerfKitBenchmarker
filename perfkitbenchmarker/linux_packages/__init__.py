@@ -44,3 +44,17 @@ def _LoadPackages():
 
 
 PACKAGES = _LoadPackages()
+
+
+def GetPipPackageVersion(vm, package_name):
+  """This function returns the version of a pip package installed on a vm.
+
+  Args:
+    vm: the VM the package is installed on.
+    package_name: the name of the package.
+
+  Returns:
+    The version string of the package.
+  """
+  version, _ = vm.RemoteCommand('pip show %s |grep Version' % package_name)
+  return version
