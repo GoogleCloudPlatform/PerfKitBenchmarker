@@ -99,7 +99,7 @@ class AwsEMR(spark_service.BaseSparkService):
     cmd = self.cmd_prefix + ['terminate-clusters', '--cluster-ids',
                              self.cluster_id]
     vm_util.IssueCommand(cmd)
-    if self.bucket_to_delete is not None:
+    if self.bucket_to_delete:
       bucket_del_cmd = self.bucket_prefix + ['rb', '--force',
                                              self.bucket_to_delete]
       vm_util.IssueCommand(bucket_del_cmd)
@@ -143,16 +143,65 @@ class AwsEMR(spark_service.BaseSparkService):
     else:
       return None
 
+
   @vm_util.Retry()
-  def _WaitForFile(self, filename, poll_interval=10):
+  def _CheckForFile(self, filename):
     """Wait for file to appear on s3."""
-    cmd = ['aws', 's3', 'ls', filename]
+    cmd = self.bucket_prefix + ['ls', filename]
     _, _, rc = vm_util.IssueCommand(cmd)
-    if rc != 0:
-      raise Exception('File not found yet')
+    return rc == 0
+
+  def _IsStepDone(self, step_id):
+    """Determine whether the step is done.
+
+    Args:
+      step_id: The step id to query.
+    Returns:
+      A dictionary describing the step if the step the step is complete,
+          None otherwise.
+    """
+
+    cmd = self.cmd_prefix + ['describe-step', '--cluster-id',
+                             self.cluster_id, '--step-id', step_id]
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    result = json.loads(stdout)
+    state = result['Step']['Status']['State']
+    if state == "COMPLETED" or state == "FAILED":
+      return result
+    else:
+      return None
 
   def SubmitJob(self, jarfile, classname, job_poll_interval=JOB_WAIT_SLEEP,
                 job_arguments=None, job_stdout_file=None):
+    """Submit the job.
+
+    Submit the job and wait for it to complete.  If job_stdout_file is not
+    None, also way for the job's stdout to appear and put that in
+    job_stdout_file.
+
+    Args:
+      jarfile: Jar file containing the class to submit.
+      classname: Name of the class.
+      job_poll_interval: Submit job will poll until the job is done; this is
+          the time between checks.
+      job_arguments: Arguments to pass to the job.
+      job_stdout_file: Name of a file in which to put the job's standard out.
+          If there is data here already, it will be overwritten.
+
+    """
+
+    @vm_util.Retry(poll_interval=job_poll_interval, fuzz=0)
+    def WaitForFile(filename):
+      if not self._CheckForFile(filename):
+        raise Exception('File not found yet')
+
+    @vm_util.Retry(poll_interval=job_poll_interval, fuzz=0)
+    def WaitForStep(step_id):
+      result = self._IsStepDone(step_id)
+      if result is None:
+        raise Exception('Step {0} not complete.'.format(step_id))
+      return result
+
     arg_list = ['--class', classname, jarfile]
     if job_arguments:
       arg_list += job_arguments
@@ -165,25 +214,16 @@ class AwsEMR(spark_service.BaseSparkService):
     result = json.loads(stdout)
     step_id = result['StepIds'][0]
     metrics = {}
-    # Now, we wait for the step to be completed.
-    while True:
-      cmd = self.cmd_prefix + ['describe-step', '--cluster-id',
-                               self.cluster_id, '--step-id', step_id]
 
-      stdout, _, _ = vm_util.IssueCommand(cmd)
-      result = json.loads(stdout)
-      state = result['Step']['Status']['State']
-      if state == "COMPLETED" or state == "FAILED":
-        pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
-        start_time = result['Step']['Status']['Timeline']['StartDateTime']
-        end_time = result['Step']['Status']['Timeline']['EndDateTime']
-        metrics[spark_service.WAITING] = start_time - pending_time
-        metrics[spark_service.RUNTIME] = end_time - start_time
-        metrics[spark_service.SUCCESS] = state == "COMPLETED"
-        break
-      else:
-        logging.info('Waiting %s seconds for job to finish', job_poll_interval)
-        time.sleep(job_poll_interval)
+    result = WaitForStep(step_id)
+    pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
+    start_time = result['Step']['Status']['Timeline']['StartDateTime']
+    end_time = result['Step']['Status']['Timeline']['EndDateTime']
+    metrics[spark_service.WAITING] = start_time - pending_time
+    metrics[spark_service.RUNTIME] = end_time - start_time
+    step_state = result['Step']['Status']['State']
+    metrics[spark_service.SUCCESS] = step_state == "COMPLETED"
+
     # Now we need to take the standard out and put it in the designated path,
     # if appropriate.
     if job_stdout_file:
@@ -197,7 +237,7 @@ class AwsEMR(spark_service.BaseSparkService):
       s3_stdout = '{0}{1}/steps/{2}/stdout.gz'.format(log_base,
                                                       self.cluster_id,
                                                       step_id)
-      self._WaitForFile(s3_stdout)
+      WaitForFile(s3_stdout)
       dest_file = '{0}.gz'.format(job_stdout_file)
       cp_cmd = ['aws', 's3', 'cp', s3_stdout, dest_file]
       _, _, rc = vm_util.IssueCommand(cp_cmd)
