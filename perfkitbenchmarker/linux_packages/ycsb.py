@@ -55,8 +55,9 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
+YCSB_VERSION = '0.7.0'
 YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases/'
-                'download/0.3.0/ycsb-0.3.0.tar.gz')
+                'download/{0}/ycsb-{0}.tar.gz').format(YCSB_VERSION)
 YCSB_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 

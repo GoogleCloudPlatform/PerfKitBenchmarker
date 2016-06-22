@@ -200,7 +200,7 @@ def Prepare(benchmark_spec):
       posixpath.join(hbase.HBASE_CONF_DIR, HBASE_SITE))
 
   def PushHBaseSite(vm):
-    conf_dir = posixpath.join(ycsb.YCSB_DIR, 'hbase-binding', 'conf')
+    conf_dir = posixpath.join(ycsb.YCSB_DIR, 'hbase10-binding', 'conf')
     vm.RemoteCommand('mkdir -p {}'.format(conf_dir))
     vm.PushFile(
         os.path.join(vm_util.GetTempDir(), HBASE_SITE),
@@ -223,7 +223,7 @@ def Run(benchmark_spec):
   loaders = by_role['clients']
   logging.info('Loaders: %s', loaders)
 
-  executor = ycsb.YCSBExecutor('hbase-10')
+  executor = ycsb.YCSBExecutor('hbase10')
 
   metadata = {'ycsb_client_vms': len(loaders),
               'hbase_cluster_size': len(by_role['hbase_vms']),
