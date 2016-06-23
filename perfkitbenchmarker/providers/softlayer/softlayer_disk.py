@@ -38,7 +38,7 @@ disk.RegisterDiskTypeMap(SoftLayer, DISK_TYPE)
 
 
 class SoftLayerDiskSpec(disk.BaseDiskSpec):
-  """Object holding the information needed to create an SoftLayerDisk."""
+  """Object holding the information needed to create a SoftLayerDisk."""
 
   CLOUD = providers.SOFTLAYER
 
