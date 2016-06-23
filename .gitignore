@@ -6,3 +6,5 @@
 *.py[co]
 /perfkitbenchmarker.egg-info
 /.tox
+.project
+.pydevproject

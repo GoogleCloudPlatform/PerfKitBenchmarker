@@ -1,3 +1,4 @@
+
 # Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,9 +32,10 @@ OPENSTACK = 'OpenStack'
 CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 MESOS = 'Mesos'
+SOFTLAYER = 'SoftLayer'
 
 VALID_CLOUDS = (GCP, AZURE, AWS, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS)
+                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS, SOFTLAYER)
 
 
 _imported_providers = set()
@@ -41,10 +43,8 @@ _imported_providers = set()
 
 def LoadProviderFlags(providers):
   """Imports just the flags module for each provider.
-
   This allows PKB to load flag definitions from each provider to include in the
   help text without actually loading any other provider-specific modules.
-
   Args:
     providers: series of strings. Each element is a value from VALID_CLOUDS
         indicating a cloud provider for which to import the flags module.
@@ -61,12 +61,10 @@ LoadProviderFlags(VALID_CLOUDS)
 
 def LoadProvider(provider_name, ignore_package_requirements=True):
   """Loads the all modules in the 'provider_name' package.
-
   This function first checks the specified provider's Python package
   requirements file, if one exists, and verifies that all requirements are met.
   Next, it loads all modules in the specified provider's package. By loading
   these modules, relevant classes (e.g. VMs) will register themselves.
-
   Args:
     provider_name: string chosen from VALID_CLOUDS. The name of the provider
         whose modules should be loaded.

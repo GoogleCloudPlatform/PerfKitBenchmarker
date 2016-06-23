@@ -14,6 +14,10 @@ default_single_core: &default_single_core
     machine_type: m3.medium
     zone: us-east-1
     image: null
+  SoftLayer:
+    machine_type: '{"cpus": 1, "memory": 2048, "os": "UBUNTU_14_64", "nic": 1000}'
+    zone: wdc01
+    image: null
   AliCloud:
     machine_type: ecs.s2.large
     zone: us-west-1a
@@ -82,3 +86,8 @@ default_500_gb: &default_500_gb
     disk_type: local
     disk_size: 500
     mount_point: /scratch
+  SoftLayer:
+    disk_type: local
+    disk_size: 500
+    mount_point: /scratch
+    
