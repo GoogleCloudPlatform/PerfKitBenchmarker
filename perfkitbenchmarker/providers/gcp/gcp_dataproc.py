@@ -110,7 +110,6 @@ class GcpDataproc(spark_service.BaseSparkService):
     if job_arguments:
       cmd.additional_flags = job_arguments
     stdout, stderr, retcode = cmd.Issue()
-    logging.debug('STDOUT: {0}\nSTDERR: {1}\n'.format(stdout, stderr))
     if retcode != 0:
       return {spark_service.SUCCESS: False}
 

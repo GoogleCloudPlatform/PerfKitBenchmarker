@@ -110,7 +110,7 @@ class BaseResource(object):
     """
     pass
 
-  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def _CreateResource(self):
     """Reliably creates the underlying resource."""
     if self.created:
