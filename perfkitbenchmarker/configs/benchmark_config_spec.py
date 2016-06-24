@@ -239,6 +239,7 @@ class _SparkServiceSpec(spec.BaseSpec):
     if flag_values['zones'].present:
       config_values['zone'] = flag_values.zones[0]
 
+
 class _VmGroupSpec(spec.BaseSpec):
   """Configurable options of a VM group.
 

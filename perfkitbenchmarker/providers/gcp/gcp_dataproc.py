@@ -18,7 +18,6 @@ Spark clusters can be created and deleted.
 
 import datetime
 import json
-import logging
 import re
 
 from perfkitbenchmarker import flags
