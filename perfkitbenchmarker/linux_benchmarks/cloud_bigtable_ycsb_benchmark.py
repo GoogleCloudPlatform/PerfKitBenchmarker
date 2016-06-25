@@ -92,8 +92,9 @@ TCNATIVE_BORINGSSL_URL = (
     'netty-tcnative-boringssl-static-1.1.33.Fork13-linux-x86_64.jar')
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
-YCSB_HBASE_LIB = posixpath.join(ycsb.YCSB_DIR, 'hbase-binding', 'lib')
-YCSB_HBASE_CONF = posixpath.join(ycsb.YCSB_DIR, 'hbase-binding', 'conf')
+HBASE_BINDING = 'hbase10-binding'
+YCSB_HBASE_LIB = posixpath.join(ycsb.YCSB_DIR, HBASE_BINDING, 'lib')
+YCSB_HBASE_CONF = posixpath.join(ycsb.YCSB_DIR, HBASE_BINDING, 'conf')
 
 REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/bigtable.admin',
@@ -278,7 +279,7 @@ def Run(benchmark_spec):
                     'jvm-args': jvm_args,
                     'table': table_name}
 
-  executor = ycsb.YCSBExecutor('hbase-10', **executor_flags)
+  executor = ycsb.YCSBExecutor('hbase10', **executor_flags)
   cluster_name = (FLAGS.google_bigtable_cluster_name or
                   'pkb-bigtable-{0}'.format(FLAGS.run_uri))
   cluster_info = _GetClusterDescription(FLAGS.project or _GetDefaultProject(),
