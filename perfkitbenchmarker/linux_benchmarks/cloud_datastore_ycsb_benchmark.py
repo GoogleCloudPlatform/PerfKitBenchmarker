@@ -58,10 +58,18 @@ def CheckPrerequisites():
 
 def Prepare(benchmark_spec):
     benchmark_spec.always_call_cleanup = True
+    default_ycsb_tar_url = ycsb.YCSB_TAR_URL
     vms = benchmark_spec.vms
+    
+    # TODO: this is a hacky way to override the tar url, need to figure some other ways.
+    # Override YCSB_TAR_URL so that we only need to download the binding we need.
+    ycsb.YCSB_TAR_URL = YCSB_BINDING_TAR_URL
+    
     # Install required packages and copy credential files
     vm_util.RunThreaded(_Install, vms)
-
+    
+    # Restore YCSB_TAR_URL
+    ycsb.YCSB_TAR_URL = default_ycsb_tar_url
 
 def Run(benchmark_spec):
     vms = benchmark_spec.vms
@@ -89,11 +97,7 @@ def Cleanup(benchmark_spec):
 
 
 def _Install(vm):
-    # Override YCSB_TAR_URL so that we only need to download the binding we need.
-    default_ycsb_tar_url = ycsb.YCSB_TAR_URL
-    ycsb.YCSB_TAR_URL = YCSB_BINDING_TAR_URL
     vm.Install('ycsb')
-    ycsb.YCSB_TAR_URL = default_ycsb_tar_url
 
     # Copy private key file to VM
     vm.RemoteCopy(FLAGS.google_datastore_keyfile, PRIVATE_KEYFILE_DIR)
