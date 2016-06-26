@@ -203,7 +203,11 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
   command_line = 'unknown'
   fp = io.BytesIO(ycsb_result_string)
   result_string = next(fp).strip()
-  while not result_string.startswith('YCSB Client 0.') and not result_string.startswith('[OVERALL]'):
+
+  def IsHeadOfResults(line):
+      return line.startswith('YCSB Client 0.') or line.startswith('[OVERALL]')
+
+  while not IsHeadOfResults(result_string):
     result_string = next(fp).strip()
 
   if result_string.startswith('YCSB Client 0.'):
@@ -211,12 +215,11 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
     command_line = next(fp).strip()
     if not command_line.startswith('Command line:'):
       raise IOError('Unexpected second line: {0}'.format(command_line))
-  if result_string.startswith('[OVERALL]'): # YCSB > 0.7.0 dosen't ouput YCSB version and command lines.
+  elif result_string.startswith('[OVERALL]'):  # YCSB > 0.7.0.
     lines.append(result_string)
   else:
     # Received unexpected header
     raise IOError('Unexpected header: {0}'.format(client_string))
-    
 
   # Some databases print additional output to stdout.
   # YCSB results start with [<OPERATION_NAME>];
