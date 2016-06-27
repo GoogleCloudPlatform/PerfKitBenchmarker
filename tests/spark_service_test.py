@@ -99,20 +99,22 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
 
   def testEMRConfig(self):
     self._mocked_flags.cloud = providers.AWS
-    spec = self._CreateBenchmarkSpecFromYaml(EMR_CONFIG)
-    spec.ConstructVirtualMachines()
-    spec.ConstructSparkService()
-    self.assertTrue(hasattr(spec, 'spark_service'))
-    self.assertTrue(spec.spark_service is not None)
-    self.assertEqual(len(spec.vms), 0)
-    self.assertEqual(spec.config.spark_service.num_workers, 4,
-                     str(spec.config.spark_service.__dict__))
-    self.assertEqual(spec.config.spark_service.service_type,
-                     spark_service.PROVIDER_MANAGED)
-    self.assertEqual(spec.config.spark_service.machine_type, 'm1.large',
-                     str(spec.config.spark_service.__dict__))
-    self.assertTrue(isinstance(spec.spark_service,
-                               aws_emr.AwsEMR))
+    self._mocked_flags.zones = ['us-west-2']
+    with mock_flags.PatchFlags(self._mocked_flags):
+      spec = self._CreateBenchmarkSpecFromYaml(EMR_CONFIG)
+      spec.ConstructVirtualMachines()
+      spec.ConstructSparkService()
+      self.assertTrue(hasattr(spec, 'spark_service'))
+      self.assertTrue(spec.spark_service is not None)
+      self.assertEqual(len(spec.vms), 0)
+      self.assertEqual(spec.config.spark_service.num_workers, 4,
+                       str(spec.config.spark_service.__dict__))
+      self.assertEqual(spec.config.spark_service.service_type,
+                       spark_service.PROVIDER_MANAGED)
+      self.assertEqual(spec.config.spark_service.machine_type, 'm1.large',
+                       str(spec.config.spark_service.__dict__))
+      self.assertTrue(isinstance(spec.spark_service,
+                                 aws_emr.AwsEMR))
 
   def testPkbManaged(self):
     spec = self._CreateBenchmarkSpecFromYaml(PKB_MANAGED_CONFIG)

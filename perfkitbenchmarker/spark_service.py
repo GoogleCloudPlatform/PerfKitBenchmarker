@@ -40,6 +40,10 @@ flags.DEFINE_string('spark_static_cluster_id', None,
 PKB_MANAGED = 'pkb_managed'
 PROVIDER_MANAGED = 'managed'
 
+SUCCESS = 'success'
+RUNTIME = 'running_time'
+WAITING = 'pending_time'
+
 # This is used for error messages.
 
 _SPARK_SERVICE_REGISTRY = {}
@@ -89,7 +93,8 @@ class BaseSparkService(resource.BaseResource):
     self.project = spark_service_spec.project
 
   @abc.abstractmethod
-  def SubmitJob(self, job_jar, class_name, job_poll_interval=None):
+  def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
+                job_stdout_file=None, job_arguments=None):
     """Submit a job to the spark service.
 
     Submits a job and waits for it to complete.
@@ -100,19 +105,25 @@ class BaseSparkService(resource.BaseResource):
       job_poll_interval: integer saying how often to poll for job
         completion.  Not used by providers for which submit job is a
         synchronous operation.
+      job_stdout_file: String giving the location of the file in
+        which to put the standard out of the job.
+      job_arguments: Arguments to pass to class_name.  These are
+        not the arguments passed to the wrapper that submits the
+        job.
 
     Returns:
-      True if the job submission was successful, false otherwise.
+      dictionary, where success is true if the job succeeded,
+      false otherwise.  The dictionary may also contain an entry for
+      running_time and pending_time if the platform reports those
+      metrics.
     """
-    # TODO(hildrum) determine what the return value from this will be
-    # and provide a way to access the job's output
     pass
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
     return {'spark_service': self.SERVICE_NAME,
-            'num_workers': self.num_workers,
-            'machine_type': self.machine_type,
+            'num_workers': str(self.num_workers),
+            'machine_type': str(self.machine_type),
             'spark_cluster_id': self.cluster_id}
 
 

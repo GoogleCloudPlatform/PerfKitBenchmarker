@@ -208,6 +208,8 @@ class _SparkServiceSpec(spec.BaseSpec):
             'default': 3, 'min': 1}),
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS}),
+        'zone': (option_decoders.StringDecoder, {'none_ok': True,
+                                                 'default': None}),
         'project': (option_decoders.StringDecoder, {'default': None,
                                                     'none_ok': True}),
         'machine_type': (option_decoders.StringDecoder, {'default': None,
@@ -234,6 +236,8 @@ class _SparkServiceSpec(spec.BaseSpec):
     if flag_values['spark_static_cluster_id'].present:
       config_values['static_cluster_id'] = (
           flag_values.spark_static_cluster_id)
+    if flag_values['zones'].present:
+      config_values['zone'] = flag_values.zones[0]
 
 
 class _VmGroupSpec(spec.BaseSpec):

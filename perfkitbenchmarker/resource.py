@@ -47,6 +47,7 @@ class BaseResource(object):
     self.delete_start_time = None
     self.create_end_time = None
     self.delete_end_time = None
+    self.resource_ready_time = None
 
   @abc.abstractmethod
   def _Create(self):
@@ -72,7 +73,7 @@ class BaseResource(object):
     """
     raise NotImplementedError()
 
-  def _WaitUntilReady(self):
+  def _IsReady(self):
     """Return true if the underlying resource is ready.
 
     Supplying this method is optional.  Use it when a resource can exist
@@ -144,13 +145,23 @@ class BaseResource(object):
 
   def Create(self):
     """Creates a resource and its dependencies."""
+
+    # A more general solution would allow the retry interval to be set as a
+    # property of the class.  We don't currently need that.
+    @vm_util.Retry(poll_interval=5, fuzz=0,
+                   retryable_exceptions=(
+                       errors.Resource.RetryableCreationError,))
+    def WaitUntilReady():
+      if not self._IsReady():
+        raise errors.Resource.RetryableCreationError('Not yet ready')
+
     if self.user_managed:
       return
     self._CreateDependencies()
     self._CreateResource()
-    ready = self._WaitUntilReady()
-    if not ready:
-      raise Exception('Wait for resource to be read timed out, giving up')
+    WaitUntilReady()
+    if not self.resource_ready_time:
+      self.resource_ready_time = time.time()
     self._PostCreate()
 
   def Delete(self):
