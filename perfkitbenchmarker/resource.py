@@ -148,10 +148,12 @@ class BaseResource(object):
 
     # A more general solution would allow the retry interval to be set as a
     # property of the class.  We don't currently need that.
-    @vm_util.Retry(poll_interval=5, fuzz=0)
+    @vm_util.Retry(poll_interval=5, fuzz=0,
+                   retryable_exceptions=(
+                       errors.Resource.RetryableCreationError,))
     def WaitUntilReady():
       if not self._IsReady():
-        raise Exception('Not yet ready')
+        raise errors.Resource.RetryableCreationError('Not yet ready')
 
     if self.user_managed:
       return

@@ -30,7 +30,7 @@ import util
 
 FLAGS = flags.FLAGS
 
-DEFAULT_MACHINE_TYPE = 'm1.large'
+DEFAULT_MACHINE_TYPE = 'm3.xlarge'
 RELEASE_LABEL = 'emr-4.5.0'
 READY_CHECK_SLEEP = 30
 READY_CHECK_TRIES = 60
@@ -174,6 +174,17 @@ class AwsEMR(spark_service.BaseSparkService):
                              self.cluster_id]
     stdout, _, rc = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
+    if result['Cluster']['Status']['State'] == 'TERMINATED_WITH_ERRORS':
+      reason = result['Cluster']['Status']['StateChangeReason']['Message']
+      message = reason
+      if reason.startswith('Subnet is required'):
+        message = ('Cluster creation failed because this machine type requires '
+                   'a subnet.  To ensure PKB creates a subnet for this machine '
+                   'type, update the NEEDS_SUBNET variable of '
+                   'providers/aws/aws_emr.py to contain prefix of this machine '
+                   'type ({0}). Raw AWS message={1}'.format(
+                       self.machine_type[0:2], reason))
+        raise Exception(message)
     return result['Cluster']['Status']['State'] == READY_STATE
 
   def _GetLogBase(self):
