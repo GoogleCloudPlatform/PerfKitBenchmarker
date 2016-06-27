@@ -15,6 +15,7 @@
 """
 
 import os
+import time
 import logging
 import base64
 
@@ -31,6 +32,8 @@ from perfkitbenchmarker import providers
 
 PROFITBRICKS_API = profitbricks.PROFITBRICKS_API
 FLAGS = flags.FLAGS
+TIMEOUT = 25.0
+INTERVAL = 15
 
 
 class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -78,19 +81,6 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     def _Create(self):
         """Create a ProfitBricks VM instance."""
-
-        # Check if this is the first iteration and we need a DC, or not.
-        if self.need_dc:
-            # Create a new DC
-            self.dc_id, self.dc_status = util.CreateDatacenter(self.header,
-                                                               self.location)
-
-            # Create LAN so that we can utilize a public IP address
-            self.lan_id, self.lan_status = util.CreateLan(self.header,
-                                                          self.dc_id)
-
-            # Switch to false as we now have our DC and LAN to work with
-            self.need_dc = False
 
         # Grab ssh pub key to inject into new VM
         with open(self.ssh_public_key) as f:
@@ -148,7 +138,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
 
         # Provision Server
         r = util.PerformRequest('post', url, self.header, json=new_server)
-        logging.info('Creating server: %s' % self.name)
+        logging.info('Creating VM: %s' % self.name)
 
         # Parse Required values from response
         self.server_status = r.headers['Location']
@@ -159,62 +149,100 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         # state for a while, and it cannot be deleted or modified in
         # this state. Wait for the action to finish and check the
         # reported result.
-        if not util.WaitFor(self.server_status, self.header):
-            raise errors.Resource.RetryableCreationError('Server creation '
-                                                         'failed, see log.')
+        if not self._WaitUntilReady(self.server_status):
+            raise errors.Error('VM creation failed, see log.')
 
     @vm_util.Retry()
     def _PostCreate(self):
         """Get the instance's public IP address."""
 
-        # Poll server to make sure it's been provisioned
-        if util.WaitFor(self.server_status, self.header):
+        # Build URL
+        url = '%s/datacenters/%s/servers/%s?depth=5' % (PROFITBRICKS_API,
+                                                        self.dc_id,
+                                                        self.server_id)
 
-            url = '%s/datacenters/%s/servers/%s?depth=5' % (PROFITBRICKS_API,
-                                                            self.dc_id,
-                                                            self.server_id)
-
-            # Perform Request
-            r = util.PerformRequest('get', url, self.header)
-            response = r.json()
-            nic = response['entities']['nics']['items'][0]
-            self.ip_address = nic['properties']['ips'][0]
-        else:
-            raise errors.Resource.RetryableCreationError('IP parse failed, '
-                                                         'see log.')
+        # Perform Request
+        r = util.PerformRequest('get', url, self.header)
+        response = r.json()
+        nic = response['entities']['nics']['items'][0]
+        self.ip_address = nic['properties']['ips'][0]
 
     def _Delete(self):
-        """Delete a ProfitBricks Datacenter (Including VM instances)."""
+        """Delete a ProfitBricks VM."""
+
+        # Build URL
+        url = '%s/datacenters/%s/servers/%s' % (PROFITBRICKS_API, self.dc_id,
+                                                self.server_id)
+
+        # Make call
+        logging.info('Deleting VM: %s' % self.server_id)
+        r = util.PerformRequest('delete', url, self.header)
+
+        # Check to make sure deletion has finished
+        delete_status = r.headers['Location']
+        if not self._WaitUntilReady(delete_status):
+            raise errors.Error('VM deletion failed, see log.')
+    
+    def _CreateDependencies(self):
+        """Create a data center, NIC, and LAN prior to creating VM."""
+
+        # Create data center
+        self.dc_id, self.dc_status = util.CreateDatacenter(self.header,
+                                                           self.location)
+        if not self._WaitUntilReady(self.dc_status):
+            raise errors.Error('Data center creation failed, see log.')
+
+        # Create LAN
+        self.lan_id, self.lan_status = util.CreateLan(self.header,
+                                                      self.dc_id)
+        if not self._WaitUntilReady(self.lan_status):
+            raise errors.Error('LAN creation failed, see log.')
+    
+    def _DeleteDependencies(self):
+        """Delete a data center, NIC, and LAN."""
 
         # Build URL
         url = '%s/datacenters/%s' % (PROFITBRICKS_API, self.dc_id)
 
-        # Make call
+        # Make call to delete data center
         logging.info('Deleting Datacenter: %s' % self.dc_id)
         r = util.PerformRequest('delete', url, self.header)
 
         # Check to make sure deletion has finished
         delete_status = r.headers['Location']
-        if not util.WaitFor(delete_status, self.header):
-            raise errors.Resource.RetryableCreationError('Datacenter deletion '
-                                                         'failed, see log.')
+        if not self._WaitUntilReady(delete_status):
+            raise errors.Error('Data center deletion failed, see log.')
+    
+    def _WaitUntilReady(self, status_url):
+        """Returns true if the ProfitBricks resource is ready."""
 
-    def _Exists(self):
-        """Returns true if the VM exists."""
+        # Set counter
+        counter = 0
 
-        # Build URL
-        url = '%s/datacenters/%s/servers/%s' % (PROFITBRICKS_API,
-                                                self.dc_id, self.server_id)
+        # Check status
+        logging.info('Polling ProfitBricks resource.')
+        r = util.PerformRequest('get', status_url, self.header)
+        response = r.json()
+        status = response['metadata']['status']
 
-        # Make call
-        r = util.PerformRequest('get', url, self.header, check_status=False)
+        # Keep polling resource until a "DONE" state is returned
+        while status != 'DONE':
 
-        # If 404 is returned, resource doesn't exist on provider cloud
-        if r.status_code == 404:
-            logging.info('Server: %s does not exist.' % self.name)
-            return False
+            # Wait before polling again
+            time.sleep(INTERVAL)
 
-        logging.info('Server: %s exists.' % self.name)
+            # Check status
+            logging.info('Polling ProfitBricks resource.')
+            r = util.PerformRequest('get', status_url, self.header)
+            response = r.json()
+            status = response['metadata']['status']
+
+            # Check for timeout
+            counter += 0.25
+            if counter >= TIMEOUT:
+                logging.debug('Timed out after waiting %s minutes.' % TIMEOUT)
+                return False
+
         return True
 
     def CreateScratchDisk(self, disk_spec):
