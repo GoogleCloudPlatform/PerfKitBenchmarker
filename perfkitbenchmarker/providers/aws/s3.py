@@ -17,7 +17,10 @@ from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 
-AWS_CREDENTIAL_LOCATION = '.aws'
+# Have to have '/.' on the end of the path in order to get
+# consistent scp behavior copying directories when the
+# destination directory may or may not exist.
+AWS_CREDENTIAL_LOCATION = '.aws/.'
 DEFAULT_AWS_REGION = 'us-east-1'
 # The endpoints in this table are subdomains of 'amazonaws.com'. So
 # where the table says 's3-us-west-2', you should connect to

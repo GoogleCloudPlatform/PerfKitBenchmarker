@@ -71,7 +71,6 @@ class ObjectStorageService(object):
     Args:
       location: where to place our data.
     """
-
     pass
 
   def CleanupService(self):
@@ -80,7 +79,6 @@ class ObjectStorageService(object):
     No other method of this class should be called after
     CleanupProvider.
     """
-
     pass
 
   # Bucket management
@@ -93,7 +91,6 @@ class ObjectStorageService(object):
     Args:
       bucket: the name of the bucket to create.
     """
-
     pass
 
   @abc.abstractmethod
@@ -105,7 +102,6 @@ class ObjectStorageService(object):
 
     This method should succeed even if bucket contains objects.
     """
-
     pass
 
   @abc.abstractmethod
@@ -115,7 +111,6 @@ class ObjectStorageService(object):
     Args:
       bucket: the name of the bucket to empty.
     """
-
     pass
 
   # Working with a VM
@@ -126,7 +121,6 @@ class ObjectStorageService(object):
     Args:
       vm: the VM to prepare.
     """
-
     pass
 
   def CleanupVM(self, vm):
@@ -135,7 +129,6 @@ class ObjectStorageService(object):
     Args:
       vm: the VM to clean up.
     """
-
     pass
 
   # CLI commands
@@ -163,7 +156,6 @@ class ObjectStorageService(object):
     Returns:
       A tuple of the (stdout, stderr) of the command.
     """
-
     pass
 
   @abc.abstractmethod
@@ -189,7 +181,6 @@ class ObjectStorageService(object):
     Returns:
       A tuple of the (stdout, stderr) of the command.
     """
-
     pass
 
   # General methods

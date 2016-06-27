@@ -194,13 +194,12 @@ GCS_MULTIREGION_LOCATION = 'gcs_multiregion_location'
 DEFAULT = 'default'
 
 # This accounts for the overhead of running RemoteCommand() on a VM.
-MULTISTREAM_DELAY_PER_VM = 10.0
-# We wait this many seconds for each stream. Note that this is
-# multiplied by the number of streams per VM, not the total number of
-# streams.
-MULTISTREAM_DELAY_PER_STREAM = 15.0
+MULTISTREAM_DELAY_PER_VM = 10.0 * units.second
+# We wait this long for each stream. Note that this is multiplied by
+# the number of streams per VM, not the total number of streams.
+MULTISTREAM_DELAY_PER_STREAM = 15.0 * units.second
 # And add a constant factor for PKB-side processing
-MULTISTREAM_DELAY_CONSTANT = 150.0
+MULTISTREAM_DELAY_CONSTANT = 150.0 * units.second
 
 # The multistream write benchmark writes a file in the VM's /tmp with
 # the objects it has written, which is used by the multistream read
@@ -271,8 +270,30 @@ def _GetClientLibVersion(vm, library_name):
   return version
 
 
+def MultiThreadStartDelay(num_vms, threads_per_vm):
+  """Find how long in the future we can simultaneously start threads on VMs.
+
+  Args:
+    num_vms: number of VMs to start threads on.
+    threads_per_vm: number of threads to start on each VM.
+
+  Returns:
+    A units.Quantity of time such that if we want to start
+    threads_per_vm threads on num_vms VMs, we can start the threads
+    sequentially, tell each of them to sleep for this number of
+    seconds, and we expect that we will be able to start the last
+    thread before the delay has finished.
+  """
+
+  return (
+      MULTISTREAM_DELAY_CONSTANT +
+      MULTISTREAM_DELAY_PER_VM * num_vms +
+      MULTISTREAM_DELAY_PER_STREAM * (num_vms * threads_per_vm))
+
+
 def _ProcessMultiStreamResults(raw_result, operation, sizes,
                                results, metadata=None):
+
   """Read and process results from the api_multistream worker process.
 
   Results will be reported per-object size and combined for all
@@ -460,23 +481,25 @@ class APIScriptCommandBuilder(object):
 
     return ' '.join(cmd_parts)
 
-# The benchmark functions below all have the same arguments:
-# Args:
-#   results: The results array to append to.
-#   metadata: a dictionary of metadata to add to samples.
-#   vm: The vm being used to run the benchmark.
-#   command_builder: an APIScriptCommandBuilder.
-#   service: an ObjectStorageService.
-#   bucket_name: The primary bucket to benchmark.
-#   regional_bucket_name: The secondary bucket to benchmark. Only
-#     used by the api_data scenario.
-
-# Raises:
-#   ValueError: unexpected test outcome is found from the API test script.
-
 
 def OneByteRWBenchmark(results, metadata, vm, command_builder,
                        service, bucket_name, regional_bucket_name):
+  """A benchmark for small object latency.
+
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vm: the VM to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    service: an ObjectStorageService.
+    bucket_name: the primary bucket to benchmark.
+    regional_bucket_name: the secondary bucket to benchmark.
+
+  Raises:
+    ValueError if an unexpected test outcome is found from the API
+    test script.
+  """
+
   buckets = [bucket_name]
   if regional_bucket_name is not None:
     buckets.append(regional_bucket_name)
@@ -509,6 +532,22 @@ def OneByteRWBenchmark(results, metadata, vm, command_builder,
 
 def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
                                     service, bucket_name, regional_bucket_name):
+  """A benchmark for large object throughput.
+
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vm: the VM to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    service: an ObjectStorageService.
+    bucket_name: the primary bucket to benchmark.
+    regional_bucket_name: the secondary bucket to benchmark.
+
+  Raises:
+    ValueError if an unexpected test outcome is found from the API
+    test script.
+  """
+
   single_stream_throughput_cmd = command_builder.BuildCommand([
       '--bucket=%s' % bucket_name,
       '--scenario=SingleStreamThroughput'])
@@ -521,24 +560,40 @@ def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
     result_string = re.findall(search_string, raw_result)
     sample_name = SINGLE_STREAM_THROUGHPUT % up_and_down
 
-    if len(result_string) > 0:
-      # Convert Bytes per second to Mega bits per second
-      # We use MB (10^6) to be consistent with network
-      # bandwidth convention.
-      result = json.loads(result_string[0])
-      for percentile in PERCENTILES_LIST:
-        results.append(sample.Sample(
-            ('%s %s') % (sample_name, percentile),
-            8 * float(result[percentile]) / 1000 / 1000,
-            THROUGHPUT_UNIT,
-            metadata))
-    else:
+    if not result_string:
       raise ValueError('Unexpected test outcome from '
                        'SingleStreamThroughput api test: %s.' % raw_result)
+
+    # Convert Bytes per second to Mega bits per second
+    # We use MB (10^6) to be consistent with network
+    # bandwidth convention.
+    result = json.loads(result_string[0])
+    for percentile in PERCENTILES_LIST:
+      results.append(sample.Sample(
+          ('%s %s') % (sample_name, percentile),
+          8 * float(result[percentile]) / 1000 / 1000,
+          THROUGHPUT_UNIT,
+          metadata))
 
 
 def ListConsistencyBenchmark(results, metadata, vm, command_builder,
                              service, bucket_name, regional_bucket_name):
+  """A benchmark for bucket list consistency.
+
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vm: the VM to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    service: an ObjectStorageService.
+    bucket_name: the primary bucket to benchmark.
+    regional_bucket_name: the secondary bucket to benchmark.
+
+  Raises:
+    ValueError if an unexpected test outcome is found from the API
+    test script.
+  """
+
   list_consistency_cmd = command_builder.BuildCommand([
       '--bucket=%s' % bucket_name,
       '--iterations=%d' % FLAGS.object_storage_list_consistency_iterations,
@@ -551,41 +606,57 @@ def ListConsistencyBenchmark(results, metadata, vm, command_builder,
     metric_name = '%s %s' % (scenario, LIST_CONSISTENCY_PERCENTAGE)
     search_string = '%s: (.*)' % metric_name
     result_string = re.findall(search_string, raw_result)
-    if len(result_string) > 0:
-      results.append(sample.Sample(metric_name,
-                                   (float)(result_string[0]),
-                                   NA_UNIT,
-                                   metadata))
-    else:
+
+    if not result_string:
       raise ValueError(
           'Cannot get percentage from ListConsistency test.')
+
+    results.append(sample.Sample(
+        metric_name,
+        (float)(result_string[0]),
+        NA_UNIT,
+        metadata))
 
     # Parse the list inconsistency window if there is any.
     metric_name = '%s %s' % (scenario, LIST_INCONSISTENCY_WINDOW)
     search_string = '%s: (.*)' % metric_name
     result_string = re.findall(search_string, raw_result)
-    if len(result_string) > 0:
-      _JsonStringToPercentileResults(results,
-                                     result_string[0],
-                                     metric_name,
-                                     LATENCY_UNIT,
-                                     metadata)
+    _JsonStringToPercentileResults(results,
+                                   result_string[0],
+                                   metric_name,
+                                   LATENCY_UNIT,
+                                   metadata)
 
     # Also report the list latency. These latencies are from the lists
     # that were consistent.
     metric_name = '%s %s' % (scenario, LIST_LATENCY)
     search_string = '%s: (.*)' % metric_name
     result_string = re.findall(search_string, raw_result)
-    if len(result_string) > 0:
-      _JsonStringToPercentileResults(results,
-                                     result_string[0],
-                                     metric_name,
-                                     LATENCY_UNIT,
-                                     metadata)
+    _JsonStringToPercentileResults(results,
+                                   result_string[0],
+                                   metric_name,
+                                   LATENCY_UNIT,
+                                   metadata)
 
 
 def MultiStreamRWBenchmark(results, metadata, vm, command_builder,
                            service, bucket_name, regional_bucket_name):
+  """A benchmark for multi-stream latency and throughput.
+
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vm: the VM to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    service: an ObjectStorageService.
+    bucket_name: the primary bucket to benchmark.
+    regional_bucket_name: the secondary bucket to benchmark.
+
+  Raises:
+    ValueError if an unexpected test outcome is found from the API
+    test script.
+  """
+
   logging.info('Starting multi-stream write test.')
 
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
@@ -595,10 +666,8 @@ def MultiStreamRWBenchmark(results, metadata, vm, command_builder,
       FLAGS.object_storage_object_sizes)
 
   def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
-    # vm_idx = proc_idx // PROCESSES_PER_VM
     cmd = command_builder.BuildCommand(
         cmd_args + ['--stream_num_start=%s' % proc_idx])
-    # out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
     out, _ = vm.RobustRemoteCommand(cmd, should_log=True)
     out_array[proc_idx] = out
 
@@ -618,12 +687,11 @@ def MultiStreamRWBenchmark(results, metadata, vm, command_builder,
     logging.info('All processes complete.')
     return output
 
+  streams_per_vm = FLAGS.object_storage_multistream_num_streams // FLAGS.num_vms
+
   write_start_time = (
       time.time() +
-      MULTISTREAM_DELAY_CONSTANT +
-      MULTISTREAM_DELAY_PER_VM * FLAGS.num_vms +
-      MULTISTREAM_DELAY_PER_STREAM *
-      FLAGS.object_storage_multistream_num_streams)
+      MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
 
   logging.info('Write start time is %s', write_start_time)
 
@@ -647,10 +715,7 @@ def MultiStreamRWBenchmark(results, metadata, vm, command_builder,
 
   read_start_time = (
       time.time() +
-      MULTISTREAM_DELAY_CONSTANT +
-      MULTISTREAM_DELAY_PER_VM * FLAGS.num_vms +
-      MULTISTREAM_DELAY_PER_STREAM *
-      FLAGS.object_storage_multistream_num_streams)
+      MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
 
   logging.info('Read start time is %s', read_start_time)
 
@@ -695,16 +760,24 @@ def _AppendPercentilesToResults(output_results, input_results, metric_name,
 
 def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
                            service, bucket, regional_bucket):
-  """ Performs tests via cli tools
+  """A benchmark for CLI tool throughput.
 
-    We will upload and download a set of files from/to a local directory via
-    cli tools and observe the throughput.
+  We will upload and download a set of files from/to a local directory
+  via cli tools and observe the throughput.
 
-    Args: the benchmark function args, documented above.
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vm: the VM to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    service: an ObjectStorageService.
+    bucket_name: the primary bucket to benchmark.
+    regional_bucket_name: the secondary bucket to benchmark.
 
-    Raises:
-      NotEnoughResultsError: if we failed too many times to upload or download.
+  Raises:
+    NotEnoughResultsError: if we failed too many times to upload or download.
   """
+
   data_directory = '%s/run/data' % vm.GetScratchDir()
   download_directory = '%s/run/temp' % vm.GetScratchDir()
 

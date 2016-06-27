@@ -82,15 +82,15 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-keystoneclient')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
 
-  def CLIUpload(self, vm, file, bucket):
+  def CLIUploadDirectory(self, vm, directory, file_names, bucket):
     return vm.RemoteCommand(
         'time swift %s upload %s %s'
-        % (self.swift_command_prefix, bucket, file))
+        % (self.swift_command_prefix, bucket, directory))
 
-  def CLIDownload(self, vm, bucket, object, dest):
+  def CLIDownloadBucket(self, vm, bucket, objects, dest):
     return vm.RemoteCommand(
-        'time swift %s download %s %s -D %s'
-        % (self.swift_command_prefix, bucket, object, dest))
+        'time swift %s download %s -D %s'
+        % (self.swift_command_prefix, bucket, dest))
 
   def Metadata(self, vm):
     return {SWIFTCLIENT_LIB_VERSION:
