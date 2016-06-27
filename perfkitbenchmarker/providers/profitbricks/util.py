@@ -14,7 +14,6 @@
 """Utilities for working with ProfitBricks resources."""
 
 import logging
-import time
 import requests
 
 from perfkitbenchmarker import errors
@@ -25,11 +24,9 @@ from perfkitbenchmarker.providers.profitbricks import \
 # Global Values
 PROFITBRICKS_API = profitbricks.PROFITBRICKS_API
 FLAVORS = profitbricks_machine_types.FLAVORS
-TIMEOUT = 25.0
-INTERVAL = 15
 
 
-def PerformRequest(action, url, header, json=None, check_status=True):
+def PerformRequest(action, url, header, json=None):
     """ Makes an HTTP request to the ProfitBricks REST API """
 
     # Make HTTP call
@@ -40,11 +37,11 @@ def PerformRequest(action, url, header, json=None, check_status=True):
     elif action == 'delete':
         r = requests.delete(url, headers=header)
 
-    if check_status:
-        # Check Response Status Code
-        if r.status_code >= 300:
-            raise errors.Error('%s call to %s failed, see log.' % (action,
-                                                                   url))
+    # Check Response Status Code
+    if r.status_code >= 300:
+        action = action.upper()
+        raise errors.Error('%s call to %s failed, see log.' % (action,
+                                                               url))
 
     return r
 
@@ -96,9 +93,6 @@ def CreateDatacenter(header, location):
     response = r.json()
     datacenter_id = response['id']
 
-    # Wait for DC to be provisioned
-    WaitFor(status_url, header)
-
     return datacenter_id, status_url
 
 
@@ -123,40 +117,4 @@ def CreateLan(header, datacenter):
     response = r.json()
     lan_id = response['id']
 
-    # Wait for LAN to be provisioned
-    WaitFor(status_url, header)
-
     return lan_id, status_url
-
-
-def WaitFor(status_url, header):
-    """ Polls a resource until the DONE status is returned. """
-
-    # Set counter
-    counter = 0
-
-    # Check status
-    logging.info('Polling resource.')
-    r = PerformRequest('get', status_url, header)
-    response = r.json()
-    status = response['metadata']['status']
-
-    # Keep polling resource until a "DONE" state is returned
-    while status != 'DONE':
-
-        # Wait before polling again
-        time.sleep(INTERVAL)
-
-        # Check status
-        logging.info('Polling resource.')
-        r = PerformRequest('get', status_url, header)
-        response = r.json()
-        status = response['metadata']['status']
-
-        # Check for timeout
-        counter += 0.25
-        if counter >= TIMEOUT:
-            logging.debug('Timed out after waiting %s minutes.' % TIMEOUT)
-            return False
-
-    return True
