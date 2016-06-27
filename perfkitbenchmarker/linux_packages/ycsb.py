@@ -198,6 +198,9 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
         indicates that 530 ops took between 0ms and 1ms, and 1 took between
         19ms and 20ms. Empty bins are not reported.
   """
+
+  # TODO: YCSB 0.9.0 output client and command line string to stderr, so
+  # we need to support it in the future.
   lines = []
   client_string = 'YCSB'
   command_line = 'unknown'

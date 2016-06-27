@@ -75,11 +75,11 @@ def CheckPrerequisites():
     # Before YCSB Cloud Datastore supports Application Default Credential,
     # we should always make sure valid credential flags are set.
     if not FLAGS.google_datastore_keyfile:
-        raise ValueError("'google_datastore_keyfile' must be set")
+        raise ValueError('"google_datastore_keyfile" must be set')
     if not FLAGS.google_datastore_serviceAccount:
-        raise ValueError("'google_datastore_serviceAccount' must be set")
+        raise ValueError('"google_datastore_serviceAccount" must be set')
     if not FLAGS.google_datastore_datasetId:
-        raise ValueError("'google_datastore_datasetId' must be set ")
+        raise ValueError('"google_datastore_datasetId" must be set ')
 
 
 def Prepare(benchmark_spec):
@@ -121,7 +121,6 @@ def Cleanup(benchmark_spec):
     # TODO: support automatic cleanup.
     logging.warning(
         "For now, we can only manually delete all the entries via GCP portal.")
-    return
 
 
 def _Install(vm):
