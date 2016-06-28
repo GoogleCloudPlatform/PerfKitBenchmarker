@@ -223,10 +223,10 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                                        self.network_name)
     stdout, stderr, _ = cmd.Issue()
     if stderr:
-      msg = ' '.join(('Network %s could not be found.' % self.network_name,
-                      'For valid network IDs/names',
-                      'run "openstack network list".',))
-      raise errors.Config.InvalidValue(msg)
+      raise errors.Config.InvalidValue(' '.join(
+          ('Network %s could not be found.' % self.network_name,
+           'For valid network IDs/names',
+           'run "openstack network list".',)))
 
   def _UploadSSHPublicKey(self):
     """Uploads SSH public key to the VM's region."""
