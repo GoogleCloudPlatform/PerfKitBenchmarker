@@ -194,12 +194,12 @@ GCS_MULTIREGION_LOCATION = 'gcs_multiregion_location'
 DEFAULT = 'default'
 
 # This accounts for the overhead of running RemoteCommand() on a VM.
-MULTISTREAM_DELAY_PER_VM = 10.0 * units.second
+MULTISTREAM_DELAY_PER_VM = 5.0 * units.second
 # We wait this long for each stream. Note that this is multiplied by
 # the number of streams per VM, not the total number of streams.
-MULTISTREAM_DELAY_PER_STREAM = 15.0 * units.second
+MULTISTREAM_DELAY_PER_STREAM = 0.1 * units.second
 # And add a constant factor for PKB-side processing
-MULTISTREAM_DELAY_CONSTANT = 150.0 * units.second
+MULTISTREAM_DELAY_CONSTANT = 10.0 * units.second
 
 # The multistream write benchmark writes a file in the VM's /tmp with
 # the objects it has written, which is used by the multistream read
