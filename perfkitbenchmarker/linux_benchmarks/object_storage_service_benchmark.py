@@ -293,7 +293,6 @@ def MultiThreadStartDelay(num_vms, threads_per_vm):
 
 def _ProcessMultiStreamResults(raw_result, operation, sizes,
                                results, metadata=None):
-
   """Read and process results from the api_multistream worker process.
 
   Results will be reported per-object size and combined for all
@@ -455,6 +454,16 @@ def _DistributionToBackendFormat(dist):
 
 
 class APIScriptCommandBuilder(object):
+  """Builds command lines for the API test script.
+
+  Attributes:
+    test_script_path: the path to the API test script on the remote machine.
+    storage: the storage provider to use, in the format expected by
+      the test script.
+    service: the ObjectStorageService object corresponding to the
+      storage provider.
+  """
+
   def __init__(self, test_script_path, storage, service):
     self.test_script_path = test_script_path
     self.storage = storage
@@ -480,6 +489,26 @@ class APIScriptCommandBuilder(object):
                     FLAGS.object_storage_storage_class]
 
     return ' '.join(cmd_parts)
+
+
+class UnsupportedProviderCommandBuilder(APIScriptCommandBuilder):
+  """A dummy command builder for unsupported providers.
+
+  When a provider isn't supported by the API test script yet, we
+  create this command builder for them. It will let us run the CLI
+  benchmark on that provider, but if the user tries to run an API
+  benchmark, it will throw an error.
+
+  Attributes:
+    provider: the name of the unsupported provider.
+  """
+
+  def __init__(self, provider):
+    self.provider = provider
+
+  def BuildCommand(self, args):
+    raise NotImplementedError('API tests are not supported on provider %s.' %
+                              self.provider)
 
 
 def OneByteRWBenchmark(results, metadata, vm, command_builder,
@@ -981,8 +1010,11 @@ def Run(benchmark_spec):
 
   results = []
   test_script_path = '%s/run/%s' % (vms[0].GetScratchDir(), API_TEST_SCRIPT)
-  command_builder = APIScriptCommandBuilder(
-      test_script_path, STORAGE_TO_API_SCRIPT_DICT[FLAGS.storage], service)
+  try:
+    command_builder = APIScriptCommandBuilder(
+        test_script_path, STORAGE_TO_API_SCRIPT_DICT[FLAGS.storage], service)
+  except KeyError:
+    command_builder = UnsupportedProviderCommandBuilder(FLAGS.storage)
   regional_bucket_name = buckets[1] if len(buckets) == 2 else None
 
   for name, benchmark in [('cli', CLIThroughputBenchmark),

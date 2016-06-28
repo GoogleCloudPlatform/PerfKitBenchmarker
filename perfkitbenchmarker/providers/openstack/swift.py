@@ -73,7 +73,7 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
 
   def PrepareVM(self, vm):
     # Upgrade to latest urllib3 version fixes SSL SNMI error
-    vm.InstallPackages('python-urllib3')
+    vm.InstallPackages('python-dev python-urllib3')
     vm.RemoteCommand('sudo pip install python-keystoneclient')
     vm.RemoteCommand('sudo pip install python-swiftclient')
 
