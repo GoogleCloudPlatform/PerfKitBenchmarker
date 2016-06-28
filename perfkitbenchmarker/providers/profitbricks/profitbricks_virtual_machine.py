@@ -182,7 +182,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         delete_status = r.headers['Location']
         if not self._WaitUntilReady(delete_status):
             raise errors.Error('VM deletion failed, see log.')
-    
+
     def _CreateDependencies(self):
         """Create a data center, NIC, and LAN prior to creating VM."""
 
@@ -197,7 +197,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
                                                       self.dc_id)
         if not self._WaitUntilReady(self.lan_status):
             raise errors.Error('LAN creation failed, see log.')
-    
+
     def _DeleteDependencies(self):
         """Delete a data center, NIC, and LAN."""
 
@@ -212,7 +212,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         delete_status = r.headers['Location']
         if not self._WaitUntilReady(delete_status):
             raise errors.Error('Data center deletion failed, see log.')
-    
+
     def _WaitUntilReady(self, status_url):
         """Returns true if the ProfitBricks resource is ready."""
 
