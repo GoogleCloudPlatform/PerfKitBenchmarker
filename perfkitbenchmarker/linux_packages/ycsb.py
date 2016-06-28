@@ -198,20 +198,38 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
         indicates that 530 ops took between 0ms and 1ms, and 1 took between
         19ms and 20ms. Empty bins are not reported.
   """
+
+  # TODO: YCSB 0.9.0 output client and command line string to stderr, so
+  # we need to support it in the future.
+  lines = []
+  client_string = 'YCSB'
+  command_line = 'unknown'
   fp = io.BytesIO(ycsb_result_string)
-  client_string = next(fp).strip()
-  if not client_string.startswith('YCSB Client 0.'):
+  result_string = next(fp).strip()
+
+  def IsHeadOfResults(line):
+      return line.startswith('YCSB Client 0.') or line.startswith('[OVERALL]')
+
+  while not IsHeadOfResults(result_string):
+    result_string = next(fp).strip()
+
+  if result_string.startswith('YCSB Client 0.'):
+    client_string = result_string
+    command_line = next(fp).strip()
+    if not command_line.startswith('Command line:'):
+      raise IOError('Unexpected second line: {0}'.format(command_line))
+  elif result_string.startswith('[OVERALL]'):  # YCSB > 0.7.0.
+    lines.append(result_string)
+  else:
+    # Received unexpected header
     raise IOError('Unexpected header: {0}'.format(client_string))
-  command_line = next(fp).strip()
-  if not command_line.startswith('Command line:'):
-    raise IOError('Unexpected second line: {0}'.format(command_line))
 
   # Some databases print additional output to stdout.
   # YCSB results start with [<OPERATION_NAME>];
   # filter to just those lines.
   def LineFilter(line):
     return re.search(r'^\[[A-Z]+\]', line) is not None
-  lines = itertools.ifilter(LineFilter, fp)
+  lines = itertools.chain(lines, itertools.ifilter(LineFilter, fp))
 
   r = csv.reader(lines)
 
