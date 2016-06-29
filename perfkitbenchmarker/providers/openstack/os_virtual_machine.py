@@ -169,21 +169,19 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _CheckImage(self):
     """Tries to get image, if found continues execution otherwise aborts."""
     cmd = os_utils.OpenStackCLICommand(self, 'image', 'show', self.image)
-    stdout, stderr, _ = cmd.Issue()
-    if stderr:
-      raise errors.Config.InvalidValue(' '.join(
-          ('Image %s could not be found.' % self.image,
-           'For valid image IDs/names run "openstack image list".',)))
+    msg = ' '.join(
+        ('Image %s could not be found.' % self.image,
+         'For valid image IDs/names run "openstack image list".',))
+    self._IssueCommandCheck(cmd, msg)
 
   def _CheckFlavor(self):
     """Tries to get flavor, if found continues execution otherwise aborts."""
     cmd = os_utils.OpenStackCLICommand(self, 'flavor', 'show',
                                        self.machine_type)
-    stdout, stderr, _ = cmd.Issue()
-    if stderr:
-      raise errors.Config.InvalidValue(' '.join(
-          ('Machine type %s could not be found.' % self.machine_type,
-           'For valid machine type IDs/names run "openstack flavor list".',)))
+    msg = ' '.join(
+        ('Machine type %s could not be found.' % self.machine_type,
+         'For valid machine type IDs/names run "openstack flavor list".',))
+    self._IssueCommandCheck(cmd, msg)
 
   def _CheckNetworks(self):
     """Tries to get network, if found continues execution otherwise aborts."""
@@ -221,12 +219,23 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _CheckNetworkExists(self):
     cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',
                                        self.network_name)
+    msg = ' '.join(
+        ('Network %s could not be found.' % self.network_name,
+         'For valid network IDs/names',
+         'run "openstack network list".',))
+    self._IssueCommandCheck(cmd, msg)
+
+  def _IssueCommandCheck(self, cmd, msg):
+    """Issues command and, if stderr is non-empty, raises an error message
+
+    Args:
+        cmd: The command to be issued.
+        msg: The custom message that is thrown if the command fails.
+    """
     stdout, stderr, _ = cmd.Issue()
     if stderr:
-      raise errors.Config.InvalidValue(' '.join(
-          ('Network %s could not be found.' % self.network_name,
-           'For valid network IDs/names',
-           'run "openstack network list".',)))
+      raise errors.Config.InvalidValue(msg)
+
 
   def _UploadSSHPublicKey(self):
     """Uploads SSH public key to the VM's region."""
