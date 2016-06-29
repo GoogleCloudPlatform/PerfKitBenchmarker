@@ -22,8 +22,7 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-FIVE_COLUMNS_ROW_REGEX = (r'\|\s+(\S+)\s+\|\s+(\S+)\s+\|\s+(\S+)\s+'
-                          r'\|\s+(\S+)\s+\|\s+(\S+)\s+\|')
+FIVE_COLUMNS_ROW_REGEX = r'\|\s+(.*)\|\s+(.*)\|\s+(.*)\|\s+(.*)\|\s+(.*)\|'
 FIVE_COLUMNS_PATTERN = re.compile(FIVE_COLUMNS_ROW_REGEX)
 
 
@@ -34,6 +33,7 @@ def ParseNovaTable(output, regex_pattern, key_names):
   dict_list = []
   try:
     next(tuples)  # Skip table header
+    tuples = (map(lambda v: v.strip(), t) for t in tuples)
     dict_list = [dict(zip(key_names, t)) for t in tuples]
   except StopIteration:
     pass  # Empty list
