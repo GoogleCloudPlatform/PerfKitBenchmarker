@@ -49,7 +49,7 @@ class TestBuildCommands(unittest.TestCase):
                    '--objects_per_stream=100',
                    '--object_sizes="{1000: 100.0}"',
                    '--num_streams=1',
-                   '--start_time=176.0',
+                   '--start_time=16.1',
                    '--objects_written_file=/tmp/pkb/pkb-objects-written',
                    '--scenario=MultiStreamWrite',
                    '--stream_num_start=0']))
@@ -59,7 +59,7 @@ class TestBuildCommands(unittest.TestCase):
         mock.call(['--bucket=bucket',
                    '--objects_per_stream=100',
                    '--num_streams=1',
-                   '--start_time=176.0',
+                   '--start_time=16.1',
                    '--objects_written_file=/tmp/pkb/pkb-objects-written',
                    '--scenario=MultiStreamRead',
                    '--stream_num_start=0']))
