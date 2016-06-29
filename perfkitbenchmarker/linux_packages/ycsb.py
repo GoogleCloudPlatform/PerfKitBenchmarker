@@ -515,6 +515,7 @@ class YCSBExecutor(object):
     for parameter, value in parameters.iteritems():
       command.extend(('-p', '{0}={1}'.format(parameter, value)))
 
+    command.append('-p measurementtype=histogram')
     return 'cd %s; %s' % (YCSB_DIR, ' '.join(command))
 
   @property
