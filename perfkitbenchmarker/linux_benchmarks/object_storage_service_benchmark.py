@@ -288,7 +288,7 @@ def MultiThreadStartDelay(num_vms, threads_per_vm):
   return (
       MULTISTREAM_DELAY_CONSTANT +
       MULTISTREAM_DELAY_PER_VM * num_vms +
-      MULTISTREAM_DELAY_PER_STREAM * (num_vms * threads_per_vm))
+      MULTISTREAM_DELAY_PER_STREAM * threads_per_vm)
 
 
 def _ProcessMultiStreamResults(raw_result, operation, sizes,
