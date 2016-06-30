@@ -621,3 +621,4 @@ class SampleCollector(object):
     """Publish samples via all registered publishers."""
     for publisher in self.publishers:
       publisher.PublishSamples(self.samples)
+    self.samples = []
