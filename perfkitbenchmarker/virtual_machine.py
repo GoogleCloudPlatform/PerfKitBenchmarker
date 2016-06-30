@@ -24,6 +24,7 @@ import threading
 
 import jinja2
 
+from perfkitbenchmarker import background_workload
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -579,15 +580,24 @@ class BaseOsMixin(object):
 
   def StartBackgroundWorkload(self):
     """Start the background workload."""
-    if self.background_cpu_threads or self.background_network_mbits_per_sec:
-      raise NotImplementedError()
+    for workload in background_workload.BACKGROUND_WORKLOADS:
+      if workload.IsEnabled(self):
+        if self.OS_TYPE in workload.EXCLUDED_OS_TYPES:
+          raise NotImplementedError()
+        workload.Start(self)
 
   def StopBackgroundWorkload(self):
     """Stop the background workoad."""
-    if self.background_cpu_threads or self.background_network_mbits_per_sec:
-      raise NotImplementedError()
+    for workload in background_workload.BACKGROUND_WORKLOADS:
+      if workload.IsEnabled(self):
+        if self.OS_TYPE in workload.EXCLUDED_OS_TYPES:
+          raise NotImplementedError()
+        workload.Stop(self)
 
   def PrepareBackgroundWorkload(self):
     """Prepare for the background workload."""
-    if self.background_cpu_threads or self.background_network_mbits_per_sec:
-      raise NotImplementedError()
+    for workload in background_workload.BACKGROUND_WORKLOADS:
+      if workload.IsEnabled(self):
+        if self.OS_TYPE in workload.EXCLUDED_OS_TYPES:
+          raise NotImplementedError()
+        workload.Prepare(self)
