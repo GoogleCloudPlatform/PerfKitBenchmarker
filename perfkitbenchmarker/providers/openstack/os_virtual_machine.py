@@ -232,7 +232,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Config.InvalidValue(msg)
     return stdout
 
-
   def _UploadSSHPublicKey(self):
     """Uploads SSH public key to the VM's region."""
     with self._lock:
