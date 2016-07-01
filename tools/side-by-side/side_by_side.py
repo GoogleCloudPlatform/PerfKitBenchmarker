@@ -233,8 +233,10 @@ def _MatchSamples(base_samples, head_samples):
       result.extend(zip(base_samples[base_begin:base_end],
                         head_samples[head_begin:head_end]))
     elif opcode == 'replace':
-      result.extend(itertools.izip_longest(base_samples[base_begin:base_end],
-                                           head_samples[head_begin:head_end]))
+      result.extend(zip(base_samples[base_begin:base_end],
+                        [None] * (base_end - base_begin)))
+      result.extend(zip([None] * (head_end - head_begin),
+                        head_samples[head_begin:head_end]))
     elif opcode == 'delete':
       result.extend(zip(base_samples[base_begin:base_end],
                         [None] * (base_end - base_begin)))

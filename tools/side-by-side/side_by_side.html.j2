@@ -112,6 +112,9 @@
 
          if (left && right) {
            rel = right.value / left.value;
+	   if (right.value == left.value) {
+	     rel = 1
+	   }
            tooltip.push('Relative value: ' + String(rel) + '\n');
            if (rel < 1) {
              style = 'fill-color: #ef8a62';
@@ -255,9 +258,14 @@
                 {% set pct_diff = ((head_sample.value - base_sample.value) / base_sample.value * 100) -%}
                 {% set relative_diff = '{0:.3f}'.format(head_sample.value / base_sample.value) %}
                 {% else -%}
-                {% set pct_diff = infinity -%}
-                {% set relative_diff = "&infin;" %}
-                {% endif -%}
+		  {% if base_sample.value == head_sample.value -%}
+		    {% set pct_diff = 0 -%}
+		    {% set relative_diff = '{0:.3f}'.format(1) -%}
+		  {% else -%}
+                    {% set pct_diff = infinity -%}
+                    {% set relative_diff = "&infin;" %}
+                  {% endif -%}
+		{% endif -%}
                 <td>{{ head_sample.value - base_sample.value }}</td>
                 <td class="{{ class_for_percent_diff(pct_diff) }}">
                   {%- if class_for_percent_diff(pct_diff) %}
