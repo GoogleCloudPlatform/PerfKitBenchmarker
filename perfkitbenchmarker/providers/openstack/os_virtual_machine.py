@@ -175,7 +175,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Tries to get flavor, if found continues execution otherwise aborts."""
     cmd = os_utils.OpenStackCLICommand(self, 'flavor', 'show',
                                        self.machine_type)
-    self._IssueCommandCheck(cmd, 'Flavor', self.machine_type)
+    self._IssueCommandCheck(cmd, 'Machine Type', self.machine_type)
 
   def _CheckNetworks(self):
     """Tries to get network, if found continues execution otherwise aborts."""
@@ -223,10 +223,14 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         id: The ID value that the check was attempted for.
 
     """
-    msg = ' '.join(
-        ('%s %s could not be found.' % (name, id),
-         'For valid %s run' % name.lower(),
-         '"openstack %s list".' % name.lower(),))
+    if id == 'Machine Type':
+      keyword = 'flavor'
+    else:
+      keyword = name
+    msg = '{1},{2} could not be found. ' \
+          'For valid {3} run ' \
+          '"openstack {4} list".'.format(name, id, name.lower(),
+                                         keyword.lower())
     stdout, stderr, _ = cmd.Issue()
     if stderr:
       raise errors.Config.InvalidValue(msg)
