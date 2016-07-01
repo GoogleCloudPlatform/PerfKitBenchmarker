@@ -223,7 +223,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         id: The ID value that the check was attempted for.
 
     """
-    if id == 'Machine Type':
+    if name == 'Machine Type':
       keyword = 'flavor'
     else:
       keyword = name
