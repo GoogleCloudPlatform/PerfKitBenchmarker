@@ -227,9 +227,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       keyword = 'flavor'
     else:
       keyword = name
-    msg = '{1},{2} could not be found. ' \
-          'For valid {3} run ' \
-          '"openstack {4} list".'.format(name, id, name.lower(),
+    msg = '{0},{1} could not be found. ' \
+          'For valid {2} run ' \
+          '"openstack {3} list".'.format(name, id, name.lower(),
                                          keyword.lower())
     stdout, stderr, _ = cmd.Issue()
     if stderr:
