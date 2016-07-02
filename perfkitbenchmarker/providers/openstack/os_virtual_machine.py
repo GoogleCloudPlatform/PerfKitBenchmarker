@@ -215,13 +215,12 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                                        self.network_name)
     self._IssueCommandCheck(cmd, 'Network', self.network_name)
 
-  def _IssueCommandCheck(self, cmd, name, id):
+  def _IssueCommandCheck(self, cmd, name, name_id):
     """Issues command and, if stderr is non-empty, raises an error message
     Args:
         cmd: The command to be issued.
         name: A string of text that identifies the object that the check is for.
-        id: The ID value that the check was attempted for.
-
+        name_id: The ID value pertaining to name object.
     """
     if name == 'Machine Type':
       keyword = 'flavor'
@@ -229,7 +228,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       keyword = name
     msg = '{0} {1} could not be found. ' \
           'For valid {2} run ' \
-          '"openstack {3} list".'.format(name, id, name.lower(),
+          '"openstack {3} list".'.format(name, name_id, name.lower(),
                                          keyword.lower())
     stdout, stderr, _ = cmd.Issue()
     if stderr:
