@@ -77,12 +77,12 @@ class OpenStackFirewall(network.BaseFirewall):
 
     sec_group_rule = (ICMP, icmp_type, icmp_code, vm.group_id)
     with self._lock:
+      if sec_group_rule in self.sec_group_rules_set:
+        return
       cmd = utils.OpenStackCLICommand(vm, OSC_SEC_GROUP_RULE_CMD, 'create',
                                       vm.group_id)
       cmd.flags['dst-port'] = str(icmp_type)
       cmd.flags['proto'] = ICMP
-      if sec_group_rule in self.sec_group_rules_set:
-        return
       cmd.Issue(suppress_warning=True)
       self.sec_group_rules_set.add(sec_group_rule)
 
