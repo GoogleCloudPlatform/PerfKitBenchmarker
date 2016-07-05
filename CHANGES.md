@@ -17,10 +17,10 @@ Bugfixes and maintenance updates:
 * Fix path to cassandra-cli (thanks @adamisrael, GH-1006)
 * Update ycsb version; affects cloud_bigtable_ycsb_benchmark, hbase_ycsb
   (GH-1021, GH-1025, GH-1031)
-  * Use latest gsutil version (GH-1012)
-  * Remove duplicate requirements files (GH-975)
-  * Update openblas version (GH-1003)
-  * Background workload refactor (GH-1033)
+* Use latest gsutil version (GH-1012)
+* Remove duplicate requirements files (GH-975)
+* Update openblas version (GH-1003)
+* Background workload refactor (GH-1033)
 
 # 1.5.0
 
