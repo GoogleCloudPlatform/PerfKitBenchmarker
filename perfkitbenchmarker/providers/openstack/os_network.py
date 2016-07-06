@@ -24,8 +24,6 @@ from perfkitbenchmarker.providers.openstack import utils
 from perfkitbenchmarker import providers
 
 
-NEUTRON_FLOAT_IP_SHOW_CMD = 'floatingip-show'
-NEUTRON_FLOAT_IP_DELETE_CMD = 'floatingip-delete'
 NOVA_FLOAT_IP_LIST_CMD = 'floating-ip-list'
 OSC_IP_CMD = 'ip'
 OSC_FLOATING_SUBCMD = 'floating'
@@ -163,8 +161,6 @@ class OpenStackFloatingIPPool(object):
     return floating_ip_dict
 
   def release(self, vm, floating_ip_dict):
-    # TODO(meteorfox): Change floating IP commands to OpenStack CLI once
-    # support for them is added.
     cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD, OSC_FLOATING_SUBCMD, 'show',
                                     floating_ip_dict['id'])
     stdout, stderr, _ = cmd.Issue(suppress_warning=True)
@@ -177,14 +173,3 @@ class OpenStackFloatingIPPool(object):
                                              updated_floating_ip_dict['id'])
       del delete_cmd.flags['format']  # Command not support json output format
       stdout, stderr, _ = delete_cmd.Issue(suppress_warning=True)
-
-  def is_attached(self, floating_ip_dict):
-    with self._floating_ip_lock:
-      show_cmd = [FLAGS.openstack_neutron_path,
-                  NEUTRON_FLOAT_IP_SHOW_CMD, floating_ip_dict['id'],
-                  '--format', 'json']
-      stdout, stderr, _ = vm_util.IssueCommand(show_cmd, suppress_warning=True)
-      if stderr:
-        return  # Not found, moving on
-      updated_floating_ip_dict = json.loads(stdout)
-      return updated_floating_ip_dict['port_id']
