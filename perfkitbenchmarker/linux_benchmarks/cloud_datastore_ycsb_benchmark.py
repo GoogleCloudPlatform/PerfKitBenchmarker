@@ -68,7 +68,10 @@ flags.DEFINE_string('google_datastore_debug',
 
 
 def GetConfig(user_config):
-    return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+    config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+    if FLAGS['num_vms'].present:
+        config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
+    return config
 
 
 def CheckPrerequisites():
