@@ -1,3 +1,27 @@
+# 1.6.0
+
+New features:
+* Apache Spark benchmark (GH-1014,GH-1011)
+* Cloudsuite dataserving benchmark (thanks @ustiugov, GH-930)
+
+Enhancements:
+* Optionally publish VM hostnames in metadata (GH-1020)
+* Control which netperf benchmarks are run via flag (GH-1029)
+* Netperf benchmark reports min and max latency (GH-1013)
+* Add multichase to the google benchmark set (GH-1018)
+* Update Cloudsuite web serving benchmark (thanks @ivonindza, @GH-998)
+* Object storage updates (GH-987)
+* Repeat Run stage (GH-1032)
+
+Bugfixes and maintenance updates:
+* Fix path to cassandra-cli (thanks @adamisrael, GH-1006)
+* Update ycsb version; affects cloud_bigtable_ycsb_benchmark, hbase_ycsb
+  (GH-1021, GH-1025, GH-1031)
+* Use latest gsutil version (GH-1012)
+* Remove duplicate requirements files (GH-975)
+* Update openblas version (GH-1003)
+* Background workload refactor (GH-1033)
+
 # 1.5.0
 
 New features:
