@@ -94,6 +94,25 @@ class ExtractAllMatchesTestCase(unittest.TestCase):
                       regex, string)
 
 
+class ExtractExactlyOneMatchTestCase(unittest.TestCase):
+  def testNoMatch(self):
+    with self.assertRaises(regex_util.NoMatchError):
+      regex_util.ExtractExactlyOneMatch('foo', 'bar')
+
+  def testNonUniqueMatch(self):
+    with self.assertRaises(regex_util.TooManyMatchesError):
+      regex_util.ExtractExactlyOneMatch('spam', 'spam spam spam')
+
+  def testNoCapturingGroup(self):
+    self.assertEqual(regex_util.ExtractExactlyOneMatch('bar+', 'foo barrr baz'),
+                     'barrr')
+
+  def testCapturingGroup(self):
+    self.assertEqual(
+        regex_util.ExtractExactlyOneMatch('ba(r+)', 'foo barrr baz'),
+        'rrr')
+
+
 class SubstituteTestCase(unittest.TestCase):
 
   def testSubstituteSuccess(self):

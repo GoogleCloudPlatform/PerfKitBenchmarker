@@ -19,7 +19,15 @@ frames, because that seems to be the most standard Python statistical
 data format.
 """
 
+import logging
+
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import units
+
+
+class ProcessSynchronizationError(errors.Error):
+  """Exception raised when we fail to synchronize processes."""
+  pass
 
 
 class Interval(object):
@@ -98,8 +106,16 @@ def GetStreamActiveIntervals(start_times, durations, stream_ids):
   interval_start = stream_start_times.max()
   interval_end = stream_end_times.min()
 
-  return (Interval(first_start, end=last_end),
-          Interval(interval_start, end=interval_end))
+  logging.info('Stream ends after stream starts: %s',
+               (stream_end_times > stream_start_times).all())
+  if interval_end <= interval_start:
+    raise ProcessSynchronizationError(
+        'No interval when all streams were active.')
+
+  any_stream = Interval(first_start, end=last_end)
+  all_streams = Interval(interval_start, end=interval_end)
+
+  return (any_stream, all_streams)
 
 
 def StreamStartAndEndGaps(start_times, durations, interval):

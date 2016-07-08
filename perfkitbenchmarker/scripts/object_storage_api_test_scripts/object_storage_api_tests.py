@@ -37,11 +37,9 @@ import time
 import yaml
 
 import gflags as flags
-import gcs_oauth2_boto_plugin  # noqa
 
-import azure_service
-import gcs
-import s3
+import azure_flags  # noqa
+import s3_flags  # noqa
 
 FLAGS = flags.FLAGS
 
@@ -83,6 +81,8 @@ flags.DEFINE_string('object_sizes', "{1024: 100.0}", 'The size of the objects '
 flags.DEFINE_integer('num_streams', 10, 'The number of streams to use. Only '
                      'applies to the MultiStreamThroughput scenario.',
                      lower_bound=1)
+flags.DEFINE_integer('stream_num_start', 1, 'The number of the first thread in '
+                     'this process.')
 flags.DEFINE_string('objects_written_file', None, 'The path where the '
                     'multistream write benchmark will save a list of the '
                     'objects it wrote, and the multistream read benchmark will '
@@ -791,7 +791,7 @@ def WriteWorker(service, payload,
                     'start_times': start_times,
                     'latencies': latencies,
                     'sizes': sizes,
-                    'stream_num': worker_num})
+                    'stream_num': worker_num + FLAGS.stream_num_start})
 
 
 def ReadWorker(service, start_time, object_records,
@@ -820,7 +820,7 @@ def ReadWorker(service, start_time, object_records,
                     'start_times': start_times,
                     'latencies': latencies,
                     'sizes': sizes,
-                    'stream_num': worker_num})
+                    'stream_num': worker_num + FLAGS.stream_num_start})
 
 
 def OneByteRWBenchmark(service):
@@ -1013,20 +1013,7 @@ def ListConsistencyBenchmark(service):
   return final_result
 
 
-# Although this dictionary does not really fit in this file, moving it
-# out of this file would require either adding a registry to
-# object_storage_interface.py or adding a new module. The improvement
-# in organization of moving it doesn't seem worth the extra
-# complexity.
-_STORAGE_TO_SERVICE_DICT = {
-    'AZURE': azure_service.AzureService,
-    'GCS': gcs.GCSService,
-    'S3': s3.S3Service
-}
-
-
 def Main(argv=sys.argv):
-
   logging.basicConfig(level=logging.INFO)
 
   try:
@@ -1044,7 +1031,20 @@ def Main(argv=sys.argv):
                FLAGS.bucket,
                FLAGS.scenario)
 
-  service = _STORAGE_TO_SERVICE_DICT[FLAGS.storage_provider]()
+  # This is essentially a dictionary lookup implemented in if
+  # statements, but doing it this way allows us to not import the
+  # modules of storage providers we're not using.
+  if FLAGS.storage_provider == 'AZURE':
+    import azure_service
+    service = azure_service.AzureService()
+  elif FLAGS.storage_provider == 'GCS':
+    import gcs
+    service = gcs.GCSService()
+  elif FLAGS.storage_provider == 'S3':
+    import s3
+    service = s3.S3Service()
+  else:
+    raise ValueError('Invalid storage provider %s' % FLAGS.storage_provider)
 
   if FLAGS.storage_provider == 'AZURE':
       # There are DNS lookup issues with the provider Azure when doing

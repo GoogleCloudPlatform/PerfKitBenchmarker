@@ -12,42 +12,91 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for ping_benchmark."""
+"""Tests for object storage service benchmark."""
 
+import time
 import unittest
 import mock
+
 from perfkitbenchmarker.linux_benchmarks import object_storage_service_benchmark
-from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import providers
 from tests import mock_flags
 
-PKB = 'perfkitbenchmarker'
-MOD_PATH = PKB + '.linux_benchmarks.object_storage_service_benchmark'
+
+class TestBuildCommands(unittest.TestCase):
+  def setUp(self):
+    mocked_flags = mock_flags.PatchTestCaseFlags(self)
+
+    mocked_flags.object_storage_multistream_objects_per_stream = 100
+    mocked_flags.object_storage_object_sizes = {'1KB': '100%'}
+    mocked_flags.object_storage_multistream_num_streams = 1
+    mocked_flags.num_vms = 1
+
+  def testBuildCommands(self):
+    vm = mock.MagicMock()
+    vm.RobustRemoteCommand = mock.MagicMock(return_value=('', ''))
+
+    command_builder = mock.MagicMock()
+
+    with mock.patch(time.__name__ + '.time', return_value=1.0):
+      with mock.patch(object_storage_service_benchmark.__name__ +
+                      '._ProcessMultiStreamResults'):
+        object_storage_service_benchmark.MultiStreamRWBenchmark(
+            [], {}, vm, command_builder, None, 'bucket', 'regional-bucket')
+
+    self.assertEqual(
+        command_builder.BuildCommand.call_args_list[0],
+        mock.call(['--bucket=bucket',
+                   '--objects_per_stream=100',
+                   '--object_sizes="{1000: 100.0}"',
+                   '--num_streams=1',
+                   '--start_time=16.1',
+                   '--objects_written_file=/tmp/pkb/pkb-objects-written',
+                   '--scenario=MultiStreamWrite',
+                   '--stream_num_start=0']))
+
+    self.assertEqual(
+        command_builder.BuildCommand.call_args_list[1],
+        mock.call(['--bucket=bucket',
+                   '--objects_per_stream=100',
+                   '--num_streams=1',
+                   '--start_time=16.1',
+                   '--objects_written_file=/tmp/pkb/pkb-objects-written',
+                   '--scenario=MultiStreamRead',
+                   '--stream_num_start=0']))
 
 
-class TestGenerateJobFileString(unittest.TestCase):
+class TestDistributionToBackendFormat(unittest.TestCase):
+  def testPointDistribution(self):
+    dist = {'100KB': '100%'}
 
+    self.assertEqual(
+        object_storage_service_benchmark._DistributionToBackendFormat(dist),
+        {100000: 100.0})
 
-  def testRunCountTest(self):
-    with mock.patch('os.path.isfile', return_value=True),\
-        mock.patch(PKB + '.data.ResourcePath', return_value=['a', 'b']),\
-        mock.patch('os.listdir', return_value=[]),\
-        mock.patch(MOD_PATH + '.S3StorageBenchmark.Prepare') as Prepare,\
-        mock.patch(MOD_PATH
-                   + '.S3StorageBenchmark.Run') as Run, mock.patch(
-                       MOD_PATH + '.S3StorageBenchmark.Cleanup') as Cleanup:
-      flags = mock_flags.PatchTestCaseFlags(self)
-      flags.storage = providers.AWS
-      flags.object_storage_scenario = 'all'
-      vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
-      vm0 = mock.MagicMock()
-      vm_spec.vms = [vm0]
-      object_storage_service_benchmark.Prepare(vm_spec)
-      self.assertEqual(Prepare.call_count, 1)
-      object_storage_service_benchmark.Run(vm_spec)
-      self.assertEqual(Run.call_count, 1)
-      object_storage_service_benchmark.Cleanup(vm_spec)
-      self.assertEqual(Cleanup.call_count, 1)
+  def testMultiplePointsDistribution(self):
+    dist = {'1B': '10%',
+            '2B': '20%',
+            '4B': '70%'}
+
+    self.assertEqual(
+        object_storage_service_benchmark._DistributionToBackendFormat(dist),
+        {1: 10.0,
+         2: 20.0,
+         4: 70.0})
+
+  def testAbbreviatedPointDistribution(self):
+    dist = '100KB'
+
+    self.assertEqual(
+        object_storage_service_benchmark._DistributionToBackendFormat(dist),
+        {100000: 100.0})
+
+  def testBadPercentages(self):
+    dist = {'1B': '50%'}
+
+    with self.assertRaises(ValueError):
+      object_storage_service_benchmark._DistributionToBackendFormat(dist)
+
 
 if __name__ == '__main__':
   unittest.main()
