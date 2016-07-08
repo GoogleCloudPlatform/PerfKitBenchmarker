@@ -17,10 +17,7 @@ from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 
-# Have to have '/.' on the end of the path in order to get
-# consistent scp behavior copying directories when the
-# destination directory may or may not exist.
-AWS_CREDENTIAL_LOCATION = '.aws/.'
+AWS_CREDENTIAL_LOCATION = '.aws'
 DEFAULT_AWS_REGION = 'us-east-1'
 # The endpoints in this table are subdomains of 'amazonaws.com'. So
 # where the table says 's3-us-west-2', you should connect to
@@ -70,7 +67,8 @@ class S3Service(object_storage_service.ObjectStorageService):
          '--recursive'])
 
   def PrepareVM(self, vm):
-    vm.RemoteCommand('sudo pip install awscli boto')
+    vm.Install('awscli')
+    vm.Install('boto')
 
     vm.PushFile(
         object_storage_service.FindCredentialFile('~/' +
@@ -80,8 +78,7 @@ class S3Service(object_storage_service.ObjectStorageService):
                 object_storage_service.DEFAULT_BOTO_LOCATION)
 
   def CleanupVM(self, vm):
-    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall awscli')
-    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
+    vm.Uninstall('awscli')
 
   def CLIUploadDirectory(self, vm, directory, file_names, bucket):
     return vm.RemoteCommand(
@@ -97,5 +94,4 @@ class S3Service(object_storage_service.ObjectStorageService):
 
   def APIScriptArgs(self):
     hostname = AWS_S3_REGION_TO_ENDPOINT_TABLE[self.region]
-
-    return ['--host=%s' % hostname + AWS_S3_ENDPOINT_SUFFIX]
+    return ['--host=' + hostname + AWS_S3_ENDPOINT_SUFFIX]

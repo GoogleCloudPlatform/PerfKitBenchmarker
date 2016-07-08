@@ -85,7 +85,6 @@ class ObjectStorageService(object):
 
   @abc.abstractmethod
   def MakeBucket(self, bucket):
-
     """Make an object storage bucket.
 
     Args:
@@ -97,10 +96,10 @@ class ObjectStorageService(object):
   def DeleteBucket(self, bucket):
     """Delete an object storage bucket.
 
+    This method should succeed even if bucket contains objects.
+
     Args:
       bucket: the name of the bucket to delete.
-
-    This method should succeed even if bucket contains objects.
     """
     pass
 
@@ -236,6 +235,6 @@ def FindBotoFile():
 
   if not os.path.isfile(boto_file):
     raise errors.Benchmarks.MissingObjectCredentialException(
-        'Boto file cannot be found in %s.' % FLAGS.boto_file_location)
+        'Boto file cannot be found in %s.' % boto_file)
 
   return boto_file

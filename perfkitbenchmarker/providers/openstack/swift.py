@@ -72,14 +72,10 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
         ['swift'] + self.swift_command_parts + ['delete', bucket])
 
   def PrepareVM(self, vm):
-    # Upgrade to latest urllib3 version fixes SSL SNMI error
-    vm.InstallPackages('python-dev python-urllib3')
-    vm.RemoteCommand('sudo pip install python-keystoneclient')
-    vm.RemoteCommand('sudo pip install python-swiftclient')
+    vm.Install('swift_client')
 
   def CleanupVM(self, vm):
-    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-swiftclient')
-    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-keystoneclient')
+    vm.Uninstall('swift_client')
     vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
 
   def CLIUploadDirectory(self, vm, directory, file_names, bucket):

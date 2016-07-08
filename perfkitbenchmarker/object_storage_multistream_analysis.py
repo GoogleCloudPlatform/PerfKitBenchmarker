@@ -21,7 +21,13 @@ data format.
 
 import logging
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import units
+
+
+class ProcessSynchronizationError(errors.Error):
+  """Exception raised when we fail to synchronize processes."""
+  pass
 
 
 class Interval(object):
@@ -103,7 +109,8 @@ def GetStreamActiveIntervals(start_times, durations, stream_ids):
   logging.info('Stream ends after stream starts: %s',
                (stream_end_times > stream_start_times).all())
   if interval_end <= interval_start:
-    raise Exception('No interval when all streams were active.')
+    raise ProcessSynchronizationError(
+        'No interval when all streams were active.')
 
   any_stream = Interval(first_start, end=last_end)
   all_streams = Interval(interval_start, end=interval_end)

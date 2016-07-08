@@ -132,9 +132,6 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
     vm.Install('gcs_boto_plugin')
 
-  def CleanupVM(self, vm):
-    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
-
   def CLIUploadDirectory(self, vm, directory, files, bucket):
     return vm.RemoteCommand(
         'time %s -m cp %s/* gs://%s/' % (

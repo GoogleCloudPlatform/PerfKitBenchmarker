@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for ping_benchmark."""
+"""Tests for object storage service benchmark."""
 
 import time
 import unittest

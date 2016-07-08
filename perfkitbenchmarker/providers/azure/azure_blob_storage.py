@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_string('azure_lib_version', None,
@@ -30,7 +29,11 @@ AZURE_CREDENTIAL_LOCATION = '.azure'
 
 
 class AzureBlobStorageService(object_storage_service.ObjectStorageService):
-  """Interface to Azure Blob Storage."""
+  """Interface to Azure Blob Storage.
+
+  Relevant documentation:
+  http://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
+  """
 
   STORAGE_NAME = providers.AZURE
 
@@ -46,8 +49,8 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
         ['azure', 'storage', 'account',
          'keys', 'list', self.storage_account])
 
-    key = re.findall(r'Primary:* (.+)', output)
-    self.azure_key = key[0]
+    self.azure_key = regex_util.ExtractExactlyOneMatch(
+        r'Primary:* (.+)', output)
 
   def CleanupService(self):
     vm_util.IssueCommand(
@@ -75,11 +78,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     pass
 
   def PrepareVM(self, vm):
-    # Documentation:
-    # http://azure.microsoft.com/en-us/documentation/articles/xplat-cli/
-
-    vm.Install('node_js')
-    vm.RemoteCommand('sudo npm install azure-cli -g')
+    vm.Install('azure_cli')
 
     if FLAGS.azure_lib_version:
       version_string = '==' + FLAGS.azure_lib_version
@@ -92,23 +91,27 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
                                                   AZURE_CREDENTIAL_LOCATION),
         AZURE_CREDENTIAL_LOCATION)
 
-
-  def CleanupVM(self, vm):
-    pass
-
   def CLIUploadDirectory(self, vm, directory, file_names, bucket):
     return vm.RemoteCommand(
-        'time for file in %s; '
-        'do azure storage blob upload -q %s/$file %s -a %s -k %s; '
-        'done' % (' '.join(file_names), directory, bucket,
-                  self.storage_account, self.azure_key))
+        ('time for file in {files}; '
+         'do azure storage blob upload -q {directory}/$file {bucket} '
+         '-a {storage_account} -k {key}; '
+         'done').format(files=' '.join(file_names),
+                        directory=directory,
+                        bucket=bucket,
+                        storage_account=self.storage_account,
+                        key=self.azure_key))
 
   def CLIDownloadBucket(self, vm, bucket, objects, dest):
     return vm.RemoteCommand(
-        'time for object in %s; '
-        'do azure storage blob download %s $object %s -a %s -k %s; '
-        'done' % (' '.join(objects), bucket, dest,
-                  self.storage_account, self.azure_key))
+        ('time for object in {objects}; '
+         'do azure storage blob download {bucket} $object {dest} '
+         '-a {storage_account} -k {key}; '
+         'done').format(objects=' '.join(objects),
+                        bucket=bucket,
+                        dest=dest,
+                        storage_account=self.storage_account,
+                        key=self.azure_key))
 
   def Metadata(self, vm):
     return {'azure_lib_version':

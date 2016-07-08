@@ -669,7 +669,13 @@ class RhelMixin(BaseLinuxMixin):
       return
     if package_name not in self._installed_packages:
       package = linux_packages.PACKAGES[package_name]
-      package.YumInstall(self)
+      if hasattr(package, 'YumInstall'):
+        package.YumInstall(self)
+      elif hasattr(package, 'Install'):
+        package.Install(self)
+      else:
+        raise KeyError('Package %s has no install method for RHEL.' %
+                       package_name)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
@@ -677,6 +683,8 @@ class RhelMixin(BaseLinuxMixin):
     package = linux_packages.PACKAGES[package_name]
     if hasattr(package, 'YumUninstall'):
       package.YumUninstall(self)
+    elif hasattr(package, 'Uninstall'):
+      package.Uninstall(self)
 
   def GetPathToConfig(self, package_name):
     """Returns the path to the config file for PerfKit packages.
@@ -778,7 +786,13 @@ class DebianMixin(BaseLinuxMixin):
 
     if package_name not in self._installed_packages:
       package = linux_packages.PACKAGES[package_name]
-      package.AptInstall(self)
+      if hasattr(package, 'AptInstall'):
+        package.AptInstall(self)
+      elif hasattr(package, 'Install'):
+        package.Install(self)
+      else:
+        raise KeyError('Package %s has no install method for Debian.' %
+                       package_name)
       self._installed_packages.add(package_name)
 
   def Uninstall(self, package_name):
@@ -786,6 +800,8 @@ class DebianMixin(BaseLinuxMixin):
     package = linux_packages.PACKAGES[package_name]
     if hasattr(package, 'AptUninstall'):
       package.AptUninstall(self)
+    elif hasattr(package, 'Uninstall'):
+      package.Uninstall(self)
 
   def GetPathToConfig(self, package_name):
     """Returns the path to the config file for PerfKit packages.
@@ -1161,7 +1177,13 @@ class JujuMixin(DebianMixin):
       logging.warn('Failed to install package %s, falling back to Apt (%s)'
                    % (package_name, e))
       if package_name not in self._installed_packages:
-        package.AptInstall(self)
+        if hasattr(package, 'AptInstall'):
+          package.AptInstall(self)
+        elif hasattr(package, 'Install'):
+          package.Install(self)
+        else:
+          raise KeyError('Package %s has no install method for Juju machines.' %
+                         package_name)
         self._installed_packages.add(package_name)
 
   def SetupPackageManager(self):
