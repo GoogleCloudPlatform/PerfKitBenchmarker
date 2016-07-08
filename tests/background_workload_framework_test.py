@@ -60,6 +60,7 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
     spec = benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
     vm0 = mock.MagicMock()
     vm1 = mock.MagicMock()
+    vm0.is_static = True
     spec.ConstructVirtualMachines()
     spec.vms = [vm0, vm1]
     timer = timing_util.IntervalTimer()
@@ -75,6 +76,7 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
       vm0.StopBackgroundWorkload.side_effect = functools.partial(
           self._CheckAndIncrement, expected_last_call=2)
       pkb.DoRunPhase(ping_benchmark, NAME, spec, collector, timer)
+      pkb.DoCleanupPhase(ping_benchmark, NAME, spec, timer)
       self.assertEqual(ping_benchmark.Run.call_count, 1)
       for vm in spec.vms:
         self.assertEqual(vm.StartBackgroundWorkload.call_count, 1)
