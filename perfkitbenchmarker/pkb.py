@@ -360,6 +360,7 @@ def DoPreparePhase(benchmark, name, spec, timer):
     spec.Prepare()
   with timer.Measure('Benchmark Prepare'):
     benchmark.Prepare(spec)
+  spec.StartBackgroundWorkload()
 
 
 def DoRunPhase(benchmark, name, spec, collector, timer):
@@ -375,13 +376,11 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
   """
   logging.info('Running benchmark %s', name)
   events.before_phase.send(events.RUN_PHASE, benchmark_spec=spec)
-  spec.StartBackgroundWorkload()
   try:
     with timer.Measure('Benchmark Run'):
       samples = benchmark.Run(spec)
   finally:
     events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
-    spec.StopBackgroundWorkload()
   collector.AddSamples(samples, name, spec)
   if FLAGS.publish_after_run:
     collector.PublishSamples()
@@ -400,6 +399,7 @@ def DoCleanupPhase(benchmark, name, spec, timer):
   logging.info('Cleaning up benchmark %s', name)
 
   if spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]):
+    spec.StopBackgroundWorkload()
     with timer.Measure('Benchmark Cleanup'):
       benchmark.Cleanup(spec)
 

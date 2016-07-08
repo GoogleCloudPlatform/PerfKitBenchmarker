@@ -69,12 +69,11 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
 
     with mock.patch(ping_benchmark.__name__ + '.Run'):
       ping_benchmark.Run.side_effect = functools.partial(
-          self._CheckAndIncrement, expected_last_call=1)
-      vm0.StartBackgroundWorkload.side_effect = functools.partial(
           self._CheckAndIncrement, expected_last_call=0)
       vm0.StopBackgroundWorkload.side_effect = functools.partial(
-          self._CheckAndIncrement, expected_last_call=2)
+          self._CheckAndIncrement, expected_last_call=1)
       pkb.DoRunPhase(ping_benchmark, NAME, spec, collector, timer)
+      pkb.DoCleanupPhase(ping_benchmark, NAME, spec, timer)
       self.assertEqual(ping_benchmark.Run.call_count, 1)
       for vm in spec.vms:
         self.assertEqual(vm.StartBackgroundWorkload.call_count, 1)
