@@ -45,7 +45,7 @@ jdbc_ycsb:
     default:
       vm_spec: *default_single_core
       vm_count: 1"""
-YCSB_VERSION = '0.9.0'
+
 YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'jdbc-binding', 'lib')
 CREATE_TABLE_SQL = ("CREATE TABLE usertable "
                     "(YCSB_KEY VARCHAR(255) PRIMARY KEY, "
@@ -75,8 +75,10 @@ flags.DEFINE_string('db_driver_path',
 
 
 def GetConfig(user_config):
-    return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
+    config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+    if FLAGS['ycsb_client_vms'].present:
+        config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
+    return config
 
 def CheckPrerequisites():
     # Before YCSB Cloud Datastore supports Application Default Credential,
