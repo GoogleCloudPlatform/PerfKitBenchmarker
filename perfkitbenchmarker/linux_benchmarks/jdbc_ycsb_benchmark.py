@@ -26,7 +26,6 @@ Tested against Azure SQL database.
 """
 
 import posixpath
-import logging
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -80,6 +79,7 @@ def GetConfig(user_config):
         config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
     return config
 
+
 def CheckPrerequisites():
     # Before YCSB Cloud Datastore supports Application Default Credential,
     # we should always make sure valid credential flags are set.
@@ -109,17 +109,17 @@ def Prepare(benchmark_spec):
 
 def ExecuteSql(vm, sql):
     db_args = (
-            ' -p db.driver={0}'
-            ' -p db.url="{1}"'
-            ' -p db.user={2}'
-            ' -p db.passwd={3}').format(
-                                        FLAGS.db_driver,
-                                        FLAGS.db_url,
-                                        FLAGS.db_user,
-                                        FLAGS.db_passwd)
+        ' -p db.driver={0}'
+        ' -p db.url="{1}"'
+        ' -p db.user={2}'
+        ' -p db.passwd={3}').format(
+        FLAGS.db_driver,
+        FLAGS.db_url,
+        FLAGS.db_user,
+        FLAGS.db_passwd)
 
     exec_cmd = 'java -cp "{0}/*" com.yahoo.ycsb.db.JdbcDBCli -c "{1}" ' \
-                .format(YCSB_BINDING_LIB_DIR, sql)
+        .format(YCSB_BINDING_LIB_DIR, sql)
     stdout, stderr = vm.RobustRemoteCommand(exec_cmd + db_args)
 
     if 'successfully executed' not in stdout and not stderr:
@@ -151,6 +151,6 @@ def Cleanup(benchmark_spec):
 
 def _Install(vm):
     vm.Install('ycsb')
-    
+
     # Copy driver jar to VM.
     vm.RemoteCopy(FLAGS.db_driver_path, YCSB_BINDING_LIB_DIR)
