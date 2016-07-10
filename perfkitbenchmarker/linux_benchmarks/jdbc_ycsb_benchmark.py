@@ -147,8 +147,6 @@ def Run(benchmark_spec):
 def Cleanup(benchmark_spec):
     # support automatic cleanup.
     ExecuteSql(benchmark_spec.vms[0], DROP_TABLE_SQL)
-    #logging.warning(
-    #    "For now, we can only manually drop the table.")
 
 
 def _Install(vm):
