@@ -14,6 +14,5 @@
 
 # Requirements for running PerfKitBenchmarker on OpenStack.
 -r../../../requirements.txt
-python-neutronclient==4.1.1
 python-novaclient==4.0.0
 python-openstackclient==2.4.0
