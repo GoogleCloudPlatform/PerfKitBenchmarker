@@ -55,7 +55,7 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-YCSB_VERSION = '0.7.0'
+YCSB_VERSION = '0.9.0'
 YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases/'
                 'download/{0}/ycsb-{0}.tar.gz').format(YCSB_VERSION)
 YCSB_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb')
@@ -627,8 +627,11 @@ class YCSBExecutor(object):
       param, value = pv.split('=', 1)
       kwargs[param] = value
     command = self._BuildCommand('run', **kwargs)
-    stdout, _ = vm.RobustRemoteCommand(command)
-    return ParseResults(str(stdout))
+    # YCSB version greater than 0.7.0 output some of the
+    # info we need to stderr. So we have to combine these 2
+    # output to get expected results.
+    stdout, stderr = vm.RobustRemoteCommand(command)
+    return ParseResults(str(stderr + stdout))
 
   def _RunThreaded(self, vms, **kwargs):
     """Run a single workload using `vms`."""
