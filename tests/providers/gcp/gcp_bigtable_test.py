@@ -27,21 +27,14 @@ ZONE = 'testzone'
 
 VALID_JSON_BASE = """[
     {{
-      "clusterId": "{2}",
-      "defaultStorageType": "STORAGE_SSD",
-      "displayName": "testing cluster",
-      "name": "projects/{0}/zones/{1}/clusters/not{2}",
-      "zoneId": "{1}",
-      "serveNodes": 3
+      "displayName": "SSD Instance",
+      "name": "projects/{0}/instances/not{1}",
+      "state": "READY"
     }},
     {{
-      "clusterId": "{2}",
-      "defaultStorageType": "STORAGE_HDD",
-      "displayName": "HDD Cluster",
-      "hddBytes": "1099511627776",
-      "name": "projects/{0}/zones/{1}/clusters/{2}",
-      "zoneId": "{1}",
-      "serveNodes": 3
+      "displayName": "HDD Instance",
+      "name": "projects/{0}/instances/{1}",
+      "state": "READY"
     }}
 ]"""
 
@@ -50,8 +43,8 @@ class GcpBigtableTestCase(unittest.TestCase):
 
   def setUp(self):
     super(GcpBigtableTestCase, self).setUp()
-    self.bigtable = gcp_bigtable.GcpBigtableCluster(NAME, NUM_NODES, PROJECT,
-                                                    ZONE)
+    self.bigtable = gcp_bigtable.GcpBigtableInstance(NAME, NUM_NODES, PROJECT,
+                                                     ZONE)
 
   def testEmptyTableList(self):
     with mock.patch.object(util.GcloudCommand, 'Issue',
@@ -64,13 +57,13 @@ class GcpBigtableTestCase(unittest.TestCase):
       self.assertFalse(self.bigtable._Exists())
 
   def testFoundTable(self):
-    stdout = VALID_JSON_BASE.format(PROJECT, ZONE, NAME)
+    stdout = VALID_JSON_BASE.format(PROJECT, NAME)
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=(stdout, '', 0)):
       self.assertTrue(self.bigtable._Exists())
 
   def testNotFoundTable(self):
-    stdout = VALID_JSON_BASE.format(PROJECT, ZONE, NAME + 'nope')
+    stdout = VALID_JSON_BASE.format(PROJECT, NAME + 'nope')
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=(stdout, '', 0)):
       self.assertFalse(self.bigtable._Exists())

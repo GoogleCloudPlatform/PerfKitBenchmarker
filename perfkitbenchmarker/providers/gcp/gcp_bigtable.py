@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing class for GCP's bigtable clusters.
+"""Module containing class for GCP's bigtable instances.
 
 Clusters can be created and deleted.
 """
@@ -26,42 +26,47 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 
 
-class GcpBigtableCluster(resource.BaseResource):
-  """Object representing a GCP Bigtable Cluster.
+class GcpBigtableInstance(resource.BaseResource):
+  """Object representing a GCP Bigtable Instance.
 
   Attributes:
-    name: Cluster name.
-    num_nodes: Number of nodes in the cluster.
-    project: Enclosing project for the cluster.
-    zone: zone of the cluster.
+    name: Instance and cluster name.
+    num_nodes: Number of nodes in the instance's cluster.
+    project: Enclosing project for the instance.
+    zone: zone of the instance's cluster.
   """
 
   def __init__(self, name, num_nodes, project, zone):
-    super(GcpBigtableCluster, self).__init__()
+    super(GcpBigtableInstance, self).__init__()
     self.num_nodes = num_nodes
     self.name = name
     self.zone = zone
     self.project = project
 
   def _Create(self):
-    """Creates the cluster."""
-    cmd = util.GcloudCommand(self, 'alpha', 'bigtable', 'clusters', 'create',
+    """Creates the instance."""
+    cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'instances', 'create',
                              self.name)
     cmd.flags['description'] = 'PkbCreatedCluster'
-    cmd.flags['nodes'] = str(self.num_nodes)
-    cmd.flags['zone'] = self.zone
+    cmd.flags['cluster'] = self.name
+    cmd.flags['cluster-num-nodes'] = str(self.num_nodes)
+    cmd.flags['cluster-zone'] = self.zone
     cmd.flags['project'] = self.project
+    # The zone flag makes this command fail.
+    cmd.flags['zone'] = []
     cmd.Issue()
 
   def _Delete(self):
-    """Deletes the cluster."""
-    cmd = util.GcloudCommand(self, 'alpha', 'bigtable', 'clusters', 'delete',
+    """Deletes the instance."""
+    cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'instances', 'delete',
                              self.name)
+    # The zone flag makes this command fail.
+    cmd.flags['zone'] = []
     cmd.Issue()
 
   def _Exists(self):
-    """Returns true if the cluster exists."""
-    cmd = util.GcloudCommand(self, 'alpha', 'bigtable', 'clusters', 'list')
+    """Returns true if the instance exists."""
+    cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'instances', 'list')
     cmd.flags['format'] = 'json'
     cmd.flags['project'] = self.project
     # The zone flag makes this command fail.
@@ -72,9 +77,10 @@ class GcpBigtableCluster(resource.BaseResource):
       # the table isn't there, but because we can't figure out whether
       # it is there.  This behavior is consistent without other
       # _Exists methods.
-      logging.error('Unable to list GCP Bigtable clusters. Return code %s '
+      logging.error('Unable to list GCP Bigtable instances. Return code %s '
                     'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
       return False
     result = json.loads(stdout)
-    clusters = {cluster['clusterId'] for cluster in result}
-    return self.name in clusters
+    instances = {instance['name'] for instance in result}
+    full_name = 'projects/{}/instances/{}'.format(self.project, self.name)
+    return full_name in instances
