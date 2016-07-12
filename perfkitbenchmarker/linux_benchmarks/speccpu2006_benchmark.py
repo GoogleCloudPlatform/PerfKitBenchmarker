@@ -383,7 +383,11 @@ def _ExtractScore(stdout, vm, keep_partial_results):
       # remove the final SPEC(int|fp) score, which has only 2 columns.
       result_section.pop()
 
-  metadata = {'num_cpus': vm.num_cpus}
+  metadata = {'num_cpus': vm.num_cpus,
+              'runspec_config': FLAGS.runspec_config,
+              'runspec_iterations': str(FLAGS.runspec_iterations),
+              'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
+              'runspec_define': FLAGS.runspec_define}
   metadata.update(vm.GetMachineTypeDict())
 
   missing_results = []
