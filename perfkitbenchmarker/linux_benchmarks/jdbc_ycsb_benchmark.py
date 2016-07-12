@@ -78,6 +78,7 @@ flags.DEFINE_integer('jdbc_ycsb_fetch_size',
                      10,
                      'The JDBC fetch size hinted to driver')
 
+
 def GetConfig(user_config):
     config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
     if FLAGS['ycsb_client_vms'].present:
