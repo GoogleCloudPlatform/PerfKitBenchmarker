@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,22 +56,27 @@ CREATE_TABLE_SQL = ("CREATE TABLE usertable "
 DROP_TABLE_SQL = "DROP TABLE IF EXISTS usertable;"
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('db_driver',
+flags.DEFINE_string('jdbc_ycsb_db_driver',
                     None,
                     'The class of JDBC driver that connects to DB.')
-flags.DEFINE_string('db_url',
+flags.DEFINE_string('jdbc_ycsb_db_url',
                     None,
                     'The URL that is used to connect to DB')
-flags.DEFINE_string('db_user',
+flags.DEFINE_string('jdbc_ycsb_db_user',
                     None,
                     'The username of target DB.')
-flags.DEFINE_string('db_passwd',
+flags.DEFINE_string('jdbc_ycsb_db_passwd',
                     None,
                     'The password of specified DB user.')
-flags.DEFINE_string('db_driver_path',
+flags.DEFINE_string('jdbc_ycsb_db_driver_path',
                     None,
                     'The path to JDBC driver jar file on local machine.')
-
+flags.DEFINE_integer('jdbc_ycsb_db_batch_size',
+                     0,
+                     'The batch size for doing batched insert.')
+flags.DEFINE_integer('jdbc_ycsb_fetch_size',
+                     10,
+                     'The JDBC fetch size hinted to driver')
 
 def GetConfig(user_config):
     config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -83,16 +88,16 @@ def GetConfig(user_config):
 def CheckPrerequisites():
     # Before YCSB Cloud Datastore supports Application Default Credential,
     # we should always make sure valid credential flags are set.
-    if not FLAGS.db_driver:
-        raise ValueError('"db_driver" must be set')
-    if not FLAGS.db_driver_path:
-        raise ValueError('"db_driver_path" must be set')
-    if not FLAGS.db_url:
-        raise ValueError('"db_url" must be set')
-    if not FLAGS.db_user:
-        raise ValueError('"db_user" must be set ')
-    if not FLAGS.db_passwd:
-        raise ValueError('"db_passwd" must be set ')
+    if not FLAGS.jdbc_ycsb_db_driver:
+        raise ValueError('"jdbc_ycsb_db_driver" must be set')
+    if not FLAGS.jdbc_ycsb_db_driver_path:
+        raise ValueError('"jdbc_ycsb_db_driver_path" must be set')
+    if not FLAGS.jdbc_ycsb_db_url:
+        raise ValueError('"jdbc_ycsb_db_url" must be set')
+    if not FLAGS.jdbc_ycsb_db_user:
+        raise ValueError('"jdbc_ycsb_db_user" must be set ')
+    if not FLAGS.jdbc_ycsb_db_passwd:
+        raise ValueError('"jdbc_ycsb_db_passwd" must be set ')
 
 
 def Prepare(benchmark_spec):
@@ -113,10 +118,10 @@ def ExecuteSql(vm, sql):
         ' -p db.url="{1}"'
         ' -p db.user={2}'
         ' -p db.passwd={3}').format(
-        FLAGS.db_driver,
-        FLAGS.db_url,
-        FLAGS.db_user,
-        FLAGS.db_passwd)
+        FLAGS.jdbc_ycsb_db_driver,
+        FLAGS.jdbc_ycsb_db_url,
+        FLAGS.jdbc_ycsb_db_user,
+        FLAGS.jdbc_ycsb_db_passwd)
 
     exec_cmd = 'java -cp "{0}/*" com.yahoo.ycsb.db.JdbcDBCli -c "{1}" ' \
         .format(YCSB_BINDING_LIB_DIR, sql)
@@ -130,10 +135,12 @@ def Run(benchmark_spec):
     vms = benchmark_spec.vms
     executor = ycsb.YCSBExecutor('jdbc')
     run_kwargs = {
-        'db.driver': FLAGS.db_driver,
-        'db.url': '"%s"' % FLAGS.db_url,
-        'db.user': FLAGS.db_user,
-        'db.passwd': FLAGS.db_passwd,
+        'db.driver': FLAGS.jdbc_ycsb_db_driver,
+        'db.url': '"%s"' % FLAGS.jdbc_ycsb_db_url,
+        'db.user': FLAGS.jdbc_ycsb_db_user,
+        'db.passwd': FLAGS.jdbc_ycsb_db_passwd,
+        'db.batchsize': FLAGS.jdbc_ycsb_db_batch_size,
+        'jdbc.fetchsize': FLAGS.jdbc_ycsb_fetch_size,
     }
     load_kwargs = run_kwargs.copy()
     if FLAGS['ycsb_preload_threads'].present:
@@ -153,4 +160,4 @@ def _Install(vm):
     vm.Install('ycsb')
 
     # Copy driver jar to VM.
-    vm.RemoteCopy(FLAGS.db_driver_path, YCSB_BINDING_LIB_DIR)
+    vm.RemoteCopy(FLAGS.jdbc_ycsb_db_driver_path, YCSB_BINDING_LIB_DIR)
