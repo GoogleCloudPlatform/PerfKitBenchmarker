@@ -27,6 +27,7 @@ def YumInstall(vm):
   """Installs the OpenJDK7 package on the VM."""
   vm.InstallPackages('java-1.7.0-openjdk-devel')
 
+
 @vm_util.Retry(max_retries=1)
 def AptInstall(vm):
   """Installs the OpenJDK7 package on the VM."""
@@ -39,8 +40,8 @@ def AptInstall(vm):
       UpdateAptRepo(vm)
       raise e
 
+
 def UpdateAptRepo(vm):
     logging.info('Adding openjdk repo.')
     vm.RemoteCommand('sudo add-apt-repository -y ppa:openjdk-r/ppa')
     vm.RemoteCommand('sudo apt-get update')
-
