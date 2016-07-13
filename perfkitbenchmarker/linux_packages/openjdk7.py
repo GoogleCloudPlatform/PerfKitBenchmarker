@@ -14,6 +14,11 @@
 
 
 """Module containing OpenJDK7 installation and cleanup functions."""
+import logging
+
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import vm_util
+
 
 JAVA_HOME = '/usr'
 
@@ -22,7 +27,20 @@ def YumInstall(vm):
   """Installs the OpenJDK7 package on the VM."""
   vm.InstallPackages('java-1.7.0-openjdk-devel')
 
-
+@vm_util.Retry(max_retries=1)
 def AptInstall(vm):
   """Installs the OpenJDK7 package on the VM."""
-  vm.InstallPackages('openjdk-7-jdk')
+  try:
+      vm.InstallPackages('openjdk-7-jdk')
+  except errors.VirtualMachine.RemoteCommandError as e:
+      # On Ubuntu 16.04, we have to add the repo that contains
+      # openjdk7 before we can install it.
+      logging.warning('failed to install openjdk-7-jdk.')
+      UpdateAptRepo(vm)
+      raise e
+
+def UpdateAptRepo(vm):
+    logging.info('Adding openjdk repo.')
+    vm.RemoteCommand('sudo add-apt-repository -y ppa:openjdk-r/ppa')
+    vm.RemoteCommand('sudo apt-get update')
+
