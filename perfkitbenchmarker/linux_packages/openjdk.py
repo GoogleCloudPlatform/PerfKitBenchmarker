@@ -21,7 +21,10 @@ FLAGS = flags.FLAGS
 
 JAVA_HOME = '/usr'
 
-flags.DEFINE_string('openjdk_version', '7', 'Version of openjdk to use.')
+flags.DEFINE_string('openjdk_version', '7', 'Version of openjdk to use. '
+                    'You must use this flag to specify version 8 for '
+                    'ubuntu 1604 and other operating systems where '
+                    'openjdk7 is not installable by default')
 
 
 def YumInstall(vm):
