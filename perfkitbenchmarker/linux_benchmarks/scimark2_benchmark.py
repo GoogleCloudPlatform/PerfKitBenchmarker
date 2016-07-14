@@ -81,7 +81,7 @@ def Prepare(benchmark_spec):
   logging.info('Preparing SciMark2 on %s', vm)
   vm.Install('build_tools')
   vm.Install('wget')
-  vm.Install('openjdk7')
+  vm.Install('openjdk')
   vm.InstallPackages('unzip')
   cmds = [
       'rm -rf {0} && mkdir {0}'.format(SCIMARK2_PATH),
