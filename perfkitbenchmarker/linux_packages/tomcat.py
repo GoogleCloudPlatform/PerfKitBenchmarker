@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ _TOMCAT_PROTOCOL = 'org.apache.coyote.http11.Http11Nio2Protocol'
 
 
 def _Install(vm):
-  vm.Install('openjdk7')
+  vm.Install('openjdk')
   vm.Install('curl')
   vm.RemoteCommand(
       ('mkdir -p {0} && curl -L {1} | '

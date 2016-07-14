@@ -13,16 +13,25 @@
 # limitations under the License.
 
 
-"""Module containing OpenJDK7 installation and cleanup functions."""
+"""Module containing OpenJDK installation and cleanup functions."""
+
+from perfkitbenchmarker import flags
+
+FLAGS = flags.FLAGS
 
 JAVA_HOME = '/usr'
 
+flags.DEFINE_string('openjdk_version', '7', 'Version of openjdk to use. '
+                    'You must use this flag to specify version 8 for '
+                    'ubuntu 1604 and other operating systems where '
+                    'openjdk7 is not installable by default')
+
 
 def YumInstall(vm):
-  """Installs the OpenJDK7 package on the VM."""
-  vm.InstallPackages('java-1.7.0-openjdk-devel')
+  """Installs the OpenJDK package on the VM."""
+  vm.InstallPackages('java-1.{0}.0-openjdk-devel'.format(FLAGS.openjdk_version))
 
 
 def AptInstall(vm):
-  """Installs the OpenJDK7 package on the VM."""
-  vm.InstallPackages('openjdk-7-jdk')
+  """Installs the OpenJDK package on the VM."""
+  vm.InstallPackages('openjdk-{0}-jdk'.format(FLAGS.openjdk_version))

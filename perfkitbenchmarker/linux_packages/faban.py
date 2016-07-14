@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import time
 import posixpath
 
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages.openjdk7 import JAVA_HOME
+from perfkitbenchmarker.linux_packages.openjdk import JAVA_HOME
 
 FABAN_HOME_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'faban')
 
@@ -30,7 +30,7 @@ FABAN_PORT = 9980
 
 def _Install(vm):
   """Installs the Faban on the VM."""
-  vm.Install('openjdk7')
+  vm.Install('openjdk')
   vm.Install('ant')
   vm.RemoteCommand('cd {0} && '
                    'wget {2} && '

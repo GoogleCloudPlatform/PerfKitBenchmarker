@@ -69,7 +69,7 @@ def _Install(vm):
   """Installs Cassandra from a tarball."""
   vm.Install('ant')
   vm.Install('build_tools')
-  vm.Install('openjdk7')
+  vm.Install('openjdk')
   vm.Install('curl')
   vm.RemoteCommand(
       'cd {0}; git clone {1}; cd {2}; git checkout {3}; {4}/bin/ant'.format(

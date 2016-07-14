@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ MVN_DIR = '%s/apache-maven-3.3.9' % vm_util.VM_TMP_DIR
 
 def _Install(vm):
   """Installs the maven package on the VM."""
-  vm.Install('openjdk7')
+  vm.Install('openjdk')
   vm.Install('wget')
   vm.RemoteCommand('wget %s -P %s' % (MVN_URL, vm_util.VM_TMP_DIR))
   vm.RemoteCommand('cd %s && tar xvzf %s' % (vm_util.VM_TMP_DIR, MVN_TAR))
