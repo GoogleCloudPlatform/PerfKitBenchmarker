@@ -23,6 +23,7 @@ JAVA_HOME = '/usr'
 
 flags.DEFINE_string('openjdk_version', '7', 'Version of openjdk to use.')
 
+
 def YumInstall(vm):
   """Installs the OpenJDK package on the VM."""
   vm.InstallPackages('java-1.{0}.0-openjdk-devel'.format(FLAGS.openjdk_version))
