@@ -61,18 +61,18 @@ flags.DEFINE_enum('cloud', providers.GCP,
                   providers.VALID_CLOUDS,
                   'Name of the cloud to use.')
 flags.DEFINE_string('scratch_dir', None,
-                    'Base name for all scratch disk directories in the VM.'
-                    'Upon creation, these directories will have numbers'
+                    'Base name for all scratch disk directories in the VM. '
+                    'Upon creation, these directories will have numbers '
                     'appended to them (for example /scratch0, /scratch1, etc).')
 flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
                   [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
                   'Method used to check compatibility between the benchmark '
                   ' and the cloud.  ' + SUPPORTED + ' runs the benchmark only'
                   ' if the cloud provider has declared it supported. ' +
-                  NOT_EXCLUDED + ' runs the benchmark unless it has been '
-                  ' declared not supported by the could provider. ' +
+                  NOT_EXCLUDED + ' runs the benchmark unless it has been'
+                  ' declared not supported by the cloud provider. ' +
                   SKIP_CHECK + ' does not do the compatibility'
-                  ' check. The default is ' + SUPPORTED)
+                  ' check.')
 
 
 class BenchmarkSpec(object):
