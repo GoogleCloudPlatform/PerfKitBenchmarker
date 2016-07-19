@@ -95,3 +95,7 @@ class S3Service(object_storage_service.ObjectStorageService):
   def APIScriptArgs(self):
     hostname = AWS_S3_REGION_TO_ENDPOINT_TABLE[self.region]
     return ['--host=' + hostname + AWS_S3_ENDPOINT_SUFFIX]
+
+  @classmethod
+  def APIScriptFiles(cls):
+    return ['boto_service.py', 's3.py']

@@ -147,6 +147,12 @@ LARGE_DATA_SIZE_IN_MBITS = 8 * LARGE_DATA_SIZE_IN_BYTES / 1000 / 1000
 API_TEST_SCRIPT = 'object_storage_api_tests.py'
 API_TEST_SCRIPTS_DIR = 'object_storage_api_test_scripts'
 
+# Files that will be sent to the remote VM for API tests.
+API_TEST_SCRIPT_FILES = ['object_storage_api_tests.py',
+                         'object_storage_interface.py',
+                         'azure_flags.py',
+                         's3_flags.py']
+
 # Various constants to name the result metrics.
 THROUGHPUT_UNIT = 'Mbps'
 LATENCY_UNIT = 'seconds'
@@ -894,7 +900,7 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
                               metadata)
 
 
-def PrepareVM(vm):
+def PrepareVM(vm, service):
   vm.Install('pip')
   vm.RemoteCommand('sudo pip install python-gflags==2.0')
   vm.RemoteCommand('sudo pip install pyyaml')
@@ -913,11 +919,10 @@ def PrepareVM(vm):
   file_path = data.ResourcePath(DATA_FILE)
   vm.PushFile(file_path, '%s/run/' % scratch_dir)
 
-  api_test_scripts_path = data.ResourcePath(API_TEST_SCRIPTS_DIR)
-  for path in os.listdir(api_test_scripts_path):
+  for file_name in API_TEST_SCRIPT_FILES + service.APIScriptFiles():
+    path = data.ResourcePath(os.path.join(API_TEST_SCRIPTS_DIR, file_name))
     logging.info('Uploading %s to %s', path, vm)
-    vm.PushFile('%s/%s' % (api_test_scripts_path, path),
-                '%s/run/' % scratch_dir)
+    vm.PushFile(path, '%s/run/' % scratch_dir)
 
 
 def CleanupVM(vm):
@@ -942,7 +947,7 @@ def Prepare(benchmark_spec):
   service.PrepareService(FLAGS.object_storage_region)
 
   vms = benchmark_spec.vms
-  PrepareVM(vms[0])
+  PrepareVM(vms[0], service)
   service.PrepareVM(vms[0])
 
   # We would like to always cleanup server side states when exception happens.

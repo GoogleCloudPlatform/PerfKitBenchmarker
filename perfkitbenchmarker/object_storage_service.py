@@ -211,6 +211,17 @@ class ObjectStorageService(object):
 
     return []
 
+  @classmethod
+  def APIScriptFiles(cls):
+    """Files to upload for the API test script.
+
+    Returns:
+      A list of file names. These files will be uploaded to the remote
+      VM if this service's API is being benchmarked.
+    """
+
+    return []
+
 
 def FindCredentialFile(default_location):
   """Return the path to the credential file."""
