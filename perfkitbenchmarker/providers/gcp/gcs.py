@@ -147,3 +147,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
                 linux_packages.GetPipPackageVersion(vm, 'boto')}
 
     return metadata
+
+  @classmethod
+  def APIScriptFiles(cls):
+    return ['boto_service.py', 'gcs.py']

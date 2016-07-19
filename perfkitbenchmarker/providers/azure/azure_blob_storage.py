@@ -120,3 +120,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   def APIScriptArgs(self):
     return ['--azure_account=%s' % self.storage_account,
             '--azure_key=%s' % self.azure_key]
+
+  @classmethod
+  def APIScriptFiles(cls):
+    return ['azure_service.py']
