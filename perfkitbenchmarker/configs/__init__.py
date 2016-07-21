@@ -83,7 +83,7 @@ flags.DEFINE_multistring(
     'the user config (specified via --benchmark_config_file_path), so it has '
     'a higher priority than that config. The value of the flag should be '
     'fully.qualified.key=value (e.g. --config_override=cluster_boot.vm_groups.'
-    'default.vm_count=4). This flag can be repeated.')
+    'default.vm_count=4).')
 
 
 def _LoadUserConfig(path):
