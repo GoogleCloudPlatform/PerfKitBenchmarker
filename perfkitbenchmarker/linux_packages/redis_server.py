@@ -40,7 +40,6 @@ def _Install(vm):
   """Installs the redis package on the VM."""
   vm.Install('build_tools')
   vm.Install('wget')
-  #vm.Install('ruby')
   vm.RemoteCommand('wget %s -P %s' % (REDIS_URL, vm_util.VM_TMP_DIR))
   vm.RemoteCommand('cd %s && tar xvfz %s' % (vm_util.VM_TMP_DIR, REDIS_TAR))
   vm.RemoteCommand('cd %s && make' % REDIS_DIR)
@@ -70,43 +69,16 @@ def Configure(vm):
     vm.RemoteCommand(
         r'sed -i -e "s/port %d/port %d/g" %s/redis-%d.conf' %
         (REDIS_FIRST_PORT, port, REDIS_DIR, port))
-    """
-    vm.RemoteCommand(
-        (r'sed -i -e "s/protected-mode yes/protected-mode no/g" '
-         '%s/redis-%d.conf') %
-        (REDIS_DIR, port))
-    if FLAGS.redis_total_num_processes > 1:
-      vm.RemoteCommand(
-          (r'sed -i -e "s/# *cluster-enabled yes/cluster-enabled yes/g" '
-           '%s/redis-%d.conf') %
-          (REDIS_DIR, port))
-      vm.RemoteCommand(
-          (r'sed -i -e "s/# cluster-config-file '
-           'nodes-%s.conf/cluster-config-file nodes-%s/g" %s/redis-%d.conf') %
-          (REDIS_FIRST_PORT, port, REDIS_DIR, port))
-      vm.RemoteCommand(
-          (r'sed -i -e "s/# cluster-node-timeout 15000/cluster-node-timeout '
-           '5000/g" %s/redis-%d.conf') %
-          (REDIS_DIR, port))
-    """
 
 
 def Start(vm):
   """Start redis server process."""
-  addresses = []
   for i in range(FLAGS.redis_total_num_processes):
     port = REDIS_FIRST_PORT + i
-    #addresses.append('127.0.0.1:%s' % str(port))
     vm.RemoteCommand(
         ('nohup sudo {0}/src/redis-server {0}/redis-{1}.conf '
          '&> /dev/null & echo $! > {0}/{2}-{1}').format(
              REDIS_DIR, port, REDIS_PID_FILE))
-  """
-  if FLAGS.redis_total_num_processes > 1:
-    vm.RemoteCommand('sudo gem install redis')
-    vm.RemoteCommand('sudo yes yes | {0}/src/redis-trib.rb create {1}'.format(
-        REDIS_DIR, ' '.join(addresses)))
-  """
 
 
 def Cleanup(vm):
