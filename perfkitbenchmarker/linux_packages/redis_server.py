@@ -20,11 +20,8 @@ from perfkitbenchmarker import vm_util
 
 
 flags.DEFINE_integer('redis_total_num_processes', 1,
-                     'Total number of redis server processes.')
-
-flags.RegisterValidator(
-    'redis_total_num_processes',
-    lambda num: num >= 1)
+                     'Total number of redis server processes.',
+                     lower_bound=1)
 
 
 REDIS_VERSION = '2.8.9'
@@ -82,5 +79,5 @@ def Start(vm):
 
 
 def Cleanup(vm):
-  "Remove redis."
+  """Remove redis."""
   vm.RemoteCommand('sudo pkill redis-server')

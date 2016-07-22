@@ -96,7 +96,7 @@ def Run(benchmark_spec):
           'redis.host': redis_vm.internal_ip,
           'perclientparam': [{
               'redis.port': redis_server.REDIS_FIRST_PORT + i} for i in range(
-                  FLAGS.redis_total_num_processes)]})
+                  FLAGS.redis_total_num_processes)] * FLAGS.ycsb_client_vms})
 
   metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
               'redis_total_num_processes': FLAGS.redis_total_num_processes}
@@ -119,6 +119,4 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  (benchmark_spec.vm_groups['workers'][0]
-   .RemoteCommand('kill $(cat {0})'.format(REDIS_PID_FILE),
-                  ignore_failure=True))
+  redis_server.Cleanup(benchmark_spec.vm_groups['workers'][0])
