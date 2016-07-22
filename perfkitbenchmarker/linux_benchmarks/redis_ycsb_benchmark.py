@@ -56,17 +56,8 @@ def PrepareLoadgen(load_vm):
 
 def PrepareServer(redis_vm):
   redis_vm.Install('redis_server')
-
-  # Do not persist to disk
-  sed_cmd = (r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
-             "{0}/redis.conf").format(redis_server.REDIS_DIR)
-  redis_vm.RemoteCommand(sed_cmd)
-
-  # Start the server
-  redis_vm.RemoteCommand(
-      ('nohup sudo {0}/src/redis-server {0}/redis.conf '
-       '&> /dev/null & echo $! > {1}').format(
-          redis_server.REDIS_DIR, REDIS_PID_FILE))
+  redis_server.Configure(redis_vm)
+  redis_server.Start(redis_vm)
 
 
 def Prepare(benchmark_spec):
@@ -99,12 +90,21 @@ def Run(benchmark_spec):
   groups = benchmark_spec.vm_groups
   redis_vm = groups['workers'][0]
   ycsb_vms = groups['clients']
-  executor = ycsb.YCSBExecutor('redis', **{'redis.host': redis_vm.internal_ip})
+  executor = ycsb.YCSBExecutor(
+      'redis', **{
+          'shardkeyspace': True,
+          'redis.host': redis_vm.internal_ip,
+          'perclientparam': [{
+              'redis.port': redis_server.REDIS_FIRST_PORT + i} for i in range(
+                  FLAGS.redis_total_num_processes)]})
 
-  metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms}
+  metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
+              'redis_total_num_processes': FLAGS.redis_total_num_processes}
 
-  # This thread count gives reasonably fast load time.
-  samples = list(executor.LoadAndRun(ycsb_vms, load_kwargs={'threads': 4}))
+  # Duplicate client vm object to target multiple redis server
+  samples = list(executor.LoadAndRun(
+      ycsb_vms * FLAGS.redis_total_num_processes,
+      load_kwargs={'threads': 4}))
 
   for sample in samples:
     sample.metadata.update(metadata)
