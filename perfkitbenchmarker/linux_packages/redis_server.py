@@ -62,7 +62,7 @@ def Configure(vm):
   sed_cmd = (r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
              "{0}/redis.conf").format(REDIS_DIR)
   vm.RemoteCommand(sed_cmd)
-  for  i in range(FLAGS.redis_total_num_processes):
+  for i in range(FLAGS.redis_total_num_processes):
     port = REDIS_FIRST_PORT + i
     vm.RemoteCommand(
         ('cp {0}/redis.conf {0}/redis-{1}.conf').format(REDIS_DIR, port))
