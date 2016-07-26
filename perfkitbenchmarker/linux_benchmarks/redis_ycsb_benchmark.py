@@ -71,7 +71,13 @@ def Prepare(benchmark_spec):
   redis_vm = groups['workers'][0]
   ycsb_vms = groups['clients']
 
+  # Increase max number of ssh connections. 10 is the default value on debian.
+  # TODO: Modify vm.RemoteCommand to send multiple commands in one connection.
   prepare_fns = ([functools.partial(PrepareServer, redis_vm)] +
+                 [functools.partial(
+                     vm.IncreaseSSHConnection,
+                     10 + FLAGS.redis_total_num_processes)
+                  for vm in ycsb_vms] +
                  [functools.partial(vm.Install, 'ycsb') for vm in ycsb_vms])
 
   vm_util.RunThreaded(lambda f: f(), prepare_fns)

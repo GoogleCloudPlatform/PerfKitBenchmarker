@@ -796,6 +796,16 @@ class DebianMixin(BaseLinuxMixin):
     if commands:
       self.RemoteCommand(";".join(commands))
 
+  def IncreaseSSHConnection(self, target):
+    """Increase maximum number of ssh connections on vm.
+
+    Args:
+      target: int. The max number of ssh connection.
+    """
+    self.RemoteCommand(r'sudo sed -i -e "s/.*MaxStartups.*/MaxStartups {0}/" '
+                       '/etc/ssh/sshd_config'.format(target))
+    self.RemoteCommand('sudo service ssh restart')
+
 
 class ContainerizedDebianMixin(DebianMixin):
   """Class representing a Containerized Virtual Machine.
