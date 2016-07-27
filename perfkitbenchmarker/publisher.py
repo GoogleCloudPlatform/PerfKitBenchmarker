@@ -486,8 +486,7 @@ class BigQueryPublisher(SamplePublisher):
                          self._credentials_file,
                          '--service_account_private_key_file=' +
                          self.service_account_private_key_file])
-      load_cmd.extend(['load',
-                       '--source_format=NEWLINE_DELIMITED_JSON',
+      load_cmd.extend(['insert',
                        self.bigquery_table,
                        tf.name])
       vm_util.IssueRetryableCommand(load_cmd)

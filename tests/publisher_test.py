@@ -126,8 +126,7 @@ class BigQueryPublisherTestCase(unittest.TestCase):
     instance.PublishSamples(self.samples)
     self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(
         ['bq',
-         'load',
-         '--source_format=NEWLINE_DELIMITED_JSON',
+         'insert',
          self.table,
          mock.ANY])
 
