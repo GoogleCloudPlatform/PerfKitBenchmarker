@@ -17,6 +17,7 @@
 Redis homepage: http://redis.io/
 """
 import functools
+import logging
 import posixpath
 
 from perfkitbenchmarker import configs
@@ -102,14 +103,22 @@ def Run(benchmark_spec):
           'redis.host': redis_vm.internal_ip,
           'perclientparam': [{
               'redis.port': redis_server.REDIS_FIRST_PORT + i} for i in range(
-                  FLAGS.redis_total_num_processes)] * FLAGS.ycsb_client_vms})
+                  FLAGS.redis_total_num_processes)]})
 
   metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
               'redis_total_num_processes': FLAGS.redis_total_num_processes}
+  logging.info('YCSB client number: %s, Redis server process: %s',
+               len(ycsb_vms), FLAGS.redis_total_num_processes)
+  if len(ycsb_vms) > FLAGS.redis_total_num_processes:
+    logging.warning('Not all ycsb clients are used.')
 
-  # Duplicate client vm object to target multiple redis server
+  # Duplicate client vm object if necessary.
+  client_vms  = ycsb_vms[
+      :FLAGS.redis_total_num_processes % len(ycsb_vms)] + ycsb_vms * (
+          FLAGS.redis_total_num_processes / len(ycsb_vms))
+
   samples = list(executor.LoadAndRun(
-      ycsb_vms * FLAGS.redis_total_num_processes,
+      client_vms,
       load_kwargs={'threads': 4}))
 
   for sample in samples:
