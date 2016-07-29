@@ -17,14 +17,22 @@
 Redis homepage: http://redis.io/
 """
 import functools
-import logging
+import math
 import posixpath
 
+from itertools import repeat
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import redis_server
 from perfkitbenchmarker.linux_packages import ycsb
+
+flags.DEFINE_integer('redis_ycsb_processes', 1,
+                     'Number of total ycsb processes across all clients.')
+
+flags.RegisterValidator(
+    'redis_ycsb_processes', lambda p: p >= max(
+        FLAGS.ycsb_client_vms, FLAGS.redis_total_num_processes))
 
 FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'redis_ycsb'
@@ -72,13 +80,7 @@ def Prepare(benchmark_spec):
   redis_vm = groups['workers'][0]
   ycsb_vms = groups['clients']
 
-  # Increase max number of ssh connections. 10 is the default value on debian.
-  # TODO: Modify vm.RemoteCommand to send multiple commands in one connection.
   prepare_fns = ([functools.partial(PrepareServer, redis_vm)] +
-                 [functools.partial(
-                     vm.IncreaseSSHConnection,
-                     10 + FLAGS.redis_total_num_processes)
-                  for vm in ycsb_vms] +
                  [functools.partial(vm.Install, 'ycsb') for vm in ycsb_vms])
 
   vm_util.RunThreaded(lambda f: f(), prepare_fns)
@@ -97,25 +99,30 @@ def Run(benchmark_spec):
   groups = benchmark_spec.vm_groups
   redis_vm = groups['workers'][0]
   ycsb_vms = groups['clients']
+  # Preparing per client parameters
+  num_ycsb = FLAGS.redis_ycsb_processes
+  num_server = FLAGS.redis_total_num_processes
+  num_client = FLAGS.ycsb_client_vms
+  server_metadata = [{
+      'redis.ports': redis_server.REDIS_FIRST_PORT + i} for i in range(
+          num_server)]
+  per_ycsb_process_params = server_metadata * (
+      num_ycsb / num_server) + server_metadata[:(num_ycsb % num_server)]
+
   executor = ycsb.YCSBExecutor(
       'redis', **{
           'shardkeyspace': True,
           'redis.host': redis_vm.internal_ip,
-          'perclientparam': [{
-              'redis.port': redis_server.REDIS_FIRST_PORT + i} for i in range(
-                  FLAGS.redis_total_num_processes)]})
+          'perclientparam': per_ycsb_process_params})
 
-  metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
-              'redis_total_num_processes': FLAGS.redis_total_num_processes}
-  logging.info('YCSB client number: %s, Redis server process: %s',
-               len(ycsb_vms), FLAGS.redis_total_num_processes)
-  if len(ycsb_vms) > FLAGS.redis_total_num_processes:
-    logging.warning('Not all ycsb clients are used.')
+  metadata = {'ycsb_client_vms': num_client,
+              'ycsb_processes': num_ycsb,
+              'redis_total_num_processes': num_server}
 
   # Duplicate client vm object if necessary.
-  client_vms  = ycsb_vms[
-      :FLAGS.redis_total_num_processes % len(ycsb_vms)] + ycsb_vms * (
-          FLAGS.redis_total_num_processes / len(ycsb_vms))
+  duplicate = int(math.ceil(num_ycsb / float(num_client)))
+  client_vms = [
+      vm for item in ycsb_vms for vm in repeat(item, duplicate)][:num_ycsb]
 
   samples = list(executor.LoadAndRun(
       client_vms,
