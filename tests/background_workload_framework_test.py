@@ -53,7 +53,6 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
     """ Check that the benchmark spec calls the prepare, stop, and start
     methods on the vms """
 
-    collector = mock.MagicMock()
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         NAME, flag_values=self.mocked_flags, **config)
@@ -68,13 +67,9 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
       self.assertEqual(vm.PrepareBackgroundWorkload.call_count, 1)
 
     with mock.patch(ping_benchmark.__name__ + '.Run'):
-      ping_benchmark.Run.side_effect = functools.partial(
-          self._CheckAndIncrement, expected_last_call=0)
       vm0.StopBackgroundWorkload.side_effect = functools.partial(
-          self._CheckAndIncrement, expected_last_call=1)
-      pkb.DoRunPhase(ping_benchmark, NAME, spec, collector, timer)
+          self._CheckAndIncrement, expected_last_call=0)
       pkb.DoCleanupPhase(ping_benchmark, NAME, spec, timer)
-      self.assertEqual(ping_benchmark.Run.call_count, 1)
       for vm in spec.vms:
         self.assertEqual(vm.StartBackgroundWorkload.call_count, 1)
         self.assertEqual(vm.StopBackgroundWorkload.call_count, 1)
