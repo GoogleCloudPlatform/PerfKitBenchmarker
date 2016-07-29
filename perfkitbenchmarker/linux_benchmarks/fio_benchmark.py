@@ -18,7 +18,6 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
-import datetime
 import json
 import logging
 import posixpath
@@ -38,7 +37,6 @@ from perfkitbenchmarker.linux_packages import fio
 LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
-MINUTES_PER_JOB = 10
 MOUNT_POINT = '/scratch'
 
 
@@ -112,24 +110,23 @@ flag_util.DEFINE_integerlist('fio_io_depths', flag_util.IntegerList([1]),
                              '--fio_io_depths=1-4, or a list, like '
                              '--fio_io_depths=1-4,6-8',
                              on_nonincreasing=flag_util.IntegerListParser.WARN)
+flag_util.DEFINE_integerlist('fio_num_jobs', flag_util.IntegerList([1]),
+                             'Number of concurrent fio jobs to run.',
+                             on_nonincreasing=flag_util.IntegerListParser.WARN)
 flags.DEFINE_integer('fio_working_set_size', None,
                      'The size of the working set, in GB. If not given, use '
                      'the full size of the device. If using '
                      '--fio_generate_scenarios and not running against a raw '
                      'device, you must pass --fio_working_set_size.',
                      lower_bound=0)
-flags.DEFINE_integer('fio_run_for_minutes', 10,
-                     'Repeat the job scenario(s) for the given number of '
-                     'minutes. Only valid when using --fio_generate_scenarios. '
-                     'When using multiple scenarios, each one is run for the '
-                     'given number of minutes. Time will be rounded up to the '
-                     'next multiple of %s minutes.' % MINUTES_PER_JOB,
-                     lower_bound=0)
 flag_util.DEFINE_units('fio_blocksize', None,
                        'The block size for fio operations. Default is given by '
                        'the scenario when using --generate_scenarios. This '
                        'flag does not apply when using --fio_jobfile.',
                        convertible_to=units.byte)
+flags.DEFINE_integer('fio_runtime', 600,
+                     'The number of seconds to run each fio job for.',
+                     lower_bound=1)
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -188,38 +185,45 @@ JOB_FILE_TEMPLATE = """
 ioengine=libaio
 invalidate=1
 direct=1
-runtime={{minutes_per_job}}m
+runtime={{runtime}}
 time_based
 filename={{filename}}
 do_verify=0
 verify_fatal=0
 randrepeat=0
+group_reporting=1
+{%- for scenario in scenarios %}
+{%- for iodepth in iodepths %}
+{%- for numjob in numjobs %}
 
-{% for scenario in scenarios %}
-{% for iodepth in iodepths %}
-[{{scenario['name']}}-io-depth-{{iodepth}}]
+[{{scenario['name']}}-io-depth-{{iodepth}}-num-jobs-{{numjob}}]
 stonewall
 rw={{scenario['rwkind']}}
 blocksize={{scenario['blocksize']}}
 iodepth={{iodepth}}
 size={{size}}
-{% endfor %}
-{% endfor %}
+numjobs={{numjob}}
+{%- endfor %}
+{%- endfor %}
+{%- endfor %}
 """
 
 SECONDS_PER_MINUTE = 60
 
 
 def GenerateJobFileString(filename, scenario_strings,
-                          io_depths, working_set_size, block_size):
+                          io_depths, num_jobs, working_set_size,
+                          block_size, runtime):
   """Make a string with our fio job file.
 
   Args:
     filename: the file or disk we pre-filled, if any.
     scenario_strings: list of strings with names in SCENARIOS.
     io_depths: iterable of integers. The IO queue depths to test.
+    num_jobs: iterable of integers. The number of fio processes to test.
     working_set_size: int or None. If int, the size of the working set in GB.
     block_size: Quantity or None. If quantity, the block size to use.
+    runtime: int. The number of seconds to run each job.
 
   Returns:
     The contents of a fio job file, as a string.
@@ -245,11 +249,12 @@ def GenerateJobFileString(filename, scenario_strings,
                                       undefined=jinja2.StrictUndefined)
 
   return str(job_file_template.render(
-      minutes_per_job=MINUTES_PER_JOB,
+      runtime=runtime,
       filename=filename,
       size=size_string,
       scenarios=scenarios,
-      iodepths=io_depths))
+      iodepths=io_depths,
+      numjobs=num_jobs))
 
 
 FILENAME_PARAM_REGEXP = re.compile('filename\s*=.*$', re.MULTILINE)
@@ -275,8 +280,9 @@ def ProcessedJobFileString(fio_jobfile, remove_filename):
 
 
 def GetOrGenerateJobFileString(job_file_path, scenario_strings,
-                               against_device, disk,
-                               io_depths, working_set_size, block_size):
+                               against_device, disk, io_depths,
+                               num_jobs, working_set_size, block_size,
+                               runtime):
   """Get the contents of the fio job file we're working with.
 
   This will either read the user's job file, if given, or generate a
@@ -291,9 +297,11 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
       if testing against a filesystem.
     disk: the disk.BaseDisk object to test against.
     io_depths: iterable of integers. The IO queue depths to test.
+    num_jobs: iterable of integers. The number of fio processes to test.
     working_set_size: int or None. If int, the size of the working set
       in GB.
     block_size: Quantity or None. If Quantity, the block size to use.
+    runtime: int. The number of seconds to run each job.
 
   Returns:
     A string containing a fio job file.
@@ -313,8 +321,9 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
       # paths or get an error.
       filename = DEFAULT_TEMP_FILE_NAME
 
-    return GenerateJobFileString(filename, scenario_strings,
-                                 io_depths, working_set_size, block_size)
+    return GenerateJobFileString(filename, scenario_strings, io_depths,
+                                 num_jobs, working_set_size, block_size,
+                                 runtime)
 
 
 NEED_SIZE_MESSAGE = ('You must specify the working set size when using '
@@ -333,40 +342,12 @@ def WarnOnBadFlags():
       logging.warning('Fio job file specified. Ignoring options "%s"',
                       ', '.join(ignored_flags))
 
-  if FLAGS.fio_run_for_minutes % MINUTES_PER_JOB != 0:
-    logging.warning('Runtime %s will be rounded up to the next multiple of %s '
-                    'minutes.', FLAGS.fio_run_for_minutes, MINUTES_PER_JOB)
-
   if (FLAGS.fio_jobfile is None and
       FLAGS.fio_generate_scenarios and
       not FLAGS.fio_working_set_size and
       not AgainstDevice()):
     logging.error(NEED_SIZE_MESSAGE)
     raise errors.Benchmarks.PrepareException(NEED_SIZE_MESSAGE)
-
-
-def RunForMinutes(proc, mins_to_run, mins_per_call):
-  """Call func until expected execution time passes threshold.
-
-  Args:
-    proc: a procedure to call.
-    mins_to_run: the minimum number of minutes to run func for.
-    mins_per_call: the expected elapsed time of each call to func.
-  """
-
-  run_reps = mins_to_run // mins_per_call
-  if mins_to_run % mins_per_call != 0:
-    run_reps += 1
-
-  start_time = datetime.datetime.now()
-  for rep_num in xrange(run_reps):
-    run_start = datetime.datetime.now()
-    seconds_since_start = int(round((run_start - start_time).total_seconds()))
-    minutes_since_start = int(round(float(seconds_since_start)
-                                    / float(SECONDS_PER_MINUTE)))
-    proc(repeat_number=rep_num,
-         minutes_since_start=minutes_since_start,
-         total_repeats=run_reps)
 
 
 def GetConfig(user_config):
@@ -437,8 +418,10 @@ def Run(benchmark_spec):
       AgainstDevice(),
       disk,
       FLAGS.fio_io_depths,
+      FLAGS.fio_num_jobs,
       FLAGS.fio_working_set_size,
-      FLAGS.fio_blocksize)
+      FLAGS.fio_blocksize,
+      FLAGS.fio_runtime)
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
     job_file.write(job_file_string)
@@ -453,44 +436,13 @@ def Run(benchmark_spec):
     fio_command = 'sudo %s --output-format=json --directory=%s %s' % (
         fio.FIO_PATH, mount_point, REMOTE_JOB_FILE_PATH)
 
-  samples = []
-
-  def RunIt(repeat_number=None, minutes_since_start=None, total_repeats=None):
-    """Run the actual fio command on the VM and save the results.
-
-    Args:
-      repeat_number: if given, our number in a sequence of repetitions.
-      minutes_since_start: if given, minutes since the start of repetition.
-      total_repeats: if given, the total number of repetitions to do.
-    """
-
-    if repeat_number:
-      logging.info('**** Repetition number %s of %s ****',
-                   repeat_number, total_repeats)
-
-    stdout, stderr = vm.RobustRemoteCommand(fio_command, should_log=True)
-
-    if repeat_number:
-      base_metadata = {
-          'repeat_number': repeat_number,
-          'minutes_since_start': minutes_since_start
-      }
-    else:
-      base_metadata = None
-
-    samples.extend(fio.ParseResults(job_file_string,
-                                    json.loads(stdout),
-                                    base_metadata=base_metadata))
-
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
 
-  if not FLAGS['fio_run_for_minutes'].present:
-    RunIt()
-  else:
-    RunForMinutes(RunIt, FLAGS.fio_run_for_minutes, MINUTES_PER_JOB)
+  stdout, stderr = vm.RobustRemoteCommand(fio_command, should_log=True)
+  samples = fio.ParseResults(job_file_string, json.loads(stdout))
 
   return samples
 

@@ -33,37 +33,36 @@ class TestGenerateJobFileString(unittest.TestCase):
 ioengine=libaio
 invalidate=1
 direct=1
-runtime=10m
+runtime=600
 time_based
 filename=/test/filename
 do_verify=0
 verify_fatal=0
 randrepeat=0
+group_reporting=1
 
-
-
-[sequential_read-io-depth-1]
+[sequential_read-io-depth-1-num-jobs-1]
 stonewall
 rw=read
 blocksize=512k
 iodepth=1
 size=100%
+numjobs=1
 
-[sequential_read-io-depth-2]
+[sequential_read-io-depth-2-num-jobs-1]
 stonewall
 rw=read
 blocksize=512k
 iodepth=2
 size=100%
-
-"""
+numjobs=1"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
             self.filename,
             ['sequential_read'],
-            [1, 2],
-            None, None),
+            [1, 2], [1],
+            None, None, 600),
         expected_jobfile)
 
   def testMultipleScenarios(self):
@@ -72,39 +71,36 @@ size=100%
 ioengine=libaio
 invalidate=1
 direct=1
-runtime=10m
+runtime=600
 time_based
 filename=/test/filename
 do_verify=0
 verify_fatal=0
 randrepeat=0
+group_reporting=1
 
-
-
-[sequential_read-io-depth-1]
+[sequential_read-io-depth-1-num-jobs-1]
 stonewall
 rw=read
 blocksize=512k
 iodepth=1
 size=100%
+numjobs=1
 
-
-
-[sequential_write-io-depth-1]
+[sequential_write-io-depth-1-num-jobs-1]
 stonewall
 rw=write
 blocksize=512k
 iodepth=1
 size=100%
-
-"""
+numjobs=1"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
             self.filename,
             ['sequential_read', 'sequential_write'],
-            [1],
-            None, None),
+            [1], [1],
+            None, None, 600),
         expected_jobfile)
 
   def testCustomBlocksize(self):
@@ -113,7 +109,7 @@ size=100%
     job_file = fio_benchmark.GenerateJobFileString(
         self.filename,
         ['sequential_read'],
-        [1], None, units.Unit('megabyte') * 2)
+        [1], [1], None, units.Unit('megabyte') * 2, 600)
 
     self.assertIn('blocksize=2000000B', job_file)
 
@@ -147,30 +143,6 @@ blocksize = 8k
       self.assertNotIn('zanzibar', jobfile)
       self.assertNotIn('asdf', jobfile)
 
-
-class TestRunForMinutes(unittest.TestCase):
-  def testBasicRun(self):
-    proc = mock.Mock()
-    fio_benchmark.RunForMinutes(proc, 20, 10)
-    self.assertEquals(proc.call_count, 2)
-
-  def testRounding(self):
-    proc = mock.Mock()
-    fio_benchmark.RunForMinutes(proc, 18, 10)
-    self.assertEquals(proc.call_count, 2)
-
-  def testRoundsUp(self):
-    proc = mock.Mock()
-    fio_benchmark.RunForMinutes(proc, 12, 10)
-    self.assertEquals(proc.call_count, 2)
-
-  def testZeroMinutes(self):
-    proc = mock.Mock()
-    fio_benchmark.RunForMinutes(proc, 0, 10)
-    self.assertEquals(proc.call_count, 0)
-
-
-class TestFioTargetModeFlag(unittest.TestCase):
   def doTargetModeTest(self, mode,
                        expect_fill_device=None,
                        expect_against_device=None,
@@ -180,10 +152,13 @@ class TestFioTargetModeFlag(unittest.TestCase):
                        '.GetOrGenerateJobFileString') as GetJobString, \
             mock.patch('__builtin__.open'), \
             mock.patch(vm_util.__name__ + '.GetTempDir'), \
+            mock.patch(fio_benchmark.__name__ + '.fio.ParseResults'), \
             mock.patch(fio_benchmark.__name__ + '.FLAGS') as fio_FLAGS:
       fio_FLAGS.fio_target_mode = mode
-      fio_FLAGS.fio_run_for_minutes = 0
       benchmark_spec = mock.MagicMock()
+      benchmark_spec.vms = [mock.MagicMock()]
+      benchmark_spec.vms[0].RobustRemoteCommand = (
+          mock.MagicMock(return_value=('"stdout"', '"stderr"')))
       fio_benchmark.Prepare(benchmark_spec)
       fio_benchmark.Run(benchmark_spec)
 

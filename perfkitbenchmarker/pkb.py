@@ -374,16 +374,25 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
     timer: An IntervalTimer that measures the start and stop times of the
       benchmark module's Run function.
   """
-  logging.info('Running benchmark %s', name)
-  events.before_phase.send(events.RUN_PHASE, benchmark_spec=spec)
-  try:
-    with timer.Measure('Benchmark Run'):
-      samples = benchmark.Run(spec)
-  finally:
-    events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
-  collector.AddSamples(samples, name, spec)
-  if FLAGS.publish_after_run:
-    collector.PublishSamples()
+  deadline = time.time() + FLAGS.run_stage_time
+  run_number = 0
+  while True:
+    logging.info('Running benchmark %s', name)
+    events.before_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+    try:
+      with timer.Measure('Benchmark Run'):
+        samples = benchmark.Run(spec)
+    finally:
+      events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+    if FLAGS.run_stage_time:
+      for sample in samples:
+        sample.metadata['run_number'] = run_number
+    collector.AddSamples(samples, name, spec)
+    if FLAGS.publish_after_run:
+      collector.PublishSamples()
+    run_number += 1
+    if time.time() > deadline:
+      break
 
 
 def DoCleanupPhase(benchmark, name, spec, timer):
@@ -486,12 +495,8 @@ def RunBenchmark(benchmark, sequence_number, total_benchmarks, benchmark_config,
             DoPreparePhase(benchmark, benchmark_name, spec, detailed_timer)
 
           if stages.RUN in FLAGS.run_stage:
-            deadline = time.time() + FLAGS.run_stage_time
-            while True:
-              DoRunPhase(benchmark, benchmark_name, spec, collector,
-                         detailed_timer)
-              if time.time() > deadline:
-                break
+            DoRunPhase(benchmark, benchmark_name, spec, collector,
+                       detailed_timer)
 
           if stages.CLEANUP in FLAGS.run_stage:
             DoCleanupPhase(benchmark, benchmark_name, spec, detailed_timer)
