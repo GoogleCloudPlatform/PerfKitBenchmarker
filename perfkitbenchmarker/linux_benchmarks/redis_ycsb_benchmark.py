@@ -89,6 +89,20 @@ def Prepare(benchmark_spec):
 def Run(benchmark_spec):
   """Run YCSB against Redis.
 
+  This method can run with multiple number of redis processes (server) on a
+  single vm. Since redis is single threaded, there is no need to run on
+  multiple server instances. When running with multiple redis processes, key
+  space is sharded.
+
+  This method can also run with muliple number of ycsb processes (client) on
+  multiple client instances. Each ycsb process can only run against a single
+  server process. The number of ycsb processes should be no smaller than
+  the number of server processes or the number of client vms.
+
+  To avoid having multiple ycsb processes on the same client vm
+  targeting the same server process, this method hash ycsb processes to server
+  processes and ycsb processes to client vms differently.
+
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
@@ -99,27 +113,32 @@ def Run(benchmark_spec):
   groups = benchmark_spec.vm_groups
   redis_vm = groups['workers'][0]
   ycsb_vms = groups['clients']
-  # Preparing per client parameters
   num_ycsb = FLAGS.redis_ycsb_processes
   num_server = FLAGS.redis_total_num_processes
   num_client = FLAGS.ycsb_client_vms
+
+  # Each redis process use different ports, number of ycsb processes should
+  # be at least as large as number of server processes, use round-robin
+  # to assign target server process to each ycsb process
   server_metadata = [{
-      'redis.ports': redis_server.REDIS_FIRST_PORT + i} for i in range(
-          num_server)]
-  per_ycsb_process_params = server_metadata * (
-      num_ycsb / num_server) + server_metadata[:(num_ycsb % num_server)]
+      'redis.ports': redis_server.REDIS_FIRST_PORT + i % num_server}
+      for i in range(num_ycsb)]
 
   executor = ycsb.YCSBExecutor(
       'redis', **{
           'shardkeyspace': True,
           'redis.host': redis_vm.internal_ip,
-          'perclientparam': per_ycsb_process_params})
+          'perclientparam': server_metadata})
 
   metadata = {'ycsb_client_vms': num_client,
               'ycsb_processes': num_ycsb,
               'redis_total_num_processes': num_server}
 
-  # Duplicate client vm object if necessary.
+  # Matching client vms and ycsb processes sequentially:
+  # 1st to xth ycsb clients are assigned to client vm 1
+  # x+1th to 2xth ycsb clients are assigned to client vm 2, etc.
+  # Duplicate VirtualMachine objects passed into YCSBExecutor to match
+  # corresponding ycsb clients.
   duplicate = int(math.ceil(num_ycsb / float(num_client)))
   client_vms = [
       vm for item in ycsb_vms for vm in repeat(item, duplicate)][:num_ycsb]
