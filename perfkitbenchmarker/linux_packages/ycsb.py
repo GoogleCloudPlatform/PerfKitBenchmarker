@@ -505,6 +505,9 @@ class YCSBExecutor(object):
       scanlengthdistribution: str.
       insertorder: str.
       hotspotdatafraction: float.
+      perclientparam: list.
+      shardkeyspace: boolean. Default to False, indicates if clients should
+      have their own keyspace.
   """
 
   FLAG_ATTRIBUTES = 'cp', 'jvm-args', 'target', 'threads'
@@ -513,6 +516,10 @@ class YCSBExecutor(object):
     self.database = database
     self.parameter_files = parameter_files or []
     self.parameters = kwargs.copy()
+    # Self-defined parameters, pop them out of self.parameters, so they
+    # are not passed to ycsb commands
+    self.perclientparam = self.parameters.pop('perclientparam', None)
+    self.shardkeyspace = self.parameters.pop('shardkeyspace', False)
 
   def _BuildCommand(self, command_name, parameter_files=None, **kwargs):
     command = [YCSB_EXE, command_name, self.database]
@@ -579,6 +586,7 @@ class YCSBExecutor(object):
                            clients=len(vms) * kwargs['threads'],
                            threads_per_client_vm=kwargs['threads'],
                            workload_name=os.path.basename(workload_file))
+      self.workload_meta = workload_meta
     record_count = int(workload_meta.get('recordcount', '1000'))
     n_per_client = long(record_count) // len(vms)
     loader_counts = [n_per_client +
@@ -593,9 +601,11 @@ class YCSBExecutor(object):
 
     def _Load(loader_index):
       start = sum(loader_counts[:loader_index])
-      kw = kwargs.copy()
+      kw = copy.deepcopy(kwargs)
       kw.update(insertstart=start,
                 insertcount=loader_counts[loader_index])
+      if self.perclientparam is not None:
+        kw.update(self.perclientparam[loader_index])
       results.append(self._Load(vms[loader_index], **kw))
       logging.info('VM %d (%s) finished', loader_index, vms[loader_index])
 
@@ -646,10 +656,24 @@ class YCSBExecutor(object):
 
     results = []
 
+    if self.shardkeyspace:
+      record_count = int(self.workload_meta.get('recordcount', '1000'))
+      n_per_client = long(record_count) // len(vms)
+      loader_counts = [n_per_client +
+                       (1 if i < (record_count % len(vms)) else 0)
+                       for i in xrange(len(vms))]
+
     def _Run(loader_index):
       vm = vms[loader_index]
-      kwargs['target'] = targets[loader_index]
-      results.append(self._Run(vm, **kwargs))
+      params = copy.deepcopy(kwargs)
+      params['target'] = targets[loader_index]
+      params.update(self.perclientparam[loader_index])
+      if self.shardkeyspace:
+        start = sum(loader_counts[:loader_index])
+        end = start + loader_counts[loader_index]
+        params.update(insertstart=start,
+                      recordcount=end)
+      results.append(self._Run(vm, **params))
       logging.info('VM %d (%s) finished', loader_index, vm)
     vm_util.RunThreaded(_Run, range(len(vms)))
 

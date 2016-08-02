@@ -15,11 +15,22 @@
 
 """Module containing redis installation and cleanup functions."""
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
-REDIS_TAR = 'redis-2.8.9.tar.gz'
-REDIS_DIR = '%s/redis-2.8.9' % vm_util.VM_TMP_DIR
+
+flags.DEFINE_integer('redis_total_num_processes', 1,
+                     'Total number of redis server processes.',
+                     lower_bound=1)
+
+
+REDIS_VERSION = '2.8.9'
+REDIS_TAR = 'redis-%s.tar.gz' % REDIS_VERSION
+REDIS_DIR = '%s/redis-%s' % (vm_util.VM_TMP_DIR, REDIS_VERSION)
 REDIS_URL = 'http://download.redis.io/releases/' + REDIS_TAR
+REDIS_FIRST_PORT = 6379
+REDIS_PID_FILE = 'redis.pid'
+FLAGS = flags.FLAGS
 
 
 def _Install(vm):
@@ -41,3 +52,32 @@ def AptInstall(vm):
   """Installs the redis package on the VM."""
   vm.InstallPackages('tcl-dev')
   _Install(vm)
+
+
+def Configure(vm):
+  """Configure redis server."""
+  sed_cmd = (r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
+             "{0}/redis.conf").format(REDIS_DIR)
+  vm.RemoteCommand(sed_cmd)
+  for i in range(FLAGS.redis_total_num_processes):
+    port = REDIS_FIRST_PORT + i
+    vm.RemoteCommand(
+        ('cp {0}/redis.conf {0}/redis-{1}.conf').format(REDIS_DIR, port))
+    vm.RemoteCommand(
+        r'sed -i -e "s/port %d/port %d/g" %s/redis-%d.conf' %
+        (REDIS_FIRST_PORT, port, REDIS_DIR, port))
+
+
+def Start(vm):
+  """Start redis server process."""
+  for i in range(FLAGS.redis_total_num_processes):
+    port = REDIS_FIRST_PORT + i
+    vm.RemoteCommand(
+        ('nohup sudo {0}/src/redis-server {0}/redis-{1}.conf '
+         '&> /dev/null & echo $! > {0}/{2}-{1}').format(
+             REDIS_DIR, port, REDIS_PID_FILE))
+
+
+def Cleanup(vm):
+  """Remove redis."""
+  vm.RemoteCommand('sudo pkill redis-server')

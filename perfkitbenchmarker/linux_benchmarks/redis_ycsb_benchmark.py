@@ -17,13 +17,22 @@
 Redis homepage: http://redis.io/
 """
 import functools
+import math
 import posixpath
 
+from itertools import repeat
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import redis_server
 from perfkitbenchmarker.linux_packages import ycsb
+
+flags.DEFINE_integer('redis_ycsb_processes', 1,
+                     'Number of total ycsb processes across all clients.')
+
+flags.RegisterValidator(
+    'redis_ycsb_processes', lambda p: p >= max(
+        FLAGS.ycsb_client_vms, FLAGS.redis_total_num_processes))
 
 FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'redis_ycsb'
@@ -56,17 +65,8 @@ def PrepareLoadgen(load_vm):
 
 def PrepareServer(redis_vm):
   redis_vm.Install('redis_server')
-
-  # Do not persist to disk
-  sed_cmd = (r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
-             "{0}/redis.conf").format(redis_server.REDIS_DIR)
-  redis_vm.RemoteCommand(sed_cmd)
-
-  # Start the server
-  redis_vm.RemoteCommand(
-      ('nohup sudo {0}/src/redis-server {0}/redis.conf '
-       '&> /dev/null & echo $! > {1}').format(
-          redis_server.REDIS_DIR, REDIS_PID_FILE))
+  redis_server.Configure(redis_vm)
+  redis_server.Start(redis_vm)
 
 
 def Prepare(benchmark_spec):
@@ -89,6 +89,20 @@ def Prepare(benchmark_spec):
 def Run(benchmark_spec):
   """Run YCSB against Redis.
 
+  This method can run with multiple number of redis processes (server) on a
+  single vm. Since redis is single threaded, there is no need to run on
+  multiple server instances. When running with multiple redis processes, key
+  space is sharded.
+
+  This method can also run with muliple number of ycsb processes (client) on
+  multiple client instances. Each ycsb process can only run against a single
+  server process. The number of ycsb processes should be no smaller than
+  the number of server processes or the number of client vms.
+
+  To avoid having multiple ycsb processes on the same client vm
+  targeting the same server process, this method hash ycsb processes to server
+  processes and ycsb processes to client vms differently.
+
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
@@ -99,12 +113,39 @@ def Run(benchmark_spec):
   groups = benchmark_spec.vm_groups
   redis_vm = groups['workers'][0]
   ycsb_vms = groups['clients']
-  executor = ycsb.YCSBExecutor('redis', **{'redis.host': redis_vm.internal_ip})
+  num_ycsb = FLAGS.redis_ycsb_processes
+  num_server = FLAGS.redis_total_num_processes
+  num_client = FLAGS.ycsb_client_vms
 
-  metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms}
+  # Each redis process use different ports, number of ycsb processes should
+  # be at least as large as number of server processes, use round-robin
+  # to assign target server process to each ycsb process
+  server_metadata = [{
+      'redis.ports': redis_server.REDIS_FIRST_PORT + i % num_server}
+      for i in range(num_ycsb)]
 
-  # This thread count gives reasonably fast load time.
-  samples = list(executor.LoadAndRun(ycsb_vms, load_kwargs={'threads': 4}))
+  executor = ycsb.YCSBExecutor(
+      'redis', **{
+          'shardkeyspace': True,
+          'redis.host': redis_vm.internal_ip,
+          'perclientparam': server_metadata})
+
+  metadata = {'ycsb_client_vms': num_client,
+              'ycsb_processes': num_ycsb,
+              'redis_total_num_processes': num_server}
+
+  # Matching client vms and ycsb processes sequentially:
+  # 1st to xth ycsb clients are assigned to client vm 1
+  # x+1th to 2xth ycsb clients are assigned to client vm 2, etc.
+  # Duplicate VirtualMachine objects passed into YCSBExecutor to match
+  # corresponding ycsb clients.
+  duplicate = int(math.ceil(num_ycsb / float(num_client)))
+  client_vms = [
+      vm for item in ycsb_vms for vm in repeat(item, duplicate)][:num_ycsb]
+
+  samples = list(executor.LoadAndRun(
+      client_vms,
+      load_kwargs={'threads': 4}))
 
   for sample in samples:
     sample.metadata.update(metadata)
@@ -119,6 +160,4 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  (benchmark_spec.vm_groups['workers'][0]
-   .RemoteCommand('kill $(cat {0})'.format(REDIS_PID_FILE),
-                  ignore_failure=True))
+  redis_server.Cleanup(benchmark_spec.vm_groups['workers'][0])
