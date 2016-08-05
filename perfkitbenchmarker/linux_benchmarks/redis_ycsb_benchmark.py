@@ -30,10 +30,6 @@ from perfkitbenchmarker.linux_packages import ycsb
 flags.DEFINE_integer('redis_ycsb_processes', 1,
                      'Number of total ycsb processes across all clients.')
 
-flags.RegisterValidator(
-    'redis_ycsb_processes', lambda p: p >= max(
-        FLAGS.ycsb_client_vms, FLAGS.redis_total_num_processes))
-
 FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'redis_ycsb'
 BENCHMARK_CONFIG = """
@@ -121,7 +117,7 @@ def Run(benchmark_spec):
   # be at least as large as number of server processes, use round-robin
   # to assign target server process to each ycsb process
   server_metadata = [{
-      'redis.ports': redis_server.REDIS_FIRST_PORT + i % num_server}
+      'redis.port': redis_server.REDIS_FIRST_PORT + i % num_server}
       for i in range(num_ycsb)]
 
   executor = ycsb.YCSBExecutor(
