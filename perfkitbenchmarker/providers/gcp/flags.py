@@ -25,7 +25,7 @@ flags.DEFINE_integer('gce_num_local_ssds', 0,
                      '(see https://cloud.google.com/compute/docs/local-ssd).')
 flags.DEFINE_string('gcloud_scopes', None, 'If set, space-separated list of '
                     'scopes to apply to every created machine')
-flags.DEFINE_boolean('gce_migrate_on_maintenance', False, 'If true, allow VM '
+flags.DEFINE_boolean('gce_migrate_on_maintenance', True, 'If true, allow VM '
                      'migration on GCE host maintenance.')
 flags.DEFINE_boolean('gce_preemptible_vms', False, 'If true, use preemptible '
                      'VMs on GCE.')
