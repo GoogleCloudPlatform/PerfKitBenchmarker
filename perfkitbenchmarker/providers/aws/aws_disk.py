@@ -39,6 +39,8 @@ VOLUME_KNOWN_STATUSES = VOLUME_EXISTS_STATUSES | VOLUME_DELETED_STATUSES
 STANDARD = 'standard'
 GP2 = 'gp2'
 IO1 = 'io1'
+ST1 = 'st1'
+SC1 = 'sc1'
 
 DISK_TYPE = {
     disk.STANDARD: STANDARD,
@@ -61,6 +63,14 @@ DISK_METADATA = {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
         disk.LEGACY_DISK_TYPE: disk.PIOPS
+    },
+    ST1: {
+        disk.MEDIA: disk.HDD,
+        disk.REPLICATION: disk.ZONE
+    },
+    SC1: {
+        disk.MEDIA: disk.HDD,
+        disk.REPLICATION: disk.ZONE
     }
 }
 
