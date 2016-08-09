@@ -667,7 +667,8 @@ class YCSBExecutor(object):
       vm = vms[loader_index]
       params = copy.deepcopy(kwargs)
       params['target'] = targets[loader_index]
-      params.update(self.perclientparam[loader_index])
+      if self.perclientparam is not None:
+        params.update(self.perclientparam[loader_index])
       if self.shardkeyspace:
         start = sum(loader_counts[:loader_index])
         end = start + loader_counts[loader_index]
