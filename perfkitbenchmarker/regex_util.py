@@ -29,7 +29,7 @@ class TooManyMatchesError(ValueError):
   pass
 
 
-def ExtractGroup(regex, text, group=1):
+def ExtractGroup(regex, text, group=1, flags=0):
   """Extracts a float from a regular expression matched to 'text'.
 
   Args:
@@ -37,13 +37,14 @@ def ExtractGroup(regex, text, group=1):
     text: string. Text to search.
     group: int. Group containing a floating point value. Use '0' for the whole
       string.
+    flags: int. Flags to pass to re.search().
   Returns:
     A floating point number matched by 'regex' on 'text'.
   Raises:
     NoMatchError: when 'regex' does not match 'text'.
     IndexError: when 'group' is not present in the match.
   """
-  match = re.search(regex, text)
+  match = re.search(regex, text, flags=flags)
   if not match:
     raise NoMatchError('No match for pattern "{0}" in "{1}"'.format(
         regex, text))

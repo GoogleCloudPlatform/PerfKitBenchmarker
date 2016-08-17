@@ -1,0 +1,13 @@
+--- src/netlib.c        2012-06-19 20:32:29.000000000 +0000
++++ src/new_netlib.c    2016-08-13 01:34:03.787253999 +0000
+@@ -4288,9 +4288,8 @@
+   for(i = 0; i < 10; i++){
+     sum = 0;
+     for (j = i * base; j <  (i + 1) * base; j++) {
+-      sum += row[j];
++      fprintf(where,": %4d", row[j]);
+     }
+-    fprintf(where,": %4d", sum);
+   }
+   fprintf(where,"\n");
+ }

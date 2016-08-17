@@ -44,6 +44,7 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     p = mock.patch(vm_util.__name__ + '.ShouldRunOnInternalIpAddress')
     self.should_run_internal = p.start()
     self.addCleanup(p.stop)
+    netperf_benchmark.FLAGS.netperf_enable_histograms = False
 
   def _ConfigureIpTypes(self, run_external=True, run_internal=True):
     self.should_run_external.return_value = run_external
