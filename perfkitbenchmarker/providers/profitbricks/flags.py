@@ -22,9 +22,9 @@ US_LAS = 'us/las'
 DE_FKB = 'de/fkb'
 DE_FRA = 'de/fra'
 
-# Zones
-ZONE_1 = 'ZONE_1'
-ZONE_2 = 'ZONE_2'
+# Boot Volume Types
+HDD = 'HDD'
+SSD = 'SSD'
 
 flags.DEFINE_string('profitbricks_config',
                     os.getenv('PROFITBRICKS_CONFIG',
@@ -33,30 +33,18 @@ flags.DEFINE_string('profitbricks_config',
                      'Can also be set via $PROFITBRICKS_CONFIG environment '
                      "variable.\n(File format: email:password)"))
 
-flags.DEFINE_enum('location',
+flags.DEFINE_enum('profitbricks_location',
                   US_LAS,
                   [US_LAS, DE_FKB, DE_FRA],
                   ('Location of data center to be provisioned (us/las, '
                    'de/fkb, de/fra)'))
 
-flags.DEFINE_integer('profitbricks_ram',
-                     None,
-                     ('Amount of RAM for the new server in multiples '
-                      'of 256 MB.'))
+flags.DEFINE_enum('profitbricks_boot_volume_type',
+                  HDD,
+                  [HDD, SSD],
+                  ('Choose between HDD or SSD boot volume types.'))
 
-flags.DEFINE_integer('profitbricks_cores',
-                     None,
-                     ('Number of cores for the new server.'))
-
-flags.DEFINE_string('profitbricks_disk_type',
-                    'HDD',
-                    ('Choose between HDD or SSD disk types.'))
-
-flags.DEFINE_integer('profitbricks_disk_size',
+flags.DEFINE_integer('profitbricks_boot_volume_size',
                      20,
-                     ('Choose the disk size in GB.'))
+                     ('Choose the boot volume size in GB.'))
 
-flags.DEFINE_enum('zone',
-                  ZONE_1,
-                  [ZONE_1, ZONE_2],
-                  ('Choose availability ZONE_1 or ZONE_2.'))

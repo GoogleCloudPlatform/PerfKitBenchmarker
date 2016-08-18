@@ -40,6 +40,7 @@ def PerformRequest(action, url, header, json=None):
     # Check Response Status Code
     if r.status_code >= 300:
         action = action.upper()
+        logging.info(r.text)
         raise errors.Error('%s call to %s failed, see log.' % (action,
                                                                url))
 
@@ -57,7 +58,7 @@ def ReturnImage(header, location):
 
     # Search for Ubuntu image in preferred zone
     for image in response['items']:
-        if('Ubuntu-15' in image['properties']['name'] and
+        if('Ubuntu-14' in image['properties']['name'] and
            image['properties']['location'] == location):
             return image['id']
 
