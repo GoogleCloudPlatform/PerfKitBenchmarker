@@ -30,6 +30,7 @@ class TestBuildCommands(unittest.TestCase):
     mocked_flags.object_storage_object_sizes = {'1KB': '100%'}
     mocked_flags.object_storage_multistream_num_streams = 1
     mocked_flags.num_vms = 1
+    mocked_flags.object_storage_object_naming_scheme = 'sequential_by_stream'
 
   def testBuildCommands(self):
     vm = mock.MagicMock()
@@ -41,7 +42,7 @@ class TestBuildCommands(unittest.TestCase):
       with mock.patch(object_storage_service_benchmark.__name__ +
                       '._ProcessMultiStreamResults'):
         object_storage_service_benchmark.MultiStreamRWBenchmark(
-            [], {}, vm, command_builder, None, 'bucket', 'regional-bucket')
+            [], {}, [vm], command_builder, None, 'bucket', 'regional-bucket')
 
     self.assertEqual(
         command_builder.BuildCommand.call_args_list[0],
@@ -50,6 +51,7 @@ class TestBuildCommands(unittest.TestCase):
                    '--object_sizes="{1000: 100.0}"',
                    '--num_streams=1',
                    '--start_time=16.1',
+                   '--object_naming_scheme=sequential_by_stream',
                    '--objects_written_file=/tmp/pkb/pkb-objects-written',
                    '--scenario=MultiStreamWrite',
                    '--stream_num_start=0']))
@@ -96,6 +98,19 @@ class TestDistributionToBackendFormat(unittest.TestCase):
 
     with self.assertRaises(ValueError):
       object_storage_service_benchmark._DistributionToBackendFormat(dist)
+
+
+class TestNaturalDivisionRoundingUp(unittest.TestCase):
+  def doTest(self, num, denom, expected):
+    self.assertEqual(
+        object_storage_service_benchmark.NaturalDivisionRoundingUp(num, denom),
+        expected)
+
+  def testRounding(self):
+    self.doTest(3, 2, 2)
+
+  def testExactlyDivisible(self):
+    self.doTest(4, 2, 2)
 
 
 if __name__ == '__main__':

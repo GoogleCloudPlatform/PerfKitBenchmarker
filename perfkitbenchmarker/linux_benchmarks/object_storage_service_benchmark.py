@@ -110,6 +110,16 @@ flags.DEFINE_integer('object_storage_list_consistency_iterations', 200,
                      'scenario. However, to get useful metrics from the '
                      'api_namespace scenario, a high number of iterations '
                      'should be used (>=200).')
+flags.DEFINE_enum('object_storage_object_naming_scheme', 'sequential_by_stream',
+                  ['sequential_by_stream',
+                   'approximately_sequential'],
+                  'How objects will be named. Only applies to the '
+                  'api_multistream benchmark. '
+                  'sequential_by_stream: object names from each stream '
+                  'will be sequential, but different streams will have '
+                  'different name prefixes. '
+                  'approximately_sequential: object names from all '
+                  'streams will roughly increase together.')
 
 
 FLAGS = flags.FLAGS
@@ -135,6 +145,7 @@ object_storage_service:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
+      vm_count: null
 """
 
 DATA_FILE = 'cloud-storage-workload.sh'
@@ -297,6 +308,20 @@ def MultiThreadStartDelay(num_vms, threads_per_vm):
       MULTISTREAM_DELAY_PER_STREAM * threads_per_vm)
 
 
+def NaturalDivisionRoundingUp(numerator, denominator):
+  """Divide two natural numbers, rounding up.
+
+  Args:
+    numerator, denominator: nonnegative integers.
+
+  Returns:
+    The unique dividend such that
+      numerator <= denominator * dividend < numerator + denominator.
+  """
+
+  return (numerator + denominator - 1) // denominator
+
+
 def _ProcessMultiStreamResults(raw_result, operation, sizes,
                                results, metadata=None):
   """Read and process results from the api_multistream worker process.
@@ -403,6 +428,16 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
     results.append(sample.Sample(
         'Multi-stream ' + operation + ' ' + name,
         value.magnitude, str(value.units), metadata=distribution_metadata))
+
+  # QPS metrics
+  results.append(sample.Sample(
+      'Multi-stream ' + operation + ' QPS',
+      len(records) / any_streams_active.duration, '',
+      metadata=distribution_metadata))
+  results.append(sample.Sample(
+      'Multi-stream ' + operation + ' QPS (all streams active)',
+      len(records_in_interval) / all_streams_active.duration, '',
+      metadata=distribution_metadata))
 
   # Publish by-size and full-distribution stats even if there's only
   # one size in the distribution, because it simplifies postprocessing
@@ -674,14 +709,14 @@ def ListConsistencyBenchmark(results, metadata, vm, command_builder,
                                    metadata)
 
 
-def MultiStreamRWBenchmark(results, metadata, vm, command_builder,
+def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
                            service, bucket_name, regional_bucket_name):
   """A benchmark for multi-stream latency and throughput.
 
   Args:
     results: the results array to append to.
     metadata: a dictionary of metadata to add to samples.
-    vm: the VM to run the benchmark on.
+    vms: the VMs to run the benchmark on.
     command_builder: an APIScriptCommandBuilder.
     service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
@@ -692,18 +727,26 @@ def MultiStreamRWBenchmark(results, metadata, vm, command_builder,
     test script.
   """
 
-  logging.info('Starting multi-stream write test.')
+  logging.info('Starting multi-stream write test on %s VMs.', len(vms))
 
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
                                         OBJECTS_WRITTEN_FILE)
 
   size_distribution = _DistributionToBackendFormat(
       FLAGS.object_storage_object_sizes)
+  logging.info('Distribution %s, backend format %s.',
+               FLAGS.object_storage_object_sizes, size_distribution)
+
+  streams_per_vm = NaturalDivisionRoundingUp(
+      FLAGS.object_storage_multistream_num_streams, len(vms))
+  logging.info('%s streams per VM.', streams_per_vm)
 
   def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
+    vm_idx = proc_idx // streams_per_vm
+    logging.info('Running on VM %s.', vm_idx)
     cmd = command_builder.BuildCommand(
         cmd_args + ['--stream_num_start=%s' % proc_idx])
-    out, _ = vm.RobustRemoteCommand(cmd, should_log=True)
+    out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
     out_array[proc_idx] = out
 
   def RunMultiStreamProcesses(command):
@@ -722,8 +765,6 @@ def MultiStreamRWBenchmark(results, metadata, vm, command_builder,
     logging.info('All processes complete.')
     return output
 
-  streams_per_vm = FLAGS.object_storage_multistream_num_streams // FLAGS.num_vms
-
   write_start_time = (
       time.time() +
       MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
@@ -737,6 +778,7 @@ def MultiStreamRWBenchmark(results, metadata, vm, command_builder,
       '--object_sizes="%s"' % size_distribution,
       '--num_streams=1',
       '--start_time=%s' % write_start_time,
+      '--object_naming_scheme=%s' % FLAGS.object_storage_object_naming_scheme,
       '--objects_written_file=%s' % objects_written_file,
       '--scenario=MultiStreamWrite']
 
@@ -785,6 +827,11 @@ def CheckPrerequisites():
 
 def _AppendPercentilesToResults(output_results, input_results, metric_name,
                                 metric_unit, metadata):
+  # PercentileCalculator will (correctly) raise an exception on empty
+  # input, but an empty input list makes semantic sense here.
+  if len(input_results) == 0:
+    return
+
   percentiles = PercentileCalculator(input_results)
   for percentile in PERCENTILES_LIST:
     output_results.append(sample.Sample(('%s %s') % (metric_name, percentile),
@@ -947,8 +994,9 @@ def Prepare(benchmark_spec):
   service.PrepareService(FLAGS.object_storage_region)
 
   vms = benchmark_spec.vms
-  PrepareVM(vms[0], service)
-  service.PrepareVM(vms[0])
+  for vm in vms:
+    PrepareVM(vm, service)
+    service.PrepareVM(vm)
 
   # We would like to always cleanup server side states when exception happens.
   benchmark_spec.always_call_cleanup = True
@@ -1026,11 +1074,17 @@ def Run(benchmark_spec):
   for name, benchmark in [('cli', CLIThroughputBenchmark),
                           ('api_data', OneByteRWBenchmark),
                           ('api_data', SingleStreamThroughputBenchmark),
-                          ('api_namespace', ListConsistencyBenchmark),
-                          ('api_multistream', MultiStreamRWBenchmark)]:
+                          ('api_namespace', ListConsistencyBenchmark)]:
     if FLAGS.object_storage_scenario in {name, 'all'}:
       benchmark(results, metadata, vms[0], command_builder,
                 service, buckets[0], regional_bucket_name)
+
+  # MultiStreamRW is the only benchmark that supports multiple VMs, so
+  # it has a slightly different calling convention than the others.
+  if FLAGS.object_storage_scenario in {'api_multistream', 'all'}:
+    MultiStreamRWBenchmark(results, metadata, vms, command_builder,
+                           service, buckets[0], regional_bucket_name)
+
 
   return results
 
@@ -1047,8 +1101,9 @@ def Cleanup(benchmark_spec):
   buckets = benchmark_spec.buckets
   vms = benchmark_spec.vms
 
-  service.CleanupVM(vms[0])
-  CleanupVM(vms[0])
+  for vm in vms:
+    service.CleanupVM(vm)
+    CleanupVM(vm)
 
   for bucket in buckets:
     service.DeleteBucket(bucket)

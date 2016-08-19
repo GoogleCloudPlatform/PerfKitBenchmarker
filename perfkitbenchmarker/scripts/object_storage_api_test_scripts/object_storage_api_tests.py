@@ -99,6 +99,17 @@ flags.DEFINE_string('object_storage_class', None, 'The storage class to use '
                     'providers, storage class is determined by the bucket, '
                     'which is passed in by the --bucket parameter.')
 
+flags.DEFINE_enum('object_naming_scheme', 'sequential_by_stream',
+                  ['sequential_by_stream',
+                   'approximately_sequential'],
+                  'How objects will be named. Only applies to the '
+                  'MultiStreamWrite benchmark. '
+                  'sequential_by_stream: object names from each stream '
+                  'will be sequential, but different streams will have '
+                  'different name prefixes. '
+                  'approximately_sequential: object names from all '
+                  'streams will roughly increase together.')
+
 STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
 # If more than 5% of our upload or download operations fail for an iteration,
@@ -248,6 +259,51 @@ def PercentileCalculator(numbers):
       result['stddev'] = 0
 
   return result
+
+# ### Object naming schemes ###
+
+
+class ObjectNameIterator(object):
+  """Provides new object names on demand.
+
+  This class exists to easily support different object naming schemes.
+  """
+
+  def __iter__(self):
+    """The iterator for this iterator.
+
+    This method is required by the Python iterator protocol.
+    """
+    return self
+
+  def next(self):
+    """Generate a new name.
+
+    Returns:
+      The object name, as a string.
+    """
+
+    raise NotImplementedError()
+
+
+class PrefixCounterIterator(ObjectNameIterator):
+  def __init__(self, prefix):
+    self.prefix = prefix
+    self.counter = 0
+
+  def next(self):
+    name = '%s_%d' % (self.prefix, self.counter)
+    self.counter = self.counter + 1
+    return name
+
+
+class PrefixTimestampSuffixIterator(ObjectNameIterator):
+  def __init__(self, prefix, suffix):
+    self.prefix = prefix
+    self.suffix = suffix
+
+  def next(self):
+    return '%s_%f_%s' % (self.prefix, time.time(), self.suffix)
 
 
 # ### Utilities for benchmarking ###
@@ -615,7 +671,8 @@ def MultiStreamWrites(service):
        payload,
        size_distribution,
        FLAGS.objects_per_stream,
-       FLAGS.start_time))
+       FLAGS.start_time,
+       FLAGS.object_naming_scheme))
 
   # object_records is the data we leave on the VM for future reads. We
   # need to pass data to the reader so it will know what object names
@@ -634,7 +691,7 @@ def MultiStreamWrites(service):
       # If we can't write our objects written, we still want to return
       # the data we collected, so keep going.
       logging.info('Got exception %s while trying to write objects written '
-                   'file.', ex.msg)
+                   'file.', ex)
 
   # operation_records is the data we send back to the controller.
   operation_records = []
@@ -743,7 +800,7 @@ def SleepUntilTime(when):
 
 def WriteWorker(service, payload,
                 size_distribution, num_objects,
-                start_time, result_queue, worker_num):
+                start_time, naming_scheme, result_queue, worker_num):
   """Upload objects for the multi-stream writes benchmark.
 
   Args:
@@ -752,6 +809,7 @@ def WriteWorker(service, payload,
     size_distribution: the distribution of object sizes to use.
     num_objects: the number of objects to upload.
     start_time: a POSIX timestamp. When to start uploading.
+    naming_scheme: how to name objects. See flag.
     result_queue: a Queue.Queue to record results in.
     worker_num: the thread number of this worker.
   """
@@ -761,8 +819,14 @@ def WriteWorker(service, payload,
   latencies = []
   sizes = []
 
+  if naming_scheme == 'sequential_by_stream':
+    name_iterator = PrefixCounterIterator(
+        'pkb_write_worker_%f_%s' % (time.time(), worker_num))
+  elif naming_scheme == 'approximately_sequential':
+    name_iterator = PrefixTimestampSuffixIterator(
+        'pkb_writes_%s' % start_time,
+        '%s' % worker_num)
   size_iterator = SizeDistributionIterator(size_distribution)
-  object_prefix = ('pkb_write_worker_%f_%s' % (time.time(), worker_num))
 
   payload_handle = cStringIO.StringIO(payload)
 
@@ -770,7 +834,7 @@ def WriteWorker(service, payload,
     SleepUntilTime(start_time)
 
   for i in xrange(num_objects):
-    object_name = '%s_%d' % (object_prefix, i)
+    object_name = name_iterator.next()
     object_size = size_iterator.next()
 
     try:
