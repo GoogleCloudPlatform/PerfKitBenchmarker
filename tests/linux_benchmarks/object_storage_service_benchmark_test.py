@@ -28,7 +28,7 @@ class TestBuildCommands(unittest.TestCase):
 
     mocked_flags.object_storage_multistream_objects_per_stream = 100
     mocked_flags.object_storage_object_sizes = {'1KB': '100%'}
-    mocked_flags.object_storage_multistream_streams_per_vm = 1
+    mocked_flags.object_storage_streams_per_vm = 1
     mocked_flags.num_vms = 1
     mocked_flags.object_storage_object_naming_scheme = 'sequential_by_stream'
 

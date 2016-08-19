@@ -97,7 +97,7 @@ flag_util.DEFINE_yaml('object_storage_object_sizes', '1KB',
                       'Size of objects to send and/or receive. Only applies to '
                       'the api_multistream scenario. Examples: 1KB, '
                       '{1KB: 50%, 10KB: 50%}')
-flags.DEFINE_integer('object_storage_multistream_streams_per_vm', 10,
+flags.DEFINE_integer('object_storage_streams_per_vm', 10,
                      'Number of independent streams per VM. Only applies to '
                      'the api_multistream scenario.',
                      lower_bound=1)
@@ -323,7 +323,7 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
     metadata: dict. Base sample metadata
   """
 
-  num_streams = FLAGS.object_storage_multistream_streams_per_vm * FLAGS.num_vms
+  num_streams = FLAGS.object_storage_streams_per_vm * FLAGS.num_vms
 
   if metadata is None:
     metadata = {}
@@ -723,7 +723,7 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
   logging.info('Distribution %s, backend format %s.',
                FLAGS.object_storage_object_sizes, size_distribution)
 
-  streams_per_vm = FLAGS.object_storage_multistream_streams_per_vm
+  streams_per_vm = FLAGS.object_storage_streams_per_vm
   num_streams = streams_per_vm * len(vms)
 
   def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
