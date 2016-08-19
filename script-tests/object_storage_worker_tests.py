@@ -16,6 +16,7 @@
 
 import itertools
 import random
+import time
 import unittest
 
 import mock
@@ -66,6 +67,25 @@ class TestMaxSizeInDistribution(unittest.TestCase):
     dist = {1: 50.0, 10: 50.0}
     self.assertEqual(object_storage_api_tests.MaxSizeInDistribution(dist),
                      10)
+
+
+class TestPrefixCounterIterator(unittest.TestCase):
+  def testIterator(self):
+    iterator = object_storage_api_tests.PrefixCounterIterator('foo')
+    values = list(itertools.islice(iterator, 3))
+    self.assertEqual(values, ['foo_0', 'foo_1', 'foo_2'])
+
+
+class TestPrefixTimestampSuffixIterator(unittest.TestCase):
+  def testIterator(self):
+    iterator = object_storage_api_tests.PrefixTimestampSuffixIterator(
+        'foo', 'bar')
+    with mock.patch(time.__name__ + '.time',
+                    side_effect=[0, 1, 2]):
+      values = list(itertools.islice(iterator, 3))
+    self.assertEqual(values, ['foo_0.000000_bar',
+                              'foo_1.000000_bar',
+                              'foo_2.000000_bar'])
 
 
 if __name__ == '__main__':
