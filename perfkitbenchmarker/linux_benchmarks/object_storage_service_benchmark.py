@@ -97,9 +97,9 @@ flag_util.DEFINE_yaml('object_storage_object_sizes', '1KB',
                       'Size of objects to send and/or receive. Only applies to '
                       'the api_multistream scenario. Examples: 1KB, '
                       '{1KB: 50%, 10KB: 50%}')
-flags.DEFINE_integer('object_storage_multistream_num_streams', 10,
-                     'Number of independent streams to send and/or receive on. '
-                     'Only applies to the api_multistream scenario.',
+flags.DEFINE_integer('object_storage_multistream_streams_per_vm', 10,
+                     'Number of independent streams per VM. Only applies to '
+                     'the api_multistream scenario.',
                      lower_bound=1)
 
 flags.DEFINE_integer('object_storage_list_consistency_iterations', 200,
@@ -308,20 +308,6 @@ def MultiThreadStartDelay(num_vms, threads_per_vm):
       MULTISTREAM_DELAY_PER_STREAM * threads_per_vm)
 
 
-def NaturalDivisionRoundingUp(numerator, denominator):
-  """Divide two natural numbers, rounding up.
-
-  Args:
-    numerator, denominator: nonnegative integers.
-
-  Returns:
-    The unique dividend such that
-      numerator <= denominator * dividend < numerator + denominator.
-  """
-
-  return (numerator + denominator - 1) // denominator
-
-
 def _ProcessMultiStreamResults(raw_result, operation, sizes,
                                results, metadata=None):
   """Read and process results from the api_multistream worker process.
@@ -337,7 +323,7 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
     metadata: dict. Base sample metadata
   """
 
-  num_streams = FLAGS.object_storage_multistream_num_streams
+  num_streams = FLAGS.object_storage_multistream_streams_per_vm * FLAGS.num_vms
 
   if metadata is None:
     metadata = {}
@@ -431,7 +417,7 @@ def _ProcessMultiStreamResults(raw_result, operation, sizes,
 
   # QPS metrics
   results.append(sample.Sample(
-      'Multi-stream ' + operation + ' QPS',
+      'Multi-stream ' + operation + ' QPS (any stream active)',
       len(records) / any_streams_active.duration, '',
       metadata=distribution_metadata))
   results.append(sample.Sample(
@@ -737,9 +723,8 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
   logging.info('Distribution %s, backend format %s.',
                FLAGS.object_storage_object_sizes, size_distribution)
 
-  streams_per_vm = NaturalDivisionRoundingUp(
-      FLAGS.object_storage_multistream_num_streams, len(vms))
-  logging.info('%s streams per VM.', streams_per_vm)
+  streams_per_vm = FLAGS.object_storage_multistream_streams_per_vm
+  num_streams = streams_per_vm * len(vms)
 
   def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
     vm_idx = proc_idx // streams_per_vm
@@ -750,16 +735,15 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
     out_array[proc_idx] = out
 
   def RunMultiStreamProcesses(command):
-    output = [None] * FLAGS.object_storage_multistream_num_streams
+    output = [None] * num_streams
     # Each process has a thread managing it.
     threads = [
         threading.Thread(target=StartMultiStreamProcess,
                          args=(command, i, output))
-        for i in xrange(FLAGS.object_storage_multistream_num_streams)]
+        for i in xrange(num_streams)]
     for thread in threads:
       thread.start()
-    logging.info('Started %s processes.',
-                 FLAGS.object_storage_multistream_num_streams)
+    logging.info('Started %s processes.', num_streams)
     for thread in threads:
       thread.join()
     logging.info('All processes complete.')

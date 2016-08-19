@@ -28,7 +28,7 @@ class TestBuildCommands(unittest.TestCase):
 
     mocked_flags.object_storage_multistream_objects_per_stream = 100
     mocked_flags.object_storage_object_sizes = {'1KB': '100%'}
-    mocked_flags.object_storage_multistream_num_streams = 1
+    mocked_flags.object_storage_multistream_streams_per_vm = 1
     mocked_flags.num_vms = 1
     mocked_flags.object_storage_object_naming_scheme = 'sequential_by_stream'
 
@@ -98,19 +98,6 @@ class TestDistributionToBackendFormat(unittest.TestCase):
 
     with self.assertRaises(ValueError):
       object_storage_service_benchmark._DistributionToBackendFormat(dist)
-
-
-class TestNaturalDivisionRoundingUp(unittest.TestCase):
-  def doTest(self, num, denom, expected):
-    self.assertEqual(
-        object_storage_service_benchmark.NaturalDivisionRoundingUp(num, denom),
-        expected)
-
-  def testRounding(self):
-    self.doTest(3, 2, 2)
-
-  def testExactlyDivisible(self):
-    self.doTest(4, 2, 2)
 
 
 if __name__ == '__main__':
