@@ -47,4 +47,3 @@ flags.DEFINE_enum('profitbricks_boot_volume_type',
 flags.DEFINE_integer('profitbricks_boot_volume_size',
                      20,
                      ('Choose the boot volume size in GB.'))
-

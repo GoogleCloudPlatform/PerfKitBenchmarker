@@ -673,7 +673,7 @@ $ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
 ## Example run on ProfitBricks
 
 ```bash
-$ ./pkb.py --cloud=ProfitBricks --machine_type=Small --location=de/fkb --benchmarks=iperf
+$ ./pkb.py --cloud=ProfitBricks --machine_type=Small --benchmarks=iperf
 ```
 
 How to Run Windows Benchmarks

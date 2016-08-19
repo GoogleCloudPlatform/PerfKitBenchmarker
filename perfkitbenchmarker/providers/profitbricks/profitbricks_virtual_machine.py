@@ -34,7 +34,7 @@ from perfkitbenchmarker import providers
 
 PROFITBRICKS_API = profitbricks.PROFITBRICKS_API
 FLAGS = flags.FLAGS
-TIMEOUT = 1500 # 25 minutes
+TIMEOUT = 1500  # 25 minutes
 
 
 class CustomMachineTypeSpec(spec.BaseSpec):
@@ -109,8 +109,8 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
       logging.info('Using custom hardware configuration from config.')
       self.cores = self.machine_type.cores
       self.ram = self.machine_type.ram
-      self.machine_type = 'Custom (RAM: {}, Cores: {})'.format(
-        self.ram, self.cores)
+      self.machine_type = 'Custom (RAM: {}, Cores: {})'.format(self.ram,
+                                                               self.cores)
     else:
       try:
           hardware = ast.literal_eval(self.machine_type)
@@ -119,7 +119,7 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
           self.cores = hardware['cores']
       except ValueError:
           # ast.literal_eval() raises a ValueError if string can not
-          # be converted to a dict.  This means machine_type is a 
+          # be converted to a dict.  This means machine_type is a
           # preset, i.e. Small, Medium, Large, etc.
           logging.info('Using preset hardware configuration.')
           self.ram, self.cores = util.ReturnFlavor(self.machine_type)
@@ -137,12 +137,12 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
     result.update({
         'machine_type': (MachineTypeDecoder, {}),
         'profitbricks_location': (option_decoders.StringDecoder,
-                                 {'default': 'us/las'}),
+                                  {'default': 'us/las'}),
         'profitbricks_boot_volume_type': (option_decoders.StringDecoder,
-                                 {'default': 'HDD'}),
+                                          {'default': 'HDD'}),
         'profitbricks_boot_volume_size': (option_decoders.IntDecoder,
-                                 {'default': 10,
-                                  'min': 10})})
+                                          {'default': 10,
+                                           'min': 10})})
     return result
 
 
@@ -325,7 +325,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
 
         # Keep polling resource until a "DONE" state is returned
         if status != 'DONE':
-            raise Exception # Exception triggers vm_util.Retry to go again
+            raise Exception  # Exception triggers vm_util.Retry to go again
 
         return True
 
