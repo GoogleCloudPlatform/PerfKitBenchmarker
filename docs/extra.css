@@ -1,0 +1,147 @@
+@import 'https://fonts.googleapis.com/css?family=Roboto';
+
+/* Element Styling */
+body {
+    color: #212121;
+    font-family: 'Roboto', sans-serif;
+    font-size: 14px;
+}
+
+p {
+    line-height: 1.5em;
+    margin-top: 20px;
+    margin-left: 15px;
+    letter-spacing: 0.2px;
+    word-wrap: break-word;
+    color: #222;
+}
+
+ul, ol {
+  margin-left: 5px;
+
+}
+
+a {
+    color: #1155CC;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a:active {
+    color: #3371E3;
+}
+
+h1 {
+    font-size: 45px;
+    font-weight: normal;
+    margin-top: 8px;
+    margin-bottom: 12px;
+}
+
+h2 {
+    margin-bottom: 20px;
+}
+
+ul.bs-sidebar, ul.nav {
+    margin-left: 0;
+}
+
+.bs-sidebar .nav > li.main > a {
+    font-weight: 600;
+}
+
+.bs-sidebar .nav > li.main > a:hover,
+.bs-sidebar .nav > li.main > a:focus {
+    font-weight: 600;
+}
+
+.bs-sidebar .nav > li > a {
+    color: #303030;
+    font-weight: normal;
+}
+
+
+.bs-sidebar .nav > li > a:hover,
+.bs-sidebar .nav > li > a:focus {
+    color: #3371E3;
+    background-color: #F5F5F5;
+    border-right: none;
+    font-weight: normal;
+}
+
+.bs-sidebar .nav > .active > a {
+    color: #3371E3;
+    background-color: #EEE;
+    font-weight: normal;
+}
+
+.navbar-default {
+    background-color: #455A64;
+    border-color: #344953;
+    font-weight: normal;
+}
+
+/* title */
+.navbar-default .navbar-brand {
+    color: #FFF;
+}
+.navbar-default .navbar-brand:hover,
+.navbar-default .navbar-brand:focus {
+    color: #DDD;
+}
+
+/* link */
+.navbar-default .navbar-nav > li > a {
+    color: #FFF;
+}
+.navbar-default .navbar-nav > li > a:hover,
+.navbar-default .navbar-nav > li > a:focus {
+    background-color: #344953;
+    color: #DDD;
+}
+.navbar-default .navbar-nav > .active > a,
+.navbar-default .navbar-nav > .active > a:hover,
+.navbar-default .navbar-nav > .active > a:focus {
+    color: #FFF;
+    background-color: #344953;
+}
+.navbar-default .navbar-nav > .open > a,
+.navbar-default .navbar-nav > .open > a:hover,
+.navbar-default .navbar-nav > .open > a:focus {
+    color: #DDD;
+    background-color: #344953;
+}
+
+/* caret */
+.navbar-default .navbar-nav > .dropdown > a .caret {
+    border-top-color: #FFF;
+    border-bottom-color: #FFF;
+}
+.navbar-default .navbar-nav > .dropdown > a:hover .caret,
+.navbar-default .navbar-nav > .dropdown > a:focus .caret {
+    border-top-color: #DDD;
+    border-bottom-color: #DDD;
+}
+.navbar-default .navbar-nav > .open > a .caret,
+.navbar-default .navbar-nav > .open > a:hover .caret,
+.navbar-default .navbar-nav > .open > a:focus .caret {
+    border-top-color: #DDD;
+    border-bottom-color: #DDD;
+}
+
+.navbar-default .dropdown-menu > li > a {
+   background-color: #455A64;
+   color: #FFF;
+}
+
+.navbar-default .dropdown-menu > li > a:hover,
+.navbar-default .dropdown-menu > .active > a,
+.navbar-default .dropdown-menu > .active > a:hover {
+    color: #DDD;
+    background-color: #344953;
+}
+
+.well {
+    background: #F5F5F5;
+    border: 1px solid #BDBDBD;
+}
