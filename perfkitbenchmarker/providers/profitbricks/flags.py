@@ -45,5 +45,5 @@ flags.DEFINE_enum('profitbricks_boot_volume_type',
                   ('Choose between HDD or SSD boot volume types.'))
 
 flags.DEFINE_integer('profitbricks_boot_volume_size',
-                     20,
+                     10,
                      ('Choose the boot volume size in GB.'))

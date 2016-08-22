@@ -17,7 +17,7 @@
 import os
 import logging
 import base64
-import ast
+import yaml
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -106,23 +106,37 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
   def __init__(self, *args, **kwargs):
     super(ProfitBricksVmSpec, self).__init__(*args, **kwargs)
     if isinstance(self.machine_type, CustomMachineTypeSpec):
-      logging.info('Using custom hardware configuration from config.')
+      logging.info('Using custom hardware configuration.')
       self.cores = self.machine_type.cores
       self.ram = self.machine_type.ram
       self.machine_type = 'Custom (RAM: {}, Cores: {})'.format(self.ram,
                                                                self.cores)
     else:
-      try:
-          hardware = ast.literal_eval(self.machine_type)
-          logging.info('Using custom hardware configuration from flag.')
-          self.ram = hardware['ram']
-          self.cores = hardware['cores']
-      except ValueError:
-          # ast.literal_eval() raises a ValueError if string can not
-          # be converted to a dict.  This means machine_type is a
-          # preset, i.e. Small, Medium, Large, etc.
-          logging.info('Using preset hardware configuration.')
-          self.ram, self.cores = util.ReturnFlavor(self.machine_type)
+      logging.info('Using preset hardware configuration.')
+      self.ram, self.cores = util.ReturnFlavor(self.machine_type)
+
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(ProfitBricksVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['machine_type'].present:
+      config_values['machine_type'] = yaml.load(flag_values.machine_type)
+    if flag_values['profitbricks_location'].present:
+      config_values['location'] = flag_values.profitbricks_location
+    if flag_values['profitbricks_boot_volume_type'].present:
+      config_values['boot_volume_type'] = \
+        flag_values.profitbricks_boot_volume_type
+    if flag_values['profitbricks_boot_volume_size'].present:
+      config_values['boot_volume_size'] = \
+        flag_values.profitbricks_boot_volume_size
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -136,11 +150,11 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
     result = super(ProfitBricksVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'machine_type': (MachineTypeDecoder, {}),
-        'profitbricks_location': (option_decoders.StringDecoder,
+        'location': (option_decoders.StringDecoder,
                                   {'default': 'us/las'}),
-        'profitbricks_boot_volume_type': (option_decoders.StringDecoder,
+        'boot_volume_type': (option_decoders.StringDecoder,
                                           {'default': 'HDD'}),
-        'profitbricks_boot_volume_size': (option_decoders.IntDecoder,
+        'boot_volume_size': (option_decoders.IntDecoder,
                                           {'default': 10,
                                            'min': 10})})
     return result
@@ -179,9 +193,9 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.cores = vm_spec.cores
         self.machine_type = vm_spec.machine_type
         self.image = self.image or self.DEFAULT_IMAGE
-        self.boot_volume_type = FLAGS.profitbricks_boot_volume_type
-        self.boot_volume_size = FLAGS.profitbricks_boot_volume_size
-        self.location = FLAGS.profitbricks_location
+        self.boot_volume_type = vm_spec.boot_volume_type
+        self.boot_volume_size = vm_spec.boot_volume_size
+        self.location = vm_spec.location
         self.user_name = 'root'
         self.header = {
             'Authorization': 'Basic %s' % self.user_token,

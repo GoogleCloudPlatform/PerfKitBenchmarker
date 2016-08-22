@@ -27,7 +27,7 @@ FLAVORS = profitbricks_machine_types.FLAVORS
 
 
 def PerformRequest(action, url, header, json=None):
-    """ Makes an HTTP request to the ProfitBricks REST API """
+    """Makes an HTTP request to the ProfitBricks REST API."""
 
     # Make HTTP call
     if action == 'get':
@@ -48,7 +48,7 @@ def PerformRequest(action, url, header, json=None):
 
 
 def ReturnImage(header, location):
-    """ Returns Ubuntu image based on zone location """
+    """Returns Ubuntu image based on zone location."""
 
     # Retrieve list of provider images
     url = '%s/images?depth=5' % PROFITBRICKS_API
@@ -64,7 +64,7 @@ def ReturnImage(header, location):
 
 
 def ReturnFlavor(machine_type):
-    """ Returns RAM and Core values based on machine_type selection """
+    """Returns RAM and Core values based on machine_type selection."""
 
     logging.info('Fetching flavor specs for new VM.')
     for flavor in FLAVORS:
@@ -73,7 +73,7 @@ def ReturnFlavor(machine_type):
 
 
 def CreateDatacenter(header, location):
-    """ Creates a Datacenter """
+    """Creates a Datacenter."""
 
     # Build new DC body
     new_dc = {
@@ -98,7 +98,7 @@ def CreateDatacenter(header, location):
 
 
 def CreateLan(header, datacenter):
-    """ Creates a LAN with public IP address """
+    """Creates a LAN with public IP address."""
 
     # Build new LAN body
     new_lan = {
