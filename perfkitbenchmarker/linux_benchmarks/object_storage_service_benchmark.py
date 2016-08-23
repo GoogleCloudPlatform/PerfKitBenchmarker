@@ -31,18 +31,15 @@ category:
 Documentation: https://goto.google.com/perfkitbenchmarker-storage
 """
 
-import itertools
 import json
 import logging
 import os
 import posixpath
 import re
+import tempfile
 import threading
 import time
 
-import pandas as pd
-
-from perfkitbenchmarker import object_storage_multistream_analysis as analysis
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -223,11 +220,8 @@ MULTISTREAM_DELAY_CONSTANT = 10.0 * units.second
 # benchmark. This is the filename.
 OBJECTS_WRITTEN_FILE = 'pkb-objects-written'
 
-# If the gap between different stream starts and ends is above a
-# certain proportion of the total time, we log a warning because we
-# are throwing out a lot of information. We also put the warning in
-# the sample metadata.
-MULTISTREAM_STREAM_GAP_THRESHOLD = 0.2
+PROCESS_OUTPUT_SCRIPT = 'process_object_storage_results.py'
+
 
 # The API test script uses different names for providers than this
 # script :(
@@ -308,138 +302,45 @@ def MultiThreadStartDelay(num_vms, threads_per_vm):
       MULTISTREAM_DELAY_PER_STREAM * threads_per_vm)
 
 
-def _ProcessMultiStreamResults(raw_result, operation, sizes,
-                               results, metadata=None):
-  """Read and process results from the api_multistream worker process.
-
-  Results will be reported per-object size and combined for all
-  objects.
+def _ProcessMultiStreamResults(files, operation, sizes, results, metadata=None):
+  """Process the output of the API test script.
 
   Args:
-    raw_result: list of strings. The stdouts of the worker processes.
-    operation: 'upload' or 'download'. The operation the results are from.
-    sizes: the object sizes used in the benchmark, in bytes.
-    results: a list to append Sample objects to.
-    metadata: dict. Base sample metadata
+    files: a list of files with the output of the script.
+    operation: 'upload' or 'download'.
+    sizes: a list of object sizes in bytes, as integers.
+    results: a list to append sample.Samples to.
+    metadata: extra metadata for the new Sample objects.
   """
 
-  num_streams = FLAGS.object_storage_streams_per_vm * FLAGS.num_vms
+  stdout, stderr, retcode = vm_util.IssueCommand(
+      [data.ResourcePath(PROCESS_OUTPUT_SCRIPT),
+       '--operation=%s' % operation,
+       '--sizes=%s' % ','.join([str(size) for size in sizes]),
+       '--num_vms=%s' % FLAGS.num_vms,
+       '--streams_per_vm=%s' % FLAGS.object_storage_streams_per_vm,
+       '--objects_per_stream=%s' %
+       FLAGS.object_storage_multistream_objects_per_stream] +
+      files,
+      force_info_log=True)
 
-  if metadata is None:
-    metadata = {}
-  metadata['num_streams'] = num_streams
-  metadata['objects_per_stream'] = (
-      FLAGS.object_storage_multistream_objects_per_stream)
+  if retcode != 0:
+    # IssueCommand will already have logged the stderr, no point in
+    # repeating it.
+    raise Exception('Error analyzing object storage results.')
 
-  records = pd.DataFrame({'operation': [],
-                          'start_time': [],
-                          'latency': [],
-                          'size': [],
-                          'stream_num': []})
-  for proc_result in raw_result:
-    proc_json = json.loads(proc_result)
-    records = records.append(pd.DataFrame(proc_json))
-  records = records.reset_index()
+  samples_json = json.loads(stdout)
 
-  logging.info('Records:\n%s', records)
-  logging.info('All latencies positive:%s',
-               (records['latency'] > 0).all())
-
-  any_streams_active, all_streams_active = analysis.GetStreamActiveIntervals(
-      records['start_time'], records['latency'], records['stream_num'])
-  start_gap, stop_gap = analysis.StreamStartAndEndGaps(
-      records['start_time'], records['latency'], all_streams_active)
-  if ((start_gap + stop_gap) / any_streams_active.duration <
-      MULTISTREAM_STREAM_GAP_THRESHOLD):
-    logging.info(
-        'First stream started %s seconds before last stream started', start_gap)
-    logging.info(
-        'Last stream ended %s seconds after first stream ended', stop_gap)
-  else:
-    logging.warning(
-        'Difference between first and last stream start/end times was %s and '
-        '%s, which is more than %s of the benchmark time %s.',
-        start_gap, stop_gap, MULTISTREAM_STREAM_GAP_THRESHOLD,
-        any_streams_active.duration)
-    metadata['stream_gap_above_threshold'] = True
-
-  records_in_interval = records[
-      analysis.FullyInInterval(records['start_time'],
-                               records['latency'],
-                               all_streams_active)]
-
-  # Don't publish the full distribution in the metadata because doing
-  # so might break regexp-based parsers that assume that all metadata
-  # values are simple Python objects. However, do add an
-  # 'object_size_B' metadata field even for the full results because
-  # searching metadata is easier when all records with the same metric
-  # name have the same set of metadata fields.
-  distribution_metadata = metadata.copy()
-  distribution_metadata['object_size_B'] = 'distribution'
-
-  latency_prefix = 'Multi-stream %s latency' % operation
-  logging.info('Processing %s multi-stream %s results for the full '
-               'distribution.', len(records_in_interval), operation)
-  _AppendPercentilesToResults(
-      results,
-      records_in_interval['latency'],
-      latency_prefix,
-      LATENCY_UNIT,
-      distribution_metadata)
-
-  logging.info('Processing %s multi-stream %s results for net throughput',
-               len(records), operation)
-  throughput_stats = analysis.ThroughputStats(
-      records_in_interval['start_time'],
-      records_in_interval['latency'],
-      records_in_interval['size'],
-      records_in_interval['stream_num'],
-      num_streams)
-  # A special throughput statistic that uses all the records, not
-  # restricted to the interval.
-  throughput_stats['net throughput (simplified)'] = (
-      records['size'].sum() * 8 / any_streams_active.duration
-      * units.bit / units.second)
-  gap_stats = analysis.GapStats(
-      records['start_time'],
-      records['latency'],
-      records['stream_num'],
-      all_streams_active,
-      num_streams)
-  logging.info('Benchmark overhead was %s percent of total benchmark time',
-               gap_stats['gap time proportion'].magnitude)
-
-  for name, value in itertools.chain(throughput_stats.iteritems(),
-                                     gap_stats.iteritems()):
+  for sample_json in samples_json:
+    logging.info('Processing sample %s', sample_json)
+    sample_meta = sample_json['metadata']
+    if metadata:
+      sample_meta.update(metadata)
     results.append(sample.Sample(
-        'Multi-stream ' + operation + ' ' + name,
-        value.magnitude, str(value.units), metadata=distribution_metadata))
-
-  # QPS metrics
-  results.append(sample.Sample(
-      'Multi-stream ' + operation + ' QPS (any stream active)',
-      len(records) / any_streams_active.duration, '',
-      metadata=distribution_metadata))
-  results.append(sample.Sample(
-      'Multi-stream ' + operation + ' QPS (all streams active)',
-      len(records_in_interval) / all_streams_active.duration, '',
-      metadata=distribution_metadata))
-
-  # Publish by-size and full-distribution stats even if there's only
-  # one size in the distribution, because it simplifies postprocessing
-  # of results.
-  for size in sizes:
-    this_size_records = records_in_interval[records_in_interval['size'] == size]
-    this_size_metadata = metadata.copy()
-    this_size_metadata['object_size_B'] = size
-    logging.info('Processing %s multi-stream %s results for object size %s',
-                 len(records), operation, size)
-    _AppendPercentilesToResults(
-        results,
-        this_size_records['latency'],
-        latency_prefix,
-        LATENCY_UNIT,
-        this_size_metadata)
+        sample_json['metric'],
+        sample_json['value'],
+        sample_json['unit'],
+        sample_meta))
 
 
 def _DistributionToBackendFormat(dist):
@@ -726,20 +627,25 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
   streams_per_vm = FLAGS.object_storage_streams_per_vm
   num_streams = streams_per_vm * len(vms)
 
-  def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
+  output_dir = tempfile.mkdtemp()
+
+  def StartMultiStreamProcess(cmd_args, proc_idx, out_array, kind):
     vm_idx = proc_idx // streams_per_vm
     logging.info('Running on VM %s.', vm_idx)
     cmd = command_builder.BuildCommand(
         cmd_args + ['--stream_num_start=%s' % proc_idx])
     out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
-    out_array[proc_idx] = out
+    out_file_name = os.path.join(output_dir, '%s_%s' % (kind, proc_idx))
+    with open(out_file_name, 'w') as out_file:
+      out_file.write(out)
+      out_array[proc_idx] = out_file_name
 
-  def RunMultiStreamProcesses(command):
+  def RunMultiStreamProcesses(command, kind):
     output = [None] * num_streams
     # Each process has a thread managing it.
     threads = [
         threading.Thread(target=StartMultiStreamProcess,
-                         args=(command, i, output))
+                         args=(command, i, output, kind))
         for i in xrange(num_streams)]
     for thread in threads:
       thread.start()
@@ -766,9 +672,9 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
       '--objects_written_file=%s' % objects_written_file,
       '--scenario=MultiStreamWrite']
 
-  write_out = RunMultiStreamProcesses(multi_stream_write_args)
+  write_out = RunMultiStreamProcesses(multi_stream_write_args, 'write')
   _ProcessMultiStreamResults(write_out, 'upload',
-                             size_distribution.iterkeys(), results,
+                             list(size_distribution.iterkeys()), results,
                              metadata=metadata)
 
   logging.info('Finished multi-stream write test. Starting multi-stream '
@@ -789,9 +695,9 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
       '--objects_written_file=%s' % objects_written_file,
       '--scenario=MultiStreamRead']
   try:
-    read_out = RunMultiStreamProcesses(multi_stream_read_args)
+    read_out = RunMultiStreamProcesses(multi_stream_read_args, 'read')
     _ProcessMultiStreamResults(read_out, 'download',
-                               size_distribution.iterkeys(), results,
+                               list(size_distribution.iterkeys()), results,
                                metadata=metadata)
   except Exception as ex:
     logging.info('MultiStreamRead test failed with exception %s. Still '

@@ -151,6 +151,14 @@ $ cd /path/to/PerfKitBenchmarker
 $ sudo pip install -r requirements.txt
 ```
 
+### Object Storage Benchmark
+
+The object storage benchmark also depends on `pandas`, which no other benchmark
+uses. To install `pandas`, run
+```bash
+$ sudo pip install pandas
+```
+
 ## Cloud account setup
 
 This section describes the setup steps needed for each cloud system.  
