@@ -31,7 +31,7 @@ flags.DEFINE_string('profitbricks_config',
                               '~/.config/profitbricks-auth.cfg'),
                     ('Path to config file containing your email and password. '
                      'Can also be set via $PROFITBRICKS_CONFIG environment '
-                     "variable.\n(File format: email:password)"))
+                     'variable.\n(File format: email:password)'))
 
 flags.DEFINE_enum('profitbricks_location',
                   US_LAS,

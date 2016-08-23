@@ -71,7 +71,7 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
 
     Args:
       value: Either a string name of a PB machine type or a dict containing
-          'cpu' and 'memory' keys describing a custom VM.
+          'cores' and 'ram' keys describing a custom VM.
       component_full_name: string. Fully qualified name of the configurable
           component containing the config option.
       flag_values: flags.FlagValues. Runtime flag values to be propagated to
