@@ -133,10 +133,10 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
       config_values['location'] = flag_values.profitbricks_location
     if flag_values['profitbricks_boot_volume_type'].present:
       config_values['boot_volume_type'] = \
-        flag_values.profitbricks_boot_volume_type
+          flag_values.profitbricks_boot_volume_type
     if flag_values['profitbricks_boot_volume_size'].present:
       config_values['boot_volume_size'] = \
-        flag_values.profitbricks_boot_volume_size
+          flag_values.profitbricks_boot_volume_size
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -150,13 +150,10 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
     result = super(ProfitBricksVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'machine_type': (MachineTypeDecoder, {}),
-        'location': (option_decoders.StringDecoder,
-                                  {'default': 'us/las'}),
-        'boot_volume_type': (option_decoders.StringDecoder,
-                                          {'default': 'HDD'}),
-        'boot_volume_size': (option_decoders.IntDecoder,
-                                          {'default': 10,
-                                           'min': 10})})
+        'location': (option_decoders.StringDecoder, {'default': 'us/las'}),
+        'boot_volume_type': (option_decoders.StringDecoder, {'default': 'HDD'}),
+        'boot_volume_size': (option_decoders.IntDecoder, {'default': 10,
+                                                          'min': 10})})
     return result
 
 
