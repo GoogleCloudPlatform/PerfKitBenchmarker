@@ -171,7 +171,7 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
           logging.warning('The key "%s" was not in the default config, '
                           'but was in user overrides. This may indicate '
                           'a typo.' % k)
-      elif isinstance(v, dict):
+      elif isinstance(d1[k], dict) and isinstance(v, dict):
         merged_dict[k] = _Merge(d1[k], v)
       else:
         merged_dict[k] = v
