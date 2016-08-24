@@ -344,8 +344,15 @@ class BenchmarkSpec(object):
     logging.info('Waiting for boot completion.')
     vm.AllowRemoteAccessPorts()
     vm.WaitForBootCompletion()
-    vm.AddMetadata(benchmark=self.name, perfkit_uuid=self.uuid,
-                   benchmark_uid=self.uid)
+    vm_metadata = {'benchmark': self.name,
+                   'perfkit_uuid': self.uuid,
+                   'benchmark_uid': self.uid}
+    if FLAGS.vm_metadata:
+      for item in FLAGS.vm_metadata:
+        logging.info('pair is ' + item)
+        key, value = item.split('=', 1)
+        vm_metadata[key] = value
+    vm.AddMetadata(**vm_metadata)
     vm.OnStartup()
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()

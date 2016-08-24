@@ -41,6 +41,10 @@ _VM_SPEC_REGISTRY = {}
 _VM_REGISTRY = {}
 
 
+flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
+                  'via the provider\'s AddMetadata function.')
+
+
 def GetVmSpecClass(cloud):
   """Returns the VmSpec class corresponding to 'cloud'."""
   return _VM_SPEC_REGISTRY.get(cloud, BaseVmSpec)
