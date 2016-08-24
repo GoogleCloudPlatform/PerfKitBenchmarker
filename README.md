@@ -111,6 +111,7 @@ Before you can run the PerfKit Benchmarker, you need account(s) on the cloud pro
 * [AliCloud](http://www.alicloud.com)
 * [DigitalOcean](https://www.digitalocean.com)
 * [Rackspace Cloud](https://www.rackspace.com)
+* [ProfitBricks](https://www.profitbricks.com/)
 
 You also need the software dependencies, which are mostly command line tools and credentials to access your
 accounts without a password.  The following steps should help you get the CLI tool auth in place.
@@ -164,6 +165,7 @@ This section describes the setup steps needed for each cloud system.
 * [AliCloud](#install-alicloud-cli-and-setup-authentication)
 * [DigitalOcean](#digitalocean-configuration-and-credentials)
 * [RackSpace](#installing-clis-and-credentials-for-rackspace)
+* [ProfitBricks](#profitbricks-configuration-and-credentials)
 
 After configuring the clouds you intend to use, skip to [Running a Single Benchmark](#running-a-single-benchmark), unless you are going to use an object storage benchmark, in which case you need to [configure a boto file](#create-and-configure-a-boto-file-for-object-storage-benchmarks).
 
@@ -536,6 +538,35 @@ You can find more details here: https://developer.rackspace.com/docs/rack-cli/co
 if the flavor is supported in the region.
 
 
+### ProfitBricks configuration and credentials
+
+Get started by running:
+```bash
+$ sudo pip install -r perfkitbenchmarker/providers/profitbricks/requirements.txt
+```
+
+PerfKit Benchmarker uses the 
+<a href='http://docs.python-requests.org/en/master/'>Requests</a> module 
+to interact with ProfitBricks' REST API. HTTP Basic authentication is used 
+to authorize access to the API. Please set this up as follows:
+
+Create a configuration file containing the email address and password 
+associated with your ProfitBricks account, separated by a colon. 
+Example:
+
+```bash
+$ less ~/.config/profitbricks-auth.cfg
+email:password
+```
+
+The PerfKit Benchmarker will automatically base64 encode your credentials 
+before making any calls to the REST API.
+
+PerfKit Benchmarker uses the file location `~/.config/profitbricks-auth.cfg`
+by default. You can use the `--profitbricks_config` flag to
+override the path.
+
+
 ## Image prerequisites for Docker based clouds
 Docker instances by default don't allow to SSH into them. Thus it is important to configure your Docker image so that it has SSH server installed. You can use your own image or build a new one based on a Dockerfile placed in `tools/docker_images` directory - in this case please refer to [Docker images document](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tools/docker_images).
 
@@ -639,6 +670,12 @@ $ ./pkb.py --cloud=Mesos --benchmarks=iperf --marathon_address=localhost:8080 --
 $ ./pkb.py --cloud=Rackspace --machine_type=general1-2 --benchmarks=iperf
 ```
 
+## Example run on ProfitBricks
+
+```bash
+$ ./pkb.py --cloud=ProfitBricks --machine_type=Small --benchmarks=iperf
+```
+
 How to Run Windows Benchmarks
 ==================
 You must be running on a Windows machine in order to run Windows benchmarks.
@@ -718,6 +755,7 @@ OpenStack | nova | |
 CloudStack | QC-1 | |
 Rackspace | IAD | OnMetal machine-types are available only in IAD zone
 Kubernetes | k8s | |
+ProfitBricks | ZONE_1 | Additional zones: ZONE_2
 
 Example:
 
