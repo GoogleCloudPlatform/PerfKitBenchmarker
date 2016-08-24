@@ -42,7 +42,8 @@ _VM_REGISTRY = {}
 
 
 flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
-                  'via the provider\'s AddMetadata function.')
+                  'via the provider\'s AddMetadata function. It expects'
+                  'key=value pairs')
 
 
 def GetVmSpecClass(cloud):
