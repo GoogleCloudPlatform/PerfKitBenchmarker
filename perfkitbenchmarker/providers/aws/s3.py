@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+
+FLAGS = flags.FLAGS
 
 AWS_CREDENTIAL_LOCATION = '.aws'
 DEFAULT_AWS_REGION = 'us-east-1'
@@ -93,8 +96,11 @@ class S3Service(object_storage_service.ObjectStorageService):
             linux_packages.GetPipPackageVersion(vm, 'boto')}
 
   def APIScriptArgs(self):
-    hostname = AWS_S3_REGION_TO_ENDPOINT_TABLE[self.region]
-    return ['--host=' + hostname + AWS_S3_ENDPOINT_SUFFIX]
+    if FLAGS.s3_custom_endpoint:
+      return ['--host=' + FLAGS.s3_custom_endpoint]
+    else:
+      hostname = AWS_S3_REGION_TO_ENDPOINT_TABLE[self.region]
+      return ['--host=' + hostname + AWS_S3_ENDPOINT_SUFFIX]
 
   @classmethod
   def APIScriptFiles(cls):
