@@ -359,6 +359,10 @@ def IssueRetryableCommand(cmd, env=None):
 def ParseTimeCommandResult(command_result):
   """Parse command result and get time elapsed.
 
+  Note this parses the output of bash's time builtin, not /usr/bin/time or other
+  implementations. You may need to run something like bash -c "time ./command"
+  to produce parseable output.
+
   Args:
      command_result: The result after executing a remote time command.
 
