@@ -41,8 +41,10 @@ class TestBuildCommands(unittest.TestCase):
     with mock.patch(time.__name__ + '.time', return_value=1.0):
       with mock.patch(object_storage_service_benchmark.__name__ +
                       '._ProcessMultiStreamResults'):
-        object_storage_service_benchmark.MultiStreamRWBenchmark(
-            [], {}, [vm], command_builder, None, 'bucket', 'regional-bucket')
+        with mock.patch(object_storage_service_benchmark.__name__ +
+                        '.LoadWorkerOutput', return_value=(None, None, None)):
+          object_storage_service_benchmark.MultiStreamRWBenchmark(
+              [], {}, [vm], command_builder, None, 'bucket', 'regional-bucket')
 
     self.assertEqual(
         command_builder.BuildCommand.call_args_list[0],
