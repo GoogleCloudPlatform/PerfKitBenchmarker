@@ -320,7 +320,8 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
     sizes: a list of numpy arrays. Object sizes used in each
       operation, in bytes.
     operation: 'upload' or 'download'. The operation the results are from.
-    all_sizes: all object sizes in the distribution used, in bytes.
+    all_sizes: a sequence of integers. all object sizes in the
+      distribution used, in bytes.
     results: a list to append Sample objects to.
     metadata: dict. Base sample metadata
   """
@@ -386,8 +387,6 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
       sizes[i][active_start_indexes[i]:active_stop_indexes[i]]
       for i in xrange(num_streams)]
 
-  logging.info('active_latencies: %s, active_sizes: %s',
-               active_latencies, active_sizes)
   all_active_latencies = np.concatenate(active_latencies)
   all_active_sizes = np.concatenate(active_sizes)
 
@@ -426,20 +425,27 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
         this_size_metadata)
 
   # Throughput metrics
-  active_times = [np.sum(latency) for latency in active_latencies]
+  total_active_times = [np.sum(latency) for latency in active_latencies]
   active_durations = [stop_times[i][active_stop_indexes[i] - 1] -
                       start_times[i][active_start_indexes[i]]
                       for i in xrange(num_streams)]
-  active_sizes = [np.sum(size) for size in active_sizes]
+  total_active_sizes = [np.sum(size) for size in active_sizes]
+  # 'net throughput (with gap)' is computed by taking the throughput
+  # for each stream (total # of bytes transmitted / (stop_time -
+  # start_time)) and then adding the per-stream throughputs. 'net
+  # throughput' is the same, but replacing (stop_time - start_time)
+  # with the sum of all of the operation latencies for that thread, so
+  # we only divide by the time that stream was actually transmitting.
   results.append(sample.Sample(
       'Multi-stream ' + operation + ' net throughput',
       np.sum((size / active_time * 8
-              for size, active_time in zip(active_sizes, active_times))),
+              for size, active_time
+              in zip(total_active_sizes, total_active_times))),
       'bit / second', metadata=distribution_metadata))
   results.append(sample.Sample(
       'Multi-stream ' + operation + ' net throughput (with gap)',
       np.sum((size / duration * 8
-              for size, duration in zip(active_sizes, active_durations))),
+              for size, duration in zip(total_active_sizes, active_durations))),
       'bit / second', metadata=distribution_metadata))
   results.append(sample.Sample(
       'Multi-stream ' + operation + ' net throughput (simplified)',
@@ -460,7 +466,7 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
   # Statistics about benchmarking overhead
   gap_time = sum((active_duration - active_time
                   for active_duration, active_time
-                  in zip(active_durations, active_times)))
+                  in zip(active_durations, total_active_times)))
   results.append(sample.Sample(
       'Multi-stream ' + operation + ' total gap time',
       gap_time, 'second', metadata=distribution_metadata))
@@ -731,12 +737,21 @@ def LoadWorkerOutput(output):
 
   Returns:
     A tuple of start_time, latency, size. Each of these is a list of
-    numpy arrays, one array per worker process. The numpy arrays have
-    one entry per object sent by the worker, and store the
-    corresponding value for that object transfer. start_time and
-    latency are float64s, storing POSIX timestamps and durations in
-    seconds. size stores int64s, holding object size in
-    bytes.
+    numpy arrays, one array per worker process. start_time[i],
+    latency[i], and size[i] together form a table giving the start
+    time, latency, and size (bytes transmitted or received) of all
+    send/receive operations for worker i.
+
+    start_time holds POSIX timestamps, stored as np.float64. latency
+    holds times in seconds, stored as np.float64. size holds sizes in
+    bytes, stored as np.int64.
+
+    Example:
+      start_time[i]  latency[i]  size[i]
+      -------------  ----------  -------
+               0.0         0.5      100
+               1.0         0.7      200
+               2.3         0.3      100
 
   Raises:
     AssertionError, if an individual worker's input includes
