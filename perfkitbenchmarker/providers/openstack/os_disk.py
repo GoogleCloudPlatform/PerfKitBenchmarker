@@ -12,107 +12,178 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
-import time
 
-
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import disk
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import utils as os_utils
+
+REMOTE_VOLUME_DEFAULT_SIZE_GB = 50
 
 FLAGS = flags.FLAGS
 
 
+def CreateVolume(resource, name):
+  """Creates a remote (Cinder) block volume."""
+  vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
+  vol_cmd.flags['availability-zone'] = resource.zone
+  vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
+                           REMOTE_VOLUME_DEFAULT_SIZE_GB)
+  stdout, _, _ = vol_cmd.Issue()
+  vol_resp = json.loads(stdout)
+  return vol_resp
+
+
+def CreateBootVolume(resource, name, image):
+  """Creates a remote (Cinder) block volume with a boot image."""
+  vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
+  vol_cmd.flags['availability-zone'] = resource.zone
+  vol_cmd.flags['image'] = image
+  vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
+                           GetImageMinDiskSize(resource, image))
+  stdout, _, _ = vol_cmd.Issue()
+  vol_resp = json.loads(stdout)
+  return vol_resp
+
+
+def GetImageMinDiskSize(resource, image):
+  """Returns minimum disk size required by the image."""
+  image_cmd = os_utils.OpenStackCLICommand(resource, 'image', 'show', image)
+  stdout, _, _ = image_cmd.Issue()
+  image_resp = json.loads(stdout)
+  volume_size = max((int(image_resp['min_disk']),
+                     REMOTE_VOLUME_DEFAULT_SIZE_GB,))
+  return volume_size
+
+
+def DeleteVolume(resource, volume_id):
+  """Deletes a remote (Cinder) block volume."""
+  vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'delete',
+                                         volume_id)
+  del vol_cmd.flags['format']  # volume delete does not support json output
+  vol_cmd.Issue()
+
+
+@vm_util.Retry(poll_interval=5, max_retries=-1, timeout=300, log_errors=False,
+               retryable_exceptions=errors.Resource.RetryableCreationError)
+def WaitForVolumeCreation(resource, volume_id):
+  """Waits until volume is available"""
+  vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'show', volume_id)
+  stdout, stderr, _ = vol_cmd.Issue()
+  if stderr:
+    raise errors.Error(stderr)
+  resp = json.loads(stdout)
+  if resp['status'] != 'available':
+    msg = 'Volume is not ready. Retrying to check status.'
+    raise errors.Resource.RetryableCreationError(msg)
+
+
 class OpenStackDisk(disk.BaseDisk):
 
-    def __init__(self, disk_spec, name, zone, image=None):
-        super(OpenStackDisk, self).__init__(disk_spec)
-        self.__nclient = os_utils.NovaClient()
-        self.attached_vm_name = None
-        self.attached_vm_id = -1
-        self.image = image
-        self.name = name
-        self.zone = zone
-        self.device = None
-        self._disk = None
+  def __init__(self, disk_spec, name, zone, image=None):
+    super(OpenStackDisk, self).__init__(disk_spec)
+    self.attached_vm_id = None
+    self.image = image
+    self.name = name
+    self.zone = zone
+    self.id = None
 
-    def _Create(self):
-        self._disk = self.__nclient.volumes.create(self.disk_size,
-                                                   display_name=self.name,
-                                                   availability_zone=self.zone,
-                                                   imageRef=self.image,
-                                                   )
+  def _Create(self):
+    vol_resp = CreateVolume(self, self.name)
+    self.id = vol_resp['id']
+    WaitForVolumeCreation(self, self.id)
 
-        is_unavailable = True
-        while is_unavailable:
-            time.sleep(1)
-            volume = self.__nclient.volumes.get(self._disk.id)
-            if volume:
-                is_unavailable = not (volume.status == "available")
-                self._disk = volume
+  def _Delete(self):
+    if self.id is None:
+      logging.info('Volume %s was not created. Skipping deletion.' % self.name)
+      return
+    DeleteVolume(self, self.id)
+    self._WaitForVolumeDeletion()
 
-    def _Delete(self):
-        from novaclient.exceptions import NotFound
+  def _Exists(self):
+    if self.id is None:
+      return False
+    cmd = os_utils.OpenStackCLICommand(self, 'volume', 'show', self.id)
+    stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+    if stdout and stdout.strip():
+      return stdout
+    return not stderr
 
-        if self._disk is None:
-            logging.info('Volume %s was not created. Skipping deletion.'
-                         % self.name)
-            return
+  def Attach(self, vm):
+    self._AttachVolume(vm)
+    self._WaitForVolumeAttachment(vm)
+    self.attached_vm_id = vm.id
 
-        sleep = 1
-        sleep_count = 0
-        try:
-            self.__nclient.volumes.delete(self._disk)
-            is_deleted = False
-            while not is_deleted:
-                volume = self.__nclient.volumes.get(self._disk.id)
-                is_deleted = volume is None
-                time.sleep(sleep)
-                sleep_count += 1
-                if sleep_count == 10:
-                    sleep = 5
-        except NotFound:
-            logging.info('Volume %s not found, might have been already deleted'
-                         % self._disk.id)
+  def Detach(self):
+    self._DetachVolume()
+    self.attached_vm_id = None
+    self.device_path = None
 
-    def _Exists(self):
-        from novaclient.exceptions import NotFound
-        try:
-            volume = self.__nclient.volumes.get(self._disk.id)
-            return volume and volume.status in ('available', 'in-use',
-                                                'deleting',)
-        except NotFound:
-            return False
+  def _AttachVolume(self, vm):
+    if self.id is None:
+      raise errors.Error('Cannot attach remote volume %s' % self.name)
+    if vm.id is None:
+      msg = 'Cannot attach remote volume %s to non-existing %s VM' % (self.name,
+                                                                      vm.name)
+      raise errors.Error(msg)
+    cmd = os_utils.OpenStackCLICommand(
+        self, 'server', 'add', 'volume', vm.id, self.id)
+    del cmd.flags['format']
+    _, stderr, _ = cmd.Issue()
+    if stderr:
+      raise errors.Error(stderr)
 
-    def Attach(self, vm):
-        self.attached_vm_name = vm.name
-        self.attached_vm_id = vm.id
+  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
+                 retryable_exceptions=errors.Resource.RetryableCreationError)
+  def _WaitForVolumeAttachment(self, vm):
+    if self.id is None:
+      return
+    cmd = os_utils.OpenStackCLICommand(self, 'volume', 'show', self.id)
+    stdout, stderr, _ = cmd.Issue()
+    if stderr:
+      raise errors.Error(stderr)
+    resp = json.loads(stdout)
+    attachments = resp['attachments']
+    self.device_path = self._GetDeviceFromAttachment(attachments)
+    msg = 'Remote volume %s has been attached to %s.' % (self.name, vm.name)
+    logging.info(msg)
 
-        result = self.__nclient.volumes.create_server_volume(vm.id,
-                                                             self._disk.id,
-                                                             self.device)
-        self.attach_id = result.id
+  def _GetDeviceFromAttachment(self, attachments):
+    device = None
+    for attachment in attachments:
+      if attachment['volume_id'] == self.id:
+        device = attachment['device']
+    if not device:
+      msg = '%s is not yet attached. Retrying to check status.' % self.name
+      raise errors.Resource.RetryableCreationError(msg)
+    return device
 
-        volume = None
-        is_unattached = True
-        while is_unattached:
-            time.sleep(1)
-            volume = self.__nclient.volumes.get(result.id)
-            if volume:
-                is_unattached = not(volume.status == "in-use"
-                                    and volume.attachments)
+  def _DetachVolume(self):
+    if self.id is None:
+      raise errors.Error('Cannot detach remote volume %s' % self.name)
+    if self.attached_vm_id is None:
+      raise errors.Error('Cannot detach remote volume from a non-existing VM.')
+    cmd = os_utils.OpenStackCLICommand(
+        self, 'server', 'remove', 'volume', self.attached_vm_id, self.id)
+    del cmd.flags['format']
+    _, stderr, _ = cmd.Issue()
+    if stderr:
+      raise errors.Error(stderr)
 
-        for attachment in volume.attachments:
-            if self.attach_id == attachment.get('volume_id'):
-                self.device = attachment.get('device')
-                return
-
-        raise errors.Error("Couldn't not attach volume to %s" % vm.name)
-
-    def GetDevicePath(self):
-        return self.device
-
-    def Detach(self):
-        self.__nclient.volumes.delete_server_volume(self.attached_vm_id,
-                                                    self.attach_id)
+  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
+                 retryable_exceptions=errors.Resource.RetryableDeletionError)
+  def _WaitForVolumeDeletion(self):
+    if self.id is None:
+      return
+    cmd = os_utils.OpenStackCLICommand(self, 'volume', 'show', self.id)
+    stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+    if stderr.strip():
+      return  # Volume could not be found, inferred that has been deleted.
+    resp = json.loads(stdout)
+    if resp['status'] in ('building', 'available', 'in-use', 'deleting',):
+      msg = ('Volume %s has not yet been deleted. Retrying to check status.'
+             % self.id)
+      raise errors.Resource.RetryableDeletionError(msg)

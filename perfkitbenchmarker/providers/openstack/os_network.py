@@ -11,15 +11,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+""""Module containing classes related to OpenStack Networking."""
 
-import logging
+import json
 import threading
-import time
 
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import utils
 from perfkitbenchmarker import providers
+
+
+NOVA_FLOAT_IP_LIST_CMD = 'floating-ip-list'
+OSC_IP_CMD = 'ip'
+OSC_FLOATING_SUBCMD = 'floating'
+OSC_SEC_GROUP_CMD = 'security group'
+OSC_SEC_GROUP_RULE_CMD = 'security group rule'
+
+SC_GROUP_NAME = 'perfkit_sc_group'
+
+ICMP = 'icmp'
+TCP = 'tcp'
+UDP = 'udp'
 
 FLAGS = flags.FLAGS
 
@@ -27,134 +42,134 @@ MAX_PORT = 65535
 
 
 class OpenStackFirewall(network.BaseFirewall):
+  """
+  An object representing OpenStack Firewall based on Secure Groups.
+  """
+
+  CLOUD = providers.OPENSTACK
+
+  def __init__(self):
+    self._lock = threading.Lock()  # Guards security-group rule set
+    self.sec_group_rules_set = set()
+
+    with self._lock:
+      cmd = utils.OpenStackCLICommand(self, OSC_SEC_GROUP_CMD, 'show',
+                                      SC_GROUP_NAME)
+      stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+      if stderr:
+        cmd = utils.OpenStackCLICommand(self, OSC_SEC_GROUP_CMD, 'create',
+                                        SC_GROUP_NAME)
+        cmd.Issue()
+
+  def AllowICMP(self, vm, icmp_type=-1, icmp_code=-1):
+    """Creates a Security Group Rule on the Firewall to allow/disallow
+    ICMP traffic.
+
+    Args:
+      vm: The BaseVirtualMachine object to allow ICMP traffic to.
+      icmp_type: ICMP type to allow. If none given then allows all types.
+      icmp_code: ICMP code to allow. If none given then allows all codes.
     """
-    An object representing OpenStack Firewall based on Secure Groups.
+    if vm.is_static:
+      return
+
+    sec_group_rule = (ICMP, icmp_type, icmp_code, vm.group_id)
+    with self._lock:
+      if sec_group_rule in self.sec_group_rules_set:
+        return
+      cmd = utils.OpenStackCLICommand(vm, OSC_SEC_GROUP_RULE_CMD, 'create',
+                                      vm.group_id)
+      cmd.flags['dst-port'] = str(icmp_type)
+      cmd.flags['proto'] = ICMP
+      cmd.Issue(suppress_warning=True)
+      self.sec_group_rules_set.add(sec_group_rule)
+
+  def AllowPort(self, vm, port, to_port=None):
+    """Creates a Security Group Rule on the Firewall to allow for both TCP
+    and UDP network traffic on given port, or port range.
+
+    Args:
+        vm: The BaseVirtualMachine object to open the port for.
+        port: The local port to open.
+        to_port: The last port to open in range of ports to open. If None,
+          then only the single 'port' is open.
     """
+    if vm.is_static:
+      return
 
-    CLOUD = providers.OPENSTACK
-    _lock = threading.Lock()
+    if to_port is None:
+      to_port = port
 
-    def __init__(self):
-        self.sec_group_rules_set = set()
-        self.__nclient = utils.NovaClient()
+    sec_group_rule = (port, to_port, vm.group_id)
 
-        with self._lock:
-            if not (self.__nclient.security_groups.findall(
-                    name='perfkit_sc_group')):
-                self.sec_group = self.__nclient.security_groups.create(
-                    'perfkit_sc_group',
-                    'Firewall configuration for Perfkit Benchmarker'
-                )
-            else:
-                self.sec_group = self.__nclient.security_groups.findall(
-                    name='perfkit_sc_group')[0]
+    with self._lock:
+      if sec_group_rule in self.sec_group_rules_set:
+        return
+      cmd = utils.OpenStackCLICommand(vm, OSC_SEC_GROUP_RULE_CMD, 'create',
+                                      vm.group_id)
+      cmd.flags['dst-port'] = '%d:%d' % (port, to_port)
+      for prot in (TCP, UDP,):
+        cmd.flags['proto'] = prot
+        cmd.Issue(suppress_warning=True)
+      self.sec_group_rules_set.add(sec_group_rule)
 
-    def AllowICMP(self, vm, icmp_type=-1, icmp_code=-1):
-        """Creates a Security Group Rule on the Firewall to allow/disallow
-        ICMP traffic.
-
-        Args:
-          vm: The BaseVirtualMachine object to allow ICMP traffic to.
-          icmp_type: ICMP type to allow. If none given then allows all types.
-          icmp_code: ICMP code to allow. If none given then allows all codes.
-        """
-        if vm.is_static:
-            return
-
-        from novaclient.exceptions import BadRequest
-
-        sec_group_rule = ('icmp', icmp_type, icmp_code, self.sec_group.id)
-        if sec_group_rule in self.sec_group_rules_set:
-            return
-
-        with self._lock:
-            if sec_group_rule in self.sec_group_rules_set:
-                return
-
-            try:
-                self.__nclient.security_group_rules.create(self.sec_group.id,
-                                                           ip_protocol='icmp',
-                                                           from_port=icmp_type,
-                                                           to_port=icmp_code)
-            except BadRequest:
-                logging.debug('Rule icmp:%d-%d already exists' % (icmp_type,
-                                                                  icmp_code))
-            self.sec_group_rules_set.add(sec_group_rule)
-
-    def AllowPort(self, vm, port, to_port=None):
-        """Creates a Security Group Rule on the Firewall to allow for both TCP
-        and UDP network traffic on given port, or port range.
-
-        Args:
-          vm: The BaseVirtualMachine object to open the port for.
-          port: The local port to open.
-          to_port: The last port to open in range of ports to open. If None,
-              then only the single 'port' is open.
-        """
-        if vm.is_static:
-            return
-
-        from novaclient.exceptions import BadRequest
-
-        if to_port is None:
-            to_port = port
-
-        sec_group_rule = (port, to_port, self.sec_group.id)
-        if sec_group_rule in self.sec_group_rules_set:
-            return
-
-        with self._lock:
-            if sec_group_rule in self.sec_group_rules_set:
-                return
-            for prot in ('tcp', 'udp',):
-                try:
-                    self.__nclient.security_group_rules.create(
-                        self.sec_group.id, ip_protocol=prot,
-                        from_port=port, to_port=to_port)
-                except BadRequest:
-                    logging.debug('Rule %s:%d-%d already exists',
-                                  prot, port, to_port)
-
-            self.sec_group_rules_set.add(sec_group_rule)
-
-    def DisallowAllPorts(self):
-        pass
+  def DisallowAllPorts(self):
+    """Closes all ports on the firewall."""
+    pass
 
 
-class OpenStackPublicNetwork(object):
+class OpenStackFloatingIPPool(object):
 
-    def __init__(self, pool):
-        self.__nclient = utils.NovaClient()
-        # TODO(meteorfox) Is this lock needed? Callers to these methods seem
-        # to be using a lock already. Should we make callers use a lock, or
-        # should this object handle the lock?
-        self.__floating_ip_lock = threading.Lock()
-        self.ip_pool_name = pool
+  _floating_ip_lock = threading.Lock()  # Guards floating IP allocation/release
 
-    def allocate(self):
-        with self.__floating_ip_lock:
-            return self.__nclient.floating_ips.create(pool=self.ip_pool_name)
+  def __init__(self, pool_name):
+    self.ip_pool_name = pool_name
 
-    def release(self, floating_ip):
-        f_id = floating_ip.id
-        if self.__nclient.floating_ips.get(f_id):
-            with self.__floating_ip_lock:
-                if self.__nclient.floating_ips.get(f_id):
-                    self.__nclient.floating_ips.delete(floating_ip)
-                    while self.__nclient.floating_ips.findall(id=f_id):
-                        time.sleep(1)
+  def associate(self, vm):
+    with self._floating_ip_lock:
+      floating_ip = self._get_or_create(vm)
+      cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD, OSC_FLOATING_SUBCMD,
+                                      'add', floating_ip['ip'], vm.id)
+      del cmd.flags['format']  # Command does not support json output format
+      _, stderr, _ = cmd.Issue()
+      if stderr:
+        raise errors.Error(stderr)
+      return floating_ip
 
-    def get_or_create(self):
-        with self.__floating_ip_lock:
-            floating_ips = self.__nclient.floating_ips.findall(
-                instance_id=None,
-                pool=self.ip_pool_name)
-        if floating_ips:
-            return floating_ips[0]
-        else:
-            return self.allocate()
+  def _get_or_create(self, vm):
+    list_cmd = [FLAGS.openstack_nova_path, NOVA_FLOAT_IP_LIST_CMD]
+    stdout, stderr, _ = vm_util.IssueCommand(list_cmd)
+    floating_ip_dict_list = utils.ParseFloatingIPTable(stdout)
+    for floating_ip_dict in floating_ip_dict_list:
+      if (floating_ip_dict['pool'] == self.ip_pool_name and
+              floating_ip_dict['instance_id'] is None):
+        return floating_ip_dict
+    return self._allocate(vm)
 
-    def is_attached(self, floating_ip):
-        return self.__nclient.floating_ips.get(
-            floating_ip.id
-        ).fixed_ip is not None
+  def _allocate(self, vm):
+    cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD, OSC_FLOATING_SUBCMD,
+                                    'create', self.ip_pool_name)
+    stdout, stderr, _ = cmd.Issue()
+    if stderr.strip():  # Strip spaces
+      raise errors.Config.InvalidValue(
+          'Could not allocate a floating ip from the pool "%s".'
+          % self.ip_pool_name)
+    floating_ip_dict = json.loads(stdout)
+    # Convert OSC format to nova's format
+    floating_ip_dict['ip'] = floating_ip_dict['floating_ip_address']
+    del floating_ip_dict['floating_ip_address']
+    return floating_ip_dict
+
+  def release(self, vm, floating_ip_dict):
+    cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD, OSC_FLOATING_SUBCMD, 'show',
+                                    floating_ip_dict['id'])
+    stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+    if stderr:
+      return  # Not found, moving on
+    updated_floating_ip_dict = json.loads(stdout)
+    with self._floating_ip_lock:
+      delete_cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD,
+                                             OSC_FLOATING_SUBCMD, 'delete',
+                                             updated_floating_ip_dict['id'])
+      del delete_cmd.flags['format']  # Command not support json output format
+      stdout, stderr, _ = delete_cmd.Issue(suppress_warning=True)

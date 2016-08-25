@@ -12,36 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 from perfkitbenchmarker import flags
 
-flags.DEFINE_string('openstack_auth_url',
-                    os.environ.get('OS_AUTH_URL', 'http://localhost:5000'),
-                    ('Url for Keystone authentication service, defaults to '
-                     '$OS_AUTH_URL. Required for discovery of other OpenStack '
-                     'service URLs.'))
+flags.DEFINE_string('openstack_cli_path',
+                    default='openstack',
+                    help='The path to the OpenStack CLI binary.')
 
-flags.DEFINE_string('openstack_username',
-                    os.getenv('OS_USERNAME', 'admin'),
-                    'OpenStack login username, defaults to $OS_USERNAME.')
+flags.DEFINE_string('openstack_nova_path',
+                    default='nova',
+                    help='The path to the Nova CLI binary.')
 
-flags.DEFINE_string('openstack_tenant',
-                    os.getenv('OS_TENANT_NAME', 'admin'),
-                    'OpenStack tenant name, defaults to $OS_TENANT_NAME.')
+flags.DEFINE_string('openstack_neutron_path',
+                    default='neutron',
+                    help='The path to the Neutron CLI binary.')
 
-flags.DEFINE_string('openstack_password_file',
-                    os.getenv('OPENSTACK_PASSWORD_FILE',
-                              '~/.config/openstack-password.txt'),
-                    'Path to file containing the openstack password, '
-                    'defaults to $OPENSTACK_PASSWORD_FILE. Alternatively, '
-                    'setting the password itself in $OS_PASSWORD is also '
-                    'supported.')
-
-flags.DEFINE_string('openstack_nova_endpoint_type',
-                    os.getenv('NOVA_ENDPOINT_TYPE', 'publicURL'),
-                    'OpenStack Nova endpoint type, '
-                    'defaults to $NOVA_ENDPOINT_TYPE.')
+flags.DEFINE_string('openstack_additional_flags',
+                    default=[],
+                    help='Additional flags to pass to every OpenStack CLI '
+                         'command. See "openstack --help" for more.')
 
 flags.DEFINE_string('openstack_public_network', None,
                     '(DEPRECATED: Use openstack_floating_ip_pool) '
