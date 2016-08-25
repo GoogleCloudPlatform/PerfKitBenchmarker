@@ -343,7 +343,7 @@ class BenchmarkSpec(object):
                    'benchmark_uid': self.uid}
     for item in FLAGS.vm_metadata:
       if ':' not in item:
-        raise Exception('"%s" not in expected key=value format' % item)
+        raise Exception('"%s" not in expected key:value format' % item)
       key, value = item.split(':', 1)
       vm_metadata[key] = value
 
