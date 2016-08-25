@@ -341,12 +341,11 @@ class BenchmarkSpec(object):
     vm_metadata = {'benchmark': self.name,
                    'perfkit_uuid': self.uuid,
                    'benchmark_uid': self.uid}
-    if FLAGS.vm_metadata:
-      for item in FLAGS.vm_metadata:
-        if ':' not in item:
-          raise Exception('\'%s\' not in expected key=value format' % item)
-        key, value = item.split(':', 1)
-        vm_metadata[key] = value
+    for item in FLAGS.vm_metadata:
+      if ':' not in item:
+        raise Exception('"%s" not in expected key=value format' % item)
+      key, value = item.split(':', 1)
+      vm_metadata[key] = value
 
     vm.Create()
 
