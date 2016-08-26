@@ -338,14 +338,22 @@ class BenchmarkSpec(object):
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
+    vm_metadata = {'benchmark': self.name,
+                   'perfkit_uuid': self.uuid,
+                   'benchmark_uid': self.uid}
+    for item in FLAGS.vm_metadata:
+      if ':' not in item:
+        raise Exception('"%s" not in expected key:value format' % item)
+      key, value = item.split(':', 1)
+      vm_metadata[key] = value
+
     vm.Create()
 
     logging.info('VM: %s', vm.ip_address)
     logging.info('Waiting for boot completion.')
     vm.AllowRemoteAccessPorts()
     vm.WaitForBootCompletion()
-    vm.AddMetadata(benchmark=self.name, perfkit_uuid=self.uuid,
-                   benchmark_uid=self.uid)
+    vm.AddMetadata(**vm_metadata)
     vm.OnStartup()
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()
