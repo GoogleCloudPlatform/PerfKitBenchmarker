@@ -1,3 +1,45 @@
+# 1.7.0
+
+New features:
+* Add ProfitBricks provider (thanks @tjb1019, GH-1005)
+* Add YCSB JDBC benchmark (thanks @k1xme, GH-1049)
+* Add support for st1 and sc1 disks on EBS (GH-1067)
+
+Breaking changes:
+* Change default gce_migrate_on_maintenance to True (GH-1069)
+
+Enhancements:
+* Update OpenStack provider to use OpenStacks CLI instead of python library
+  (thanks @meteorfox, GH-942)
+* Improve side-by-side tool (GH-1034)
+* Specify flags to metadata (GH-1047)
+* Allow Java version for Java benchmarks to be selected via command line (GH-1051)
+* Add numjobs runtime option to fio_benchmark (GH-1066)
+* Add netperf histogram support (GH-1072)
+* Add multi-vm support for object_storage_service_benchmark (GH-1074)
+* Add support for custom s3 endpoints for object_storage_service_benchmark
+  (GH-1078)
+* Add user-defined metadata for vms (GH-1080)
+
+Bugfixes and maintenance updates:
+* Refactor object_storage_service_benchmark (GH-1023)
+* Support overriding ycsb_client_vms in benchmark spec (thanks @k1xme, GH-1042)
+* Update YCSB to 0.9.0 and support latest logging format (thanks @k1xme, GH-1043)
+* Fix zones flag (GH-1044)
+* Update Bigtable to v2 API (thanks @tswast, GH-1045)
+* Update maven version to 3.3.9 (GH-1046)
+* Start background workload in prepare stage and stop in cleanup stage (GH-1048)
+* Minor fixes in flag description (GH-1052)
+* Only upload files needed for API testing script for
+  object_storage_service_benchmark (GH-1053)
+* Fix redis_ycsb benchmark to use multiple processes (GH-1062, GH-1068, GH-1070)
+* Fix bug with custom machine types configs (GH-1077)
+* Fix in documentation of ParseTimeCommandResult (thanks @skorgu, GH-1079)
+* Replace Pandas dependency with Numpy (GH-1081)
+* Turn off OpenBlas threading, improving HPCC on large vms (GH-1084)
+* Cleanup object_storage_serivce benchmark (GH-1085)
+* Cleanup aerospike_ycsb benchmarks (GH-1086)
+
 # 1.6.0
 
 New features:
