@@ -27,7 +27,7 @@ def _Install(vm):
   vm.Install('fortran')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, OPENBLAS_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(OPENBLAS_DIR, GIT_TAG))
-  vm.RemoteCommand('cd {0} && make'.format(OPENBLAS_DIR))
+  vm.RemoteCommand('cd {0} && make USE_THREAD=0'.format(OPENBLAS_DIR))
 
 
 def YumInstall(vm):
