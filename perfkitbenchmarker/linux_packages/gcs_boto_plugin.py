@@ -17,18 +17,23 @@
 
 
 def _Install(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the GCS boto plugin on the VM."""
   vm.Install('pip')
   vm.RemoteCommand('sudo pip install gcs-oauth2-boto-plugin')
 
 
 def YumInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the GCS boto plugin on the VM."""
   vm.InstallPackages('gcc openssl-devel python-devel libffi-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the iperf package on the VM."""
+  """Installs the GCS boto plugin on the VM."""
   vm.InstallPackages('gcc python-dev libffi-dev')
   _Install(vm)
+
+
+def _Uninstall(vm):
+  """Uninstall the GCS boto plugin from the VM."""
+  vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall gcs-oauth2-boto-plugin')

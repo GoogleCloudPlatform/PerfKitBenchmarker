@@ -30,6 +30,7 @@ FLAGS = flags.FLAGS
 
 GCS_CREDENTIAL_LOCATION = '.config/gcloud/credentials'
 DEFAULT_GCP_REGION = 'us-central1'
+GCLOUD_CONFIG_PATH = '.config/gcloud'
 
 
 class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
@@ -99,7 +100,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     vm.PushFile(
         object_storage_service.FindCredentialFile(
             '~/' + GCS_CREDENTIAL_LOCATION),
-        '.config/gcloud')
+        GCLOUD_CONFIG_PATH)
     vm.PushFile(object_storage_service.FindBotoFile(),
                 object_storage_service.DEFAULT_BOTO_LOCATION)
 
@@ -119,7 +120,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         # crcmod on the system already, this is required by gsutil doc:
         # https://cloud.google.com/storage/docs/
         # gsutil/addlhelp/CRC32CandInstallingcrcmod
-        vm.RemoteCommand('/usr/bin/yes |sudo pip uninstall crcmod')
+        vm.Uninstall('crcmod')
       except errors.VirtualMachine.RemoteCommandError:
         logging.info('pip uninstall crcmod failed, could be normal if crcmod '
                      'is not available at all.')
@@ -131,6 +132,12 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       vm.installed_crcmod = False
 
     vm.Install('gcs_boto_plugin')
+
+  def CleanupVM(self, vm):
+    vm.RemoveFile('google-cloud-sdk')
+    vm.RemoveFile(GCLOUD_CONFIG_PATH)
+    vm.RemoveFile(object_storage_service.DEFAULT_BOTO_LOCATION)
+    vm.Uninstall('gcs_boto_plugin')
 
   def CLIUploadDirectory(self, vm, directory, files, bucket):
     return vm.RemoteCommand(
