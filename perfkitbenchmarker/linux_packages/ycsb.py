@@ -242,6 +242,10 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
 
   for operation, lines in by_operation:
     operation = operation[1:-1].lower()
+
+    if operation == 'cleanup':
+      continue
+
     op_result = {
         'group': operation,
         data_type: [],

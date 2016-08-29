@@ -79,6 +79,7 @@ def ConfigureAndStart(server, seed_node_ips=None):
   server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
                         AEROSPIKE_CONF_PATH,
                         {'devices': devices,
+                         'memory_size': int(server.total_memory_kb * 0.8),
                          'seed_addresses': seed_node_ips})
 
   for scratch_disk in server.scratch_disks:
