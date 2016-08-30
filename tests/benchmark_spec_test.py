@@ -167,6 +167,15 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
       self.assertTrue(all(disk_spec.disk_size == 75
                           for disk_spec in vm.disk_specs))
 
+  def testZonesFlag(self):
+    with mock_flags.PatchFlags(self._mocked_flags):
+      self._mocked_flags.zones = ['us-east-1b', 'zone2']
+      spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
+      spec.ConstructVirtualMachines()
+      self.assertEqual(len(spec.vms), 2)
+      self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
+      self.assertEqual(spec.vm_groups['group2'][0].zone, 'zone2')
+
 
 class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
 

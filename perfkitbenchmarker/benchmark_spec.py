@@ -104,6 +104,8 @@ class BenchmarkSpec(object):
     self.always_call_cleanup = False
     self.spark_service = None
 
+    self._zone_index = 0
+
     # Set the current thread's BenchmarkSpec object to this one.
     context.SetThreadBenchmarkSpec(self)
 
@@ -121,7 +123,6 @@ class BenchmarkSpec(object):
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
     vms = []
-    zone_index = 0
 
     vm_count = group_spec.vm_count
     disk_count = group_spec.disk_count
@@ -157,9 +158,10 @@ class BenchmarkSpec(object):
     for _ in xrange(vm_count - len(vms)):
       # Assign a zone to each VM sequentially from the --zones flag.
       if FLAGS.zones:
-        group_spec.vm_spec.zone = FLAGS.zones[zone_index]
-        zone_index = (zone_index + 1 if zone_index < len(FLAGS.zones) - 1
-                      else 0)
+        group_spec.vm_spec.zone = FLAGS.zones[self._zone_index]
+        self._zone_index = (self._zone_index + 1
+                            if self._zone_index < len(FLAGS.zones) - 1
+                            else 0)
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       if disk_spec:
         vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
