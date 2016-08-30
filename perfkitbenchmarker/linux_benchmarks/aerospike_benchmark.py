@@ -48,6 +48,11 @@ flags.DEFINE_integer('aerospike_client_threads_step_size', 8,
 flags.DEFINE_integer('aerospike_read_percent', 90,
                      'The percent of operations which are reads.',
                      lower_bound=0, upper_bound=100)
+flags.DEFINE_integer('aerospike_num_keys', 1000000,
+                     'The number of keys to load Aerospike with. The index '
+                     'must fit in memory regardless of where the actual '
+                     'data is being stored and each entry in the '
+                     'index requires 64 bytes.')
 
 BENCHMARK_NAME = 'aerospike'
 BENCHMARK_CONFIG = """
@@ -58,6 +63,7 @@ aerospike:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
       vm_count: null
+      disk_count: 0
     client:
       vm_spec: *default_single_core
 """
@@ -73,8 +79,7 @@ def GetConfig(user_config):
   if (FLAGS.aerospike_storage_type == aerospike_server.DISK and
       FLAGS.data_disk_type != disk.LOCAL):
     config['vm_groups']['workers']['disk_count'] = 1
-  else:
-    config['vm_groups']['workers']['disk_count'] = 0
+
   return config
 
 
@@ -153,27 +158,31 @@ def Run(benchmark_spec):
     Returns:
       A tuple of average TPS and average latency.
     """
-    write_latency, read_latency = re.findall(
-        r'Overall Average Latency \(ms\) ([0-9]+\.[0-9]+)', output)[-2:]
+    read_latency = re.findall(
+        r'read.*Overall Average Latency \(ms\) ([0-9]+\.[0-9]+)\n', output)[-1]
+    write_latency = re.findall(
+        r'write.*Overall Average Latency \(ms\) ([0-9]+\.[0-9]+)\n', output)[-1]
     average_latency = (
         (FLAGS.aerospike_read_percent / 100.0) * float(read_latency) +
         ((100 - FLAGS.aerospike_read_percent) / 100.0) * float(write_latency))
-    tps = map(int, re.findall(r'total\(tps=([0-9]+)', output)[:-1])
+    tps = map(int, re.findall(r'total\(tps=([0-9]+) ', output))
     return float(sum(tps)) / len(tps), average_latency
 
   load_command = ('./%s/benchmarks/target/benchmarks -z 32 -n test -w I '
-                  '-o B:1000 -k 1000000 -h %s' %
-                  (CLIENT_DIR, ','.join(s.internal_ip for s in servers)))
+                  '-o B:1000 -k %s -h %s' %
+                  (CLIENT_DIR, FLAGS.aerospike_num_keys,
+                   ','.join(s.internal_ip for s in servers)))
   client.RemoteCommand(load_command, should_log=True)
 
   max_throughput_for_completion_latency_under_1ms = 0.0
   for threads in range(FLAGS.aerospike_min_client_threads,
                        FLAGS.aerospike_max_client_threads + 1,
                        FLAGS.aerospike_client_threads_step_size):
-    load_command = ('timeout 15 ./%s/benchmarks/target/benchmarks '
-                    '-z %s -n test -w RU,%s -o B:1000 -k 1000000 '
+    load_command = ('timeout 60 ./%s/benchmarks/target/benchmarks '
+                    '-z %s -n test -w RU,%s -o B:1000 -k %s '
                     '--latency 5,1 -h %s;:' %
                     (CLIENT_DIR, threads, FLAGS.aerospike_read_percent,
+                     FLAGS.aerospike_num_keys,
                      ','.join(s.internal_ip for s in servers)))
     stdout, _ = client.RemoteCommand(load_command, should_log=True)
     tps, latency = ParseOutput(stdout)

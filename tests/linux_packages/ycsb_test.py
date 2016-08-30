@@ -107,12 +107,6 @@ class DetailedResultParserTestCase(unittest.TestCase):
     self.assertEqual(1, percentiles['p50'])
     self.assertEqual(7, percentiles['p99'])
 
-  def testPercentilesFromHistogram_cleanup(self):
-    hist = self.results['groups']['cleanup']['histogram']
-    percentiles = ycsb._PercentilesFromHistogram(hist)
-    self.assertEqual(0, percentiles['p50'])
-    self.assertEqual(385, percentiles['p99'])
-
 
 class WeightedQuantileTestCase(unittest.TestCase):
 

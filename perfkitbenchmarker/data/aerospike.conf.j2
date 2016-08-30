@@ -60,7 +60,7 @@ network {
 
 namespace test {
 	replication-factor 3  # To match HBase / Cassandra tests.
-	memory-size 4G
+	memory-size {{ memory_size }}K
 	default-ttl 30d # 30 days, use 0 to never expire/evict.
 	{# if storage devices are passed to the template, use them for storage; otherwise use memory. -#}
 	{% if devices %}
