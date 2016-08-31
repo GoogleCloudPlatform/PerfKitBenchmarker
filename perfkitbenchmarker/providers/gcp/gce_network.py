@@ -29,7 +29,7 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
-NETWORK_RANGE = '10.0.0.0/16'
+NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 
@@ -144,7 +144,7 @@ class GceNetworkResource(resource.BaseResource):
   def _Create(self):
     """Creates the Network resource."""
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'create', self.name)
-    cmd.flags['range'] = NETWORK_RANGE
+    cmd.flags['mode'] = 'auto'
     cmd.Issue()
 
   def _Delete(self):
