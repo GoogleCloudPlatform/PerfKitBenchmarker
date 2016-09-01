@@ -24,6 +24,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import random
 
 import jinja2
 
@@ -279,13 +280,36 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   """
   logging.debug('Environment variables: %s' % env)
 
+  # Save Temp files
+
+
+
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
+  path = os.path.abspath("")
+  # save_path = path + '/example'
+  if len(cmd) > 3:
+      print cmd
+      if cmd[2] == 'create' or cmd[2] == 'replace': #and cmd[len(cmd)-1] != 's': # and cmd[3] == '-f':
+          variable1 = lambda: random.randint(13, 19)
+          name_of_file = "temp" + str(variable1())
+          PrependTempDir(name_of_file+".json")
+        #   completeName = os.path.join(path, name_of_file+".json")
+          file1 = open(PrependTempDir(name_of_file+".json"), "w")
+          file1.flush()
+          file1.write(str(input))
+          file1.close()
+          del cmd[-1]
+          cmd.append(PrependTempDir(name_of_file+".json"))
+
+  full_cmd = ' '.join(cmd)
+
+
   shell_value = RunningOnWindows()
   with tempfile.TemporaryFile() as tf_out, tempfile.TemporaryFile() as tf_err:
-    process = subprocess.Popen(cmd, env=env, shell=shell_value,
-                               stdin=subprocess.PIPE, stdout=tf_out,
+
+    process = subprocess.Popen(cmd, env=env, shell=shell_value, stdout=tf_out,
                                stderr=tf_err)
 
     def _KillProcess():
@@ -314,7 +338,6 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     logging.debug(debug_text)
 
   return stdout, stderr, process.returncode
-
 
 def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
   """Run the provided command once in the background.
@@ -358,10 +381,6 @@ def IssueRetryableCommand(cmd, env=None):
 
 def ParseTimeCommandResult(command_result):
   """Parse command result and get time elapsed.
-
-  Note this parses the output of bash's time builtin, not /usr/bin/time or other
-  implementations. You may need to run something like bash -c "time ./command"
-  to produce parseable output.
 
   Args:
      command_result: The result after executing a remote time command.
