@@ -80,6 +80,11 @@ def main():
         status.flush()
         status.seek(0)
 
+        # Initialize the stdout; avoid race condition.
+        stdout.write('')
+        stdout.flush()
+        stdout.seek(0)
+
         p = subprocess.Popen(options.command, stdout=stdout, stderr=stderr,
                              shell=True)
         logging.info('Started pid %d: %s', p.pid, options.command)
