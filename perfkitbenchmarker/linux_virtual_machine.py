@@ -136,12 +136,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if not isinstance(command, basestring):
       command = ' '.join(command)
 
-    # Create files to avoid race conditions
-    self.RemoteCommand('touch %s %s %s' % (
-        stdout_file,
-        stderr_file,
-        status_file))
-
     start_command = ['nohup', 'python', execute_path,
                      '--stdout', stdout_file,
                      '--stderr', stderr_file,
