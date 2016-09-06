@@ -44,7 +44,8 @@ cloudsuite_data_serving:
   description: >
       Run YCSB client against Cassandra servers.
       Specify record count and operation count with
-      --rec_count and --op_count.
+      --cloudsuite_data_serving_rec_count and
+      --cloudsuite_data_serving_op_count.
   vm_groups:
     server_seed:
       vm_spec: *default_single_core
