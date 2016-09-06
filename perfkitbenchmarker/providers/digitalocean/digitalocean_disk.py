@@ -93,7 +93,7 @@ class DigitalOceanBlockStorageDisk(disk.BaseDisk):
          '--size', str(self.disk_size) + 'gb'])
     if retcode:
       raise errors.Resource.RetryableCreationError(
-          'Error creating disk: %s' % response)
+          'Error creating disk: %s' % (response,))
 
     self.volume_id = response[0]['id']
 
@@ -103,7 +103,7 @@ class DigitalOceanBlockStorageDisk(disk.BaseDisk):
          self.volume_id])
     if retcode:
       raise errors.Resource.RetryableDeletionError(
-          'Error deleting disk: %s' % response)
+          'Error deleting disk: %s' % (response,))
 
   def Attach(self, vm):
     response, retcode = util.DoctlAndParse(
@@ -111,7 +111,7 @@ class DigitalOceanBlockStorageDisk(disk.BaseDisk):
          self.volume_id, vm.droplet_id])
     if retcode:
       raise errors.VmUtil.CalledProcessException(
-          'Error attaching disk: %s' % response)
+          'Error attaching disk: %s' % (response,))
 
     action_id = response[0]['id']
     util.WaitForAction(action_id)
@@ -122,7 +122,7 @@ class DigitalOceanBlockStorageDisk(disk.BaseDisk):
          self.volume_id])
     if retcode:
       raise errors.VmUtil.CalledProcessException(
-          'Error detaching disk: %s' % response)
+          'Error detaching disk: %s' % (response,))
 
     action_id = response[0]['id']
     util.WaitForAction(action_id)

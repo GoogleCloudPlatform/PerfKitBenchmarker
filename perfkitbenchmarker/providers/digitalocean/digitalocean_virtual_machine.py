@@ -86,7 +86,7 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
          '--wait'])
     if retcode:
       raise errors.Resource.RetryableCreationError('Creation failed: %s' %
-                                                   response)
+                                                   (response,))
     self.droplet_id = response[0]['id']
 
   @vm_util.Retry()
@@ -111,7 +111,7 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
       return
     elif retcode:
       raise errors.Resource.RetryableDeletionError('Deletion failed: %s' %
-                                                   response)
+                                                   (response,))
 
   def _Exists(self):
     """Returns true if the VM exists."""
