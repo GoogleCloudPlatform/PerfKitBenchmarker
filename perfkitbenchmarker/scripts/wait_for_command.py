@@ -31,6 +31,10 @@ import os
 import shutil
 import sys
 import threading
+import time
+
+WAIT_TIMEOUT_IN_SEC = 120.0
+WAIT_SLEEP_IN_SEC = 5.0
 
 
 def main():
@@ -61,12 +65,21 @@ def main():
     sys.stderr.write(msg)
     return 1
 
+  start = time.time()
+  return_code_str = None
+  while (time.time() < WAIT_TIMEOUT_IN_SEC + start):
+    try:
+      with open(options.stdout, 'r'):
+        with open(options.stderr, 'r'):
+          with open(options.status, 'r') as status:
+            fcntl.lockf(status, fcntl.LOCK_SH)
+            return_code_str = status.read()
+    except IOError:
+      print >> sys.stderr, 'WARNING: file doesn\'t exist, retrying'
+      time.sleep(WAIT_SLEEP_IN_SEC)
+
   with open(options.stdout, 'r') as stdout:
     with open(options.stderr, 'r') as stderr:
-      with open(options.status, 'r') as status:
-        fcntl.lockf(status, fcntl.LOCK_SH)
-        return_code_str = status.read()
-
       if return_code_str:
         return_code = int(return_code_str)
       else:
