@@ -24,6 +24,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.static_virtual_machine import StaticVirtualMachine
 from perfkitbenchmarker.static_virtual_machine import StaticVmSpec
 
+from tests import mock_flags
 
 _COMPONENT = 'test_static_vm_spec'
 _DISK_SPEC_DICTS = [{'device_path': '/test_device_path'},
@@ -62,6 +63,10 @@ class StaticVirtualMachineTest(unittest.TestCase):
     p = mock.patch(vm_util.__name__ + '.GetTempDir')
     p.start()
     self.addCleanup(p.stop)
+    mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    mocked_flags.image = 'test_image'
+    mocked_flags.os_type = 'debian'
+
 
   def tearDown(self):
     StaticVirtualMachine.vm_pool = self._initial_pool
