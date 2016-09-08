@@ -47,8 +47,7 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
 
   def __init__(self, component_full_name, ip_address=None, user_name=None,
                ssh_private_key=None, internal_ip=None, ssh_port=22,
-               password=None, disk_specs=None, os_type=None, flag_values=None,
-               **kwargs):
+               password=None, disk_specs=None, os_type=None, **kwargs):
     """Initialize the StaticVmSpec object.
 
     Args:
@@ -65,11 +64,8 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
           create disk.BaseDiskSpecs.
       os_type: The OS type of the VM. See the flag of the same name for more
           information.
-      flag_values: None or flags.FlagValues. Runtime flags that may override
-          the provided config option values in kwargs.
     """
-    super(StaticVmSpec, self).__init__(
-        component_full_name, flag_values, **kwargs)
+    super(StaticVmSpec, self).__init__(component_full_name, **kwargs)
     self.ip_address = ip_address
     self.user_name = user_name
     self.ssh_private_key = ssh_private_key
