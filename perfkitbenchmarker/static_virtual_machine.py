@@ -252,7 +252,8 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
           'static_vm_file', ip_address=ip_address, user_name=user_name,
           ssh_port=ssh_port, install_packages=install_packages,
           ssh_private_key=keyfile_path, internal_ip=internal_ip, zone=zone,
-          disk_specs=disk_kwargs_list, password=password)
+          disk_specs=disk_kwargs_list, password=password,
+          flag_values=flags.FLAGS)
 
       vm_class = GetStaticVmClass(os_type)
       vm = vm_class(vm_spec)
