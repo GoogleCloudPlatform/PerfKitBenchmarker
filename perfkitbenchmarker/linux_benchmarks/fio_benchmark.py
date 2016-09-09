@@ -359,8 +359,12 @@ def GetConfig(user_config):
   return config
 
 
-def Prepare(benchmark_spec):
+def CheckPrerequisites():
+  """Perform flag checks."""
+  WarnOnBadFlags()
 
+
+def Prepare(benchmark_spec):
   """Prepare the virtual machine to run FIO.
 
      This includes installing fio, bc, and libaio1 and pre-filling the
@@ -372,9 +376,6 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
 
   """
-
-  WarnOnBadFlags()
-
   vm = benchmark_spec.vms[0]
   logging.info('FIO prepare on %s', vm)
   vm.Install('fio')
