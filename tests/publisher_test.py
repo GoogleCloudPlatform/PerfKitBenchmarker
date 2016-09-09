@@ -237,7 +237,9 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     p = mock.patch(publisher.__name__ + '.FLAGS')
     self.mock_flags = p.start()
     self.mock_flags.configure_mock(metadata=[],
-                                   num_striped_disks=1)
+                                   num_striped_disks=1,
+                                   procfs_config={},
+                                   sysfs_config={})
     self.addCleanup(p.stop)
 
     self.maxDiff = None
@@ -271,7 +273,9 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                          'image': self.mock_vm.image,
                          'vm_count': 1,
                          'num_striped_disks': 1,
-                         'hostnames': 'Hostname'}
+                         'hostnames': 'Hostname',
+                         'procfs_config': '{}',
+                         'sysfs_config': '{}'}
 
   def _RunTest(self, spec, expected, input_metadata=None):
     input_metadata = input_metadata or {}

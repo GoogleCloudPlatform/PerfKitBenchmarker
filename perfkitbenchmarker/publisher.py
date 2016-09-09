@@ -185,6 +185,9 @@ class DefaultMetadataProvider(MetadataProvider):
           for key, value in data_disk.metadata.iteritems():
             metadata[name_prefix + 'data_disk_0_' + key] = value
 
+    metadata['procfs_config'] = str(FLAGS.procfs_config)
+    metadata['sysfs_config'] = str(FLAGS.sysfs_config)
+
     # Flatten all user metadata into a single list (since each string in the
     # FLAGS.metadata can actually be several key-value pairs) and then iterate
     # over it.
