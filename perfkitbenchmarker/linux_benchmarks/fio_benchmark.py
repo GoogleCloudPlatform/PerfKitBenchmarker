@@ -130,8 +130,8 @@ flags.DEFINE_integer('fio_runtime', 600,
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
-    'fio_generate_scenarios', 'fio_io_depths', 'fio_run_for_minutes',
-    'fio_blocksize'}
+    'fio_generate_scenarios', 'fio_io_depths', 'fio_runtime',
+    'fio_blocksize', 'fio_num_jobs'}
 
 
 def AgainstDevice():
