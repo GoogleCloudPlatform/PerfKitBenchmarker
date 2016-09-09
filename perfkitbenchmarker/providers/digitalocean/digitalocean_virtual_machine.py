@@ -14,21 +14,14 @@
 """Class to represent a DigitalOcean Virtual Machine object (Droplet).
 """
 
-import json
-import logging
-import time
-
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.digitalocean import digitalocean_disk
 from perfkitbenchmarker.providers.digitalocean import util
 from perfkitbenchmarker import providers
-
-FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu-14-04-x64'
 
@@ -56,23 +49,6 @@ runcmd:
   - [ chage, -d, -1, -I, -1, -E, -1, -M, 999999, root ]
 '''
 
-# HTTP status codes for creation that should not be retried.
-FATAL_CREATION_ERRORS = set([
-    422,  # 'unprocessable_entity' such as invalid size or region.
-])
-
-# Default configuration for action status polling.
-DEFAULT_ACTION_WAIT_SECONDS = 10
-DEFAULT_ACTION_MAX_TRIES = 90
-
-
-def GetErrorMessage(stdout):
-  """Extract a message field from JSON output if present."""
-  try:
-    return json.loads(stdout)['message']
-  except (ValueError, KeyError):
-    return stdout
-
 
 class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a DigitalOcean Virtual Machine (Droplet)."""
@@ -98,62 +74,27 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
 
-    stdout, ret = util.RunCurlCommand(
-        'POST', 'droplets', {
-            'name': self.name,
-            'region': self.zone,
-            'size': self.machine_type,
-            'image': self.image,
-            'backups': False,
-            'ipv6': False,
-            'private_networking': True,
-            'ssh_keys': [],
-            'user_data': CLOUD_CONFIG_TEMPLATE.format(
-                self.user_name, public_key)
-        })
-    if ret != 0:
-      msg = GetErrorMessage(stdout)
-      if ret in FATAL_CREATION_ERRORS:
-        raise errors.Error('Creation request invalid, not retrying: %s' % msg)
-      raise errors.Resource.RetryableCreationError('Creation failed: %s' % msg)
-    response = json.loads(stdout)
-    self.droplet_id = response['droplet']['id']
-
-    # The freshly created droplet will be in a locked and unusable
-    # state for a while, and it cannot be deleted or modified in
-    # this state. Wait for the action to finish and check the
-    # reported result.
-    if not self._GetActionResult(response['links']['actions'][0]['id']):
-      raise errors.Resource.RetryableCreationError('Creation failed, see log.')
-
-  def _GetActionResult(self, action_id,
-                       wait_seconds=DEFAULT_ACTION_WAIT_SECONDS,
-                       max_tries=DEFAULT_ACTION_MAX_TRIES):
-    """Wait until a VM action completes."""
-    for _ in xrange(max_tries):
-      time.sleep(wait_seconds)
-      stdout, ret = util.RunCurlCommand('GET', 'actions/%s' % action_id)
-      if ret != 0:
-        logging.warn('Unexpected action lookup failure.')
-        return False
-      response = json.loads(stdout)
-      status = response['action']['status']
-      logging.debug('action %d: status is "%s".', action_id, status)
-      if status == 'completed':
-        return True
-      elif status == 'errored':
-        return False
-    # If we get here, waiting timed out. Treat as failure.
-    logging.debug('action %d: timed out waiting.', action_id)
-    return False
+    response, retcode = util.DoctlAndParse(
+        ['compute', 'droplet', 'create',
+         self.name,
+         '--region', self.zone,
+         '--size', self.machine_type,
+         '--image', self.image,
+         '--user-data', CLOUD_CONFIG_TEMPLATE.format(
+             self.user_name, public_key),
+         '--enable-private-networking',
+         '--wait'])
+    if retcode:
+      raise errors.Resource.RetryableCreationError('Creation failed: %s' %
+                                                   (response,))
+    self.droplet_id = response[0]['id']
 
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data."""
-    stdout, _ = util.RunCurlCommand(
-        'GET', 'droplets/%s' % self.droplet_id)
-    response = json.loads(stdout)['droplet']
-    for interface in response['networks']['v4']:
+    response, retcode = util.DoctlAndParse(
+        ['compute', 'droplet', 'get', self.droplet_id])
+    for interface in response[0]['networks']['v4']:
       if interface['type'] == 'public':
         self.ip_address = interface['ip_address']
       else:
@@ -161,47 +102,25 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Delete(self):
     """Delete a DigitalOcean VM instance."""
-    stdout, ret = util.RunCurlCommand(
-        'DELETE', 'droplets/%s' % self.droplet_id)
-    if ret != 0:
-      if ret == 404:
-        return  # Assume already deleted.
-      raise errors.Resource.RetryableDeletionError('Deletion failed: %s' %
-                                                   GetErrorMessage(stdout))
 
-    # Get the droplet's actions so that we can look up the
-    # ID for the deletion just issued.
-    stdout, ret = util.RunCurlCommand(
-        'GET', 'droplets/%s/actions' % self.droplet_id)
-    if ret != 0:
-      # There's a race condition here - if the lookup fails, assume it's
-      # due to deletion already being complete. Don't raise an error in
-      # that case,  the _Exists check should trigger retry if needed.
+    response, retcode = util.DoctlAndParse(
+        ['compute', 'droplet', 'delete', self.droplet_id])
+    # The command doesn't return the HTTP status code, and the error
+    # format is very difficult to parse, so we string
+    # search. TODO(noahl): parse the error message.
+    if retcode and '404' in response['errors'][0]['detail']:
       return
-    response = json.loads(stdout)['actions']
-
-    # Get the action ID for the 'destroy' action. This assumes there's only
-    # one of them, but AFAIK there can't be more since 'destroy' locks the VM.
-    destroy = [v for v in response if v['type'] == 'destroy'][0]
-
-    # Wait for completion. Actions are global objects, so the action
-    # status should still be retrievable after the VM got destroyed.
-    # We don't care about the result, let the _Exists check decide if we
-    # need to try again.
-    self._GetActionResult(destroy['id'])
+    elif retcode:
+      raise errors.Resource.RetryableDeletionError('Deletion failed: %s' %
+                                                   (response,))
 
   def _Exists(self):
     """Returns true if the VM exists."""
-    _, ret = util.RunCurlCommand(
-        'GET', 'droplets/%s' % self.droplet_id,
-        suppress_warning=True)
-    if ret == 0:
-      return True
-    if ret == 404:
-      # Definitely doesn't exist.
-      return False
-    # Unknown status - assume it doesn't exist. TODO(klausw): retry?
-    return False
+
+    response, retcode = util.DoctlAndParse(
+        ['compute', 'droplet', 'get', self.droplet_id])
+
+    return retcode == 0
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
@@ -209,21 +128,34 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
-    if disk_spec.disk_type != disk.STANDARD:
-      # TODO(klausw): support type BOOT_DISK once that's implemented.
-      raise errors.Error('DigitalOcean does not support disk type %s.' %
-                         disk_spec.disk_type)
 
-    if self.scratch_disks:
-      # We have a "disk" already, don't add more. TODO(klausw): permit
-      # multiple creation for type BOOT_DISK once that's implemented.
-      raise errors.Error('DigitalOcean does not support multiple disks.')
+    if disk_spec.disk_type == disk.LOCAL:
+      if self.scratch_disks and self.scratch_disks[0].disk_type == disk.LOCAL:
+        raise errors.Error('DigitalOcean does not support multiple local '
+                           'disks.')
 
-    # Just create a local directory at the specified path, don't mount
-    # anything.
-    self.RemoteCommand('sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'
-                       .format(disk_spec.mount_point))
-    self.scratch_disks.append(digitalocean_disk.DigitalOceanDisk(disk_spec))
+      if disk_spec.num_striped_disks != 1:
+        raise ValueError('num_striped_disks=%s, but DigitalOcean VMs can only '
+                         'have one local disk.' % disk_spec.num_striped_disks)
+      # The single unique local disk on DigitalOcean is also the boot
+      # disk, so we can't follow the normal procedure of formatting
+      # and mounting. Instead, create a folder at the "mount point" so
+      # the rest of PKB will work as expected and deliberately skip
+      # self._CreateScratchDiskFromDisks.
+      self.RemoteCommand('sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'
+                         .format(disk_spec.mount_point))
+      self.scratch_disks.append(
+          digitalocean_disk.DigitalOceanLocalDisk(disk_spec))
+    else:
+      disks = []
+      for _ in range(disk_spec.num_striped_disks):
+        # Disk 0 is the local disk.
+        data_disk = digitalocean_disk.DigitalOceanBlockStorageDisk(
+            disk_spec, self.zone)
+        data_disk.disk_number = self.remote_disk_counter + 1
+        self.remote_disk_counter += 1
+        disks.append(data_disk)
+      self._CreateScratchDiskFromDisks(disk_spec, disks)
 
 
 class ContainerizedDigitalOceanVirtualMachine(

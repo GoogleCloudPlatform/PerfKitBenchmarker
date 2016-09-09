@@ -463,37 +463,12 @@ Run the following command to install `aliyuncli` (omit the `sudo` on Windows)
 
 ### DigitalOcean configuration and credentials
 
-PerfKit Benchmarker uses the `curl` tool to interact with
-DigitalOcean's REST API. This API uses oauth for authentication.
-Please set this up as follows:
+1. Install `doctl`, the DigitalOcean CLI, following the instructions at
+`https://github.com/digitalocean/doctl`.
 
-Log in to your DigitalOcean account and create a Personal Access Token
-for use by PerfKit Benchmarker with read/write access in [Settings /
-API](https://cloud.digitalocean.com/settings/applications).
-
-Save a copy of the authentication token it shows, this is a
-64-character hex string.
-
-Create a curl configuration file containing the needed authorization
-header. The double quotes are required. Example:
-
-```bash
-$ cat > ~/.config/digitalocean-oauth.curl
-header = "Authorization: Bearer 9876543210fedc...ba98765432"
-^D
-```
-
-Confirm that the authentication works:
-
-```bash
-$ curl --config ~/.config/digitalocean-oauth.curl https://api.digitalocean.com/v2/sizes
-{"sizes":[{"slug":"512mb","memory":512,"vcpus":1,...
-```
-
-PerfKit Benchmarker uses the file location `~/.config/digitalocean-oauth.curl`
-by default, you can use the `--digitalocean_curl_config` flag to
-override the path.
-
+2. Authenticate with `doctl`. The easiest way is running `doctl auth login` and
+   following the instructions, but any of the options at the `doctl` site will
+   work.
 
 ### Installing CLIs and credentials for Rackspace
 

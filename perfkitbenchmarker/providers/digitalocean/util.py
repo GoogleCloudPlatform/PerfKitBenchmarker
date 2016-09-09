@@ -15,98 +15,83 @@
 
 import json
 import logging
-import os
 
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
-DIGITALOCEAN_API = 'https://api.digitalocean.com/v2/'
-
-FLAGS = flags.FLAGS
-
-
-def GetDefaultDigitalOceanCurlFlags():
-  """Return common set of curl options for Digital Ocean.
-
-  Returns:
-    A common set of curl options.
-  """
-  options = [
-      '--config', os.path.expanduser(FLAGS.digitalocean_curl_config),
-  ]
-  options.extend(FLAGS.additional_curl_flags)
-
-  return options
+# Default configuration for action status polling.
+DEFAULT_ACTION_WAIT_SECONDS = 10
+DEFAULT_ACTION_MAX_TRIES = 90
 
 
-def GetCurlCommand(action, url, args=None):
-  """Returns a curl command line.
+def DoctlAndParse(arg_list):
+  """Run a doctl command and parse the output.
 
   Args:
-    action: HTTP request type such as 'POST'
-    url: URL location such as 'account/keys'
-    args: key/value dict, used for JSON input
+    arg_list: a list of arguments for doctl. Will be formated with
+      str() before being sent to the process.
+
   Returns:
-    Command as argv list.
+    A tuple of
+      - doctl's JSON output, pre-parsed, or None if output is empty.
+      - doctl's return code
+
+  Raises:
+    errors.VmUtil.CalledProcessError if doctl fails.
   """
 
-  cmd = [
-      FLAGS.curl_path,
-      '--request', action,
-      '--url', DIGITALOCEAN_API + url,
-      '--include',
-      '--silent',
-  ]
+  stdout, _, retcode = vm_util.IssueCommand(
+      ['doctl'] +
+      [str(arg) for arg in arg_list] +
+      ['--output=json'])
 
-  if action == 'GET':
-    # Disable pagination
-    cmd.extend(['--form', 'per_page=999999999'])
+  # In case of error, doctl sometimes prints "null" before printing a
+  # JSON error string to stdout. TODO(noahl): improve parsing of
+  # error messages.
+  if retcode and stdout.startswith('null'):
+    output = stdout[4:]
+  else:
+    output = stdout
 
-  if args is not None:
-    cmd.extend([
-        '--header', 'Content-Type: application/json',
-        '--data', json.dumps(args, separators=(',', ':'))])
-
-  return cmd
+  if output:
+    return json.loads(output), retcode
+  else:
+    return None, retcode
 
 
-def RunCurlCommand(action, url, args=None, suppress_warning=False):
-  """Runs a curl command and processes the result.
+class ActionInProgressException(Exception):
+  """Exception to indicate that a DigitalOcean action is in-progress."""
+  pass
 
-  Args:
-    action: HTTP request type such as 'POST'
-    url: URL location such as 'account/keys'
-    args: key/value dict, used for JSON input
-    suppress_warning: if true, failures aren't interesting
-  Returns:
-    (stdout, ret) tuple, where stdout is a JSON string and
-    ret is zero for success, the command exit code (1-255),
-    or the HTTP status code (300 and up).
-  """
 
-  cmd = GetCurlCommand(action, url, args)
+class ActionFailedError(Exception):
+  """Exception raised when a DigitalOcean action fails."""
+  pass
 
-  cmd.extend(GetDefaultDigitalOceanCurlFlags())
 
-  stdout, _, curl_ret, = vm_util.IssueCommand(
-      cmd, suppress_warning=suppress_warning)
-  if curl_ret:
-    # Executing command failed - IssueCommand will have logged details.
-    return stdout, curl_ret
+class UnknownStatusError(Exception):
+  """Exception raised for an unknown status message."""
+  pass
 
-  # Use last two \r\n separated blocks, there may be
-  # extra blocks for HTTP "100 Continue" responses.
-  meta, body = stdout.split('\r\n\r\n')[-2:]
 
-  response, unused_header = meta.split('\r\n', 1)
-  code = int(response.split()[1])
-  status = 0  # Success.
-  if code >= 300:
-    # For non-success responses, use the HTTP code as return value.
-    status = code
+@vm_util.Retry(poll_interval=DEFAULT_ACTION_WAIT_SECONDS,
+               max_retries=DEFAULT_ACTION_MAX_TRIES,
+               retryable_exceptions=ActionInProgressException)
+def WaitForAction(action_id):
+  """Wait until a VM action completes."""
+  response, retcode = DoctlAndParse(
+      ['compute', 'action', 'get', action_id])
+  if retcode:
+    logging.warn('Unexpected action lookup failure.')
+    raise ActionFailedError('Failed to get action %s' % action_id)
 
-  if status and not suppress_warning:
-    logging.info('Got HTTP status code (%s).\nRESPONSE: %s\n',
-                 code, body)
-
-  return body, status
+  status = response[0]['status']
+  logging.debug('action %d: status is "%s".', action_id, status)
+  if status == 'completed':
+    return
+  elif status == 'in-progress':
+    raise ActionInProgressException()
+  elif status == 'errored':
+    raise ActionFailedError('Action %s errored' % action_id)
+  else:
+    raise UnknownStatusError('Action %s had unknown status "%s"' %
+                             (action_id, status))
