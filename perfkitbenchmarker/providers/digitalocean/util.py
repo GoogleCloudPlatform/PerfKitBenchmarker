@@ -16,18 +16,11 @@
 import json
 import logging
 
-from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
-
-DIGITALOCEAN_API = 'https://api.digitalocean.com/v2/'
 
 # Default configuration for action status polling.
 DEFAULT_ACTION_WAIT_SECONDS = 10
 DEFAULT_ACTION_MAX_TRIES = 90
-
-
-FLAGS = flags.FLAGS
 
 
 def DoctlAndParse(arg_list):
@@ -51,8 +44,9 @@ def DoctlAndParse(arg_list):
       [str(arg) for arg in arg_list] +
       ['--output=json'])
 
-  # In case of error, doctl sometimes prints "null" before printing
-  # a JSON error string to stdout.
+  # In case of error, doctl sometimes prints "null" before printing a
+  # JSON error string to stdout. TODO(noahl): improve parsing of
+  # error messages.
   if retcode and stdout.startswith('null'):
     output = stdout[4:]
   else:
@@ -88,7 +82,7 @@ def WaitForAction(action_id):
       ['compute', 'action', 'get', action_id])
   if retcode:
     logging.warn('Unexpected action lookup failure.')
-    raise errors.ActionFailedError('Failed to get action %s' % action_id)
+    raise ActionFailedError('Failed to get action %s' % action_id)
 
   status = response[0]['status']
   logging.debug('action %d: status is "%s".', action_id, status)

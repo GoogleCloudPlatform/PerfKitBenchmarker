@@ -106,7 +106,8 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     response, retcode = util.DoctlAndParse(
         ['compute', 'droplet', 'delete', self.droplet_id])
     # The command doesn't return the HTTP status code, and the error
-    # format is very difficult to parse, so we string search.
+    # format is very difficult to parse, so we string
+    # search. TODO(noahl): parse the error message.
     if retcode and '404' in response['errors'][0]['detail']:
       return
     elif retcode:
@@ -130,16 +131,17 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if disk_spec.disk_type == disk.LOCAL:
       if self.scratch_disks and self.scratch_disks[0].disk_type == disk.LOCAL:
-        # We have a disk object already, don't add more.
-        raise errors.Error('DigitalOcean does not support multiple disks.')
+        raise errors.Error('DigitalOcean does not support multiple local '
+                           'disks.')
 
       if disk_spec.num_striped_disks != 1:
         raise ValueError('num_striped_disks=%s, but DigitalOcean VMs can only '
                          'have one local disk.' % disk_spec.num_striped_disks)
-      # Since the local disk is already mounted, just create a local
-      # directory at the specified path. Calling
-      # self._CreateScratchDiskFromDisks would try to mount the
-      # volume, so don't do that.
+      # The single unique local disk on DigitalOcean is also the boot
+      # disk, so we can't follow the normal procedure of formatting
+      # and mounting. Instead, create a folder at the "mount point" so
+      # the rest of PKB will work as expected and deliberately skip
+      # self._CreateScratchDiskFromDisks.
       self.RemoteCommand('sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'
                          .format(disk_spec.mount_point))
       self.scratch_disks.append(
