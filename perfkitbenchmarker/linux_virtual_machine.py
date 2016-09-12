@@ -234,7 +234,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         path_components.append(name)
         if not isinstance(value, dict):
           self.RemoteCommand('echo "%s" | sudo tee %s' %
-                             (str(value), posixpath.join(*path_components)))
+                             (value, posixpath.join(*path_components)))
         else:
           ConfigureSubtree(value)
         path_components.pop()

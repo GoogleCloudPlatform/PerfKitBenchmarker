@@ -33,63 +33,60 @@ class LinuxVM(linux_virtual_machine.BaseLinuxMixin):
 
 
 class TestConfigureVMKernel(unittest.TestCase):
-  def setUp(self):
+  def runTest(self, procfs, sysfs, procfs_calls, sysfs_calls):
+    """Run a ConfigureVMKernel test.
+
+    Args:
+      procfs, sysfs: dictionaries in the format of FLAGS.{procfs,sysfs}_config
+        giving the configuration options to set.
+      procfs_calls, sysfs_calls: lists of mock.call() objects giving the
+        expected calls to vm.RemoteCommand() for the test.
+    """
+
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    self.mocked_flags.procfs_config = procfs
+    self.mocked_flags.sysfs_config = sysfs
+
+    vm = LinuxVM()
+
+    with mock.patch.object(vm, 'RemoteCommand') as remote_command:
+      vm.ConfigureVMKernel()
+
+    self.assertItemsEqual(  # use assertItemsEqual because order is undefined.
+      procfs_calls + sysfs_calls,
+      remote_command.call_args_list)
 
   def testConfigureVMKernel(self):
-    vm = LinuxVM()
-
-    self.mocked_flags.procfs_config = {'sys': {'vm':
-                                          {'dirty_background_ratio': '10'}}}
-    self.mocked_flags.sysfs_config = {}
-    with mock.patch.object(vm, 'RemoteCommand') as remote_command:
-      vm.ConfigureVMKernel()
-
-    self.assertEqual(remote_command.call_args_list,
-                     [mock.call('echo "10" | sudo tee '
-                                '/proc/sys/vm/dirty_background_ratio')])
+    self.runTest({'sys': {'vm': {'dirty_background_ratio': '10'}}},
+                 {},
+                 [mock.call('echo "10" | sudo tee '
+                            '/proc/sys/vm/dirty_background_ratio')],
+                 [])
 
   def testConvertToString(self):
-    vm = LinuxVM()
-
-    self.mocked_flags.procfs_config = {'sys': {'vm':
-                                          {'dirty_background_ratio': 10}}}
-    self.mocked_flags.sysfs_config = {}
-    with mock.patch.object(vm, 'RemoteCommand') as remote_command:
-      vm.ConfigureVMKernel()
-
-    self.assertEqual(remote_command.call_args_list,
-                     [mock.call('echo "10" | sudo tee '
-                                '/proc/sys/vm/dirty_background_ratio')])
+    self.runTest({'sys': {'vm': {'dirty_background_ratio': 10}}},
+                 {},
+                 [mock.call('echo "10" | sudo tee '
+                            '/proc/sys/vm/dirty_background_ratio')],
+                 [])
 
   def testMultipleFiles(self):
-    vm = LinuxVM()
-
-    self.mocked_flags.procfs_config = {'sys': {'vm':
-                                               {'dirty_background_ratio': 10,
-                                                'dirty_ratio': 50}}}
-    self.mocked_flags.sysfs_config = {}
-    with mock.patch.object(vm, 'RemoteCommand') as remote_command:
-      vm.ConfigureVMKernel()
-
-    self.assertEqual(remote_command.call_args_list,
-                     [mock.call('echo "10" | sudo tee '
-                                '/proc/sys/vm/dirty_background_ratio'),
-                      mock.call('echo "50" | sudo tee '
-                                '/proc/sys/vm/dirty_ratio')])
+    self.runTest({'sys': {'vm': {'dirty_background_ratio': 10,
+                                 'dirty_ratio': 50}}},
+                 {},
+                 [mock.call('echo "10" | sudo tee '
+                            '/proc/sys/vm/dirty_background_ratio'),
+                  mock.call('echo "50" | sudo tee '
+                            '/proc/sys/vm/dirty_ratio')],
+                 [])
 
   def testSysfs(self):
-    vm = LinuxVM()
-
-    self.mocked_flags.procfs_config = {}
-    self.mocked_flags.sysfs_config = {'kernel': {'mm': {'transparent_hugepage':
-                                                        {'enabled': 'always'}}}}
-    with mock.patch.object(vm, 'RemoteCommand') as remote_command:
-      vm.ConfigureVMKernel()
-
-    self.assertEqual(remote_command.call_args_list,
-                     [mock.call('echo "always" | sudo tee '
-                                '/sys/kernel/mm/transparent_hugepage/enabled')])
+    self.runTest({},
+                 {'kernel': {'mm': {'transparent_hugepage':
+                                    {'enabled': 'always'}}}},
+                 [],
+                 [mock.call('echo "always" | sudo tee '
+                            '/sys/kernel/mm/transparent_hugepage/enabled')])
 
 
 if __name__ == '__main__':
