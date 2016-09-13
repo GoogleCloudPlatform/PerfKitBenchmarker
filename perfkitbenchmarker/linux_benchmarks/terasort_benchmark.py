@@ -61,14 +61,14 @@ TERAVALIDATE_CLASSNAME = 'org.apache.hadoop.examples.terasort.TeraValidate'
 
 flags.DEFINE_integer('terasort_dataset_size', 10000,
                      'Data set size to generate')
-flags.DEFINE_string('terasort_unsorted_dir', 'tera_gen_data2', 'Location of '
+flags.DEFINE_string('terasort_unsorted_dir', 'tera_gen_data', 'Location of '
                     'the unsorted data. TeraGen writes here, and TeraSort '
                     'reads from here.')
 
-flags.DEFINE_string('terasort_sorted_dir', 'tera_sort_dir2', 'Location for the '
+flags.DEFINE_string('terasort_sorted_dir', 'tera_sort_dir', 'Location for the '
                     'sorted data. TeraSort writes to here, TeraValidate reads '
                     'from here.')
-flags.DEFINE_string('terasort_validate_dir', 'tera_validate_dir2', 'Output of '
+flags.DEFINE_string('terasort_validate_dir', 'tera_validate_dir', 'Output of '
                     'the TeraValidate command')
 
 FLAGS = flags.FLAGS
