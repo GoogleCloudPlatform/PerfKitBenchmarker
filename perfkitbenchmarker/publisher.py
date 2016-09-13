@@ -183,7 +183,7 @@ class DefaultMetadataProvider(MetadataProvider):
             metadata[name_prefix + 'scratch_disk_type'] = (
                 data_disk.metadata[disk.LEGACY_DISK_TYPE])
           for key, value in data_disk.metadata.iteritems():
-            metadata[name_prefix + 'data_disk_0_' + key] = value
+            metadata[name_prefix + 'data_disk_0_%s' % (key, )] = value
 
     # Flatten all user metadata into a single list (since each string in the
     # FLAGS.metadata can actually be several key-value pairs) and then iterate
