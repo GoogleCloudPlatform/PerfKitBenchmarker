@@ -44,6 +44,9 @@ SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
 
+SPARK_JOB_TYPE = 'spark'
+HADOOP_JOB_TYPE = 'hadoop'
+
 # This is used for error messages.
 
 _SPARK_SERVICE_REGISTRY = {}
@@ -94,7 +97,8 @@ class BaseSparkService(resource.BaseResource):
 
   @abc.abstractmethod
   def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
-                job_stdout_file=None, job_arguments=None):
+                job_stdout_file=None, job_arguments=None,
+                job_type=SPARK_JOB_TYPE):
     """Submit a job to the spark service.
 
     Submits a job and waits for it to complete.

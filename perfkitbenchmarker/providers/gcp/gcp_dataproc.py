@@ -94,16 +94,18 @@ class GcpDataproc(spark_service.BaseSparkService):
     stdout, stderr, retcode = cmd.Issue()
     return retcode == 0
 
+
   def SubmitJob(self, jarfile, classname, job_poll_interval=None,
-                job_arguments=None, job_stdout_file=None):
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'spark')
+                job_arguments=None, job_stdout_file=None,
+                job_type=spark_service.SPARK_JOB_TYPE):
+    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jars'] = jarfile
     cmd.flags['class'] = classname
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
     # stdout of the job.  We set the driver log level to FATAL
-    # to supress those messages, and we can then separate, hopefully
+    # to suppress those messages, and we can then separate, hopefully
     # the job standard out from the log messages.
     cmd.flags['driver-log-levels'] = 'root=FATAL'
     if job_arguments:
@@ -119,17 +121,21 @@ class GcpDataproc(spark_service.BaseSparkService):
       with open(job_stdout_file, 'w') as f:
         lines = stderr.splitlines(True)
         if (not re.match(r'Job \[.*\] submitted.', lines[0]) or
-            not re.match(r'Waiting for job output...', lines[1]) or
-            not re.match(r'\r', lines[2])):
+            not re.match(r'Waiting for job output...', lines[1])):
           raise Exception('Dataproc output in unexpected format.')
-        i = 3
-        # Eat these status lines.  The end in \r, so they overwrite themselves
-        # at the console or when you cat a file.  But they are part of this
-        # string.
-        while re.match(r'\[Stage \d+:', lines[i]):
+        i = 2
+        if job_type == spark_service.SPARK_JOB_TYPE:
+          if not re.match(r'\r', lines[i]):
+            raise Exception('Dataproc output in unexpected format.')
           i += 1
-        if not re.match(r' *\r$', lines[i]):
-          raise Exception('Dataproc output in unexpected format.')
+          # Eat these status lines.  They end in \r, so they overwrite
+          # themselves at the console or when you cat a file.  But they
+          # are part of this string.
+          while re.match(r'\[Stage \d+:', lines[i]):
+            i += 1
+          if not re.match(r' *\r$', lines[i]):
+            raise Exception('Dataproc output in unexpected format.')
+
         while i < len(lines) and not re.match(r'Job \[.*\]', lines[i]):
           f.write(lines[i])
           i += 1

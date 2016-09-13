@@ -35,9 +35,6 @@ For more on Apache Spark, see: http://spark.apache.org/
 """
 
 import datetime
-import logging
-import os
-import tempfile
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -46,30 +43,33 @@ from perfkitbenchmarker import flags
 
 
 
-BENCHMARK_NAME = 'spark'
+BENCHMARK_NAME = 'terasort_benchmark'
 BENCHMARK_CONFIG = """
-spark:
-  description: Run a jar on a spark cluster.
+terasort_benchmark:
+  description: Run the Apache hadoop terasort benchmark on a cluster.
   spark_service:
     service_type: managed
     num_workers: 4
 """
 
 # This points to a file on the spark cluster.
-DEFAULT_JARFILE = 'file:///usr/lib/spark/lib/spark-examples.jar'
-DEFAULT_CLASSNAME = 'org.apache.spark.examples.SparkPi'
+TERASORT_JARFILE = ('file:///usr/lib/hadoop-mapreduce/'
+                    'hadoop-mapreduce-examples.jar')
+TERAGEN_CLASSNAME = 'org.apache.hadoop.examples.terasort.TeraGen'
+TERASORT_CLASSNAME = 'org.apache.hadoop.examples.terasort.TeraSort'
+TERAVALIDATE_CLASSNAME = 'org.apache.hadoop.examples.terasort.TeraValidate'
 
-flags.DEFINE_string('spark_jarfile', DEFAULT_JARFILE,
-                    'Jarfile to submit.')
-flags.DEFINE_string('spark_classname', DEFAULT_CLASSNAME,
-                    'Classname to be used')
-flags.DEFINE_bool('spark_print_stdout', True, 'Print the standard '
-                  'output of the job')
-flags.DEFINE_list('spark_job_arguments', [], 'Arguments to be passed '
-                  'to the class given by spark_classname')
-flags.DEFINE_enum('spark_job_type', spark_service.SPARK_JOB_TYPE,
-                  [spark_service.SPARK_JOB_TYPE, spark_service.HADOOP_JOB_TYPE],
-                  'Type of the job to submit.')
+flags.DEFINE_integer('terasort_dataset_size', 10000,
+                     'Data set size to generate')
+flags.DEFINE_string('terasort_unsorted_dir', 'tera_gen_data2', 'Location of '
+                    'the unsorted data. TeraGen writes here, and TeraSort '
+                    'reads from here.')
+
+flags.DEFINE_string('terasort_sorted_dir', 'tera_sort_dir2', 'Location for the '
+                    'sorted data. TeraSort writes to here, TeraValidate reads '
+                    'from here.')
+flags.DEFINE_string('terasort_validate_dir', 'tera_validate_dir2', 'Output of '
+                    'the TeraValidate command')
 
 FLAGS = flags.FLAGS
 
@@ -93,60 +93,44 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   spark_cluster = benchmark_spec.spark_service
-  jar_start = datetime.datetime.now()
+  start = datetime.datetime.now()
 
-  stdout_path = None
   results = []
-  try:
-    if FLAGS.spark_print_stdout:
-      # We need to get a name for a temporary file, so we create
-      # a file, then close it, and use that path name.
-      stdout_file = tempfile.NamedTemporaryFile(suffix='.stdout',
-                                                prefix='spark_benchmark',
-                                                delete=False)
-      stdout_path = stdout_file.name
-      stdout_file.close()
+  metadata = spark_cluster.GetMetadata()
+  gen_args = [str(FLAGS.terasort_dataset_size), FLAGS.terasort_unsorted_dir]
+  sort_args = [FLAGS.terasort_unsorted_dir, FLAGS.terasort_sorted_dir]
+  validate_args = [FLAGS.terasort_sorted_dir, FLAGS.terasort_validate_dir]
 
-    stats = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
-                                    FLAGS.spark_classname,
-                                    job_arguments=FLAGS.spark_job_arguments,
-                                    job_stdout_file=stdout_path,
-                                    job_type=FLAGS.spark_job_type)
+  stages = [('generate', TERAGEN_CLASSNAME, gen_args),
+            ('sort', TERASORT_CLASSNAME, sort_args),
+            ('validate', TERAVALIDATE_CLASSNAME, validate_args)]
+  for (label, classname, args) in stages:
+    stats = spark_cluster.SubmitJob(TERASORT_JARFILE,
+                                    classname,
+                                    job_type=spark_service.HADOOP_JOB_TYPE,
+                                    job_arguments=args)
     if not stats[spark_service.SUCCESS]:
-      raise Exception('Class {0} from jar {1} did not run'.format(
-          FLAGS.spark_classname, FLAGS.spark_jarfile))
-    jar_end = datetime.datetime.now()
-    if stdout_path:
-      with open(stdout_path, 'r') as f:
-        logging.info('The output of the job is ' + f.read())
-    metadata = spark_cluster.GetMetadata()
-    metadata.update({'jarfile': FLAGS.spark_jarfile,
-                     'class': FLAGS.spark_classname,
-                     'job_arguments': str(FLAGS.spark_job_arguments),
-                     'print_stdout': str(FLAGS.spark_print_stdout)})
-
-    results.append(sample.Sample('wall_time',
-                                 (jar_end - jar_start).total_seconds(),
+      raise Exception('Stage {0} unsuccessful'.format(label))
+    current_time = datetime.datetime.now()
+    results.append(sample.Sample(label + '_wall_time',
+                                 (current_time - start).total_seconds(),
                                  'seconds', metadata))
+    start = current_time
+
     if spark_service.RUNTIME in stats:
-      results.append(sample.Sample('runtime',
+      results.append(sample.Sample(label + '_runtime',
                                    stats[spark_service.RUNTIME],
                                    'seconds', metadata))
     if spark_service.WAITING in stats:
-      results.append(sample.Sample('pending_time',
+      results.append(sample.Sample(label + '_pending_time',
                                    stats[spark_service.WAITING],
                                    'seconds', metadata))
 
-
-    if not spark_cluster.user_managed:
-      create_time = (spark_cluster.resource_ready_time -
-                     spark_cluster.create_start_time)
-      results.append(sample.Sample('cluster_create_time', create_time,
-                                   'seconds', metadata))
-  finally:
-    if stdout_path and os.path.isfile(stdout_path):
-      os.remove(stdout_path)
-
+  if not spark_cluster.user_managed:
+    create_time = (spark_cluster.resource_ready_time -
+                   spark_cluster.create_start_time)
+    results.append(sample.Sample('cluster_create_time', create_time,
+                                 'seconds', metadata))
   return results
 
 
