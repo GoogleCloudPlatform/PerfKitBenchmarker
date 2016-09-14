@@ -63,7 +63,7 @@ spark:
 """
 
 # This points to a file on the spark cluster.
-DEFAULT_JARFILE = 'file:///usr/lib/spark/lib/spark-examples.jar'
+DEFAULT_JARFILE = 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
 DEFAULT_CLASSNAME = 'org.apache.spark.examples.SparkPi'
 
 flags.DEFINE_string('spark_jarfile', DEFAULT_JARFILE,
