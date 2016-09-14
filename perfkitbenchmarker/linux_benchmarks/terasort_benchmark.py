@@ -14,18 +14,16 @@
 
 """Runs a jar using a cluster that supports Apache Spark.
 
-This benchmark takes a jarfile and class name, and runs that class
-using an Apache Spark cluster.  The Apache Spark cluster can be one
+This benchmark takes runs the Apache Terasort benchmark on an
+Apache Spark cluster. The Apache Spark cluster can be one
 supplied by a cloud provider, such as Google's Dataproc.
 
-By default, it runs SparkPi.
-
-It records how long the job takes to run.  It always reports the
-wall clock time, but this number should be used with caution, as it
-some platforms (such as AWS's EMR) use polling to determine when
-the job is done, so the wall time is inflated.  Furthermore, if the standard
-output of the job is retrieved, AWS EMR's time is again inflated because
-it takes extra time to get the output.
+It records how long each phase (generate, sort, validate) takes to run.
+For each phase, it reports the wall clock time, but this number should
+be used with caution, as it some platforms (such as AWS's EMR) use polling
+to determine when the job is done, so the wall time is inflated
+Furthermore, if the standard output of the job is retrieved, AWS EMR's
+time is again inflated because it takes extra time to get the output.
 
 If available, it will also report a pending time (the time between when the
 job was received by the platform and when it ran), and a runtime, which is
