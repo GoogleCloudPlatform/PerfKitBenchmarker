@@ -39,7 +39,7 @@ cluster supports it by setting the spark_job_type flag to hadoop, eg:
       --spark_job_arguments=bbp,1,1000,10,bbp_dir
 
 For Amazon's EMR service, if the the provided jar file has a main class, you
-should pass in an empty class name for hadoop jobs. 
+should pass in an empty class name for hadoop jobs.
 
 For more on Apache Spark, see: http://spark.apache.org/
 For more on Apache Hadoop, see: http://hadoop.apache.org/

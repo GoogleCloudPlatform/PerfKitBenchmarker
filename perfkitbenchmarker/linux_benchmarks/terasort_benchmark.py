@@ -74,8 +74,8 @@ flags.DEFINE_string('terasort_validate_dir', 'tera_validate_dir', 'Output of '
                     'the TeraValidate command')
 
 flags.DEFINE_bool('terasort_append_timestamp', True, 'Append a timestamp to '
-                  'the directories given by terasort_unsorted_dir, terasort_sorted_dir, '
-                  'and terasort_validate_dir')
+                  'the directories given by terasort_unsorted_dir, '
+                  'terasort_sorted_dir, and terasort_validate_dir')
 
 FLAGS = flags.FLAGS
 
