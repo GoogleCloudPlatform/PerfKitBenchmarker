@@ -100,8 +100,13 @@ class GcpDataproc(spark_service.BaseSparkService):
                 job_type=spark_service.SPARK_JOB_TYPE):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['jars'] = jarfile
-    cmd.flags['class'] = classname
+
+    if classname:
+      cmd.flags['jars'] = jarfile
+      cmd.flags['class'] = classname
+    else:
+      cmd.flags['jar'] = jarfile
+
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
     # stdout of the job.  We set the driver log level to FATAL

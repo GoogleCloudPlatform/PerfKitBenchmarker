@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs a jar using a cluster that supports Apache Spark.
+"""Runs a jar using a cluster that supports Apache Hadoop MapReduce.
 
-This benchmark takes runs the Apache Terasort benchmark on an
-Apache Spark cluster. The Apache Spark cluster can be one
-supplied by a cloud provider, such as Google's Dataproc.
+This benchmark takes runs the Apache Hadoop MapReduce Terasort benchmark on an
+Hadoop YARN cluster. The cluster can be one supplied by a cloud provider,
+such as Google's Dataproc or Amazon's EMR.
 
 It records how long each phase (generate, sort, validate) takes to run.
 For each phase, it reports the wall clock time, but this number should
@@ -29,7 +29,7 @@ If available, it will also report a pending time (the time between when the
 job was received by the platform and when it ran), and a runtime, which is
 the time the job took to run, as reported by the underlying cluster.
 
-For more on Apache Spark, see: http://spark.apache.org/
+For more on Apache Hadoop, see: http://hadoop.apache.org/
 """
 
 import datetime
@@ -41,10 +41,10 @@ from perfkitbenchmarker import flags
 
 
 
-BENCHMARK_NAME = 'terasort_benchmark'
+BENCHMARK_NAME = 'terasort'
 BENCHMARK_CONFIG = """
-terasort_benchmark:
-  description: Run the Apache hadoop terasort benchmark on a cluster.
+terasort:
+  description: Run the Apache Hadoop MapReduce Terasort benchmark on a cluster.
   spark_service:
     service_type: managed
     num_workers: 4
@@ -57,6 +57,10 @@ TERAGEN_CLASSNAME = 'org.apache.hadoop.examples.terasort.TeraGen'
 TERASORT_CLASSNAME = 'org.apache.hadoop.examples.terasort.TeraSort'
 TERAVALIDATE_CLASSNAME = 'org.apache.hadoop.examples.terasort.TeraValidate'
 
+TERAGEN = 'teragen'
+TERASORT = 'terasort'
+TERAVALIDATE = 'teravalidate'
+
 flags.DEFINE_integer('terasort_dataset_size', 10000,
                      'Data set size to generate')
 flags.DEFINE_string('terasort_unsorted_dir', 'tera_gen_data', 'Location of '
@@ -68,6 +72,10 @@ flags.DEFINE_string('terasort_sorted_dir', 'tera_sort_dir', 'Location for the '
                     'from here.')
 flags.DEFINE_string('terasort_validate_dir', 'tera_validate_dir', 'Output of '
                     'the TeraValidate command')
+
+flags.DEFINE_bool('terasort_append_timestamp', True, 'Append a timestamp to '
+                  'the directories given by terasort_unsorted_dir, terasort_sorted_dir, '
+                  'and terasort_validate_dir')
 
 FLAGS = flags.FLAGS
 
@@ -95,23 +103,33 @@ def Run(benchmark_spec):
 
   results = []
   metadata = spark_cluster.GetMetadata()
-  gen_args = [str(FLAGS.terasort_dataset_size), FLAGS.terasort_unsorted_dir]
-  sort_args = [FLAGS.terasort_unsorted_dir, FLAGS.terasort_sorted_dir]
-  validate_args = [FLAGS.terasort_sorted_dir, FLAGS.terasort_validate_dir]
+  unsorted_dir = FLAGS.terasort_unsorted_dir
+  sorted_dir = FLAGS.terasort_sorted_dir
+  validate_dir = FLAGS.terasort_validate_dir
+  if FLAGS.terasort_append_timestamp:
+    time_string = datetime.datetime.now().strftime('%Y%m%d%H%S')
+    unsorted_dir += time_string
+    sorted_dir += time_string
+    validate_dir += time_string
 
-  stages = [('generate', TERAGEN_CLASSNAME, gen_args),
-            ('sort', TERASORT_CLASSNAME, sort_args),
-            ('validate', TERAVALIDATE_CLASSNAME, validate_args)]
-  for (label, classname, args) in stages:
+  gen_args = (TERAGEN, str(FLAGS.terasort_dataset_size), unsorted_dir)
+  sort_args = (TERASORT, unsorted_dir, sorted_dir)
+  validate_args = (TERAVALIDATE, sorted_dir, validate_dir)
+
+  stages = [('generate', gen_args),
+            ('sort', sort_args),
+            ('validate', validate_args)]
+  for (label, args) in stages:
     stats = spark_cluster.SubmitJob(TERASORT_JARFILE,
-                                    classname,
+                                    None,
                                     job_type=spark_service.HADOOP_JOB_TYPE,
                                     job_arguments=args)
     if not stats[spark_service.SUCCESS]:
       raise Exception('Stage {0} unsuccessful'.format(label))
     current_time = datetime.datetime.now()
+    wall_time = (current_time - start).total_seconds()
     results.append(sample.Sample(label + '_wall_time',
-                                 (current_time - start).total_seconds(),
+                                 wall_time,
                                  'seconds', metadata))
     start = current_time
 
@@ -127,7 +145,8 @@ def Run(benchmark_spec):
   if not spark_cluster.user_managed:
     create_time = (spark_cluster.resource_ready_time -
                    spark_cluster.create_start_time)
-    results.append(sample.Sample('cluster_create_time', create_time,
+    results.append(sample.Sample('cluster_create_time',
+                                 create_time,
                                  'seconds', metadata))
   return results
 

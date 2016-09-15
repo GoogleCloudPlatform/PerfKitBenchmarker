@@ -228,8 +228,27 @@ class AwsEMR(spark_service.BaseSparkService):
     else:
       return None
 
+  def _MakeHadoopStep(self, jarfile, classname, job_arguments):
+    """Construct an EMR step with a type CUSTOM_JAR"""
+    step_list = ['Type=CUSTOM_JAR', 'Jar=' + jarfile]
+    if classname:
+      step_list.append('MainClass=' + classname)
+    if job_arguments:
+      arg_string = '[' + ','.join(job_arguments) + ']'
+    step_list.append('Args=' + arg_string)
+    return step_list
+
+  def _MakeSparkStep(self, jarfile, classname, job_arguments):
+    arg_list = ['--class', classname, jarfile]
+    if job_arguments:
+      arg_list += job_arguments
+    arg_string = '[' + ','.join(arg_list) + ']'
+    step_list = ['Type=Spark', 'Args=' + arg_string]
+    return step_list
+
   def SubmitJob(self, jarfile, classname, job_poll_interval=JOB_WAIT_SLEEP,
-                job_arguments=None, job_stdout_file=None):
+                job_arguments=None, job_stdout_file=None,
+                job_type=spark_service.SPARK_JOB_TYPE):
     """Submit the job.
 
     Submit the job and wait for it to complete.  If job_stdout_file is not
@@ -259,11 +278,12 @@ class AwsEMR(spark_service.BaseSparkService):
         raise Exception('Step {0} not complete.'.format(step_id))
       return result
 
-    arg_list = ['--class', classname, jarfile]
-    if job_arguments:
-      arg_list += job_arguments
-    arg_string = '[' + ','.join(arg_list) + ']'
-    step_list = ['Type=Spark', 'Args=' + arg_string]
+    if job_type == spark_service.SPARK_JOB_TYPE:
+      step_list = self._MakeSparkStep(jarfile, classname, job_arguments)
+    elif job_type == spark_service.HADOOP_JOB_TYPE:
+      step_list = self._MakeHadoopStep(jarfile, classname, job_arguments)
+    else:
+      raise Exception('Job type %s unsupported for EMR' % job_type)
     step_string = ','.join(step_list)
     cmd = self.cmd_prefix + ['emr', 'add-steps', '--cluster-id',
                              self.cluster_id, '--steps', step_string]

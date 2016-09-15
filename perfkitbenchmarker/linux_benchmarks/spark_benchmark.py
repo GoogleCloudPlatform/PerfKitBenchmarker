@@ -31,14 +31,18 @@ If available, it will also report a pending time (the time between when the
 job was received by the platform and when it ran), and a runtime, which is
 the time the job took to run, as reported by the underlying cluster.
 
-This benchmark can be used to run a hadoop job by setting the spark_job_type
-flag to hadoop, eg:
+This benchmark can be used be used to Hadoop MapReduce jobs if the underlying
+cluster supports it by setting the spark_job_type flag to hadoop, eg:
   ./pkb.py --benchmarks=spark --spark_job_type=hadoop \
       --spark_jarfile=file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar\
-      --spark_classname=org.apache.hadoop.examples.BaileyBorweinPlouffe\
-      --spark_job_arguments=1,1000,10,bbp\
+      --spark_classname=''\
+      --spark_job_arguments=bbp,1,1000,10,bbp_dir
+
+For Amazon's EMR service, if the the provided jar file has a main class, you
+should pass in an empty class name for hadoop jobs. 
 
 For more on Apache Spark, see: http://spark.apache.org/
+For more on Apache Hadoop, see: http://hadoop.apache.org/
 """
 
 import datetime
