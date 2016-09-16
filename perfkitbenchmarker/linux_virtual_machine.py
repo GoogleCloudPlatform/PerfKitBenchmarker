@@ -39,7 +39,6 @@ import yaml
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
@@ -74,27 +73,22 @@ flags.DEFINE_bool('setup_remote_firewall', False,
                   'Whether PKB should configure the firewall of each remote'
                   'VM to make sure it accepts all internal connections.')
 
-flag_util.DEFINE_yaml('procfs_config', {},
-                      'Values to write in procfs. This flag should be a tree '
-                      'of dictionaries and strings corresponding to the folder '
-                      'structure of procfs. Strings will be written to the '
-                      'corresponding file. For example, if you pass '
-                      '--procfs_config=\'{"sys": {"vm": '
-                      '{"dirty_background_ratio": "10"}}}\','
-                      'then PKB will write "10" to '
-                      '/proc/sys/vm/dirty_background_ratio before starting the '
-                      'benchmark.')
+flags.DEFINE_list('sysctl', [],
+                  'Sysctl values to set. This flag should be a comma-separated '
+                  'list of path=value pairs. Each value will be written to the '
+                  'corresponding path. For example, if you pass '
+                  '--sysctls=vm.dirty_background_ratio=10,vm.dirty_ratio=25, '
+                  'PKB will run "sysctl vm.dirty_background_ratio=10 '
+                  'vm.dirty_ratio=25" before starting the benchmark.')
 
-flag_util.DEFINE_yaml('sysfs_config', {},
-                      'Values to write in sysfs. This flag should be a tree of '
-                      'dictionaries and strings corresponding to the folder '
-                      'structure of sysfs. Strings will be written to the '
-                      'corresponding file. For example, if you pass '
-                      '--sysfs_config=\'{"kernel": {"mm": '
-                      '{"transparent_hugepage": {"enabled": "always"}}}}\','
-                      'then PKB will write "always" to '
-                      '/sys/kernel/mm/transparent_hugepage/enabled before '
-                      'starting the benchmark.')
+flags.DEFINE_list('set_files', [],
+                  'Arbitrary filesystem configuration. This flag should be a '
+                  'comma-separated list of path=value pairs. Each value will '
+                  'be written to the corresponding path. For example, if you '
+                  'pass --set_files=/sys/kernel/mm/transparent_hugepage/enabled=always, '  # noqa
+                  'then PKB will write "always" to '
+                  '/sys/kernel/mm/transparent_hugepage/enabled before starting '
+                  'the benchmark.')
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -221,28 +215,22 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
-    self.ConfigureVMKernel()
+    self.SetFiles()
+    self.DoSysctls()
     self.BurnCpu()
 
-  def ConfigureVMKernel(self):
-    """Apply {procfs,sysfs}_config to VM."""
+  def SetFiles(self):
+    """Apply --set_files to the VM."""
 
-    path_components = None
+    for pair in FLAGS.set_files:
+      path, value = pair.split('=')
+      self.RemoteCommand('echo "%s" | sudo tee %s' %
+                         (value, path))
 
-    def ConfigureSubtree(subtree):
-      for name, value in subtree.iteritems():
-        path_components.append(name)
-        if not isinstance(value, dict):
-          self.RemoteCommand('echo "%s" | sudo tee %s' %
-                             (value, posixpath.join(*path_components)))
-        else:
-          ConfigureSubtree(value)
-        path_components.pop()
+  def DoSysctls(self):
+    """Apply --sysctl to the VM."""
 
-    path_components = ['/proc']
-    ConfigureSubtree(FLAGS.procfs_config)
-    path_components = ['/sys']
-    ConfigureSubtree(FLAGS.sysfs_config)
+    self.RemoteCommand('sudo sysctl -w %s' % (' '.join(FLAGS.sysctl),))
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):

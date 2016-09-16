@@ -32,61 +32,60 @@ class LinuxVM(linux_virtual_machine.BaseLinuxMixin):
     pass
 
 
-class TestConfigureVMKernel(unittest.TestCase):
-  def runTest(self, procfs, sysfs, procfs_calls, sysfs_calls):
-    """Run a ConfigureVMKernel test.
+class TestSetFiles(unittest.TestCase):
+  def runTest(self, set_files, calls):
+    """Run a SetFiles test.
 
     Args:
-      procfs, sysfs: dictionaries in the format of FLAGS.{procfs,sysfs}_config
-        giving the configuration options to set.
-      procfs_calls, sysfs_calls: lists of mock.call() objects giving the
-        expected calls to vm.RemoteCommand() for the test.
+      set_files: the value of FLAGS.set_files
+      calls: a list of mock.call() objects giving the expected calls to
+        vm.RemoteCommand() for the test.
     """
 
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags.procfs_config = procfs
-    self.mocked_flags.sysfs_config = sysfs
+    self.mocked_flags.set_files = set_files
 
     vm = LinuxVM()
 
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
-      vm.ConfigureVMKernel()
+      vm.SetFiles()
 
-    self.assertItemsEqual(  # use assertItemsEqual because order is undefined.
-      procfs_calls + sysfs_calls,
-      remote_command.call_args_list)
+    self.assertItemsEqual(  # use assertItemsEqual because order is undefined
+        remote_command.call_args_list,
+        calls)
 
-  def testConfigureVMKernel(self):
-    self.runTest({'sys': {'vm': {'dirty_background_ratio': '10'}}},
-                 {},
-                 [mock.call('echo "10" | sudo tee '
-                            '/proc/sys/vm/dirty_background_ratio')],
+  def testNoFiles(self):
+    self.runTest([],
                  [])
 
-  def testConvertToString(self):
-    self.runTest({'sys': {'vm': {'dirty_background_ratio': 10}}},
-                 {},
-                 [mock.call('echo "10" | sudo tee '
-                            '/proc/sys/vm/dirty_background_ratio')],
-                 [])
-
-  def testMultipleFiles(self):
-    self.runTest({'sys': {'vm': {'dirty_background_ratio': 10,
-                                 'dirty_ratio': 50}}},
-                 {},
-                 [mock.call('echo "10" | sudo tee '
-                            '/proc/sys/vm/dirty_background_ratio'),
-                  mock.call('echo "50" | sudo tee '
-                            '/proc/sys/vm/dirty_ratio')],
-                 [])
-
-  def testSysfs(self):
-    self.runTest({},
-                 {'kernel': {'mm': {'transparent_hugepage':
-                                    {'enabled': 'always'}}}},
-                 [],
+  def testOneFile(self):
+    self.runTest(['/sys/kernel/mm/transparent_hugepage/enabled=always'],
                  [mock.call('echo "always" | sudo tee '
                             '/sys/kernel/mm/transparent_hugepage/enabled')])
+
+  def testMultipleFiles(self):
+    self.runTest(['/sys/kernel/mm/transparent_hugepage/enabled=always',
+                  '/sys/kernel/mm/transparent_hugepage/defrag=never'],
+                 [mock.call('echo "always" | sudo tee '
+                            '/sys/kernel/mm/transparent_hugepage/enabled'),
+                  mock.call('echo "never" | sudo tee '
+                            '/sys/kernel/mm/transparent_hugepage/defrag')])
+
+
+class TestSysctl(unittest.TestCase):
+  def testSysctl(self):
+    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    self.mocked_flags.sysctl = ['vm.dirty_background_ratio=10',
+                                'vm.dirty_ratio=25']
+    vm = LinuxVM()
+
+    with mock.patch.object(vm, 'RemoteCommand') as remote_command:
+      vm.DoSysctls()
+
+    self.assertEqual(
+        remote_command.call_args_list,
+        [mock.call('sudo sysctl -w vm.dirty_background_ratio=10 '
+                   'vm.dirty_ratio=25')])
 
 
 if __name__ == '__main__':
