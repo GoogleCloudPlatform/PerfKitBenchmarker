@@ -273,9 +273,7 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                          'image': self.mock_vm.image,
                          'vm_count': 1,
                          'num_striped_disks': 1,
-                         'hostnames': 'Hostname',
-                         'sysctl': '',
-                         'set_files': ''}
+                         'hostnames': 'Hostname'}
 
   def _RunTest(self, spec, expected, input_metadata=None):
     input_metadata = input_metadata or {}
