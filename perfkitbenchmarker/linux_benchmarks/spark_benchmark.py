@@ -52,11 +52,18 @@ spark:
   description: Run a jar on a spark cluster.
   spark_service:
     service_type: managed
-    num_workers: 4
+    worker_group:
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+        AWS:
+          machine_type: m4.xlarge
+      vm_count: 2
+
 """
 
 # This points to a file on the spark cluster.
-DEFAULT_JARFILE = 'file:///usr/lib/spark/lib/spark-examples.jar'
+DEFAULT_JARFILE = 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
 DEFAULT_CLASSNAME = 'org.apache.spark.examples.SparkPi'
 
 flags.DEFINE_string('spark_jarfile', DEFAULT_JARFILE,

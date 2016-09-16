@@ -65,9 +65,8 @@ class AwsEMR(spark_service.BaseSparkService):
   def __init__(self, spark_service_spec):
     super(AwsEMR, self).__init__(spark_service_spec)
     # TODO(hildrum) use availability zone when appropriate
-    if self.machine_type is None:
-      self.machine_type = DEFAULT_MACHINE_TYPE
-
+    worker_machine_type = self.spec.worker_group.vm_spec.machine_type
+    leader_machine_type = self.spec.master_group.vm_spec.machine_type
     self.cmd_prefix = util.AWS_PREFIX
 
     if self.spec.zone:
@@ -76,7 +75,8 @@ class AwsEMR(spark_service.BaseSparkService):
 
     # Certain machine types require subnets.
     if (self.spec.static_cluster_id is None and
-        self.machine_type[0:2] in NEEDS_SUBNET):
+        (worker_machine_type[0:2] in NEEDS_SUBNET or
+        leader_machine_type[0:2] in NEEDS_SUBNET)):
       self.network = aws_network.AwsNetwork.GetNetwork(self.spec)
     else:
       self.network = None
@@ -96,13 +96,23 @@ class AwsEMR(spark_service.BaseSparkService):
     name = 'pkb_' + FLAGS.run_uri
     logs_bucket = FLAGS.aws_emr_loguri or self._CreateLogBucket()
 
+    instance_groups = []
+    for group_type, group_spec in [
+        ('CORE', self.spec.worker_group),
+        ('MASTER', self.spec.master_group)]:
+      instance_groups.append({'InstanceCount': group_spec.vm_count,
+                              'InstanceGroupType': group_type,
+                              'InstanceType': group_spec.vm_spec.machine_type,
+                              'Name': group_type + ' group'})
+
     # we need to store the cluster id.
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
                              '--release-label', RELEASE_LABEL,
                              '--use-default-roles',
-                             '--instance-count', str(self.num_workers),
-                             '--instance-type', self.machine_type,
-                             '--application', 'Name=SPARK',
+                             '--instance-groups',
+                             json.dumps(instance_groups),
+                             '--application', 'Name=Spark',
+                             'Name=Hadoop',
                              '--log-uri', logs_bucket]
     if self.network:
       cmd += ['--ec2-attributes', 'SubnetId=' + self.network.subnet.id]
@@ -182,8 +192,7 @@ class AwsEMR(spark_service.BaseSparkService):
                    'a subnet.  To ensure PKB creates a subnet for this machine '
                    'type, update the NEEDS_SUBNET variable of '
                    'providers/aws/aws_emr.py to contain prefix of this machine '
-                   'type ({0}). Raw AWS message={1}'.format(
-                       self.machine_type[0:2], reason))
+                   'type. Raw AWS message={0}'.format(reason))
         raise Exception(message)
     return result['Cluster']['Status']['State'] == READY_STATE
 

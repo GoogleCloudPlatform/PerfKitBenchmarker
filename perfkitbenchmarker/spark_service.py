@@ -26,6 +26,7 @@ For more on Apache Spark: http://spark.apache.org/
 """
 
 import abc
+import copy
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
@@ -87,9 +88,12 @@ class BaseSparkService(resource.BaseResource):
     is_user_managed = spark_service_spec.static_cluster_id is not None
     super(BaseSparkService, self).__init__(user_managed=is_user_managed)
     self.spec = spark_service_spec
+    # If only the worker group is specified, assume the master group is
+    # configured the same way.
+    if spark_service_spec.master_group is None:
+      self.spec.master_group = copy.copy(self.spec.worker_group)
+      self.spec.master_group.vm_count = 1
     self.cluster_id = spark_service_spec.static_cluster_id
-    self.num_workers = spark_service_spec.num_workers
-    self.machine_type = spark_service_spec.machine_type
     self.project = spark_service_spec.project
 
   @abc.abstractmethod
@@ -122,8 +126,8 @@ class BaseSparkService(resource.BaseResource):
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
     return {'spark_service': self.SERVICE_NAME,
-            'num_workers': str(self.num_workers),
-            'machine_type': str(self.machine_type),
+            'num_workers': str(self.spec.worker_group.vm_count),
+            'machine_type': str(self.spec.worker_group.vm_spec.machine_type),
             'spark_cluster_id': self.cluster_id}
 
 

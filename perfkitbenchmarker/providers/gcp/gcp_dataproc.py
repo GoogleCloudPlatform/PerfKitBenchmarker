@@ -36,7 +36,6 @@ class GcpDataproc(spark_service.BaseSparkService):
 
   Attributes:
     cluster_id: ID of the cluster.
-    num_workers: Number of nodes in the cluster.
     project: Enclosing project for the cluster.
   """
 
@@ -75,10 +74,19 @@ class GcpDataproc(spark_service.BaseSparkService):
                              self.cluster_id)
     if self.project is not None:
       cmd.flags['project'] = self.project
-    cmd.flags['num-workers'] = self.num_workers
-    if self.machine_type:
-      cmd.flags['worker-machine-type'] = self.machine_type
-      cmd.flags['master-machine-type'] = self.machine_type
+    cmd.flags['num-workers'] = self.spec.worker_group.vm_count
+
+    for group_type, group_spec in [
+        ('worker', self.spec.worker_group),
+        ('master', self.spec.master_group)]:
+      if group_spec and group_spec.vm_spec:
+        flag_name = group_type + '-machine-type'
+        cmd.flags[flag_name] = group_spec.vm_spec.machine_type
+      if group_spec.vm_spec.num_local_ssds > 0:
+        ssd_flag = 'num-{0}-local-ssds'.format(group_type)
+        cmd.flags[ssd_flag] = group_spec.vm_spec.num_local_ssds
+      # do something here for boot disk size?
+
     cmd.Issue()
 
   def _Delete(self):
