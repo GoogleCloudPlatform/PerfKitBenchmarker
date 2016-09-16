@@ -230,7 +230,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def DoSysctls(self):
     """Apply --sysctl to the VM."""
 
-    self.RemoteCommand('sudo sysctl -w %s' % (' '.join(FLAGS.sysctl),))
+    if FLAGS.sysctl:
+      self.RemoteCommand('sudo sysctl -w %s' % (' '.join(FLAGS.sysctl),))
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):

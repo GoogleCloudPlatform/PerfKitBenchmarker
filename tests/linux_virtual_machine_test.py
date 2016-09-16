@@ -87,6 +87,18 @@ class TestSysctl(unittest.TestCase):
         [mock.call('sudo sysctl -w vm.dirty_background_ratio=10 '
                    'vm.dirty_ratio=25')])
 
+  def testNoSysctl(self):
+    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
+    self.mocked_flags.sysctl = []
+    vm = LinuxVM()
+
+    with mock.patch.object(vm, 'RemoteCommand') as remote_command:
+      vm.DoSysctls()
+
+    self.assertEqual(
+        remote_command.call_args_list,
+        [])
+
 
 if __name__ == '__main__':
   unittest.main()
