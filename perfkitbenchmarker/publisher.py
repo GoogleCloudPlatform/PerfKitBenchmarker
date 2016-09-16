@@ -185,6 +185,11 @@ class DefaultMetadataProvider(MetadataProvider):
           for key, value in data_disk.metadata.iteritems():
             metadata[name_prefix + 'data_disk_0_%s' % (key, )] = value
 
+    if FLAGS.set_files:
+      metadata['set_files'] = ','.join(FLAGS.set_files)
+    if FLAGS.sysctl:
+      metadata['sysctl'] = ','.join(FLAGS.sysctl)
+
     # Flatten all user metadata into a single list (since each string in the
     # FLAGS.metadata can actually be several key-value pairs) and then iterate
     # over it.
