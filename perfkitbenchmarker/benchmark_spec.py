@@ -163,7 +163,7 @@ class BenchmarkSpec(object):
                             if self._zone_index < len(FLAGS.zones) - 1
                             else 0)
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
-      if disk_spec:
+      if disk_spec and not vm.is_static:
         vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
         # In the event that we need to create multiple disks from the same
         # DiskSpec, we need to ensure that they have different mount points.

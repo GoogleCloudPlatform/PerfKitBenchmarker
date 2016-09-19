@@ -167,7 +167,14 @@ class AzureDisk(disk.BaseDisk):
                 self.vm_name]
     stdout, _, _ = vm_util.IssueCommand(show_cmd)
     response = json.loads(stdout)
-    data_disk = response['DataDisks'][self.lun]
+
+    # data disks are ordered *alphabetically* by lun, so once we hit
+    # lun 10 the ordering doesn't match numerical order. We could
+    # compute the right offset for the alphabetical ordering, but it's
+    # simpler and more resilient to just search the array, and the
+    # size is limited to 15 so it will never take too long.
+    data_disk = (disk for disk in response['DataDisks']
+                 if int(disk.get('logicalUnitNumber', 0)) == self.lun).next()
     assert ((self.lun == 0 and 'logicalUnitNumber' not in data_disk)
             or (self.lun == int(data_disk['logicalUnitNumber'])))
     self.name = data_disk['name']

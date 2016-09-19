@@ -173,6 +173,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     num_local_ssds: int. The number of local SSDs to attach to the instance.
     preemptible: boolean. True if the VM should be preemptible, False otherwise.
     project: string or None. The project to create the VM in.
+    boot_disk_size: None or int. The size of the boot disk in GB.
+    boot_disk_type: string or None. The tyoe of the boot disk.
   """
 
   CLOUD = providers.GCP
@@ -204,6 +206,10 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['num_local_ssds'] = flag_values.gce_num_local_ssds
     if flag_values['gce_preemptible_vms'].present:
       config_values['preemptible'] = flag_values.gce_preemptible_vms
+    if flag_values['gce_boot_disk_size'].present:
+      config_values['boot_disk_size'] = flag_values.gce_boot_disk_size
+    if flag_values['gce_boot_disk_type'].present:
+      config_values['boot_disk_type'] = flag_values.gce_boot_disk_type
     if flag_values['machine_type'].present:
       config_values['machine_type'] = yaml.load(flag_values.machine_type)
     if flag_values['project'].present:
@@ -224,6 +230,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
                                                         'min': 0}),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
+        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
+        'boot_disk_type': (option_decoders.StringDecoder, {'default': None}),
         'project': (option_decoders.StringDecoder, {'default': None})})
     return result
 
@@ -259,6 +267,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.project = vm_spec.project
     self.network = gce_network.GceNetwork.GetNetwork(self)
     self.firewall = gce_network.GceFirewall.GetFirewall()
+    self.boot_disk_size = vm_spec.boot_disk_size
+    self.boot_disk_type = vm_spec.boot_disk_type
     events.sample_created.connect(self.AnnotateSample, weak=False)
 
   def _GenerateCreateCommand(self, ssh_keys_path):
@@ -276,8 +286,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['boot-disk-auto-delete'] = True
     if FLAGS.image_project:
       cmd.flags['image-project'] = FLAGS.image_project
-    cmd.flags['boot-disk-size'] = self.BOOT_DISK_SIZE_GB
-    cmd.flags['boot-disk-type'] = self.BOOT_DISK_TYPE
+    cmd.flags['boot-disk-size'] = self.boot_disk_size or self.BOOT_DISK_SIZE_GB
+    cmd.flags['boot-disk-type'] = self.boot_disk_type or self.BOOT_DISK_TYPE
     if self.machine_type is None:
       cmd.flags['custom-cpu'] = self.cpus
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)

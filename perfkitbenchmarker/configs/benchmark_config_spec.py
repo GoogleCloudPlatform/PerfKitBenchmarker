@@ -19,6 +19,7 @@ configuration files.
 
 import contextlib
 import copy
+import logging
 import os
 
 from perfkitbenchmarker import disk
@@ -176,8 +177,8 @@ class _SparkServiceSpec(spec.BaseSpec):
     service_type: string.  pkb_managed or managed_service
     static_cluster_id: if user has created a cluster, the id of the
       cluster.
-    num_workers: number of workers.
-    machine_type: machine type to use.
+    worker_group: Vm group spec for workers.
+    master_group: Vm group spec for master
     cloud: cloud to use.
     project: project to use.
   """
@@ -204,16 +205,16 @@ class _SparkServiceSpec(spec.BaseSpec):
             'default': spark_service.PROVIDER_MANAGED,
             'valid_values': [spark_service.PROVIDER_MANAGED,
                              spark_service.PKB_MANAGED]}),
-        'num_workers': (option_decoders.IntDecoder, {
-            'default': 3, 'min': 1}),
+        'worker_group': (_VmGroupSpecDecoder, {}),
+        'master_group': (_VmGroupSpecDecoder,
+                              {'default': None,
+                               'none_ok': True}),
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS}),
         'zone': (option_decoders.StringDecoder, {'none_ok': True,
                                                  'default': None}),
         'project': (option_decoders.StringDecoder, {'default': None,
-                                                    'none_ok': True}),
-        'machine_type': (option_decoders.StringDecoder, {'default': None,
-                                                         'none_ok': True})})
+                                                    'none_ok': True})})
     return result
 
   @classmethod
@@ -361,6 +362,45 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
                            vm_group_name),
           flag_values=flag_values, **vm_group_config)
     return result
+
+
+
+class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
+  """Validates a single VmGroupSpec dictionary."""
+
+  def __init__(self, **kwargs):
+    super(_VmGroupSpecDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies vm_groups dictionary of a benchmark config object.
+
+    Args:
+      value: dict corresonding to a VM group config.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+
+    Returns:
+      dict a _VmGroupSpec.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    logging.info('value = ' + str(value))
+    vm_group_config = super(_VmGroupSpecDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    logging.info('vm_group_config = ' + str(value))
+    result = _VmGroupSpec(self._GetOptionFullName(component_full_name),
+                          flag_values=flag_values,
+                          **vm_group_config)
+    logging.info('vm count is ' + str(result.vm_count))
+    logging.info('vm spec is ' + str(result.vm_spec))
+    logging.info('vm spec machine type is ' + str(result.vm_spec.machine_type))
+    
+    return result
+
+
 
 
 class _SparkServiceDecoder(option_decoders.TypeVerifier):
