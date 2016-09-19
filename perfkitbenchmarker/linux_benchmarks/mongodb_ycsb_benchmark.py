@@ -96,6 +96,7 @@ def Prepare(benchmark_spec):
                      for client in benchmark_spec.vm_groups['clients']]
 
   vm_util.RunThreaded((lambda f: f()), server_partials + client_partials)
+  benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
 
 
 def Run(benchmark_spec):
@@ -108,14 +109,13 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-
-  executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   server = benchmark_spec.vm_groups['workers'][0]
   kwargs = {
       'mongodb.url': 'mongodb://%s:27017/' % server.internal_ip,
       'mongodb.writeConcern': FLAGS.mongodb_writeconcern}
-  samples = list(executor.LoadAndRun(benchmark_spec.vm_groups['clients'],
-                                     load_kwargs=kwargs, run_kwargs=kwargs))
+  samples = list(benchmark_spec.executor.LoadAndRun(
+      benchmark_spec.vm_groups['clients'],
+      load_kwargs=kwargs, run_kwargs=kwargs))
   return samples
 
 
