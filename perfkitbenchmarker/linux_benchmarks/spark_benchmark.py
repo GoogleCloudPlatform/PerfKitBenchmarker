@@ -56,6 +56,7 @@ spark:
       vm_spec:
         GCP:
           machine_type: n1-standard-4
+          boot_disk_size: 500
         AWS:
           machine_type: m4.xlarge
       vm_count: 2

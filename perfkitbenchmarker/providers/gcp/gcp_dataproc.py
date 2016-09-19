@@ -79,13 +79,16 @@ class GcpDataproc(spark_service.BaseSparkService):
     for group_type, group_spec in [
         ('worker', self.spec.worker_group),
         ('master', self.spec.master_group)]:
-      if group_spec and group_spec.vm_spec:
-        flag_name = group_type + '-machine-type'
-        cmd.flags[flag_name] = group_spec.vm_spec.machine_type
+      flag_name = group_type + '-machine-type'
+      cmd.flags[flag_name] = group_spec.vm_spec.machine_type
+
       if group_spec.vm_spec.num_local_ssds > 0:
         ssd_flag = 'num-{0}-local-ssds'.format(group_type)
         cmd.flags[ssd_flag] = group_spec.vm_spec.num_local_ssds
-      # do something here for boot disk size?
+
+      if group_spec.vm_spec.boot_disk_size:
+        disk_flag = group_type + '-boot-disk-size'
+        cmd.flags[disk_flag] = group_spec.vm_spec.boot_disk_size
 
     cmd.Issue()
 
