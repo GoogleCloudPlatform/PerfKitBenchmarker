@@ -48,6 +48,8 @@ WAITING = 'pending_time'
 SPARK_JOB_TYPE = 'spark'
 HADOOP_JOB_TYPE = 'hadoop'
 
+SPARK_VM_GROUPS = ('master_group', 'worker_group')
+
 # This is used for error messages.
 
 _SPARK_SERVICE_REGISTRY = {}
@@ -149,18 +151,51 @@ class PkbSparkService(BaseSparkService):
 
   def __init__(self, spark_service_spec):
     super(PkbSparkService, self).__init__(spark_service_spec)
-    self.vms = []
+    # construct the VMs.
+    for group_name, group_spec in [('worker_group', self.spec.worker_group),
+                                   ('master_group', self.spec.master_group)]:
+      self.vms[group_name] = self.ConstructVirtualMachineGroup(
+          group_name, group_spec)
 
   def _Create(self):
     """Create an Apache Spark cluster."""
-    raise NotImplementedError()
+
+    sshable_vm_groups = {}
+    for group_name in SPARK_VM_GROUPS:
+      vm_util.RunThreaded(self.PrepareVm, self.vms[group_name])
+      sshable_vm_groups[group_name] = self.vms[group_name]
+    vm_util.GenerateSSHConfig({}, sshable_vm_groups)
+
+    # need to fix this to install spark. 
+    def InstallHadoop(vm):
+      vm.Install('hadoop')
+
+    vm_util.RunThreaded(InstallHadoop, self.vms['worker_group'] +
+                        self.vms['master_group'])
+    hadoop.ConfigureAndStart(self.vms['master_group'][0],
+                             self.vms['worker_group'])
+
 
   def _Delete(self):
     """Delete the vms."""
-    for vm in self.vms:
-      vm.Delete()
+    for group_name in SPARK_VM_GROUPS:
+      for vm in self.vms[group_name]:
+        vm.Delete()
 
   # TODO(hildrum) actually implement this.
-  def SubmitJob(self, jar_file, class_name):
+  def SubmitJob(self, jar_file, class_name, job_poll_interval=None,
+                                job_stdout_file=None, job_arguments=None,
+                                job_type=SPARK_JOB_TYPE):
     """Submit the jar file."""
-    raise NotImplementedError()
+    if job_type == SPARK_JOB_TYPE:
+      raise NotImplemented()
+    if job_stdout_file is not None:
+      raise NotImplemented()
+    cmd_string = '{0} jar {1}'.format(
+        posixpath.join(hadoop.HADOOP_BIN, 'yarn'), jar_file)
+    if class_name:
+      cmd_string += class_name
+      cmd_string += ' '
+    cmd_string += ' '.join(job_arguments)
+    self.leader.RobustRemoteCommand(cmd_string)
+
