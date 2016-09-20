@@ -207,6 +207,7 @@ def Prepare(benchmark_spec):
         posixpath.join(conf_dir, HBASE_SITE))
 
   vm_util.RunThreaded(PushHBaseSite, loaders)
+  benchmark_spec.executor = ycsb.YCSBExecutor('hbase10')
 
 
 def Run(benchmark_spec):
@@ -222,8 +223,6 @@ def Run(benchmark_spec):
   by_role = _GetVMsByRole(benchmark_spec.vm_groups)
   loaders = by_role['clients']
   logging.info('Loaders: %s', loaders)
-
-  executor = ycsb.YCSBExecutor('hbase10')
 
   metadata = {'ycsb_client_vms': len(loaders),
               'hbase_cluster_size': len(by_role['hbase_vms']),
@@ -242,9 +241,8 @@ def Run(benchmark_spec):
   load_kwargs['clientbuffering'] = 'true'
   if not FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = 1
-  samples = list(executor.LoadAndRun(loaders,
-                                     load_kwargs=load_kwargs,
-                                     run_kwargs=run_kwargs))
+  samples = list(benchmark_spec.executor.LoadAndRun(
+      loaders, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
   for sample in samples:
     sample.metadata.update(metadata)
 
