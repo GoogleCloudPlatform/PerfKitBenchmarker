@@ -99,11 +99,11 @@ def Prepare(benchmark_spec):
 
     # Restore YCSB_TAR_URL
     ycsb.YCSB_TAR_URL = default_ycsb_tar_url
+    benchmark_spec.executor = ycsb.YCSBExecutor('googledatastore')
 
 
 def Run(benchmark_spec):
     vms = benchmark_spec.vms
-    executor = ycsb.YCSBExecutor('googledatastore')
     run_kwargs = {
         'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
         'googledatastore.privateKeyFile': PRIVATE_KEYFILE_DIR,
@@ -114,9 +114,8 @@ def Run(benchmark_spec):
     load_kwargs = run_kwargs.copy()
     if FLAGS['ycsb_preload_threads'].present:
         load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
-    samples = list(executor.LoadAndRun(vms,
-                                       load_kwargs=load_kwargs,
-                                       run_kwargs=run_kwargs))
+    samples = list(benchmark_spec.executor.LoadAndRun(
+        vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
     return samples
 
 
