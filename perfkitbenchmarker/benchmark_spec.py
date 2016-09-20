@@ -242,7 +242,7 @@ class BenchmarkSpec(object):
     service_type = spark_service_spec.service_type
     spark_service_class = spark_service.GetSparkServiceClass(
         spark_service_spec.cloud, service_type)
-    self.spark_service = spark_service_class(spark_service_spec)
+    self.spark_service = spark_service_class(self)
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]

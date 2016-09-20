@@ -27,10 +27,13 @@ For more on Apache Spark: http://spark.apache.org/
 
 import abc
 import copy
+import datetime
+import posixpath
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker import resource
-
+from perfkitbenchmarker import vm_util
 
 flags.DEFINE_string('spark_static_cluster_id', None,
                     'If set, the name of the Spark cluster, assumed to be '
@@ -84,12 +87,14 @@ class BaseSparkService(resource.BaseResource):
 
   __metaclass__ = AutoRegisterSparkServiceMeta
 
-  def __init__(self, spark_service_spec):
+  def __init__(self, benchmark_spec):
     """Initialize the Apache Spark Service object.
 
     Args:
       spark_service_spec: spec of the spark service.
     """
+    self.benchmark_spec = benchmark_spec
+    spark_service_spec = benchmark_spec.config.spark_service
     is_user_managed = spark_service_spec.static_cluster_id is not None
     super(BaseSparkService, self).__init__(user_managed=is_user_managed)
     self.spec = spark_service_spec
@@ -152,9 +157,10 @@ class PkbSparkService(BaseSparkService):
   def __init__(self, spark_service_spec):
     super(PkbSparkService, self).__init__(spark_service_spec)
     # construct the VMs.
+    self.vms = {}
     for group_name, group_spec in [('worker_group', self.spec.worker_group),
                                    ('master_group', self.spec.master_group)]:
-      self.vms[group_name] = self.ConstructVirtualMachineGroup(
+      self.vms[group_name] = self.benchmark_spec.ConstructVirtualMachineGroup(
           group_name, group_spec)
 
   def _Create(self):
@@ -162,7 +168,7 @@ class PkbSparkService(BaseSparkService):
 
     sshable_vm_groups = {}
     for group_name in SPARK_VM_GROUPS:
-      vm_util.RunThreaded(self.PrepareVm, self.vms[group_name])
+      vm_util.RunThreaded(self.benchmark_spec.PrepareVm, self.vms[group_name])
       sshable_vm_groups[group_name] = self.vms[group_name]
     vm_util.GenerateSSHConfig({}, sshable_vm_groups)
 
@@ -172,7 +178,8 @@ class PkbSparkService(BaseSparkService):
 
     vm_util.RunThreaded(InstallHadoop, self.vms['worker_group'] +
                         self.vms['master_group'])
-    hadoop.ConfigureAndStart(self.vms['master_group'][0],
+    self.leader = self.vms['master_group'][0]
+    hadoop.ConfigureAndStart(self.leader,
                              self.vms['worker_group'])
 
 
@@ -189,13 +196,20 @@ class PkbSparkService(BaseSparkService):
     """Submit the jar file."""
     if job_type == SPARK_JOB_TYPE:
       raise NotImplemented()
-    if job_stdout_file is not None:
-      raise NotImplemented()
-    cmd_string = '{0} jar {1}'.format(
-        posixpath.join(hadoop.HADOOP_BIN, 'yarn'), jar_file)
+
+    cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop'),
+                'jar', jar_file]
     if class_name:
-      cmd_string += class_name
-      cmd_string += ' '
-    cmd_string += ' '.join(job_arguments)
-    self.leader.RobustRemoteCommand(cmd_string)
+      cmd_list.append(class_name)
+    if job_arguments:
+      cmd_list += job_arguments
+    cmd_string = ' '.join(cmd_list)
+    start_time = datetime.datetime.now()
+    stdout, _ = self.leader.RemoteCommand(cmd_string)
+    end_time = datetime.datetime.now()
+    if job_stdout_file:
+      with open(job_stdout_file, 'w') as f:
+        f.write(stdout)
+    return {SUCCESS: True,
+            RUNTIME: (end_time - start_time).total_seconds()}
 
