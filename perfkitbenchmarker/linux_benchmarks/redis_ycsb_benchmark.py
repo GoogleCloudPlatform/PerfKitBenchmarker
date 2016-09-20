@@ -81,6 +81,22 @@ def Prepare(benchmark_spec):
 
   vm_util.RunThreaded(lambda f: f(), prepare_fns)
 
+  num_ycsb = FLAGS.redis_ycsb_processes
+  num_server = FLAGS.redis_total_num_processes
+  # Each redis process use different ports, number of ycsb processes should
+  # be at least as large as number of server processes, use round-robin
+  # to assign target server process to each ycsb process
+  server_metadata = [
+      {'redis.port': redis_server.REDIS_FIRST_PORT + i % num_server}
+      for i in range(num_ycsb)]
+
+  benchmark_spec.executor = ycsb.YCSBExecutor(
+      'redis', **{
+          'shardkeyspace': True,
+          'redis.host': redis_vm.internal_ip,
+          'perclientparam': server_metadata})
+
+
 
 def Run(benchmark_spec):
   """Run YCSB against Redis.
@@ -107,25 +123,10 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   groups = benchmark_spec.vm_groups
-  redis_vm = groups['workers'][0]
   ycsb_vms = groups['clients']
   num_ycsb = FLAGS.redis_ycsb_processes
   num_server = FLAGS.redis_total_num_processes
   num_client = FLAGS.ycsb_client_vms
-
-  # Each redis process use different ports, number of ycsb processes should
-  # be at least as large as number of server processes, use round-robin
-  # to assign target server process to each ycsb process
-  server_metadata = [{
-      'redis.port': redis_server.REDIS_FIRST_PORT + i % num_server}
-      for i in range(num_ycsb)]
-
-  executor = ycsb.YCSBExecutor(
-      'redis', **{
-          'shardkeyspace': True,
-          'redis.host': redis_vm.internal_ip,
-          'perclientparam': server_metadata})
-
   metadata = {'ycsb_client_vms': num_client,
               'ycsb_processes': num_ycsb,
               'redis_total_num_processes': num_server}
@@ -139,7 +140,7 @@ def Run(benchmark_spec):
   client_vms = [
       vm for item in ycsb_vms for vm in repeat(item, duplicate)][:num_ycsb]
 
-  samples = list(executor.LoadAndRun(
+  samples = list(benchmark_spec.executor.LoadAndRun(
       client_vms,
       load_kwargs={'threads': 4}))
 

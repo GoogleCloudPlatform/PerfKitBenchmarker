@@ -237,7 +237,9 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     p = mock.patch(publisher.__name__ + '.FLAGS')
     self.mock_flags = p.start()
     self.mock_flags.configure_mock(metadata=[],
-                                   num_striped_disks=1)
+                                   num_striped_disks=1,
+                                   sysctl=[],
+                                   set_files=[])
     self.addCleanup(p.stop)
 
     self.maxDiff = None
