@@ -95,6 +95,10 @@ def Prepare(benchmark_spec):
                       for vm in loaders]
 
   vm_util.RunThreaded(lambda f: f(), aerospike_install_fns + ycsb_install_fns)
+  benchmark_spec.executor = ycsb.YCSBExecutor(
+      'aerospike',
+      **{'as.host': aerospike_vms[0].internal_ip,
+         'as.namespace': 'test'})
 
 
 def Run(benchmark_spec):
@@ -110,14 +114,10 @@ def Run(benchmark_spec):
   loaders = benchmark_spec.vm_groups['clients']
   aerospike_vms = benchmark_spec.vm_groups['workers']
 
-  executor = ycsb.YCSBExecutor('aerospike',
-                               **{'as.host': aerospike_vms[0].internal_ip,
-                                  'as.namespace': 'test'})
-
   metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
               'num_vms': len(aerospike_vms)}
 
-  samples = list(executor.LoadAndRun(loaders))
+  samples = list(benchmark_spec.executor.LoadAndRun(loaders))
 
   for sample in samples:
     sample.metadata.update(metadata)

@@ -73,6 +73,23 @@ flags.DEFINE_bool('setup_remote_firewall', False,
                   'Whether PKB should configure the firewall of each remote'
                   'VM to make sure it accepts all internal connections.')
 
+flags.DEFINE_list('sysctl', [],
+                  'Sysctl values to set. This flag should be a comma-separated '
+                  'list of path=value pairs. Each value will be written to the '
+                  'corresponding path. For example, if you pass '
+                  '--sysctls=vm.dirty_background_ratio=10,vm.dirty_ratio=25, '
+                  'PKB will run "sysctl vm.dirty_background_ratio=10 '
+                  'vm.dirty_ratio=25" before starting the benchmark.')
+
+flags.DEFINE_list('set_files', [],
+                  'Arbitrary filesystem configuration. This flag should be a '
+                  'comma-separated list of path=value pairs. Each value will '
+                  'be written to the corresponding path. For example, if you '
+                  'pass --set_files=/sys/kernel/mm/transparent_hugepage/enabled=always, '  # noqa
+                  'then PKB will write "always" to '
+                  '/sys/kernel/mm/transparent_hugepage/enabled before starting '
+                  'the benchmark.')
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -198,7 +215,23 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
+    self.SetFiles()
+    self.DoSysctls()
     self.BurnCpu()
+
+  def SetFiles(self):
+    """Apply --set_files to the VM."""
+
+    for pair in FLAGS.set_files:
+      path, value = pair.split('=')
+      self.RemoteCommand('echo "%s" | sudo tee %s' %
+                         (value, path))
+
+  def DoSysctls(self):
+    """Apply --sysctl to the VM."""
+
+    if FLAGS.sysctl:
+      self.RemoteCommand('sudo sysctl -w %s' % (' '.join(FLAGS.sysctl),))
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
