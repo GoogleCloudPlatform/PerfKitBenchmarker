@@ -141,6 +141,15 @@ class BaseSparkService(resource.BaseResource):
             'machine_type': str(self.spec.worker_group.vm_spec.machine_type),
             'spark_cluster_id': self.cluster_id}
 
+  @classmethod
+  def GetExampleJar(cls, job_type):
+    if job_type == SPARK_JOB_TYPE:
+      return 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
+    elif job_type == HADOOP_JOB_TYPE:
+      return 'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar'
+    else:
+      raise NotImplemented()
+
 
 
 class PkbSparkService(BaseSparkService):
@@ -212,4 +221,14 @@ class PkbSparkService(BaseSparkService):
         f.write(stdout)
     return {SUCCESS: True,
             RUNTIME: (end_time - start_time).total_seconds()}
+
+  @classmethod
+  def GetExampleJar(cls, job_type):
+    if job_type == HADOOP_JOB_TYPE:
+      return posixpath.join(
+          hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
+          'hadoop-mapreduce-examples-{0}.jar'.format(hadoop.HADOOP_VERSION))
+    else:
+      raise NotImplemented()
+
 

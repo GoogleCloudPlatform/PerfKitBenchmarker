@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,136 +12,145 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs terasort on hadoop.
+"""Runs a jar using a cluster that supports Apache Hadoop MapReduce.
 
-Cluster Setup:
-http://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/ClusterSetup.html
+This benchmark takes runs the Apache Hadoop MapReduce Terasort benchmark on an
+Hadoop YARN cluster. The cluster can be one supplied by a cloud provider,
+such as Google's Dataproc or Amazon's EMR.
 
-TODO(user): Make hadoop scale when the number of nodes changes. Also
-investigate other settings and verfiy that we are seeing good performance.
+It records how long each phase (generate, sort, validate) takes to run.
+For each phase, it reports the wall clock time, but this number should
+be used with caution, as it some platforms (such as AWS's EMR) use polling
+to determine when the job is done, so the wall time is inflated
+Furthermore, if the standard output of the job is retrieved, AWS EMR's
+time is again inflated because it takes extra time to get the output.
+
+If available, it will also report a pending time (the time between when the
+job was received by the platform and when it ran), and a runtime, which is
+the time the job took to run, as reported by the underlying cluster.
+
+For more on Apache Hadoop, see: http://hadoop.apache.org/
 """
 
-import logging
-import posixpath
-import time
+import datetime
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import hadoop
+from perfkitbenchmarker import spark_service
+from perfkitbenchmarker import flags
 
-flags.DEFINE_integer('terasort_num_rows', 100000000,
-                     'Number of 100-byte rows used in terasort.')
 
-FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'hadoop_terasort'
 BENCHMARK_CONFIG = """
 hadoop_terasort:
-  description: Runs Terasort. Control the number of worker VMs with --num_vms.
-  vm_groups:
-    master:
-      vm_spec: *default_single_core
-      disk_spec: *default_500_gb
-    workers:
-      vm_spec: *default_single_core
-      disk_spec: *default_500_gb
-      vm_count: 8
+  description: Run the Apache Hadoop MapReduce Terasort benchmark on a cluster.
+  spark_service:
+    service_type: managed
+    worker_group:
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+          boot_disk_size: 500
+        AWS:
+          machine_type: m4.xlarge
+      vm_count: 2
 """
 
-NUM_BYTES_PER_ROW = 100
-NUM_MB_PER_ROW = NUM_BYTES_PER_ROW / (1024.0 ** 2)
+TERAGEN = 'teragen'
+TERASORT = 'terasort'
+TERAVALIDATE = 'teravalidate'
+
+flags.DEFINE_integer('terasort_num_rows', 10000,
+                     'Number of 100-byte rows to generate.')
+flags.DEFINE_string('terasort_unsorted_dir', 'tera_gen_data', 'Location of '
+                    'the unsorted data. TeraGen writes here, and TeraSort '
+                    'reads from here.')
+
+flags.DEFINE_string('terasort_sorted_dir', 'tera_sort_dir',
+                    'Location for the sorted data. TeraSort writes to here, '
+                    'TeraValidate reads from here.')
+flags.DEFINE_string('terasort_validate_dir', 'tera_validate_dir',
+                    'Output of the TeraValidate command')
+
+flags.DEFINE_bool('terasort_append_timestamp', True, 'Append a timestamp to '
+                  'the directories given by terasort_unsorted_dir, '
+                  'terasort_sorted_dir, and terasort_validate_dir')
+
+FLAGS = flags.FLAGS
 
 
 def GetConfig(user_config):
-  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  if FLAGS['num_vms'].present:
-    config['vm_groups']['workers']['vm_count'] = FLAGS.num_vms
-  return config
-
-
-def CheckPrerequisites():
-  """Verifies that the required resources are present.
-
-  Raises:
-    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
-  """
-  hadoop.CheckPrerequisites()
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):
-  """Prepare the virtual machines to run hadoop.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-  """
-  master = benchmark_spec.vm_groups['master'][0]
-  workers = benchmark_spec.vm_groups['workers']
-  vms = benchmark_spec.vms
-
-  def InstallHadoop(vm):
-    vm.Install('hadoop')
-  vm_util.RunThreaded(InstallHadoop, vms)
-  hadoop.ConfigureAndStart(master, workers)
+  pass
 
 
 def Run(benchmark_spec):
-  """Spawn hadoop and gather the results.
+  """Executes the given jar on the specified Spark cluster.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
 
   Returns:
-    A list of sample.Sample instances.
+    A list of sample.Sample objects.
   """
-  vms = benchmark_spec.vms
-  master = benchmark_spec.vm_groups['master'][0]
+  spark_cluster = benchmark_spec.spark_service
+  start = datetime.datetime.now()
+  terasort_jar = spark_cluster.GetExampleJar(spark_service.HADOOP_JOB_TYPE)
+  results = []
+  metadata = spark_cluster.GetMetadata().update({
+      'terasort_num_rows': FLAGS.terasort_num_rows})
+  unsorted_dir = FLAGS.terasort_unsorted_dir
+  sorted_dir = FLAGS.terasort_sorted_dir
+  validate_dir = FLAGS.terasort_validate_dir
+  if FLAGS.terasort_append_timestamp:
+    time_string = datetime.datetime.now().strftime('%Y%m%d%H%S')
+    unsorted_dir += time_string
+    sorted_dir += time_string
+    validate_dir += time_string
 
-  mapreduce_example_jar = posixpath.join(
-      hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
-      'hadoop-mapreduce-examples-{0}.jar'.format(hadoop.HADOOP_VERSION))
-  hadoop_cmd = '{0} jar {1}'.format(
-      posixpath.join(hadoop.HADOOP_BIN, 'yarn'),
-      mapreduce_example_jar)
-  master.RobustRemoteCommand('{0} teragen {1} /teragen'.format(
-      hadoop_cmd, FLAGS.terasort_num_rows))
-  num_cpus = sum(vm.num_cpus for vm in vms[1:])
-  start_time = time.time()
-  stdout, _ = master.RobustRemoteCommand(
-      hadoop_cmd + ' terasort /teragen /terasort')
-  logging.info('Terasort output: %s', stdout)
-  time_elapsed = time.time() - start_time
-  data_processed_in_mbytes = FLAGS.terasort_num_rows * NUM_MB_PER_ROW
-  master.RobustRemoteCommand(
-      hadoop_cmd + ' teravalidate /terasort /teravalidate')
+  gen_args = (TERAGEN, str(FLAGS.terasort_num_rows), unsorted_dir)
+  sort_args = (TERASORT, unsorted_dir, sorted_dir)
+  validate_args = (TERAVALIDATE, sorted_dir, validate_dir)
 
-  # Clean up
-  master.RemoteCommand(
-      '{0} dfs -rm -r -f /teragen /teravalidate /terasort'.format(
-          posixpath.join(hadoop.HADOOP_BIN, 'hdfs')))
+  stages = [('generate', gen_args),
+            ('sort', sort_args),
+            ('validate', validate_args)]
+  for (label, args) in stages:
+    stats = spark_cluster.SubmitJob(terasort_jar,
+                                    None,
+                                    job_type=spark_service.HADOOP_JOB_TYPE,
+                                    job_arguments=args)
+    if not stats[spark_service.SUCCESS]:
+      raise Exception('Stage {0} unsuccessful'.format(label))
+    current_time = datetime.datetime.now()
+    wall_time = (current_time - start).total_seconds()
+    results.append(sample.Sample(label + '_wall_time',
+                                 wall_time,
+                                 'seconds', metadata))
+    start = current_time
 
-  metadata = {'num_rows': FLAGS.terasort_num_rows,
-              'data_size_in_bytes': FLAGS.terasort_num_rows * NUM_BYTES_PER_ROW,
-              'num_vms': len(vms)}
-  return [sample.Sample('Terasort Throughput Per Core',
-                        data_processed_in_mbytes / time_elapsed / num_cpus,
-                        'MB/sec',
-                        metadata),
-          sample.Sample('Terasort Total Time', time_elapsed, 'sec', metadata)]
+    if spark_service.RUNTIME in stats:
+      results.append(sample.Sample(label + '_runtime',
+                                   stats[spark_service.RUNTIME],
+                                   'seconds', metadata))
+    if spark_service.WAITING in stats:
+      results.append(sample.Sample(label + '_pending_time',
+                                   stats[spark_service.WAITING],
+                                   'seconds', metadata))
+
+  if not spark_cluster.user_managed:
+    create_time = (spark_cluster.resource_ready_time -
+                   spark_cluster.create_start_time)
+    results.append(sample.Sample('cluster_create_time',
+                                 create_time,
+                                 'seconds', metadata))
+  return results
 
 
 def Cleanup(benchmark_spec):
-  """Uninstall packages required for Hadoop and remove benchmark files.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-  """
-  master = benchmark_spec.vm_groups['master'][0]
-  workers = benchmark_spec.vm_groups['workers']
-  logging.info('Stopping Hadoop.')
-  hadoop.StopAll(master)
-  vm_util.RunThreaded(hadoop.CleanDatanode, workers)
+  pass
