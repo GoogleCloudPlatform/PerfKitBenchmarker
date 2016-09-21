@@ -38,7 +38,7 @@ READY_STATE = 'WAITING'
 
 JOB_WAIT_SLEEP = 30
 
-DELETED_STATES = ['TERMINATING', 'TERMINATED_WITH_ERRORS', 'TERMINATED']
+DELETED_STATES = ['TERMINATED_WITH_ERRORS', 'TERMINATED']
 
 MANAGER_SG = 'EmrManagedMasterSecurityGroup'
 WORKER_SG = 'EmrManagedSlaveSecurityGroup'
@@ -60,6 +60,7 @@ class AwsEMR(spark_service.BaseSparkService):
   """
 
   CLOUD = providers.AWS
+  SPARK_SAMPLE_LOCATION = 'file:///usr/lib/spark/lib/spark-examples.jar'
   SERVICE_NAME = 'emr'
 
   def __init__(self, spark_service_spec):
@@ -154,8 +155,6 @@ class AwsEMR(spark_service.BaseSparkService):
 
   def _Delete(self):
     """Deletes the cluster."""
-    if self.network:
-      self._DeleteSecurityGroups()
 
     cmd = self.cmd_prefix + ['emr', 'terminate-clusters', '--cluster-ids',
                              self.cluster_id]
@@ -174,6 +173,10 @@ class AwsEMR(spark_service.BaseSparkService):
       return False
     result = json.loads(stdout)
     if result['Cluster']['Status']['State'] in DELETED_STATES:
+      # This can only be done after the cluster is deleted, and it it needs to
+      # be done before we try to delete the network.
+      if self.network:
+        self._DeleteSecurityGroups()
       return False
     else:
       return True

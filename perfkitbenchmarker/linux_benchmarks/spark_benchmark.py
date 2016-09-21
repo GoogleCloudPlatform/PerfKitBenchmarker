@@ -76,11 +76,10 @@ spark:
 """
 
 # This points to a file on the spark cluster.
-DEFAULT_JARFILE = 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
 DEFAULT_CLASSNAME = 'org.apache.spark.examples.SparkPi'
 
-flags.DEFINE_string('spark_jarfile', DEFAULT_JARFILE,
-                    'Jarfile to submit.')
+flags.DEFINE_string('spark_jarfile', None,
+                    'If none, use the spark sample jar.')
 flags.DEFINE_string('spark_classname', DEFAULT_CLASSNAME,
                     'Classname to be used')
 flags.DEFINE_bool('spark_print_stdout', True, 'Print the standard '
@@ -117,6 +116,8 @@ def Run(benchmark_spec):
 
   stdout_path = None
   results = []
+  jarfile = (FLAGS.spark_jarfile or
+             spark_cluster.GetExampleJar(spark_service.SPARK_JOB_TYPE))
   try:
     if FLAGS.spark_print_stdout:
       # We need to get a name for a temporary file, so we create
@@ -127,20 +128,20 @@ def Run(benchmark_spec):
       stdout_path = stdout_file.name
       stdout_file.close()
 
-    stats = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
+    stats = spark_cluster.SubmitJob(jarfile,
                                     FLAGS.spark_classname,
                                     job_arguments=FLAGS.spark_job_arguments,
                                     job_stdout_file=stdout_path,
                                     job_type=FLAGS.spark_job_type)
     if not stats[spark_service.SUCCESS]:
       raise Exception('Class {0} from jar {1} did not run'.format(
-          FLAGS.spark_classname, FLAGS.spark_jarfile))
+          FLAGS.spark_classname, jarfile))
     jar_end = datetime.datetime.now()
     if stdout_path:
       with open(stdout_path, 'r') as f:
         logging.info('The output of the job is ' + f.read())
     metadata = spark_cluster.GetMetadata()
-    metadata.update({'jarfile': FLAGS.spark_jarfile,
+    metadata.update({'jarfile': jarfile,
                      'class': FLAGS.spark_classname,
                      'job_arguments': str(FLAGS.spark_job_arguments),
                      'print_stdout': str(FLAGS.spark_print_stdout)})

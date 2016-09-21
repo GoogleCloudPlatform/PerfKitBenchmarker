@@ -87,6 +87,10 @@ class BaseSparkService(resource.BaseResource):
 
   __metaclass__ = AutoRegisterSparkServiceMeta
 
+  SPARK_SAMPLE_LOCATION = 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
+
+  HADOOP_SAMPLE_LOCATION = 'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar'
+
   def __init__(self, benchmark_spec):
     """Initialize the Apache Spark Service object.
 
@@ -144,9 +148,9 @@ class BaseSparkService(resource.BaseResource):
   @classmethod
   def GetExampleJar(cls, job_type):
     if job_type == SPARK_JOB_TYPE:
-      return 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
+      return cls.SPARK_SAMPLE_LOCATION
     elif job_type == HADOOP_JOB_TYPE:
-      return 'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar'
+      return cls.HADOOP_SAMPLE_LOCATION
     else:
       raise NotImplemented()
 
