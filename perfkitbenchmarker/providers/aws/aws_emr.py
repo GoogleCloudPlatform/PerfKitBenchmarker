@@ -159,6 +159,10 @@ class AwsEMR(spark_service.BaseSparkService):
     cmd = self.cmd_prefix + ['emr', 'terminate-clusters', '--cluster-ids',
                              self.cluster_id]
     vm_util.IssueCommand(cmd)
+
+  def _DeleteDependencies(self):
+    if self.network:
+      self._DeleteSecurityGroups()
     if self.bucket_to_delete:
       bucket_del_cmd = self.cmd_prefix + ['s3', 'rb', '--force',
                                           self.bucket_to_delete]
@@ -173,10 +177,6 @@ class AwsEMR(spark_service.BaseSparkService):
       return False
     result = json.loads(stdout)
     if result['Cluster']['Status']['State'] in DELETED_STATES:
-      # This can only be done after the cluster is deleted, and it it needs to
-      # be done before we try to delete the network.
-      if self.network:
-        self._DeleteSecurityGroups()
       return False
     else:
       return True
