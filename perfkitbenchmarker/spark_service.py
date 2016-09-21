@@ -87,9 +87,11 @@ class BaseSparkService(resource.BaseResource):
 
   __metaclass__ = AutoRegisterSparkServiceMeta
 
-  SPARK_SAMPLE_LOCATION = 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
+  SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
+                           'spark-examples.jar')
 
-  HADOOP_SAMPLE_LOCATION = 'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar'
+  HADOOP_SAMPLE_LOCATION = ('file:///usr/lib/hadoop-mapreduce/'
+                            'hadoop-mapreduce-examples.jar')
 
   def __init__(self, benchmark_spec):
     """Initialize the Apache Spark Service object.
@@ -109,6 +111,7 @@ class BaseSparkService(resource.BaseResource):
       self.spec.master_group.vm_count = 1
     self.cluster_id = spark_service_spec.static_cluster_id
     self.project = spark_service_spec.project
+    self.zone = spark_service_spec.zone
 
   @abc.abstractmethod
   def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
@@ -185,7 +188,7 @@ class PkbSparkService(BaseSparkService):
       sshable_vm_groups[group_name] = self.vms[group_name]
     vm_util.GenerateSSHConfig({}, sshable_vm_groups)
 
-    # need to fix this to install spark. 
+    # need to fix this to install spark
     def InstallHadoop(vm):
       vm.Install('hadoop')
 
@@ -202,10 +205,9 @@ class PkbSparkService(BaseSparkService):
       for vm in self.vms[group_name]:
         vm.Delete()
 
-  # TODO(hildrum) actually implement this.
   def SubmitJob(self, jar_file, class_name, job_poll_interval=None,
-                                job_stdout_file=None, job_arguments=None,
-                                job_type=SPARK_JOB_TYPE):
+                job_stdout_file=None, job_arguments=None,
+                job_type=SPARK_JOB_TYPE):
     """Submit the jar file."""
     if job_type == SPARK_JOB_TYPE:
       raise NotImplemented()
@@ -234,5 +236,3 @@ class PkbSparkService(BaseSparkService):
           'hadoop-mapreduce-examples-{0}.jar'.format(hadoop.HADOOP_VERSION))
     else:
       raise NotImplemented()
-
-

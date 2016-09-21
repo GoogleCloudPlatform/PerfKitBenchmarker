@@ -52,11 +52,11 @@ class AwsEMR(spark_service.BaseSparkService):
 
   Attributes:
     cluster_id: Cluster identifier, set in superclass.
-    num_workers: Number of works, set in superclass.
-    machine_type: Machine type to use.
     project: Enclosing project for the cluster.
     cmd_prefix: emr prefix, including region
-    region: region in which cluster is located.
+    network: network to use; set if needed by machine type
+    bucket_to_delete: bucket name to delete when cluster is
+    terminated.
   """
 
   CLOUD = providers.AWS
@@ -71,13 +71,13 @@ class AwsEMR(spark_service.BaseSparkService):
     self.cmd_prefix = util.AWS_PREFIX
 
     if self.spec.zone:
-      region = util.GetRegionFromZone(FLAGS.zones[0])
+      region = util.GetRegionFromZone(self.spec.zone)
       self.cmd_prefix += ['--region', region]
 
     # Certain machine types require subnets.
     if (self.spec.static_cluster_id is None and
         (worker_machine_type[0:2] in NEEDS_SUBNET or
-        leader_machine_type[0:2] in NEEDS_SUBNET)):
+         leader_machine_type[0:2] in NEEDS_SUBNET)):
       self.network = aws_network.AwsNetwork.GetNetwork(self.spec)
     else:
       self.network = None

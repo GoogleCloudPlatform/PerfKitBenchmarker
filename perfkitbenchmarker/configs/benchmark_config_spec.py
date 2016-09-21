@@ -207,8 +207,8 @@ class _SparkServiceSpec(spec.BaseSpec):
                              spark_service.PKB_MANAGED]}),
         'worker_group': (_VmGroupSpecDecoder, {}),
         'master_group': (_VmGroupSpecDecoder,
-                              {'default': None,
-                               'none_ok': True}),
+                         {'default': None,
+                          'none_ok': True}),
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS}),
         'zone': (option_decoders.StringDecoder, {'none_ok': True,
@@ -397,7 +397,6 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
     logging.info('vm count is ' + str(result.vm_count))
     logging.info('vm spec is ' + str(result.vm_spec))
     logging.info('vm spec machine type is ' + str(result.vm_spec.machine_type))
-    
     return result
 
 
