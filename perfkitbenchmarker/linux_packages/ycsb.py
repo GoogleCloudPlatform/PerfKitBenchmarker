@@ -137,7 +137,7 @@ def _GetWorkloadFileList():
   if FLAGS.ycsb_workload_files:
     return FLAGS.ycsb_workload_files
   return [data.ResourcePath(os.path.join('ycsb', workload))
-          for workload in ('workloada', 'workloadb')]
+          for workload in ('workloada', 'workloadb', 'workloadc')]
 
 
 def CheckPrerequisites():
