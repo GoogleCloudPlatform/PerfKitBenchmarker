@@ -134,10 +134,9 @@ def _GetWorkloadFileList():
       * The argument to --ycsb_workload_files.
       * Bundled YCSB workloads A and B.
   """
-  if FLAGS.ycsb_workload_files:
-    return FLAGS.ycsb_workload_files
   return [data.ResourcePath(os.path.join('ycsb', workload))
-          for workload in ('workloada', 'workloadb', 'workloadc')]
+          for workload in FLAGS.ycsb_workload_files or (
+              'workloada', 'workloadb')]
 
 
 def CheckPrerequisites():
