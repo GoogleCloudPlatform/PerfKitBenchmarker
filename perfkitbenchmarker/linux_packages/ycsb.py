@@ -94,7 +94,7 @@ flags.DEFINE_boolean('ycsb_reload_database', True,
                      'is already loaded.')
 flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.',
                      lower_bound=1)
-flags.DEFINE_list('ycsb_workload_files', [],
+flags.DEFINE_list('ycsb_workload_files', ['workloada', 'workloadb'],
                   'Path to YCSB workload file to use during *run* '
                   'stage only. Comma-separated list')
 flags.DEFINE_list('ycsb_load_parameters', [],
@@ -134,10 +134,8 @@ def _GetWorkloadFileList():
       * The argument to --ycsb_workload_files.
       * Bundled YCSB workloads A and B.
   """
-  if FLAGS.ycsb_workload_files:
-    return FLAGS.ycsb_workload_files
   return [data.ResourcePath(os.path.join('ycsb', workload))
-          for workload in ('workloada', 'workloadb')]
+          for workload in FLAGS.ycsb_workload_files]
 
 
 def CheckPrerequisites():
