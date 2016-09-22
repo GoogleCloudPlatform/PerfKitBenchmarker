@@ -134,7 +134,7 @@ def _GetWorkloadFileList():
       * The argument to --ycsb_workload_files.
       * Bundled YCSB workloads A and B.
   """
-  return [data.ResourcePath(os.path.join('ycsb', workload))
+  return [data.ResourcePath(workload)
           for workload in FLAGS.ycsb_workload_files]
 
 
