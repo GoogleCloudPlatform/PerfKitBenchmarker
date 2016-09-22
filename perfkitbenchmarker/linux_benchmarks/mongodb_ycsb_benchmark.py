@@ -131,4 +131,4 @@ def Cleanup(benchmark_spec):
                          server.GetServiceName('mongodb_server'))
     server.RemoteCommand('rm -rf %s' % _GetDataDir(server))
 
-  vm_util.RunThreaded(CleanupServer, benchmark_spec.vm_groups['workers'][0])
+  CleanupServer(benchmark_spec.vm_groups['workers'][0])
