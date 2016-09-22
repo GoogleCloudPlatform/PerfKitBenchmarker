@@ -29,3 +29,5 @@ flags.DEFINE_string('s3_custom_endpoint', None,
                     'If given, a custom endpoint to use for S3 transfers. If '
                     'this flag is not given, use the standard endpoint for the '
                     'storage region.')
+flags.DEFINE_boolean('aws_dedicated_hosts', False,
+                     'Whether to use AWS dedicated hosts for any AWS VMs.')
