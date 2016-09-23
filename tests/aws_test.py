@@ -24,7 +24,6 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
@@ -110,8 +109,8 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
     self.vm = aws_virtual_machine.AwsVirtualMachine(
-        virtual_machine.BaseVmSpec('test_vm_spec.AWS', zone='us-east-1a',
-                                   machine_type='c3.large'))
+        aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS', zone='us-east-1a',
+                                      machine_type='c3.large'))
     self.vm.id = 'i-foo'
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'aws-describe-instance.json')
