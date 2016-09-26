@@ -23,6 +23,7 @@ for more information about Azure Virtual Networks.
 
 import logging
 import json
+import threading
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -42,10 +43,13 @@ DEFAULT_LOCATION = 'eastus2'
 def GetResourceGroup():
   """Get the resource group for the current benchmark."""
   spec = context.GetThreadBenchmarkSpec()
-  if hasattr(spec, 'azure_resource_group'):
+  # This is protected by spec.networks_lock, so there's no race
+  # condition with checking for the attribute and then creating a
+  # resource group.
+  try:
     return spec.azure_resource_group
-  else:
-    group = AzureResourceGroup('pkb%s%s' % (FLAGS.run_uri, spec.uid))
+  except AttributeError:
+    group = AzureResourceGroup(FLAGS.run_uri, spec.uid)
     spec.azure_resource_group = group
     return group
 
@@ -53,9 +57,11 @@ def GetResourceGroup():
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
 
-  def __init__(self, name):
+  def __init__(self, run_uri, spec_uid):
     super(AzureResourceGroup, self).__init__()
-    self.name = name
+    self.name = 'pkb%s-%s' % (run_uri, spec_uid)
+    # Storage account names can't include separator characters :(.
+    self.storage_account_prefix = 'pkb%s%s' % (run_uri, spec_uid)
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
@@ -100,7 +106,13 @@ class AzureStorageAccount(resource.BaseResource):
     self.resource_group = GetResourceGroup()
     self.location = location
     self.kind = kind or 'Storage'
-    self.access_tier = (access_tier or 'Hot') if kind == 'BlobStorage' else None
+
+    if kind == 'BlobStorage':
+      self.access_tier = access_tier or 'Hot'
+    else:
+      # Access tiers are only valid for blob storage accounts.
+      assert access_tier is None
+      self.access_tier = access_tier
 
   def _Create(self):
     """Creates the storage account."""
@@ -164,19 +176,32 @@ class AzureStorageAccount(resource.BaseResource):
 class AzureVirtualNetwork(resource.BaseResource):
   """Object representing an Azure Virtual Network."""
 
+  num_vnets = 0
+  vnet_lock = threading.Lock()
+
   def __init__(self, location, name):
     super(AzureVirtualNetwork, self).__init__()
     self.name = name
     self.resource_group = GetResourceGroup()
-    self.address_space = '10.0.0.0/8'
     self.location = location
     self.args = ['--vnet-name', self.name]
+
+    with self.vnet_lock:
+      self.vnet_num = self.num_vnets
+      self.num_vnets += 1
+
+    # Allocate a different /16 in each region. This allows for 255
+    # regions (should be enough for anyone), and 65536 VMs in each
+    # region. Using different address spaces prevents us from
+    # accidentally contacting the wrong VM.
+    self.address_space = '10.%s.0.0/16' % self.vnet_num
 
   def _Create(self):
     """Creates the virtual network."""
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'vnet', 'create',
          '--location', self.location,
+         '--address-prefixes', self.address_space,
          self.name] + self.resource_group.args)
 
   def _Delete(self):
@@ -230,8 +255,95 @@ class AzureSubnet(resource.BaseResource):
          self.name] + self.resource_group.args)
 
 
+class AzureNetworkSecurityGroup(resource.BaseResource):
+  def __init__(self, location, subnet, name):
+    super(AzureNetworkSecurityGroup, self).__init__()
+
+    self.location = location
+    self.subnet = subnet
+    self.name = name
+    self.resource_group = GetResourceGroup()
+    self.args = ['--nsg-name', self.name]
+
+    # Mapping of port -> rule name, used to deduplicate rules.
+    self.rules = {}
+    self.rules_lock = threading.Lock()
+
+  def _Create(self):
+    vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'network', 'nsg', 'create',
+         '--location', self.location,
+         self.name] + self.resource_group.args)
+
+  def _Exists(self):
+    stdout, _, retcode = vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'network', 'nsg', 'show',
+         '--json',
+         self.name] + self.resource_group.args)
+
+    return retcode == 0 and stdout != '{}\n'
+
+  def _Delete(self):
+    vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'network', 'nsg', 'delete',
+         '--quiet',
+         self.name] + self.resource_group.args)
+
+  def AttachToSubnet(self):
+    vm_util.IssueRetryableCommand(
+        [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'set',
+         '--name', self.subnet.name,
+         '--network-security-group-name', self.name] +
+        self.resource_group.args +
+        self.subnet.vnet.args)
+
+  def AllowPort(self, vm, port):
+    with self.rules_lock:
+      if port in self.rules:
+        return
+
+      rule_name = 'allow-%s' % port
+      # priorities are between 100 and 4096.
+      rule_priority = 100 + len(self.rules)
+      self.rules[port] = rule_name
+
+    vm_util.IssueRetryableCommand(
+        [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create',
+         rule_name,
+         '--destination-port-range', str(port),
+         '--access', 'Allow',
+         '--priority', str(rule_priority)]
+        + self.resource_group.args
+        + self.args)
+
+  def DisallowAllPorts(self):
+    for rule in self.rules.itervalues():
+      vm_util.IssueRetryableCommand(
+          [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'delete',
+           '--quiet',
+           rule] +
+          self.resource_group.args +
+          self.args)
+
+    # An NSG comes with some default rules, which we can't delete, so
+    # we create a new rule at higher priority than those.
+    vm_util.IssueRetryableCommand(
+        [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create',
+         'DenyAll',
+         '--access', 'Deny',
+         '--priority', '4095']
+        + self.resource_group.args
+        + self.args)
+
+
+ALL_NSGS = set()
+
+
 class AzureFirewall(network.BaseFirewall):
-  """An object representing the Azure Firewall equivalent.
+  """A fireall on Azure is a Network Security Group.
+
+  NSGs are per-subnet, but this class is per-provider, so we just
+  proxy methods through to the right NSG instance.
   """
 
   CLOUD = providers.AZURE
@@ -243,12 +355,14 @@ class AzureFirewall(network.BaseFirewall):
       vm: The BaseVirtualMachine object to open the port for.
       port: The local port to open.
     """
-    if vm.is_static or port == SSH_PORT:
-      return
+
+    vm.network.nsg.AllowPort(vm, port)
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
-    pass
+
+    for nsg in ALL_NSGS:
+      nsg.DisallowAllPorts()
 
 
 class AzureNetwork(network.BaseNetwork):
@@ -270,10 +384,13 @@ class AzureNetwork(network.BaseNetwork):
     suffix = '%sstorage' % self.zone
     self.storage_account = AzureStorageAccount(
         FLAGS.azure_storage_type, self.zone,
-        self.resource_group.name[:24 - len(suffix)] + suffix)
+        self.resource_group.storage_account_prefix[:24 - len(suffix)] + suffix)
     prefix = '%s-%s' % (self.resource_group.name, self.zone)
     self.vnet = AzureVirtualNetwork(self.zone, prefix + '-vnet')
     self.subnet = AzureSubnet(self.vnet, self.vnet.name + '-subnet')
+    self.nsg = AzureNetworkSecurityGroup(self.zone, self.subnet,
+                                         self.subnet.name + '-nsg')
+    ALL_NSGS.add(self.nsg)
 
   @vm_util.Retry()
   def Create(self):
@@ -290,9 +407,15 @@ class AzureNetwork(network.BaseNetwork):
 
     self.subnet.Create()
 
+    self.nsg.Create()
+    self.nsg.AttachToSubnet()
+
   def Delete(self):
     """Deletes the network."""
     self.subnet.Delete()
+
+    # Have to delete NSG after subnet or Azure will throw an error.
+    self.nsg.Delete()
 
     self.vnet.Delete()
 
