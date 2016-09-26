@@ -39,6 +39,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   STORAGE_NAME = providers.AZURE
 
   def PrepareService(self, location):
+    # abs is "Azure Blob Storage"
     prefix = 'pkb%sabs' % FLAGS.run_uri
     self.resource_group = azure_network.GetResourceGroup()
 
