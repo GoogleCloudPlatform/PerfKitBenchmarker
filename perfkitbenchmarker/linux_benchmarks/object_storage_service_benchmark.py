@@ -70,7 +70,7 @@ flags.DEFINE_string('object_storage_storage_class', None,
 
 flags.DEFINE_enum('object_storage_scenario', 'all',
                   ['all', 'cli', 'api_data', 'api_namespace',
-                   'api_multistream'],
+                   'api_multistream', 'api_multistream_writes'],
                   'select all, or one particular scenario to run: \n'
                   'ALL: runs all scenarios. This is the default. \n'
                   'cli: runs the command line only scenario. \n'
@@ -78,7 +78,9 @@ flags.DEFINE_enum('object_storage_scenario', 'all',
                   'api_namespace: runs API based benchmarking for namespace '
                   'operations. \n'
                   'api_multistream: runs API-based benchmarking with multiple '
-                  'upload/download streams.')
+                  'upload/download streams.',
+                  'api_multistream_writes: runs API-based benchmarking with'
+                  'multiple upload streams')
 
 flags.DEFINE_enum('cli_test_size', 'normal',
                   ['normal', 'large'],
@@ -899,6 +901,88 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
                  'recording write data.', ex.msg)
 
   logging.info('Finished multi-stream read test.')
+
+
+
+def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
+                              service, bucket_name, regional_bucket_name):
+
+  """A benchmark for multi-stream write latency and throughput.
+
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vms: the VMs to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    service: an ObjectStorageService.
+    bucket_name: the primary bucket to benchmark.
+    regional_bucket_name: the secondary bucket to benchmark.
+
+  Raises:
+    ValueError if an unexpected test outcome is found from the API
+    test script.
+  """
+
+  logging.info('Starting multi-stream write test on %s VMs.', len(vms))
+
+  objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
+                                        OBJECTS_WRITTEN_FILE)
+
+  size_distribution = _DistributionToBackendFormat(
+      FLAGS.object_storage_object_sizes)
+  logging.info('Distribution %s, backend format %s.',
+               FLAGS.object_storage_object_sizes, size_distribution)
+
+  streams_per_vm = FLAGS.object_storage_streams_per_vm
+  num_streams = streams_per_vm * len(vms)
+
+  def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
+    vm_idx = proc_idx // streams_per_vm
+    logging.info('Running on VM %s.', vm_idx)
+    cmd = command_builder.BuildCommand(
+        cmd_args + ['--stream_num_start=%s' % proc_idx])
+    out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
+    out_array[proc_idx] = out
+
+  def RunMultiStreamProcesses(command):
+    output = [None] * num_streams
+    # Each process has a thread managing it.
+    threads = [
+        threading.Thread(target=StartMultiStreamProcess,
+                         args=(command, i, output))
+        for i in xrange(num_streams)]
+    for thread in threads:
+      thread.start()
+    logging.info('Started %s processes.', num_streams)
+    for thread in threads:
+      thread.join()
+    logging.info('All processes complete.')
+    return output
+
+  write_start_time = (
+      time.time() +
+      MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
+
+  logging.info('Write start time is %s', write_start_time)
+
+  multi_stream_write_args = [
+      '--bucket=%s' % bucket_name,
+      '--objects_per_stream=%s' % (
+          FLAGS.object_storage_multistream_objects_per_stream),
+      '--object_sizes="%s"' % size_distribution,
+      '--num_streams=1',
+      '--start_time=%s' % write_start_time,
+      '--object_naming_scheme=%s' % FLAGS.object_storage_object_naming_scheme,
+      '--objects_written_file=%s' % objects_written_file,
+      '--scenario=MultiStreamWrite']
+
+  write_out = RunMultiStreamProcesses(multi_stream_write_args)
+  start_times, latencies, sizes = LoadWorkerOutput(write_out)
+  _ProcessMultiStreamResults(start_times, latencies, sizes, 'upload',
+                             size_distribution.iterkeys(), results,
+                             metadata=metadata)
+
+  logging.info('Finished multi-stream write test.')
 
 
 def CheckPrerequisites():
