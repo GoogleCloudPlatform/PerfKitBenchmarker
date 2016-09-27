@@ -78,8 +78,8 @@ flags.DEFINE_enum('object_storage_scenario', 'all',
                   'api_namespace: runs API based benchmarking for namespace '
                   'operations. \n'
                   'api_multistream: runs API-based benchmarking with multiple '
-                  'upload/download streams.',
-                  'api_multistream_writes: runs API-based benchmarking with'
+                  'upload/download streams.'
+                  'api_multistream_writes: runs API-based benchmarking with '
                   'multiple upload streams')
 
 flags.DEFINE_enum('cli_test_size', 'normal',
@@ -795,6 +795,42 @@ def LoadWorkerOutput(output):
   return start_times, latencies, sizes
 
 
+def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
+                             streams_per_vm, num_streams):
+
+  """Runs all of the multistream read or write processes and doesn't return
+     until they complete.
+
+  Args:
+    command_builder: an APIScriptCommandBuilder.
+    cmd_args: arguments for the command_builder.
+    streams_per_vm: number of threads per vm.
+    num_streams: total number of threads to launch.
+  """
+
+  output = [None] * num_streams
+
+  def _StartMultiStreamProcess(proc_idx):
+    vm_idx = proc_idx // streams_per_vm
+    logging.info('Running on VM %s.', vm_idx)
+    cmd = command_builder.BuildCommand(
+        cmd_args + ['--stream_num_start=%s' % proc_idx])
+    out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
+    output[proc_idx] = out
+
+  # Each process has a thread managing it.
+  threads = [
+      threading.Thread(target=_StartMultiStreamProcess, args=(i,))
+      for i in xrange(num_streams)]
+  for thread in threads:
+    thread.start()
+  logging.info('Started %s processes.', num_streams)
+  for thread in threads:
+    thread.join()
+  logging.info('All processes complete.')
+  return output
+
+
 def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
                            service, bucket_name, regional_bucket_name):
 
@@ -827,36 +863,13 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
   streams_per_vm = FLAGS.object_storage_streams_per_vm
   num_streams = streams_per_vm * len(vms)
 
-  def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
-    vm_idx = proc_idx // streams_per_vm
-    logging.info('Running on VM %s.', vm_idx)
-    cmd = command_builder.BuildCommand(
-        cmd_args + ['--stream_num_start=%s' % proc_idx])
-    out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
-    out_array[proc_idx] = out
-
-  def RunMultiStreamProcesses(command):
-    output = [None] * num_streams
-    # Each process has a thread managing it.
-    threads = [
-        threading.Thread(target=StartMultiStreamProcess,
-                         args=(command, i, output))
-        for i in xrange(num_streams)]
-    for thread in threads:
-      thread.start()
-    logging.info('Started %s processes.', num_streams)
-    for thread in threads:
-      thread.join()
-    logging.info('All processes complete.')
-    return output
-
   write_start_time = (
       time.time() +
       MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
 
   logging.info('Write start time is %s', write_start_time)
 
-  multi_stream_write_args = [
+  write_args = [
       '--bucket=%s' % bucket_name,
       '--objects_per_stream=%s' % (
           FLAGS.object_storage_multistream_objects_per_stream),
@@ -867,7 +880,8 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
       '--objects_written_file=%s' % objects_written_file,
       '--scenario=MultiStreamWrite']
 
-  write_out = RunMultiStreamProcesses(multi_stream_write_args)
+  write_out = _RunMultiStreamProcesses(vms, command_builder, write_args,
+                                       streams_per_vm, num_streams)
   start_times, latencies, sizes = LoadWorkerOutput(write_out)
   _ProcessMultiStreamResults(start_times, latencies, sizes, 'upload',
                              size_distribution.iterkeys(), results,
@@ -882,7 +896,7 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
 
   logging.info('Read start time is %s', read_start_time)
 
-  multi_stream_read_args = [
+  read_args = [
       '--bucket=%s' % bucket_name,
       '--objects_per_stream=%s' % (
           FLAGS.object_storage_multistream_objects_per_stream),
@@ -891,7 +905,8 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
       '--objects_written_file=%s' % objects_written_file,
       '--scenario=MultiStreamRead']
   try:
-    read_out = RunMultiStreamProcesses(multi_stream_read_args)
+    read_out = _RunMultiStreamProcesses(vms, command_builder, read_args,
+                                        streams_per_vm, num_streams)
     start_times, latencies, sizes = LoadWorkerOutput(read_out)
     _ProcessMultiStreamResults(start_times, latencies, sizes, 'download',
                                size_distribution.iterkeys(), results,
@@ -936,36 +951,13 @@ def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
   streams_per_vm = FLAGS.object_storage_streams_per_vm
   num_streams = streams_per_vm * len(vms)
 
-  def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
-    vm_idx = proc_idx // streams_per_vm
-    logging.info('Running on VM %s.', vm_idx)
-    cmd = command_builder.BuildCommand(
-        cmd_args + ['--stream_num_start=%s' % proc_idx])
-    out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
-    out_array[proc_idx] = out
-
-  def RunMultiStreamProcesses(command):
-    output = [None] * num_streams
-    # Each process has a thread managing it.
-    threads = [
-        threading.Thread(target=StartMultiStreamProcess,
-                         args=(command, i, output))
-        for i in xrange(num_streams)]
-    for thread in threads:
-      thread.start()
-    logging.info('Started %s processes.', num_streams)
-    for thread in threads:
-      thread.join()
-    logging.info('All processes complete.')
-    return output
-
   write_start_time = (
       time.time() +
       MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
 
   logging.info('Write start time is %s', write_start_time)
 
-  multi_stream_write_args = [
+  write_args = [
       '--bucket=%s' % bucket_name,
       '--objects_per_stream=%s' % (
           FLAGS.object_storage_multistream_objects_per_stream),
@@ -976,7 +968,8 @@ def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
       '--objects_written_file=%s' % objects_written_file,
       '--scenario=MultiStreamWrite']
 
-  write_out = RunMultiStreamProcesses(multi_stream_write_args)
+  write_out = _RunMultiStreamProcesses(vms, command_builder, write_args,
+                                       streams_per_vm, num_streams)
   start_times, latencies, sizes = LoadWorkerOutput(write_out)
   _ProcessMultiStreamResults(start_times, latencies, sizes, 'upload',
                              size_distribution.iterkeys(), results,
@@ -1248,11 +1241,13 @@ def Run(benchmark_spec):
       benchmark(results, metadata, vms[0], command_builder,
                 service, buckets[0], regional_bucket_name)
 
-  # MultiStreamRW is the only benchmark that supports multiple VMs, so
-  # it has a slightly different calling convention than the others.
-  if FLAGS.object_storage_scenario in {'api_multistream', 'all'}:
-    MultiStreamRWBenchmark(results, metadata, vms, command_builder,
-                           service, buckets[0], regional_bucket_name)
+  # MultiStreamRW and MultiStreamWrite are the only benchmarks that support multiple VMs, so
+  # they have a slightly different calling convention than the others.
+  for name, benchmark in [('api_multistream', MultiStreamRWBenchmark),
+                          ('api_multistream_writes', MultiStreamWriteBenchmark)]:
+    if FLAGS.object_storage_scenario in {name, 'all'}:
+      benchmark(results, metadata, vms, command_builder,
+                service, buckets[0], regional_bucket_name)
 
 
   return results
