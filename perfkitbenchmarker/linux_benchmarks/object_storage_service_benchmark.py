@@ -1229,10 +1229,12 @@ def Run(benchmark_spec):
       benchmark(results, metadata, vms[0], command_builder,
                 service, buckets[0], regional_bucket_name)
 
-  # MultiStreamRW and MultiStreamWrite are the only benchmarks that support multiple VMs, so
-  # they have a slightly different calling convention than the others.
+  # MultiStreamRW and MultiStreamWrite are the only benchmarks that support
+  # multiple VMs, so they have a slightly different calling convention than the
+  # others.
   for name, benchmark in [('api_multistream', MultiStreamRWBenchmark),
-                          ('api_multistream_writes', MultiStreamWriteBenchmark)]:
+                          ('api_multistream_writes',
+                           MultiStreamWriteBenchmark)]:
     if FLAGS.object_storage_scenario in {name, 'all'}:
       benchmark(results, metadata, vms, command_builder,
                 service, buckets[0], regional_bucket_name)
