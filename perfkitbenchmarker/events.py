@@ -75,3 +75,36 @@ The sample's metadata is mutable, and may be updated by the subscriber.
 
 Sender: None
 Payload: benchmark_spec (BenchmarkSpec), sample (dict).""")
+
+samples_modified = _events.signal('samples-modified', doc="""
+Called with list of samples and benchmark spec.
+
+Sender: the phase
+Payload: samples (list of sample.Sample)
+""")
+
+record_event = _events.signal('record-event', doc="""
+Signal sent when an event is recorded.
+
+Sender: None
+Payload: event (string), start_timestamp (float), end_timestamp (float),
+metadata (dict).""")
+
+
+def RegisterTracingEvents():
+  e = TracingEvents()
+  record_event.connect(e.Add, weak=False)
+
+
+class TracingEvents(object):
+  """Represents an event object."""
+
+  events = []
+
+  def Add(self, sender, event, start_timestamp, end_timestamp, metadata):
+    self.sender = sender
+    self.event = event
+    self.start_timestamp = start_timestamp
+    self.end_timestamp = end_timestamp
+    self.metadata = metadata
+    self.events.append(self)

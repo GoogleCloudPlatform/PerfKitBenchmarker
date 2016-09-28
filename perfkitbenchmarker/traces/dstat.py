@@ -16,8 +16,10 @@
 http://dag.wiee.rs/home-made/dstat/
 """
 
+import copy
 import functools
 import logging
+import numpy as np
 import os
 import posixpath
 import threading
@@ -25,7 +27,9 @@ import uuid
 
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import dstat
 
 flags.DEFINE_boolean('dstat', False,
                      'Run dstat (http://dag.wiee.rs/home-made/dstat/) '
@@ -38,6 +42,8 @@ flags.DEFINE_string('dstat_output', None,
                     'Output directory for dstat output. '
                     'Only applicable when --dstat is specified. '
                     'Default: run temporary directory.')
+flags.DEFINE_boolean('dstat_publish', False,
+                     'Whether or not publish dstat statistics.')
 
 
 class _DStatCollector(object):
@@ -59,6 +65,7 @@ class _DStatCollector(object):
     self._lock = threading.Lock()
     self._pids = {}
     self._file_names = {}
+    self._role_mapping = {}  # mapping from dstat file to vm role
 
     if not os.path.isdir(self.output_directory):
       raise IOError('dstat output directory does not exist: {0}'.format(
@@ -90,7 +97,7 @@ class _DStatCollector(object):
       self._pids[vm.name] = stdout.strip()
       self._file_names[vm.name] = dstat_file
 
-  def _StopOnVm(self, vm):
+  def _StopOnVm(self, vm, vm_rule):
     """Stop dstat on 'vm', copy the results to the run temporary directory."""
     if vm.name not in self._pids:
       logging.warn('No dstat PID for %s', vm.name)
@@ -103,6 +110,7 @@ class _DStatCollector(object):
     vm.RemoteCommand(cmd)
     try:
       vm.PullFile(self.output_directory, file_name)
+      self._role_mapping[vm_rule] = file_name
     except Exception:
       logging.exception('Failed fetching dstat result from %s.', vm.name)
 
@@ -115,7 +123,42 @@ class _DStatCollector(object):
 
   def Stop(self, sender, benchmark_spec):
     """Stop dstat on all VMs in 'benchmark_spec', fetch results."""
-    vm_util.RunThreaded(self._StopOnVm, benchmark_spec.vms)
+    args = []
+    for role, vms in benchmark_spec.vm_groups.iteritems():
+      args.extend([((
+          vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)])
+    vm_util.RunThreaded(self._StopOnVm, args)
+
+  def Analyze(self, sender, samples):
+    """Analyze dstat file and record samples."""
+
+    def _AnalyzeEvent(role, labels, out, event):
+      for idx, label in enumerate(labels[1:], 1):
+        cond = [(out[:, 0] > event.start_timestamp) & (
+            out[:, 0] < event.end_timestamp)]
+        choice = [out[:, idx]]
+        filtered = np.select(cond, choice)
+        avg = np.mean(filtered[np.nonzero(filtered)])
+        metadata = copy.deepcopy(event.metadata)
+        metadata['event'] = event.sender
+        metadata['sender'] = sender
+        metadata['vm_role'] = role
+        samples.append(sample.Sample(label, avg, '', metadata))
+        #logging.info(
+        #    'metric: %s, avg: %s, sender: %s, event: %s, metadata: %s',
+        #    label, avg, event.sender, event.event, event.metadata)
+
+    def _Analyze(role, file):
+      with open(os.path.join(self.output_directory,
+                             os.path.basename(file)), 'r') as f:
+        fp = iter(f)
+        labels, out = dstat.ParseCsvFile(fp)
+        vm_util.RunThreaded(
+            _AnalyzeEvent,
+            [((role, labels, out, e), {}) for e in events.TracingEvents.events])
+
+    vm_util.RunThreaded(
+        _Analyze, [((k, w), {}) for k, w in self._role_mapping.iteritems()])
 
 
 def Register(parsed_flags):
@@ -136,3 +179,6 @@ def Register(parsed_flags):
                               output_directory=output_directory)
   events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
   events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
+  if parsed_flags.dstat_publish:
+    events.samples_modified.connect(
+        collector.Analyze, events.RUN_PHASE, weak=False)
