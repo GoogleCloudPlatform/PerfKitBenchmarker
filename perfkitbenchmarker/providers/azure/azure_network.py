@@ -188,7 +188,7 @@ class AzureVirtualNetwork(resource.BaseResource):
 
     with self.vnet_lock:
       self.vnet_num = self.num_vnets
-      self.num_vnets += 1
+      self.__class__.num_vnets += 1
 
     # Allocate a different /16 in each region. This allows for 255
     # regions (should be enough for anyone), and 65536 VMs in each
@@ -265,9 +265,15 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     self.resource_group = GetResourceGroup()
     self.args = ['--nsg-name', self.name]
 
-    # Mapping of port -> rule name, used to deduplicate rules.
-    self.rules = {}
     self.rules_lock = threading.Lock()
+    # Mapping of port -> rule name, used to deduplicate rules. We
+    # expect duplicate rules because PKB will call AllowPort() for
+    # each VM on a subnet, but the rules are actually applied to the
+    # entire subnet.
+    self.rules = {}
+    # True if the special 'DenyAll' rule is present. If deny_all_mode
+    # is True, then rules should be empty.
+    self.deny_all_mode = False
 
   def _Create(self):
     vm_util.IssueCommand(
@@ -297,10 +303,21 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         self.resource_group.args +
         self.subnet.vnet.args)
 
+  def DeleteRule(self, rule):
+      vm_util.IssueRetryableCommand(
+          [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'delete',
+           '--quiet',
+           rule] +
+          self.resource_group.args +
+          self.args)
+
   def AllowPort(self, vm, port):
     with self.rules_lock:
       if port in self.rules:
         return
+      if self.deny_all_mode:
+        self.deny_all_mode = False
+        self.DeleteRule('DenyAll')
 
       rule_name = 'allow-%s' % port
       # priorities are between 100 and 4096.
@@ -317,23 +334,27 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         + self.args)
 
   def DisallowAllPorts(self):
-    for rule in self.rules.itervalues():
-      vm_util.IssueRetryableCommand(
-          [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'delete',
-           '--quiet',
-           rule] +
-          self.resource_group.args +
-          self.args)
+    with self.rules_lock:
+      if self.deny_all_mode:
+        return
+      self.deny_all_mode = True
 
-    # An NSG comes with some default rules, which we can't delete, so
-    # we create a new rule at higher priority than those.
-    vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create',
-         'DenyAll',
-         '--access', 'Deny',
-         '--priority', '4095']
-        + self.resource_group.args
-        + self.args)
+      for port, rule in self.rules.iteritems():
+        self.DeleteRule(rule)
+      # Can't remove rules from self.rules one by one because the
+      # iterator errors when the underlying dictionary is changed
+      # during iteration.
+      self.rules = {}
+
+      # An NSG comes with some default rules, which we can't delete,
+      # so we create a new rule at higher priority than those.
+      vm_util.IssueRetryableCommand(
+          [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create',
+           'DenyAll',
+           '--access', 'Deny',
+           '--priority', '4095']
+          + self.resource_group.args
+          + self.args)
 
 
 ALL_NSGS = set()

@@ -245,6 +245,16 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.internal_ip = self.nic.GetInternalIP()
     self.ip_address = self.public_ip.GetIPAddress()
 
+  def AddMetadata(self, **tags):
+    tag_string = ';'.join(
+        ['%s=%s' % (key, value)
+         for key, value in tags.iteritems()])
+    vm_util.IssueRetryableCommand(
+        [azure.AZURE_PATH, 'vm', 'set',
+         self.name,
+         '--tags', tag_string] +
+        self.resource_group.args)
+
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.
 
