@@ -811,7 +811,7 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
 
   output = [None] * num_streams
 
-  def _StartMultiStreamProcess(proc_idx):
+  def RunOneProcess(proc_idx):
     vm_idx = proc_idx // streams_per_vm
     logging.info('Running on VM %s.', vm_idx)
     cmd = command_builder.BuildCommand(
@@ -821,7 +821,7 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
 
   # Each process has a thread managing it.
   threads = [
-      threading.Thread(target=_StartMultiStreamProcess, args=(i,))
+      threading.Thread(target=RunOneProcess, args=(i,))
       for i in xrange(num_streams)]
   for thread in threads:
     thread.start()
