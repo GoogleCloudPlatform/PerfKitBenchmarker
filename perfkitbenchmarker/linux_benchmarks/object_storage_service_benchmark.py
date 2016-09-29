@@ -868,23 +868,23 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
   logging.info('Start time is %s', start_time)
 
   cmd_args = [
-    '--bucket=%s' % bucket_name,
-    '--objects_per_stream=%s' % (
-      FLAGS.object_storage_multistream_objects_per_stream),
-    '--num_streams=1',
-    '--start_time=%s' % start_time,
-    '--objects_written_file=%s' % objects_written_file]
-  
+      '--bucket=%s' % bucket_name,
+      '--objects_per_stream=%s' % (
+          FLAGS.object_storage_multistream_objects_per_stream),
+      '--num_streams=1',
+      '--start_time=%s' % start_time,
+      '--objects_written_file=%s' % objects_written_file]
+
   if operation == 'upload':
     cmd_args += [
-      '--object_sizes="%s"' % size_distribution,
-      '--object_naming_scheme=%s' % FLAGS.object_storage_object_naming_scheme,
-      '--scenario=MultiStreamWrite']
+        '--object_sizes="%s"' % size_distribution,
+        '--object_naming_scheme=%s' % FLAGS.object_storage_object_naming_scheme,
+        '--scenario=MultiStreamWrite']
   elif operation == 'download':
     cmd_args += ['--scenario=MultiStreamRead']
   else:
     raise Exception('Value of operation must be \'upload\' or \'download\'.'
-                    'Value is: \''+operation+'\'')
+                    'Value is: \'' + operation + '\'')
 
   output = _RunMultiStreamProcesses(vms, command_builder, cmd_args,
                                     streams_per_vm, num_streams)
