@@ -20,3 +20,4 @@ futures>=3.0.3
 PyYAML==3.11
 pint>=0.7
 numpy
+functools32
