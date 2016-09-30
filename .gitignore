@@ -4,5 +4,6 @@
 /setuptools-*.egg
 /setuptools*.zip
 *.py[co]
+*.swp
 /perfkitbenchmarker.egg-info
 /.tox
