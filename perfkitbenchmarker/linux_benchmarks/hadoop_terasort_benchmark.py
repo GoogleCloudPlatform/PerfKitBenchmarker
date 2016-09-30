@@ -46,7 +46,7 @@ BENCHMARK_CONFIG = """
 hadoop_terasort:
   description: Run the Apache Hadoop MapReduce Terasort benchmark on a cluster.
   spark_service:
-    service_type: managed
+    service_type: pkb_managed
     worker_group:
       vm_spec:
         GCP:
@@ -71,7 +71,7 @@ flags.DEFINE_string('terasort_sorted_dir', 'tera_sort_dir',
                     'Location for the sorted data. TeraSort writes to here, '
                     'TeraValidate reads from here.')
 flags.DEFINE_string('terasort_validate_dir', 'tera_validate_dir',
-                    'Output of the TeraValidate command')
+                    'Location for the output of the TeraValidate command')
 
 flags.DEFINE_bool('terasort_append_timestamp', True, 'Append a timestamp to '
                   'the directories given by terasort_unsorted_dir, '

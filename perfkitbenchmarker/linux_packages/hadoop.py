@@ -76,8 +76,6 @@ def AptInstall(vm):
 # TODO: revisit memory fraction.
 def _RenderConfig(vm, master_ip, worker_ips, memory_fraction=0.9):
   yarn_memory_mb = int((vm.total_memory_kb / 1024) * memory_fraction)
-  vm.RemoteCommand('ls -l /')
-  vm.RemoteCommand('cd ; pwd')
   if vm.scratch_disks:
     scratch_dir = posixpath.join(vm.GetScratchDir(), 'hadoop')
   else:

@@ -82,7 +82,7 @@ class GcpDataproc(spark_service.BaseSparkService):
       flag_name = group_type + '-machine-type'
       cmd.flags[flag_name] = group_spec.vm_spec.machine_type
 
-      if group_spec.vm_spec.num_local_ssds > 0:
+      if group_spec.vm_spec.num_local_ssds:
         ssd_flag = 'num-{0}-local-ssds'.format(group_type)
         cmd.flags[ssd_flag] = group_spec.vm_spec.num_local_ssds
 
@@ -96,13 +96,15 @@ class GcpDataproc(spark_service.BaseSparkService):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
                              self.cluster_id)
+    cmd.flags['zone'] = []
     cmd.Issue()
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
                              self.cluster_id)
-    stdout, stderr, retcode = cmd.Issue()
+    cmd.flags['zone'] = []
+    _, _, retcode = cmd.Issue()
     return retcode == 0
 
 
@@ -111,6 +113,7 @@ class GcpDataproc(spark_service.BaseSparkService):
                 job_type=spark_service.SPARK_JOB_TYPE):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
+    cmd.flags['zone'] = []
 
     if classname:
       cmd.flags['jars'] = jarfile

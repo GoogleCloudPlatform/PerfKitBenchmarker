@@ -70,15 +70,15 @@ class AwsEMR(spark_service.BaseSparkService):
     leader_machine_type = self.spec.master_group.vm_spec.machine_type
     self.cmd_prefix = util.AWS_PREFIX
 
-    if self.spec.zone:
-      region = util.GetRegionFromZone(self.spec.zone)
+    if self.zone:
+      region = util.GetRegionFromZone(self.zone)
       self.cmd_prefix += ['--region', region]
 
     # Certain machine types require subnets.
     if (self.spec.static_cluster_id is None and
         (worker_machine_type[0:2] in NEEDS_SUBNET or
          leader_machine_type[0:2] in NEEDS_SUBNET)):
-      self.network = aws_network.AwsNetwork.GetNetwork(self.spec)
+      self.network = aws_network.AwsNetwork.GetNetwork(self)
     else:
       self.network = None
     self.bucket_to_delete = None
@@ -151,7 +151,7 @@ class AwsEMR(spark_service.BaseSparkService):
     for group in manager_sg, worker_sg:
       cmd = self.cmd_prefix + ['ec2', 'delete-security-group',
                                '--group-id=' + group]
-      vm_util.IssueCommand(cmd)
+      vm_util.IssueRetryableCommand(cmd)
 
   def _Delete(self):
     """Deletes the cluster."""

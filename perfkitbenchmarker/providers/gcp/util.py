@@ -14,7 +14,7 @@
 """Utilities for working with Google Cloud Platform resources."""
 
 from collections import OrderedDict
-
+import logging
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
@@ -65,6 +65,7 @@ class GcloudCommand(object):
         cmd.append(flag_name_str)
       else:
         values_iterable = values if isinstance(values, list) else [values]
+        logging.info('flag string {0}, value is {1}'.format(flag_name_str, str(values)))
         for value in values_iterable:
           cmd.append(flag_name_str)
           cmd.append(str(value))

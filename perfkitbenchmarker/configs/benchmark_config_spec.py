@@ -179,8 +179,6 @@ class _SparkServiceSpec(spec.BaseSpec):
       cluster.
     worker_group: Vm group spec for workers.
     master_group: Vm group spec for master
-    cloud: cloud to use.
-    project: project to use.
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
@@ -208,13 +206,7 @@ class _SparkServiceSpec(spec.BaseSpec):
         'worker_group': (_VmGroupSpecDecoder, {}),
         'master_group': (_VmGroupSpecDecoder,
                          {'default': None,
-                          'none_ok': True}),
-        'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS}),
-        'zone': (option_decoders.StringDecoder, {'none_ok': True,
-                                                 'default': None}),
-        'project': (option_decoders.StringDecoder, {'default': None,
-                                                    'none_ok': True})})
+                          'none_ok': True})})
     return result
 
   @classmethod
@@ -230,15 +222,9 @@ class _SparkServiceSpec(spec.BaseSpec):
           provided config values.
     """
     super(_SparkServiceSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['cloud'].present or 'cloud' not in config_values:
-      config_values['cloud'] = flag_values.cloud
-    if flag_values['project'].present or 'project' not in config_values:
-      config_values['project'] = flag_values.project
     if flag_values['spark_static_cluster_id'].present:
       config_values['static_cluster_id'] = (
           flag_values.spark_static_cluster_id)
-    if flag_values['zones'].present:
-      config_values['zone'] = flag_values.zones[0]
 
 
 class _VmGroupSpec(spec.BaseSpec):
@@ -387,19 +373,12 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    logging.info('value = ' + str(value))
     vm_group_config = super(_VmGroupSpecDecoder, self).Decode(
         value, component_full_name, flag_values)
-    logging.info('vm_group_config = ' + str(value))
     result = _VmGroupSpec(self._GetOptionFullName(component_full_name),
                           flag_values=flag_values,
                           **vm_group_config)
-    logging.info('vm count is ' + str(result.vm_count))
-    logging.info('vm spec is ' + str(result.vm_spec))
-    logging.info('vm spec machine type is ' + str(result.vm_spec.machine_type))
     return result
-
-
 
 
 class _SparkServiceDecoder(option_decoders.TypeVerifier):
@@ -426,7 +405,6 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
     result = _SparkServiceSpec(self._GetOptionFullName(component_full_name),
                                flag_values, **spark_service_config)
     return result
-
 
 
 class BenchmarkConfigSpec(spec.BaseSpec):

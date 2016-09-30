@@ -232,17 +232,37 @@ class BenchmarkSpec(object):
 
       self.vm_groups[group_name] = vms
       self.vms.extend(vms)
+    # If we have a spark service, it needs to access the master_group and
+    # the worker group.
+    if (self.config.spark_service and
+        self.config.spark_service.service_type == spark_service.PKB_MANAGED):
+      for group_name in 'master_group', 'worker_group':
+        self.spark_service.vms[group_name] = self.vm_groups[group_name]
+
 
   def ConstructSparkService(self):
+    """Create the spark_service object and create groups for its vms."""
     if self.config.spark_service is None:
       return
 
-    providers.LoadProvider(self.config.spark_service.cloud)
-    spark_service_spec = self.config.spark_service
-    service_type = spark_service_spec.service_type
+    spark_spec = self.config.spark_service
+    # Worker group is required, master group is optional
+    cloud = spark_spec.worker_group.cloud
+    if spark_spec.master_group:
+      cloud = spark_spec.master_group.cloud
+    providers.LoadProvider(cloud)
+    service_type = spark_spec.service_type
     spark_service_class = spark_service.GetSparkServiceClass(
-        spark_service_spec.cloud, service_type)
-    self.spark_service = spark_service_class(self)
+        cloud, service_type)
+    self.spark_service = spark_service_class(spark_spec)
+    # If this is Pkb managed, the benchmark spec needs to adopt vms.
+    if service_type == spark_service.PKB_MANAGED:
+      for name, spec in [('master_group', spark_spec.worker_group),
+                         ('worker_group', spark_spec.master_group)]:
+        if name in self.config.vm_groups:
+          raise Exception('Cannot have a vm group {0} with a {1} spark '
+                          'service'.format(name, spark_service.PKB_MANAGED))
+        self.config.vm_groups[name] = spec
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]

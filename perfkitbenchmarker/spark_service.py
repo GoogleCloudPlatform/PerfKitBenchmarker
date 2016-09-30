@@ -28,6 +28,7 @@ For more on Apache Spark: http://spark.apache.org/
 import abc
 import copy
 import datetime
+import logging
 import posixpath
 
 from perfkitbenchmarker import flags
@@ -56,6 +57,7 @@ SPARK_VM_GROUPS = ('master_group', 'worker_group')
 # This is used for error messages.
 
 _SPARK_SERVICE_REGISTRY = {}
+FLAGS = flags.FLAGS
 
 
 def GetSparkServiceClass(cloud, service_type):
@@ -93,14 +95,12 @@ class BaseSparkService(resource.BaseResource):
   HADOOP_SAMPLE_LOCATION = ('file:///usr/lib/hadoop-mapreduce/'
                             'hadoop-mapreduce-examples.jar')
 
-  def __init__(self, benchmark_spec):
+  def __init__(self, spark_service_spec):
     """Initialize the Apache Spark Service object.
 
     Args:
       spark_service_spec: spec of the spark service.
     """
-    self.benchmark_spec = benchmark_spec
-    spark_service_spec = benchmark_spec.config.spark_service
     is_user_managed = spark_service_spec.static_cluster_id is not None
     super(BaseSparkService, self).__init__(user_managed=is_user_managed)
     self.spec = spark_service_spec
@@ -110,8 +110,13 @@ class BaseSparkService(resource.BaseResource):
       self.spec.master_group = copy.copy(self.spec.worker_group)
       self.spec.master_group.vm_count = 1
     self.cluster_id = spark_service_spec.static_cluster_id
-    self.project = spark_service_spec.project
-    self.zone = spark_service_spec.zone
+    if spark_service_spec.master_group.vm_spec.zone:
+      self.zone = spark_service_spec.master_group.vm_spec.zone
+    elif FLAGS.zones:
+      self.zone = FLAGS.zones[0]
+    else:
+      self.zone = None
+    self.project = FLAGS.project
 
   @abc.abstractmethod
   def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
@@ -174,20 +179,11 @@ class PkbSparkService(BaseSparkService):
     super(PkbSparkService, self).__init__(spark_service_spec)
     # construct the VMs.
     self.vms = {}
-    for group_name, group_spec in [('worker_group', self.spec.worker_group),
-                                   ('master_group', self.spec.master_group)]:
-      self.vms[group_name] = self.benchmark_spec.ConstructVirtualMachineGroup(
-          group_name, group_spec)
 
   def _Create(self):
     """Create an Apache Spark cluster."""
 
     sshable_vm_groups = {}
-    for group_name in SPARK_VM_GROUPS:
-      vm_util.RunThreaded(self.benchmark_spec.PrepareVm, self.vms[group_name])
-      sshable_vm_groups[group_name] = self.vms[group_name]
-    vm_util.GenerateSSHConfig({}, sshable_vm_groups)
-
     # need to fix this to install spark
     def InstallHadoop(vm):
       vm.Install('hadoop')
