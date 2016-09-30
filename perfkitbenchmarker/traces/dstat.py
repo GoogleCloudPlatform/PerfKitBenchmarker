@@ -23,6 +23,7 @@ import math
 import numpy as np
 import os
 import posixpath
+import time
 import threading
 import uuid
 
@@ -67,6 +68,7 @@ class _DStatCollector(object):
     self._pids = {}
     self._file_names = {}
     self._role_mapping = {}  # mapping from dstat file to vm role
+    self._start_time = 0
 
     if not os.path.isdir(self.output_directory):
       raise IOError('dstat output directory does not exist: {0}'.format(
@@ -121,9 +123,14 @@ class _DStatCollector(object):
                                      str(uuid.uuid4())[:8])
     start_on_vm = functools.partial(self._StartOnVm, suffix=suffix)
     vm_util.RunThreaded(start_on_vm, benchmark_spec.vms)
+    self._start_time = time.time()
 
   def Stop(self, sender, benchmark_spec):
     """Stop dstat on all VMs in 'benchmark_spec', fetch results."""
+    events.record_event.send(sender, event='dstat',
+                             start_timestamp=self._start_time,
+                             end_timestamp=time.time(),
+                             metadata={})
     args = []
     for role, vms in benchmark_spec.vm_groups.iteritems():
       args.extend([((
