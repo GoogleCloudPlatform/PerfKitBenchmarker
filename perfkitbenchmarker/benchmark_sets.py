@@ -211,12 +211,14 @@ def GetBenchmarksFromFlags():
   # create a list of module, config tuples to return
   benchmark_config_list = []
   for benchmark_name in benchmark_names:
-    if benchmark_name in valid_benchmarks:
-      benchmark_module = valid_benchmarks[benchmark_name]
-      user_config = user_config.get(benchmark_name, {})
-      benchmark_config_list.append((benchmark_module, user_config))
-    else:
+    benchmark_config = user_config.get(benchmark_name, {})
+    benchmark_name = benchmark_config.get('name', benchmark_name)
+    benchmark_module = valid_benchmarks.get(benchmark_name)
+
+    if benchmark_module is None:
       raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
                        (benchmark_name, FLAGS.os_type))
+
+    benchmark_config_list.append((benchmark_module, benchmark_config))
 
   return benchmark_config_list
