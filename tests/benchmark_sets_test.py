@@ -16,11 +16,19 @@
 
 import unittest
 from mock import patch
+import yaml
 
 # This import to ensure required FLAGS are defined.
 from perfkitbenchmarker import pkb  # NOQA
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import benchmark_sets
+
+USER_CONFIG = """
+internal_iprf:
+  name: iperf
+  flags:
+    ip_addresses: INTERNAL
+"""
 
 
 class BenchmarkSetsTestCase(unittest.TestCase):
@@ -147,3 +155,11 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # make sure invalid benchmark names and sets cause a failure
     self.mock_flags.benchmarks = ['standard_set', 'iperf_invalid_name']
     self.assertRaises(ValueError, benchmark_sets.GetBenchmarksFromFlags)
+
+  def testConfigNames(self):
+    self.mock_flags.benchmarks = ['internal_iprf', 'netperf']
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(USER_CONFIG)):
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertTrue(self._ContainsModule('iperf', benchmark_tuple_list))
+    self.assertTrue(self._ContainsModule('netperf', benchmark_tuple_list))

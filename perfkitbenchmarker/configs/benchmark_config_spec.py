@@ -395,6 +395,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
 
   Attributes:
     description: None or string. Description of the benchmark to run.
+    name: Optional. The name of the benchmark
     flags: flags.FlagValues. Values to use for each flag while executing the
         benchmark.
     vm_groups: dict mapping VM group name string to _VmGroupSpec. Configurable
@@ -445,6 +446,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     result = super(BenchmarkConfigSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'description': (option_decoders.StringDecoder, {'default': None}),
+        'name': (option_decoders.StringDecoder, {'default': None}),
         'flags': (_FlagsDecoder, {}),
         'vm_groups': (_VmGroupsDecoder, {'default': {}}),
         'spark_service': (_SparkServiceDecoder, {'default': None})})
