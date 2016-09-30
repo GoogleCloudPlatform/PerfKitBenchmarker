@@ -191,6 +191,12 @@ flags.DEFINE_integer(
     'PKB will run/re-run the run stage of each benchmark until it has spent '
     'at least this many seconds. It defaults to 0, so benchmarks will only '
     'be run once unless some other value is specified.')
+flags.DEFINE_integer(
+    'run_stage_retries', 0,
+    'The number of allowable consecutive failures during the run stage. After '
+    'this number of failures any exceptions will cause benchmark termination. '
+    'If run_stage_time is exceeded, the run stage will not be retried even if '
+    'the number of failures is less than the value of this flag.')
 
 
 # Support for using a proxy in the cloud environment.
@@ -376,12 +382,20 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
   """
   deadline = time.time() + FLAGS.run_stage_time
   run_number = 0
+  consecutive_failures = 0
   while True:
+    samples = []
     logging.info('Running benchmark %s', name)
     events.before_phase.send(events.RUN_PHASE, benchmark_spec=spec)
     try:
       with timer.Measure('Benchmark Run'):
         samples = benchmark.Run(spec)
+    except Exception:
+      consecutive_failures += 1
+      if consecutive_failures > FLAGS.run_stage_retries:
+        raise
+    else:
+      consecutive_failures = 0
     finally:
       events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
     if FLAGS.run_stage_time:
