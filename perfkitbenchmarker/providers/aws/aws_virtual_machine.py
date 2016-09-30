@@ -203,7 +203,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   CLOUD = providers.AWS
   IMAGE_NAME_FILTER = None
-  DEFAULT_ROOT_DISK_TYPE = 'standard'
+  DEFAULT_ROOT_DISK_TYPE = 'gp2'
 
   _lock = threading.Lock()
   imported_keyfile_set = set()
@@ -226,6 +226,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
+    self.client_token = str(uuid.uuid4())
     self.host = None
     self.id = None
 
@@ -377,6 +378,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--region=%s' % self.region,
         '--subnet-id=%s' % self.network.subnet.id,
         '--associate-public-ip-address',
+        '--client-token=%s' % self.client_token,
         '--image-id=%s' % self.image,
         '--instance-type=%s' % self.machine_type,
         '--key-name=%s' % 'perfkit-key-%s' % FLAGS.run_uri]
@@ -386,7 +388,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.append('--placement=%s' % placement)
     if self.user_data:
       create_cmd.append('--user-data=%s' % self.user_data)
-    stdout, stderr, _ = vm_util.IssueCommand(create_cmd)
+    _, stderr, _ = vm_util.IssueCommand(create_cmd)
 
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       logging.warning(
@@ -398,10 +400,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           self.host_list.append(host)
           host.Create()
         self.host = self.host_list[-1]
+      self.client_token = str(uuid.uuid4())
       raise errors.Resource.RetryableCreationError()
-
-    response = json.loads(stdout)
-    self.id = response['Instances'][0]['InstanceId']
 
   def _Delete(self):
     """Delete a VM instance."""
@@ -419,7 +419,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'ec2',
         'describe-instances',
         '--region=%s' % self.region,
-        '--filter=Name=instance-id,Values=%s' % self.id]
+        '--filter=Name=client-token,Values=%s' % self.client_token]
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     reservations = response['Reservations']
@@ -429,6 +429,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     instances = reservations[0]['Instances']
     assert len(instances) == 1, 'Wrong number of instances.'
     status = instances[0]['State']['Name']
+    self.id = instances[0]['InstanceId']
     assert status in INSTANCE_KNOWN_STATUSES, status
     return status in INSTANCE_EXISTS_STATUSES
 
@@ -497,14 +498,17 @@ class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.RhelMixin):
-  pass
+  IMAGE_NAME_FILTER = 'amzn-ami-*-x86_64-*'
+
+  def __init__(self, vm_spec):
+    super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
+    self.user_name = 'ec2-user'
 
 
 class WindowsAwsVirtualMachine(AwsVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
 
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
-  DEFAULT_ROOT_DISK_TYPE = 'gp2'
 
   def __init__(self, vm_spec):
     super(WindowsAwsVirtualMachine, self).__init__(vm_spec)
