@@ -19,6 +19,7 @@ http://dag.wiee.rs/home-made/dstat/
 import copy
 import functools
 import logging
+import math
 import numpy as np
 import os
 import posixpath
@@ -139,14 +140,13 @@ class _DStatCollector(object):
         choice = [out[:, idx]]
         filtered = np.select(cond, choice)
         avg = np.mean(filtered[np.nonzero(filtered)])
+        if math.isnan(avg):
+          avg = 0
         metadata = copy.deepcopy(event.metadata)
         metadata['event'] = event.sender
         metadata['sender'] = sender
         metadata['vm_role'] = role
         samples.append(sample.Sample(label, avg, '', metadata))
-        #logging.info(
-        #    'metric: %s, avg: %s, sender: %s, event: %s, metadata: %s',
-        #    label, avg, event.sender, event.event, event.metadata)
 
     def _Analyze(role, file):
       with open(os.path.join(self.output_directory,
