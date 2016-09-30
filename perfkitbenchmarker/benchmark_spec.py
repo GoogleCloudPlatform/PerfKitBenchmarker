@@ -257,8 +257,8 @@ class BenchmarkSpec(object):
     self.spark_service = spark_service_class(spark_spec)
     # If this is Pkb managed, the benchmark spec needs to adopt vms.
     if service_type == spark_service.PKB_MANAGED:
-      for name, spec in [('master_group', spark_spec.worker_group),
-                         ('worker_group', spark_spec.master_group)]:
+      for name, spec in [('master_group', spark_spec.master_group),
+                         ('worker_group', spark_spec.worker_group)]:
         if name in self.config.vm_groups:
           raise Exception('Cannot have a vm group {0} with a {1} spark '
                           'service'.format(name, spark_service.PKB_MANAGED))

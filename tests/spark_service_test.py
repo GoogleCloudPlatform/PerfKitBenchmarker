@@ -37,15 +37,16 @@ UID = 'name0'
 SERVICE_CONFIG = """
 name:
   spark_service:
-    zone: us-west-1
     service_type: managed
     worker_group:
       vm_spec:
         GCP:
           machine_type: n1-standard-4
           boot_disk_size: 500
+          zone: us-west1-a
         AWS:
           machine_type: m4.xlarge
+          zone: us-west-1
       vm_count: 4
 """
 
@@ -90,8 +91,8 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
 
   def testDataprocConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(SERVICE_CONFIG)
-    spec.ConstructVirtualMachines()
     spec.ConstructSparkService()
+    spec.ConstructVirtualMachines()
     self.assertTrue(hasattr(spec, 'spark_service'))
     self.assertTrue(spec.spark_service is not None)
     self.assertEqual(len(spec.vms), 0)
@@ -110,8 +111,8 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
     self._mocked_flags.zones = 'us-west-2'
     with mock_flags.PatchFlags(self._mocked_flags):
       spec = self._CreateBenchmarkSpecFromYaml(SERVICE_CONFIG)
-      spec.ConstructVirtualMachines()
       spec.ConstructSparkService()
+      spec.ConstructVirtualMachines()
       self.assertTrue(hasattr(spec, 'spark_service'))
       self.assertTrue(spec.spark_service is not None)
       self.assertEqual(len(spec.vms), 0)
@@ -131,10 +132,11 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
                      str(spec.config.spark_service.__dict__))
     self.assertEqual(spec.config.spark_service.service_type,
                      spark_service.PKB_MANAGED)
-
-    spec.ConstructVirtualMachines()
-    self.assertEqual(len(spec.vms), 0)
     spec.ConstructSparkService()
+    spec.ConstructVirtualMachines()
+    self.assertEqual(len(spec.vms), 3)
+    self.assertEqual(len(spec.vm_groups['master_group']), 1)
+    self.assertEqual(len(spec.vm_groups['worker_group']), 2)
     self.assertEqual(len(spec.spark_service.vms['worker_group']), 2)
     self.assertEqual(len(spec.spark_service.vms['master_group']), 1)
     self.assertTrue(isinstance(spec.spark_service,

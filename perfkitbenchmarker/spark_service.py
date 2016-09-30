@@ -28,7 +28,6 @@ For more on Apache Spark: http://spark.apache.org/
 import abc
 import copy
 import datetime
-import logging
 import posixpath
 
 from perfkitbenchmarker import flags
@@ -183,7 +182,6 @@ class PkbSparkService(BaseSparkService):
   def _Create(self):
     """Create an Apache Spark cluster."""
 
-    sshable_vm_groups = {}
     # need to fix this to install spark
     def InstallHadoop(vm):
       vm.Install('hadoop')
