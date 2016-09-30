@@ -377,6 +377,7 @@ def ParseTimeCommandResult(command_result):
 
 def ShouldRunOnExternalIpAddress():
   """Returns whether a test should be run on an instance's external IP."""
+
   return FLAGS.ip_addresses in (IpAddressSubset.EXTERNAL,
                                 IpAddressSubset.BOTH,
                                 IpAddressSubset.REACHABLE)

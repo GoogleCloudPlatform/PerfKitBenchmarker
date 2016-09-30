@@ -20,8 +20,18 @@ This benchmark runs ping using the internal ips of vms in the same zone.
 import logging
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import flags
+
 import re
 
+flags.DEFINE_enum('ping_net_interface_type', 'internal_ip',
+                  ['internal_ip', 'external_ip', 'both'],
+                  'runs ping test using the internal or external IP of the vms'
+                  'in the same or across different zones. note AWS / Azure does'
+                  'not support natively support a single virtual network  '
+                  'spanning across zones.')
+
+FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'ping'
 BENCHMARK_CONFIG = """
@@ -67,10 +77,17 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   results = []
   for sending_vm, receiving_vm in vms, reversed(vms):
-    results = results + _RunPing(sending_vm,
-                                 receiving_vm,
-                                 receiving_vm.internal_ip,
-                                 'internal')
+    if FLAGS.ping_net_interface_type in ('external_ip', 'both'):
+        results = results + _RunPing(sending_vm,
+                                     receiving_vm,
+                                     receiving_vm.ip_address,
+                                     'external')
+    if FLAGS.ping_net_interface_type in ('internal_ip', 'both'):
+        results = results + _RunPing(sending_vm,
+                                     receiving_vm,
+                                     receiving_vm.internal_ip,
+                                     'internal')
+
   return results
 
 
