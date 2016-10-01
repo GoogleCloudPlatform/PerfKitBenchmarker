@@ -390,10 +390,13 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
     try:
       with timer.Measure('Benchmark Run'):
         samples = benchmark.Run(spec)
-    except Exception:
+    except Exception as e:
       consecutive_failures += 1
       if consecutive_failures > FLAGS.run_stage_retries:
-        raise
+        raise e
+      logging.error('Run failed (consecutive_failures=%s); retrying. '
+                    'Exception that caused failure: %s',
+                    consecutive_failures, e)
     else:
       consecutive_failures = 0
     finally:
