@@ -58,9 +58,7 @@ def ParseCsvFile(fp):
             len(categories), len(labels), categories, labels))
 
   # Generate new column names
-  for i, label in enumerate(labels):
-    category = categories[i]
-    labels[i] = category + '__' + label
+  labels = ['%s__%s' % x for x in zip(labels, categories)]
 
   data = []
   for i, row in enumerate(reader):
