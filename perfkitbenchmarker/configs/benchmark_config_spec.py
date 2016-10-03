@@ -224,6 +224,12 @@ class _SparkServiceSpec(spec.BaseSpec):
     if flag_values['spark_static_cluster_id'].present:
       config_values['static_cluster_id'] = (
           flag_values.spark_static_cluster_id)
+    if flag_values['zones'].present:
+      for group in ('master_group', 'worker_group'):
+        if group in config_values:
+          for cloud in config_values[group]['vm_spec']:
+            config_values[group]['vm_spec'][cloud]['zone'] = (
+                flag_values.zones[0])
 
 
 class _VmGroupSpec(spec.BaseSpec):
@@ -349,7 +355,6 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
     return result
 
 
-
 class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
   """Validates a single VmGroupSpec dictionary."""
 
@@ -374,10 +379,9 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
     """
     vm_group_config = super(_VmGroupSpecDecoder, self).Decode(
         value, component_full_name, flag_values)
-    result = _VmGroupSpec(self._GetOptionFullName(component_full_name),
-                          flag_values=flag_values,
-                          **vm_group_config)
-    return result
+    return _VmGroupSpec(self._GetOptionFullName(component_full_name),
+                        flag_values=flag_values,
+                        **vm_group_config)
 
 
 class _SparkServiceDecoder(option_decoders.TypeVerifier):

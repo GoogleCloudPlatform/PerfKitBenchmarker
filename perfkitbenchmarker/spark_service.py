@@ -109,13 +109,9 @@ class BaseSparkService(resource.BaseResource):
       self.spec.master_group = copy.copy(self.spec.worker_group)
       self.spec.master_group.vm_count = 1
     self.cluster_id = spark_service_spec.static_cluster_id
-    if spark_service_spec.master_group.vm_spec.zone:
-      self.zone = spark_service_spec.master_group.vm_spec.zone
-    elif FLAGS.zones:
-      self.zone = FLAGS.zones[0]
-    else:
-      self.zone = None
-    self.project = FLAGS.project
+    assert (spark_service_spec.master_group.vm_spec.zone ==
+            spark_service_spec.worker_group.vm_spec.zone)
+    self.zone = spark_service_spec.master_group.vm_spec.zone
 
   @abc.abstractmethod
   def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
@@ -176,7 +172,6 @@ class PkbSparkService(BaseSparkService):
 
   def __init__(self, spark_service_spec):
     super(PkbSparkService, self).__init__(spark_service_spec)
-    # construct the VMs.
     self.vms = {}
 
   def _Create(self):
@@ -194,10 +189,7 @@ class PkbSparkService(BaseSparkService):
 
 
   def _Delete(self):
-    """Delete the vms."""
-    for group_name in SPARK_VM_GROUPS:
-      for vm in self.vms[group_name]:
-        vm.Delete()
+    pass
 
   def SubmitJob(self, jar_file, class_name, job_poll_interval=None,
                 job_stdout_file=None, job_arguments=None,

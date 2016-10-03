@@ -21,6 +21,7 @@ import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
 
@@ -45,6 +46,40 @@ WORKER_SG = 'EmrManagedSlaveSecurityGroup'
 
 # Certain machine types require a subnet.
 NEEDS_SUBNET = ['m4', 'c4']
+
+
+class AwsSecurityGroup(resource.BaseResource):
+  """Object representing a AWS Security Group.
+
+  A security group is created automatically when an Amazon EMR cluster
+  is deleted.  It is not deleted automatically, and the subnet and VPN
+  cannot be deleted until the security group is deleted.
+
+  Because of this, there's no _Create method, only a _Delete and an
+  _Exists method.
+  """
+
+  def __init__(self, cmd_prefix, group_id):
+    super(AwsSecurityGroup, self).__init__()
+    self.created = True
+    self.group_id = group_id
+    self.cmd_prefix = cmd_prefix
+
+  def _Delete(self):
+    cmd = self.cmd_prefix + ['ec2', 'delete-security-group',
+                             '--group-id=' + self.group_id]
+    vm_util.IssueCommand(cmd)
+
+  def _Exists(self):
+    cmd = self.cmd_prefix + ['ec2', 'describe-security-group',
+                             '--group-id=' + self.group_id]
+    _, _, retcode = vm_util.IssueCommand(cmd)
+    # if the security group doesn't exist, the describe command gives an error.
+    return retcode == 0
+
+  def _Create(self):
+    if not self.created:
+      raise NotImplemented()
 
 
 class AwsEMR(spark_service.BaseSparkService):
@@ -78,6 +113,8 @@ class AwsEMR(spark_service.BaseSparkService):
     if (self.spec.static_cluster_id is None and
         (worker_machine_type[0:2] in NEEDS_SUBNET or
          leader_machine_type[0:2] in NEEDS_SUBNET)):
+      # GetNetwork is supposed to take a VM, but all it uses
+      # from the VM is the zone attribute, which self has.
       self.network = aws_network.AwsNetwork.GetNetwork(self)
     else:
       self.network = None
@@ -149,9 +186,8 @@ class AwsEMR(spark_service.BaseSparkService):
 
     # Now we need to delete the manager, then the worker.
     for group in manager_sg, worker_sg:
-      cmd = self.cmd_prefix + ['ec2', 'delete-security-group',
-                               '--group-id=' + group]
-      vm_util.IssueRetryableCommand(cmd)
+      sec_group = AwsSecurityGroup(self.cmd_prefix, group)
+      sec_group.Delete()
 
   def _Delete(self):
     """Deletes the cluster."""

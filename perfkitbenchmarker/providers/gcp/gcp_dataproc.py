@@ -36,11 +36,15 @@ class GcpDataproc(spark_service.BaseSparkService):
 
   Attributes:
     cluster_id: ID of the cluster.
-    project: Enclosing project for the cluster.
+    project: ID of the project.
   """
 
   CLOUD = providers.GCP
   SERVICE_NAME = 'dataproc'
+
+  def __init__(self, spark_service_spec):
+    super(GcpDataproc, self).__init__(spark_service_spec)
+    self.project = self.spec.master_group.vm_spec.project
 
   @staticmethod
   def _GetStats(stdout):
@@ -96,6 +100,8 @@ class GcpDataproc(spark_service.BaseSparkService):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
                              self.cluster_id)
+    # If we don't put this here, zone is automatically added, which
+    # breaks the dataproc clusters delete
     cmd.flags['zone'] = []
     cmd.Issue()
 
@@ -103,6 +109,8 @@ class GcpDataproc(spark_service.BaseSparkService):
     """Check to see whether the cluster exists."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
                              self.cluster_id)
+    # If we don't put this here, zone is automatically added to
+    # the command, which breaks dataproc clusters describe
     cmd.flags['zone'] = []
     _, _, retcode = cmd.Issue()
     return retcode == 0
@@ -113,6 +121,8 @@ class GcpDataproc(spark_service.BaseSparkService):
                 job_type=spark_service.SPARK_JOB_TYPE):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
+    # If we don't put this here, zone is auotmatically added to the command
+    # which breaks dataproc jobs submit
     cmd.flags['zone'] = []
 
     if classname:
