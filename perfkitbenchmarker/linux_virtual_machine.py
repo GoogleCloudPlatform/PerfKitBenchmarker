@@ -914,6 +914,11 @@ class ContainerizedDebianMixin(DebianMixin):
     # Escapes bash sequences
     command = command.replace("'", r"'\''")
 
+    # The base image, ubuntu-latest, doesn't have 'sudo'. Also 'sudo' is not
+    # needed because the container starts as root.
+    if command.startswith('sudo '):
+      command = command[5:]
+
     logging.info('Docker running: %s' % command)
     command = "sudo docker exec %s bash -c '%s'" % (self.docker_id, command)
     return self.RemoteHostCommand(command, should_log, retries,
