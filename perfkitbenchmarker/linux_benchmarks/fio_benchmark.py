@@ -133,8 +133,8 @@ flags.DEFINE_integer('fio_runtime', 600,
                      'The number of seconds to run each fio job for.',
                      lower_bound=1)
 flags.DEFINE_list('fio_parameters', [],
-                  'Parameters to apply to all fio jobs. Each member of the '
-                  'list should be of the form "param=value".')
+                  'Parameters to apply to all PKB generated fio jobs. Each '
+                  'member of the list should be of the form "param=value".')
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -200,6 +200,9 @@ do_verify=0
 verify_fatal=0
 randrepeat=0
 group_reporting=1
+{%- for parameter in parameters %}
+{{parameter}}
+{%- endfor %}
 {%- for scenario in scenarios %}
 {%- for iodepth in iodepths %}
 {%- for numjob in numjobs %}
@@ -211,9 +214,6 @@ blocksize={{scenario['blocksize']}}
 iodepth={{iodepth}}
 size={{size}}
 numjobs={{numjob}}
-{%- for parameter in parameters %}
-{{parameter}}
-{%- endfor %}
 {%- endfor %}
 {%- endfor %}
 {%- endfor %}
