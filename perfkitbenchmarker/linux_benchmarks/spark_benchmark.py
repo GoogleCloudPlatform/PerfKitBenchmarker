@@ -72,7 +72,6 @@ spark:
         AWS:
           machine_type: m4.xlarge
       vm_count: 2
-
 """
 
 # This points to a file on the spark cluster.

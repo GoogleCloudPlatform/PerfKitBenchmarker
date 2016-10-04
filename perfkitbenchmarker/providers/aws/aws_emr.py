@@ -52,7 +52,7 @@ class AwsSecurityGroup(resource.BaseResource):
   """Object representing a AWS Security Group.
 
   A security group is created automatically when an Amazon EMR cluster
-  is deleted.  It is not deleted automatically, and the subnet and VPN
+  is created.  It is not deleted automatically, and the subnet and VPN
   cannot be deleted until the security group is deleted.
 
   Because of this, there's no _Create method, only a _Delete and an
