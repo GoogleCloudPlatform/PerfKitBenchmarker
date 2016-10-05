@@ -26,6 +26,7 @@ import csv
 import io
 import json
 import logging
+import threading
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -44,7 +45,9 @@ flags.DEFINE_integer('netperf_test_length', 60,
                      lower_bound=1)
 flags.DEFINE_bool('netperf_enable_histograms', True,
                   'Determines whether latency histograms are '
-                  'collected/reported.')
+                  'collected/reported. Only for *RR benchmarks')
+flags.DEFINE_integer('netperf_num_streams', 1,
+                     'Number of netperf processes to run.')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
@@ -101,13 +104,78 @@ def Prepare(benchmark_spec):
                        (netperf.NETSERVER_PATH, COMMAND_PORT))
 
 
-def RunNetperf(vm, benchmark_name, server_ip):
-  """Spawns netperf on a remove VM, parses results.
+def _ParseNetperfOutput(stdout, metadata, benchmark_name):
+  """Parses the stdout of a single netperf process.
+
+  Args:
+    stdout: the stdout of the netperf process
+    metadata: metadata for any sample.Sample objects we create
+
+  Returns:
+    A tuple containing (throughput_sample, latency_samples, latency_histogram)
+  """
+  # Don't modify the metadata dict that was passed in
+  metadata = metadata.copy()
+
+  fp = io.StringIO(stdout)
+  # "-o" flag above specifies CSV output, but there is one extra header line:
+  banner = next(fp)
+  assert banner.startswith('MIGRATED'), stdout
+  r = csv.DictReader(fp)
+  results = next(r)
+  logging.info('Netperf Results: %s', results)
+  assert 'Throughput' in results
+
+  # Create the throughput sample
+  throughput = float(results['Throughput'])
+  unit = {'Trans/s': TRANSACTIONS_PER_SECOND, # *_RR
+          '10^6bits/s': MBPS}[results['Throughput Units']] # TCP_STREAM
+  if unit == MBPS:
+    metric = '%s_Throughput' % benchmark_name
+  else:
+    metric = '%s_Transaction_Rate' % benchmark_name
+  meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
+               ('Throughput Confidence Width (%)', 'confidence_width_percent')]
+  metadata.update({meta_key: results[np_key] for np_key, meta_key in meta_keys})
+  throughput_sample = sample.Sample(metric, throughput, unit, metadata)
+
+  # No tail latency for throughput.
+  if unit == MBPS:
+    return (throughput_sample, [], None)
+
+  hist = None
+  latency_samples = []
+  if FLAGS.netperf_enable_histograms:
+    # Parse the latency histogram. {latency: response_latency} where latency is
+    # the latency in microseconds with only 1 significant figure.
+    latency_hist = netperf.ParseHistogram(stdout)
+    hist_metadata = {'histogram': json.dumps(latency_hist)}
+    hist_metadata.update(metadata)
+    latency_samples.append(sample.Sample(
+        '%s_Latency_Histogram' % benchmark_name, 0, 'us', hist_metadata))
+
+  for metric_key, metric_name in [
+      ('50th Percentile Latency Microseconds', 'p50'),
+      ('90th Percentile Latency Microseconds', 'p90'),
+      ('99th Percentile Latency Microseconds', 'p99'),
+      ('Minimum Latency Microseconds', 'min'),
+      ('Maximum Latency Microseconds', 'max'),
+      ('Stddev Latency Microseconds', 'stddev')]:
+    latency_samples.append(
+        sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
+                      float(results[metric_key]), 'us', metadata))
+
+  return (throughput_sample, latency_samples, latency_hist)
+
+
+def RunNetperf(vm, benchmark_name, server_ip, num_streams):
+  """Spawns netperf on a remote VM, parses results.
 
   Args:
     vm: The VM that the netperf TCP_RR benchmark will be run upon.
     benchmark_name: The netperf benchmark to run, see the documentation.
     server_ip: A machine that is running netserver.
+    num_streams: The number of netperf client threads to run.
 
   Returns:
     A sample.Sample object with the result.
@@ -121,7 +189,8 @@ def RunNetperf(vm, benchmark_name, server_ip):
   # -i specifies the maximum and minimum number of iterations.
   confidence = ('-I 99,5 -i {0},3'.format(FLAGS.netperf_max_iter)
                 if FLAGS.netperf_max_iter else '')
-  verbosity = '-v2 ' if FLAGS.netperf_enable_histograms else ''
+  verbosity = '-v2 ' if FLAGS.netperf_enable_histograms or num_streams > 1 \
+                     else ''
   netperf_cmd = ('{netperf_path} -p {command_port} -j {verbosity}'
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence} '
                  ' -- '
@@ -136,59 +205,35 @@ def RunNetperf(vm, benchmark_name, server_ip):
                      data_port=DATA_PORT,
                      length=FLAGS.netperf_test_length,
                      confidence=confidence, verbosity=verbosity)
-  stdout, _ = vm.RemoteCommand(netperf_cmd,
-                               timeout=2 * FLAGS.netperf_test_length *
-                               (FLAGS.netperf_max_iter or 1))
 
-  fp = io.StringIO(stdout)
-  # "-o" flag above specifies CSV output, but there is one extra header line:
-  banner = next(fp)
-  assert banner.startswith('MIGRATED'), stdout
-  r = csv.DictReader(fp)
-  row = next(r)
-  logging.info('Netperf Results: %s', row)
-  assert 'Throughput' in row, row
+  # Run all of the netperf processes and collect their stdout
+  # TODO: Record start times of netperf processes on the remote machine
+  stdouts = [None for _ in range(num_streams)]
+  def NetperfThread(i):
+    stdout, _ = vm.RemoteCommand(netperf_cmd,
+                                 timeout=2 * FLAGS.netperf_test_length *
+                                 (FLAGS.netperf_max_iter or 1))
+    stdouts[i] = stdout
 
-  value = float(row['Throughput'])
-  unit = {'Trans/s': TRANSACTIONS_PER_SECOND,
-          '10^6bits/s': MBPS}[row['Throughput Units']]
-  if unit == MBPS:
-    metric = '%s_Throughput' % benchmark_name
+  threads = [threading.Thread(target=NetperfThread, args=(i,))
+             for i in range(num_streams)]
+  for thread in threads:
+    thread.start()
+  for thread in threads:
+    thread.join()
+
+  metadata = {'netperf_test_length': FLAGS.netperf_test_length,
+              'max_iter': FLAGS.netperf_max_iter or 1}
+
+  parsed_output = [_ParseNetperfOutput(stdout, metadata, benchmark_name) for stdout in stdouts]
+
+  if len(parsed_output) == 1:
+    # Only 1 netperf thread
+    (throughput_sample, latency_samples, histogram) = parsed_output[0]
+    return [throughput_sample] + latency_samples
   else:
-    metric = '%s_Transaction_Rate' % benchmark_name
-
-  meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
-               ('Throughput Confidence Width (%)', 'confidence_width_percent')]
-  metadata = {meta_key: row[np_key] for np_key, meta_key in meta_keys}
-  metadata.update(netperf_test_length=FLAGS.netperf_test_length,
-                  max_iter=FLAGS.netperf_max_iter or 1)
-
-  samples = [sample.Sample(metric, value, unit, metadata)]
-
-  # No tail latency for throughput.
-  if unit == MBPS:
-    return samples
-
-  if FLAGS.netperf_enable_histograms:
-    # Generate a sample containing the entire histogram of
-    # latencies.
-    hist = netperf.ParseHistogram(stdout)
-    hist_metadata = {'histogram': json.dumps(hist)}
-    hist_metadata.update(metadata)
-    samples.append(sample.Sample(
-        '%s_Latency_Histogram' % benchmark_name, 0, 'us', hist_metadata))
-
-  for metric_key, metric_name in [
-      ('50th Percentile Latency Microseconds', 'p50'),
-      ('90th Percentile Latency Microseconds', 'p90'),
-      ('99th Percentile Latency Microseconds', 'p99'),
-      ('Minimum Latency Microseconds', 'min'),
-      ('Maximum Latency Microseconds', 'max'),
-      ('Stddev Latency Microseconds', 'stddev')]:
-    samples.append(
-        sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
-                      float(row[metric_key]), 'us', metadata))
-  return samples
+    # Multiple netperf threads
+    pass
 
 
 def Run(benchmark_spec):
@@ -212,18 +257,21 @@ def Run(benchmark_spec):
     for k, v in vm.GetMachineTypeDict().iteritems():
       metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
+  num_streams = FLAGS.netperf_num_streams
+  assert(num_streams >= 1)
+
   for netperf_benchmark in FLAGS.netperf_benchmarks:
 
     if vm_util.ShouldRunOnExternalIpAddress():
       external_ip_results = RunNetperf(client_vm, netperf_benchmark,
-                                       server_vm.ip_address)
+                                       server_vm.ip_address, num_streams)
       for external_ip_result in external_ip_results:
         external_ip_result.metadata.update(metadata)
       results.extend(external_ip_results)
 
     if vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm):
       internal_ip_results = RunNetperf(client_vm, netperf_benchmark,
-                                       server_vm.internal_ip)
+                                       server_vm.internal_ip, num_streams)
       for internal_ip_result in internal_ip_results:
         internal_ip_result.metadata.update(metadata)
         internal_ip_result.metadata['ip_type'] = 'internal'
