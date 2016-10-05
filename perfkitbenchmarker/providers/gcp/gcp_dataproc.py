@@ -36,12 +36,15 @@ class GcpDataproc(spark_service.BaseSparkService):
 
   Attributes:
     cluster_id: ID of the cluster.
-    num_workers: Number of nodes in the cluster.
-    project: Enclosing project for the cluster.
+    project: ID of the project.
   """
 
   CLOUD = providers.GCP
   SERVICE_NAME = 'dataproc'
+
+  def __init__(self, spark_service_spec):
+    super(GcpDataproc, self).__init__(spark_service_spec)
+    self.project = self.spec.master_group.vm_spec.project
 
   @staticmethod
   def _GetStats(stdout):
@@ -75,39 +78,67 @@ class GcpDataproc(spark_service.BaseSparkService):
                              self.cluster_id)
     if self.project is not None:
       cmd.flags['project'] = self.project
-    cmd.flags['num-workers'] = self.num_workers
-    if self.machine_type:
-      cmd.flags['worker-machine-type'] = self.machine_type
-      cmd.flags['master-machine-type'] = self.machine_type
+    cmd.flags['num-workers'] = self.spec.worker_group.vm_count
+
+    for group_type, group_spec in [
+        ('worker', self.spec.worker_group),
+        ('master', self.spec.master_group)]:
+      flag_name = group_type + '-machine-type'
+      cmd.flags[flag_name] = group_spec.vm_spec.machine_type
+
+      if group_spec.vm_spec.num_local_ssds:
+        ssd_flag = 'num-{0}-local-ssds'.format(group_type)
+        cmd.flags[ssd_flag] = group_spec.vm_spec.num_local_ssds
+
+      if group_spec.vm_spec.boot_disk_size:
+        disk_flag = group_type + '-boot-disk-size'
+        cmd.flags[disk_flag] = group_spec.vm_spec.boot_disk_size
+
     cmd.Issue()
 
   def _Delete(self):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
                              self.cluster_id)
+    # If we don't put this here, zone is automatically added, which
+    # breaks the dataproc clusters delete
+    cmd.flags['zone'] = []
     cmd.Issue()
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
                              self.cluster_id)
-    stdout, stderr, retcode = cmd.Issue()
+    # If we don't put this here, zone is automatically added to
+    # the command, which breaks dataproc clusters describe
+    cmd.flags['zone'] = []
+    _, _, retcode = cmd.Issue()
     return retcode == 0
 
+
   def SubmitJob(self, jarfile, classname, job_poll_interval=None,
-                job_arguments=None, job_stdout_file=None):
-    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'spark')
+                job_arguments=None, job_stdout_file=None,
+                job_type=spark_service.SPARK_JOB_TYPE):
+    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['jars'] = jarfile
-    cmd.flags['class'] = classname
+    # If we don't put this here, zone is auotmatically added to the command
+    # which breaks dataproc jobs submit
+    cmd.flags['zone'] = []
+
+    if classname:
+      cmd.flags['jars'] = jarfile
+      cmd.flags['class'] = classname
+    else:
+      cmd.flags['jar'] = jarfile
+
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
     # stdout of the job.  We set the driver log level to FATAL
-    # to supress those messages, and we can then separate, hopefully
+    # to suppress those messages, and we can then separate, hopefully
     # the job standard out from the log messages.
     cmd.flags['driver-log-levels'] = 'root=FATAL'
     if job_arguments:
-      cmd.additional_flags = job_arguments
+      cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue()
     if retcode != 0:
       return {spark_service.SUCCESS: False}
@@ -119,17 +150,21 @@ class GcpDataproc(spark_service.BaseSparkService):
       with open(job_stdout_file, 'w') as f:
         lines = stderr.splitlines(True)
         if (not re.match(r'Job \[.*\] submitted.', lines[0]) or
-            not re.match(r'Waiting for job output...', lines[1]) or
-            not re.match(r'\r', lines[2])):
+            not re.match(r'Waiting for job output...', lines[1])):
           raise Exception('Dataproc output in unexpected format.')
-        i = 3
-        # Eat these status lines.  The end in \r, so they overwrite themselves
-        # at the console or when you cat a file.  But they are part of this
-        # string.
-        while re.match(r'\[Stage \d+:', lines[i]):
+        i = 2
+        if job_type == spark_service.SPARK_JOB_TYPE:
+          if not re.match(r'\r', lines[i]):
+            raise Exception('Dataproc output in unexpected format.')
           i += 1
-        if not re.match(r' *\r$', lines[i]):
-          raise Exception('Dataproc output in unexpected format.')
+          # Eat these status lines.  They end in \r, so they overwrite
+          # themselves at the console or when you cat a file.  But they
+          # are part of this string.
+          while re.match(r'\[Stage \d+:', lines[i]):
+            i += 1
+          if not re.match(r' *\r$', lines[i]):
+            raise Exception('Dataproc output in unexpected format.')
+
         while i < len(lines) and not re.match(r'Job \[.*\]', lines[i]):
           f.write(lines[i])
           i += 1
