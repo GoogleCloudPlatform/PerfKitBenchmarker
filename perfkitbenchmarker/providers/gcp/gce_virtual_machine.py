@@ -429,6 +429,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def AnnotateSample(self, unused_sender, benchmark_spec, sample):
     sample['metadata']['preemptible'] = self.preemptible
+    if FLAGS.project:
+      sample['metadata']['project'] = FLAGS.project
+    else:
+      sample['metadata']['project'] = util.GetDefaultProject()
 
   def GetMachineTypeDict(self):
     """Returns a dict containing properties that specify the machine type.
