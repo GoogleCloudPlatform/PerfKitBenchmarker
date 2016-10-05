@@ -193,6 +193,9 @@ class SampleCollectorTestCase(unittest.TestCase):
     self.benchmark_spec = mock.MagicMock()
 
     p = mock.patch(publisher.__name__ + '.FLAGS')
+    p2 = mock.patch(util.__name__ + '.GetDefaultProject')
+    p2.start()
+    self.addCleanup(p2.stop)
     self.mock_flags = p.start()
     self.addCleanup(p.stop)
 
@@ -224,13 +227,12 @@ class SampleCollectorTestCase(unittest.TestCase):
   def testAddSamples_WithTimestamp(self):
     timestamp_sample = sample.Sample('widgets', 100, 'oz', {}, 1.0)
     samples = [timestamp_sample]
-    with mock.patch(util.__name__ + '.GetDefaultProject'):
-      self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
-      self.assertDictContainsSubset(
-          {
-              'timestamp': 1.0
-          },
-          self.instance.samples[0])
+    self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
+    self.assertDictContainsSubset(
+        {
+            'timestamp': 1.0
+        },
+        self.instance.samples[0])
 
 
 class DefaultMetadataProviderTestCase(unittest.TestCase):
