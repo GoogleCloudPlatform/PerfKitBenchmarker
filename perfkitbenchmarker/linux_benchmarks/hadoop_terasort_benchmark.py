@@ -46,7 +46,7 @@ BENCHMARK_CONFIG = """
 hadoop_terasort:
   description: Run the Apache Hadoop MapReduce Terasort benchmark on a cluster.
   spark_service:
-    service_type: pkb_managed
+    service_type: managed
     worker_group:
       vm_spec:
         GCP:

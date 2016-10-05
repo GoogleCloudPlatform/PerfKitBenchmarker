@@ -172,6 +172,7 @@ class PkbSparkService(BaseSparkService):
 
   def __init__(self, spark_service_spec):
     super(PkbSparkService, self).__init__(spark_service_spec)
+    assert self.cluster_id is None
     self.vms = {}
 
   def _Create(self):
