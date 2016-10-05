@@ -27,6 +27,7 @@ import mock
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import util
 
 
 class PrettyPrintStreamPublisherTestCase(unittest.TestCase):
@@ -223,8 +224,7 @@ class SampleCollectorTestCase(unittest.TestCase):
   def testAddSamples_WithTimestamp(self):
     timestamp_sample = sample.Sample('widgets', 100, 'oz', {}, 1.0)
     samples = [timestamp_sample]
-    with mock.patch(vm_util.__name__ + '.IssueCommand') as p:
-      p.side_effect = 'fakeproject'
+    with mock.patch(util.__name__ + '.GetDefaultProject'):
       self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
       self.assertDictContainsSubset(
           {
