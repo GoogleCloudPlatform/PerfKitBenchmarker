@@ -223,12 +223,14 @@ class SampleCollectorTestCase(unittest.TestCase):
   def testAddSamples_WithTimestamp(self):
     timestamp_sample = sample.Sample('widgets', 100, 'oz', {}, 1.0)
     samples = [timestamp_sample]
-    self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
-    self.assertDictContainsSubset(
-        {
-            'timestamp': 1.0
-        },
-        self.instance.samples[0])
+    with mock.patch(vm_util.__name__ + '.IssueCommand') as p:
+      p.side_effect = 'fakeproject'
+      self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
+      self.assertDictContainsSubset(
+          {
+              'timestamp': 1.0
+          },
+          self.instance.samples[0])
 
 
 class DefaultMetadataProviderTestCase(unittest.TestCase):
