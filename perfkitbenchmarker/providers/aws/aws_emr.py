@@ -21,6 +21,7 @@ import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
 
@@ -38,7 +39,7 @@ READY_STATE = 'WAITING'
 
 JOB_WAIT_SLEEP = 30
 
-DELETED_STATES = ['TERMINATING', 'TERMINATED_WITH_ERRORS', 'TERMINATED']
+DELETED_STATES = ['TERMINATED_WITH_ERRORS', 'TERMINATED']
 
 MANAGER_SG = 'EmrManagedMasterSecurityGroup'
 WORKER_SG = 'EmrManagedSlaveSecurityGroup'
@@ -47,37 +48,74 @@ WORKER_SG = 'EmrManagedSlaveSecurityGroup'
 NEEDS_SUBNET = ['m4', 'c4']
 
 
+class AwsSecurityGroup(resource.BaseResource):
+  """Object representing a AWS Security Group.
+
+  A security group is created automatically when an Amazon EMR cluster
+  is created.  It is not deleted automatically, and the subnet and VPN
+  cannot be deleted until the security group is deleted.
+
+  Because of this, there's no _Create method, only a _Delete and an
+  _Exists method.
+  """
+
+  def __init__(self, cmd_prefix, group_id):
+    super(AwsSecurityGroup, self).__init__()
+    self.created = True
+    self.group_id = group_id
+    self.cmd_prefix = cmd_prefix
+
+  def _Delete(self):
+    cmd = self.cmd_prefix + ['ec2', 'delete-security-group',
+                             '--group-id=' + self.group_id]
+    vm_util.IssueCommand(cmd)
+
+  def _Exists(self):
+    cmd = self.cmd_prefix + ['ec2', 'describe-security-group',
+                             '--group-id=' + self.group_id]
+    _, _, retcode = vm_util.IssueCommand(cmd)
+    # if the security group doesn't exist, the describe command gives an error.
+    return retcode == 0
+
+  def _Create(self):
+    if not self.created:
+      raise NotImplemented()
+
+
 class AwsEMR(spark_service.BaseSparkService):
   """Object representing a AWS EMR cluster.
 
   Attributes:
     cluster_id: Cluster identifier, set in superclass.
-    num_workers: Number of works, set in superclass.
-    machine_type: Machine type to use.
     project: Enclosing project for the cluster.
     cmd_prefix: emr prefix, including region
-    region: region in which cluster is located.
+    network: network to use; set if needed by machine type
+    bucket_to_delete: bucket name to delete when cluster is
+    terminated.
   """
 
   CLOUD = providers.AWS
+  SPARK_SAMPLE_LOCATION = '/usr/lib/spark/examples/jars/spark-examples.jar'
   SERVICE_NAME = 'emr'
 
   def __init__(self, spark_service_spec):
     super(AwsEMR, self).__init__(spark_service_spec)
     # TODO(hildrum) use availability zone when appropriate
-    if self.machine_type is None:
-      self.machine_type = DEFAULT_MACHINE_TYPE
-
+    worker_machine_type = self.spec.worker_group.vm_spec.machine_type
+    leader_machine_type = self.spec.master_group.vm_spec.machine_type
     self.cmd_prefix = util.AWS_PREFIX
 
-    if self.spec.zone:
-      region = util.GetRegionFromZone(FLAGS.zones[0])
+    if self.zone:
+      region = util.GetRegionFromZone(self.zone)
       self.cmd_prefix += ['--region', region]
 
     # Certain machine types require subnets.
     if (self.spec.static_cluster_id is None and
-        self.machine_type[0:2] in NEEDS_SUBNET):
-      self.network = aws_network.AwsNetwork.GetNetwork(self.spec)
+        (worker_machine_type[0:2] in NEEDS_SUBNET or
+         leader_machine_type[0:2] in NEEDS_SUBNET)):
+      # GetNetwork is supposed to take a VM, but all it uses
+      # from the VM is the zone attribute, which self has.
+      self.network = aws_network.AwsNetwork.GetNetwork(self)
     else:
       self.network = None
     self.bucket_to_delete = None
@@ -96,13 +134,23 @@ class AwsEMR(spark_service.BaseSparkService):
     name = 'pkb_' + FLAGS.run_uri
     logs_bucket = FLAGS.aws_emr_loguri or self._CreateLogBucket()
 
+    instance_groups = []
+    for group_type, group_spec in [
+        ('CORE', self.spec.worker_group),
+        ('MASTER', self.spec.master_group)]:
+      instance_groups.append({'InstanceCount': group_spec.vm_count,
+                              'InstanceGroupType': group_type,
+                              'InstanceType': group_spec.vm_spec.machine_type,
+                              'Name': group_type + ' group'})
+
     # we need to store the cluster id.
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
                              '--release-label', RELEASE_LABEL,
                              '--use-default-roles',
-                             '--instance-count', str(self.num_workers),
-                             '--instance-type', self.machine_type,
-                             '--application', 'Name=SPARK',
+                             '--instance-groups',
+                             json.dumps(instance_groups),
+                             '--application', 'Name=Spark',
+                             'Name=Hadoop',
                              '--log-uri', logs_bucket]
     if self.network:
       cmd += ['--ec2-attributes', 'SubnetId=' + self.network.subnet.id]
@@ -138,18 +186,19 @@ class AwsEMR(spark_service.BaseSparkService):
 
     # Now we need to delete the manager, then the worker.
     for group in manager_sg, worker_sg:
-      cmd = self.cmd_prefix + ['ec2', 'delete-security-group',
-                               '--group-id=' + group]
-      vm_util.IssueCommand(cmd)
+      sec_group = AwsSecurityGroup(self.cmd_prefix, group)
+      sec_group.Delete()
 
   def _Delete(self):
     """Deletes the cluster."""
-    if self.network:
-      self._DeleteSecurityGroups()
 
     cmd = self.cmd_prefix + ['emr', 'terminate-clusters', '--cluster-ids',
                              self.cluster_id]
     vm_util.IssueCommand(cmd)
+
+  def _DeleteDependencies(self):
+    if self.network:
+      self._DeleteSecurityGroups()
     if self.bucket_to_delete:
       bucket_del_cmd = self.cmd_prefix + ['s3', 'rb', '--force',
                                           self.bucket_to_delete]
@@ -182,8 +231,7 @@ class AwsEMR(spark_service.BaseSparkService):
                    'a subnet.  To ensure PKB creates a subnet for this machine '
                    'type, update the NEEDS_SUBNET variable of '
                    'providers/aws/aws_emr.py to contain prefix of this machine '
-                   'type ({0}). Raw AWS message={1}'.format(
-                       self.machine_type[0:2], reason))
+                   'type. Raw AWS message={0}'.format(reason))
         raise Exception(message)
     return result['Cluster']['Status']['State'] == READY_STATE
 
@@ -228,8 +276,27 @@ class AwsEMR(spark_service.BaseSparkService):
     else:
       return None
 
+  def _MakeHadoopStep(self, jarfile, classname, job_arguments):
+    """Construct an EMR step with a type CUSTOM_JAR"""
+    step_list = ['Type=CUSTOM_JAR', 'Jar=' + jarfile]
+    if classname:
+      step_list.append('MainClass=' + classname)
+    if job_arguments:
+      arg_string = '[' + ','.join(job_arguments) + ']'
+    step_list.append('Args=' + arg_string)
+    return step_list
+
+  def _MakeSparkStep(self, jarfile, classname, job_arguments):
+    arg_list = ['--class', classname, jarfile]
+    if job_arguments:
+      arg_list += job_arguments
+    arg_string = '[' + ','.join(arg_list) + ']'
+    step_list = ['Type=Spark', 'Args=' + arg_string]
+    return step_list
+
   def SubmitJob(self, jarfile, classname, job_poll_interval=JOB_WAIT_SLEEP,
-                job_arguments=None, job_stdout_file=None):
+                job_arguments=None, job_stdout_file=None,
+                job_type=spark_service.SPARK_JOB_TYPE):
     """Submit the job.
 
     Submit the job and wait for it to complete.  If job_stdout_file is not
@@ -259,11 +326,12 @@ class AwsEMR(spark_service.BaseSparkService):
         raise Exception('Step {0} not complete.'.format(step_id))
       return result
 
-    arg_list = ['--class', classname, jarfile]
-    if job_arguments:
-      arg_list += job_arguments
-    arg_string = '[' + ','.join(arg_list) + ']'
-    step_list = ['Type=Spark', 'Args=' + arg_string]
+    if job_type == spark_service.SPARK_JOB_TYPE:
+      step_list = self._MakeSparkStep(jarfile, classname, job_arguments)
+    elif job_type == spark_service.HADOOP_JOB_TYPE:
+      step_list = self._MakeHadoopStep(jarfile, classname, job_arguments)
+    else:
+      raise Exception('Job type %s unsupported for EMR' % job_type)
     step_string = ','.join(step_list)
     cmd = self.cmd_prefix + ['emr', 'add-steps', '--cluster-id',
                              self.cluster_id, '--steps', step_string]

@@ -14,7 +14,6 @@
 """Utilities for working with Google Cloud Platform resources."""
 
 from collections import OrderedDict
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
@@ -110,6 +109,6 @@ class GcloudCommand(object):
     self.flags['quiet'] = True
     if resource.project is not None:
       self.flags['project'] = resource.project
-    if hasattr(resource, 'zone'):
+    if hasattr(resource, 'zone') and resource.zone:
       self.flags['zone'] = resource.zone
     self.additional_flags.extend(FLAGS.additional_gcloud_flags or ())

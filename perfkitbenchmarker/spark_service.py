@@ -26,10 +26,14 @@ For more on Apache Spark: http://spark.apache.org/
 """
 
 import abc
+import copy
+import datetime
+import posixpath
 
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker import resource
-
+from perfkitbenchmarker import vm_util
 
 flags.DEFINE_string('spark_static_cluster_id', None,
                     'If set, the name of the Spark cluster, assumed to be '
@@ -44,9 +48,15 @@ SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
 
+SPARK_JOB_TYPE = 'spark'
+HADOOP_JOB_TYPE = 'hadoop'
+
+SPARK_VM_GROUPS = ('master_group', 'worker_group')
+
 # This is used for error messages.
 
 _SPARK_SERVICE_REGISTRY = {}
+FLAGS = flags.FLAGS
 
 
 def GetSparkServiceClass(cloud, service_type):
@@ -78,6 +88,12 @@ class BaseSparkService(resource.BaseResource):
 
   __metaclass__ = AutoRegisterSparkServiceMeta
 
+  SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
+                           'spark-examples.jar')
+
+  HADOOP_SAMPLE_LOCATION = ('file:///usr/lib/hadoop-mapreduce/'
+                            'hadoop-mapreduce-examples.jar')
+
   def __init__(self, spark_service_spec):
     """Initialize the Apache Spark Service object.
 
@@ -87,14 +103,20 @@ class BaseSparkService(resource.BaseResource):
     is_user_managed = spark_service_spec.static_cluster_id is not None
     super(BaseSparkService, self).__init__(user_managed=is_user_managed)
     self.spec = spark_service_spec
+    # If only the worker group is specified, assume the master group is
+    # configured the same way.
+    if spark_service_spec.master_group is None:
+      self.spec.master_group = copy.copy(self.spec.worker_group)
+      self.spec.master_group.vm_count = 1
     self.cluster_id = spark_service_spec.static_cluster_id
-    self.num_workers = spark_service_spec.num_workers
-    self.machine_type = spark_service_spec.machine_type
-    self.project = spark_service_spec.project
+    assert (spark_service_spec.master_group.vm_spec.zone ==
+            spark_service_spec.worker_group.vm_spec.zone)
+    self.zone = spark_service_spec.master_group.vm_spec.zone
 
   @abc.abstractmethod
   def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
-                job_stdout_file=None, job_arguments=None):
+                job_stdout_file=None, job_arguments=None,
+                job_type=SPARK_JOB_TYPE):
     """Submit a job to the spark service.
 
     Submits a job and waits for it to complete.
@@ -122,9 +144,18 @@ class BaseSparkService(resource.BaseResource):
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
     return {'spark_service': self.SERVICE_NAME,
-            'num_workers': str(self.num_workers),
-            'machine_type': str(self.machine_type),
+            'num_workers': str(self.spec.worker_group.vm_count),
+            'machine_type': str(self.spec.worker_group.vm_spec.machine_type),
             'spark_cluster_id': self.cluster_id}
+
+  @classmethod
+  def GetExampleJar(cls, job_type):
+    if job_type == SPARK_JOB_TYPE:
+      return cls.SPARK_SAMPLE_LOCATION
+    elif job_type == HADOOP_JOB_TYPE:
+      return cls.HADOOP_SAMPLE_LOCATION
+    else:
+      raise NotImplemented()
 
 
 
@@ -141,18 +172,54 @@ class PkbSparkService(BaseSparkService):
 
   def __init__(self, spark_service_spec):
     super(PkbSparkService, self).__init__(spark_service_spec)
-    self.vms = []
+    assert self.cluster_id is None
+    self.vms = {}
 
   def _Create(self):
     """Create an Apache Spark cluster."""
-    raise NotImplementedError()
+
+    # need to fix this to install spark
+    def InstallHadoop(vm):
+      vm.Install('hadoop')
+
+    vm_util.RunThreaded(InstallHadoop, self.vms['worker_group'] +
+                        self.vms['master_group'])
+    self.leader = self.vms['master_group'][0]
+    hadoop.ConfigureAndStart(self.leader,
+                             self.vms['worker_group'])
+
 
   def _Delete(self):
-    """Delete the vms."""
-    for vm in self.vms:
-      vm.Delete()
+    pass
 
-  # TODO(hildrum) actually implement this.
-  def SubmitJob(self, jar_file, class_name):
+  def SubmitJob(self, jar_file, class_name, job_poll_interval=None,
+                job_stdout_file=None, job_arguments=None,
+                job_type=SPARK_JOB_TYPE):
     """Submit the jar file."""
-    raise NotImplementedError()
+    if job_type == SPARK_JOB_TYPE:
+      raise NotImplemented()
+
+    cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop'),
+                'jar', jar_file]
+    if class_name:
+      cmd_list.append(class_name)
+    if job_arguments:
+      cmd_list += job_arguments
+    cmd_string = ' '.join(cmd_list)
+    start_time = datetime.datetime.now()
+    stdout, _ = self.leader.RemoteCommand(cmd_string)
+    end_time = datetime.datetime.now()
+    if job_stdout_file:
+      with open(job_stdout_file, 'w') as f:
+        f.write(stdout)
+    return {SUCCESS: True,
+            RUNTIME: (end_time - start_time).total_seconds()}
+
+  @classmethod
+  def GetExampleJar(cls, job_type):
+    if job_type == HADOOP_JOB_TYPE:
+      return posixpath.join(
+          hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
+          'hadoop-mapreduce-examples-{0}.jar'.format(hadoop.HADOOP_VERSION))
+    else:
+      raise NotImplemented()
