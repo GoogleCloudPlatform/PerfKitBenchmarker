@@ -14,12 +14,14 @@
 
 """Test the translation of disk type names."""
 
+import mock
 import unittest
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.providers.gcp import util
 from tests import mock_flags
 
 
@@ -32,7 +34,9 @@ class _DiskTypeRenamingTestCase(unittest.TestCase):
   def setUp(self):
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self.mocked_flags.os_type = os_types.DEBIAN
-    self.mocked_flags.project = 'aproject'
+    p = mock.patch(util.__name__ + '.GetDefaultProject')
+    p.start()
+    self.addCleanup(p.stop)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpec(self, config_dict):
