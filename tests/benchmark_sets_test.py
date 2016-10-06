@@ -29,6 +29,20 @@ internal_iprf:
   flags:
     ip_addresses: INTERNAL
 """
+MATRIX_CONFIG = """
+netperf:
+  flag_matrix: GCP
+  flag_matrix_defs:
+    GCP:
+      machine_type: [n1-standard-1, n1-standard-4]
+      zones: [us-central1-a, us-central1-b]
+"""
+EXPECTED_FLAGS = [
+    {'machine_type': 'n1-standard-1', 'zones': 'us-central1-a'},
+    {'machine_type': 'n1-standard-1', 'zones': 'us-central1-b'},
+    {'machine_type': 'n1-standard-4', 'zones': 'us-central1-a'},
+    {'machine_type': 'n1-standard-4', 'zones': 'us-central1-b'}
+]
 
 
 class BenchmarkSetsTestCase(unittest.TestCase):
@@ -163,3 +177,14 @@ class BenchmarkSetsTestCase(unittest.TestCase):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertTrue(self._ContainsModule('iperf', benchmark_tuple_list))
     self.assertTrue(self._ContainsModule('netperf', benchmark_tuple_list))
+
+  def testMatrices(self):
+    self.mock_flags.benchmarks = ['netperf']
+    self.mock_flags.flag_matrix = None
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(MATRIX_CONFIG)):
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertEqual(len(benchmark_tuple_list), 4)
+    flag_list = [benchmark_tuple[1]['flags']
+                 for benchmark_tuple in benchmark_tuple_list]
+    self.assertItemsEqual(flag_list, EXPECTED_FLAGS)
