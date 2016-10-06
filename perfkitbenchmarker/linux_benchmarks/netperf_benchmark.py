@@ -28,6 +28,8 @@ import json
 import logging
 import threading
 
+from collections import Counter
+
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -75,6 +77,8 @@ TRANSACTIONS_PER_SECOND = 'transactions_per_second'
 COMMAND_PORT = 20000
 DATA_PORT = 20001
 
+PERCENTILES = [50, 90, 99]
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -100,8 +104,48 @@ def Prepare(benchmark_spec):
     vms[1].AllowPort(COMMAND_PORT)
     vms[1].AllowPort(DATA_PORT)
 
-  vms[1].RemoteCommand('%s -p %s' %
-                       (netperf.NETSERVER_PATH, COMMAND_PORT))
+  vms[1].RemoteCommand('%s -p %s' % (netperf.NETSERVER_PATH, COMMAND_PORT))
+
+
+def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
+  """ Computes values at percentiles in a distribution as well as stddev.
+
+  Args:
+    histogram: A dict mapping values to the number of samples with that value.
+
+  Returns:
+    A dict mapping stat names to their values.
+  """
+  stats = {}
+
+  # Histogram data in list form sorted by key
+  by_value = sorted([(value, count) for value, count in histogram.items()],
+                    key=lambda x: x[0])
+  total_count = sum(histogram.values())
+
+  cur_value_index = 0  # Current index in by_value
+  cur_index = 0  # Number of values we've passed so far
+  for p in percentiles:
+    index = int(float(total_count) * float(p) / 100.0)
+    index = min(index, total_count - 1)  # Handle 100th percentile
+    for value, count in by_value[cur_value_index:]:
+      if cur_index + count > index:
+        stats['p%s' % str(p)] = by_value[cur_value_index][0]
+        break
+      else:
+        cur_index += count
+        cur_value_index += 1
+
+  # Compute stddev
+  value_sum = float(sum([value * count for value, count in histogram.items()]))
+  average = value_sum / float(total_count)
+  if total_count > 1:
+    total_of_squares = sum([(value - average) * count
+                            for value, count in histogram.items()])
+    stats['stddev'] = (total_of_squares / (total_count - 1)) ** 0.5
+  else:
+    stats['stddev'] = 0
+  return stats
 
 
 def _ParseNetperfOutput(stdout, metadata, benchmark_name):
@@ -128,8 +172,8 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name):
 
   # Create the throughput sample
   throughput = float(results['Throughput'])
-  unit = {'Trans/s': TRANSACTIONS_PER_SECOND, # *_RR
-          '10^6bits/s': MBPS}[results['Throughput Units']] # TCP_STREAM
+  unit = {'Trans/s': TRANSACTIONS_PER_SECOND,  # *_RR
+          '10^6bits/s': MBPS}[results['Throughput Units']]  # TCP_STREAM
   if unit == MBPS:
     metric = '%s_Throughput' % benchmark_name
   else:
@@ -143,7 +187,7 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name):
   if unit == MBPS:
     return (throughput_sample, [], None)
 
-  hist = None
+  latency_hist = None
   latency_samples = []
   if FLAGS.netperf_enable_histograms:
     # Parse the latency histogram. {latency: response_latency} where latency is
@@ -190,7 +234,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   confidence = ('-I 99,5 -i {0},3'.format(FLAGS.netperf_max_iter)
                 if FLAGS.netperf_max_iter else '')
   verbosity = '-v2 ' if FLAGS.netperf_enable_histograms or num_streams > 1 \
-                     else ''
+              else ''
   netperf_cmd = ('{netperf_path} -p {command_port} -j {verbosity}'
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence} '
                  ' -- '
@@ -209,6 +253,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   # Run all of the netperf processes and collect their stdout
   # TODO: Record start times of netperf processes on the remote machine
   stdouts = [None for _ in range(num_streams)]
+
   def NetperfThread(i):
     stdout, _ = vm.RemoteCommand(netperf_cmd,
                                  timeout=2 * FLAGS.netperf_test_length *
@@ -222,18 +267,57 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   for thread in threads:
     thread.join()
 
+  # Metadata to attach to samples
   metadata = {'netperf_test_length': FLAGS.netperf_test_length,
               'max_iter': FLAGS.netperf_max_iter or 1}
 
-  parsed_output = [_ParseNetperfOutput(stdout, metadata, benchmark_name) for stdout in stdouts]
+  parsed_output = [_ParseNetperfOutput(stdout, metadata, benchmark_name)
+                   for stdout in stdouts]
 
   if len(parsed_output) == 1:
     # Only 1 netperf thread
-    (throughput_sample, latency_samples, histogram) = parsed_output[0]
+    throughput_sample, latency_samples, histogram = parsed_output[0]
     return [throughput_sample] + latency_samples
   else:
     # Multiple netperf threads
-    pass
+
+    samples = []
+
+    # Unzip parsed output
+    throughput_samples, _, latency_histograms = [list(t)
+                                                 for t in zip(*parsed_output)]
+    # They should all have the same units
+    throughput_unit = throughput_samples[0].unit
+    # Extract the throughput values from the samples
+    throughputs = [sample.value for sample in throughput_samples]
+    # Compute some stats on the throughput values
+    throughput_stats = sample.PercentileCalculator(throughputs, [50, 90, 99])
+    throughput_stats['min'] = min(throughputs)
+    throughput_stats['max'] = max(throughputs)
+    # Create samples for throughput stats
+    for stat, value in throughput_stats.items():
+      samples.append(
+          sample.Sample('%s_Throughput_%s' % (benchmark_name, stat),
+                        float(value),
+                        throughput_unit, metadata))
+    # Combine all of the latency histogram dictionaries
+    latency_histogram = Counter()
+    for histogram in latency_histograms:
+      latency_histogram.update(histogram)
+    # Create a sample for the aggregate latency histogram
+    hist_metadata = {'histogram': json.dumps(latency_histogram)}
+    hist_metadata.update(metadata)
+    samples.append(sample.Sample(
+        '%s_Latency_Histogram' % benchmark_name, 0, 'us', hist_metadata))
+    # Calculate stats on aggregate latency histogram
+    latency_stats = _HistogramStatsCalculator(latency_histogram, [50, 90, 99])
+    # Create samples for the latency stats
+    for stat, value in latency_stats.items():
+      samples.append(
+          sample.Sample('%s_Latency_%s' % (benchmark_name, stat),
+                        float(value),
+                        'us', metadata))
+    return samples
 
 
 def Run(benchmark_spec):

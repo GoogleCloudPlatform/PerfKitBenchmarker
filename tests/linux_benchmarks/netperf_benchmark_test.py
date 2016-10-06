@@ -50,6 +50,18 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     self.should_run_external.return_value = run_external
     self.should_run_internal.return_value = run_internal
 
+  def testHistogramStatsCalculator(self):
+    histogram = {1: 5, 2: 10, 5: 5}
+    stats = netperf_benchmark._HistogramStatsCalculator(
+        histogram, [0, 20, 30, 74, 80, 100])
+    self.assertEqual(stats['p0'], 1)
+    self.assertEqual(stats['p20'], 1)
+    self.assertEqual(stats['p30'], 2)
+    self.assertEqual(stats['p74'], 2)
+    self.assertEqual(stats['p80'], 5)
+    self.assertEqual(stats['p100'], 5)
+    self.assertTrue(stats['stddev'] - 1.538 <= 0.001)
+
   def testExternalAndInternal(self):
     self._ConfigureIpTypes()
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
