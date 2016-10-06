@@ -26,6 +26,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 from tests import mock_flags
 
@@ -59,8 +60,10 @@ class TestBackgroundWorkload(unittest.TestCase):
     self._mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
-    self._mocked_flags.project = 'aproject'
+    p = patch(util.__name__ + '.GetDefaultProject')
+    p.start()
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
+    self.addCleanup(p.stop)
 
   def _CreateBenchmarkSpec(self, benchmark_config_yaml):
     config = configs.LoadConfig(benchmark_config_yaml, {}, NAME)
