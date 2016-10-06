@@ -31,7 +31,6 @@ import yaml
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
