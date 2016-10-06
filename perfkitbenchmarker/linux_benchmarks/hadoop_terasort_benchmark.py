@@ -113,9 +113,9 @@ def Run(benchmark_spec):
     sorted_dir += time_string
     validate_dir += time_string
 
-  gen_args = (TERAGEN, str(FLAGS.terasort_num_rows), unsorted_dir)
-  sort_args = (TERASORT, unsorted_dir, sorted_dir)
-  validate_args = (TERAVALIDATE, sorted_dir, validate_dir)
+  gen_args = [TERAGEN, str(FLAGS.terasort_num_rows), unsorted_dir]
+  sort_args = [TERASORT, unsorted_dir, sorted_dir]
+  validate_args = [TERAVALIDATE, sorted_dir, validate_dir]
 
   stages = [('generate', gen_args),
             ('sort', sort_args),
