@@ -31,8 +31,8 @@ internal_iprf:
 """
 MATRIX_CONFIG = """
 netperf:
-  test_matrix: GCP
-  test_matrices:
+  flag_matrix: GCP
+  flag_matrix_defs:
     GCP:
       machine_type: [n1-standard-1, n1-standard-4]
       zones: [us-central1-a, us-central1-b]
@@ -180,7 +180,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testMatrices(self):
     self.mock_flags.benchmarks = ['netperf']
-    self.mock_flags.test_matrix = None
+    self.mock_flags.flag_matrix = None
     with patch('perfkitbenchmarker.configs.GetUserConfig',
                return_value=yaml.load(MATRIX_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
