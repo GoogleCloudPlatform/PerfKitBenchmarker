@@ -14,6 +14,9 @@
 
 """Benchmark set specific functions and definitions."""
 
+import copy
+import itertools
+
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
@@ -21,6 +24,9 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import windows_benchmarks
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_string('test_matrix', None,
+                    'The name of the test matrix to run.')
 
 MESSAGE = 'message'
 BENCHMARK_LIST = 'benchmark_list'
@@ -219,6 +225,25 @@ def GetBenchmarksFromFlags():
       raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
                        (benchmark_name, FLAGS.os_type))
 
-    benchmark_config_list.append((benchmark_module, benchmark_config))
+    # We need to remove both the 'test_matrix' and 'test_matrices'
+    # keys from the config dictionairy since they aren't actually
+    # part of the config spec and will cause errors if they are
+    # left in.
+    test_matrix_name = benchmark_config.pop(
+        'test_matrix', None)
+    test_matrix_name = FLAGS.test_matrix or test_matrix_name
+    test_matrix = benchmark_config.pop(
+        'test_matrices', {}).get(test_matrix_name, {})
+
+    test_axes = []
+    for flag, values in test_matrix.iteritems():
+      test_axes.append([{flag: v} for v in values])
+
+    for test_config in itertools.product(*test_axes):
+      config = copy.copy(benchmark_config)
+      config['flags'] = copy.deepcopy(config.get('flags', {}))
+      for setting in test_config:
+        config['flags'].update(setting)
+      benchmark_config_list.append((benchmark_module, config))
 
   return benchmark_config_list
