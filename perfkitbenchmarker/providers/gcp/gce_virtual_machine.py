@@ -263,10 +263,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
-    if vm_spec.project:
-      self.project = vm_spec.project
-    else:
-      self.project = util.GetDefaultProject()
+    self.project = vm_spec.project or util.GetDefaultProject()
     self.network = gce_network.GceNetwork.GetNetwork(self)
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size
