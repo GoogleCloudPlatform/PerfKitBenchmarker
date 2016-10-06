@@ -38,6 +38,19 @@ Signal sent after a cloud provider's modules have been imported.
 
 Sender: string. Cloud provider name chosen from providers.VALID_CLOUDS.""")
 
+benchmark_start = _events.signal('benchmark-start', doc="""
+Signal sent at the beginning of a benchmark before any resources are
+provisioned.
+
+Sender: None
+Payload: benchmark_spec.""")
+
+benchmark_end = _events.signal('benchmark-end', doc="""
+Signal sent at the end of a benchmark after any resources have been
+torn down (if run_stage includes teardown).
+
+Sender: None
+Payload: benchmark_spec.""")
 
 RUN_PHASE = 'run'
 

@@ -342,6 +342,7 @@ def DoProvisionPhase(name, spec, timer):
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.PickleSpec()
+  events.benchmark_start.send(benchmark_spec=spec)
   try:
     with timer.Measure('Resource Provisioning'):
       spec.Provision()
@@ -548,6 +549,7 @@ def RunBenchmark(benchmark, sequence_number, total_benchmarks, benchmark_config,
       finally:
         if stages.TEARDOWN in FLAGS.run_stage:
           spec.Delete()
+        events.benchmark_end.send(benchmark_spec=spec)
         # Pickle spec to save final resource state.
         spec.PickleSpec()
 
