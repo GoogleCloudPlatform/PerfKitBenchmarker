@@ -32,6 +32,7 @@ class _DiskTypeRenamingTestCase(unittest.TestCase):
   def setUp(self):
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self.mocked_flags.os_type = os_types.DEBIAN
+    self.mocked_flags.project = 'aproject'
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpec(self, config_dict):

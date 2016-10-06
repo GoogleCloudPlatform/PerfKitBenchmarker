@@ -27,6 +27,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.gcp import util
 from tests import mock_flags
 
 
@@ -248,7 +249,8 @@ class GCEVMFlagsTestCase(unittest.TestCase):
     """A context manager that patches a few critical objects with mocks."""
     with mock.patch(vm_util.__name__ + '.IssueCommand') as issue_command, \
             mock.patch('__builtin__.open'), \
-            mock.patch(vm_util.__name__ + '.NamedTemporaryFile'):
+            mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
+            mock.patch(util.__name__ + '.GetDefaultProject'):
       yield issue_command
 
   def testPreemptibleVMFlag(self):

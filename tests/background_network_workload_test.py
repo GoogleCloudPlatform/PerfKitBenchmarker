@@ -94,6 +94,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self.mocked_flags.os_type = os_types.DEBIAN
     self.mocked_flags.cloud = providers.GCP
+    self.mocked_flags.project = 'aproject'
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CheckVmCallCounts(self, spec, working_groups, working_expected_counts,

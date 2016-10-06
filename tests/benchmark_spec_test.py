@@ -107,6 +107,7 @@ class _BenchmarkSpecTestCase(unittest.TestCase):
     self._mocked_flags = mock_flags.MockFlags()
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
+    self._mocked_flags.project = 'aproject'
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpecFromYaml(self, yaml_string, benchmark_name=NAME):
