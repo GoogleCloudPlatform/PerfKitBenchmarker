@@ -19,7 +19,6 @@ http://dag.wiee.rs/home-made/dstat/
 import copy
 import functools
 import logging
-import math
 import numpy as np
 import os
 import posixpath
@@ -67,7 +66,7 @@ class _DStatCollector(object):
     self._lock = threading.Lock()
     self._pids = {}
     self._file_names = {}
-    self._role_mapping = {}  # mapping from dstat file to vm role
+    self._role_mapping = {}  # mapping vm role to dstat file
     self._start_time = 0
 
     if not os.path.isdir(self.output_directory):
@@ -100,7 +99,7 @@ class _DStatCollector(object):
       self._pids[vm.name] = stdout.strip()
       self._file_names[vm.name] = dstat_file
 
-  def _StopOnVm(self, vm, vm_rule):
+  def _StopOnVm(self, vm, vm_role):
     """Stop dstat on 'vm', copy the results to the run temporary directory."""
     if vm.name not in self._pids:
       logging.warn('No dstat PID for %s', vm.name)
@@ -113,7 +112,7 @@ class _DStatCollector(object):
     vm.RemoteCommand(cmd)
     try:
       vm.PullFile(self.output_directory, file_name)
-      self._role_mapping[vm_rule] = file_name
+      self._role_mapping[vm_role] = file_name
     except Exception:
       logging.exception('Failed fetching dstat result from %s.', vm.name)
 
@@ -141,19 +140,23 @@ class _DStatCollector(object):
     """Analyze dstat file and record samples."""
 
     def _AnalyzeEvent(role, labels, out, event):
-      for idx, label in enumerate(labels[1:], 1):
-        cond = [(out[:, 0] > event.start_timestamp) & (
-            out[:, 0] < event.end_timestamp)]
-        choice = [out[:, idx]]
-        filtered = np.select(cond, choice)
-        avg = np.mean(filtered[np.nonzero(filtered)])
-        if math.isnan(avg):
-          avg = 0
-        metadata = copy.deepcopy(event.metadata)
-        metadata['event'] = event.sender
-        metadata['sender'] = sender
-        metadata['vm_role'] = role
-        samples.append(sample.Sample(label, avg, '', metadata))
+      cond = (out[:, 0] > event.start_timestamp) & (
+          out[:, 0] < event.end_timestamp)
+      idx_array = np.nonzero(cond)
+      if not len(idx_array[0]):
+        return
+      # Filter out lines doesn't belong to the event
+      filtered = out[idx_array, 1:]
+      avg = np.mean(filtered[0], axis=0)
+      logging.info('avgs: %s', avg)
+      metadata = copy.deepcopy(event.metadata)
+      metadata['event'] = event.sender
+      metadata['sender'] = sender
+      metadata['vm_role'] = role
+
+      samples.extend([
+          sample.Sample(label, avg[idx], '', metadata)
+          for idx, label in enumerate(labels[1:])])
 
     def _Analyze(role, file):
       with open(os.path.join(self.output_directory,

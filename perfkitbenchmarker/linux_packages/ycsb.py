@@ -622,7 +622,7 @@ class YCSBExecutor(object):
     start = time.time()
     vm_util.RunThreaded(_Load, range(len(vms)))
     events.record_event.send(
-        type(self).__name__, event='loader', start_timestamp=start,
+        type(self).__name__, event='load', start_timestamp=start,
         end_timestamp=time.time(), metadata=kwargs)
 
     if len(results) != len(vms):

@@ -30,16 +30,16 @@ def ParseCsvFile(fp):
     A tuple of list of dstat labels and ndarray containing parsed data.
   """
   reader = csv.reader(fp)
-  headers = list(itertools.islice(fp, 5))
+  headers = list(itertools.islice(reader, 5))
   if len(headers) != 5:
     raise ValueError(
         'Expected exactly 5 header lines got {}\n{}'.format(
             len(headers), headers))
-  if 'Dstat' not in headers[0]:
+  if 'Dstat' not in headers[0][0]:
     raise ValueError(
         'Expected first header cell to contain "Dstat"\n{}'.format(
             headers[0]))
-  if 'Host:' in headers[2][0]:
+  if 'Host:' not in headers[2][0]:
     raise ValueError(('Expected first cell in third line to be '
                       '"Host:"\n{}').format(headers[2]))
   categories = next(reader)
