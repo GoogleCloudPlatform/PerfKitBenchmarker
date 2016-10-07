@@ -406,6 +406,8 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
       consecutive_failures = 0
     finally:
       events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+    events.samples_created.send(
+        events.RUN_PHASE, benchmark_spec=spec, samples=samples)
     if FLAGS.run_stage_time:
       for sample in samples:
         sample.metadata['run_number'] = run_number

@@ -16,16 +16,21 @@
 http://dag.wiee.rs/home-made/dstat/
 """
 
+import copy
 import functools
 import logging
+import numpy as np
 import os
 import posixpath
+import time
 import threading
 import uuid
 
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import dstat
 
 flags.DEFINE_boolean('dstat', False,
                      'Run dstat (http://dag.wiee.rs/home-made/dstat/) '
@@ -38,6 +43,8 @@ flags.DEFINE_string('dstat_output', None,
                     'Output directory for dstat output. '
                     'Only applicable when --dstat is specified. '
                     'Default: run temporary directory.')
+flags.DEFINE_boolean('dstat_publish', False,
+                     'Whether or not publish dstat statistics.')
 
 
 class _DStatCollector(object):
@@ -59,6 +66,8 @@ class _DStatCollector(object):
     self._lock = threading.Lock()
     self._pids = {}
     self._file_names = {}
+    self._role_mapping = {}  # mapping vm role to dstat file
+    self._start_time = 0
 
     if not os.path.isdir(self.output_directory):
       raise IOError('dstat output directory does not exist: {0}'.format(
@@ -90,7 +99,7 @@ class _DStatCollector(object):
       self._pids[vm.name] = stdout.strip()
       self._file_names[vm.name] = dstat_file
 
-  def _StopOnVm(self, vm):
+  def _StopOnVm(self, vm, vm_role):
     """Stop dstat on 'vm', copy the results to the run temporary directory."""
     if vm.name not in self._pids:
       logging.warn('No dstat PID for %s', vm.name)
@@ -103,6 +112,7 @@ class _DStatCollector(object):
     vm.RemoteCommand(cmd)
     try:
       vm.PullFile(self.output_directory, file_name)
+      self._role_mapping[vm_role] = file_name
     except Exception:
       logging.exception('Failed fetching dstat result from %s.', vm.name)
 
@@ -112,10 +122,52 @@ class _DStatCollector(object):
                                      str(uuid.uuid4())[:8])
     start_on_vm = functools.partial(self._StartOnVm, suffix=suffix)
     vm_util.RunThreaded(start_on_vm, benchmark_spec.vms)
+    self._start_time = time.time()
 
   def Stop(self, sender, benchmark_spec):
     """Stop dstat on all VMs in 'benchmark_spec', fetch results."""
-    vm_util.RunThreaded(self._StopOnVm, benchmark_spec.vms)
+    events.record_event.send(sender, event='dstat',
+                             start_timestamp=self._start_time,
+                             end_timestamp=time.time(),
+                             metadata={})
+    args = []
+    for role, vms in benchmark_spec.vm_groups.iteritems():
+      args.extend([((
+          vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)])
+    vm_util.RunThreaded(self._StopOnVm, args)
+
+  def Analyze(self, sender, benchmark_spec, samples):
+    """Analyze dstat file and record samples."""
+
+    def _AnalyzeEvent(role, labels, out, event):
+      # Find out index of rows belong to event according to timestamp.
+      cond = (out[:, 0] > event.start_timestamp) & (
+          out[:, 0] < event.end_timestamp)
+      # Skip analyzing event if none of rows falling into time range.
+      if not cond.any():
+        return
+      # Calculate mean of each column.
+      avg = np.average(out[:, 1:], weights=cond, axis=0)
+      metadata = copy.deepcopy(event.metadata)
+      metadata['event'] = event.sender
+      metadata['sender'] = sender
+      metadata['vm_role'] = role
+
+      samples.extend([
+          sample.Sample(label, avg[idx], '', metadata)
+          for idx, label in enumerate(labels[1:])])
+
+    def _Analyze(role, file):
+      with open(os.path.join(self.output_directory,
+                             os.path.basename(file)), 'r') as f:
+        fp = iter(f)
+        labels, out = dstat.ParseCsvFile(fp)
+        vm_util.RunThreaded(
+            _AnalyzeEvent,
+            [((role, labels, out, e), {}) for e in events.TracingEvent.events])
+
+    vm_util.RunThreaded(
+        _Analyze, [((k, w), {}) for k, w in self._role_mapping.iteritems()])
 
 
 def Register(parsed_flags):
@@ -136,3 +188,6 @@ def Register(parsed_flags):
                               output_directory=output_directory)
   events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
   events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
+  if parsed_flags.dstat_publish:
+    events.samples_created.connect(
+        collector.Analyze, events.RUN_PHASE, weak=False)

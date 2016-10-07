@@ -19,6 +19,7 @@ is initialized.
 """
 
 
+from perfkitbenchmarker import events
 from perfkitbenchmarker import import_util
 
 
@@ -28,3 +29,5 @@ TRACE_COLLECTORS = list(import_util.LoadModulesForPath(__path__, __name__))
 def RegisterAll(sender, parsed_flags):
   for module in TRACE_COLLECTORS:
     module.Register(parsed_flags)
+
+  events.RegisterTracingEvents()
