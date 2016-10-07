@@ -34,6 +34,7 @@ from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.gcp import util
 from tests import mock_flags
 
 
@@ -71,6 +72,8 @@ class ScratchDiskTestMixin(object):
         mock.patch(vm_prefix + '.FormatDisk'))
     self.patches.append(
         mock.patch(vm_prefix + '.MountDisk'))
+    self.patches.append(
+        mock.patch(util.__name__ + '.GetDefaultProject'))
 
     # Patch subprocess.Popen to make sure we don't issue any commands to spin up
     # resources.

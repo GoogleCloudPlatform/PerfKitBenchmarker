@@ -27,6 +27,7 @@ import mock
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import util
 
 
 class PrettyPrintStreamPublisherTestCase(unittest.TestCase):
@@ -192,6 +193,9 @@ class SampleCollectorTestCase(unittest.TestCase):
     self.benchmark_spec = mock.MagicMock()
 
     p = mock.patch(publisher.__name__ + '.FLAGS')
+    p2 = mock.patch(util.__name__ + '.GetDefaultProject')
+    p2.start()
+    self.addCleanup(p2.stop)
     self.mock_flags = p.start()
     self.addCleanup(p.stop)
 
