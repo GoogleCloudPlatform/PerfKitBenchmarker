@@ -71,7 +71,7 @@ class AwsSecurityGroup(resource.BaseResource):
     vm_util.IssueCommand(cmd)
 
   def _Exists(self):
-    cmd = self.cmd_prefix + ['ec2', 'describe-security-group',
+    cmd = self.cmd_prefix + ['ec2', 'describe-security-groups',
                              '--group-id=' + self.group_id]
     _, _, retcode = vm_util.IssueCommand(cmd)
     # if the security group doesn't exist, the describe command gives an error.
