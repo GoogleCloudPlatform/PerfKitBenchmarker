@@ -43,7 +43,7 @@ class DstatTestCase(unittest.TestCase):
 
   def testAnalyzeValidEventSingleRow(self):
     events.AddEvent('sender', 'event', 1475708693, 1475708694,
-                   {'label1': 123})
+                    {'label1': 123})
     self.collector.Analyze('testSender', None, self.samples)
     # 61 metrics
     self.assertTrue(len(self.samples), 61)
@@ -63,7 +63,7 @@ class DstatTestCase(unittest.TestCase):
 
   def testAnalyzeValidEventTwoRows(self):
     events.AddEvent('sender', 'event', 1475708693, 1475708695,
-                   {'label1': 123})
+                    {'label1': 123})
     self.collector.Analyze('testSender', None, self.samples)
     # 61 metrics
     self.assertTrue(len(self.samples), 61)
@@ -83,7 +83,7 @@ class DstatTestCase(unittest.TestCase):
 
   def testAnalyzeValidEventEntireFile(self):
     events.AddEvent('sender', 'event', 1475708693, 1475709076,
-                   {'label1': 123})
+                    {'label1': 123})
     self.collector.Analyze('testSender', None, self.samples)
     # 61 metrics
     self.assertTrue(len(self.samples), 61)
