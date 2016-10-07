@@ -43,6 +43,17 @@ EXPECTED_FLAGS = [
     {'machine_type': 'n1-standard-4', 'zones': 'us-central1-a'},
     {'machine_type': 'n1-standard-4', 'zones': 'us-central1-b'}
 ]
+FILTER_CONFIG = """
+netperf:
+  flag_matrix: GCP
+  flag_matrix_filters:
+    GCP: "machine_type == 'n1-standard-1' and zones == 'us-central1-a'"
+  flag_matrix_defs:
+    GCP:
+      machine_type: [n1-standard-1, n1-standard-4]
+      zones: [us-central1-a, us-central1-b]
+"""
+
 
 
 class BenchmarkSetsTestCase(unittest.TestCase):
@@ -188,3 +199,14 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     flag_list = [benchmark_tuple[1]['flags']
                  for benchmark_tuple in benchmark_tuple_list]
     self.assertItemsEqual(flag_list, EXPECTED_FLAGS)
+
+  def testFilters(self):
+    self.mock_flags.benchmarks = ['netperf']
+    self.mock_flags.flag_matrix = None
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(FILTER_CONFIG)):
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertEqual(len(benchmark_tuple_list), 1)
+    self.assertEqual(benchmark_tuple_list[0][1]['flags'],
+                     {'zones': 'us-central1-a',
+                      'machine_type': 'n1-standard-1'})
