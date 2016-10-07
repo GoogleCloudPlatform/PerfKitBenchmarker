@@ -105,11 +105,15 @@ flags.DEFINE_string('project', None, 'GCP project ID under which '
 flags.DEFINE_list(
     'zones', [],
     'A list of zones within which to run PerfKitBenchmarker. '
-    'This is specific to the cloud provider you are running o`n. '
+    'This is specific to the cloud provider you are running on. '
     'If multiple zones are given, PerfKitBenchmarker will create 1 VM in '
     'zone, until enough VMs are created as specified in each '
     'benchmark. The order in which this flag is applied to VMs is '
     'undefined.')
+flags.DEFINE_list(
+    'extra_zones', [],
+    'Zones that will be appended to the "zones" list. This is functionally '
+    'the same, but allows flag matrices to have two zone axes.')
 # TODO(user): note that this is currently very GCE specific. Need to create a
 #    module which can traslate from some generic types to provider specific
 #    nomenclature.

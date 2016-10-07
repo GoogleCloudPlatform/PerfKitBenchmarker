@@ -170,6 +170,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
   def testZonesFlag(self):
     with mock_flags.PatchFlags(self._mocked_flags):
       self._mocked_flags.zones = ['us-east-1b', 'zone2']
+      self._mocked_flags.extra_zones = []
       spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
       spec.ConstructVirtualMachines()
       self.assertEqual(len(spec.vms), 2)
