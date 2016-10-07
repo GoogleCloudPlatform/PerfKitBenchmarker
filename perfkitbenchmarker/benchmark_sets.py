@@ -225,15 +225,17 @@ def GetBenchmarksFromFlags():
       raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
                        (benchmark_name, FLAGS.os_type))
 
-    # We need to remove both the 'flag_matrix' and 'flag_matrix_defs'
-    # keys from the config dictionairy since they aren't actually
-    # part of the config spec and will cause errors if they are
-    # left in.
+    # We need to remove the 'flag_matrix', 'flag_matrix_defs', and
+    # 'flag_matrix_filters' keys from the config dictionairy since
+    # they aren't actually part of the config spec and will cause
+    # errors if they are left in.
     flag_matrix_name = benchmark_config.pop(
         'flag_matrix', None)
     flag_matrix_name = FLAGS.flag_matrix or flag_matrix_name
     flag_matrix = benchmark_config.pop(
         'flag_matrix_defs', {}).get(flag_matrix_name, {})
+    flag_matrix_filter = benchmark_config.pop(
+        'flag_matrix_filters', {}).get(flag_matrix_name)
 
     flag_axes = []
     for flag, values in flag_matrix.iteritems():
@@ -244,6 +246,9 @@ def GetBenchmarksFromFlags():
       config['flags'] = copy.deepcopy(config.get('flags', {}))
       for setting in flag_config:
         config['flags'].update(setting)
+      if (flag_matrix_filter and not eval(
+          flag_matrix_filter, {}, config['flags'])):
+          continue
       benchmark_config_list.append((benchmark_module, config))
 
   return benchmark_config_list
