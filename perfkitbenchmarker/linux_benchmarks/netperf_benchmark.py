@@ -76,8 +76,8 @@ netperf:
 MBPS = 'Mbits/sec'
 TRANSACTIONS_PER_SECOND = 'transactions_per_second'
 
-COMMAND_PORT = 20000
-DATA_PORT = 20001
+# Command ports are even (id*2), data ports are odd (id*2 + 1)
+PORT_START = 20000
 
 REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
 REMOTE_SCRIPT_FILES = ['netperf_test.py']
@@ -106,11 +106,20 @@ def Prepare(benchmark_spec):
   vms = vms[:2]
   vm_util.RunThreaded(PrepareNetperf, vms)
 
-  if vm_util.ShouldRunOnExternalIpAddress():
-    vms[1].AllowPort(COMMAND_PORT)
-    vms[1].AllowPort(DATA_PORT)
+  num_streams = FLAGS.netperf_num_streams
 
-  vms[1].RemoteCommand('%s -p %s' % (netperf.NETSERVER_PATH, COMMAND_PORT))
+  # Start the netserver processes
+  if vm_util.ShouldRunOnExternalIpAddress():
+    for i in range(num_streams):
+      vms[1].AllowPort(PORT_START + i * 2)  # Command port
+      vms[1].AllowPort(PORT_START + i * 2 + 1)  # Data port
+  netserver_cmd = ('for i in $(seq {port_start} 2 {port_end}); do '
+                   '{netserver_path} -p $i & done').format(
+                       port_start=PORT_START,
+                       port_end=PORT_START + num_streams * 2,
+                       netserver_path=netperf.NETSERVER_PATH)
+  vms[1].RemoteCommand(netserver_cmd)
+  # vms[1].RemoteCommand('%s -p %s' % (netperf.NETSERVER_PATH, COMMAND_PORT))
 
   # Install some stuff on the client vm
   vms[0].Install('pip')
@@ -255,18 +264,16 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                 if FLAGS.netperf_max_iter else '')
   verbosity = '-v2 ' if FLAGS.netperf_enable_histograms or num_streams > 1 \
               else ''
-  netperf_cmd = ('{netperf_path} -p {command_port} -j {verbosity}'
+  netperf_cmd = ('{netperf_path} -j {verbosity}'
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence} '
                  ' -- '
-                 '-P {data_port} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
                  'P99_LATENCY,STDDEV_LATENCY,'
                  'MIN_LATENCY,MAX_LATENCY,'
                  'CONFIDENCE_ITERATION,THROUGHPUT_CONFID').format(
                      netperf_path=netperf.NETPERF_PATH,
                      benchmark_name=benchmark_name,
-                     server_ip=server_ip, command_port=COMMAND_PORT,
-                     data_port=DATA_PORT,
+                     server_ip=server_ip,
                      length=FLAGS.netperf_test_length,
                      confidence=confidence, verbosity=verbosity)
 
@@ -274,8 +281,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   # TODO: Record start times of netperf processes on the remote machine
 
   remote_script_path = '%s/run/%s' % (vm.GetScratchDir(), REMOTE_SCRIPT)
-  remote_cmd = '%s --netperf_cmd="%s" --num_streams=%s' % \
-               (remote_script_path, netperf_cmd, num_streams)
+  remote_cmd = '%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' % \
+               (remote_script_path, netperf_cmd, num_streams, PORT_START)
   remote_stdout, _ = vm.RemoteCommand(remote_cmd)
 
   # Decode stdouts, stderrs, and return codes from remote command's stdout
@@ -386,5 +393,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vms[1].RemoteCommand('sudo pkill netserver')
+  vms[1].RemoteCommand('sudo killall netserver')
   vms[0].RemoteCommand('rm -rf %s/run/' % vms[0].GetScratchDir())
