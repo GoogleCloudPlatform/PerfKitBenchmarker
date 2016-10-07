@@ -28,6 +28,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
+from perfkitbenchmarker.providers.gcp import util
 from tests import mock_flags
 
 
@@ -44,6 +45,9 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
     self.mocked_flags.os_type = os_types.DEBIAN
     self.mocked_flags.cloud = providers.GCP
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
+    p = mock.patch(util.__name__ + '.GetDefaultProject')
+    p.start()
+    self.addCleanup(p.stop)
 
   def _CheckAndIncrement(self, throwaway=None, expected_last_call=None):
     self.assertEqual(self.last_call, expected_last_call)

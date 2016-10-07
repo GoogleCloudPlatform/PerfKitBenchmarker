@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
+import mock
 import unittest
 
 from perfkitbenchmarker import benchmark_spec
@@ -26,6 +27,7 @@ from perfkitbenchmarker import spark_service
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_emr
 from perfkitbenchmarker.providers.gcp import gcp_dataproc
+from perfkitbenchmarker.providers.gcp import util
 from tests import mock_flags
 
 
@@ -71,6 +73,9 @@ class _BenchmarkSpecTestCase(unittest.TestCase):
     self._mocked_flags = mock_flags.MockFlags()
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
+    p = mock.patch(util.__name__ + '.GetDefaultProject')
+    p.start()
+    self.addCleanup(p.stop)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpecFromYaml(self, yaml_string, benchmark_name=NAME):
