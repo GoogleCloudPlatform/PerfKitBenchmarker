@@ -73,7 +73,7 @@ Called with samples list and benchmark spec.
 Signal sent immediately after a sample is created.
 The samples' metadata is mutable, and may be updated by the subscriber.
 
-Sender: publisher or RUN_PHASE
+Sender: the phase. Currently only RUN_PHASE.
 Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""")
 
 record_event = _events.signal('record-event', doc="""

@@ -27,7 +27,6 @@ import time
 import uuid
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import version
@@ -603,9 +602,9 @@ class SampleCollector(object):
       benchmark: string. The name of the benchmark.
       benchmark_spec: BenchmarkSpec. Benchmark specification.
     """
-    annotated_samples = [dict(s.asdict()) for s in samples]
-    for sample in annotated_samples:
+    for s in samples:
       # Annotate the sample.
+      sample = dict(s.asdict())
       sample['test'] = benchmark
 
       for meta_provider in self.metadata_providers:
@@ -617,10 +616,7 @@ class SampleCollector(object):
       sample['owner'] = FLAGS.owner
       sample['run_uri'] = benchmark_spec.uuid
       sample['sample_uri'] = str(uuid.uuid4())
-    events.samples_created.send(sender='publisher',
-                                benchmark_spec=benchmark_spec,
-                                samples=annotated_samples)
-    self.samples.extend(annotated_samples)
+      self.samples.append(sample)
 
   def PublishSamples(self):
     """Publish samples via all registered publishers."""
