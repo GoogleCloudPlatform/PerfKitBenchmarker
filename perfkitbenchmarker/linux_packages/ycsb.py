@@ -47,8 +47,10 @@ import logging
 import operator
 import os
 import posixpath
+import time
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -617,7 +619,11 @@ class YCSBExecutor(object):
       results.append(self._Load(vms[loader_index], **kw))
       logging.info('VM %d (%s) finished', loader_index, vms[loader_index])
 
+    start = time.time()
     vm_util.RunThreaded(_Load, range(len(vms)))
+    events.record_event.send(
+        type(self).__name__, event='load', start_timestamp=start,
+        end_timestamp=time.time(), metadata=kwargs)
 
     if len(results) != len(vms):
       raise IOError('Missing results: only {0}/{1} reported\n{2}'.format(
@@ -730,7 +736,11 @@ class YCSBExecutor(object):
       parameters['parameter_files'] = [remote_path]
       for client_count in _GetThreadsPerLoaderList():
         parameters['threads'] = client_count
+        start = time.time()
         results = self._RunThreaded(vms, **parameters)
+        events.record_event.send(
+            type(self).__name__, event='run', start_timestamp=start,
+            end_timestamp=time.time(), metadata=parameters)
         client_meta = workload_meta.copy()
         client_meta.update(clients=len(vms) * client_count,
                            threads_per_client_vm=client_count)
