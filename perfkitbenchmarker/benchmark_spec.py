@@ -157,10 +157,11 @@ class BenchmarkSpec(object):
 
     for _ in xrange(vm_count - len(vms)):
       # Assign a zone to each VM sequentially from the --zones flag.
-      if FLAGS.zones:
-        group_spec.vm_spec.zone = FLAGS.zones[self._zone_index]
+      if FLAGS.zones or FLAGS.extra_zones:
+        zone_list = FLAGS.zones + FLAGS.extra_zones
+        group_spec.vm_spec.zone = zone_list[self._zone_index]
         self._zone_index = (self._zone_index + 1
-                            if self._zone_index < len(FLAGS.zones) - 1
+                            if self._zone_index < len(zone_list) - 1
                             else 0)
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       if disk_spec and not vm.is_static:
