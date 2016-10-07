@@ -22,15 +22,16 @@ Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
 machines.
 """
 
+import os
 import csv
 import io
 import json
 import logging
-import threading
 
 from collections import Counter
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -67,6 +68,7 @@ netperf:
   vm_groups:
     vm_1:
       vm_spec: *default_single_core
+      disk_spec: *default_500_gb
     vm_2:
       vm_spec: *default_single_core
 """
@@ -76,6 +78,10 @@ TRANSACTIONS_PER_SECOND = 'transactions_per_second'
 
 COMMAND_PORT = 20000
 DATA_PORT = 20001
+
+REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
+REMOTE_SCRIPT_FILES = ['netperf_test.py']
+REMOTE_SCRIPT = 'netperf_test.py'
 
 PERCENTILES = [50, 90, 99]
 
@@ -105,6 +111,20 @@ def Prepare(benchmark_spec):
     vms[1].AllowPort(DATA_PORT)
 
   vms[1].RemoteCommand('%s -p %s' % (netperf.NETSERVER_PATH, COMMAND_PORT))
+
+  # Install some stuff on the client vm
+  vms[0].Install('pip')
+  vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
+
+  # Copy remote test script to client
+  scratch_dir = vms[0].GetScratchDir()
+  vms[0].RemoteCommand('sudo mkdir -p %s/run/' % scratch_dir)
+  vms[0].RemoteCommand('sudo chmod 777 %s/run/' % scratch_dir)
+  for file_name in REMOTE_SCRIPT_FILES:
+    path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, file_name))
+    logging.info('Uploading %s to %s', path, vms[0])
+    vms[0].PushFile(path, '%s/run/' % scratch_dir)
+    vms[0].RemoteCommand('sudo chmod 777 %s/run/%s' % (scratch_dir, file_name))
 
 
 def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
@@ -140,7 +160,7 @@ def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
   value_sum = float(sum([value * count for value, count in histogram.items()]))
   average = value_sum / float(total_count)
   if total_count > 1:
-    total_of_squares = sum([(value - average) * count
+    total_of_squares = sum([(value - average) ** 2 * count
                             for value, count in histogram.items()])
     stats['stddev'] = (total_of_squares / (total_count - 1)) ** 0.5
   else:
@@ -252,20 +272,14 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
 
   # Run all of the netperf processes and collect their stdout
   # TODO: Record start times of netperf processes on the remote machine
-  stdouts = [None for _ in range(num_streams)]
 
-  def NetperfThread(i):
-    stdout, _ = vm.RemoteCommand(netperf_cmd,
-                                 timeout=2 * FLAGS.netperf_test_length *
-                                 (FLAGS.netperf_max_iter or 1))
-    stdouts[i] = stdout
+  remote_script_path = '%s/run/%s' % (vm.GetScratchDir(), REMOTE_SCRIPT)
+  remote_cmd = '%s --netperf_cmd="%s" --num_streams=%s' % \
+               (remote_script_path, netperf_cmd, num_streams)
+  remote_stdout, _ = vm.RemoteCommand(remote_cmd)
 
-  threads = [threading.Thread(target=NetperfThread, args=(i,))
-             for i in range(num_streams)]
-  for thread in threads:
-    thread.start()
-  for thread in threads:
-    thread.join()
+  # Decode stdouts, stderrs, and return codes from remote command's stdout
+  stdouts, stderrs, return_codes = json.loads(remote_stdout)
 
   # Metadata to attach to samples
   metadata = {'netperf_test_length': FLAGS.netperf_test_length,
@@ -289,7 +303,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     # They should all have the same units
     throughput_unit = throughput_samples[0].unit
     # Extract the throughput values from the samples
-    throughputs = [sample.value for sample in throughput_samples]
+    throughputs = [s.value for s in throughput_samples]
     # Compute some stats on the throughput values
     throughput_stats = sample.PercentileCalculator(throughputs, [50, 90, 99])
     throughput_stats['min'] = min(throughputs)
@@ -373,3 +387,4 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vms[1].RemoteCommand('sudo pkill netserver')
+  vms[0].RemoteCommand('rm -rf %s/run/' % vms[0].GetScratchDir())
