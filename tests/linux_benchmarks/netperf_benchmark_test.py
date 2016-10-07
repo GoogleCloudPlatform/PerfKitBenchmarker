@@ -35,7 +35,9 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
                         'netperf_results.json')
 
     with open(path) as fp:
-      self.expected_stdout = ['\n'.join(i) for i in json.load(fp)]
+      stdouts = ['\n'.join(i) for i in json.load(fp)]
+      self.expected_stdout = [json.dumps(([stdout], [''], [0]))
+                              for stdout in stdouts]
 
     p = mock.patch(vm_util.__name__ + '.ShouldRunOnExternalIpAddress')
     self.should_run_external = p.start()
@@ -60,7 +62,10 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(stats['p74'], 2)
     self.assertEqual(stats['p80'], 5)
     self.assertEqual(stats['p100'], 5)
-    self.assertTrue(stats['stddev'] - 1.538 <= 0.001)
+    self.assertTrue(abs(stats['stddev'] - 1.538) <= 0.001)
+
+  def testParseNetperfOutput(self):
+    pass
 
   def testExternalAndInternal(self):
     self._ConfigureIpTypes()
