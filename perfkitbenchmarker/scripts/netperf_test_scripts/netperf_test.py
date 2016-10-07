@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import io
 import json
+import logging
 import subprocess
 import sys
 import gflags as flags
@@ -13,6 +13,10 @@ flags.DEFINE_integer('num_streams', 1, 'Number of netperf processes to run')
 flags.DEFINE_string('netperf_cmd', None,
                     'netperf command to run')
 
+flags.DEFINE_integer('port_start', None,
+                     'Starting port for netperf command and data ports')
+
+
 def Main(argv=sys.argv):
   # Parse command-line flags
   try:
@@ -23,9 +27,11 @@ def Main(argv=sys.argv):
 
   netperf_cmd = FLAGS.netperf_cmd
   num_streams = FLAGS.num_streams
+  port_start = FLAGS.port_start
 
   assert(netperf_cmd)
   assert(num_streams >= 1)
+  assert(port_start)
 
   stdouts = [None for _ in range(num_streams)]
   stderrs = [None for _ in range(num_streams)]
@@ -34,7 +40,10 @@ def Main(argv=sys.argv):
 
   # Start all of the netperf processes
   for i in range(num_streams):
-    processes[i] = subprocess.Popen(netperf_cmd, stdout=subprocess.PIPE,
+    command_port = port_start + i * 2
+    data_port = port_start + i * 2 + 1
+    cmd = netperf_cmd + (' -p %s -P %s' % (command_port, data_port))
+    processes[i] = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, shell=True)
   # Wait for all of the netperf processes to finish and save their return codes
   for i, process in enumerate(processes):
