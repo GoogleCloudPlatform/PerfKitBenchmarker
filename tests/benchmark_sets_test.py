@@ -55,7 +55,6 @@ netperf:
 """
 
 
-
 class BenchmarkSetsTestCase(unittest.TestCase):
 
   def setUp(self):
