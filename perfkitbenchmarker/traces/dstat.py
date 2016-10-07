@@ -136,7 +136,7 @@ class _DStatCollector(object):
           vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)])
     vm_util.RunThreaded(self._StopOnVm, args)
 
-  def Analyze(self, sender, samples):
+  def Analyze(self, sender, benchmark_spec, samples):
     """Analyze dstat file and record samples."""
 
     def _AnalyzeEvent(role, labels, out, event):
@@ -148,7 +148,6 @@ class _DStatCollector(object):
       # Filter out lines doesn't belong to the event
       filtered = out[idx_array, 1:]
       avg = np.mean(filtered[0], axis=0)
-      logging.info('avgs: %s', avg)
       metadata = copy.deepcopy(event.metadata)
       metadata['event'] = event.sender
       metadata['sender'] = sender
@@ -165,7 +164,7 @@ class _DStatCollector(object):
         labels, out = dstat.ParseCsvFile(fp)
         vm_util.RunThreaded(
             _AnalyzeEvent,
-            [((role, labels, out, e), {}) for e in events.TracingEvents.events])
+            [((role, labels, out, e), {}) for e in events.TracingEvent.events])
 
     vm_util.RunThreaded(
         _Analyze, [((k, w), {}) for k, w in self._role_mapping.iteritems()])
@@ -190,5 +189,5 @@ def Register(parsed_flags):
   events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
   events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
   if parsed_flags.dstat_publish:
-    events.samples_modified.connect(
+    events.samples_created.connect(
         collector.Analyze, events.RUN_PHASE, weak=False)

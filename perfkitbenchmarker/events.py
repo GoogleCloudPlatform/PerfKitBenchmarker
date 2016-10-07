@@ -67,24 +67,20 @@ successful.
 Sender: the phase. Currently only RUN_PHASE.
 Payload: benchmark_spec.""")
 
-sample_created = _events.signal('sample-created', doc="""
-Called with sample object and benchmark spec.
+samples_created = _events.signal('samples-created', doc="""
+Called with samples list and benchmark spec.
 
-Signal sent immediately after a sample is created by a publisher.
-The sample's metadata is mutable, and may be updated by the subscriber.
+Signal sent immediately after a sample is created.
+The samples' metadata is mutable, and may be updated by the subscriber.
 
-Sender: None
-Payload: benchmark_spec (BenchmarkSpec), sample (dict).""")
-
-samples_modified = _events.signal('samples-modified', doc="""
-Called with list of samples and benchmark spec.
-
-Sender: the phase
-Payload: samples (list of sample.Sample)
-""")
+Sender: publisher or RUN_PHASE
+Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""")
 
 record_event = _events.signal('record-event', doc="""
 Signal sent when an event is recorded.
+
+Signal sent after an event occurred. Record start, end timestamp and metadata
+of the event for analysis.
 
 Sender: None
 Payload: event (string), start_timestamp (float), end_timestamp (float),
@@ -92,19 +88,31 @@ metadata (dict).""")
 
 
 def RegisterTracingEvents():
-  e = TracingEvents()
-  record_event.connect(e.Add, weak=False)
+  record_event.connect(AddEvent, weak=False)
 
 
-class TracingEvents(object):
-  """Represents an event object."""
+class TracingEvent(object):
+  """Represents an event object.
+
+  Attributes:
+    sender: string. Name of the sending class/object.
+    event: string. Name of the event.
+    start_timestamp: float. Represents the start timestamp of the event.
+    end_timestamp: float. Represents the end timestamp of the event.
+    metadata: dict. Additional metadata of the event.
+  """
 
   events = []
 
-  def Add(self, sender, event, start_timestamp, end_timestamp, metadata):
+  def __init__(self, sender, event, start_timestamp, end_timestamp, metadata):
     self.sender = sender
     self.event = event
     self.start_timestamp = start_timestamp
     self.end_timestamp = end_timestamp
     self.metadata = metadata
-    self.events.append(self)
+
+
+def AddEvent(sender, event, start_timestamp, end_timestamp, metadata):
+  """Record a TracingEvent."""
+  TracingEvent.events.append(
+      TracingEvent(sender, event, start_timestamp, end_timestamp, metadata))
