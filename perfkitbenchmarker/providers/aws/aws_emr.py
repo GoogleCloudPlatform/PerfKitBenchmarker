@@ -138,10 +138,24 @@ class AwsEMR(spark_service.BaseSparkService):
     for group_type, group_spec in [
         ('CORE', self.spec.worker_group),
         ('MASTER', self.spec.master_group)]:
-      instance_groups.append({'InstanceCount': group_spec.vm_count,
-                              'InstanceGroupType': group_type,
-                              'InstanceType': group_spec.vm_spec.machine_type,
-                              'Name': group_type + ' group'})
+      instance_properties = {'InstanceCount': group_spec.vm_count,
+                             'InstanceGroupType': group_type,
+                             'InstanceType': group_spec.vm_spec.machine_type,
+                             'Name': group_type + ' group'}
+      if group_spec.disk_spec:
+        # Make sure nothing we are ignoring is included in the disk spec
+        assert group_spec.disk_spec.device_path is None
+        assert group_spec.disk_spec.disk_number is None
+        assert group_spec.disk_spec.mount_point is None
+        assert group_spec.disk_spec.iops is None
+        ebs_configuration = {'EbsBlockDeviceConfigs': [
+            {'VolumeSpecification':
+             {'SizeInGB': group_spec.disk_spec.disk_size,
+              'VolumeType': group_spec.disk_spec.disk_type},
+             'VolumesPerInstance':
+             group_spec.disk_spec.num_striped_disks}]}
+        instance_properties.update({'EbsConfiguration': ebs_configuration})
+      instance_groups.append(instance_properties)
 
     # we need to store the cluster id.
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
