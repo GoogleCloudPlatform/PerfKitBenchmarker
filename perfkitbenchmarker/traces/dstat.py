@@ -140,14 +140,14 @@ class _DStatCollector(object):
     """Analyze dstat file and record samples."""
 
     def _AnalyzeEvent(role, labels, out, event):
+      # Find out index of rows belong to event according to timestamp.
       cond = (out[:, 0] > event.start_timestamp) & (
           out[:, 0] < event.end_timestamp)
-      idx_array = np.nonzero(cond)
-      if not len(idx_array[0]):
+      # Skip analyzing event if none of rows falling into time range.
+      if not cond.any():
         return
-      # Filter out lines doesn't belong to the event
-      filtered = out[idx_array, 1:]
-      avg = np.mean(filtered[0], axis=0)
+      # Calculate mean of each column.
+      avg = np.average(out[:, 1:], weights=cond, axis=0)
       metadata = copy.deepcopy(event.metadata)
       metadata['event'] = event.sender
       metadata['sender'] = sender
