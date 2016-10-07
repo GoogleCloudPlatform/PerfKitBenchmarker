@@ -32,7 +32,9 @@ the time the job took to run, as reported by the underlying cluster.
 For more on Apache Hadoop, see: http://hadoop.apache.org/
 """
 
+import copy
 import datetime
+import logging
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -102,8 +104,8 @@ def Run(benchmark_spec):
   start = datetime.datetime.now()
   terasort_jar = spark_cluster.GetExampleJar(spark_service.HADOOP_JOB_TYPE)
   results = []
-  metadata = spark_cluster.GetMetadata().update({
-      'terasort_num_rows': FLAGS.terasort_num_rows})
+  metadata = copy.copy(spark_cluster.GetMetadata())
+  logging.info('metadata %s ' % str(metadata))
   unsorted_dir = FLAGS.terasort_unsorted_dir
   sorted_dir = FLAGS.terasort_sorted_dir
   validate_dir = FLAGS.terasort_validate_dir
@@ -113,6 +115,10 @@ def Run(benchmark_spec):
     sorted_dir += time_string
     validate_dir += time_string
 
+  metadata.update({'terasort_num_rows': FLAGS.terasort_num_rows,
+                   'terasort_sorted_dir': sorted_dir,
+                   'terasort_unsorted_dir': unsorted_dir,
+                   'terasort_validate_dir': validate_dir})
   gen_args = [TERAGEN, str(FLAGS.terasort_num_rows), unsorted_dir]
   sort_args = [TERASORT, unsorted_dir, sorted_dir]
   validate_args = [TERAVALIDATE, sorted_dir, validate_dir]

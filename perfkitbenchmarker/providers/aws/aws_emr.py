@@ -319,7 +319,8 @@ class AwsEMR(spark_service.BaseSparkService):
       if not self._CheckForFile(filename):
         raise Exception('File not found yet')
 
-    @vm_util.Retry(poll_interval=job_poll_interval, fuzz=0)
+    @vm_util.Retry(timeout=FLAGS.aws_emr_job_wait_time,
+                   poll_interval=job_poll_interval, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
