@@ -29,23 +29,22 @@ class DstatTestCase(unittest.TestCase):
     path = os.path.join(directory, 'dstat-result.csv')
     self.collector = dstat._DStatCollector(output_directory=directory)
     self.collector._role_mapping['test_vm0'] = path
-    events.TracingEvents.events = []
+    events.TracingEvent.events = []
     self.samples = []
-    self.event = events.TracingEvents()
 
   def testAnalyzeEmptyEvents(self):
-    self.collector.Analyze('testSender', self.samples)
+    self.collector.Analyze('testSender', None, self.samples)
     self.assertEqual(self.samples, [])
 
   def testAnalyzeInvalidEventTimestamps(self):
-    self.event.Add('sender', 'event', -1, -2, {})
-    self.collector.Analyze('testSender', self.samples)
+    events.AddEvent('sender', 'event', -1, -2, {})
+    self.collector.Analyze('testSender', None, self.samples)
     self.assertEqual(self.samples, [])
 
   def testAnalyzeValidEventSingleRow(self):
-    self.event.Add('sender', 'event', 1475708693, 1475708694,
+    events.AddEvent('sender', 'event', 1475708693, 1475708694,
                    {'label1': 123})
-    self.collector.Analyze('testSender', self.samples)
+    self.collector.Analyze('testSender', None, self.samples)
     # 61 metrics
     self.assertTrue(len(self.samples), 61)
     expected = Sample(metric='usr__total cpu usage',
@@ -63,9 +62,9 @@ class DstatTestCase(unittest.TestCase):
         expected.metadata, self.samples[0].metadata)
 
   def testAnalyzeValidEventTwoRows(self):
-    self.event.Add('sender', 'event', 1475708693, 1475708695,
+    events.AddEvent('sender', 'event', 1475708693, 1475708695,
                    {'label1': 123})
-    self.collector.Analyze('testSender', self.samples)
+    self.collector.Analyze('testSender', None, self.samples)
     # 61 metrics
     self.assertTrue(len(self.samples), 61)
     expected = Sample(metric='usr__total cpu usage',
@@ -83,9 +82,9 @@ class DstatTestCase(unittest.TestCase):
         expected.metadata, self.samples[0].metadata)
 
   def testAnalyzeValidEventEntireFile(self):
-    self.event.Add('sender', 'event', 1475708693, 1475709076,
+    events.AddEvent('sender', 'event', 1475708693, 1475709076,
                    {'label1': 123})
-    self.collector.Analyze('testSender', self.samples)
+    self.collector.Analyze('testSender', None, self.samples)
     # 61 metrics
     self.assertTrue(len(self.samples), 61)
     expected = Sample(metric='usr__total cpu usage',
