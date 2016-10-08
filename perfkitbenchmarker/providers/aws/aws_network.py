@@ -51,7 +51,7 @@ class AwsFirewall(network.BaseFirewall):
     self.firewall_set = set()
     self._lock = threading.Lock()
 
-  def AllowPort(self, vm, port):
+  def AllowPort(self, vm, port, to_port=None):
     """Opens a port on the firewall.
 
     Args:
@@ -60,7 +60,9 @@ class AwsFirewall(network.BaseFirewall):
     """
     if vm.is_static:
       return
-    entry = (port, vm.group_id)
+    if to_port is None:
+      to_port = port
+    entry = (port, to_port, vm.group_id)
     if entry in self.firewall_set:
       return
     with self._lock:
@@ -71,7 +73,7 @@ class AwsFirewall(network.BaseFirewall):
           'authorize-security-group-ingress',
           '--region=%s' % vm.region,
           '--group-id=%s' % vm.group_id,
-          '--port=%s' % port,
+          '--port=%s-%s' % (port, to_port),
           '--cidr=0.0.0.0/0']
       util.IssueRetryableCommand(
           authorize_cmd + ['--protocol=tcp'])
