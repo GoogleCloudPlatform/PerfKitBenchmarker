@@ -69,12 +69,12 @@ flags.DEFINE_string('terasort_unsorted_dir', 'tera_gen_data', 'Location of '
                     'the unsorted data. TeraGen writes here, and TeraSort '
                     'reads from here.')
 
-flags.DEFINE_string('terasort_sorted_dir', 'tera_sort_dir',
-                    'Location for the sorted data. TeraSort writes to here, '
-                    'TeraValidate reads from here.')
-flags.DEFINE_string('terasort_validate_dir', 'tera_validate_dir',
-                    'Location for the output of the TeraValidate command')
-
+flags.DEFINE_string('terasort_data_base', 'terasort_data/',
+                    'The benchmark will append to this to create three '
+                    'directories: one for the generated, unsorted data, '
+                    'one for the sorted data, and one for the validate '
+                    'data.  If using a static cluster or if using object '
+                    'storage buckets, you must cleanup.')
 flags.DEFINE_bool('terasort_append_timestamp', True, 'Append a timestamp to '
                   'the directories given by terasort_unsorted_dir, '
                   'terasort_sorted_dir, and terasort_validate_dir')
@@ -106,14 +106,14 @@ def Run(benchmark_spec):
   results = []
   metadata = copy.copy(spark_cluster.GetMetadata())
   logging.info('metadata %s ' % str(metadata))
-  unsorted_dir = FLAGS.terasort_unsorted_dir
-  sorted_dir = FLAGS.terasort_sorted_dir
-  validate_dir = FLAGS.terasort_validate_dir
+  base_dir = FLAGS.terasort_data_base
   if FLAGS.terasort_append_timestamp:
     time_string = datetime.datetime.now().strftime('%Y%m%d%H%S')
-    unsorted_dir += time_string
-    sorted_dir += time_string
-    validate_dir += time_string
+    base_dir += time_string
+    base_dir += '/'
+  unsorted_dir = base_dir + 'unsorted'
+  sorted_dir = base_dir + 'sorted'
+  validate_dir = base_dir + 'validate'
 
   metadata.update({'terasort_num_rows': FLAGS.terasort_num_rows,
                    'terasort_sorted_dir': sorted_dir,
