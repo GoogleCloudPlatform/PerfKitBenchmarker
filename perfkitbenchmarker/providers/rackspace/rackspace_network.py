@@ -301,7 +301,7 @@ class RackspaceFirewall(network.BaseFirewall):
     self._lock = threading.Lock()  # Guards security-group creation/deletion
     self.firewall_rules = {}
 
-  def AllowPort(self, vm, port, to_port=None, source_range=None):
+  def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     # At Rackspace all ports are open by default
     # TODO(meteorfox) Implement security groups support
     if FLAGS.rackspace_use_security_group:
