@@ -51,12 +51,14 @@ class BaseFirewall(object):
         benchmark_spec.firewalls[key] = cls()
       return benchmark_spec.firewalls[key]
 
-  def AllowPort(self, vm, port):
+  def AllowPort(self, vm, start_port, end_port=None):
     """Opens a port on the firewall.
 
     Args:
       vm: The BaseVirtualMachine object to open the port for.
-      port: The local port to open.
+      start_port: The first local port in a range of ports to open.
+      end_port: The last port in a range of ports to open. If None, only
+        start_port will be opened.
     """
     pass
 
