@@ -84,30 +84,30 @@ class OpenStackFirewall(network.BaseFirewall):
       cmd.Issue(suppress_warning=True)
       self.sec_group_rules_set.add(sec_group_rule)
 
-  def AllowPort(self, vm, port, to_port=None):
+  def AllowPort(self, vm, start_port, end_port=None):
     """Creates a Security Group Rule on the Firewall to allow for both TCP
     and UDP network traffic on given port, or port range.
 
     Args:
-        vm: The BaseVirtualMachine object to open the port for.
-        port: The local port to open.
-        to_port: The last port to open in range of ports to open. If None,
-          then only the single 'port' is open.
+      vm: The BaseVirtualMachine object to open the port for.
+      start_port: The first local port to open in a range.
+      end_port: The last local port to open in a range. If None, only start_port
+        will be opened.
     """
     if vm.is_static:
       return
 
-    if to_port is None:
-      to_port = port
+    if end_port is None:
+      end_port = start_port
 
-    sec_group_rule = (port, to_port, vm.group_id)
+    sec_group_rule = (start_port, end_port, vm.group_id)
 
     with self._lock:
       if sec_group_rule in self.sec_group_rules_set:
         return
       cmd = utils.OpenStackCLICommand(vm, OSC_SEC_GROUP_RULE_CMD, 'create',
                                       vm.group_id)
-      cmd.flags['dst-port'] = '%d:%d' % (port, to_port)
+      cmd.flags['dst-port'] = '%d:%d' % (start_port, end_port)
       for prot in (TCP, UDP,):
         cmd.flags['proto'] = prot
         cmd.Issue(suppress_warning=True)
