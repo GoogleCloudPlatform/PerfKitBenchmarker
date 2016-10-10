@@ -28,7 +28,7 @@ def _CheckAzureCLIMode(sender):
   assert sender == providers.AZURE, sender
 
   stdout, _ = vm_util.IssueRetryableCommand(
-    [azure.AZURE_PATH, 'config'])
+      [azure.AZURE_PATH, 'config'])
 
   if 'Current Mode: arm' not in stdout:
     raise BadAzureCLIModeError('Azure CLI may not be in ARM mode.')
