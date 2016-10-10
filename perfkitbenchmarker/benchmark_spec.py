@@ -129,7 +129,10 @@ class BenchmarkSpec(object):
 
     # First create the Static VM objects.
     if group_spec.static_vms:
-      for vm_spec in group_spec.static_vms[:vm_count]:
+      specs = [spec for spec in group_spec.static_vms
+               if (FLAGS.static_vm_tags is None or
+                   spec.tag in FLAGS.static_vm_tags)][:vm_count]
+      for vm_spec in specs:
         static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
         vms.append(static_vm_class(vm_spec))
 
