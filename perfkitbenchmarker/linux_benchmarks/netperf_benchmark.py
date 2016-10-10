@@ -110,13 +110,12 @@ def Prepare(benchmark_spec):
 
   # Start the netserver processes
   if vm_util.ShouldRunOnExternalIpAddress():
-    for i in range(num_streams):
-      vms[1].AllowPort(PORT_START + i * 2)  # Command port
-      vms[1].AllowPort(PORT_START + i * 2 + 1)  # Data port
+    # Open all of the command and data ports
+    vms[1].AllowPort(PORT_START, PORT_START + num_streams * 2 - 1)
   netserver_cmd = ('for i in $(seq {port_start} 2 {port_end}); do '
                    '{netserver_path} -p $i & done').format(
                        port_start=PORT_START,
-                       port_end=PORT_START + num_streams * 2,
+                       port_end=PORT_START + num_streams * 2 - 1,
                        netserver_path=netperf.NETSERVER_PATH)
   vms[1].RemoteCommand(netserver_cmd)
   # vms[1].RemoteCommand('%s -p %s' % (netperf.NETSERVER_PATH, COMMAND_PORT))
@@ -264,9 +263,10 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                 if FLAGS.netperf_max_iter else '')
   verbosity = '-v2 ' if FLAGS.netperf_enable_histograms or num_streams > 1 \
               else ''
-  netperf_cmd = ('{netperf_path} -j {verbosity}'
-                 '-t {benchmark_name} -H {server_ip} -l {length} {confidence} '
+  netperf_cmd = ('{netperf_path} -p {{command_port}} -j {verbosity} '
+                 '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
+                 '-P {{data_port}} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
                  'P99_LATENCY,STDDEV_LATENCY,'
                  'MIN_LATENCY,MAX_LATENCY,'
