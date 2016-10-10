@@ -42,7 +42,7 @@ def Main(argv=sys.argv):
   for i in range(num_streams):
     command_port = port_start + i * 2
     data_port = port_start + i * 2 + 1
-    cmd = netperf_cmd + (' -p %s -P %s' % (command_port, data_port))
+    cmd = netperf_cmd.format(command_port=command_port, data_port=data_port)
     processes[i] = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, shell=True)
   # Wait for all of the netperf processes to finish and save their return codes
