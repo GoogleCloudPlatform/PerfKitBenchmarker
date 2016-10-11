@@ -127,8 +127,6 @@ class AzureDisk(disk.BaseDisk):
         raise errors.Resource.RetryableCreationError(
             'Error creating Azure disk.')
 
-      # self.created = True
-
       disk = self._GetDiskJSON()
       self.name = disk['name']
 
