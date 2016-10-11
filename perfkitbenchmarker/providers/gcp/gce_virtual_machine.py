@@ -31,7 +31,6 @@ import yaml
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
@@ -264,12 +263,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
-    self.project = vm_spec.project
+    self.project = vm_spec.project or util.GetDefaultProject()
     self.network = gce_network.GceNetwork.GetNetwork(self)
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size
     self.boot_disk_type = vm_spec.boot_disk_type
-    events.sample_created.connect(self.AnnotateSample, weak=False)
 
   def _GenerateCreateCommand(self, ssh_keys_path):
     """Generates a command to create the VM instance.
@@ -427,9 +425,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                                      for key, value in kwargs.iteritems())
     cmd.Issue()
 
-  def AnnotateSample(self, unused_sender, benchmark_spec, sample):
-    sample['metadata']['preemptible'] = self.preemptible
-
   def GetMachineTypeDict(self):
     """Returns a dict containing properties that specify the machine type.
 
@@ -437,7 +432,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       dict mapping string property key to value.
     """
     result = super(GceVirtualMachine, self).GetMachineTypeDict()
-    for attr_name in 'cpus', 'memory_mib', 'preemptible':
+    for attr_name in 'cpus', 'memory_mib', 'preemptible', 'project':
       attr_value = getattr(self, attr_name)
       if attr_value:
         result[attr_name] = attr_value

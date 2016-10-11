@@ -14,8 +14,6 @@
 
 import unittest
 
-import pandas as pd
-
 from perfkitbenchmarker import sample
 
 
@@ -58,8 +56,3 @@ class TestPercentileCalculator(unittest.TestCase):
   def testWrongTypePercentile(self):
     with self.assertRaises(ValueError):
       sample.PercentileCalculator([3], percentiles=["a"])
-
-  def testPandasSeries(self):
-    percentiles = sample.PercentileCalculator(pd.Series([1, 2, 3]),
-                                              percentiles=[50])
-    self.assertEqual(percentiles['p50'], 2)

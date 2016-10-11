@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
+import mock
 import unittest
 
 from perfkitbenchmarker import benchmark_spec
@@ -26,6 +27,7 @@ from perfkitbenchmarker import spark_service
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_emr
 from perfkitbenchmarker.providers.gcp import gcp_dataproc
+from perfkitbenchmarker.providers.gcp import util
 from tests import mock_flags
 
 
@@ -33,27 +35,35 @@ FLAGS = flags.FLAGS
 
 NAME = 'name'
 UID = 'name0'
-DATAPROC_CONFIG = """
-name:
-  spark_service:
-    service_type: managed
-    machine_type: n1-standard-4
-    num_workers: 4
-"""
 
-EMR_CONFIG = """
+SERVICE_CONFIG = """
 name:
   spark_service:
     service_type: managed
-    machine_type: m1.large
-    num_workers: 4
+    worker_group:
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+          boot_disk_size: 500
+          zone: us-west1-a
+        AWS:
+          machine_type: m4.xlarge
+          zone: us-west-1
+      vm_count: 4
 """
 
 PKB_MANAGED_CONFIG = """
 name:
   spark_service:
     service_type: pkb_managed
-    num_workers: 5
+    worker_group:
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+          boot_disk_size: 500
+        AWS:
+          machine_type: m4.xlarge
+      vm_count: 2
 """
 
 
@@ -63,6 +73,9 @@ class _BenchmarkSpecTestCase(unittest.TestCase):
     self._mocked_flags = mock_flags.MockFlags()
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
+    p = mock.patch(util.__name__ + '.GetDefaultProject')
+    p.start()
+    self.addCleanup(p.stop)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpecFromYaml(self, yaml_string, benchmark_name=NAME):
@@ -82,51 +95,55 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
     pkb._InitializeRunUri()
 
   def testDataprocConfig(self):
-    spec = self._CreateBenchmarkSpecFromYaml(DATAPROC_CONFIG)
-    spec.ConstructVirtualMachines()
+    spec = self._CreateBenchmarkSpecFromYaml(SERVICE_CONFIG)
     spec.ConstructSparkService()
+    spec.ConstructVirtualMachines()
     self.assertTrue(hasattr(spec, 'spark_service'))
     self.assertTrue(spec.spark_service is not None)
     self.assertEqual(len(spec.vms), 0)
-    self.assertEqual(spec.config.spark_service.num_workers, 4,
+    machine_type = spec.config.spark_service.worker_group.vm_spec.machine_type
+    self.assertEqual(spec.config.spark_service.worker_group.vm_count, 4,
                      str(spec.config.spark_service.__dict__))
     self.assertEqual(spec.config.spark_service.service_type,
                      spark_service.PROVIDER_MANAGED)
-    self.assertEqual(spec.config.spark_service.machine_type, 'n1-standard-4',
-                     str(spec.config.spark_service.__dict__))
+    self.assertEqual(machine_type,
+                     'n1-standard-4', str(spec.config.spark_service.__dict__))
     self.assertTrue(isinstance(spec.spark_service,
                                gcp_dataproc.GcpDataproc))
 
   def testEMRConfig(self):
     self._mocked_flags.cloud = providers.AWS
-    self._mocked_flags.zones = ['us-west-2']
+    self._mocked_flags.zones = 'us-west-2'
     with mock_flags.PatchFlags(self._mocked_flags):
-      spec = self._CreateBenchmarkSpecFromYaml(EMR_CONFIG)
-      spec.ConstructVirtualMachines()
+      spec = self._CreateBenchmarkSpecFromYaml(SERVICE_CONFIG)
       spec.ConstructSparkService()
+      spec.ConstructVirtualMachines()
       self.assertTrue(hasattr(spec, 'spark_service'))
       self.assertTrue(spec.spark_service is not None)
       self.assertEqual(len(spec.vms), 0)
-      self.assertEqual(spec.config.spark_service.num_workers, 4,
+      self.assertEqual(spec.config.spark_service.worker_group.vm_count, 4,
                        str(spec.config.spark_service.__dict__))
+      machine_type = spec.config.spark_service.worker_group.vm_spec.machine_type
       self.assertEqual(spec.config.spark_service.service_type,
                        spark_service.PROVIDER_MANAGED)
-      self.assertEqual(spec.config.spark_service.machine_type, 'm1.large',
+      self.assertEqual(machine_type, 'm4.xlarge',
                        str(spec.config.spark_service.__dict__))
       self.assertTrue(isinstance(spec.spark_service,
                                  aws_emr.AwsEMR))
 
   def testPkbManaged(self):
     spec = self._CreateBenchmarkSpecFromYaml(PKB_MANAGED_CONFIG)
-    self.assertEqual(spec.config.spark_service.num_workers, 5,
+    self.assertEqual(spec.config.spark_service.worker_group.vm_count, 2,
                      str(spec.config.spark_service.__dict__))
     self.assertEqual(spec.config.spark_service.service_type,
                      spark_service.PKB_MANAGED)
-
-    spec.ConstructVirtualMachines()
-    self.assertEqual(len(spec.vms), 0)
     spec.ConstructSparkService()
-    self.assertEqual(spec.spark_service.num_workers, 5)
+    spec.ConstructVirtualMachines()
+    self.assertEqual(len(spec.vms), 3)
+    self.assertEqual(len(spec.vm_groups['master_group']), 1)
+    self.assertEqual(len(spec.vm_groups['worker_group']), 2)
+    self.assertEqual(len(spec.spark_service.vms['worker_group']), 2)
+    self.assertEqual(len(spec.spark_service.vms['master_group']), 1)
     self.assertTrue(isinstance(spec.spark_service,
                                spark_service.PkbSparkService))
 

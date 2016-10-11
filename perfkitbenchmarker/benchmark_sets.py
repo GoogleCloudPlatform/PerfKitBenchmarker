@@ -14,6 +14,9 @@
 
 """Benchmark set specific functions and definitions."""
 
+import copy
+import itertools
+
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
@@ -21,6 +24,9 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import windows_benchmarks
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_string('flag_matrix', None,
+                    'The name of the flag matrix to run.')
 
 MESSAGE = 'message'
 BENCHMARK_LIST = 'benchmark_list'
@@ -211,12 +217,38 @@ def GetBenchmarksFromFlags():
   # create a list of module, config tuples to return
   benchmark_config_list = []
   for benchmark_name in benchmark_names:
-    if benchmark_name in valid_benchmarks:
-      benchmark_module = valid_benchmarks[benchmark_name]
-      user_config = user_config.get(benchmark_name, {})
-      benchmark_config_list.append((benchmark_module, user_config))
-    else:
+    benchmark_config = user_config.get(benchmark_name, {})
+    benchmark_name = benchmark_config.get('name', benchmark_name)
+    benchmark_module = valid_benchmarks.get(benchmark_name)
+
+    if benchmark_module is None:
       raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
                        (benchmark_name, FLAGS.os_type))
+
+    # We need to remove the 'flag_matrix', 'flag_matrix_defs', and
+    # 'flag_matrix_filters' keys from the config dictionairy since
+    # they aren't actually part of the config spec and will cause
+    # errors if they are left in.
+    flag_matrix_name = benchmark_config.pop(
+        'flag_matrix', None)
+    flag_matrix_name = FLAGS.flag_matrix or flag_matrix_name
+    flag_matrix = benchmark_config.pop(
+        'flag_matrix_defs', {}).get(flag_matrix_name, {})
+    flag_matrix_filter = benchmark_config.pop(
+        'flag_matrix_filters', {}).get(flag_matrix_name)
+
+    flag_axes = []
+    for flag, values in flag_matrix.iteritems():
+      flag_axes.append([{flag: v} for v in values])
+
+    for flag_config in itertools.product(*flag_axes):
+      config = copy.copy(benchmark_config)
+      config['flags'] = copy.deepcopy(config.get('flags', {}))
+      for setting in flag_config:
+        config['flags'].update(setting)
+      if (flag_matrix_filter and not eval(
+          flag_matrix_filter, {}, config['flags'])):
+          continue
+      benchmark_config_list.append((benchmark_module, config))
 
   return benchmark_config_list

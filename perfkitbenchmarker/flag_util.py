@@ -454,7 +454,7 @@ def ParseKeyValuePairs(strings):
   pairs = {}
   for pair in [kv for s in strings for kv in s.split(',')]:
     try:
-      key, value = pair.split(':')
+      key, value = pair.split(':', 1)
       pairs[key] = value
     except ValueError:
       logging.error('Bad key value pair format. Skipping "%s".', pair)

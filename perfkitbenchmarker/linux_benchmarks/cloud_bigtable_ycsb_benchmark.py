@@ -28,7 +28,6 @@ import logging
 import os
 import pipes
 import posixpath
-import re
 import subprocess
 
 from perfkitbenchmarker import configs
@@ -43,8 +42,7 @@ from perfkitbenchmarker.providers.gcp import gcp_bigtable
 
 FLAGS = flags.FLAGS
 
-HBASE_VERSION = re.match(r'(\d+\.\d+)\.?\d*', hbase.HBASE_VERSION).group(1)
-
+HBASE_CLIENT_VERSION = '1.1'
 BIGTABLE_CLIENT_VERSION = '0.9.0'
 
 flags.DEFINE_string('google_bigtable_endpoint', 'bigtable.googleapis.com',
@@ -62,7 +60,7 @@ flags.DEFINE_string(
     'https://oss.sonatype.org/service/local/repositories/releases/content/'
     'com/google/cloud/bigtable/bigtable-hbase-{0}/'
     '{1}/bigtable-hbase-{0}-{1}.jar'.format(
-        HBASE_VERSION,
+        HBASE_CLIENT_VERSION,
         BIGTABLE_CLIENT_VERSION),
     'URL for the Bigtable-HBase client JAR.')
 
@@ -207,7 +205,7 @@ def _Install(vm):
       'google_bigtable_admin_endpoint': FLAGS.google_bigtable_admin_endpoint,
       'project': FLAGS.project or _GetDefaultProject(),
       'instance': instance_name,
-      'hbase_version': HBASE_VERSION.replace('.', '_')
+      'hbase_version': HBASE_CLIENT_VERSION.replace('.', '_')
   }
 
   for file_name in HBASE_CONF_FILES:

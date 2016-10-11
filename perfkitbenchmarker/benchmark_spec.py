@@ -129,7 +129,10 @@ class BenchmarkSpec(object):
 
     # First create the Static VM objects.
     if group_spec.static_vms:
-      for vm_spec in group_spec.static_vms[:vm_count]:
+      specs = [spec for spec in group_spec.static_vms
+               if (FLAGS.static_vm_tags is None or
+                   spec.tag in FLAGS.static_vm_tags)][:vm_count]
+      for vm_spec in specs:
         static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
         vms.append(static_vm_class(vm_spec))
 
@@ -157,10 +160,11 @@ class BenchmarkSpec(object):
 
     for _ in xrange(vm_count - len(vms)):
       # Assign a zone to each VM sequentially from the --zones flag.
-      if FLAGS.zones:
-        group_spec.vm_spec.zone = FLAGS.zones[self._zone_index]
+      if FLAGS.zones or FLAGS.extra_zones:
+        zone_list = FLAGS.zones + FLAGS.extra_zones
+        group_spec.vm_spec.zone = zone_list[self._zone_index]
         self._zone_index = (self._zone_index + 1
-                            if self._zone_index < len(FLAGS.zones) - 1
+                            if self._zone_index < len(zone_list) - 1
                             else 0)
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       if disk_spec and not vm.is_static:
@@ -232,17 +236,37 @@ class BenchmarkSpec(object):
 
       self.vm_groups[group_name] = vms
       self.vms.extend(vms)
+    # If we have a spark service, it needs to access the master_group and
+    # the worker group.
+    if (self.config.spark_service and
+        self.config.spark_service.service_type == spark_service.PKB_MANAGED):
+      for group_name in 'master_group', 'worker_group':
+        self.spark_service.vms[group_name] = self.vm_groups[group_name]
+
 
   def ConstructSparkService(self):
+    """Create the spark_service object and create groups for its vms."""
     if self.config.spark_service is None:
       return
 
-    providers.LoadProvider(self.config.spark_service.cloud)
-    spark_service_spec = self.config.spark_service
-    service_type = spark_service_spec.service_type
+    spark_spec = self.config.spark_service
+    # Worker group is required, master group is optional
+    cloud = spark_spec.worker_group.cloud
+    if spark_spec.master_group:
+      cloud = spark_spec.master_group.cloud
+    providers.LoadProvider(cloud)
+    service_type = spark_spec.service_type
     spark_service_class = spark_service.GetSparkServiceClass(
-        spark_service_spec.cloud, service_type)
-    self.spark_service = spark_service_class(spark_service_spec)
+        cloud, service_type)
+    self.spark_service = spark_service_class(spark_spec)
+    # If this is Pkb managed, the benchmark spec needs to adopt vms.
+    if service_type == spark_service.PKB_MANAGED:
+      for name, spec in [('master_group', spark_spec.master_group),
+                         ('worker_group', spark_spec.worker_group)]:
+        if name in self.config.vm_groups:
+          raise Exception('Cannot have a vm group {0} with a {1} spark '
+                          'service'.format(name, spark_service.PKB_MANAGED))
+        self.config.vm_groups[name] = spec
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]

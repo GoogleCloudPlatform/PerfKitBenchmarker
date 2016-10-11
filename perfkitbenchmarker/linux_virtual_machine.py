@@ -49,7 +49,7 @@ FLAGS = flags.FLAGS
 EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
              '6/x86_64/epel-release-6-8.noarch.rpm')
 EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-             '7/x86_64/e/epel-release-7-5.noarch.rpm')
+             '7/x86_64/e/epel-release-7-8.noarch.rpm')
 
 UPDATE_RETRIES = 5
 SSH_RETRIES = 10
@@ -622,6 +622,8 @@ class RhelMixin(BaseLinuxMixin):
       else:
         raise e
       self.RemoteCommand('sudo rpm -ivh --force %s' % epel_rpm)
+    self.InstallPackages('yum-utils')
+    self.RemoteCommand('sudo yum-config-manager --enable epel')
 
   def PackageCleanup(self):
     """Cleans up all installed packages.
@@ -911,6 +913,11 @@ class ContainerizedDebianMixin(DebianMixin):
     """
     # Escapes bash sequences
     command = command.replace("'", r"'\''")
+
+    # The base image, ubuntu-latest, doesn't have 'sudo'. Also 'sudo' is not
+    # needed because the container starts as root.
+    if command.startswith('sudo '):
+      command = command[5:]
 
     logging.info('Docker running: %s' % command)
     command = "sudo docker exec %s bash -c '%s'" % (self.docker_id, command)

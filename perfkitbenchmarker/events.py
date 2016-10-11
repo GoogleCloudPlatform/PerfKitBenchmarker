@@ -38,6 +38,19 @@ Signal sent after a cloud provider's modules have been imported.
 
 Sender: string. Cloud provider name chosen from providers.VALID_CLOUDS.""")
 
+benchmark_start = _events.signal('benchmark-start', doc="""
+Signal sent at the beginning of a benchmark before any resources are
+provisioned.
+
+Sender: None
+Payload: benchmark_spec.""")
+
+benchmark_end = _events.signal('benchmark-end', doc="""
+Signal sent at the end of a benchmark after any resources have been
+torn down (if run_stage includes teardown).
+
+Sender: None
+Payload: benchmark_spec.""")
 
 RUN_PHASE = 'run'
 
@@ -54,11 +67,52 @@ successful.
 Sender: the phase. Currently only RUN_PHASE.
 Payload: benchmark_spec.""")
 
-sample_created = _events.signal('sample-created', doc="""
-Called with sample object and benchmark spec.
+samples_created = _events.signal('samples-created', doc="""
+Called with samples list and benchmark spec.
 
-Signal sent immediately after a sample is created by a publisher.
-The sample's metadata is mutable, and may be updated by the subscriber.
+Signal sent immediately after a sample is created.
+The samples' metadata is mutable, and may be updated by the subscriber.
+
+Sender: the phase. Currently only RUN_PHASE.
+Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""")
+
+record_event = _events.signal('record-event', doc="""
+Signal sent when an event is recorded.
+
+Signal sent after an event occurred. Record start, end timestamp and metadata
+of the event for analysis.
 
 Sender: None
-Payload: benchmark_spec (BenchmarkSpec), sample (dict).""")
+Payload: event (string), start_timestamp (float), end_timestamp (float),
+metadata (dict).""")
+
+
+def RegisterTracingEvents():
+  record_event.connect(AddEvent, weak=False)
+
+
+class TracingEvent(object):
+  """Represents an event object.
+
+  Attributes:
+    sender: string. Name of the sending class/object.
+    event: string. Name of the event.
+    start_timestamp: float. Represents the start timestamp of the event.
+    end_timestamp: float. Represents the end timestamp of the event.
+    metadata: dict. Additional metadata of the event.
+  """
+
+  events = []
+
+  def __init__(self, sender, event, start_timestamp, end_timestamp, metadata):
+    self.sender = sender
+    self.event = event
+    self.start_timestamp = start_timestamp
+    self.end_timestamp = end_timestamp
+    self.metadata = metadata
+
+
+def AddEvent(sender, event, start_timestamp, end_timestamp, metadata):
+  """Record a TracingEvent."""
+  TracingEvent.events.append(
+      TracingEvent(sender, event, start_timestamp, end_timestamp, metadata))

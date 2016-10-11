@@ -147,9 +147,11 @@ class PackageResourceLoader(ResourceLoader):
 
 
 DATA_PACKAGE_NAME = 'perfkitbenchmarker.data'
+YCSB_WORKLOAD_DIR_NAME = 'perfkitbenchmarker/data/ycsb'
 SCRIPT_PACKAGE_NAME = 'perfkitbenchmarker.scripts'
 CONFIG_PACKAGE_NAME = 'perfkitbenchmarker.configs'
 DEFAULT_RESOURCE_LOADERS = [PackageResourceLoader(DATA_PACKAGE_NAME),
+                            FileResourceLoader(YCSB_WORKLOAD_DIR_NAME),
                             PackageResourceLoader(SCRIPT_PACKAGE_NAME),
                             PackageResourceLoader(CONFIG_PACKAGE_NAME)]
 

@@ -105,11 +105,15 @@ flags.DEFINE_string('project', None, 'GCP project ID under which '
 flags.DEFINE_list(
     'zones', [],
     'A list of zones within which to run PerfKitBenchmarker. '
-    'This is specific to the cloud provider you are running o`n. '
+    'This is specific to the cloud provider you are running on. '
     'If multiple zones are given, PerfKitBenchmarker will create 1 VM in '
     'zone, until enough VMs are created as specified in each '
     'benchmark. The order in which this flag is applied to VMs is '
     'undefined.')
+flags.DEFINE_list(
+    'extra_zones', [],
+    'Zones that will be appended to the "zones" list. This is functionally '
+    'the same, but allows flag matrices to have two zone axes.')
 # TODO(user): note that this is currently very GCE specific. Need to create a
 #    module which can traslate from some generic types to provider specific
 #    nomenclature.
@@ -191,6 +195,12 @@ flags.DEFINE_integer(
     'PKB will run/re-run the run stage of each benchmark until it has spent '
     'at least this many seconds. It defaults to 0, so benchmarks will only '
     'be run once unless some other value is specified.')
+flags.DEFINE_integer(
+    'run_stage_retries', 0,
+    'The number of allowable consecutive failures during the run stage. After '
+    'this number of failures any exceptions will cause benchmark termination. '
+    'If run_stage_time is exceeded, the run stage will not be retried even if '
+    'the number of failures is less than the value of this flag.')
 
 
 # Support for using a proxy in the cloud environment.
@@ -330,11 +340,13 @@ def DoProvisionPhase(name, spec, timer):
       provisioning.
   """
   logging.info('Provisioning resources for benchmark %s', name)
-  spec.ConstructVirtualMachines()
+  # spark service needs to go first, because it adds some vms.
   spec.ConstructSparkService()
+  spec.ConstructVirtualMachines()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.PickleSpec()
+  events.benchmark_start.send(benchmark_spec=spec)
   try:
     with timer.Measure('Resource Provisioning'):
       spec.Provision()
@@ -376,14 +388,26 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
   """
   deadline = time.time() + FLAGS.run_stage_time
   run_number = 0
+  consecutive_failures = 0
   while True:
+    samples = []
     logging.info('Running benchmark %s', name)
     events.before_phase.send(events.RUN_PHASE, benchmark_spec=spec)
     try:
       with timer.Measure('Benchmark Run'):
         samples = benchmark.Run(spec)
+    except Exception:
+      consecutive_failures += 1
+      if consecutive_failures > FLAGS.run_stage_retries:
+        raise
+      logging.exception('Run failed (consecutive_failures=%s); retrying.',
+                        consecutive_failures)
+    else:
+      consecutive_failures = 0
     finally:
       events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+    events.samples_created.send(
+        events.RUN_PHASE, benchmark_spec=spec, samples=samples)
     if FLAGS.run_stage_time:
       for sample in samples:
         sample.metadata['run_number'] = run_number
@@ -531,6 +555,7 @@ def RunBenchmark(benchmark, sequence_number, total_benchmarks, benchmark_config,
       finally:
         if stages.TEARDOWN in FLAGS.run_stage:
           spec.Delete()
+        events.benchmark_end.send(benchmark_spec=spec)
         # Pickle spec to save final resource state.
         spec.PickleSpec()
 

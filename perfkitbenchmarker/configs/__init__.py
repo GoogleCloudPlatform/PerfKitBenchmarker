@@ -23,6 +23,8 @@ specify which benchmarks to run in the same config file.
 Valid top level keys:
   benchmarks: A YAML array of dictionaries mapping benchmark names to their
       configs. This also determines which benchmarks to run.
+  flags: A YAML dictionary with overrides for default flag values. Benchmark
+      config specific flags override those specified here.
   *any_benchmark_name*: If the 'benchmarks' key is not specified, then
       specifying a benchmark name mapped to a config will override
       that benchmark's default configuration in the event that that
@@ -61,6 +63,7 @@ dictionary.
 """
 
 import copy
+import functools32
 import logging
 import yaml
 
@@ -70,6 +73,7 @@ from perfkitbenchmarker import flags
 
 FLAGS = flags.FLAGS
 CONFIG_CONSTANTS = 'default_config_constants.yaml'
+FLAGS_KEY = 'flags'
 
 flags.DEFINE_string('benchmark_config_file', None,
                     'The file path to the user config file which will '
@@ -92,6 +96,13 @@ def _LoadUserConfig(path):
     return yaml.load(fp.read())
 
 
+@functools32.lru_cache()
+def _LoadConfigConstants():
+  """Reads the config constants file."""
+  with open(data.ResourcePath(CONFIG_CONSTANTS, False)) as fp:
+    return fp.read()
+
+
 def _GetConfigFromOverrides(overrides):
   """Converts a list of overrides into a config."""
   config = {}
@@ -109,6 +120,12 @@ def _GetConfigFromOverrides(overrides):
     config = MergeConfigs(config, new_config)
 
   return config
+
+
+@functools32.lru_cache()
+def _GetConfigFlags():
+  """Returns the global flags from the user config."""
+  return GetUserConfig().get(FLAGS_KEY, {})
 
 
 def GetUserConfig():
@@ -198,8 +215,7 @@ def LoadMinimalConfig(benchmark_config, benchmark_name):
     dict. The loaded config.
   """
   yaml_config = []
-  with open(data.ResourcePath(CONFIG_CONSTANTS, False)) as fp:
-    yaml_config.append(fp.read())
+  yaml_config.append(_LoadConfigConstants())
   yaml_config.append(benchmark_config)
 
   try:
@@ -233,5 +249,8 @@ def LoadConfig(benchmark_config, user_config, benchmark_name):
     dict. The loaded config.
   """
   config = LoadMinimalConfig(benchmark_config, benchmark_name)
+  if FLAGS_KEY not in config:
+    config[FLAGS_KEY] = {}
+  config[FLAGS_KEY].update(_GetConfigFlags())
   config = MergeConfigs(config, user_config, warn_new_key=True)
   return config

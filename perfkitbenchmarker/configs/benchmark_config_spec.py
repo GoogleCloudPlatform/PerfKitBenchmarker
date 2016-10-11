@@ -176,10 +176,8 @@ class _SparkServiceSpec(spec.BaseSpec):
     service_type: string.  pkb_managed or managed_service
     static_cluster_id: if user has created a cluster, the id of the
       cluster.
-    num_workers: number of workers.
-    machine_type: machine type to use.
-    cloud: cloud to use.
-    project: project to use.
+    worker_group: Vm group spec for workers.
+    master_group: Vm group spec for master
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
@@ -204,16 +202,10 @@ class _SparkServiceSpec(spec.BaseSpec):
             'default': spark_service.PROVIDER_MANAGED,
             'valid_values': [spark_service.PROVIDER_MANAGED,
                              spark_service.PKB_MANAGED]}),
-        'num_workers': (option_decoders.IntDecoder, {
-            'default': 3, 'min': 1}),
-        'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS}),
-        'zone': (option_decoders.StringDecoder, {'none_ok': True,
-                                                 'default': None}),
-        'project': (option_decoders.StringDecoder, {'default': None,
-                                                    'none_ok': True}),
-        'machine_type': (option_decoders.StringDecoder, {'default': None,
-                                                         'none_ok': True})})
+        'worker_group': (_VmGroupSpecDecoder, {}),
+        'master_group': (_VmGroupSpecDecoder,
+                         {'default': None,
+                          'none_ok': True})})
     return result
 
   @classmethod
@@ -229,15 +221,15 @@ class _SparkServiceSpec(spec.BaseSpec):
           provided config values.
     """
     super(_SparkServiceSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['cloud'].present or 'cloud' not in config_values:
-      config_values['cloud'] = flag_values.cloud
-    if flag_values['project'].present or 'project' not in config_values:
-      config_values['project'] = flag_values.project
     if flag_values['spark_static_cluster_id'].present:
       config_values['static_cluster_id'] = (
           flag_values.spark_static_cluster_id)
     if flag_values['zones'].present:
-      config_values['zone'] = flag_values.zones[0]
+      for group in ('master_group', 'worker_group'):
+        if group in config_values:
+          for cloud in config_values[group]['vm_spec']:
+            config_values[group]['vm_spec'][cloud]['zone'] = (
+                flag_values.zones[0])
 
 
 class _VmGroupSpec(spec.BaseSpec):
@@ -363,6 +355,35 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
+  """Validates a single VmGroupSpec dictionary."""
+
+  def __init__(self, **kwargs):
+    super(_VmGroupSpecDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies vm_groups dictionary of a benchmark config object.
+
+    Args:
+      value: dict corresonding to a VM group config.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+
+    Returns:
+      dict a _VmGroupSpec.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    vm_group_config = super(_VmGroupSpecDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    return _VmGroupSpec(self._GetOptionFullName(component_full_name),
+                        flag_values=flag_values,
+                        **vm_group_config)
+
+
 class _SparkServiceDecoder(option_decoders.TypeVerifier):
   """Validates the spark_service dictionary of a benchmark config object."""
   def __init__(self, **kwargs):
@@ -389,12 +410,12 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
     return result
 
 
-
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
   Attributes:
     description: None or string. Description of the benchmark to run.
+    name: Optional. The name of the benchmark
     flags: flags.FlagValues. Values to use for each flag while executing the
         benchmark.
     vm_groups: dict mapping VM group name string to _VmGroupSpec. Configurable
@@ -445,6 +466,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     result = super(BenchmarkConfigSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'description': (option_decoders.StringDecoder, {'default': None}),
+        'name': (option_decoders.StringDecoder, {'default': None}),
         'flags': (_FlagsDecoder, {}),
         'vm_groups': (_VmGroupsDecoder, {'default': {}}),
         'spark_service': (_SparkServiceDecoder, {'default': None})})

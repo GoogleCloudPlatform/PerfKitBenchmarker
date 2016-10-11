@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
+import mock
 import unittest
 
 from perfkitbenchmarker import benchmark_spec
@@ -25,6 +26,7 @@ from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
+from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
 from tests import mock_flags
 
@@ -107,6 +109,9 @@ class _BenchmarkSpecTestCase(unittest.TestCase):
     self._mocked_flags = mock_flags.MockFlags()
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
+    p = mock.patch(util.__name__ + '.GetDefaultProject')
+    p.start()
+    self.addCleanup(p.stop)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
   def _CreateBenchmarkSpecFromYaml(self, yaml_string, benchmark_name=NAME):
@@ -170,6 +175,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
   def testZonesFlag(self):
     with mock_flags.PatchFlags(self._mocked_flags):
       self._mocked_flags.zones = ['us-east-1b', 'zone2']
+      self._mocked_flags.extra_zones = []
       spec = self._CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
       spec.ConstructVirtualMachines()
       self.assertEqual(len(spec.vms), 2)
