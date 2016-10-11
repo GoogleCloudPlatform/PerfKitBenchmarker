@@ -211,16 +211,22 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name,
   assert 'Throughput' in results
 
   # Create the throughput sample
-  throughput = float(results['Throughput'])
-  unit = {'Trans/s': TRANSACTIONS_PER_SECOND,  # *_RR
-          '10^6bits/s': MBPS}[results['Throughput Units']]  # TCP_STREAM
-  if unit == MBPS:
+  throughput_units = results['Throughput Units']
+  if throughput_units == '10^6bits/s':
+    # TCP_STREAM benchmark
+    unit = MBPS
     metric = '%s_Throughput' % benchmark_name
-  else:
+  elif throughput_units == 'Trans/s':
+    # *RR benchmarks
+    unit = TRANSACTIONS_PER_SECOND
     metric = '%s_Transaction_Rate' % benchmark_name
+  else:
+    raise ValueError('Netperf output specifies unrecognized throughput units %s'
+                     % throughput_units)
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
                ('Throughput Confidence Width (%)', 'confidence_width_percent')]
-  metadata.update({meta_key: results[np_key] for np_key, meta_key in meta_keys})
+  metadata.update({meta_key: results[netperf_key]
+                   for netperf_key, meta_key in meta_keys})
   throughput_sample = sample.Sample(metric, throughput, unit, metadata)
 
   # No tail latency for throughput.
