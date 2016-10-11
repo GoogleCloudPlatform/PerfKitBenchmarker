@@ -176,7 +176,8 @@ def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
   return stats
 
 
-def _ParseNetperfOutput(stdout, metadata, benchmark_name):
+def _ParseNetperfOutput(stdout, metadata, benchmark_name,
+                        enable_latency_histograms):
   """Parses the stdout of a single netperf process.
 
   Args:
@@ -217,7 +218,7 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name):
 
   latency_hist = None
   latency_samples = []
-  if FLAGS.netperf_enable_histograms:
+  if enable_latency_histograms:
     # Parse the latency histogram. {latency: response_latency} where latency is
     # the latency in microseconds with only 1 significant figure.
     latency_hist = netperf.ParseHistogram(stdout)
@@ -252,6 +253,10 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   Returns:
     A sample.Sample object with the result.
   """
+  enable_latency_histograms = FLAGS.netperf_enable_histograms or num_streams > 1
+  # Throughput benchmarks don't have latency histograms
+  enable_latency_histograms = enable_latency_histograms and \
+      benchmark_name != 'TCP_STREAM'
   # Flags:
   # -o specifies keys to include in CSV output.
   # -j keeps additional latency numbers
@@ -261,8 +266,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   # -i specifies the maximum and minimum number of iterations.
   confidence = ('-I 99,5 -i {0},3'.format(FLAGS.netperf_max_iter)
                 if FLAGS.netperf_max_iter else '')
-  verbosity = '-v2 ' if FLAGS.netperf_enable_histograms or num_streams > 1 \
-              else ''
+  verbosity = '-v2 ' if enable_latency_histograms else ''
   netperf_cmd = ('{netperf_path} -p {{command_port}} -j {verbosity} '
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
@@ -292,7 +296,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   metadata = {'netperf_test_length': FLAGS.netperf_test_length,
               'max_iter': FLAGS.netperf_max_iter or 1}
 
-  parsed_output = [_ParseNetperfOutput(stdout, metadata, benchmark_name)
+  parsed_output = [_ParseNetperfOutput(stdout, metadata, benchmark_name,
+                                       enable_latency_histograms)
                    for stdout in stdouts]
 
   if len(parsed_output) == 1:
@@ -321,23 +326,24 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
           sample.Sample('%s_Throughput_%s' % (benchmark_name, stat),
                         float(value),
                         throughput_unit, metadata))
-    # Combine all of the latency histogram dictionaries
-    latency_histogram = Counter()
-    for histogram in latency_histograms:
-      latency_histogram.update(histogram)
-    # Create a sample for the aggregate latency histogram
-    hist_metadata = {'histogram': json.dumps(latency_histogram)}
-    hist_metadata.update(metadata)
-    samples.append(sample.Sample(
-        '%s_Latency_Histogram' % benchmark_name, 0, 'us', hist_metadata))
-    # Calculate stats on aggregate latency histogram
-    latency_stats = _HistogramStatsCalculator(latency_histogram, [50, 90, 99])
-    # Create samples for the latency stats
-    for stat, value in latency_stats.items():
-      samples.append(
-          sample.Sample('%s_Latency_%s' % (benchmark_name, stat),
-                        float(value),
-                        'us', metadata))
+    if enable_latency_histograms:
+      # Combine all of the latency histogram dictionaries
+      latency_histogram = Counter()
+      for histogram in latency_histograms:
+        latency_histogram.update(histogram)
+      # Create a sample for the aggregate latency histogram
+      hist_metadata = {'histogram': json.dumps(latency_histogram)}
+      hist_metadata.update(metadata)
+      samples.append(sample.Sample(
+          '%s_Latency_Histogram' % benchmark_name, 0, 'us', hist_metadata))
+      # Calculate stats on aggregate latency histogram
+      latency_stats = _HistogramStatsCalculator(latency_histogram, [50, 90, 99])
+      # Create samples for the latency stats
+      for stat, value in latency_stats.items():
+        samples.append(
+            sample.Sample('%s_Latency_%s' % (benchmark_name, stat),
+                          float(value),
+                          'us', metadata))
     return samples
 
 
