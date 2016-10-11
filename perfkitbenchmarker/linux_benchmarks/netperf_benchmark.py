@@ -80,7 +80,6 @@ TRANSACTIONS_PER_SECOND = 'transactions_per_second'
 PORT_START = 20000
 
 REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
-REMOTE_SCRIPT_FILES = ['netperf_test.py']
 REMOTE_SCRIPT = 'netperf_test.py'
 
 PERCENTILES = [50, 90, 99]
@@ -123,15 +122,16 @@ def Prepare(benchmark_spec):
   vms[0].Install('pip')
   vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
 
-  # Copy remote test script to client
+  # Create a scratch directory for the remote test script
   scratch_dir = vms[0].GetScratchDir()
   vms[0].RemoteCommand('sudo mkdir -p %s/run/' % scratch_dir)
   vms[0].RemoteCommand('sudo chmod 777 %s/run/' % scratch_dir)
-  for file_name in REMOTE_SCRIPT_FILES:
-    path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, file_name))
-    logging.info('Uploading %s to %s', path, vms[0])
-    vms[0].PushFile(path, '%s/run/' % scratch_dir)
-    vms[0].RemoteCommand('sudo chmod 777 %s/run/%s' % (scratch_dir, file_name))
+  # Copy remote test script to client
+  path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
+  logging.info('Uploading %s to %s', path, vms[0])
+  vms[0].PushFile(path, '%s/run/' % scratch_dir)
+  vms[0].RemoteCommand('sudo chmod 777 %s/run/%s' %
+                       (scratch_dir, REMOTE_SCRIPT))
 
 
 def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
