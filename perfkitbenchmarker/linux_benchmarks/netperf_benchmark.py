@@ -189,6 +189,18 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name,
   # Don't modify the metadata dict that was passed in
   metadata = metadata.copy()
 
+  # Extract stats from stdout
+  # Sample output:
+  #
+  # "MIGRATED TCP REQUEST/RESPONSE TEST from 0.0.0.0 (0.0.0.0) port 20001
+  # AF_INET to 104.154.50.86 () port 20001 AF_INET : +/-2.500% @ 99% conf.
+  # : first burst 0",\n
+  # Throughput,Throughput Units,Throughput Confidence Width (%),
+  # Confidence Iterations Run,Stddev Latency Microseconds,
+  # 50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,
+  # 99th Percentile Latency Microseconds,Minimum Latency Microseconds,
+  # Maximum Latency Microseconds\n
+  # 1405.50,Trans/s,2.522,4,783.80,683,735,841,600,900\n
   fp = io.StringIO(stdout)
   # "-o" flag above specifies CSV output, but there is one extra header line:
   banner = next(fp)
