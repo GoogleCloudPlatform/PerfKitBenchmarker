@@ -266,14 +266,13 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     self.args = ['--nsg-name', self.name]
 
     self.rules_lock = threading.Lock()
-    # Mapping of port -> rule name, used to deduplicate rules. We
-    # expect duplicate rules because PKB will call AllowPort() for
-    # each VM on a subnet, but the rules are actually applied to the
-    # entire subnet.
+    # Mapping of (start_port, end_port) -> rule name, used to
+    # deduplicate rules. We expect duplicate rules because PKB will
+    # call AllowPort() for each VM on a subnet, but the rules are
+    # actually applied to the entire subnet.
     self.rules = {}
-    # True if the special 'DenyAll' rule is present. If deny_all_mode
-    # is True, then rules should be empty.
-    self.deny_all_mode = False
+    # True if the special 'DenyAll' rule is present.
+    self.have_deny_all_rule = False
 
   def _Create(self):
     vm_util.IssueCommand(
@@ -303,31 +302,34 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         self.resource_group.args +
         self.subnet.vnet.args)
 
-  def DeleteRule(self, rule):
-      vm_util.IssueRetryableCommand(
-          [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'delete',
-           '--quiet',
-           rule] +
-          self.resource_group.args +
-          self.args)
+  def AllowPort(self, vm, start_port, end_port=None, source_range=None):
+    """Open a port or port range.
 
-  def AllowPort(self, vm, port):
+    Args:
+      vm: the virtual machine to open the port for.
+      start_port: either a single port or the start of a range.
+      end_port: if given, the end of the port range.
+      source_range: unsupported at present.
+    """
+
     with self.rules_lock:
-      if port in self.rules:
-        return
-      if self.deny_all_mode:
-        self.deny_all_mode = False
-        self.DeleteRule('DenyAll')
+      end_port = end_port or start_port
 
-      rule_name = 'allow-%s' % port
-      # priorities are between 100 and 4096.
+      if (start_port, end_port) in self.rules:
+        return
+      port_range = '%s-%s' % (start_port, end_port)
+      rule_name = 'allow-%s' % port_range
+      # Azure priorities are between 100 and 4096, but we reserve 4095
+      # for the special DenyAll rule created by DisallowAllPorts.
       rule_priority = 100 + len(self.rules)
-      self.rules[port] = rule_name
+      if rule_priority >= 4095:
+        raise ValueError('Too many firewall rules!')
+      self.rules[(start_port, end_port)] = rule_name
 
     vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create',
          rule_name,
-         '--destination-port-range', str(port),
+         '--destination-port-range', port_range,
          '--access', 'Allow',
          '--priority', str(rule_priority)]
         + self.resource_group.args
@@ -335,17 +337,20 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
 
   def DisallowAllPorts(self):
     with self.rules_lock:
-      if self.deny_all_mode:
-        return
-      self.deny_all_mode = True
-
       for port, rule in self.rules.iteritems():
-        self.DeleteRule(rule)
-      # Can't remove rules from self.rules one by one because the
+        vm_util.IssueRetryableCommand(
+            [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'delete',
+             '--quiet',
+             rule] +
+            self.resource_group.args +
+            self.args)
+      # Can't remove rules from self.rules in the for loop because the
       # iterator errors when the underlying dictionary is changed
       # during iteration.
       self.rules = {}
 
+      if self.have_deny_all_rule:
+        return
       # An NSG comes with some default rules, which we can't delete,
       # so we create a new rule at higher priority than those.
       vm_util.IssueRetryableCommand(
@@ -355,6 +360,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
            '--priority', '4095']
           + self.resource_group.args
           + self.args)
+      self.have_deny_all_rule = True
 
 
 ALL_NSGS = set()
@@ -369,15 +375,17 @@ class AzureFirewall(network.BaseFirewall):
 
   CLOUD = providers.AZURE
 
-  def AllowPort(self, vm, port):
+  def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Opens a port on the firewall.
 
     Args:
       vm: The BaseVirtualMachine object to open the port for.
-      port: The local port to open.
+      start_port: The local port to open.
+      end_port: if given, open the range [start_port, end_port].
     """
 
-    vm.network.nsg.AllowPort(vm, port)
+    vm.network.nsg.AllowPort(vm, start_port, end_port=end_port,
+                             source_range=source_range)
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
