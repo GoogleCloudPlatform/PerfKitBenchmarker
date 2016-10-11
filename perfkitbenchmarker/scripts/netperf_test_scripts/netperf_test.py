@@ -47,10 +47,10 @@ def Main(argv=sys.argv):
   assert(num_streams >= 1)
   assert(port_start)
 
-  stdouts = [None for _ in range(num_streams)]
-  stderrs = [None for _ in range(num_streams)]
-  return_codes = [None for _ in range(num_streams)]
-  processes = [None for _ in range(num_streams)]
+  stdouts = [None] * len(num_streams)
+  stderrs = [None] * len(num_streams)
+  return_codes = [None] * len(num_streams)
+  processes = [None] * len(num_streams)
 
   # Start all of the netperf processes
   for i in range(num_streams):

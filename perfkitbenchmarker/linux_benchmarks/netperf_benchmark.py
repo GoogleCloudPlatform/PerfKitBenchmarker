@@ -210,7 +210,14 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name,
   logging.info('Netperf Results: %s', results)
   assert 'Throughput' in results
 
+  # Update the metadata with some additional infos
+  meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
+               ('Throughput Confidence Width (%)', 'confidence_width_percent')]
+  metadata.update({meta_key: results[netperf_key]
+                   for netperf_key, meta_key in meta_keys})
+
   # Create the throughput sample
+  throughput = float(results['Throughput'])
   throughput_units = results['Throughput Units']
   if throughput_units == '10^6bits/s':
     # TCP_STREAM benchmark
@@ -223,21 +230,14 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name,
   else:
     raise ValueError('Netperf output specifies unrecognized throughput units %s'
                      % throughput_units)
-  meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
-               ('Throughput Confidence Width (%)', 'confidence_width_percent')]
-  metadata.update({meta_key: results[netperf_key]
-                   for netperf_key, meta_key in meta_keys})
   throughput_sample = sample.Sample(metric, throughput, unit, metadata)
-
-  # No tail latency for throughput.
-  if unit == MBPS:
-    return (throughput_sample, [], None)
 
   latency_hist = None
   latency_samples = []
   if enable_latency_histograms:
-    # Parse the latency histogram. {latency: response_latency} where latency is
-    # the latency in microseconds with only 1 significant figure.
+    # Parse the latency histogram. {latency: count} where "latency" is the
+    # latency in microseconds with only 2 significant figures and "count" is the
+    # number of response times that fell in that latency range.
     latency_hist = netperf.ParseHistogram(stdout)
     hist_metadata = {'histogram': json.dumps(latency_hist)}
     hist_metadata.update(metadata)
@@ -251,9 +251,10 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name,
       ('Minimum Latency Microseconds', 'min'),
       ('Maximum Latency Microseconds', 'max'),
       ('Stddev Latency Microseconds', 'stddev')]:
-    latency_samples.append(
-        sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
-                      float(results[metric_key]), 'us', metadata))
+    if metric_key in results:
+      latency_samples.append(
+          sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
+                        float(results[metric_key]), 'us', metadata))
 
   return (throughput_sample, latency_samples, latency_hist)
 
@@ -327,6 +328,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     samples = []
 
     # Unzip parsed output
+    # Note that latency_samples are invalid with multiple threads because stats
+    # are computed per-thread by netperf, so we don't use them here.
     throughput_samples, _, latency_histograms = [list(t)
                                                  for t in zip(*parsed_output)]
     # They should all have the same units
