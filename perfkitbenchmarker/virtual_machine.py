@@ -285,10 +285,10 @@ class BaseVirtualMachine(resource.BaseResource):
     """Returns a list of local disks on the VM."""
     return []
 
-  def AllowPort(self, port):
+  def AllowPort(self, start_port, end_port=None):
     """Opens the port on the firewall corresponding to the VM if one exists."""
     if self.firewall:
-      self.firewall.AllowPort(self, port)
+      self.firewall.AllowPort(self, start_port, end_port)
 
   def AllowRemoteAccessPorts(self):
     """Allow all ports in self.remote_access_ports."""
