@@ -35,7 +35,9 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
                         'netperf_results.json')
 
     with open(path) as fp:
-      self.expected_stdout = ['\n'.join(i) for i in json.load(fp)]
+      stdouts = ['\n'.join(i) for i in json.load(fp)]
+      self.expected_stdout = [json.dumps(([stdout], [''], [0]))
+                              for stdout in stdouts]
 
     p = mock.patch(vm_util.__name__ + '.ShouldRunOnExternalIpAddress')
     self.should_run_external = p.start()
@@ -49,6 +51,18 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
   def _ConfigureIpTypes(self, run_external=True, run_internal=True):
     self.should_run_external.return_value = run_external
     self.should_run_internal.return_value = run_internal
+
+  def testHistogramStatsCalculator(self):
+    histogram = {1: 5, 2: 10, 5: 5}
+    stats = netperf_benchmark._HistogramStatsCalculator(
+        histogram, [0, 20, 30, 74, 80, 100])
+    self.assertEqual(stats['p0'], 1)
+    self.assertEqual(stats['p20'], 1)
+    self.assertEqual(stats['p30'], 2)
+    self.assertEqual(stats['p74'], 2)
+    self.assertEqual(stats['p80'], 5)
+    self.assertEqual(stats['p100'], 5)
+    self.assertTrue(abs(stats['stddev'] - 1.538) <= 0.001)
 
   def testExternalAndInternal(self):
     self._ConfigureIpTypes()
@@ -91,7 +105,19 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
          ('TCP_CRR_Latency_max', 2500.0, 'us'),
          ('TCP_CRR_Latency_stddev', 551.07, 'us'),
          ('TCP_STREAM_Throughput', 1187.94, mbps),
-         ('TCP_STREAM_Throughput', 1973.37, mbps),
+         ('TCP_STREAM_Latency_p50', 2.0, 'us'),
+         ('TCP_STREAM_Latency_p90', 6.0, 'us'),
+         ('TCP_STREAM_Latency_p99', 3374.0, 'us'),
+         ('TCP_STREAM_Latency_min', 1.0, 'us'),
+         ('TCP_STREAM_Latency_max', 3500.0, 'us'),
+         ('TCP_STREAM_Latency_stddev', 1084.37, 'us'),
+         ('TCP_STREAM_Throughput', 1973.37, 'Mbits/sec'),
+         ('TCP_STREAM_Latency_p50', 2.0, 'us'),
+         ('TCP_STREAM_Latency_p90', 4.0, 'us'),
+         ('TCP_STREAM_Latency_p99', 20.0, 'us'),
+         ('TCP_STREAM_Latency_min', 1.0, 'us'),
+         ('TCP_STREAM_Latency_max', 30.0, 'us'),
+         ('TCP_STREAM_Latency_stddev', 694.1, 'us'),
          ('UDP_RR_Transaction_Rate', 1359.71, tps),
          ('UDP_RR_Latency_p50', 700.0, 'us'),
          ('UDP_RR_Latency_p90', 757.0, 'us'),
@@ -110,10 +136,7 @@ class NetperfBenchmarkTestCase(unittest.TestCase):
 
     external_meta = {'ip_type': 'external'}
     internal_meta = {'ip_type': 'internal'}
-    expected_meta = (([external_meta] * 7 + [internal_meta] * 7) * 2 +
-                     [external_meta, internal_meta] +
-                     [external_meta] * 7 +
-                     [internal_meta] * 7)
+    expected_meta = (([external_meta] * 7 + [internal_meta] * 7) * 4)
 
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)
