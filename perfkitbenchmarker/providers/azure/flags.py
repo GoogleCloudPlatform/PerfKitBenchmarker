@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.providers import azure
 
 
 NONE = 'None'
@@ -32,6 +31,9 @@ ZRS = 'ZRS'
 GRS = 'GRS'
 RAGRS = 'RAGRS'
 
+STORAGE = 'Storage'
+BLOB_STORAGE = 'BlobStorage'
+
 flags.DEFINE_enum(
     'azure_storage_type', LRS,
     [LRS, PLRS, ZRS, GRS, RAGRS],
@@ -41,7 +43,9 @@ flags.DEFINE_enum(
     'use PLRS, you must use the DS series of machines, or else VM creation '
     'will fail.')
 
-flags.DEFINE_boolean(
-    'azure_ignore_cli_version', False,
-    'Unless set, PKB will require a specific version (%s) of the Azure CLI in '
-    'order to execute benchmarks using Azure VMs.' % azure.EXPECTED_CLI_VERSION)
+flags.DEFINE_enum(
+    'azure_blob_account_kind', BLOB_STORAGE,
+    [STORAGE, BLOB_STORAGE],
+    'The type of storage account to use for blob storage. Choosing Storage '
+    'will let you use ZRS storage. Choosing BlobStorage will give you access '
+    'to Hot and Cold storage tiers.')

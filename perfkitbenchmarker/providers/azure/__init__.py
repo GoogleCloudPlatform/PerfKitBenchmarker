@@ -12,4 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-EXPECTED_CLI_VERSION = '0.9.9'
+
+AZURE_PATH = 'azure'
