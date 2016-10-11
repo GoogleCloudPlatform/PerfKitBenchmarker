@@ -118,7 +118,6 @@ def Prepare(benchmark_spec):
                        port_end=PORT_START + num_streams * 2 - 1,
                        netserver_path=netperf.NETSERVER_PATH)
   vms[1].RemoteCommand(netserver_cmd)
-  # vms[1].RemoteCommand('%s -p %s' % (netperf.NETSERVER_PATH, COMMAND_PORT))
 
   # Install some stuff on the client vm
   vms[0].Install('pip')
