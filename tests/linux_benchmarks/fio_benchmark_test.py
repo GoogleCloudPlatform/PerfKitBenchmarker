@@ -62,7 +62,7 @@ numjobs=1"""
             self.filename,
             ['sequential_read'],
             [1, 2], [1],
-            None, None, 600),
+            None, None, 600, {}),
         expected_jobfile)
 
   def testMultipleScenarios(self):
@@ -100,7 +100,7 @@ numjobs=1"""
             self.filename,
             ['sequential_read', 'sequential_write'],
             [1], [1],
-            None, None, 600),
+            None, None, 600, {}),
         expected_jobfile)
 
   def testCustomBlocksize(self):
@@ -109,7 +109,7 @@ numjobs=1"""
     job_file = fio_benchmark.GenerateJobFileString(
         self.filename,
         ['sequential_read'],
-        [1], [1], None, units.Unit('megabyte') * 2, 600)
+        [1], [1], None, units.Unit('megabyte') * 2, 600, {})
 
     self.assertIn('blocksize=2000000B', job_file)
 

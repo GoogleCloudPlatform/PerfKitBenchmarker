@@ -16,11 +16,43 @@
 
 import unittest
 from mock import patch
+import yaml
 
 # This import to ensure required FLAGS are defined.
 from perfkitbenchmarker import pkb  # NOQA
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import benchmark_sets
+
+USER_CONFIG = """
+internal_iprf:
+  name: iperf
+  flags:
+    ip_addresses: INTERNAL
+"""
+MATRIX_CONFIG = """
+netperf:
+  flag_matrix: GCP
+  flag_matrix_defs:
+    GCP:
+      machine_type: [n1-standard-1, n1-standard-4]
+      zones: [us-central1-a, us-central1-b]
+"""
+EXPECTED_FLAGS = [
+    {'machine_type': 'n1-standard-1', 'zones': 'us-central1-a'},
+    {'machine_type': 'n1-standard-1', 'zones': 'us-central1-b'},
+    {'machine_type': 'n1-standard-4', 'zones': 'us-central1-a'},
+    {'machine_type': 'n1-standard-4', 'zones': 'us-central1-b'}
+]
+FILTER_CONFIG = """
+netperf:
+  flag_matrix: GCP
+  flag_matrix_filters:
+    GCP: "machine_type == 'n1-standard-1' and zones == 'us-central1-a'"
+  flag_matrix_defs:
+    GCP:
+      machine_type: [n1-standard-1, n1-standard-4]
+      zones: [us-central1-a, us-central1-b]
+"""
 
 
 class BenchmarkSetsTestCase(unittest.TestCase):
@@ -147,3 +179,33 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     # make sure invalid benchmark names and sets cause a failure
     self.mock_flags.benchmarks = ['standard_set', 'iperf_invalid_name']
     self.assertRaises(ValueError, benchmark_sets.GetBenchmarksFromFlags)
+
+  def testConfigNames(self):
+    self.mock_flags.benchmarks = ['internal_iprf', 'netperf']
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(USER_CONFIG)):
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertTrue(self._ContainsModule('iperf', benchmark_tuple_list))
+    self.assertTrue(self._ContainsModule('netperf', benchmark_tuple_list))
+
+  def testMatrices(self):
+    self.mock_flags.benchmarks = ['netperf']
+    self.mock_flags.flag_matrix = None
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(MATRIX_CONFIG)):
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertEqual(len(benchmark_tuple_list), 4)
+    flag_list = [benchmark_tuple[1]['flags']
+                 for benchmark_tuple in benchmark_tuple_list]
+    self.assertItemsEqual(flag_list, EXPECTED_FLAGS)
+
+  def testFilters(self):
+    self.mock_flags.benchmarks = ['netperf']
+    self.mock_flags.flag_matrix = None
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(FILTER_CONFIG)):
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertEqual(len(benchmark_tuple_list), 1)
+    self.assertEqual(benchmark_tuple_list[0][1]['flags'],
+                     {'zones': 'us-central1-a',
+                      'machine_type': 'n1-standard-1'})

@@ -70,7 +70,7 @@ flags.DEFINE_string('object_storage_storage_class', None,
 
 flags.DEFINE_enum('object_storage_scenario', 'all',
                   ['all', 'cli', 'api_data', 'api_namespace',
-                   'api_multistream'],
+                   'api_multistream', 'api_multistream_writes'],
                   'select all, or one particular scenario to run: \n'
                   'ALL: runs all scenarios. This is the default. \n'
                   'cli: runs the command line only scenario. \n'
@@ -78,7 +78,9 @@ flags.DEFINE_enum('object_storage_scenario', 'all',
                   'api_namespace: runs API based benchmarking for namespace '
                   'operations. \n'
                   'api_multistream: runs API-based benchmarking with multiple '
-                  'upload/download streams.')
+                  'upload/download streams.\n'
+                  'api_multistream_writes: runs API-based benchmarking with '
+                  'multiple upload streams.')
 
 flags.DEFINE_enum('cli_test_size', 'normal',
                   ['normal', 'large'],
@@ -793,26 +795,60 @@ def LoadWorkerOutput(output):
   return start_times, latencies, sizes
 
 
-def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
-                           service, bucket_name, regional_bucket_name):
+def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
+                             streams_per_vm, num_streams):
 
-  """A benchmark for multi-stream latency and throughput.
+  """Runs all of the multistream read or write processes and doesn't return
+     until they complete.
+
+  Args:
+    vms: the VMs to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    cmd_args: arguments for the command_builder.
+    streams_per_vm: number of threads per vm.
+    num_streams: total number of threads to launch.
+  """
+
+  output = [None] * num_streams
+
+  def RunOneProcess(proc_idx):
+    vm_idx = proc_idx // streams_per_vm
+    logging.info('Running on VM %s.', vm_idx)
+    cmd = command_builder.BuildCommand(
+        cmd_args + ['--stream_num_start=%s' % proc_idx])
+    out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
+    output[proc_idx] = out
+
+  # Each process has a thread managing it.
+  threads = [
+      threading.Thread(target=RunOneProcess, args=(i,))
+      for i in xrange(num_streams)]
+  for thread in threads:
+    thread.start()
+  logging.info('Started %s processes.', num_streams)
+  # Wait for the threads to finish
+  for thread in threads:
+    thread.join()
+  logging.info('All processes complete.')
+  return output
+
+
+def _MultiStreamOneWay(results, metadata, vms, command_builder,
+                       bucket_name, operation):
+
+  """Measures multi-stream latency and throughput in one direction.
 
   Args:
     results: the results array to append to.
     metadata: a dictionary of metadata to add to samples.
     vms: the VMs to run the benchmark on.
     command_builder: an APIScriptCommandBuilder.
-    service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
-    regional_bucket_name: the secondary bucket to benchmark.
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
     test script.
   """
-
-  logging.info('Starting multi-stream write test on %s VMs.', len(vms))
 
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
                                         OBJECTS_WRITTEN_FILE)
@@ -825,80 +861,97 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
   streams_per_vm = FLAGS.object_storage_streams_per_vm
   num_streams = streams_per_vm * len(vms)
 
-  def StartMultiStreamProcess(cmd_args, proc_idx, out_array):
-    vm_idx = proc_idx // streams_per_vm
-    logging.info('Running on VM %s.', vm_idx)
-    cmd = command_builder.BuildCommand(
-        cmd_args + ['--stream_num_start=%s' % proc_idx])
-    out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
-    out_array[proc_idx] = out
-
-  def RunMultiStreamProcesses(command):
-    output = [None] * num_streams
-    # Each process has a thread managing it.
-    threads = [
-        threading.Thread(target=StartMultiStreamProcess,
-                         args=(command, i, output))
-        for i in xrange(num_streams)]
-    for thread in threads:
-      thread.start()
-    logging.info('Started %s processes.', num_streams)
-    for thread in threads:
-      thread.join()
-    logging.info('All processes complete.')
-    return output
-
-  write_start_time = (
+  start_time = (
       time.time() +
       MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
 
-  logging.info('Write start time is %s', write_start_time)
+  logging.info('Start time is %s', start_time)
 
-  multi_stream_write_args = [
+  cmd_args = [
       '--bucket=%s' % bucket_name,
       '--objects_per_stream=%s' % (
           FLAGS.object_storage_multistream_objects_per_stream),
-      '--object_sizes="%s"' % size_distribution,
       '--num_streams=1',
-      '--start_time=%s' % write_start_time,
-      '--object_naming_scheme=%s' % FLAGS.object_storage_object_naming_scheme,
-      '--objects_written_file=%s' % objects_written_file,
-      '--scenario=MultiStreamWrite']
+      '--start_time=%s' % start_time,
+      '--objects_written_file=%s' % objects_written_file]
 
-  write_out = RunMultiStreamProcesses(multi_stream_write_args)
-  start_times, latencies, sizes = LoadWorkerOutput(write_out)
-  _ProcessMultiStreamResults(start_times, latencies, sizes, 'upload',
+  if operation == 'upload':
+    cmd_args += [
+        '--object_sizes="%s"' % size_distribution,
+        '--object_naming_scheme=%s' % FLAGS.object_storage_object_naming_scheme,
+        '--scenario=MultiStreamWrite']
+  elif operation == 'download':
+    cmd_args += ['--scenario=MultiStreamRead']
+  else:
+    raise Exception('Value of operation must be \'upload\' or \'download\'.'
+                    'Value is: \'' + operation + '\'')
+
+  output = _RunMultiStreamProcesses(vms, command_builder, cmd_args,
+                                    streams_per_vm, num_streams)
+  start_times, latencies, sizes = LoadWorkerOutput(output)
+  _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
                              size_distribution.iterkeys(), results,
                              metadata=metadata)
 
-  logging.info('Finished multi-stream write test. Starting multi-stream '
-               'read test.')
 
-  read_start_time = (
-      time.time() +
-      MultiThreadStartDelay(FLAGS.num_vms, streams_per_vm).m_as('second'))
+def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
+                           bucket_name):
 
-  logging.info('Read start time is %s', read_start_time)
+  """A benchmark for multi-stream read/write latency and throughput.
 
-  multi_stream_read_args = [
-      '--bucket=%s' % bucket_name,
-      '--objects_per_stream=%s' % (
-          FLAGS.object_storage_multistream_objects_per_stream),
-      '--num_streams=1',
-      '--start_time=%s' % read_start_time,
-      '--objects_written_file=%s' % objects_written_file,
-      '--scenario=MultiStreamRead']
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vms: the VMs to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    bucket_name: the primary bucket to benchmark.
+
+  Raises:
+    ValueError if an unexpected test outcome is found from the API
+    test script.
+  """
+
+  logging.info('Starting multi-stream write test on %s VMs.', len(vms))
+
+  _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
+                     'upload')
+
+  logging.info('Finished multi-stream write test. Starting '
+               'multi-stream read test.')
+
   try:
-    read_out = RunMultiStreamProcesses(multi_stream_read_args)
-    start_times, latencies, sizes = LoadWorkerOutput(read_out)
-    _ProcessMultiStreamResults(start_times, latencies, sizes, 'download',
-                               size_distribution.iterkeys(), results,
-                               metadata=metadata)
+    _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
+                       'download')
   except Exception as ex:
     logging.info('MultiStreamRead test failed with exception %s. Still '
                  'recording write data.', ex.msg)
 
   logging.info('Finished multi-stream read test.')
+
+
+def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
+                              bucket_name):
+
+  """A benchmark for multi-stream write latency and throughput.
+
+  Args:
+    results: the results array to append to.
+    metadata: a dictionary of metadata to add to samples.
+    vms: the VMs to run the benchmark on.
+    command_builder: an APIScriptCommandBuilder.
+    bucket_name: the primary bucket to benchmark.
+
+  Raises:
+    ValueError if an unexpected test outcome is found from the API
+    test script.
+  """
+
+  logging.info('Starting multi-stream write test on %s VMs.', len(vms))
+
+  _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
+                     'upload')
+
+  logging.info('Finished multi-stream write test.')
 
 
 def CheckPrerequisites():
@@ -1164,11 +1217,14 @@ def Run(benchmark_spec):
       benchmark(results, metadata, vms[0], command_builder,
                 service, buckets[0], regional_bucket_name)
 
-  # MultiStreamRW is the only benchmark that supports multiple VMs, so
-  # it has a slightly different calling convention than the others.
-  if FLAGS.object_storage_scenario in {'api_multistream', 'all'}:
-    MultiStreamRWBenchmark(results, metadata, vms, command_builder,
-                           service, buckets[0], regional_bucket_name)
+  # MultiStreamRW and MultiStreamWrite are the only benchmarks that support
+  # multiple VMs, so they have a slightly different calling convention than the
+  # others.
+  for name, benchmark in [('api_multistream', MultiStreamRWBenchmark),
+                          ('api_multistream_writes',
+                           MultiStreamWriteBenchmark)]:
+    if FLAGS.object_storage_scenario in {name, 'all'}:
+      benchmark(results, metadata, vms, command_builder, buckets[0])
 
 
   return results

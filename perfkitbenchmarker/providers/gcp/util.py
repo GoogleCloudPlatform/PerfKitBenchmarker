@@ -13,12 +13,23 @@
 # limitations under the License.
 """Utilities for working with Google Cloud Platform resources."""
 
-from collections import OrderedDict
+import json
+import functools32
 
+from collections import OrderedDict
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
+
+
+@functools32.lru_cache()
+def GetDefaultProject():
+  """Get the default project."""
+  cmd = ['gcloud', 'config', 'list', '--format=json']
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  result = json.loads(stdout)
+  return result['core']['project']
 
 
 class GcloudCommand(object):
@@ -110,6 +121,6 @@ class GcloudCommand(object):
     self.flags['quiet'] = True
     if resource.project is not None:
       self.flags['project'] = resource.project
-    if hasattr(resource, 'zone'):
+    if hasattr(resource, 'zone') and resource.zone:
       self.flags['zone'] = resource.zone
     self.additional_flags.extend(FLAGS.additional_gcloud_flags or ())

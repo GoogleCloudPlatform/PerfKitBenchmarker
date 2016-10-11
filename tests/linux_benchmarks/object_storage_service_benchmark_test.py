@@ -44,17 +44,17 @@ class TestBuildCommands(unittest.TestCase):
         with mock.patch(object_storage_service_benchmark.__name__ +
                         '.LoadWorkerOutput', return_value=(None, None, None)):
           object_storage_service_benchmark.MultiStreamRWBenchmark(
-              [], {}, [vm], command_builder, None, 'bucket', 'regional-bucket')
+              [], {}, [vm], command_builder, 'bucket')
 
     self.assertEqual(
         command_builder.BuildCommand.call_args_list[0],
         mock.call(['--bucket=bucket',
                    '--objects_per_stream=100',
-                   '--object_sizes="{1000: 100.0}"',
                    '--num_streams=1',
                    '--start_time=16.1',
-                   '--object_naming_scheme=sequential_by_stream',
                    '--objects_written_file=/tmp/pkb/pkb-objects-written',
+                   '--object_sizes="{1000: 100.0}"',
+                   '--object_naming_scheme=sequential_by_stream',
                    '--scenario=MultiStreamWrite',
                    '--stream_num_start=0']))
 

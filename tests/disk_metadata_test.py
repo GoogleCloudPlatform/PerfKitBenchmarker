@@ -63,7 +63,7 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
     disk_spec = aws_disk.AwsDiskSpec(_COMPONENT, disk_size=2,
                                      disk_type=disk_type)
 
-    vm_spec = virtual_machine.BaseVmSpec(
+    vm_spec = aws_virtual_machine.AwsVmSpec(
         'test_vm_spec.AWS', zone='us-east-1a', machine_type=machine_type)
     vm = aws_virtual_machine.DebianBasedAwsVirtualMachine(
         vm_spec)

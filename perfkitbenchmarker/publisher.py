@@ -27,7 +27,6 @@ import time
 import uuid
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import version
@@ -302,7 +301,7 @@ class PrettyPrintStreamPublisher(SamplePublisher):
 
     for sample in samples:
       for k, v in sample['metadata'].iteritems():
-        if len(unique_values.setdefault(k, set())) < 2:
+        if len(unique_values.setdefault(k, set())) < 2 and v.__hash__:
           unique_values[k].add(v)
 
     # Find keys which are not present in all samples
@@ -617,8 +616,6 @@ class SampleCollector(object):
       sample['owner'] = FLAGS.owner
       sample['run_uri'] = benchmark_spec.uuid
       sample['sample_uri'] = str(uuid.uuid4())
-      events.sample_created.send(benchmark_spec=benchmark_spec,
-                                 sample=sample)
       self.samples.append(sample)
 
   def PublishSamples(self):

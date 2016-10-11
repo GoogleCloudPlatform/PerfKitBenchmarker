@@ -90,23 +90,27 @@ class GceFirewall(network.BaseFirewall):
     self._lock = threading.Lock()
     self.firewall_rules = {}
 
-  def AllowPort(self, vm, port, source_range=None):
+  def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Opens a port on the firewall.
 
     Args:
       vm: The BaseVirtualMachine object to open the port for.
-      port: The local port to open.
+      start_port: The first local port to open in a range.
+      end_port: The last local port to open in a range. If None, only start_port
+        will be opened.
       source_range: The source ip range to allow for this port.
     """
     if vm.is_static:
       return
     with self._lock:
-      firewall_name = ('perfkit-firewall-%s-%d' %
-                       (FLAGS.run_uri, port))
-      key = (vm.project, port)
+      if end_port is None:
+        end_port = start_port
+      firewall_name = ('perfkit-firewall-%s-%d-%d' %
+                       (FLAGS.run_uri, start_port, end_port))
+      key = (vm.project, start_port, end_port)
       if key in self.firewall_rules:
         return
-      allow = ','.join('{0}:{1}'.format(protocol, port)
+      allow = ','.join('{0}:{1}-{2}'.format(protocol, start_port, end_port)
                        for protocol in ('tcp', 'udp'))
       firewall_rule = GceFirewallRule(
           firewall_name, vm.project, allow,

@@ -24,8 +24,7 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
   """Computes percentiles, stddev and mean on a set of numbers.
 
   Args:
-    numbers: The set of numbers to compute percentiles for. Can be a
-      list or a Pandas Series.
+    numbers: A sequence of numbers to compute percentiles for.
     percentiles: If given, a list of percentiles to compute. Can be
       floats, ints or longs.
 

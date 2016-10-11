@@ -47,8 +47,10 @@ import logging
 import operator
 import os
 import posixpath
+import time
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -94,7 +96,7 @@ flags.DEFINE_boolean('ycsb_reload_database', True,
                      'is already loaded.')
 flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.',
                      lower_bound=1)
-flags.DEFINE_list('ycsb_workload_files', [],
+flags.DEFINE_list('ycsb_workload_files', ['workloada', 'workloadb'],
                   'Path to YCSB workload file to use during *run* '
                   'stage only. Comma-separated list')
 flags.DEFINE_list('ycsb_load_parameters', [],
@@ -134,10 +136,8 @@ def _GetWorkloadFileList():
       * The argument to --ycsb_workload_files.
       * Bundled YCSB workloads A and B.
   """
-  if FLAGS.ycsb_workload_files:
-    return FLAGS.ycsb_workload_files
-  return [data.ResourcePath(os.path.join('ycsb', workload))
-          for workload in ('workloada', 'workloadb')]
+  return [data.ResourcePath(workload)
+          for workload in FLAGS.ycsb_workload_files]
 
 
 def CheckPrerequisites():
@@ -619,7 +619,11 @@ class YCSBExecutor(object):
       results.append(self._Load(vms[loader_index], **kw))
       logging.info('VM %d (%s) finished', loader_index, vms[loader_index])
 
+    start = time.time()
     vm_util.RunThreaded(_Load, range(len(vms)))
+    events.record_event.send(
+        type(self).__name__, event='load', start_timestamp=start,
+        end_timestamp=time.time(), metadata=kwargs)
 
     if len(results) != len(vms):
       raise IOError('Missing results: only {0}/{1} reported\n{2}'.format(
@@ -732,7 +736,11 @@ class YCSBExecutor(object):
       parameters['parameter_files'] = [remote_path]
       for client_count in _GetThreadsPerLoaderList():
         parameters['threads'] = client_count
+        start = time.time()
         results = self._RunThreaded(vms, **parameters)
+        events.record_event.send(
+            type(self).__name__, event='run', start_timestamp=start,
+            end_timestamp=time.time(), metadata=parameters)
         client_meta = workload_meta.copy()
         client_meta.update(clients=len(vms) * client_count,
                            threads_per_client_vm=client_count)

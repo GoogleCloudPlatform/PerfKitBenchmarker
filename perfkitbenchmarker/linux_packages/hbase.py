@@ -20,15 +20,16 @@ https://hbase.apache.org/
 import functools
 import os
 import posixpath
+import re
+import urllib2
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 
 
-HBASE_VERSION = '1.1.5'
-HBASE_URL = ('http://www.us.apache.org/dist/hbase/{0}/'
-             'hbase-{0}-bin.tar.gz').format(HBASE_VERSION)
+HBASE_URL_BASE = 'http://www.us.apache.org/dist/hbase/stable/'
+HBASE_PATTERN = r'>(hbase-\d+.\d+.\d+-bin.tar.gz)<'
 
 DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
               'hbase/hbase-env.sh.j2']
@@ -36,6 +37,14 @@ DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
 HBASE_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'hbase')
 HBASE_BIN = posixpath.join(HBASE_DIR, 'bin')
 HBASE_CONF_DIR = posixpath.join(HBASE_DIR, 'conf')
+
+
+def _GetHBaseURL():
+  response = urllib2.urlopen(HBASE_URL_BASE)
+  html = response.read()
+  m = re.search(HBASE_PATTERN, html)
+  the_version = m.group(1)
+  return HBASE_URL_BASE + the_version
 
 
 def CheckPrerequisites():
@@ -51,9 +60,10 @@ def CheckPrerequisites():
 def _Install(vm):
   vm.Install('hadoop')
   vm.Install('curl')
+  hbase_url = _GetHBaseURL()
   vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
-                        HBASE_DIR, HBASE_URL))
+                        HBASE_DIR, hbase_url))
 
 
 def YumInstall(vm):

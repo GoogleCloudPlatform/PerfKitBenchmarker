@@ -39,8 +39,18 @@ from perfkitbenchmarker import stages
 
 FLAGS = flags.FLAGS
 
+_SPECINT_BENCHMARKS = frozenset([
+    'perlbench', 'bzip2', 'gcc', 'mcf', 'gobmk', 'hmmer', 'sjeng',
+    'libquantum', 'h264ref', 'omnetpp', 'astar', 'xalancbmk'])
+_SPECFP_BENCHMARKS = frozenset([
+    'bwaves', 'gamess', 'milc', 'zeusmp', 'gromacs', 'cactusADM',
+    'leslie3d', 'namd', 'dealII', 'soplex', 'povray', 'calculix',
+    'GemsFDTD', 'tonto', 'lbm', 'wrf', 'sphinx3'])
+_SPECCPU_SUBSETS = frozenset(['int', 'fp', 'all'])
+
 flags.DEFINE_enum(
-    'benchmark_subset', 'int', ['int', 'fp', 'all'],
+    'benchmark_subset', 'int',
+    _SPECFP_BENCHMARKS | _SPECINT_BENCHMARKS | _SPECCPU_SUBSETS,
     'Used by the PKB speccpu2006 benchmark. Specifies a subset of SPEC CPU2006 '
     'benchmarks to run.')
 flags.DEFINE_string(
@@ -438,16 +448,17 @@ def _ParseOutput(vm, spec_dir):
   # id is hardcoded as 001, which might change with different runspec
   # parameters. SPEC CPU2006 will generate different logs for build, test
   # run, training run and ref run.
-  if FLAGS.benchmark_subset in ('int', 'all'):
+  if FLAGS.benchmark_subset in _SPECINT_BENCHMARKS | set(['int', 'all']):
     log_files.append('CINT2006.001.ref.txt')
-  if FLAGS.benchmark_subset in ('fp', 'all'):
+  if FLAGS.benchmark_subset in _SPECFP_BENCHMARKS | set(['fp', 'all']):
     log_files.append('CFP2006.001.ref.txt')
 
   for log in log_files:
     stdout, _ = vm.RemoteCommand('cat %s/result/%s' % (spec_dir, log),
                                  should_log=True)
-    results.extend(_ExtractScore(stdout, vm,
-                                 FLAGS.runspec_keep_partial_results))
+    results.extend(_ExtractScore(
+        stdout, vm, FLAGS.runspec_keep_partial_results or (
+            FLAGS.benchmark_subset not in _SPECCPU_SUBSETS)))
 
   return results
 
@@ -481,7 +492,6 @@ def Run(benchmark_spec):
       'cd {0}'.format(speccpu_vm_state.spec_dir), '. ./shrc', './bin/relocate',
       '. ./shrc', 'rm -rf result', runspec_cmd))
   vm.RobustRemoteCommand(cmd)
-
   logging.info('SPEC CPU2006 Results:')
   return _ParseOutput(vm, speccpu_vm_state.spec_dir)
 

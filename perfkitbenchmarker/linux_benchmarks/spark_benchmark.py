@@ -31,7 +31,19 @@ If available, it will also report a pending time (the time between when the
 job was received by the platform and when it ran), and a runtime, which is
 the time the job took to run, as reported by the underlying cluster.
 
+Secondarily, this benchmark can be used be used to run Apache Hadoop MapReduce
+jobs if the underlying cluster supports it by setting the spark_job_type flag
+to hadoop, eg:
+  ./pkb.py --benchmarks=spark --spark_job_type=hadoop \
+      --spark_jarfile=file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar\
+      --spark_classname=''\
+      --spark_job_arguments=bbp,1,1000,10,bbp_dir
+
+For Amazon's EMR service, if the the provided jar file has a main class, you
+should pass in an empty class name for hadoop jobs.
+
 For more on Apache Spark, see: http://spark.apache.org/
+For more on Apache Hadoop, see: http://hadoop.apache.org/
 """
 
 import datetime
@@ -52,21 +64,30 @@ spark:
   description: Run a jar on a spark cluster.
   spark_service:
     service_type: managed
-    num_workers: 4
+    worker_group:
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-4
+          boot_disk_size: 500
+        AWS:
+          machine_type: m4.xlarge
+      vm_count: 2
 """
 
 # This points to a file on the spark cluster.
-DEFAULT_JARFILE = 'file:///usr/lib/spark/lib/spark-examples.jar'
 DEFAULT_CLASSNAME = 'org.apache.spark.examples.SparkPi'
 
-flags.DEFINE_string('spark_jarfile', DEFAULT_JARFILE,
-                    'Jarfile to submit.')
+flags.DEFINE_string('spark_jarfile', None,
+                    'If none, use the spark sample jar.')
 flags.DEFINE_string('spark_classname', DEFAULT_CLASSNAME,
                     'Classname to be used')
 flags.DEFINE_bool('spark_print_stdout', True, 'Print the standard '
                   'output of the job')
 flags.DEFINE_list('spark_job_arguments', [], 'Arguments to be passed '
                   'to the class given by spark_classname')
+flags.DEFINE_enum('spark_job_type', spark_service.SPARK_JOB_TYPE,
+                  [spark_service.SPARK_JOB_TYPE, spark_service.HADOOP_JOB_TYPE],
+                  'Type of the job to submit.')
 
 FLAGS = flags.FLAGS
 
@@ -94,6 +115,8 @@ def Run(benchmark_spec):
 
   stdout_path = None
   results = []
+  jarfile = (FLAGS.spark_jarfile or
+             spark_cluster.GetExampleJar(spark_service.SPARK_JOB_TYPE))
   try:
     if FLAGS.spark_print_stdout:
       # We need to get a name for a temporary file, so we create
@@ -104,19 +127,20 @@ def Run(benchmark_spec):
       stdout_path = stdout_file.name
       stdout_file.close()
 
-    stats = spark_cluster.SubmitJob(FLAGS.spark_jarfile,
+    stats = spark_cluster.SubmitJob(jarfile,
                                     FLAGS.spark_classname,
                                     job_arguments=FLAGS.spark_job_arguments,
-                                    job_stdout_file=stdout_path)
+                                    job_stdout_file=stdout_path,
+                                    job_type=FLAGS.spark_job_type)
     if not stats[spark_service.SUCCESS]:
       raise Exception('Class {0} from jar {1} did not run'.format(
-          FLAGS.spark_classname, FLAGS.spark_jarfile))
+          FLAGS.spark_classname, jarfile))
     jar_end = datetime.datetime.now()
     if stdout_path:
       with open(stdout_path, 'r') as f:
         logging.info('The output of the job is ' + f.read())
     metadata = spark_cluster.GetMetadata()
-    metadata.update({'jarfile': FLAGS.spark_jarfile,
+    metadata.update({'jarfile': jarfile,
                      'class': FLAGS.spark_classname,
                      'job_arguments': str(FLAGS.spark_job_arguments),
                      'print_stdout': str(FLAGS.spark_print_stdout)})

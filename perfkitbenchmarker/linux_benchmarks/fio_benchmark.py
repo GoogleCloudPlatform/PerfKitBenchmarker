@@ -61,6 +61,11 @@ SCENARIOS = {
         'name': 'random_read',
         'rwkind': 'randread',
         'blocksize': '4k'
+    },
+    'random_read_write': {
+        'name': 'random_read_write',
+        'rwkind': 'randrw',
+        'blocksize': '4k'
     }
 }
 
@@ -127,11 +132,14 @@ flag_util.DEFINE_units('fio_blocksize', None,
 flags.DEFINE_integer('fio_runtime', 600,
                      'The number of seconds to run each fio job for.',
                      lower_bound=1)
+flags.DEFINE_list('fio_parameters', [],
+                  'Parameters to apply to all PKB generated fio jobs. Each '
+                  'member of the list should be of the form "param=value".')
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
     'fio_generate_scenarios', 'fio_io_depths', 'fio_runtime',
-    'fio_blocksize', 'fio_num_jobs'}
+    'fio_blocksize', 'fio_num_jobs', 'fio_parameters'}
 
 
 def AgainstDevice():
@@ -192,6 +200,9 @@ do_verify=0
 verify_fatal=0
 randrepeat=0
 group_reporting=1
+{%- for parameter in parameters %}
+{{parameter}}
+{%- endfor %}
 {%- for scenario in scenarios %}
 {%- for iodepth in iodepths %}
 {%- for numjob in numjobs %}
@@ -213,7 +224,7 @@ SECONDS_PER_MINUTE = 60
 
 def GenerateJobFileString(filename, scenario_strings,
                           io_depths, num_jobs, working_set_size,
-                          block_size, runtime):
+                          block_size, runtime, parameters):
   """Make a string with our fio job file.
 
   Args:
@@ -224,6 +235,7 @@ def GenerateJobFileString(filename, scenario_strings,
     working_set_size: int or None. If int, the size of the working set in GB.
     block_size: Quantity or None. If quantity, the block size to use.
     runtime: int. The number of seconds to run each job.
+    parameters: list. Other fio parameters to be applied to all jobs.
 
   Returns:
     The contents of a fio job file, as a string.
@@ -254,7 +266,8 @@ def GenerateJobFileString(filename, scenario_strings,
       size=size_string,
       scenarios=scenarios,
       iodepths=io_depths,
-      numjobs=num_jobs))
+      numjobs=num_jobs,
+      parameters=parameters))
 
 
 FILENAME_PARAM_REGEXP = re.compile('filename\s*=.*$', re.MULTILINE)
@@ -282,7 +295,7 @@ def ProcessedJobFileString(fio_jobfile, remove_filename):
 def GetOrGenerateJobFileString(job_file_path, scenario_strings,
                                against_device, disk, io_depths,
                                num_jobs, working_set_size, block_size,
-                               runtime):
+                               runtime, parameters):
   """Get the contents of the fio job file we're working with.
 
   This will either read the user's job file, if given, or generate a
@@ -302,6 +315,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
       in GB.
     block_size: Quantity or None. If Quantity, the block size to use.
     runtime: int. The number of seconds to run each job.
+    paramters: list. Other fio parameters to apply to all jobs.
 
   Returns:
     A string containing a fio job file.
@@ -323,7 +337,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
 
     return GenerateJobFileString(filename, scenario_strings, io_depths,
                                  num_jobs, working_set_size, block_size,
-                                 runtime)
+                                 runtime, parameters)
 
 
 NEED_SIZE_MESSAGE = ('You must specify the working set size when using '
@@ -422,7 +436,8 @@ def Run(benchmark_spec):
       FLAGS.fio_num_jobs,
       FLAGS.fio_working_set_size,
       FLAGS.fio_blocksize,
-      FLAGS.fio_runtime)
+      FLAGS.fio_runtime,
+      FLAGS.fio_parameters)
   job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
   with open(job_file_path, 'w') as job_file:
     job_file.write(job_file_string)
