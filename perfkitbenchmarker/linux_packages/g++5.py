@@ -12,20 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing fortran installation and cleanup functions."""
+"""Module containing g++5 installation and cleanup functions."""
 
 
-def GetLibPath(vm):
-  """Get fortran library path."""
-  out, _ = vm.RemoteCommand('find /usr/lib/ | grep fortran.a')
-  return out[:-1]
+def _Install(vm):
+  """Installs the g++-5 package on the VM."""
+  pass
 
 
 def YumInstall(vm):
-  """Installs the fortran package on the VM."""
-  vm.InstallPackages('gcc-gfortran libgfortran')
+  """Installs the g++-5 package on the VM."""
+  # TODO: Figure out how to install gcc/g++5 with yum
+  _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the fortan package on the VM."""
-  vm.InstallPackages('gfortran')
+  """Installs the g++-5 package on the VM."""
+  vm.RemoteCommand(
+      'sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y; '
+      'sudo apt-get update')
+  vm.InstallPackages('g++-5')
