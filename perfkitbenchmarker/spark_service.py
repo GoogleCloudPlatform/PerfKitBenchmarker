@@ -143,10 +143,14 @@ class BaseSparkService(resource.BaseResource):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
-    return {'spark_service': self.SERVICE_NAME,
-            'num_workers': str(self.spec.worker_group.vm_count),
-            'machine_type': str(self.spec.worker_group.vm_spec.machine_type),
-            'spark_cluster_id': self.cluster_id}
+    basic_data = {'spark_service': self.SERVICE_NAME,
+                  'spark_cluster_id': self.cluster_id}
+    # TODO grab this information for user_managed clusters.
+    if not self.user_managed:
+      basic_data.update({'num_workers': str(self.spec.worker_group.vm_count),
+                         'worker_machine_type':
+                         str(self.spec.worker_group.vm_spec.machine_type)})
+    return basic_data
 
   @classmethod
   def GetExampleJar(cls, job_type):

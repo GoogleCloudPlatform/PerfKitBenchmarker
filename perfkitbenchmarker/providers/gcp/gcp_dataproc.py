@@ -139,7 +139,7 @@ class GcpDataproc(spark_service.BaseSparkService):
     cmd.flags['driver-log-levels'] = 'root=FATAL'
     if job_arguments:
       cmd.additional_flags = ['--'] + job_arguments
-    stdout, stderr, retcode = cmd.Issue()
+    stdout, stderr, retcode = cmd.Issue(timeout=None)
     if retcode != 0:
       return {spark_service.SUCCESS: False}
 

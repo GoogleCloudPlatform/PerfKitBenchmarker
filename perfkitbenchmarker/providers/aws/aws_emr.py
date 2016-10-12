@@ -71,7 +71,7 @@ class AwsSecurityGroup(resource.BaseResource):
     vm_util.IssueCommand(cmd)
 
   def _Exists(self):
-    cmd = self.cmd_prefix + ['ec2', 'describe-security-group',
+    cmd = self.cmd_prefix + ['ec2', 'describe-security-groups',
                              '--group-id=' + self.group_id]
     _, _, retcode = vm_util.IssueCommand(cmd)
     # if the security group doesn't exist, the describe command gives an error.
@@ -138,10 +138,24 @@ class AwsEMR(spark_service.BaseSparkService):
     for group_type, group_spec in [
         ('CORE', self.spec.worker_group),
         ('MASTER', self.spec.master_group)]:
-      instance_groups.append({'InstanceCount': group_spec.vm_count,
-                              'InstanceGroupType': group_type,
-                              'InstanceType': group_spec.vm_spec.machine_type,
-                              'Name': group_type + ' group'})
+      instance_properties = {'InstanceCount': group_spec.vm_count,
+                             'InstanceGroupType': group_type,
+                             'InstanceType': group_spec.vm_spec.machine_type,
+                             'Name': group_type + ' group'}
+      if group_spec.disk_spec:
+        # Make sure nothing we are ignoring is included in the disk spec
+        assert group_spec.disk_spec.device_path is None
+        assert group_spec.disk_spec.disk_number is None
+        assert group_spec.disk_spec.mount_point is None
+        assert group_spec.disk_spec.iops is None
+        ebs_configuration = {'EbsBlockDeviceConfigs': [
+            {'VolumeSpecification':
+             {'SizeInGB': group_spec.disk_spec.disk_size,
+              'VolumeType': group_spec.disk_spec.disk_type},
+             'VolumesPerInstance':
+             group_spec.disk_spec.num_striped_disks}]}
+        instance_properties.update({'EbsConfiguration': ebs_configuration})
+      instance_groups.append(instance_properties)
 
     # we need to store the cluster id.
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
@@ -319,7 +333,8 @@ class AwsEMR(spark_service.BaseSparkService):
       if not self._CheckForFile(filename):
         raise Exception('File not found yet')
 
-    @vm_util.Retry(poll_interval=job_poll_interval, fuzz=0)
+    @vm_util.Retry(timeout=FLAGS.aws_emr_job_wait_time,
+                   poll_interval=job_poll_interval, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:

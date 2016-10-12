@@ -24,6 +24,8 @@ flags.DEFINE_integer('aws_provisioned_iops', None,
 flags.DEFINE_string('aws_emr_loguri', None,
                     'The log-uri parameter to pass to AWS when creating a '
                     'cluster.  If not set, a bucket will be created.')
+flags.DEFINE_integer('aws_emr_job_wait_time', None,
+                     'The time to wait for an EMR job to finish, in seconds')
 
 flags.DEFINE_string('s3_custom_endpoint', None,
                     'If given, a custom endpoint to use for S3 transfers. If '
