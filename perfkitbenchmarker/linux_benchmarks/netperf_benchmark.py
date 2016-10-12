@@ -340,6 +340,9 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     throughput_stats = sample.PercentileCalculator(throughputs, [50, 90, 99])
     throughput_stats['min'] = min(throughputs)
     throughput_stats['max'] = max(throughputs)
+    # Calculate aggregate throughput
+    assert num_streams, len(throughputs)
+    throughput_stats['total'] = throughput_stats['average'] * num_streams
     # Create samples for throughput stats
     for stat, value in throughput_stats.items():
       samples.append(
