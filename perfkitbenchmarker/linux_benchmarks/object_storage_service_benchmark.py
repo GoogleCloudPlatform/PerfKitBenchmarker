@@ -124,14 +124,12 @@ flags.DEFINE_enum('object_storage_object_naming_scheme', 'sequential_by_stream',
 
 FLAGS = flags.FLAGS
 
-# User a scratch disk here to simulate what most users would do when they
-# use CLI tools to interact with the storage provider.
 BENCHMARK_INFO = {'name': 'object_storage_service',
                   'description':
                   'Object/blob storage service benchmarks. Specify '
                   '--object_storage_scenario '
                   'to select a set of sub-benchmarks to run. default is all.',
-                  'scratch_disk': True,
+                  'scratch_disk': False,
                   'num_machines': 1}
 
 BENCHMARK_NAME = 'object_storage_service'
@@ -144,7 +142,6 @@ object_storage_service:
   vm_groups:
     default:
       vm_spec: *default_single_core
-      disk_spec: *default_500_gb
       vm_count: null
 """
 
@@ -998,8 +995,8 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
     NotEnoughResultsError: if we failed too many times to upload or download.
   """
 
-  data_directory = '%s/run/data' % vm.GetScratchDir()
-  download_directory = '%s/run/temp' % vm.GetScratchDir()
+  data_directory = '/tmp/run/data'
+  download_directory = '/tmp/run/temp'
 
   # The real solution to the iteration count issue is dynamically
   # choosing the number of iterations based on how long they
@@ -1013,8 +1010,7 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
 
   # The CLI-based tests require some provisioning on the VM first.
   vm.RemoteCommand(
-      'cd %s/run/; bash cloud-storage-workload.sh %s' % (vm.GetScratchDir(),
-                                                         FLAGS.cli_test_size))
+      'cd /tmp/run/; bash cloud-storage-workload.sh %s' % FLAGS.cli_test_size)
 
   # CLI tool based tests.
   cli_upload_results = []
@@ -1092,27 +1088,26 @@ def PrepareVM(vm, service):
 
   vm.Install('openssl')
 
-  # Prepare data on vm, create a run directory on scratch drive, and add
+  # Prepare data on vm, create a run directory in temporary directory, and add
   # permission.
-  scratch_dir = vm.GetScratchDir()
-  vm.RemoteCommand('sudo mkdir -p %s/run/' % scratch_dir)
-  vm.RemoteCommand('sudo chmod 777 %s/run/' % scratch_dir)
+  vm.RemoteCommand('sudo mkdir -p /tmp/run/')
+  vm.RemoteCommand('sudo chmod 777 /tmp/run/')
 
-  vm.RemoteCommand('sudo mkdir -p %s/run/temp/' % scratch_dir)
-  vm.RemoteCommand('sudo chmod 777 %s/run/temp/' % scratch_dir)
+  vm.RemoteCommand('sudo mkdir -p /tmp/run/temp/')
+  vm.RemoteCommand('sudo chmod 777 /tmp/run/temp/')
 
   file_path = data.ResourcePath(DATA_FILE)
-  vm.PushFile(file_path, '%s/run/' % scratch_dir)
+  vm.PushFile(file_path, '/tmp/run/')
 
   for file_name in API_TEST_SCRIPT_FILES + service.APIScriptFiles():
     path = data.ResourcePath(os.path.join(API_TEST_SCRIPTS_DIR, file_name))
     logging.info('Uploading %s to %s', path, vm)
-    vm.PushFile(path, '%s/run/' % scratch_dir)
+    vm.PushFile(path, '/tmp/run/')
 
 
 def CleanupVM(vm):
   vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
-  vm.RemoteCommand('rm -rf %s/run/' % vm.GetScratchDir())
+  vm.RemoteCommand('rm -rf /tmp/run/')
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
                                         OBJECTS_WRITTEN_FILE)
   vm.RemoteCommand('rm -f %s' % objects_written_file)
@@ -1201,7 +1196,7 @@ def Run(benchmark_spec):
   metadata.update(service.Metadata(vms[0]))
 
   results = []
-  test_script_path = '%s/run/%s' % (vms[0].GetScratchDir(), API_TEST_SCRIPT)
+  test_script_path = '/tmp/run/%s' % API_TEST_SCRIPT
   try:
     command_builder = APIScriptCommandBuilder(
         test_script_path, STORAGE_TO_API_SCRIPT_DICT[FLAGS.storage], service)
