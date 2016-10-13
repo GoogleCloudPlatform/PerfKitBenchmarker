@@ -1,3 +1,50 @@
+# 1.8.0
+
+New features:
+- Multithreaded netperf benchmark (GH-1141, GH-1144)
+- Terasort benchmark using spark service infrastructure (GH-1104)
+- Support 10 or more disks on Azure (GH-1102)
+- Add sysctl and set_files flags (GH-1096)
+- Support DigitalOcean block storage (GH-1092)
+- Add cloudsuite_data_serving_rec_count and cloudsuite_data_serving_op_count parameters to cloudsuite_data_serving benchmark (GH-1091)
+- Add support for setting GCE boot disk size and type (GH-1106)
+- Add flag to skip reload on ycsb benchmark (GH-1108)
+- Support for AWS dedicated hosts (GH-1109)
+- Object storage multistream write-only scenario (GH-1123)
+- Allow multiple configs for the same benchmark in the same file (GH-1126)
+- Add flat that allows run retries (GH-1129)
+- Add fio_parameters flag (GH-1131)
+- Add config matrices (GH-1134)
+- Add events at the beginning and end of benchmarks (GH-1135)
+- Add extra_zones flag to pkb (GH-1137)
+- Add flag matrix filters (GH-1138)
+- Support allowing port ranges on Firewall.AllowPort (GH-1139)
+- Add static vm tags (GH-1142)
+
+Breaking changes:
+- Because of GH-1112, region names have changed.
+
+Enhancements:
+- Allow speccpu to run individual test (GH-1113)
+- Use Azure resource management mode (GH-1112)
+- GCP networks use subnets (GH-1087)
+- Add top level flags key to configs (GH-1125)
+- Precise resource usage for YCSB benchmarks (GH-1127)
+
+Bugfixes and maintanence updates:
+- Fix bugs with Terasort (GH-1136)
+- Don't run container commands as sudo with ContainerizedDebianMixin (GH-1130)
+- Automatically use amazon linux if os_type is rhel (GH-1124)
+- Removed Panda as a dependency (GH-1118, GH-1119)
+- Allow flag_util.ParseKeyValuePairs values to have colons in them (GH-1117)
+- Add ycsb to data directory (GH-1116)
+- Fix bug in mongodb_ycsb_benchmark cleanup (GH-1115)
+- Fix bug where static VM disk specs were overriden (GH-1105)
+- Use string formatting instead of addition to concatenate (GH-1103)
+- Fixed regression with fio flag (GH-1097)
+- Fix flags in static vm files (GH-1093)
+- Fix wait_for_command.py: wait for status file to avoid race condition (GH-1090)
+
 # 1.7.0
 
 New features:
