@@ -32,9 +32,10 @@ def _Install(vm):
       'cd %s; wget %s; tar xf %s' % (
           vm_util.VM_TMP_DIR, LAPACK_URL, LAPACK_TAR))
   vm.RemoteCommand(
-      'cd %s; mv make.inc.example make.inc; cmake .; make' % (LAPACK_DIR))
+      'cd %s; mv make.inc.example make.inc; cmake .; make -j %s' % (
+          LAPACK_DIR, vm.num_cpus))
   vm.RemoteCommand(
-      'cd %s; make' % (os.path.join(LAPACK_DIR, 'BLAS')))
+      'cd %s; make -j %s' % (os.path.join(LAPACK_DIR, 'BLAS'), vm.num_cpus))
 
 
 def YumInstall(vm):
