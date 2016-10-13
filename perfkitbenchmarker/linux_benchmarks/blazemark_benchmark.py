@@ -29,7 +29,7 @@ flags.DEFINE_list('blazemark_set', ['all'],
 flags.DEFINE_list('blazemark_kernels', ['-only-blaze'], 'A list of additional '
                   'flags send to blazemark, in order to '
                   'enable/disable kernels/libraries. '
-                  'To run all libraries, set the flag to "all" '
+                  'Currently only support blaze. '
                   'See following link for more details: '
                   'https://bitbucket.org/blaze-lib/blaze/wiki/'
                   'Blazemark#!command-line-parameters')
@@ -87,7 +87,7 @@ def Run(benchmark_spec):
     logging.info('Running %s', test)
     results.extend([
         sample.Sample(*result) for result in blazemark.RunTest(
-            vm, test, FLAGS.blazemark_kernels)])
+            vm, test)])
   return results
 
 

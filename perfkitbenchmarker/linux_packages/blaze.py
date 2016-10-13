@@ -36,13 +36,14 @@ def _Configure(vm):
   # Adjust cache size
   cache_in_KB, _ = vm.RemoteCommand(
       'cat /proc/cpuinfo | grep "cache size" | awk \'{print $4}\'')
-  cache_in_B = int(1024 * sum([float(c) for c in cache_in_KB.split()]))
+  cache_in_B = int(1024 * float(cache_in_KB.split()[0]))
   vm.RemoteCommand(
       'sed -i \'s/constexpr size_t cacheSize = 3145728UL;/constexpr '
       'size_t cacheSize = %sUL;/g\' %s' % (
           max(cache_in_B, MAX_BLAZE_CACHE_SIZE_IN_B - 1), os.path.join(
               BLAZE_DIR, 'blaze', 'config', 'CacheSize.h')))
-  vm.RemoteCommand('cd %s; ./configure %s; make' % (BLAZE_DIR, CONFIG))
+  vm.RemoteCommand('cd %s; ./configure %s; make -j %s' % (
+      BLAZE_DIR, CONFIG, vm.num_cpus))
 
 
 def _Install(vm):

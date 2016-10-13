@@ -154,24 +154,23 @@ def _ParseResult(out, test):
   return _ParseThroughput(out, test)
 
 
-def RunTest(vm, test, args):
+def RunTest(vm, test):
   """Run blazemark test on vm.
 
   Args:
     vm: VirtualMachine. The VM to run blazemark.
     test: string. The test name to run.
-    args: List of string. Additional flags passed to test.
 
   Returns:
     A list of samples. Each sample if a 4-tuple of (benchmark_name, value, unit,
     metadata).
   """
-  additional_args = ''
-  if 'all' not in args:
-    additional_args = ' '.join(args)
+  additional_command = ''
+  if vm.num_cpus > 1:
+    additional_command = 'export BLAZE_NUM_THREADS=%s;' % vm.num_cpus
   out, _ = vm.RemoteCommand(
-      'cd %s; ./%s %s' % (
-          os.path.join(BLAZEMARK_DIR, 'bin'), test, additional_args))
+      'cd %s; %s ./%s -only-blaze' % (
+          os.path.join(BLAZEMARK_DIR, 'bin'), additional_command, test))
   return _ParseResult(out, test)
 
 
@@ -183,7 +182,8 @@ def _Configure(vm):
           BLAZEMARK_DIR,
           os.path.dirname(fortran.GetLibPath(vm)),
           CONFIG))
-  vm.RemoteCommand('cd %s; ./configure %s; make' % (BLAZEMARK_DIR, CONFIG))
+  vm.RemoteCommand('cd %s; ./configure %s; make -j %s' % (
+      BLAZEMARK_DIR, CONFIG, vm.num_cpus))
 
 
 def _Install(vm):

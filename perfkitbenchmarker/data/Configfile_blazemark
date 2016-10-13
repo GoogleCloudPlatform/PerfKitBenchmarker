@@ -37,7 +37,7 @@ CXX="g++-5"
 
 # Special compiler flags
 # This variable specifies the compiler flags used for the compilation of all benchmarks.
-CXXFLAGS="-Wall -Wextra -Werror -Wshadow -Woverloaded-virtual -ansi -O3 -mavx -DNDEBUG -fpermissive -ansi -O3 -DNDEBUG --std=c++14"
+CXXFLAGS="-Wall -Wextra -Werror -Wshadow -Woverloaded-virtual -ansi -O3 -mavx -DNDEBUG -fpermissive -ansi -O3 -DNDEBUG -DBLAZE_USE_BOOST_THREADS --std=c++14"
 
 # Special include directives
 # This variable can be used to specify special/additional include-related compiler directives.

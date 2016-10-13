@@ -56,7 +56,7 @@ CXX="g++-5"
 # active the AVX instruction set). Also, it is recommended to enable one of the shared
 # memory parallelizations (OpenMP, C++11 threads, or Boost threads). Please consult the
 # Blaze tutorial for the specifics.
-CXXFLAGS="-Werror -Wall -Wextra -Wshadow -Woverloaded-virtual -ansi -O3 -DNDEBUG --std=c++14"
+CXXFLAGS="-Werror -Wall -Wextra -Wshadow -Woverloaded-virtual -ansi -O3 -DNDEBUG -DBLAZE_USE_BOOST_THREADS --std=c++14"
 
 # Library configuration
 # This selection configures which libraries are created during the compilation process.
