@@ -285,7 +285,6 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   netperf_cmd = ('{netperf_path} -p {{command_port}} -j {verbosity} '
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
-                 '-P {{data_port}} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
                  'P99_LATENCY,STDDEV_LATENCY,'
                  'MIN_LATENCY,MAX_LATENCY,'
