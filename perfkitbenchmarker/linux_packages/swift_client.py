@@ -18,7 +18,8 @@
 def Install(vm):
   """Installs the swiftclient package on the VM."""
   # Upgrade to latest urllib3 version fixes SSL SNMI error
-  vm.InstallPackages('python-dev python-urllib3 pip')
+  vm.Install('pip')
+  vm.InstallPackages('python-dev python-urllib3')
   vm.RemoteCommand('sudo pip install python-keystoneclient')
   vm.RemoteCommand('sudo pip install python-swiftclient')
 
