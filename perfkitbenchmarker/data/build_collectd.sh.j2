@@ -30,7 +30,7 @@ readonly INTERVAL='{{ interval }}'
 
 function install_deps_debian() {
   export DEBIAN_FRONTEND=noninteractive
-  sudo aptitude install -q -y \
+  sudo apt-get install -q -y \
     autoconf \
     bison \
     flex \
