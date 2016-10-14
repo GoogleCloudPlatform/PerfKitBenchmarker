@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,16 +18,19 @@ import copy
 import logging
 import os
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import blaze
 from perfkitbenchmarker.linux_packages import fortran
 
 BLAZEMARK_FOLDER = 'blazemark'
 BLAZEMARK_DIR = os.path.join(blaze.BLAZE_DIR, BLAZEMARK_FOLDER)
-CONFIG = 'Configfile_blazemark'
+CONFIG_TEMPLATE = 'blazemark_config.j2'
+CONFIG = 'config'
 
 THROUGHPUT_HEADER_REGEX = (
-    r'(\w+[\w\- ]+\w+)\s*(\([0-9]+% filled\))*\s*\[([\w/]+)\]:([0-9\s.]+)')
+    r'(\w+[\w\- ]+\w+)\s*(\([0-9.]+% filled\))*\s*\[([\w/]+)\]:([0-9\s.]+)')
 THROUGHPUT_RESULT_REGEX = r'([0-9]+)\s*([0-9.]+)'
 FILLED_REGEX = r'([0-9.]+)% filled'
 
@@ -35,12 +38,39 @@ LIBS = frozenset([
     'C-like', 'Classic', 'Blaze', 'Boost uBLAS', 'Blitz++',
     'GMM++', 'Armadillo', 'MTL', 'Eigen'])
 
+BLAZEMARK_BINARIES = frozenset([
+    'cg', 'daxpy', 'dmatsvecmult', 'dvecdvecsub', 'mat3mat3mult',
+    'smatdmatmult', 'smattsmatadd', 'svectdvecmult', 'tdmattdmatmult',
+    'tmat3mat3mult', 'tsmatdmatmult', 'tsvecdmatmult', 'tvec6tmat6mult',
+    'complex1', 'dmatdmatadd', 'dmattdmatadd', 'dvecnorm', 'mat3tmat3mult',
+    'smatdvecmult', 'smattsmatmult', 'svectsvecmult', 'tdmattsmatadd',
+    'tmat3tmat3add', 'tsmatdvecmult', 'tsvecdvecmult', 'vec3vec3add',
+    'complex2', 'dmatdmatmult', 'dmattdmatmult', 'dvecscalarmult',
+    'mat3vec3mult', 'smatscalarmult', 'svecdvecadd', 'tdmatdmatadd',
+    'tdmattsmatmult', 'tmat3tmat3mult', 'tsmatsmatadd', 'tsvecsmatmult',
+    'vec6vec6add', 'complex3', 'dmatdmatsub', 'dmattrans', 'dvecsvecadd',
+    'mat6mat6add', 'smatsmatadd', 'svecdveccross', 'tdmatdmatmult',
+    'tdvecdmatmult', 'tmat3vec3mult', 'tsmatsmatmult', 'tsvecsvecmult',
+    'complex4', 'dmatdvecmult', 'dmattsmatadd', 'dvecsveccross', 'mat6mat6mult',
+    'smatsmatmult', 'svecdvecmult', 'tdmatdvecmult', 'tdvecdvecmult',
+    'tmat6mat6mult', 'tsmatsvecmult', 'tsvectdmatmult', 'complex5', 'dmatinv',
+    'dmattsmatmult', 'dvecsvecmult', 'mat6tmat6mult', 'smatsvecmult',
+    'svecscalarmult', 'tdmatsmatadd', 'tdvecsmatmult', 'tmat6tmat6add',
+    'tsmattdmatadd', 'tsvectsmatmult', 'complex6', 'dmatscalarmult',
+    'dvecdvecadd', 'dvectdvecmult', 'mat6vec6mult', 'smattdmatadd',
+    'svecsvecadd', 'tdmatsmatmult', 'tdvecsvecmult', 'tmat6tmat6mult',
+    'tsmattdmatmult', 'tvec3mat3mult', 'complex7', 'dmatsmatadd',
+    'dvecdveccross', 'dvectsvecmult', 'memorysweep', 'smattdmatmult',
+    'svecsveccross', 'tdmatsvecmult', 'tdvectdmatmult', 'tmat6vec6mult',
+    'tsmattsmatadd', 'tvec3tmat3mult', 'complex8', 'dmatsmatmult',
+    'dvecdvecmult', 'mat3mat3add', 'smatdmatadd', 'smattrans',
+    'svecsvecmult', 'tdmattdmatadd', 'tdvectsmatmult', 'tsmatdmatadd',
+    'tsmattsmatmult', 'tvec6mat6mult'])
 
-def GetBinaries(vm):
+
+def GetBinaries():
   """Find available blazemark binaries."""
-  out, _ = vm.RemoteCommand('ls %s' % (
-      os.path.join(BLAZEMARK_DIR, 'bin')))
-  return out.split()
+  return BLAZEMARK_BINARIES
 
 
 def _SimplfyLibName(name):
@@ -56,37 +86,6 @@ def _SimplfyLibName(name):
     if lib in name:
       return lib
   return name
-
-
-def _ParseThroughput(out, test):
-  """Parse throughput section of blazemark results.
-
-  Args:
-    out: string. Blazemark output in raw string format.
-    test: string. Name of the test ran.
-
-  Returns:
-    A list of samples. Each sample if a 4-tuple of (benchmark_name, value, unit,
-    metadata).
-  """
-  matches = regex_util.ExtractAllMatches(THROUGHPUT_HEADER_REGEX, out)
-  results = []
-  for m in matches:
-    lib = _SimplfyLibName(m[0])
-    metadata = {}
-    filled = m[1]
-    if filled:
-      metadata['% filled'] = regex_util.ExtractFloat(FILLED_REGEX, filled)
-    unit = m[-2]
-    for v in regex_util.ExtractAllMatches(THROUGHPUT_RESULT_REGEX, m[-1]):
-      metadata['N'] = int(v[0])
-      results.append((
-          '_'.join([test, lib, 'Throughput']),  # Metric name
-          float(v[1]),  # Value
-          unit,  # Unit
-          copy.deepcopy(metadata)))  # Metadata
-  logging.info('Results for %s:\n %s', test, results)
-  return results
 
 
 def _ParseResult(out, test):
@@ -151,7 +150,24 @@ def _ParseResult(out, test):
     A list of samples. Each sample if a 4-tuple of (benchmark_name, value, unit,
     metadata).
   """
-  return _ParseThroughput(out, test)
+  matches = regex_util.ExtractAllMatches(THROUGHPUT_HEADER_REGEX, out)
+  results = []
+  for m in matches:
+    lib = _SimplfyLibName(m[0])
+    metadata = {}
+    filled = m[1]
+    if filled:
+      metadata['% filled'] = regex_util.ExtractFloat(FILLED_REGEX, filled)
+    unit = m[-2]
+    for v in regex_util.ExtractAllMatches(THROUGHPUT_RESULT_REGEX, m[-1]):
+      metadata['N'] = int(v[0])
+      results.append(sample.Sample(
+          '_'.join([test, lib, 'Throughput']),  # Metric name
+          float(v[1]),  # Value
+          unit,  # Unit
+          copy.deepcopy(metadata)))  # Metadata
+  logging.info('Results for %s:\n %s', test, results)
+  return results
 
 
 def RunTest(vm, test):
@@ -176,12 +192,17 @@ def RunTest(vm, test):
 
 def _Configure(vm):
   """Configure and build blazemark on vm."""
-  vm.PushDataFile(CONFIG, BLAZEMARK_DIR)
-  vm.RemoteCommand(
-      'cd %s;sed -i \'s|FORTRAN_PATH|%s|\' %s' % (
-          BLAZEMARK_DIR,
-          os.path.dirname(fortran.GetLibPath(vm)),
-          CONFIG))
+  vm.RenderTemplate(
+      data.ResourcePath(CONFIG_TEMPLATE),
+      os.path.join(BLAZEMARK_DIR, CONFIG),
+      {'compiler': '"g++-5"',
+       'compiler_flags': (
+           '"-Wall -Wextra -Werror -Wshadow -Woverloaded-virtual -ansi -O3 '
+           '-mavx -DNDEBUG -fpermissive -ansi -O3 -DNDEBUG '
+           '-DBLAZE_USE_BOOST_THREADS --std=c++14"'),
+       'lapack_path': '"/tmp/pkb/lapack-3.6.1/lib"',
+       'lapack_libs': '"-llapack -lblas -L%s -lgfortran"'
+       % os.path.dirname(fortran.GetLibPath(vm))})
   vm.RemoteCommand('cd %s; ./configure %s; make -j %s' % (
       BLAZEMARK_DIR, CONFIG, vm.num_cpus))
 
