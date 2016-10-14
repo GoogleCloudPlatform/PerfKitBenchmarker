@@ -82,7 +82,7 @@ def Prepare(benchmark_spec):
   vm.Install('build_tools')
   vm.Install('wget')
   vm.Install('openjdk')
-  vm.InstallPackages('unzip')
+  vm.Install('unzip')
   cmds = [
       'rm -rf {0} && mkdir {0}'.format(SCIMARK2_PATH),
       'wget {0}/{1} -O {2}/{1}'.format(
