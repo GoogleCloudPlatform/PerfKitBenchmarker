@@ -25,12 +25,12 @@ by the "aerospike_storage_type" and "data_disk_type" flags.
 import re
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aerospike_server
+from perfkitbenchmarker.linux_packages import aerospike_client
 
 
 FLAGS = flags.FLAGS
@@ -68,11 +68,6 @@ aerospike:
       vm_spec: *default_single_core
 """
 
-AEROSPIKE_CLIENT = 'https://github.com/aerospike/aerospike-client-c.git'
-CLIENT_DIR = 'aerospike-client-c'
-CLIENT_VERSION = '4.0.4'
-PATCH_FILE = 'aerospike.patch'
-
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -89,30 +84,7 @@ def CheckPrerequisites():
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  data.ResourcePath(PATCH_FILE)
-
-
-def _PrepareClient(client):
-  """Prepare the Aerospike C client on a VM."""
-  client.Install('build_tools')
-  client.Install('lua5_1')
-  client.Install('openssl')
-  clone_command = 'git clone %s'
-  client.RemoteCommand(clone_command % AEROSPIKE_CLIENT)
-  build_command = ('cd %s && git checkout %s && git submodule update --init '
-                   '&& make')
-  client.RemoteCommand(build_command % (CLIENT_DIR, CLIENT_VERSION))
-
-  # Apply a patch to the client benchmark so we have access to average latency
-  # of requests. Switching over to YCSB should obviate this.
-  client.PushDataFile(PATCH_FILE)
-  benchmark_dir = '%s/benchmarks/src/main' % CLIENT_DIR
-  client.RemoteCommand('cp aerospike.patch %s' % benchmark_dir)
-  client.RemoteCommand('cd %s && patch -p1 -f  < aerospike.patch'
-                       % benchmark_dir)
-  client.RemoteCommand('sed -i -e "s/lpthread/lpthread -lz/" '
-                       '%s/benchmarks/Makefile' % CLIENT_DIR)
-  client.RemoteCommand('cd %s/benchmarks && make' % CLIENT_DIR)
+  aerospike_client.CheckPrerequisites()
 
 
 def Prepare(benchmark_spec):
@@ -128,7 +100,7 @@ def Prepare(benchmark_spec):
 
   def _Prepare(vm):
     if vm == client:
-      _PrepareClient(vm)
+      vm.Install('aerospike_client')
     else:
       aerospike_server.ConfigureAndStart(vm, [workers[0].internal_ip])
 
@@ -170,7 +142,7 @@ def Run(benchmark_spec):
 
   load_command = ('./%s/benchmarks/target/benchmarks -z 32 -n test -w I '
                   '-o B:1000 -k %s -h %s' %
-                  (CLIENT_DIR, FLAGS.aerospike_num_keys,
+                  (aerospike_client.CLIENT_DIR, FLAGS.aerospike_num_keys,
                    ','.join(s.internal_ip for s in servers)))
   client.RemoteCommand(load_command, should_log=True)
 
@@ -181,8 +153,8 @@ def Run(benchmark_spec):
     load_command = ('timeout 60 ./%s/benchmarks/target/benchmarks '
                     '-z %s -n test -w RU,%s -o B:1000 -k %s '
                     '--latency 5,1 -h %s;:' %
-                    (CLIENT_DIR, threads, FLAGS.aerospike_read_percent,
-                     FLAGS.aerospike_num_keys,
+                    (aerospike_client.CLIENT_DIR, threads,
+                     FLAGS.aerospike_read_percent, FLAGS.aerospike_num_keys,
                      ','.join(s.internal_ip for s in servers)))
     stdout, _ = client.RemoteCommand(load_command, should_log=True)
     tps, latency = ParseOutput(stdout)
