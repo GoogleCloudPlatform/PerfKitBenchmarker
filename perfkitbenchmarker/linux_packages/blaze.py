@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 """Module containing blaze installation and cleanup functions."""
 
 import os
+from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 
 BLAZE_VERSION = '3.0'
@@ -22,7 +23,8 @@ BLAZE_TAR = 'blaze-%s.tar.gz' % BLAZE_VERSION
 BLAZE_DIR = '%s/blaze-%s' % (vm_util.VM_TMP_DIR, BLAZE_VERSION)
 BLAZE_TAR_URL = (
     'https://bitbucket.org/blaze-lib/blaze/downloads/%s' % BLAZE_TAR)
-CONFIG = 'Configfile_blaze'
+CONFIG_TEMPLATE = 'blaze_config.j2'
+CONFIG = 'config'
 MAX_BLAZE_CACHE_SIZE_IN_B = 100000000
 
 
@@ -32,7 +34,11 @@ def _Configure(vm):
   See https://bitbucket.org/blaze-lib/blaze/wiki/Configuration%20Files
   for more details.
   """
-  vm.PushDataFile(CONFIG, BLAZE_DIR)
+  vm.RenderTemplate(
+      data.ResourcePath(CONFIG_TEMPLATE),
+      os.path.join(BLAZE_DIR, CONFIG),
+      {'compiler': 'g++-5',
+       'compile_flags': ' -DBLAZE_USE_BOOST_THREADS --std=c++14'})
   # Adjust cache size
   cache_in_KB, _ = vm.RemoteCommand(
       'cat /proc/cpuinfo | grep "cache size" | awk \'{print $4}\'')
@@ -40,7 +46,7 @@ def _Configure(vm):
   vm.RemoteCommand(
       'sed -i \'s/constexpr size_t cacheSize = 3145728UL;/constexpr '
       'size_t cacheSize = %sUL;/g\' %s' % (
-          max(cache_in_B, MAX_BLAZE_CACHE_SIZE_IN_B - 1), os.path.join(
+          min(cache_in_B, MAX_BLAZE_CACHE_SIZE_IN_B - 1), os.path.join(
               BLAZE_DIR, 'blaze', 'config', 'CacheSize.h')))
   vm.RemoteCommand('cd %s; ./configure %s; make -j %s' % (
       BLAZE_DIR, CONFIG, vm.num_cpus))

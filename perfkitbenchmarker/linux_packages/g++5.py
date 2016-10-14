@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ def _Install(vm):
 def YumInstall(vm):
   """Installs the g++-5 package on the VM."""
   # TODO: Figure out how to install gcc/g++5 with yum
-  _Install(vm)
+  raise NotImplementedError
 
 
 def AptInstall(vm):

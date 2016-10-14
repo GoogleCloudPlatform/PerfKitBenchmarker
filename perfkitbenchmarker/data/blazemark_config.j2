@@ -33,11 +33,11 @@
 
 # Compiler selection
 # This variable specifies the compiler used for the compilation of all benchmarks.
-CXX="g++-5"
+CXX={{ compiler }}
 
 # Special compiler flags
 # This variable specifies the compiler flags used for the compilation of all benchmarks.
-CXXFLAGS="-Wall -Wextra -Werror -Wshadow -Woverloaded-virtual -ansi -O3 -mavx -DNDEBUG -fpermissive -ansi -O3 -DNDEBUG -DBLAZE_USE_BOOST_THREADS --std=c++14"
+CXXFLAGS={{ compiler_flags }}
 
 # Special include directives
 # This variable can be used to specify special/additional include-related compiler directives.
@@ -88,8 +88,8 @@ BLAS_LIBRARIES=
 # The Blaze library requires a LAPACK library for the matrix inversion benchmark. For
 # this benchmark it is mandatory to specify the LAPACK library path and the required
 # LAPACK libraries.
-LAPACK_LIBRARY_PATH="/tmp/pkb/lapack-3.6.1/lib"
-LAPACK_LIBRARIES="-llapack -lblas -LFORTRAN_PATH -lgfortran"
+LAPACK_LIBRARY_PATH={{ lapack_path }}
+LAPACK_LIBRARIES={{ lapack_libs }}
 
 # Configuration of the Blitz++ library (optional)
 # With this setting it is possible to include the Blitz++ expression template library

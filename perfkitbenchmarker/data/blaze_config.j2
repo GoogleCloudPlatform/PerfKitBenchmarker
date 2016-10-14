@@ -40,7 +40,7 @@ VERSION="release"
 # This switch specifies the compiler that is used to compile the Blaze library. The default
 # compiler is the GNU C++ compiler (g++). Other possible options are for instance the Intel
 # C++ compiler (icpc), or the Clang compiler (clang).
-CXX="g++-5"
+CXX="{{ compiler }}"
 
 # Compiler flags
 # This setting specifies the compilation flags used to build the Blaze library. Depending
@@ -56,7 +56,7 @@ CXX="g++-5"
 # active the AVX instruction set). Also, it is recommended to enable one of the shared
 # memory parallelizations (OpenMP, C++11 threads, or Boost threads). Please consult the
 # Blaze tutorial for the specifics.
-CXXFLAGS="-Werror -Wall -Wextra -Wshadow -Woverloaded-virtual -ansi -O3 -DNDEBUG -DBLAZE_USE_BOOST_THREADS --std=c++14"
+CXXFLAGS="-Werror -Wall -Wextra -Wshadow -Woverloaded-virtual -ansi -O3 -DNDEBUG {{ compile_flags }}"
 
 # Library configuration
 # This selection configures which libraries are created during the compilation process.

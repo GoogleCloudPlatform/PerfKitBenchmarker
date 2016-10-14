@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 import logging
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import blazemark
 
 flags.DEFINE_list('blazemark_set', ['all'],
@@ -51,6 +51,17 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
+def CheckPrerequisites():
+  """Perform flag checks."""
+  if 'all' not in FLAGS.blazemark_set:
+    requested = frozenset(FLAGS.blazemark_set)
+    binaries = blazemark.GetBinaries()
+    if requested - binaries:
+      raise errors.Benchmarks.PrepareException(
+          'Binaries %s not available. Options are %s' % (
+              requested - binaries, binaries))
+
+
 def Prepare(benchmark_spec):
   """Prepare vm for blazemark.
 
@@ -73,21 +84,14 @@ def Run(benchmark_spec):
     A list of sample.Sample objects with individual machine boot times.
   """
   vm = benchmark_spec.vms[0]
-  all_tests = blazemark.GetBinaries(vm)
-  requested = set(FLAGS.blazemark_set)
-  run = set(all_tests)
   if 'all' not in FLAGS.blazemark_set:
-    if requested - run:
-      logging.warning(
-          'Binaries %s not available, skipping. Options are %s',
-          requested - run, run)
-    run &= requested
+    run = FLAGS.blazemark_set
+  else:
+    run = blazemark.GetBinaries()
   results = []
   for test in run:
     logging.info('Running %s', test)
-    results.extend([
-        sample.Sample(*result) for result in blazemark.RunTest(
-            vm, test)])
+    results.extend(blazemark.RunTest(vm, test))
   return results
 
 
