@@ -31,7 +31,8 @@ def _Install(vm, packages):
   vm.Install('build_tools')
   vm.InstallPackages(packages)
   vm.RemoteCommand('git clone --recursive %s' % OLDISIM_GIT)
-  vm.RemoteCommand('cd %s && git checkout %s && scons' %
+  vm.RemoteCommand('cd %s && git checkout %s && '
+                   'scons -j$(cat /proc/cpuinfo | grep processor | wc -l)' %
                    (OLDISIM_DIR, OLDISIM_VERSION))
 
 
