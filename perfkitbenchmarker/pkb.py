@@ -203,7 +203,8 @@ flags.DEFINE_integer(
     'If run_stage_time is exceeded, the run stage will not be retried even if '
     'the number of failures is less than the value of this flag.')
 flags.DEFINE_boolean(
-    'boot_samples', True, 'Whether to publish boot time samples for all tests.')
+    'boot_samples', False,
+    'Whether to publish boot time samples for all tests.')
 
 
 # Support for using a proxy in the cloud environment.
