@@ -173,6 +173,22 @@ class StaticVmDecoderTestCase(unittest.TestCase):
     self.assertIsInstance(result, static_virtual_machine.StaticVmSpec)
     self.assertEqual(result.ssh_port, 111)
 
+  def testVmSpecFlag(self):
+    flags = mock_flags.MockFlags()
+    flags['install_packages'].value = False
+    flags['install_packages'].present = True
+    result = self._decoder.Decode({}, _COMPONENT, flags)
+    self.assertFalse(result.install_packages)
+
+  def testDiskSpecFlag(self):
+    flags = mock_flags.MockFlags()
+    flags['scratch_dir'].value = '/path/from/flag'
+    flags['scratch_dir'].present = True
+    result = self._decoder.Decode(
+        {'disk_specs': [{'mount_point': '/path/from/spec'}]},
+        _COMPONENT, flags)
+    self.assertEqual(result.disk_specs[0].mount_point, '/path/from/flag')
+
 
 class StaticVmListDecoderTestCase(unittest.TestCase):
 

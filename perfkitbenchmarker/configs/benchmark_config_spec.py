@@ -153,7 +153,8 @@ class _StaticVmDecoder(option_decoders.TypeVerifier):
     input_dict = super(_StaticVmDecoder, self).Decode(
         value, component_full_name, flag_values)
     return static_virtual_machine.StaticVmSpec(
-        self._GetOptionFullName(component_full_name), **input_dict)
+        self._GetOptionFullName(component_full_name), flag_values=flag_values,
+        **input_dict)
 
 
 class _StaticVmListDecoder(option_decoders.ListDecoder):
