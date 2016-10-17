@@ -51,8 +51,8 @@ class DstatTestCase(unittest.TestCase):
                       value=6.4000000000000004,
                       unit='',
                       metadata={'vm_role': 'test_vm0',
-                                'label1': 123, 'event': 'sender',
-                                'sender': 'testSender'},
+                                'label1': 123, 'event': 'event',
+                                'sender': 'sender'},
                       timestamp=0.0)
     self.assertEqual(
         expected.metric, self.samples[0].metric)
@@ -71,8 +71,8 @@ class DstatTestCase(unittest.TestCase):
                       value=3.200000000000000,
                       unit='',
                       metadata={'vm_role': 'test_vm0',
-                                'label1': 123, 'event': 'sender',
-                                'sender': 'testSender'},
+                                'label1': 123, 'event': 'event',
+                                'sender': 'sender'},
                       timestamp=0.0)
     self.assertEqual(
         expected.metric, self.samples[0].metric)
@@ -91,8 +91,8 @@ class DstatTestCase(unittest.TestCase):
                       value=10.063689295039159,
                       unit='',
                       metadata={'vm_role': 'test_vm0',
-                                'label1': 123, 'event': 'sender',
-                                'sender': 'testSender'},
+                                'label1': 123, 'event': 'event',
+                                'sender': 'sender'},
                       timestamp=0.0)
     self.assertEqual(
         expected.metric, self.samples[0].metric)
