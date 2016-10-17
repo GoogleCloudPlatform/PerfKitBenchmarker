@@ -14,8 +14,6 @@
 
 """Records the time required to boot a cluster of VMs."""
 
-import logging
-
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import sample
@@ -42,29 +40,30 @@ def Prepare(unused_benchmark_spec):
   pass
 
 
-def _GetTimeToBoot(vms, vm_index):
-  """Creates a Sample for the boot time of a single VM.
+def GetTimeToBoot(vms):
+  """Creates Samples for the boot time of a list of VMs.
 
   The boot time is the time difference from before the VM is created to when
   the VM is responsive to SSH commands.
 
   Args:
-    vms: list of BaseVirtualMachine subclasses.
-    vm_index: int. Index into vms that identifies the VM for which to calculate
-        the boot time.
+    vms: List of BaseVirtualMachine subclasses.
 
   Returns:
-    Sample containing the boot time.
+    List of Samples containing the boot time.
   """
-  vm = vms[vm_index]
-  metadata = {'num_cpus': vm.num_cpus, 'machine_instance': vm_index,
-              'num_vms': len(vms), 'os_type': vm.OS_TYPE}
-  metadata.update(vm.GetMachineTypeDict())
-  assert vm.bootable_time
-  assert vm.create_start_time
-  assert vm.bootable_time >= vm.create_start_time
-  value = vm.bootable_time - vm.create_start_time
-  return sample.Sample('Boot Time', value, 'seconds', metadata)
+  def _GetTimeToBoot(vm, vm_index):
+    metadata = {'num_cpus': vm.num_cpus, 'machine_instance': vm_index,
+                'num_vms': len(vms), 'os_type': vm.OS_TYPE}
+    assert vm.bootable_time
+    assert vm.create_start_time
+    assert vm.bootable_time >= vm.create_start_time
+    value = vm.bootable_time - vm.create_start_time
+    return sample.Sample('Boot Time', value, 'seconds', metadata)
+  params = [((vm, i), {}) for i, vm in enumerate(vms)]
+  samples = vm_util.RunThreaded(_GetTimeToBoot, params)
+  assert len(samples) == len(vms)
+  return samples
 
 
 def Run(benchmark_spec):
@@ -75,15 +74,9 @@ def Run(benchmark_spec):
         required to run the benchmark.
 
   Returns:
-    A list of sample.Sample objects with individual machine boot times.
+    An empty list (all boot samples will be added later).
   """
-  logging.info('Boot Results:')
-  vms = benchmark_spec.vms
-  params = [((vms, i), {}) for i in xrange(len(vms))]
-  samples = vm_util.RunThreaded(_GetTimeToBoot, params)
-  logging.info(samples)
-  assert len(samples) == len(vms)
-  return samples
+  return []
 
 
 def Cleanup(unused_benchmark_spec):

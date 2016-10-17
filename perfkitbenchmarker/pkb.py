@@ -85,6 +85,7 @@ from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
 from perfkitbenchmarker.publisher import SampleCollector
 
 LOG_FILE_NAME = 'pkb.log'
@@ -201,6 +202,8 @@ flags.DEFINE_integer(
     'this number of failures any exceptions will cause benchmark termination. '
     'If run_stage_time is exceeded, the run stage will not be retried even if '
     'the number of failures is less than the value of this flag.')
+flags.DEFINE_boolean(
+    'boot_samples', True, 'Whether to publish boot time samples for all tests.')
 
 
 # Support for using a proxy in the cloud environment.
@@ -396,6 +399,8 @@ def DoRunPhase(benchmark, name, spec, collector, timer):
     try:
       with timer.Measure('Benchmark Run'):
         samples = benchmark.Run(spec)
+      if FLAGS.boot_samples or name == cluster_boot_benchmark.BENCHMARK_NAME:
+        samples.extend(cluster_boot_benchmark.GetTimeToBoot(spec.vms))
     except Exception:
       consecutive_failures += 1
       if consecutive_failures > FLAGS.run_stage_retries:
