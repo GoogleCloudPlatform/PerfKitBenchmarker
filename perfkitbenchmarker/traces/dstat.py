@@ -149,8 +149,8 @@ class _DStatCollector(object):
       # Calculate mean of each column.
       avg = np.average(out[:, 1:], weights=cond, axis=0)
       metadata = copy.deepcopy(event.metadata)
-      metadata['event'] = event.sender
-      metadata['sender'] = sender
+      metadata['event'] = event.event
+      metadata['sender'] = event.sender
       metadata['vm_role'] = role
 
       samples.extend([

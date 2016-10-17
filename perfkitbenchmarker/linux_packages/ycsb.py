@@ -623,7 +623,7 @@ class YCSBExecutor(object):
     vm_util.RunThreaded(_Load, range(len(vms)))
     events.record_event.send(
         type(self).__name__, event='load', start_timestamp=start,
-        end_timestamp=time.time(), metadata=kwargs)
+        end_timestamp=time.time(), metadata=copy.deepcopy(kwargs))
 
     if len(results) != len(vms):
       raise IOError('Missing results: only {0}/{1} reported\n{2}'.format(
@@ -740,7 +740,7 @@ class YCSBExecutor(object):
         results = self._RunThreaded(vms, **parameters)
         events.record_event.send(
             type(self).__name__, event='run', start_timestamp=start,
-            end_timestamp=time.time(), metadata=parameters)
+            end_timestamp=time.time(), metadata=copy.deepcopy(parameters))
         client_meta = workload_meta.copy()
         client_meta.update(clients=len(vms) * client_count,
                            threads_per_client_vm=client_count)
