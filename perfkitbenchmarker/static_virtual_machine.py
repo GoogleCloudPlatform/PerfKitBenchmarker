@@ -84,7 +84,8 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
     self.tag = tag
     self.disk_specs = [
         disk.BaseDiskSpec(
-            '{0}.disk_specs[{1}]'.format(component_full_name, i), **disk_spec)
+            '{0}.disk_specs[{1}]'.format(component_full_name, i),
+            flag_values=kwargs.get('flag_values'), **disk_spec)
         for i, disk_spec in enumerate(disk_specs or ())]
 
 
