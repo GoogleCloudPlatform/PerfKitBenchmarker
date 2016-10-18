@@ -156,10 +156,10 @@ $ sudo pip install -r requirements.txt
 
 This section describes the setup steps needed for each cloud system.  
 * [Google Cloud](#install-gcloud-and-setup-authentication)
-* [OpenStack](#install-openstack-nova-client-and-setup-authentication)
+* [OpenStack](#install-openstack-cli-client-and-setup-authentication)
 * [Kubernetes](#kubernetes-configuration-and-credentials)
 * [Mesos](#mesos-configuration)
-* [Cloudstack](#cloudstack-install-csapi-and-set-the-api-keys)
+* [Cloudstack](#cloudstack-install-dependencies-and-set-the-api-keys)
 * [AWS](#install-aws-cli-and-setup-authentication)
 * [Azure](#windows-azure-cli-and-credentials)
 * [AliCloud](#install-alicloud-cli-and-setup-authentication)
