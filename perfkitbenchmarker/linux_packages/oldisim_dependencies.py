@@ -14,20 +14,44 @@
 
 """Module containing oldisim dependencies installation functions."""
 
+import os
+
 YUM_PACKAGES = ('bc gengetopt libevent-devel '
                 'google-perftools-devel scons')
 APT_PACKAGES = ('bc gengetopt libevent-dev '
                 'libgoogle-perftools-dev scons')
 
+OLDISIM_GIT = 'https://github.com/GoogleCloudPlatform/oldisim.git'
+OLDISIM_DIR = 'oldisim'
+OLDISIM_VERSION = 'v0.1'
+BINARY_BASE = 'release/workloads/search'
+
+
+def _Install(vm, packages):
+  vm.Install('build_tools')
+  vm.InstallPackages(packages)
+  vm.RemoteCommand('git clone --recursive %s' % OLDISIM_GIT)
+  vm.RemoteCommand('cd %s && git checkout %s && '
+                   'scons -j$(cat /proc/cpuinfo | grep processor | wc -l)' %
+                   (OLDISIM_DIR, OLDISIM_VERSION))
+
 
 def YumInstall(vm):
   """Installs oldisim dependencies on the VM."""
-  vm.Install('build_tools')
   vm.InstallEpelRepo()
-  vm.InstallPackages(YUM_PACKAGES)
+  _Install(vm, YUM_PACKAGES)
 
 
 def AptInstall(vm):
   """Installs oldisim dependencies on the VM."""
-  vm.Install('build_tools')
-  vm.InstallPackages(APT_PACKAGES)
+  _Install(vm, APT_PACKAGES)
+
+
+def Path(name):
+  """Returns the path of a file within the package."""
+  return os.path.join(OLDISIM_DIR, name)
+
+
+def BinaryPath(name):
+  """Returns the path of a binary within the package."""
+  return os.path.join(OLDISIM_DIR, BINARY_BASE, name)
