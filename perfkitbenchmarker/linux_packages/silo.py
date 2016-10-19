@@ -36,8 +36,13 @@ def _Install(vm):
   # This is due to a failing clone command when executing behind a proxy.
   # Replacing the protocol to https instead of git fixes the issue.
   vm.RemoteCommand('git config --global url."https://".insteadOf git://')
-  vm.RemoteCommand('cd {0} && MODE=perf DEBUG=0 CHECK_INVARIANTS=0 make\
-          -j{1} dbtest'.format(SILO_DIR, nthreads))
+  # Disable -Wmaybe-uninitialized errors when GCC has the option to workaround
+  # a spurious error in masstree.
+  cxx = '"g++ -std=gnu++0x \
+          $(echo | gcc -Wmaybe-uninitialized -E - >/dev/null 2>&1 && \
+            echo -Wno-error=maybe-uninitialized)"'
+  vm.RemoteCommand('cd {0} && CXX={2} MODE=perf DEBUG=0 CHECK_INVARIANTS=0 make\
+          -j{1} dbtest'.format(SILO_DIR, nthreads, cxx))
 
 
 def YumInstall(vm):

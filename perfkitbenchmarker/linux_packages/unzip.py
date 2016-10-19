@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,15 +13,14 @@
 # limitations under the License.
 
 
-"""Module containing libjpeg installation and cleanup functions."""
+"""Module containing unzip installation and cleanup functions."""
 
 
 def YumInstall(vm):
-  """Installs the libjpeg package on the VM."""
-  vm.InstallPackages('libjpeg-turbo')
-  vm.InstallPackages('libjpeg-turbo-devel')
+  """Installs the unzip package on the VM."""
+  vm.InstallPackages('unzip')
 
 
 def AptInstall(vm):
-  """Installs the libjpeg package on the VM."""
-  vm.InstallPackages('libjpeg-dev')
+  """Installs the unzip package on the VM."""
+  vm.InstallPackages('unzip')

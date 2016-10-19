@@ -89,3 +89,7 @@ def ConfigureAndStart(server, seed_node_ips=None):
   server.RemoteCommand('cd %s; nohup sudo make start &> /dev/null &' %
                        AEROSPIKE_DIR)
   time.sleep(5)  # Wait for server to come up
+
+
+def Uninstall(vm):
+  vm.RemoteCommand('rm -rf %s' % AEROSPIKE_DIR)

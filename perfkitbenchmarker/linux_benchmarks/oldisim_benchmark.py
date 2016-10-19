@@ -38,7 +38,6 @@ and measure the scaling efficiency.
 """
 
 import logging
-import posixpath
 import re
 import time
 
@@ -47,6 +46,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
+from perfkitbenchmarker.linux_packages import oldisim_dependencies
 
 FLAGS = flags.FLAGS
 
@@ -61,12 +61,8 @@ flags.DEFINE_enum('oldisim_latency_metric', 'avg',
                   'Allowable metrics for end-to-end latency')
 flags.DEFINE_float('oldisim_latency_target', '30', 'latency target in ms')
 
-OLDISIM_GIT = 'https://github.com/GoogleCloudPlatform/oldisim.git'
 NUM_DRIVERS = 1
 NUM_ROOTS = 1
-OLDISIM_DIR = 'oldisim'
-OLDISIM_VERSION = 'v0.1'
-BINARY_BASE = 'release/workloads/search'
 BENCHMARK_NAME = 'oldisim'
 BENCHMARK_CONFIG = """
 oldisim:
@@ -95,9 +91,6 @@ def InstallAndBuild(vm):
   """
   logging.info('prepare oldisim on %s', vm)
   vm.Install('oldisim_dependencies')
-  vm.RemoteCommand('git clone --recursive %s' % OLDISIM_GIT)
-  vm.RemoteCommand('cd %s && git checkout %s && scons' %
-                   (OLDISIM_DIR, OLDISIM_VERSION))
 
 
 def Prepare(benchmark_spec):
@@ -116,7 +109,7 @@ def Prepare(benchmark_spec):
     vm_util.RunThreaded(InstallAndBuild, vms)
 
   # Launch job on the leaf nodes.
-  leaf_server_bin = posixpath.join(OLDISIM_DIR, BINARY_BASE, 'LeafNode')
+  leaf_server_bin = oldisim_dependencies.BinaryPath('LeafNode')
   for vm in leaf_vms:
     leaf_cmd = '%s --threads=%s' % (leaf_server_bin, vm.num_cpus)
     vm.RemoteCommand('%s &> /dev/null &' % leaf_cmd)
@@ -131,7 +124,7 @@ def SetupRoot(root_vm, leaf_vms):
   """
   fanout_args = ' '.join(['--leaf=%s' % i.internal_ip
                           for i in leaf_vms])
-  root_server_bin = posixpath.join(OLDISIM_DIR, BINARY_BASE, 'ParentNode')
+  root_server_bin = oldisim_dependencies.BinaryPath('ParentNode')
   root_cmd = '%s --threads=%s %s' % (root_server_bin, root_vm.num_cpus,
                                      fanout_args)
   logging.info('Root cmdline: %s', root_cmd)
@@ -201,8 +194,8 @@ def RunLoadTest(benchmark_spec, fanout):
     SetupRoot(root_vm, leaf_vms)
 
   driver_vm = driver_vms[0]
-  driver_binary = posixpath.join(OLDISIM_DIR, BINARY_BASE, 'DriverNode')
-  launch_script = posixpath.join(OLDISIM_DIR, 'workloads/search/search_qps.sh')
+  driver_binary = oldisim_dependencies.BinaryPath('DriverNode')
+  launch_script = oldisim_dependencies.Path('workloads/search/search_qps.sh')
   driver_args = ' '.join(['--server=%s' % i.internal_ip
                           for i in root_vms])
   # Make sure server is up.

@@ -28,6 +28,8 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 
+from perfkitbenchmarker.linux_packages import multichase
+
 
 _CHASES_WITHOUT_ARGS = (
     'simple', 'incr', 't0', 't1', 't2', 'nta', 'movdqa', 'movntdqa',
@@ -44,8 +46,6 @@ _CHASES = {c: c in _CHASES_WITH_ARGS
            for c in _CHASES_WITHOUT_ARGS + _CHASES_WITH_ARGS}
 
 _BENCHMARK_SPECIFIC_VM_STATE_ATTR = 'multichase_vm_state'
-_GIT_PATH = 'https://github.com/google/multichase'
-_GIT_VERSION = '8a00c4006d253c6aa5079f5e702279ee20e0df68'
 
 BENCHMARK_NAME = 'multichase'
 BENCHMARK_CONFIG = """
@@ -244,15 +244,13 @@ def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
   vm_state = _MultichaseSpecificState()
   setattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR, vm_state)
-  vm.Install('build_tools')
+  vm.Install('multichase')
   remote_benchmark_dir = '_'.join(('pkb', FLAGS.run_uri, benchmark_spec.uid))
   vm.RemoteCommand('mkdir ' + remote_benchmark_dir)
   vm_state.dir = remote_benchmark_dir
   vm_state.multichase_dir = posixpath.join(vm_state.dir, 'multichase')
-  vm.RemoteCommand('git clone --recursive {git_path} {dir}'.format(
-      dir=vm_state.multichase_dir, git_path=_GIT_PATH))
-  vm.RemoteCommand('cd {dir} && git checkout {version} && make'.format(
-      dir=vm_state.multichase_dir, version=_GIT_VERSION))
+  vm.RemoteCommand('cp -ar {0} {1}'.format(
+                   multichase.INSTALL_PATH, vm_state.multichase_dir))
 
 
 def Run(benchmark_spec):
@@ -267,7 +265,7 @@ def Run(benchmark_spec):
   samples = []
   base_metadata = {'additional_flags': FLAGS.multichase_additional_flags,
                    'chase_type': FLAGS.multichase_chase_type,
-                   'multichase_version': _GIT_VERSION,
+                   'multichase_version': multichase.GIT_VERSION,
                    'thread_count': FLAGS.multichase_thread_count}
   vm = benchmark_spec.vms[0]
   vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR)
