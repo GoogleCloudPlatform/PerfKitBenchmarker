@@ -243,7 +243,8 @@ def GetBenchmarksFromFlags():
 
     for flag_config in itertools.product(*flag_axes):
       config = copy.copy(benchmark_config)
-      config['flags'] = copy.deepcopy(config.get('flags', {}))
+      config['flags'] = copy.deepcopy(configs.GetConfigFlags())
+      config['flags'].update(config.get('flags', {}))
       for setting in flag_config:
         config['flags'].update(setting)
       if (flag_matrix_filter and not eval(
