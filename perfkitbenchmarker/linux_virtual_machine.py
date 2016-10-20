@@ -640,6 +640,11 @@ class RhelMixin(BaseLinuxMixin):
         vm_util.VM_TMP_DIR,
         ignore_failure=True)
 
+  def HasPackage(self, package):
+    """Returns True iff the package is available for installation."""
+    return self.TryRemoteCommand('sudo yum info %s' % package,
+                                 suppress_warning=True)
+
   def InstallPackages(self, packages):
     """Installs packages using the yum package manager."""
     self.RemoteCommand('sudo yum install -y %s' % packages)
@@ -741,6 +746,11 @@ class DebianMixin(BaseLinuxMixin):
         'sudo dpkg --set-selections < %s/dpkg_selections' % vm_util.VM_TMP_DIR)
     self.RemoteCommand('sudo DEBIAN_FRONTEND=\'noninteractive\' '
                        'apt-get --purge -y dselect-upgrade')
+
+  def HasPackage(self, package):
+    """Returns True iff the package is available for installation."""
+    return self.TryRemoteCommand('apt-get install --just-print %s' % package,
+                                 suppress_warning=True)
 
   @vm_util.Retry()
   def InstallPackages(self, packages):
