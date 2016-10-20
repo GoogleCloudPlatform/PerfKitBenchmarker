@@ -7,7 +7,7 @@ default_single_core: &default_single_core
     zone: us-central1-a
     image: null
   Azure:
-    machine_type: Small
+    machine_type: Standard_A1
     zone: eastus2
     image: null
   AWS:
