@@ -450,9 +450,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       AuthError: If the VM cannot access its peer.
     """
-    try:
-      self.RemoteCommand('ssh %s hostname' % peer.internal_ip)
-    except errors.VirtualMachine.RemoteCommandError:
+    if not self.TryRemoteCommand('ssh %s hostname' % peer.internal_ip):
       raise errors.VirtualMachine.AuthError(
           'Authentication check failed. If you are running with Static VMs, '
           'please make sure that %s can ssh into %s without supplying any '
@@ -517,11 +515,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
-    try:
-      self.RemoteCommand('ping -c 1 %s' % ip)
-    except errors.VirtualMachine.RemoteCommandError:
-      return False
-    return True
+    return self.TryRemoteCommand('ping -c 1 %s' % ip)
 
   def SetupLocalDisks(self):
     """Performs Linux specific setup of local disks."""
