@@ -62,9 +62,11 @@ VM specs, disk specs, or any component of the benchmark configuration
 dictionary.
 """
 
+import contextlib2
 import copy
 import functools32
 import logging
+import re
 import yaml
 
 from perfkitbenchmarker import data
@@ -74,6 +76,7 @@ from perfkitbenchmarker import flags
 FLAGS = flags.FLAGS
 CONFIG_CONSTANTS = 'default_config_constants.yaml'
 FLAGS_KEY = 'flags'
+IMPORT_REGEX = re.compile('^#import (.*)')
 
 flags.DEFINE_string('benchmark_config_file', None,
                     'The file path to the user config file which will '
@@ -90,10 +93,44 @@ flags.DEFINE_multistring(
     'default.vm_count=4).')
 
 
+class _ConcatenatedFiles(object):
+
+  def __init__(self, files):
+    self.files = files
+    self.current_file_index = 0
+
+  def read(self, length):
+    data = self.files[self.current_file_index].read(length)
+    while (not data) and (self.current_file_index + 1 < len(self.files)):
+      self.current_file_index += 1
+      data = self.files[self.current_file_index].read(length)
+    return data
+
+
+def _GetImportFiles(config_file):
+  """Get a list of file names that get imported from config_file."""
+  config_path = data.ResourcePath(config_file)
+  with open(config_path) as f:
+    line = f.readline()
+    match = IMPORT_REGEX.match(line)
+    import_files = []
+    while match:
+      import_file = data.ResourcePath(match.group(1))
+      for file_name in _GetImportFiles(import_file):
+        if file_name not in import_files:
+          import_files.append(file_name)
+      line = f.readline()
+      match = IMPORT_REGEX.match(line)
+    import_files.append(config_path)
+    return import_files
+
+
 def _LoadUserConfig(path):
   """Loads a user config from the supplied path."""
-  with open(data.ResourcePath(path)) as fp:
-    return yaml.load(fp.read())
+  config_files = _GetImportFiles(path)
+  with contextlib2.ExitStack() as stack:
+    files = [stack.enter_context(open(f)) for f in config_files]
+    return yaml.load(_ConcatenatedFiles(files))
 
 
 @functools32.lru_cache()
