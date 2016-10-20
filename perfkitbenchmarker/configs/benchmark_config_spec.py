@@ -38,12 +38,12 @@ _DEFAULT_DISK_COUNT = 1
 _DEFAULT_VM_COUNT = 1
 
 
-class _FlagsDecoder(option_decoders.TypeVerifier):
+class FlagsDecoder(option_decoders.TypeVerifier):
   """Processes the flags override dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
-    super(_FlagsDecoder, self).__init__(default=None, none_ok=True,
-                                        valid_types=(dict,), **kwargs)
+    super(FlagsDecoder, self).__init__(default=None, none_ok=True,
+                                       valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Processes the flags override dictionary of a benchmark config object.
@@ -58,8 +58,8 @@ class _FlagsDecoder(option_decoders.TypeVerifier):
       dict mapping flag name string to Flag object. The flag values to use
       when running the benchmark.
     """
-    config_flags = super(_FlagsDecoder, self).Decode(value, component_full_name,
-                                                     flag_values)
+    config_flags = super(FlagsDecoder, self).Decode(value, component_full_name,
+                                                    flag_values)
     merged_flag_values = copy.deepcopy(flag_values)
     if config_flags:
       for key, value in config_flags.iteritems():
@@ -467,7 +467,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     result.update({
         'description': (option_decoders.StringDecoder, {'default': None}),
         'name': (option_decoders.StringDecoder, {'default': None}),
-        'flags': (_FlagsDecoder, {}),
+        'flags': (FlagsDecoder, {}),
         'vm_groups': (_VmGroupsDecoder, {'default': {}}),
         'spark_service': (_SparkServiceDecoder, {'default': None})})
     return result

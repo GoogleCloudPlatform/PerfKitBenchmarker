@@ -42,7 +42,7 @@ class FlagsDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
     super(FlagsDecoderTestCase, self).setUp()
-    self._decoder = benchmark_config_spec._FlagsDecoder(option=_OPTION)
+    self._decoder = benchmark_config_spec.FlagsDecoder(option=_OPTION)
     self._flag_values = flags.FlagValues()
     flags.DEFINE_integer('test_flag', 0, 'Test flag.',
                          flag_values=self._flag_values)

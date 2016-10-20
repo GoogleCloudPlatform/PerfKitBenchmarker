@@ -123,7 +123,7 @@ def _GetConfigFromOverrides(overrides):
 
 
 @functools32.lru_cache()
-def _GetConfigFlags():
+def GetConfigFlags():
   """Returns the global flags from the user config."""
   return GetUserConfig().get(FLAGS_KEY, {})
 
@@ -249,8 +249,5 @@ def LoadConfig(benchmark_config, user_config, benchmark_name):
     dict. The loaded config.
   """
   config = LoadMinimalConfig(benchmark_config, benchmark_name)
-  if FLAGS_KEY not in config:
-    config[FLAGS_KEY] = {}
-  config[FLAGS_KEY].update(_GetConfigFlags())
   config = MergeConfigs(config, user_config, warn_new_key=True)
   return config
