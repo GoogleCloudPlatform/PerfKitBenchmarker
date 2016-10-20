@@ -21,17 +21,26 @@ FLAGS = flags.FLAGS
 
 JAVA_HOME = '/usr'
 
-flags.DEFINE_string('openjdk_version', '7', 'Version of openjdk to use. '
-                    'You must use this flag to specify version 8 for '
-                    'ubuntu 1604 and other operating systems where '
-                    'openjdk7 is not installable by default')
+flags.DEFINE_string('openjdk_version', None, 'Version of openjdk to use. '
+                    'By default, the version of openjdk is automatically '
+                    'detected.')
+
+
+def _OpenJdkPackage(vm, format_string):
+  version = FLAGS.openjdk_version
+  if version is None:
+    if vm.HasPackage(format_string.format('7')):
+      version = '7'
+    else:
+      version = '8'
+  return format_string.format(version)
 
 
 def YumInstall(vm):
   """Installs the OpenJDK package on the VM."""
-  vm.InstallPackages('java-1.{0}.0-openjdk-devel'.format(FLAGS.openjdk_version))
+  vm.InstallPackages(_OpenJdkPackage(vm, 'java-1.{0}.0-openjdk-devel'))
 
 
 def AptInstall(vm):
   """Installs the OpenJDK package on the VM."""
-  vm.InstallPackages('openjdk-{0}-jdk'.format(FLAGS.openjdk_version))
+  vm.InstallPackages(_OpenJdkPackage(vm, 'openjdk-{0}-jdk'))
