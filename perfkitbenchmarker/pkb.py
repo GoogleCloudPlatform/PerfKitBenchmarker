@@ -72,6 +72,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
@@ -306,7 +307,10 @@ def _CreateBenchmarkRunList():
     expected_os_types = (
         os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPES
         else os_types.LINUX_OS_TYPES)
-    config_dict = benchmark_module.GetConfig(user_config)
+    merged_flags = benchmark_config_spec.FlagsDecoder().Decode(
+        user_config.get('flags'), 'flags', FLAGS)
+    with flag_util.FlagDictSubstitution(FLAGS, lambda: merged_flags):
+      config_dict = benchmark_module.GetConfig(user_config)
     config_spec_class = getattr(
         benchmark_module, 'BENCHMARK_CONFIG_SPEC_CLASS',
         benchmark_config_spec.BenchmarkConfigSpec)
