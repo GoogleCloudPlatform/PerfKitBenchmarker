@@ -69,7 +69,11 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs Hadoop on the VM."""
-  vm.InstallPackages('libsnappy1 libsnappy-dev')
+  libsnappy = 'libsnappy1'
+  if not vm.HasPackage(libsnappy):
+    # libsnappy's name on ubuntu16.04 is libsnappy1v5. Let's try that instead.
+    libsnappy = 'libsnappy1v5'
+  vm.InstallPackages('%s libsnappy-dev' % libsnappy)
   _Install(vm)
 
 
