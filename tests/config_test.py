@@ -129,3 +129,11 @@ class ConfigsTestCase(unittest.TestCase):
     config = configs.GetUserConfig()
     self.assertEqual(config['a']['vm_groups']['default']['vm_count'], 5)
     self.assertEqual(config['a']['flags']['flag'], 'value')
+
+  def testConfigImport(self):
+    p = mock.patch(configs.__name__ + '.FLAGS')
+    self.addCleanup(p.stop)
+    mock_flags = p.start()
+    mock_flags.configure_mock(benchmark_config_file="test_import.yml")
+    config = configs.GetUserConfig()
+    self.assertEqual(config['flags']['num_vms'], 3)
