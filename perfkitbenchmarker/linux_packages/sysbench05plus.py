@@ -46,18 +46,17 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """ Installs the sysbench 0.5 or later versions via APT Install """
-
-  # Setup the proper sources list so apt get will get the latest version
-  # of sysbench. By default, it only gets version earlier than 0.5.
-  vm.RemoteCommand('sudo bash -c \'echo "deb http://repo.percona.com/apt'
-                   ' trusty main">>/etc/apt/sources.list.d/percona.list\'')
-  vm.RemoteCommand('sudo bash -c \'echo "deb-src http://repo.percona.com/apt'
-                   ' trusty main">>/etc/apt/sources.list.d/percona.list\'')
-  vm.RemoteCommand('sudo bash -c \'echo "deb http://security.ubuntu.com/ubuntu'
-                   ' trusty-security main">>/etc/apt/sources.list\'')
-  vm.RemoteCommand('sudo apt-key adv --keyserver keys.gnupg.net --recv-keys'
-                   ' 1C4CBDCDCD2EFD2A')
+  vm.Install('wget')
+  vm.RemoteCommand('wget https://repo.percona.com/apt/'
+                   'percona-release_0.1-4.$(lsb_release -sc)_all.deb')
+  vm.RemoteCommand(
+      'sudo dpkg -i percona-release_0.1-4.$(lsb_release -sc)_all.deb')
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('libc6')
   vm.InstallPackages('mysql-client')
   vm.InstallPackages('sysbench')
+
+
+def AptUninstall(vm):
+  vm.RemoteCommand('sudo dpkg --purge percona-release')
+  vm.RemoteCommand('sudo apt-get update')
