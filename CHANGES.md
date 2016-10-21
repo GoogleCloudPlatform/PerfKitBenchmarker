@@ -1,3 +1,8 @@
+# 1.8.1
+
+Bugfixes and maintanence updates:
+- Fixed default machine type for Azure (GH-1161)
+
 # 1.8.0
 
 New features:
