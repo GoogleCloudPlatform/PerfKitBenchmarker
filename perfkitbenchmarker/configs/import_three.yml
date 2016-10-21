@@ -1,1 +1,2 @@
+#import test_import.yml
 three: &three 3

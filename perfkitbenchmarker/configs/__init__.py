@@ -94,6 +94,15 @@ flags.DEFINE_multistring(
 
 
 class _ConcatenatedFiles(object):
+  """Class that presents several files as a single object.
+
+  The class exposes a single method (read) which is all that yaml
+  needs to interact with a stream.
+
+  Attributes:
+    files: A list of opened file objects.
+    current_file_index: The index of the current file that is being read from.
+  """
 
   def __init__(self, files):
     self.files = files
@@ -107,16 +116,32 @@ class _ConcatenatedFiles(object):
     return data
 
 
-def _GetImportFiles(config_file):
-  """Get a list of file names that get imported from config_file."""
+def _GetImportFiles(config_file, imported_set=None):
+  """Get a list of file names that get imported from config_file.
+
+  Args:
+    config_file: The name of a config file to find imports for.
+    imported_set: A set of files that _GetImportFiles has already
+        been called on that should be ignored.
+
+  Returns:
+    A list of file names that are imported by config_file
+    (including config_file itself).
+  """
+  imported_set = imported_set or set()
   config_path = data.ResourcePath(config_file)
+  # Give up on circular imports.
+  if config_path in imported_set:
+    return []
+  imported_set.add(config_path)
+
   with open(config_path) as f:
     line = f.readline()
     match = IMPORT_REGEX.match(line)
     import_files = []
     while match:
-      import_file = data.ResourcePath(match.group(1))
-      for file_name in _GetImportFiles(import_file):
+      import_file = match.group(1)
+      for file_name in _GetImportFiles(import_file, imported_set):
         if file_name not in import_files:
           import_files.append(file_name)
       line = f.readline()
