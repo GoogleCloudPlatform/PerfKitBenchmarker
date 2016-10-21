@@ -20,6 +20,7 @@ import yaml
 
 # This import to ensure required FLAGS are defined.
 from perfkitbenchmarker import pkb  # NOQA
+from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import benchmark_sets
 
@@ -53,6 +54,20 @@ netperf:
       machine_type: [n1-standard-1, n1-standard-4]
       zones: [us-central1-a, us-central1-b]
 """
+FLAG_PRECEDENCE_CONFIG = """
+flags:
+  netperf_benchmarks: TCP_RR
+  netperf_test_length: 30
+  netperf_max_iter: 3
+netperf:
+  flags:
+    netperf_benchmarks: UDP_RR
+    netperf_test_length: 40
+  flag_matrix: test_matrix
+  flag_matrix_defs:
+    test_matrix:
+      netperf_benchmarks: [TCP_STREAM]
+"""
 
 
 class BenchmarkSetsTestCase(unittest.TestCase):
@@ -73,6 +88,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     p = patch(benchmark_sets.__name__ + '.FLAGS')
     self.mock_flags = p.start()
     self.addCleanup(p.stop)
+    self.addCleanup(configs.GetConfigFlags.cache_clear)
 
   def testStandardSet(self):
     self.assertIn(benchmark_sets.STANDARD_SET, benchmark_sets.BENCHMARK_SETS)
@@ -209,3 +225,15 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertEqual(benchmark_tuple_list[0][1]['flags'],
                      {'zones': 'us-central1-a',
                       'machine_type': 'n1-standard-1'})
+
+  def testFlagPrecedence(self):
+    self.mock_flags.benchmarks = ['netperf']
+    self.mock_flags.flag_matrix = None
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(FLAG_PRECEDENCE_CONFIG)):
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertEqual(len(benchmark_tuple_list), 1)
+    self.assertEqual(benchmark_tuple_list[0][1]['flags'],
+                     {'netperf_benchmarks': 'TCP_STREAM',
+                      'netperf_test_length': 40,
+                      'netperf_max_iter': 3})
