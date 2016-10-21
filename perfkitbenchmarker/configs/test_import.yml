@@ -1,0 +1,11 @@
+#import import_three2.yml
+#import import_three.yml
+#import import_three.yml
+
+# This is an example of how to import in config files.
+# You can even use anchors from other yaml files.
+# Importing a file multiple times either directly or indirectly won't break
+# things.
+# Imports must all be at the top of the file with no spaces between them.
+flags:
+  num_vms: *three
