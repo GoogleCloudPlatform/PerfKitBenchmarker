@@ -15,14 +15,14 @@
 
 """Module containing memtier installation and cleanup functions."""
 
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '1.2.0'
 LIBEVENT_TAR = 'libevent-2.0.21-stable.tar.gz'
 LIBEVENT_URL = 'https://github.com/downloads/libevent/libevent/' + LIBEVENT_TAR
-LIBEVENT_DIR = '%s/libevent-2.0.21-stable' % vm_util.VM_TMP_DIR
-MEMTIER_DIR = '%s/memtier_benchmark' % vm_util.VM_TMP_DIR
+LIBEVENT_DIR = '%s/libevent-2.0.21-stable' % INSTALL_DIR
+MEMTIER_DIR = '%s/memtier_benchmark' % INSTALL_DIR
 APT_PACKAGES = ('autoconf automake libpcre3-dev '
                 'libevent-dev pkg-config zlib1g-dev')
 YUM_PACKAGES = 'zlib-devel pcre-devel libmemcached-devel'
@@ -33,8 +33,8 @@ def YumInstall(vm):
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
   vm.Install('wget')
-  vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL, vm_util.VM_TMP_DIR))
-  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(vm_util.VM_TMP_DIR,
+  vm.RemoteCommand('wget {0} -P {1}'.format(LIBEVENT_URL, INSTALL_DIR))
+  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(INSTALL_DIR,
                                                    LIBEVENT_TAR))
   vm.RemoteCommand('cd {0} && ./configure && sudo make install'.format(
       LIBEVENT_DIR))

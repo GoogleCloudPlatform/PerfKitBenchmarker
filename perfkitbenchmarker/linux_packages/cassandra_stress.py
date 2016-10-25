@@ -22,9 +22,9 @@ https://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStress_t.html
 import posixpath
 
 from perfkitbenchmarker.linux_packages import cassandra
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-CASSANDRA_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'cassandra')
+CASSANDRA_DIR = posixpath.join(INSTALL_DIR, 'cassandra')
 
 
 def YumInstall(vm):
@@ -50,6 +50,6 @@ def JujuInstall(vm, vm_group_name):
 
   for unit in vm.units:
     # Make sure the cassandra/conf dir is created, since we're skipping
-    # the manual installation to /tmp/pkb.
+    # the manual installation to /opt/pkb.
     remote_path = posixpath.join(CASSANDRA_DIR, 'conf')
     unit.RemoteCommand('mkdir -p %s' % remote_path)

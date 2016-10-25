@@ -22,12 +22,12 @@ http://icl.cs.utk.edu/hpcc/
 
 import re
 
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import openblas
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 HPCC_TAR = 'hpcc-1.4.3.tar.gz'
 HPCC_URL = 'http://icl.cs.utk.edu/projectsfiles/hpcc/download/' + HPCC_TAR
-HPCC_DIR = '%s/hpcc-1.4.3' % vm_util.VM_TMP_DIR
+HPCC_DIR = '%s/hpcc-1.4.3' % INSTALL_DIR
 MAKE_FLAVOR = 'Linux_PII_CBLAS'
 HPCC_MAKEFILE = 'Make.' + MAKE_FLAVOR
 HPCC_MAKEFILE_PATH = HPCC_DIR + '/hpl/' + HPCC_MAKEFILE
@@ -38,8 +38,8 @@ def _Install(vm):
   vm.Install('wget')
   vm.Install('openmpi')
   vm.Install('openblas')
-  vm.RemoteCommand('wget %s -P %s' % (HPCC_URL, vm_util.VM_TMP_DIR))
-  vm.RemoteCommand('cd %s && tar xvfz %s' % (vm_util.VM_TMP_DIR, HPCC_TAR))
+  vm.RemoteCommand('wget %s -P %s' % (HPCC_URL, INSTALL_DIR))
+  vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, HPCC_TAR))
   vm.RemoteCommand(
       'cp %s/hpl/setup/%s %s' % (HPCC_DIR, HPCC_MAKEFILE, HPCC_MAKEFILE_PATH))
   sed_cmd = (

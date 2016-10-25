@@ -24,12 +24,12 @@ https://tomcat.apache.org/
 """
 import posixpath
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
 TOMCAT_URL = ('https://archive.apache.org/dist/tomcat/tomcat-8/v8.0.28/bin/'
               'apache-tomcat-8.0.28.tar.gz')
-TOMCAT_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'tomcat')
+TOMCAT_DIR = posixpath.join(INSTALL_DIR, 'tomcat')
 TOMCAT_HTTP_PORT = 8080
 
 flags.DEFINE_string('tomcat_url', TOMCAT_URL, 'Tomcat 8 download URL.')
