@@ -568,8 +568,8 @@ class YCSBExecutor(object):
       param, value = pv.split('=', 1)
       kwargs[param] = value
     command = self._BuildCommand('load', **kwargs)
-    stdout, _ = vm.RobustRemoteCommand(command)
-    return ParseResults(str(stdout))
+    stdout, stderr = vm.RobustRemoteCommand(command)
+    return ParseResults(str(stderr + stdout))
 
   def _LoadThreaded(self, vms, workload_file, **kwargs):
     """Runs "Load" in parallel for each VM in VMs.
