@@ -69,14 +69,14 @@ def Prepare(benchmark_spec):
   def PrepareCommon(vm):
     if not docker.IsInstalled(vm):
       vm.Install('docker')
-    vm.RemoteCommand('sudo docker pull cloudsuite/spark')
-    vm.RemoteCommand('sudo docker pull cloudsuite/movielens-dataset')
+    vm.Install('cloudsuite/spark')
+    vm.Install('cloudsuite/movielens-dataset')
     vm.RemoteCommand('sudo docker create --name data '
                      'cloudsuite/movielens-dataset')
 
   def PrepareMaster(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/in-memory-analytics')
+    vm.Install('cloudsuite/in-memory-analytics')
     start_master_cmd = ('sudo docker run -d --net host -e SPARK_MASTER_IP=%s '
                         '--name spark-master cloudsuite/spark master' %
                         master.internal_ip)
@@ -139,13 +139,10 @@ def Cleanup(benchmark_spec):
 
   def CleanupCommon(vm):
     vm.RemoteCommand('sudo docker rm -v data')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/movielens-dataset')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/spark')
 
   def CleanupMaster(vm):
     vm.RemoteCommand('sudo docker stop spark-master')
     vm.RemoteCommand('sudo docker rm spark-master')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/in-memory-analytics')
     CleanupCommon(vm)
 
   def CleanupWorker(vm):
