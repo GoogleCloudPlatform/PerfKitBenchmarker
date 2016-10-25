@@ -80,6 +80,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.floating_ip = None
     self.firewall = None
     self.public_network = None
+    self.has_neutron = True
 
   @property
   def group_id(self):
@@ -90,8 +91,12 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Validate and Create dependencies prior creating the VM."""
     self._CheckPrerequisites()
     self.firewall = os_network.OpenStackFirewall.GetFirewall()
-    self.public_network = os_network.OpenStackFloatingIPPool(
-        self.floating_ip_pool_name)
+    if self.has_neutron:
+      self.public_network = os_network.OpenStackNeutronFloatingIPPool(
+          self.floating_ip_pool_name)
+    else:
+      self.public_network = os_network.OpenStackFloatingIPPool(
+          self.floating_ip_pool_name)
     self._UploadSSHPublicKey()
     self.firewall.AllowICMP(self)  # Allowing ICMP traffic (i.e. ping)
     self.AllowRemoteAccessPorts()
@@ -201,17 +206,27 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CheckFloatingIPNetworkExists(self):
     cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'pool', 'list')
-    stdout, stderr, _ = cmd.Issue()
-    resp = json.loads(stdout)
-    for flip_pool in resp:
-      if flip_pool['Name'] == self.floating_ip_pool_name:
-        break
-    else:
-      raise errors.Config.InvalidValue(' '.join(
-          ('Floating IP pool %s could not be found.'
-           % self.floating_ip_pool_name,
-           'For valid floating IP pools run '
-           '"openstack ip floating pool list".',)))
+    stdout, _, retcode = cmd.Issue()
+
+    if retcode == 0:  # Nova network is present
+      self.has_neutron = False
+      resp = json.loads(stdout)
+      for flip_pool in resp:
+        if flip_pool['Name'] == self.floating_ip_pool_name:
+          break
+      else:
+        raise errors.Config.InvalidValue(' '.join(
+            ('Floating IP pool %s could not be found.'
+             % self.floating_ip_pool_name,
+             'For valid floating IP pools run '
+             '"openstack ip floating pool list".',)))
+    else:  # networks are managed by Neutron
+      self.has_neutron = True
+      cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',
+                                         self.floating_ip_pool_name)
+      err_msg = VALIDATION_ERROR_MESSAGE.format('Network',
+                                                self.floating_ip_pool_name)
+      self._IssueCommandCheck(cmd, err_msg)
 
   def _CheckNetworkExists(self):
     cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',

@@ -173,3 +173,68 @@ class OpenStackFloatingIPPool(object):
                                              updated_floating_ip_dict['id'])
       del delete_cmd.flags['format']  # Command not support json output format
       stdout, stderr, _ = delete_cmd.Issue(suppress_warning=True)
+
+
+class OpenStackNeutronFloatingIPPool(object):
+
+  _floating_ip_lock = threading.Lock()  # Guards floating IP allocation/release
+
+  def __init__(self, pool_name):
+    self.ip_pool_name = pool_name
+
+  def associate(self, vm):
+    with self._floating_ip_lock:
+      floating_ip = self._get_or_create(vm)
+      cmd = utils.OpenStackCLICommand(vm, 'server', 'add', 'floating', 'ip',
+                                      vm.id, floating_ip['ip'])
+      del cmd.flags['format']  # Command does not support json output format
+      _, stderr, _ = cmd.Issue()
+      if stderr:
+        raise errors.Error(stderr)
+      return floating_ip
+
+  def _get_or_create(self, vm):  # returns FIP ID
+    fip_id = self._get_available_floating_ip_id(vm)
+    if not fip_id:
+      return self._allocate(vm)
+
+    cmd = utils.OpenStackCLICommand(vm, 'floating', 'ip', 'show', fip_id)
+    stdout, stderr, _ = cmd.Issue()
+    if stderr.strip():
+      raise errors.Error(stderr)
+    floating_ip_dict = json.loads(stdout)
+    # Convert OSC format to nova's format
+    floating_ip_dict['ip'] = floating_ip_dict['floating_ip_address']
+    del floating_ip_dict['floating_ip_address']
+    return floating_ip_dict
+
+  def _get_available_floating_ip_id(self, vm):
+    cmd = utils.OpenStackCLICommand(vm, 'floating', 'ip', 'list')
+    stdout, stderr, _ = cmd.Issue()
+    if stderr.strip():
+      raise errors.Error(stderr)
+    floating_ip_dict_list = json.loads(stdout)
+    for floating_ip_dict in floating_ip_dict_list:
+      if not floating_ip_dict['Port']:
+        return floating_ip_dict['ID']
+
+  def _allocate(self, vm):
+    cmd = utils.OpenStackCLICommand(vm, 'floating', 'ip',
+                                    'create', self.ip_pool_name)
+    stdout, stderr, _ = cmd.Issue()
+    if stderr.strip():  # Strip spaces
+      raise errors.Config.InvalidValue(
+          'Could not allocate a floating ip from the pool "%s".'
+          % self.ip_pool_name)
+    floating_ip_dict = json.loads(stdout)
+    # Convert OSC format to nova's format
+    floating_ip_dict['ip'] = floating_ip_dict['floating_ip_address']
+    del floating_ip_dict['floating_ip_address']
+    return floating_ip_dict
+
+  def release(self, vm, floating_ip_dict):
+    with self._floating_ip_lock:
+      delete_cmd = utils.OpenStackCLICommand(vm, 'floating', 'ip', 'delete',
+                                             floating_ip_dict['ip'])
+      del delete_cmd.flags['format']  # Command not support json output format
+      stdout, stderr, _ = delete_cmd.Issue(suppress_warning=True)
