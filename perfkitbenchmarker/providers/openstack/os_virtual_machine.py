@@ -80,6 +80,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.floating_ip = None
     self.firewall = None
     self.public_network = None
+    self.subnet_id = None
 
   @property
   def group_id(self):
@@ -93,6 +94,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.public_network = os_network.OpenStackFloatingIPPool(
         self.floating_ip_pool_name)
     self._UploadSSHPublicKey()
+    source_range = self._GetInternalNetworkCIDR()
+    self.firewall.AllowPort(self, os_network.MIN_PORT, os_network.MAX_PORT,
+                            source_range)
     self.firewall.AllowICMP(self)  # Allowing ICMP traffic (i.e. ping)
     self.AllowRemoteAccessPorts()
 
@@ -347,6 +351,19 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       if network_name in address:
         _, ip = address.split('=')
         return ip
+
+  def _GetInternalNetworkCIDR(self):
+    """Returns IP addresses source range of internal network."""
+    net_cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',
+                                           self.network_name)
+    net_stdout, _, _ = net_cmd.Issue()
+    network = json.loads(net_stdout)
+    self.subnet_id = network['subnets']
+    subnet_cmd = os_utils.OpenStackCLICommand(self, 'subnet', 'show',
+                                              self.subnet_id)
+    stdout, _, _ = subnet_cmd.Issue()
+    subnet_dict = json.loads(stdout)
+    return subnet_dict['cidr']
 
   def _AllocateFloatingIP(self):
     floating_ip = self.public_network.associate(self)
