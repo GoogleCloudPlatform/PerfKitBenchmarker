@@ -21,7 +21,7 @@ install 0.5 or later for them. Therefore, it's necessary that we have a
 separate installer here for 0.5 and later.
 """
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
 def PathPrefix(vm):
@@ -34,7 +34,7 @@ def PathPrefix(vm):
     A string representing the sysbench command prefix.
   """
   if vm.OS_TYPE == os_types.RHEL:
-    return vm_util.VM_TMP_DIR
+    return INSTALL_DIR
   else:
     return '/usr/'
 
@@ -47,14 +47,14 @@ def YumInstall(vm):
   vm.RemoteCommand('cd ~ && bzr branch lp:sysbench')
   vm.RemoteCommand(('cd ~/sysbench && ./autogen.sh &&'
                     ' ./configure --prefix=%s --mandir=%s/share/man &&'
-                    ' make') % (vm_util.VM_TMP_DIR, vm_util.VM_TMP_DIR))
+                    ' make') % (INSTALL_DIR, INSTALL_DIR))
   vm.RemoteCommand('cd ~/sysbench && sudo make install')
   vm.RemoteCommand('sudo mkdir %s/share/doc/sysbench/tests/db -p' %
-                   vm_util.VM_TMP_DIR)
+                   INSTALL_DIR)
   vm.RemoteCommand('sudo cp ~/sysbench/sysbench/tests/db/*'
-                   ' %s/share/doc/sysbench/tests/db/' % vm_util.VM_TMP_DIR)
+                   ' %s/share/doc/sysbench/tests/db/' % INSTALL_DIR)
   vm.RemoteCommand('echo "export PATH=$PATH:%s/bin" >> ~/.bashrc && '
-                   'source ~/.bashrc' % vm_util.VM_TMP_DIR)
+                   'source ~/.bashrc' % INSTALL_DIR)
 
   # Cleanup the source code enlisthment from bzr, we don't need it anymore.
   vm.RemoteCommand('cd ~ && rm -fr ./sysbench')

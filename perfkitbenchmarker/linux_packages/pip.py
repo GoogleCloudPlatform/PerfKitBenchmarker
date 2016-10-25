@@ -19,7 +19,7 @@ Uninstalling the pip package will also remove all python packages
 added after installation.
 """
 
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
 def _Install(vm):
@@ -27,7 +27,7 @@ def _Install(vm):
   vm.InstallPackages('python-pip')
   vm.RemoteCommand('sudo pip install -U pip')  # Make pip upgrade pip
   vm.RemoteCommand('mkdir -p {0} && pip freeze > {0}/requirements.txt'.format(
-      vm_util.VM_TMP_DIR))
+      INSTALL_DIR))
 
 
 def YumInstall(vm):
@@ -46,7 +46,7 @@ def _Uninstall(vm):
   vm.RemoteCommand('pip freeze | grep --fixed-strings --line-regexp '
                    '--invert-match --file {0}/requirements.txt | '
                    'xargs --no-run-if-empty sudo pip uninstall -y'.format(
-                       vm_util.VM_TMP_DIR))
+                       INSTALL_DIR))
 
 
 def YumUninstall(vm):

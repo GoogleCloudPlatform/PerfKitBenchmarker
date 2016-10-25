@@ -212,6 +212,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
     if self.install_packages:
+      self.RemoteCommand('sudo mkdir -p %s' % linux_packages.INSTALL_DIR)
+      self.RemoteCommand('sudo chmod a+rwxt %s' % linux_packages.INSTALL_DIR)
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
@@ -260,7 +262,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     for package_name in self._installed_packages:
       self.Uninstall(package_name)
     self.RestorePackages()
-    self.RemoteCommand('rm -rf %s' % vm_util.VM_TMP_DIR)
+    self.RemoteCommand('sudo rm -rf %s' % linux_packages.INSTALL_DIR)
 
   def GetPathToConfig(self, package_name):
     """Returns the path to the config file for PerfKit packages.
@@ -630,14 +632,15 @@ class RhelMixin(BaseLinuxMixin):
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
-    self.RemoteCommand('rpm -qa > %s/rpm_package_list' % vm_util.VM_TMP_DIR)
+    self.RemoteCommand('rpm -qa > %s/rpm_package_list'
+                       % linux_packages.INSTALL_DIR)
 
   def RestorePackages(self):
     """Restores the currently installed packages to those snapshotted."""
     self.RemoteCommand(
         'rpm -qa | grep --fixed-strings --line-regexp --invert-match --file '
         '%s/rpm_package_list | xargs --no-run-if-empty sudo rpm -e' %
-        vm_util.VM_TMP_DIR,
+        linux_packages.INSTALL_DIR,
         ignore_failure=True)
 
   def HasPackage(self, package):
@@ -737,13 +740,15 @@ class DebianMixin(BaseLinuxMixin):
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
     self.RemoteCommand(
-        'dpkg --get-selections > %s/dpkg_selections' % vm_util.VM_TMP_DIR)
+        'dpkg --get-selections > %s/dpkg_selections'
+        % linux_packages.INSTALL_DIR)
 
   def RestorePackages(self):
     """Restores the currently installed packages to those snapshotted."""
     self.RemoteCommand('sudo dpkg --clear-selections')
     self.RemoteCommand(
-        'sudo dpkg --set-selections < %s/dpkg_selections' % vm_util.VM_TMP_DIR)
+        'sudo dpkg --set-selections < %s/dpkg_selections'
+        % linux_packages.INSTALL_DIR)
     self.RemoteCommand('sudo DEBIAN_FRONTEND=\'noninteractive\' '
                        'apt-get --purge -y dselect-upgrade')
 
