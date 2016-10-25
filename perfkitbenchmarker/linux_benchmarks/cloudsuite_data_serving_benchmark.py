@@ -83,13 +83,13 @@ def Prepare(benchmark_spec):
 
   def PrepareServerSeed(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/data-serving:server')
+    vm.Install('cloudsuite/data-serving:server')
     vm.RemoteCommand('sudo docker run -d --name cassandra-server-seed '
                      '--net host cloudsuite/data-serving:server')
 
   def PrepareServer(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/data-serving:server')
+    vm.Install('cloudsuite/data-serving:server')
     start_server_cmd = ('sudo docker run -d --name cassandra-server '
                         '-e CASSANDRA_SEEDS=%s --net host '
                         'cloudsuite/data-serving:server' %
@@ -98,7 +98,7 @@ def Prepare(benchmark_spec):
 
   def PrepareClient(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/data-serving:client')
+    vm.Install('cloudsuite/data-serving:client')
 
   target_arg_tuples = ([(PrepareServerSeed, [server_seed], {})] +
                        [(PrepareServer, [vm], {}) for vm in servers] +
@@ -198,11 +198,9 @@ def Cleanup(benchmark_spec):
   """
   server_seed = benchmark_spec.vm_groups['server_seed'][0]
   servers = benchmark_spec.vm_groups['servers']
-  client = benchmark_spec.vm_groups['client'][0]
 
   def CleanupServerCommon(vm):
     vm.RemoteCommand('sudo docker rm cassandra-server')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/data-serving:server')
 
   def CleanupServerSeed(vm):
     vm.RemoteCommand('sudo docker stop cassandra-server-seed')
@@ -212,10 +210,6 @@ def Cleanup(benchmark_spec):
     vm.RemoteCommand('sudo docker stop cassandra-server')
     CleanupServerCommon(vm)
 
-  def CleanupClient(vm):
-    vm.RemoteCommand('sudo docker rmi cloudsuite/data-serving:client')
-
   target_arg_tuples = ([(CleanupServerSeed, [server_seed], {})] +
-                       [(CleanupServer, [vm], {}) for vm in servers] +
-                       [(CleanupClient, [client], {})])
+                       [(CleanupServer, [vm], {}) for vm in servers])
   vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

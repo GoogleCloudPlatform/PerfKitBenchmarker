@@ -86,8 +86,8 @@ def Prepare(benchmark_spec):
 
   def PrepareFrontend(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/web-serving:web_server')
-    vm.RemoteCommand('sudo docker pull cloudsuite/web-serving:memcached_server')
+    vm.Install('cloudsuite/web-serving:web_server')
+    vm.Install('cloudsuite/web-serving:memcached_server')
     vm.RemoteCommand('sudo docker run -dt --net host --name web_server '
                      'cloudsuite/web-serving:web_server /etc/bootstrap.sh')
     vm.RemoteCommand('sudo docker run -dt --net host --name memcache_server '
@@ -95,13 +95,13 @@ def Prepare(benchmark_spec):
 
   def PrepareBackend(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/web-serving:db_server')
+    vm.Install('cloudsuite/web-serving:db_server')
     vm.RemoteCommand('sudo docker run -dt --net host --name mysql_server '
                      'cloudsuite/web-serving:db_server')
 
   def PrepareClient(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/web-serving:faban_client')
+    vm.Install('cloudsuite/web-serving:faban_client')
 
   target_arg_tuples = [(PrepareFrontend, [frontend], {}),
                        (PrepareBackend, [backend], {}),
@@ -162,17 +162,13 @@ def Cleanup(benchmark_spec):
     vm.RemoteCommand('sudo docker rm memcache_server')
     vm.RemoteCommand('sudo docker stop web_server')
     vm.RemoteCommand('sudo docker rm web_server')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/web-serving:memcached_server')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/web-serving:web_server')
 
   def CleanupBackend(vm):
     vm.RemoteCommand('sudo docker stop mysql_server')
     vm.RemoteCommand('sudo docker rm mysql_server')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/web-serving:db_server')
 
   def CleanupClient(vm):
     vm.RemoteCommand('sudo docker rm faban_client')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/web-serving:faban_client')
 
   target_arg_tuples = [(CleanupFrontend, [frontend], {}),
                        (CleanupBackend, [backend], {}),
