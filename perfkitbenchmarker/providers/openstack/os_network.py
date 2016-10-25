@@ -39,6 +39,7 @@ UDP = 'udp'
 FLAGS = flags.FLAGS
 
 MAX_PORT = 65535
+MIN_PORT = 1
 
 
 class OpenStackFirewall(network.BaseFirewall):
@@ -61,7 +62,7 @@ class OpenStackFirewall(network.BaseFirewall):
                                         SC_GROUP_NAME)
         cmd.Issue()
 
-  def AllowICMP(self, vm, icmp_type=-1, icmp_code=-1):
+  def AllowICMP(self, vm, icmp_type=-1, icmp_code=-1, source_range=None):
     """Creates a Security Group Rule on the Firewall to allow/disallow
     ICMP traffic.
 
@@ -69,6 +70,7 @@ class OpenStackFirewall(network.BaseFirewall):
       vm: The BaseVirtualMachine object to allow ICMP traffic to.
       icmp_type: ICMP type to allow. If none given then allows all types.
       icmp_code: ICMP code to allow. If none given then allows all codes.
+      source_range: The source IP range to allow ICMP traffic.
     """
     if vm.is_static:
       return
@@ -79,12 +81,14 @@ class OpenStackFirewall(network.BaseFirewall):
         return
       cmd = utils.OpenStackCLICommand(vm, OSC_SEC_GROUP_RULE_CMD, 'create',
                                       vm.group_id)
+      if source_range:
+        cmd.flags['src-ip'] = source_range
       cmd.flags['dst-port'] = str(icmp_type)
       cmd.flags['proto'] = ICMP
       cmd.Issue(suppress_warning=True)
       self.sec_group_rules_set.add(sec_group_rule)
 
-  def AllowPort(self, vm, start_port, end_port=None):
+  def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Creates a Security Group Rule on the Firewall to allow for both TCP
     and UDP network traffic on given port, or port range.
 
@@ -93,6 +97,7 @@ class OpenStackFirewall(network.BaseFirewall):
       start_port: The first local port to open in a range.
       end_port: The last local port to open in a range. If None, only start_port
         will be opened.
+      source_range: The source IP range to allow traffic for these ports.
     """
     if vm.is_static:
       return
@@ -107,6 +112,8 @@ class OpenStackFirewall(network.BaseFirewall):
         return
       cmd = utils.OpenStackCLICommand(vm, OSC_SEC_GROUP_RULE_CMD, 'create',
                                       vm.group_id)
+      if source_range:
+        cmd.flags['src-ip'] = source_range
       cmd.flags['dst-port'] = '%d:%d' % (start_port, end_port)
       for prot in (TCP, UDP,):
         cmd.flags['proto'] = prot
