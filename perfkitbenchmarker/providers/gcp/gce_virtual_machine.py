@@ -279,7 +279,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
     cmd = util.GcloudCommand(self, 'compute', 'instances', 'create', self.name)
-    cmd.flags['network'] = self.network.network_resource.name
+    if self.network.subnet_resource is not None:
+      cmd.flags['subnet'] = self.network.subnet_resource.name
+    else:
+      cmd.flags['network'] = self.network.network_resource.name
     cmd.flags['image'] = self.image
     cmd.flags['boot-disk-auto-delete'] = True
     if FLAGS.image_project:

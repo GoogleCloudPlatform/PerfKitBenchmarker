@@ -140,15 +140,16 @@ class GceNetworkSpec(network.BaseNetworkSpec):
 class GceNetworkResource(resource.BaseResource):
   """Object representing a GCE Network resource."""
 
-  def __init__(self, name, project):
+  def __init__(self, name, mode, project):
     super(GceNetworkResource, self).__init__()
     self.name = name
+    self.mode = mode
     self.project = project
 
   def _Create(self):
     """Creates the Network resource."""
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'create', self.name)
-    cmd.flags['mode'] = 'auto'
+    cmd.flags['mode'] = self.mode
     cmd.Issue()
 
   def _Delete(self):
@@ -163,6 +164,37 @@ class GceNetworkResource(resource.BaseResource):
     return not retcode
 
 
+class GceSubnetResource(resource.BaseResource):
+
+  def __init__(self, name, network_name, region, addr_range, project):
+    super(GceSubnetResource, self).__init__()
+    self.name = name
+    self.network_name = network_name
+    self.region = region
+    self.addr_range = addr_range
+    self.project = project
+
+  def _Create(self):
+    cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'create',
+                             self.name)
+    cmd.flags['network'] = self.network_name
+    cmd.flags['region'] = self.region
+    cmd.flags['range'] = self.addr_range
+    cmd.Issue()
+
+  def _Exists(self):
+    cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'describe',
+                             self.name)
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
+
+  def _Delete(self):
+    cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'delete',
+                             self.name)
+    cmd.Issue()
+
+
+
 class GceNetwork(network.BaseNetwork):
   """Object representing a GCE Network."""
 
@@ -172,7 +204,15 @@ class GceNetwork(network.BaseNetwork):
     super(GceNetwork, self).__init__(network_spec)
     self.project = network_spec.project
     name = FLAGS.gce_network_name or 'pkb-network-%s' % FLAGS.run_uri
-    self.network_resource = GceNetworkResource(name, self.project)
+    mode = 'auto' if FLAGS.gce_subnet_region is None else 'custom'
+    self.network_resource = GceNetworkResource(name, mode, self.project)
+    if FLAGS.gce_subnet_region is None:
+      self.subnet_resource = None
+    else:
+      self.subnet_resource = GceSubnetResource(name, name,
+                                               FLAGS.gce_subnet_region,
+                                               FLAGS.gce_subnet_addr,
+                                               self.project)
     firewall_name = 'default-internal-%s' % FLAGS.run_uri
     self.default_firewall_rule = GceFirewallRule(
         firewall_name, self.project, ALLOW_ALL, name, NETWORK_RANGE)
@@ -191,10 +231,14 @@ class GceNetwork(network.BaseNetwork):
     """Creates the actual network."""
     if FLAGS.gce_network_name is None:
       self.network_resource.Create()
+      if self.subnet_resource:
+        self.subnet_resource.Create()
       self.default_firewall_rule.Create()
 
   def Delete(self):
     """Deletes the actual network."""
     if FLAGS.gce_network_name is None:
       self.default_firewall_rule.Delete()
+      if self.subnet_resource:
+        self.subnet_resource.Delete()
       self.network_resource.Delete()
