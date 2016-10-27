@@ -278,13 +278,6 @@ class BaseVirtualMachine(resource.BaseResource):
               disk_num, len(self.scratch_disks)))
     return self.scratch_disks[disk_num].mount_point
 
-  def GetLocalDisks(self):
-    # TODO(ehankland) This method should be removed as soon as raw/unmounted
-    # scratch disks are supported in a different way. Only the Aerospike
-    # benchmark currently accesses disks using this method.
-    """Returns a list of local disks on the VM."""
-    return []
-
   def AllowPort(self, start_port, end_port=None):
     """Opens the port on the firewall corresponding to the VM if one exists."""
     if self.firewall:

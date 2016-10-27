@@ -307,6 +307,7 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                     scratch_disk_type='disk-type',
                     data_disk_0_size=20,
                     data_disk_0_type='disk-type',
+                    data_disk_count=1,
                     data_disk_0_num_stripes=1)
     self._RunTest(self.mock_spec, expected)
 
@@ -320,6 +321,7 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                     scratch_disk_type='disk-type',
                     data_disk_0_size=None,
                     data_disk_0_type='disk-type',
+                    data_disk_count=1,
                     data_disk_0_num_stripes=1)
     self._RunTest(self.mock_spec, expected)
 
@@ -333,6 +335,7 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                     scratch_disk_iops=1000,
                     data_disk_0_size=20,
                     data_disk_0_type='disk-type',
+                    data_disk_count=1,
                     data_disk_0_num_stripes=1,
                     aws_provisioned_iops=1000)
     self._RunTest(self.mock_spec, expected)
@@ -346,6 +349,7 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                     scratch_disk_type='disk-type',
                     data_disk_0_size=20,
                     data_disk_0_type='disk-type',
+                    data_disk_count=1,
                     data_disk_0_num_stripes=1,
                     data_disk_0_foo='bar')
     self._RunTest(self.mock_spec, expected)
@@ -360,6 +364,7 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                     scratch_disk_type='remote_ssd',
                     data_disk_0_size=20,
                     data_disk_0_type='disk-type',
+                    data_disk_count=1,
                     data_disk_0_num_stripes=1,
                     data_disk_0_foo='bar',
                     data_disk_0_legacy_disk_type='remote_ssd')

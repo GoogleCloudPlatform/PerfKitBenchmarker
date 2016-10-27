@@ -18,7 +18,6 @@
 import time
 
 from perfkitbenchmarker import data
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
@@ -34,6 +33,7 @@ DISK = 'disk'
 flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
                   'The type of storage to use for Aerospike data. The type of '
                   'disk is controlled by the "data_disk_type" flag.')
+
 
 def _Install(vm):
   """Installs the Aerospike server on the VM."""
