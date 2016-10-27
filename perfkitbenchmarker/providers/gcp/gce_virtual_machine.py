@@ -405,16 +405,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
-  def GetLocalDisks(self):
-    """Returns a list of local disks on the VM.
-
-    Returns:
-      A list of strings, where each string is the absolute path to the local
-          disks on the VM (e.g. '/dev/sdb').
-    """
-    return ['/dev/disk/by-id/google-local-ssd-%d' % i
-            for i in range(self.max_local_disks)]
-
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM via 'gcloud compute instances add-metadata'."""
     if not kwargs:
