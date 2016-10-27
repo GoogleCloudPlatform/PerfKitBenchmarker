@@ -283,15 +283,6 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
-  def GetLocalDisks(self):
-    """Returns a list of local disks on the VM.
-
-    Returns:
-      A list of strings, where each string is the absolute path to the local
-          disks on the VM (e.g. '/dev/sdb').
-    """
-    return ['/dev/sdb']
-
 
 class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
                                      linux_virtual_machine.DebianMixin):

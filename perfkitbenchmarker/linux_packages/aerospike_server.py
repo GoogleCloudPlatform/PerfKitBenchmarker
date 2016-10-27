@@ -18,7 +18,6 @@
 import time
 
 from perfkitbenchmarker import data
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
@@ -68,11 +67,8 @@ def ConfigureAndStart(server, seed_node_ips=None):
   seed_node_ips = seed_node_ips or [server.internal_ip]
 
   if FLAGS.aerospike_storage_type == DISK:
-    if FLAGS.data_disk_type == disk.LOCAL:
-      devices = server.GetLocalDisks()
-    else:
-      devices = [scratch_disk.GetDevicePath()
-                 for scratch_disk in server.scratch_disks]
+    devices = [scratch_disk.GetDevicePath()
+               for scratch_disk in server.scratch_disks]
   else:
     devices = []
 

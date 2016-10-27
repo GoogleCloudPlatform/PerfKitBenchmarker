@@ -157,12 +157,6 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     """StaticVirtualMachines do not delete scratch disks."""
     pass
 
-  def GetLocalDisks(self):
-    """Returns a list of local disks on the VM."""
-    return [disk_spec.device_path
-            for disk_spec in self.disk_specs if disk_spec.device_path]
-
-
   @classmethod
   def ReadStaticVirtualMachineFile(cls, file_obj):
     """Read a file describing the static VMs to use.

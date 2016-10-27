@@ -233,12 +233,6 @@ class VmGroupSpecTestCase(unittest.TestCase):
         'one of the following: {0}.'.format(', '.join(providers.VALID_CLOUDS))))
 
   def testInvalidDiskCount(self):
-    self._kwargs['disk_count'] = None
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      self._spec_class(_COMPONENT, **self._kwargs)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.disk_count value: "None" (of type "NoneType"). '
-        'Value must be one of the following types: int.'))
     self._kwargs['disk_count'] = -1
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._spec_class(_COMPONENT, **self._kwargs)
