@@ -170,7 +170,7 @@ class TypeVerifier(ConfigOptionDecoder):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    if not isinstance(value, self._valid_types):
+    if value != None and not isinstance(value, self._valid_types):
       raise errors.Config.InvalidValue(
           'Invalid {0} value: "{1}" (of type "{2}"). Value must be one of the '
           'following types: {3}.'.format(

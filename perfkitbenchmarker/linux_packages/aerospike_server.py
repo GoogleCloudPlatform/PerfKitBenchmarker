@@ -35,7 +35,6 @@ flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
                   'The type of storage to use for Aerospike data. The type of '
                   'disk is controlled by the "data_disk_type" flag.')
 
-
 def _Install(vm):
   """Installs the Aerospike server on the VM."""
   vm.Install('build_tools')
@@ -68,11 +67,8 @@ def ConfigureAndStart(server, seed_node_ips=None):
   seed_node_ips = seed_node_ips or [server.internal_ip]
 
   if FLAGS.aerospike_storage_type == DISK:
-    if FLAGS.data_disk_type == disk.LOCAL:
-      devices = server.GetLocalDisks()
-    else:
-      devices = [scratch_disk.GetDevicePath()
-                 for scratch_disk in server.scratch_disks]
+    devices = [scratch_disk.GetDevicePath()
+               for scratch_disk in server.scratch_disks]
   else:
     devices = []
 
