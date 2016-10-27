@@ -289,7 +289,8 @@ class _VmGroupSpec(spec.BaseSpec):
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS}),
         'disk_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_DISK_COUNT, 'min': 0}),
+            'default': _DEFAULT_DISK_COUNT,
+            'min': 0, 'none_ok': True}),
         'disk_spec': (_PerCloudConfigDecoder, {'default': None,
                                                'none_ok': True}),
         'os_type': (option_decoders.EnumDecoder, {

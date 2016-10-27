@@ -369,17 +369,6 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.FormatDisk(data_disk.GetDevicePath())
     self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point)
 
-  def GetLocalDisks(self):
-    """Returns a list of local disks on the VM.
-
-    Returns:
-      A list of strings, where each string is the absolute path to the local
-          disks on the VM (e.g. '/dev/xvdb').
-    """
-    return ['%s%s' % (util.GetDrivePathPrefix(),
-                      chr(ord(DRIVE_START_LETTER) + i))
-            for i in xrange(NUM_LOCAL_VOLUMES[self.machine_type])]
-
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
     util.AddTags(self.id, RESOURCE_TYPE[INSTANCE], self.region, **kwargs)

@@ -168,7 +168,7 @@ class BenchmarkSpec(object):
                             else 0)
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       if disk_spec and not vm.is_static:
-        if disk_spec.disk_type == disk.LOCAL and disk_count == None:
+        if disk_spec.disk_type == disk.LOCAL and disk_count is None:
           disk_count = vm.max_local_disks
         vm.disk_specs = [copy.copy(disk_spec) for _ in xrange(disk_count)]
         # In the event that we need to create multiple disks from the same
