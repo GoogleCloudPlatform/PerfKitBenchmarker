@@ -174,6 +174,7 @@ class DefaultMetadataProvider(MetadataProvider):
           metadata[name_prefix + 'aws_provisioned_iops'] = data_disk.iops
         # Modern metadata keys
         metadata[name_prefix + 'data_disk_0_type'] = disk_type
+        metadata[name_prefix + 'data_disk_count'] = len(vm.scratch_disks)
         metadata[name_prefix + 'data_disk_0_size'] = (
             disk_size * num_stripes if disk_size else disk_size)
         metadata[name_prefix + 'data_disk_0_num_stripes'] = num_stripes
