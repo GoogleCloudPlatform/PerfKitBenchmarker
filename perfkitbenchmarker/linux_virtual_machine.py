@@ -852,6 +852,7 @@ class ContainerizedDebianMixin(DebianMixin):
   """
 
   OS_TYPE = os_types.UBUNTU_CONTAINER
+  BASE_DOCKER_IMAGE = 'ubuntu:trusty-20161006'
 
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
@@ -874,7 +875,6 @@ class ContainerizedDebianMixin(DebianMixin):
 
   def InitDocker(self):
     """Initializes the docker container daemon."""
-    self.CONTAINER_IMAGE = 'ubuntu:latest'
     init_docker_cmd = ['sudo docker run -d '
                        '--net=host '
                        '--workdir=%s '
@@ -883,7 +883,7 @@ class ContainerizedDebianMixin(DebianMixin):
                                       CONTAINER_MOUNT_DIR)]
     for sd in self.scratch_disks:
       init_docker_cmd.append('-v %s:%s ' % (sd.mount_point, sd.mount_point))
-    init_docker_cmd.append('%s sleep infinity ' % self.CONTAINER_IMAGE)
+    init_docker_cmd.append('%s sleep infinity ' % self.BASE_DOCKER_IMAGE)
     init_docker_cmd = ''.join(init_docker_cmd)
 
     resp, _ = self.RemoteHostCommand(init_docker_cmd)
@@ -913,11 +913,6 @@ class ContainerizedDebianMixin(DebianMixin):
     """
     # Escapes bash sequences
     command = command.replace("'", r"'\''")
-
-    # The base image, ubuntu-latest, doesn't have 'sudo'. Also 'sudo' is not
-    # needed because the container starts as root.
-    if command.startswith('sudo '):
-      command = command[5:]
 
     logging.info('Docker running: %s' % command)
     command = "sudo docker exec %s bash -c '%s'" % (self.docker_id, command)
