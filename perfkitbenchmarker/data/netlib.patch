@@ -1,6 +1,19 @@
---- src/netlib.c        2012-06-19 20:32:29.000000000 +0000
-+++ src/new_netlib.c    2016-08-13 01:34:03.787253999 +0000
-@@ -4288,9 +4288,8 @@
+diff -u -r netperf-2.6.0/src/netlib.c netperf-2.6.0-patch/src/netlib.c
+--- netperf-2.6.0/src/netlib.c	2012-06-19 13:32:29.000000000 -0700
++++ netperf-2.6.0-patch/src/netlib.c	2016-10-25 15:27:57.567600872 -0700
+@@ -234,6 +234,11 @@
+ char local_data_port[10];
+ char remote_data_port[10];
+ 
++// See comment in netlib.h
++uint32_t think_time = 0;
++uint32_t think_time_array_size = 0;
++float think_time_shuffle_ratio = 0.f;
++
+ char *local_data_address=NULL;
+ char *remote_data_address=NULL;
+ 
+@@ -4288,9 +4293,8 @@
    for(i = 0; i < 10; i++){
      sum = 0;
      for (j = i * base; j <  (i + 1) * base; j++) {
@@ -11,3 +24,202 @@
    }
    fprintf(where,"\n");
  }
+diff -u -r netperf-2.6.0/src/netlib.h netperf-2.6.0-patch/src/netlib.h
+--- netperf-2.6.0/src/netlib.h	2012-06-19 13:46:47.000000000 -0700
++++ netperf-2.6.0-patch/src/netlib.h	2016-10-25 15:27:20.011688139 -0700
+@@ -458,6 +458,11 @@
+ extern char local_data_port[10];
+ extern char remote_data_port[10];
+ 
++// Time in microseconds to do pointless work after each request received
++extern uint32_t think_time;
++extern uint32_t think_time_array_size;
++extern float think_time_shuffle_ratio;
++
+ extern char *local_data_address;
+ extern char *remote_data_address;
+ 
+diff -u -r netperf-2.6.0/src/nettest_bsd.c netperf-2.6.0-patch/src/nettest_bsd.c
+--- netperf-2.6.0/src/nettest_bsd.c	2012-06-19 13:32:47.000000000 -0700
++++ netperf-2.6.0-patch/src/nettest_bsd.c	2016-10-19 15:49:52.513244546 -0700
+@@ -8426,7 +8426,6 @@
+ void
+ recv_tcp_rr()
+ {
+-
+   struct ring_elt *send_ring;
+   struct ring_elt *recv_ring;
+ 
+diff -u -r netperf-2.6.0/src/nettest_bsd.h netperf-2.6.0-patch/src/nettest_bsd.h
+--- netperf-2.6.0/src/nettest_bsd.h	2012-06-19 13:47:09.000000000 -0700
++++ netperf-2.6.0-patch/src/nettest_bsd.h	2016-10-25 15:40:54.721791660 -0700
+@@ -66,6 +66,10 @@
+ 
+   int32_t    test_length;    /* how long is the test? */
+ 
++  uint32_t   think_time;               /* how long to pointlessly think on each request */
++  uint32_t   think_time_array_size;    /* size of pointer chase array for think_time work */
++  float      think_time_shuffle_ratio; /* how much of the pointer chase array to shuffle */
++
+   uint32_t   so_rcvavoid;    /* avoid copies on recv? */
+   uint32_t   so_sndavoid;    /* avoid copies on send? */
+   uint32_t   send_dirty_count; /* bytes to dirty before calling send */
+diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni.c
+--- netperf-2.6.0/src/nettest_omni.c	2012-06-19 13:33:48.000000000 -0700
++++ netperf-2.6.0-patch/src/nettest_omni.c	2016-10-27 17:22:31.537180976 -0700
+@@ -3759,6 +3759,10 @@
+       omni_request->socket_prio            = remote_socket_prio;
+       omni_request->socket_tos             = remote_socket_tos;
+ 
++      omni_request->think_time = think_time;
++      omni_request->think_time_array_size = think_time_array_size;
++      omni_request->think_time_shuffle_ratio = think_time_shuffle_ratio;
++
+       /* we have no else clauses here because we previously set flags
+ 	 to zero above raj 20090803 */
+       if (rem_nodelay)
+@@ -4932,6 +4936,11 @@
+ 	  omni_request->cong_control,
+ 	  sizeof(local_cong_control_req));
+ 
++  // Extract think_time parameters
++  think_time = omni_request->think_time;
++  think_time_array_size = omni_request->think_time_array_size;
++  think_time_shuffle_ratio = omni_request->think_time_shuffle_ratio;
++
+   /* based on what we have been told by the remote netperf, we want to
+      setup our endpoint for the "data connection" and let the remote
+      netperf know the situation. */
+@@ -5240,6 +5249,82 @@
+   addrlen = sizeof(peeraddr_in);
+   memset(&peeraddr_in,0,sizeof(peeraddr_in));
+ 
++
++  uint32_t* pointer_chase_array;
++  uint32_t* pointer_chase_inverse; // map pointers to their current index in the array
++  // Keep track of the current traversal order. We double buffer because we use the old ordering
++  // to calculate the new ordering after every swap.
++  uint32_t* pointer_chase_order; 
++  uint32_t* pointer_chase_order_tmp; 
++  if (think_time > 0 && think_time_array_size > 0) {
++    // Create a big array for our pointer chase
++    pointer_chase_array = malloc(sizeof(uint32_t) * think_time_array_size);
++    pointer_chase_inverse = malloc(sizeof(uint32_t) * think_time_array_size);
++    pointer_chase_order = malloc(sizeof(uint32_t) * think_time_array_size);
++    pointer_chase_order_tmp = malloc(sizeof(uint32_t) * think_time_array_size);
++    // Make each slot in the array point to the next slot
++    int i;
++    for (i = 0; i < think_time_array_size; i++) {
++      pointer_chase_array[i] = (i + 1) % think_time_array_size;
++      pointer_chase_inverse[i] = (think_time_array_size - 1 + i) % think_time_array_size;
++      pointer_chase_order[i] = (i + 1) % think_time_array_size;
++      pointer_chase_order_tmp[i] = (i + 1) % think_time_array_size;
++    }
++    // Shuffle some of the array
++    uint32_t swaps = 0;
++    const uint32_t to_swap = think_time_array_size * think_time_shuffle_ratio / 2.f;
++    while (swaps < to_swap) {
++      // Generate two random indices, a and b, where a < b < len-1
++      uint32_t a = rand() % (think_time_array_size - 1);
++      uint32_t b = (rand() % (think_time_array_size - 2 - a)) + a + 1;
++      // Generate two random indices, c and d, where a < c <= b and b < d < len
++      uint32_t c = (rand() % (b - a)) + a + 1;
++      uint32_t d = rand() % (think_time_array_size - 1 - b) + b + 1;
++      uint32_t tmp;
++      // In pointer_chase_array
++      // Swap a and b
++      uint32_t array_a = pointer_chase_inverse[pointer_chase_order[a]];
++      uint32_t array_b = pointer_chase_inverse[pointer_chase_order[b]];
++      uint32_t array_c = pointer_chase_inverse[pointer_chase_order[c]];
++      uint32_t array_d = pointer_chase_inverse[pointer_chase_order[d]];
++      tmp = pointer_chase_array[array_a];
++      pointer_chase_array[array_a] =
++        pointer_chase_array[array_b];
++      pointer_chase_array[array_b] = tmp;
++      // Swap c and d
++      tmp = pointer_chase_array[array_c];
++      pointer_chase_array[array_c] =
++        pointer_chase_array[array_d];
++      pointer_chase_array[array_d] = tmp;
++      // Fix pointer_chase_inverse
++      pointer_chase_inverse[pointer_chase_array[array_a]] = array_a;
++      pointer_chase_inverse[pointer_chase_array[array_b]] = array_b;
++      pointer_chase_inverse[pointer_chase_array[array_c]] = array_c;
++      pointer_chase_inverse[pointer_chase_array[array_d]] = array_d;
++      // Calculate the new traversal order
++      // Copy the beginning
++      memcpy(&pointer_chase_order_tmp[0], &pointer_chase_order[0], a*sizeof(uint32_t));
++      // Copy the middle sections
++      unsigned int cur_index = a;
++      memcpy(&pointer_chase_order_tmp[cur_index], &pointer_chase_order[b], (d - b)*sizeof(uint32_t));
++      cur_index += (d - b);
++      memcpy(&pointer_chase_order_tmp[cur_index], &pointer_chase_order[c], (b - c)*sizeof(uint32_t));
++      cur_index += (b - c);
++      memcpy(&pointer_chase_order_tmp[cur_index], &pointer_chase_order[a], (c - a)*sizeof(uint32_t));
++      // Copy the end
++      memcpy(&pointer_chase_order_tmp[d], &pointer_chase_order[d], (think_time_array_size - d)*sizeof(uint32_t));
++      // Swap our order buffers
++      uint32_t* tmp_order = pointer_chase_order_tmp;
++      pointer_chase_order_tmp = pointer_chase_order;
++      pointer_chase_order = tmp_order;
++      swaps++;
++    }
++    free(pointer_chase_inverse);
++    free(pointer_chase_order);
++    free(pointer_chase_order_tmp);
++    fprintf(where, "Finished creating pointer chase array\n");
++  }
++
+   /* Now it's time to start receiving data on the connection. We will */
+   /* first grab the apropriate counters and then start grabbing. */
+ 
+@@ -5409,6 +5494,15 @@
+       recv_ring = recv_ring->next;
+     }
+ 
++    if (think_time > 0) {
++        // Do think time here before we send the response
++        clock_t think_start = clock();
++        uint32_t cur_index = 0;
++        while (clock() - think_start < ((float)think_time) * (((float)CLOCKS_PER_SEC) / 1000000.f)) {
++            cur_index = pointer_chase_array[cur_index];
++        }
++    }
++
+     /* if we should try to send something, then by all means, let us
+        try to send something. */
+     if ((omni_request->direction & NETPERF_XMIT) &&
+@@ -5522,6 +5616,10 @@
+     }
+   }
+ 
++  if (think_time > 0) {
++      free(pointer_chase_array);
++  }
++
+   /* The current iteration loop now exits due to timeout or unit count
+      being  reached */
+   stop_timer();
+@@ -6895,7 +6993,7 @@
+ 
+ {
+ 
+-#define OMNI_ARGS "b:cCd:DG:hH:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:u:Vw:W:46"
++#define OMNI_ARGS "b:cCd:DG:hH:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:U:u:Vw:W:46"
+ 
+   extern char	*optarg;	  /* pointer to option string	*/
+ 
+@@ -7218,6 +7316,13 @@
+       test_uuid[sizeof(test_uuid) - 1] = 0;
+       have_uuid = 1;
+       break;
++    case 'U':
++      break_args(optarg, arg1, arg2);
++      break_args(optarg+strlen(arg1)+1, arg2, arg3);
++      think_time = convert(arg1);
++      think_time_array_size = convert(arg2);
++      think_time_shuffle_ratio = atof(arg3);
++      break;
+     case 'W':
+       /* set the "width" of the user space data */
+       /* buffer. This will be the number of */

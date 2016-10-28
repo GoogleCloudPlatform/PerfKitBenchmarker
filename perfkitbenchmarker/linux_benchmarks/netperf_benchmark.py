@@ -51,6 +51,8 @@ flags.DEFINE_bool('netperf_enable_histograms', True,
                   'collected/reported. Only for *RR benchmarks')
 flags.DEFINE_integer('netperf_num_streams', 1,
                      'Number of netperf processes to run.')
+flags.DEFINE_integer('netperf_thinktime', 0,
+                     'Time in microseconds to do work for each request.')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
@@ -198,14 +200,19 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name,
   # 99th Percentile Latency Microseconds,Minimum Latency Microseconds,
   # Maximum Latency Microseconds\n
   # 1405.50,Trans/s,2.522,4,783.80,683,735,841,600,900\n
-  fp = io.StringIO(stdout)
-  # "-o" flag above specifies CSV output, but there is one extra header line:
-  banner = next(fp)
-  assert banner.startswith('MIGRATED'), stdout
-  r = csv.DictReader(fp)
-  results = next(r)
-  logging.info('Netperf Results: %s', results)
-  assert 'Throughput' in results
+  try:
+    fp = io.StringIO(stdout)
+    # "-o" flag above specifies CSV output, but there is one extra header line:
+    banner = next(fp)
+    assert banner.startswith('MIGRATED'), stdout
+    r = csv.DictReader(fp)
+    results = next(r)
+    logging.info('Netperf Results: %s', results)
+    assert 'Throughput' in results
+  except:
+    logging.info('Netperf ERROR: Failed to parse stdout. STDOUT: %s' %
+                 stdout)
+    return None
 
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
@@ -286,6 +293,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
                  '-P ,{{data_port}} '
+                 '-U {thinktime} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
                  'P99_LATENCY,STDDEV_LATENCY,'
                  'MIN_LATENCY,MAX_LATENCY,'
@@ -294,6 +302,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                      benchmark_name=benchmark_name,
                      server_ip=server_ip,
                      length=FLAGS.netperf_test_length,
+                     thinktime=FLAGS.netperf_thinktime,
                      confidence=confidence, verbosity=verbosity)
 
   # Run all of the netperf processes and collect their stdout
@@ -315,7 +324,15 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                                        enable_latency_histograms)
                    for stdout in stdouts]
 
-  if len(parsed_output) == 1:
+  # Filter out failed netperf runs
+  parsed_output = [out for out in parsed_output if out is not None]
+
+  logging.info('%s out of %s netperf threads succeeded',
+               len(parsed_output), num_streams)
+
+  if len(parsed_output) == 0:
+    raise Exception('All netperf threads failed')
+  elif len(parsed_output) == 1:
     # Only 1 netperf thread
     throughput_sample, latency_samples, histogram = parsed_output[0]
     return [throughput_sample] + latency_samples
@@ -338,8 +355,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     throughput_stats['min'] = min(throughputs)
     throughput_stats['max'] = max(throughputs)
     # Calculate aggregate throughput
-    assert num_streams, len(throughputs)
-    throughput_stats['total'] = throughput_stats['average'] * num_streams
+    throughput_stats['total'] = throughput_stats['average'] * len(throughputs)
     # Create samples for throughput stats
     for stat, value in throughput_stats.items():
       samples.append(
