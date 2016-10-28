@@ -49,7 +49,7 @@ def _Install(vm):
   # Modify netperf to print out all buckets in its histogram rather than
   # aggregating.
   vm.PushDataFile('netlib.patch', NETLIB_PATCH)
-  vm.RemoteCommand('cd %s && patch -p0 netlib.c netlib.patch' %
+  vm.RemoteCommand('cd %s && patch -p2 < netlib.patch' %
                    NETPERF_SRC_DIR)
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
                    './configure --enable-histogram=yes '
