@@ -33,6 +33,10 @@ DISK = 'disk'
 flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
                   'The type of storage to use for Aerospike data. The type of '
                   'disk is controlled by the "data_disk_type" flag.')
+flags.DEFINE_integer('aerospike_replication_factor', 1,
+                     'Replication factor for aerospike server.')
+flags.DEFINE_integer('aerospike_transaction_threads_per_queue', 4,
+                     'Number of threads per transaction queue.')
 
 
 def _Install(vm):
@@ -72,11 +76,14 @@ def ConfigureAndStart(server, seed_node_ips=None):
   else:
     devices = []
 
-  server.RenderTemplate(data.ResourcePath('aerospike.conf.j2'),
-                        AEROSPIKE_CONF_PATH,
-                        {'devices': devices,
-                         'memory_size': int(server.total_memory_kb * 0.8),
-                         'seed_addresses': seed_node_ips})
+  server.RenderTemplate(
+      data.ResourcePath('aerospike.conf.j2'), AEROSPIKE_CONF_PATH,
+      {'devices': devices,
+       'memory_size': int(server.total_memory_kb * 0.8),
+       'seed_addresses': seed_node_ips,
+       'transaction_threads_per_queue':
+       FLAGS.aerospike_transaction_threads_per_queue,
+       'replication_factor': FLAGS.aerospike_replication_factor})
 
   for scratch_disk in server.scratch_disks:
     server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
