@@ -56,7 +56,7 @@ flags.DEFINE_integer('netperf_thinktime', 0,
 flags.DEFINE_integer('netperf_thinktime_array_size', 0,
                      'The size of the array to traverse for thinktime.')
 flags.DEFINE_float('netperf_thinktime_shuffle', 0.0,
-                     'The fraction of the thinktime array to shuffle.')
+                   'The fraction of the thinktime array to shuffle.')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
