@@ -31,6 +31,7 @@ def CreateVolume(resource, name):
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
+                           vol_cmd.flags.get('data_disk_size') or
                            REMOTE_VOLUME_DEFAULT_SIZE_GB)
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
@@ -43,6 +44,7 @@ def CreateBootVolume(resource, name, image):
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['image'] = image
   vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
+                           vol_cmd.flags.get('data_disk_size') or
                            GetImageMinDiskSize(resource, image))
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
