@@ -6,7 +6,7 @@ service {
 	paxos-single-replica-limit 1 # Number of nodes where the replica count is automatically reduced to 1.
 	service-threads {{ vm.num_cpus }}
 	transaction-queues {{ vm.num_cpus }}
-	transaction-threads-per-queue 4
+	transaction-threads-per-queue {{ transaction_threads_per_queue }}
 	# Note:  The number of concurrent connections to the database is limited by "proto-fd-max",
 	#         which is in turn limited by the system's maximum number of open file descriptors.
 	#         Read "man limits.conf" for how to set the system's "nofile" limit.
@@ -59,7 +59,7 @@ network {
 }
 
 namespace test {
-	replication-factor 3  # To match HBase / Cassandra tests.
+	replication-factor {{ replication_factor }}
 	memory-size {{ memory_size }}K
 	default-ttl 30d # 30 days, use 0 to never expire/evict.
 	{# if storage devices are passed to the template, use them for storage; otherwise use memory. -#}
