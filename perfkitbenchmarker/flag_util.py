@@ -213,15 +213,17 @@ class FlagDictSubstitution(object):
     """
     self._flags = flag_values
     self._substitute = substitute
+    self._flag_dict_func_name = (
+        '_flags' if hasattr(self._flags, '_flags') else 'FlagDict')
 
   def __enter__(self):
     """Begins the flag substitution."""
-    self._original_flagdict = self._flags.FlagDict
-    self._flags.__dict__['FlagDict'] = self._substitute
+    self._original_flagdict = getattr(self._flags, self._flag_dict_func_name)
+    self._flags.__dict__[self._flag_dict_func_name] = self._substitute
 
   def __exit__(self, *unused_args, **unused_kwargs):
     """Stops the flag substitution."""
-    self._flags.__dict__['FlagDict'] = self._original_flagdict
+    self._flags.__dict__[self._flag_dict_func_name] = self._original_flagdict
 
 
 class UnitsParser(flags.ArgumentParser):
