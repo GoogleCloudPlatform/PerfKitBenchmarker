@@ -32,6 +32,7 @@ from collections import Counter
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -49,8 +50,9 @@ flags.DEFINE_integer('netperf_test_length', 60,
 flags.DEFINE_bool('netperf_enable_histograms', True,
                   'Determines whether latency histograms are '
                   'collected/reported. Only for *RR benchmarks')
-flags.DEFINE_integer('netperf_num_streams', 1,
-                     'Number of netperf processes to run.')
+flag_util.DEFINE_integerlist('netperf_num_streams', flag_util.IntegerList([1]),
+                             'Number of netperf processes to run. Netperf '
+                             'will run once for each value in the list.')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
@@ -104,7 +106,7 @@ def Prepare(benchmark_spec):
   vms = vms[:2]
   vm_util.RunThreaded(PrepareNetperf, vms)
 
-  num_streams = FLAGS.netperf_num_streams
+  num_streams = max(FLAGS.netperf_num_streams)
 
   # Start the netserver processes
   if vm_util.ShouldRunOnExternalIpAddress():
@@ -240,18 +242,18 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name,
     hist_metadata.update(metadata)
     latency_samples.append(sample.Sample(
         '%s_Latency_Histogram' % benchmark_name, 0, 'us', hist_metadata))
-
-  for metric_key, metric_name in [
-      ('50th Percentile Latency Microseconds', 'p50'),
-      ('90th Percentile Latency Microseconds', 'p90'),
-      ('99th Percentile Latency Microseconds', 'p99'),
-      ('Minimum Latency Microseconds', 'min'),
-      ('Maximum Latency Microseconds', 'max'),
-      ('Stddev Latency Microseconds', 'stddev')]:
-    if metric_key in results:
-      latency_samples.append(
-          sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
-                        float(results[metric_key]), 'us', metadata))
+  if unit != MBPS:
+    for metric_key, metric_name in [
+        ('50th Percentile Latency Microseconds', 'p50'),
+        ('90th Percentile Latency Microseconds', 'p90'),
+        ('99th Percentile Latency Microseconds', 'p99'),
+        ('Minimum Latency Microseconds', 'min'),
+        ('Maximum Latency Microseconds', 'max'),
+        ('Stddev Latency Microseconds', 'stddev')]:
+      if metric_key in results:
+        latency_samples.append(
+            sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
+                          float(results[metric_key]), 'us', metadata))
 
   return (throughput_sample, latency_samples, latency_hist)
 
@@ -309,7 +311,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
 
   # Metadata to attach to samples
   metadata = {'netperf_test_length': FLAGS.netperf_test_length,
-              'max_iter': FLAGS.netperf_max_iter or 1}
+              'max_iter': FLAGS.netperf_max_iter or 1,
+              'num_streams': num_streams}
 
   parsed_output = [_ParseNetperfOutput(stdout, metadata, benchmark_name,
                                        enable_latency_histograms)
@@ -388,25 +391,24 @@ def Run(benchmark_spec):
     for k, v in vm.GetMachineTypeDict().iteritems():
       metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
-  num_streams = FLAGS.netperf_num_streams
-  assert(num_streams >= 1)
+  for num_streams in FLAGS.netperf_num_streams:
+    assert(num_streams >= 1)
 
-  for netperf_benchmark in FLAGS.netperf_benchmarks:
+    for netperf_benchmark in FLAGS.netperf_benchmarks:
+      if vm_util.ShouldRunOnExternalIpAddress():
+        external_ip_results = RunNetperf(client_vm, netperf_benchmark,
+                                         server_vm.ip_address, num_streams)
+        for external_ip_result in external_ip_results:
+          external_ip_result.metadata.update(metadata)
+        results.extend(external_ip_results)
 
-    if vm_util.ShouldRunOnExternalIpAddress():
-      external_ip_results = RunNetperf(client_vm, netperf_benchmark,
-                                       server_vm.ip_address, num_streams)
-      for external_ip_result in external_ip_results:
-        external_ip_result.metadata.update(metadata)
-      results.extend(external_ip_results)
-
-    if vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm):
-      internal_ip_results = RunNetperf(client_vm, netperf_benchmark,
-                                       server_vm.internal_ip, num_streams)
-      for internal_ip_result in internal_ip_results:
-        internal_ip_result.metadata.update(metadata)
-        internal_ip_result.metadata['ip_type'] = 'internal'
-      results.extend(internal_ip_results)
+      if vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm):
+        internal_ip_results = RunNetperf(client_vm, netperf_benchmark,
+                                         server_vm.internal_ip, num_streams)
+        for internal_ip_result in internal_ip_results:
+          internal_ip_result.metadata.update(metadata)
+          internal_ip_result.metadata['ip_type'] = 'internal'
+        results.extend(internal_ip_results)
 
   return results
 
