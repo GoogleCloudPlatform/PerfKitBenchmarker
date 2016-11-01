@@ -74,6 +74,9 @@ AGGREGATE_OPERATORS = {
     'Return=-1': operator.add,
     'Return=-2': operator.add,
     'Return=-3': operator.add,
+    'Return=OK': operator.add,
+    'Return=ERROR': operator.add,
+    'LatencyVariance(ms)': None,
     'AverageLatency(ms)': None,  # Requires both average and # of ops.
     'Throughput(ops/sec)': operator.add,
     '95thPercentileLatency(ms)': None,  # Calculated across clients.
