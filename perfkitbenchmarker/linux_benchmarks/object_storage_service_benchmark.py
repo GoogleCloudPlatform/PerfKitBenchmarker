@@ -1107,7 +1107,7 @@ def PrepareVM(vm, service):
 
 def CleanupVM(vm):
   vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
-  vm.RemoteCommand('rm -rf /tmp/run/')
+  vm.RemoteCommand('sudo rm -rf /tmp/run/')
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
                                         OBJECTS_WRITTEN_FILE)
   vm.RemoteCommand('rm -f %s' % objects_written_file)
