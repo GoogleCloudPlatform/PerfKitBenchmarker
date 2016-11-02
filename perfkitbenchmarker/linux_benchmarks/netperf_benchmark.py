@@ -56,8 +56,8 @@ flags.DEFINE_integer('netperf_thinktime', 0,
 flags.DEFINE_integer('netperf_thinktime_array_size', 0,
                      'The size of the array to traverse for thinktime.')
 flags.DEFINE_integer('netperf_thinktime_run_length', 0,
-                   'The number of contiguous numbers to sum at a time in the '
-                   'thinktime array.')
+                     'The number of contiguous numbers to sum at a time in the '
+                     'thinktime array.')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
