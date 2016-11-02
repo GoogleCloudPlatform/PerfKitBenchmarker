@@ -55,8 +55,9 @@ flags.DEFINE_integer('netperf_thinktime', 0,
                      'Time in microseconds to do work for each request.')
 flags.DEFINE_integer('netperf_thinktime_array_size', 0,
                      'The size of the array to traverse for thinktime.')
-flags.DEFINE_float('netperf_thinktime_shuffle', 0.0,
-                   'The fraction of the thinktime array to shuffle.')
+flags.DEFINE_integer('netperf_thinktime_run_length', 0,
+                   'The number of contiguous numbers to sum at a time in the '
+                   'thinktime array.')
 
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
@@ -297,7 +298,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
                  '-P ,{{data_port}} '
-                 '-U {thinktime},{thinktime_array_size},{thinktime_shuffle} '
+                 '-U {thinktime},{thinktime_array_size},{thinktime_run_length} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
                  'P99_LATENCY,STDDEV_LATENCY,'
                  'MIN_LATENCY,MAX_LATENCY,'
@@ -308,7 +309,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                      length=FLAGS.netperf_test_length,
                      thinktime=FLAGS.netperf_thinktime,
                      thinktime_array_size=FLAGS.netperf_thinktime_array_size,
-                     thinktime_shuffle=FLAGS.netperf_thinktime_shuffle,
+                     thinktime_run_length=FLAGS.netperf_thinktime_run_length,
                      confidence=confidence, verbosity=verbosity)
 
   # Run all of the netperf processes and collect their stdout
