@@ -15,11 +15,13 @@
 """Classes to collect and publish performance samples to various sinks."""
 
 import abc
+import copy
 import csv
 import io
 import itertools
 import json
 import logging
+import math
 import operator
 import pprint
 import sys
@@ -87,6 +89,15 @@ flags.DEFINE_string(
     'cloud_storage_bucket',
     None,
     'GCS bucket to upload records to. Bucket must exist.')
+
+flags.DEFINE_string(
+    'es_uri', None,
+    'The Elasticsearch address and port. e.g. http://localhost:9200')
+
+flags.DEFINE_string(
+    'es_index', 'perfkit', 'Elasticsearch index name to store documents')
+
+flags.DEFINE_string('es_type', 'result', 'Elasticsearch document type')
 
 flags.DEFINE_multistring(
     'metadata',
@@ -539,6 +550,96 @@ class CloudStoragePublisher(SamplePublisher):
       vm_util.IssueRetryableCommand(copy_cmd)
 
 
+class ElasticsearchPublisher(SamplePublisher):
+  """Publish samples to an Elasticsearch server. Index and document type
+  will be created if they do not exist.
+
+  Attributes:
+    es_uri: String. e.g. "http://localhost:9200"
+    es_index: String. Default "perfkit"
+    es_type: String. Default "result"
+  """
+  def __init__(self, es_uri=None, es_index=None, es_type=None):
+    self.es_uri = es_uri
+    self.es_index = es_index.lower()
+    self.es_type = es_type
+    self.mapping = {
+        "mappings": {
+            "result": {
+                "numeric_detection": True,
+                "properties": {
+                    "timestamp": {
+                        "type": "date",
+                        "format": "yyyy-MM-dd HH:mm:ss.SSSSSS"
+                    },
+                    "value": {
+                        "type": "double"
+                    }
+                },
+                "dynamic_templates": [{
+                    "strings": {
+                        "match_mapping_type": "string",
+                        "mapping": {
+                            "type": "string",
+                            "fields": {
+                                "raw": {
+                                    "type": "string",
+                                    "index": "not_analyzed"
+                                }
+                            }
+                        }
+                    }
+                }]
+            }
+        }
+    }
+
+  def PublishSamples(self, samples):
+    """Publish samples to Elasticsearch service"""
+    try:
+      from elasticsearch import Elasticsearch
+    except ImportError:
+      raise ImportError('The "elasticsearch" package is required to use '
+                        'the Elasticsearch publisher. Please make sure it '
+                        'is installed.')
+
+    es = Elasticsearch([self.es_uri])
+    if not es.indices.exists(index=self.es_index):
+      es.indices.create(index=self.es_index, body=self.mapping)
+      logging.info('Create index %s and default mappings', self.es_index)
+    for s in samples:
+      sample = copy.deepcopy(s)
+      # Make timestamp understandable by ES and human.
+      sample['timestamp'] = self._FormatTimestampForElasticsearch(
+          sample['timestamp']
+      )
+      # Keys cannot have dots for ES
+      sample = self._deDotKeys(sample)
+      # Add sample to the "perfkit index" of "result type" and using sample_uri
+      # as each ES's document's unique _id
+      es.create(index=self.es_index, doc_type=self.es_type,
+                id=sample['sample_uri'], body=json.dumps(sample))
+
+  def _FormatTimestampForElasticsearch(self, epoch_us):
+    """Convert the floating epoch timestamp in micro seconds epoch_us to
+    yyyy-MM-dd HH:mm:ss.SSSSSS in string
+    """
+    ts = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(epoch_us))
+    num_dec = ("%.6f" % (epoch_us - math.floor(epoch_us))).split('.')[1]
+    new_ts = '%s.%s' % (ts, num_dec)
+    return new_ts
+
+  def _deDotKeys(self, res):
+    """Recursively replace dot with underscore in all keys in a dictionary."""
+    for key, value in res.items():
+      if isinstance(value, dict):
+        self._deDotKeys(value)
+      new_key = key.replace('.', '_')
+      if new_key != key:
+        res[new_key] = res.pop(key)
+    return res
+
+
 class SampleCollector(object):
   """A performance sample collector.
 
@@ -592,6 +693,11 @@ class SampleCollector(object):
                                               gsutil_path=FLAGS.gsutil_path))
     if FLAGS.csv_path:
       publishers.append(CSVPublisher(FLAGS.csv_path))
+
+    if FLAGS.es_uri:
+      publishers.append(ElasticsearchPublisher(es_uri=FLAGS.es_uri,
+                                               es_index=FLAGS.es_index,
+                                               es_type=FLAGS.es_type))
 
     return publishers
 
