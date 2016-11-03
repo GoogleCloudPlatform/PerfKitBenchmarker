@@ -89,7 +89,8 @@ def Prepare(benchmark_spec):
     vm.RemoteCommand('sudo docker pull cloudsuite/web-serving:web_server')
     vm.RemoteCommand('sudo docker pull cloudsuite/web-serving:memcached_server')
     vm.RemoteCommand('sudo docker run -dt --net host --name web_server '
-                     'cloudsuite/web-serving:web_server /etc/bootstrap.sh')
+                     'cloudsuite/web-serving:web_server '
+                     '/etc/bootstrap.sh mysql_server memcache_server')
     vm.RemoteCommand('sudo docker run -dt --net host --name memcache_server '
                      'cloudsuite/web-serving:memcached_server')
 
@@ -97,7 +98,7 @@ def Prepare(benchmark_spec):
     PrepareCommon(vm)
     vm.RemoteCommand('sudo docker pull cloudsuite/web-serving:db_server')
     vm.RemoteCommand('sudo docker run -dt --net host --name mysql_server '
-                     'cloudsuite/web-serving:db_server')
+                     'cloudsuite/web-serving:db_server web_server')
 
   def PrepareClient(vm):
     PrepareCommon(vm)
