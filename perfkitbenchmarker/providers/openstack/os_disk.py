@@ -30,7 +30,8 @@ def CreateVolume(resource, name):
   """Creates a remote (Cinder) block volume."""
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
-  if 'openstack_volume_size' in vol_cmd.flags.keys():
+  if 'openstack_volume_size' in vol_cmd.flags.keys() and \
+          'data_disk_size' not in vol_cmd.flags.keys():
     vol_cmd.flags['data_disk_size'] = vol_cmd.flags.get('openstack_volume_size')
   vol_cmd.flags['size'] = (vol_cmd.flags.get('data_disk_size') or
                            REMOTE_VOLUME_DEFAULT_SIZE_GB)
@@ -44,7 +45,8 @@ def CreateBootVolume(resource, name, image):
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['image'] = image
-  if 'openstack_volume_size' in vol_cmd.flags.keys():
+  if 'openstack_volume_size' in vol_cmd.flags.keys() and \
+          'data_disk_size' not in vol_cmd.flags.keys():
     vol_cmd.flags['data_disk_size'] = vol_cmd.flags.get('openstack_volume_size')
   vol_cmd.flags['size'] = (vol_cmd.flags.get('data_disk_size') or
                            GetImageMinDiskSize(resource, image))
