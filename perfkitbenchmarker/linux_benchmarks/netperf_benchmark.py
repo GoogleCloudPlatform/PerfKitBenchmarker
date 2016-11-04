@@ -299,7 +299,6 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
                  '-P ,{{data_port}} '
-                 '-U {thinktime},{thinktime_array_size},{thinktime_run_length} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
                  'P99_LATENCY,STDDEV_LATENCY,'
                  'MIN_LATENCY,MAX_LATENCY,'
@@ -308,10 +307,14 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                      benchmark_name=benchmark_name,
                      server_ip=server_ip,
                      length=FLAGS.netperf_test_length,
-                     thinktime=FLAGS.netperf_thinktime,
-                     thinktime_array_size=FLAGS.netperf_thinktime_array_size,
-                     thinktime_run_length=FLAGS.netperf_thinktime_run_length,
                      confidence=confidence, verbosity=verbosity)
+  if FLAGS.netperf_thinktime != 0:
+    netperf_cmd += (' -U {thinktime},{thinktime_array_size},'
+                    '{thinktime_run_length} ').format(
+                        thinktime=FLAGS.netperf_thinktime,
+                        thinktime_array_size=FLAGS.netperf_thinktime_array_size,
+                        thinktime_run_length=FLAGS.netperf_thinktime_run_length)
+
 
   # Run all of the netperf processes and collect their stdout
   # TODO: Record start times of netperf processes on the remote machine
