@@ -72,14 +72,14 @@ def Prepare(benchmark_spec):
   def PrepareCommon(vm):
     if not docker.IsInstalled(vm):
       vm.Install('docker')
-    vm.RemoteCommand('sudo docker pull cloudsuite/spark')
-    vm.RemoteCommand('sudo docker pull cloudsuite/twitter-dataset-graph')
+    vm.Install('cloudsuite/spark')
+    vm.Install('cloudsuite/twitter-dataset-graph')
     vm.RemoteCommand('sudo docker create --name data '
                      'cloudsuite/twitter-dataset-graph')
 
   def PrepareMaster(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/graph-analytics')
+    vm.Install('cloudsuite/graph-analytics')
     master_cmd = ('sudo docker run -d --net host -e SPARK_MASTER_IP=%s '
                   '--name spark-master cloudsuite/spark master' %
                   vm.internal_ip)
@@ -140,13 +140,10 @@ def Cleanup(benchmark_spec):
 
   def CleanupCommon(vm):
     vm.RemoteCommand('sudo docker rm -v data')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/twitter-dataset-graph')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/spark')
 
   def CleanupMaster(vm):
     vm.RemoteCommand('sudo docker stop spark-master')
     vm.RemoteCommand('sudo docker rm spark-master')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/spark')
     CleanupCommon(vm)
 
   def CleanupWorker(vm):
