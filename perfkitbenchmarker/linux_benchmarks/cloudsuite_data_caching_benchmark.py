@@ -65,7 +65,7 @@ def Prepare(benchmark_spec):
       vm.Install('docker')
 
   # Prepare and start the server VM.
-  server_vm.RemoteCommand('sudo docker pull cloudsuite/data-caching:server')
+  server_vm.Install('cloudsuite/data-caching:server')
   server_vm.RemoteCommand("echo '%s    dc-client' | sudo tee -a /etc/hosts >"
                           " /dev/null" % client_vm.internal_ip)
   server_vm.RemoteCommand('sudo docker run --name dc-server --net host -d '
@@ -73,7 +73,7 @@ def Prepare(benchmark_spec):
                           FLAGS.cloudsuite_data_caching_memcached_flags)
 
   # Prepare the client.
-  client_vm.RemoteCommand('sudo docker pull cloudsuite/data-caching:client')
+  client_vm.Install('cloudsuite/data-caching:client')
   client_vm.RemoteCommand("echo '%s    dc-server' | sudo tee -a /etc/hosts >"
                           " /dev/null" % server_vm.internal_ip)
 
@@ -135,7 +135,5 @@ def Cleanup(benchmark_spec):
 
   server_vm.RemoteCommand('sudo docker stop dc-server')
   server_vm.RemoteCommand('sudo docker rm dc-server')
-  server_vm.RemoteCommand('sudo docker rmi cloudsuite/data-caching:server')
   client_vm.RemoteCommand('sudo docker stop dc-client')
   client_vm.RemoteCommand('sudo docker rm dc-client')
-  client_vm.RemoteCommand('sudo docker rmi cloudsuite/data-caching:client')

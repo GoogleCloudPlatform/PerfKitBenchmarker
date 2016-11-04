@@ -26,6 +26,51 @@ DOCKER_RPM_URL = ('https://get.docker.com/rpm/1.7.0/centos-6/'
                   'RPMS/x86_64/docker-engine-1.7.0-1.el6.x86_64.rpm')
 
 
+# Docker images that VMs are allowed to install.
+_IMAGES = [
+    'cloudsuite/data-caching:client',
+    'cloudsuite/data-caching:server',
+    'cloudsuite/data-serving:client',
+    'cloudsuite/data-serving:server',
+    'cloudsuite/graph-analytics',
+    'cloudsuite/in-memory-analytics',
+    'cloudsuite/media-streaming:client',
+    'cloudsuite/media-streaming:dataset',
+    'cloudsuite/media-streaming:server',
+    'cloudsuite/movielens-dataset',
+    'cloudsuite/spark',
+    'cloudsuite/twitter-dataset-graph',
+    'cloudsuite/web-search:client',
+    'cloudsuite/web-search:server',
+    'cloudsuite/web-serving:db_server',
+    'cloudsuite/web-serving:faban_client',
+    'cloudsuite/web-serving:memcached_server',
+    'cloudsuite/web-serving:web_server',
+]
+
+
+class _DockerImagePackage(object):
+  """Facsimile of a perfkitbenchmarker.linux_packages.<name> package."""
+
+  def __init__(self, name):
+    """Creates a vm-installable package from a docker image."""
+    self.name = name
+
+  def Install(self, vm):
+    """Installs the docker image for self.name on the VM."""
+    vm.Install('docker')
+    vm.RemoteCommand('sudo docker pull {}'.format(self.name))
+
+  def Uninstall(self, vm):
+    """Removes the docker image for self.name from the VM."""
+    vm.RemoteCommand('sudo docker rmi {}'.format(self.name))
+
+
+def CreateImagePackages():
+  """Creates _DockerImagePackage objects."""
+  return [(name, _DockerImagePackage(name)) for name in _IMAGES]
+
+
 def YumInstall(vm):
   """Installs the docker package on the VM."""
   vm.RemoteHostCommand('curl -o %s/docker.rpm -sSL %s'

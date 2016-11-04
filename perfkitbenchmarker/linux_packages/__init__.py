@@ -39,8 +39,10 @@ from perfkitbenchmarker import import_util
 
 
 def _LoadPackages():
-  return dict([(module.__name__.split('.')[-1], module) for module in
-               import_util.LoadModulesForPath(__path__, __name__)])
+  packages = dict([(module.__name__.split('.')[-1], module) for module in
+                   import_util.LoadModulesForPath(__path__, __name__)])
+  packages.update(packages['docker'].CreateImagePackages())
+  return packages
 
 
 PACKAGES = _LoadPackages()

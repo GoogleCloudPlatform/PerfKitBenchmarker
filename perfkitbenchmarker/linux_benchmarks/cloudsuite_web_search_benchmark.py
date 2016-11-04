@@ -97,7 +97,7 @@ def Prepare(benchmark_spec):
     server_cmd = 'sudo service docker restart'
     stdout, _ = vm.RemoteCommand(server_cmd, should_log=True)
 
-    vm.RemoteCommand('sudo docker pull cloudsuite/web-search:server')
+    vm.Install('cloudsuite/web-search:server')
 
     server_cmd = ('sudo docker run -d --net host '
                   '--name server cloudsuite/web-search:server %s 1' %
@@ -107,7 +107,7 @@ def Prepare(benchmark_spec):
 
   def PrepareClient(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/web-search:client')
+    vm.Install('cloudsuite/web-search:client')
 
   PrepareServer(servers)
 
@@ -165,12 +165,10 @@ def Cleanup(benchmark_spec):
   def CleanupClient(vm):
     vm.RemoteCommand('sudo docker stop client')
     vm.RemoteCommand('sudo docker rm client')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/web-search:client')
 
   def CleanupServer(vm):
     vm.RemoteCommand('sudo docker stop server')
     vm.RemoteCommand('sudo docker rm server')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/web-search:server')
 
   target_arg_tuples = ([(CleanupClient, [vm], {}) for vm in clients] +
                        [(CleanupServer, [servers], {})])

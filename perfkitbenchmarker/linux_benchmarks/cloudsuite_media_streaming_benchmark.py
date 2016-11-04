@@ -59,20 +59,20 @@ def Prepare(benchmark_spec):
   def PrepareCommon(vm):
     if not docker.IsInstalled(vm):
       vm.Install('docker')
-    vm.RemoteCommand('sudo docker pull cloudsuite/media-streaming:dataset')
+    vm.Install('cloudsuite/media-streaming:dataset')
     vm.RemoteCommand('sudo docker create --name dataset '
                      'cloudsuite/media-streaming:dataset')
 
   def PrepareServer(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/media-streaming:server')
+    vm.Install('cloudsuite/media-streaming:server')
     vm.RemoteCommand('sudo docker run -d --name server --net host '
                      '--volumes-from dataset '
                      'cloudsuite/media-streaming:server')
 
   def PrepareClient(vm):
     PrepareCommon(vm)
-    vm.RemoteCommand('sudo docker pull cloudsuite/media-streaming:client')
+    vm.Install('cloudsuite/media-streaming:client')
 
   target_arg_tuples = [(PrepareServer, [server], {}),
                        (PrepareClient, [client], {})]
@@ -129,16 +129,13 @@ def Cleanup(benchmark_spec):
 
   def CleanupCommon(vm):
     vm.RemoteCommand('sudo docker rm -v dataset')
-    vm.RemoteCommand('sudo docker rmi cloudsuite/media-streaming:dataset')
 
   def CleanupServer(vm):
     server.RemoteCommand('sudo docker stop server')
     server.RemoteCommand('sudo docker rm server')
-    server.RemoteCommand('sudo docker rmi cloudsuite/media-streaming:server')
     CleanupCommon(vm)
 
   def CleanupClient(vm):
-    client.RemoteCommand('sudo docker rmi cloudsuite/media-streaming:client')
     CleanupCommon(vm)
 
   target_arg_tuples = [(CleanupServer, [server], {}),
