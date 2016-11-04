@@ -374,6 +374,16 @@ class BaseOsMixin(object):
     """
     raise NotImplementedError()
 
+  def TryRemoteCommand(self, command, **kwargs):
+    """Runs a remote command and returns True iff it succeeded."""
+    try:
+      self.RemoteCommand(command, **kwargs)
+      return True
+    except errors.VirtualMachine.RemoteCommandError:
+      return False
+    except:
+      raise
+
   @abc.abstractmethod
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.
