@@ -450,9 +450,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       AuthError: If the VM cannot access its peer.
     """
-    try:
-      self.RemoteCommand('ssh %s hostname' % peer.internal_ip)
-    except errors.VirtualMachine.RemoteCommandError:
+    if not self.TryRemoteCommand('ssh %s hostname' % peer.internal_ip):
       raise errors.VirtualMachine.AuthError(
           'Authentication check failed. If you are running with Static VMs, '
           'please make sure that %s can ssh into %s without supplying any '
@@ -517,11 +515,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
-    try:
-      self.RemoteCommand('ping -c 1 %s' % ip)
-    except errors.VirtualMachine.RemoteCommandError:
-      return False
-    return True
+    return self.TryRemoteCommand('ping -c 1 %s' % ip)
 
   def SetupLocalDisks(self):
     """Performs Linux specific setup of local disks."""
@@ -646,6 +640,11 @@ class RhelMixin(BaseLinuxMixin):
         vm_util.VM_TMP_DIR,
         ignore_failure=True)
 
+  def HasPackage(self, package):
+    """Returns True iff the package is available for installation."""
+    return self.TryRemoteCommand('sudo yum info %s' % package,
+                                 suppress_warning=True)
+
   def InstallPackages(self, packages):
     """Installs packages using the yum package manager."""
     self.RemoteCommand('sudo yum install -y %s' % packages)
@@ -747,6 +746,11 @@ class DebianMixin(BaseLinuxMixin):
         'sudo dpkg --set-selections < %s/dpkg_selections' % vm_util.VM_TMP_DIR)
     self.RemoteCommand('sudo DEBIAN_FRONTEND=\'noninteractive\' '
                        'apt-get --purge -y dselect-upgrade')
+
+  def HasPackage(self, package):
+    """Returns True iff the package is available for installation."""
+    return self.TryRemoteCommand('apt-get install --just-print %s' % package,
+                                 suppress_warning=True)
 
   @vm_util.Retry()
   def InstallPackages(self, packages):
