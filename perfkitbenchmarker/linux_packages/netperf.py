@@ -36,7 +36,7 @@ NETPERF_DIR = '%s/netperf-2.6.0' % vm_util.VM_TMP_DIR
 NETPERF_SRC_DIR = NETPERF_DIR + '/src'
 NETSERVER_PATH = NETPERF_SRC_DIR + '/netserver'
 NETPERF_PATH = NETPERF_SRC_DIR + '/netperf'
-NETLIB_PATCH = NETPERF_SRC_DIR + '/netlib.patch'
+NETLIB_PATCH = NETPERF_SRC_DIR + '/netperf.patch'
 
 
 def _Install(vm):
@@ -48,8 +48,8 @@ def _Install(vm):
   vm.RemoteCommand('cd %s && tar xvzf %s' % (vm_util.VM_TMP_DIR, NETPERF_TAR))
   # Modify netperf to print out all buckets in its histogram rather than
   # aggregating.
-  vm.PushDataFile('netlib.patch', NETLIB_PATCH)
-  vm.RemoteCommand('cd %s && patch -p2 < netlib.patch' %
+  vm.PushDataFile('netperf.patch', NETLIB_PATCH)
+  vm.RemoteCommand('cd %s && patch -p2 < netperf.patch' %
                    NETPERF_SRC_DIR)
   vm.RemoteCommand('cd %s && CFLAGS=-DHIST_NUM_OF_BUCKET=%s '
                    './configure --enable-histogram=yes '
