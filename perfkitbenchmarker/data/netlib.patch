@@ -1,6 +1,19 @@
---- src/netlib.c        2012-06-19 20:32:29.000000000 +0000
-+++ src/new_netlib.c    2016-08-13 01:34:03.787253999 +0000
-@@ -4288,9 +4288,8 @@
+diff -u -r netperf-2.6.0/src/netlib.c netperf-2.6.0-patch/src/netlib.c
+--- netperf-2.6.0/src/netlib.c	2012-06-19 13:32:29.000000000 -0700
++++ netperf-2.6.0-patch/src/netlib.c	2016-11-02 11:09:56.426738496 -0700
+@@ -234,6 +234,11 @@
+ char local_data_port[10];
+ char remote_data_port[10];
+ 
++// See comment in netlib.h
++uint32_t think_time = 0;
++uint32_t think_time_array_size = 0;
++uint32_t think_time_run_length = 0;
++
+ char *local_data_address=NULL;
+ char *remote_data_address=NULL;
+ 
+@@ -4288,9 +4293,8 @@
    for(i = 0; i < 10; i++){
      sum = 0;
      for (j = i * base; j <  (i + 1) * base; j++) {
@@ -11,3 +24,139 @@
    }
    fprintf(where,"\n");
  }
+diff -u -r netperf-2.6.0/src/netlib.h netperf-2.6.0-patch/src/netlib.h
+--- netperf-2.6.0/src/netlib.h	2012-06-19 13:46:47.000000000 -0700
++++ netperf-2.6.0-patch/src/netlib.h	2016-11-02 10:56:38.460630189 -0700
+@@ -458,6 +458,11 @@
+ extern char local_data_port[10];
+ extern char remote_data_port[10];
+ 
++// Time in microseconds to do pointless work after each request received
++extern uint32_t think_time;
++extern uint32_t think_time_array_size;
++extern float think_time_run_length;
++
+ extern char *local_data_address;
+ extern char *remote_data_address;
+ 
+diff -u -r netperf-2.6.0/src/nettest_bsd.c netperf-2.6.0-patch/src/nettest_bsd.c
+--- netperf-2.6.0/src/nettest_bsd.c	2012-06-19 13:32:47.000000000 -0700
++++ netperf-2.6.0-patch/src/nettest_bsd.c	2016-10-19 15:49:52.513244546 -0700
+@@ -8426,7 +8426,6 @@
+ void
+ recv_tcp_rr()
+ {
+-
+   struct ring_elt *send_ring;
+   struct ring_elt *recv_ring;
+ 
+diff -u -r netperf-2.6.0/src/nettest_bsd.h netperf-2.6.0-patch/src/nettest_bsd.h
+--- netperf-2.6.0/src/nettest_bsd.h	2012-06-19 13:47:09.000000000 -0700
++++ netperf-2.6.0-patch/src/nettest_bsd.h	2016-11-02 11:10:13.542697954 -0700
+@@ -66,6 +66,10 @@
+ 
+   int32_t    test_length;    /* how long is the test? */
+ 
++  uint32_t   think_time;               /* how long to pointlessly think on each request */
++  uint32_t   think_time_array_size;    /* size of pointer chase array for think_time work */
++  uint32_t   think_time_run_length; /* the number of contiguous elements in the think time array to sum */
++
+   uint32_t   so_rcvavoid;    /* avoid copies on recv? */
+   uint32_t   so_sndavoid;    /* avoid copies on send? */
+   uint32_t   send_dirty_count; /* bytes to dirty before calling send */
+diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni.c
+--- netperf-2.6.0/src/nettest_omni.c	2012-06-19 13:33:48.000000000 -0700
++++ netperf-2.6.0-patch/src/nettest_omni.c	2016-11-02 11:04:58.939443126 -0700
+@@ -3759,6 +3759,10 @@
+       omni_request->socket_prio            = remote_socket_prio;
+       omni_request->socket_tos             = remote_socket_tos;
+ 
++      omni_request->think_time = think_time;
++      omni_request->think_time_array_size = think_time_array_size;
++      omni_request->think_time_run_length = think_time_run_length;
++
+       /* we have no else clauses here because we previously set flags
+ 	 to zero above raj 20090803 */
+       if (rem_nodelay)
+@@ -4932,6 +4936,11 @@
+ 	  omni_request->cong_control,
+ 	  sizeof(local_cong_control_req));
+ 
++  // Extract think_time parameters
++  think_time = omni_request->think_time;
++  think_time_array_size = omni_request->think_time_array_size;
++  think_time_run_length = omni_request->think_time_run_length;
++
+   /* based on what we have been told by the remote netperf, we want to
+      setup our endpoint for the "data connection" and let the remote
+      netperf know the situation. */
+@@ -5240,6 +5249,16 @@
+   addrlen = sizeof(peeraddr_in);
+   memset(&peeraddr_in,0,sizeof(peeraddr_in));
+ 
++
++  uint32_t* think_time_array;
++  if (think_time > 0 && think_time_array_size > 0) {
++    // Create a big array to randomly traverse
++    // Don't bother intializing elements - we're just going to pointlessly sum things to force the CPU to read
++    // memory locations and do work. It should just be filled with random numbers anyway
++    think_time_array = malloc(sizeof(uint32_t) * think_time_array_size);
++    fprintf(where, "Finished creating think time array\n");
++  }
++
+   /* Now it's time to start receiving data on the connection. We will */
+   /* first grab the apropriate counters and then start grabbing. */
+ 
+@@ -5409,6 +5428,18 @@
+       recv_ring = recv_ring->next;
+     }
+ 
++    if (think_time > 0) {
++      // Do think time here before we send the response
++      clock_t think_start = clock();
++      uint32_t sum = 0;
++      while (clock() - think_start < ((float)think_time) * (((float)CLOCKS_PER_SEC) / 1000000.f)) {
++        uint32_t i;
++        uint32_t run_start = rand() % think_time_array_size;
++        for (i = run_start; i < think_time_run_length; i++)
++          sum = think_time_array[i];
++      }
++    }
++
+     /* if we should try to send something, then by all means, let us
+        try to send something. */
+     if ((omni_request->direction & NETPERF_XMIT) &&
+@@ -5522,6 +5553,10 @@
+     }
+   }
+ 
++  if (think_time > 0) {
++      free(think_time_array);
++  }
++
+   /* The current iteration loop now exits due to timeout or unit count
+      being  reached */
+   stop_timer();
+@@ -6895,7 +6930,7 @@
+ 
+ {
+ 
+-#define OMNI_ARGS "b:cCd:DG:hH:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:u:Vw:W:46"
++#define OMNI_ARGS "b:cCd:DG:hH:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:U:u:Vw:W:46"
+ 
+   extern char	*optarg;	  /* pointer to option string	*/
+ 
+@@ -7218,6 +7253,13 @@
+       test_uuid[sizeof(test_uuid) - 1] = 0;
+       have_uuid = 1;
+       break;
++    case 'U':
++      break_args(optarg, arg1, arg2);
++      break_args(optarg+strlen(arg1)+1, arg2, arg3);
++      think_time = convert(arg1);
++      think_time_array_size = convert(arg2);
++      think_time_run_length = atof(arg3);
++      break;
+     case 'W':
+       /* set the "width" of the user space data */
+       /* buffer. This will be the number of */
