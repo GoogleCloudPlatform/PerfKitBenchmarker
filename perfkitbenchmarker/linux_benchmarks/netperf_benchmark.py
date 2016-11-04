@@ -54,7 +54,7 @@ flag_util.DEFINE_integerlist('netperf_num_streams', flag_util.IntegerList([1]),
                              'Number of netperf processes to run. Netperf '
                              'will run once for each value in the list.')
 flags.DEFINE_integer('netperf_thinktime', 0,
-                     'Time in microseconds to do work for each request.')
+                     'Time in nanoseconds to do work for each request.')
 flags.DEFINE_integer('netperf_thinktime_array_size', 0,
                      'The size of the array to traverse for thinktime.')
 flags.DEFINE_integer('netperf_thinktime_run_length', 0,
