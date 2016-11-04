@@ -217,9 +217,8 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name,
     logging.info('Netperf Results: %s', results)
     assert 'Throughput' in results
   except:
-    logging.info('Netperf ERROR: Failed to parse stdout. STDOUT: %s' %
-                 stdout)
-    return None
+    raise Exception('Netperf ERROR: Failed to parse stdout. STDOUT: %s' %
+                    stdout)
 
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
@@ -334,15 +333,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                                        enable_latency_histograms)
                    for stdout in stdouts]
 
-  # Filter out failed netperf runs
-  parsed_output = [out for out in parsed_output if out is not None]
-
-  logging.info('%s out of %s netperf threads succeeded',
-               len(parsed_output), num_streams)
-
-  if len(parsed_output) == 0:
-    raise Exception('All netperf threads failed')
-  elif len(parsed_output) == 1:
+  if len(parsed_output) == 1:
     # Only 1 netperf thread
     throughput_sample, latency_samples, histogram = parsed_output[0]
     return [throughput_sample] + latency_samples
