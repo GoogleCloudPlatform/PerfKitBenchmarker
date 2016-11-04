@@ -25,7 +25,10 @@ from perfkitbenchmarker import pkb  # NOQA
 class HelpTest(unittest.TestCase):
   def testHelp(self):
     # Test that help generation finishes without errors
-    flags.FLAGS.GetHelp()
+    if hasattr(flags.FLAGS, 'get_help'):
+      flags.FLAGS.get_help()
+    else:
+      flags.FLAGS.GetHelp()
 
 
 class HelpXMLTest(unittest.TestCase):
