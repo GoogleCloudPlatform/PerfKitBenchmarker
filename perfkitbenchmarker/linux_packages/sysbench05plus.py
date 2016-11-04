@@ -20,7 +20,23 @@ oltp benchmarks depending on older version of sysbench will break if we
 install 0.5 or later for them. Therefore, it's necessary that we have a
 separate installer here for 0.5 and later.
 """
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
+
+
+def PathPrefix(vm):
+  """Determines the prefix for a sysbench command based on the operating system.
+
+  Args:
+    vm: VM  on which the sysbench command will be executed.
+
+  Returns:
+    A string representing the sysbench command prefix.
+  """
+  if vm.OS_TYPE == os_types.RHEL:
+    return vm_util.VM_TMP_DIR
+  else:
+    return '/usr/'
 
 
 def YumInstall(vm):
