@@ -39,17 +39,6 @@ diff -u -r netperf-2.6.0/src/netlib.h netperf-2.6.0-patch/src/netlib.h
  extern char *local_data_address;
  extern char *remote_data_address;
  
-diff -u -r netperf-2.6.0/src/nettest_bsd.c netperf-2.6.0-patch/src/nettest_bsd.c
---- netperf-2.6.0/src/nettest_bsd.c	2012-06-19 13:32:47.000000000 -0700
-+++ netperf-2.6.0-patch/src/nettest_bsd.c	2016-10-19 15:49:52.513244546 -0700
-@@ -8426,7 +8426,6 @@
- void
- recv_tcp_rr()
- {
--
-   struct ring_elt *send_ring;
-   struct ring_elt *recv_ring;
- 
 diff -u -r netperf-2.6.0/src/nettest_bsd.h netperf-2.6.0-patch/src/nettest_bsd.h
 --- netperf-2.6.0/src/nettest_bsd.h	2012-06-19 13:47:09.000000000 -0700
 +++ netperf-2.6.0-patch/src/nettest_bsd.h	2016-11-02 11:10:13.542697954 -0700
