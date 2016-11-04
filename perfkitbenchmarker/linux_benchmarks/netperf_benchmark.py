@@ -422,4 +422,4 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vms[1].RemoteCommand('sudo killall netserver')
-  vms[0].RemoteCommand('rm -rf /tmp/run/')
+  vms[0].RemoteCommand('sudo rm -rf /tmp/run/')
