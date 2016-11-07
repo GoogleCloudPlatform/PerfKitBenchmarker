@@ -303,6 +303,7 @@ class AtomicCounter:
       self.value += 1
     return self.value
 
+
 class PrefixSharedCounterIterator(ObjectNameIterator):
   def __init__(self, prefix):
     self.prefix = prefix
@@ -310,6 +311,7 @@ class PrefixSharedCounterIterator(ObjectNameIterator):
 
   def next(self):
     return '%s_%d' % (self.prefix, self.counter.increment())
+
 
 class PrefixCounterIterator(ObjectNameIterator):
   def __init__(self, prefix):
