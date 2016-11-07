@@ -101,14 +101,17 @@ flags.DEFINE_string('object_storage_class', None, 'The storage class to use '
 
 flags.DEFINE_enum('object_naming_scheme', 'sequential_by_stream',
                   ['sequential_by_stream',
-                   'approximately_sequential'],
+                   'approximately_sequential',
+                   'sequential'],
                   'How objects will be named. Only applies to the '
                   'MultiStreamWrite benchmark. '
                   'sequential_by_stream: object names from each stream '
                   'will be sequential, but different streams will have '
                   'different name prefixes. '
                   'approximately_sequential: object names from all '
-                  'streams will roughly increase together.')
+                  'streams will roughly increase together.'
+                  'sequential: object names will be completely sequential in '
+                  'time')
 
 STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
@@ -285,6 +288,28 @@ class ObjectNameIterator(object):
 
     raise NotImplementedError()
 
+
+class AtomicCounter:
+  """A shared, thread-safe, incrementing counter.
+  """
+  def __init__(self, initial=0):
+    self.value = initial
+    self._lock = threading.Lock()
+
+  def increment(self):
+    """Atomically increment the counter and return the new value.
+    """
+    with self._lock:
+      self.value += 1
+    return self.value
+
+class PrefixSharedCounterIterator(ObjectNameIterator):
+  def __init__(self, prefix):
+    self.prefix = prefix
+    self.counter = AtomicCounter()
+
+  def next(self):
+    return '%s_%d' % (self.prefix, self.counter.increment())
 
 class PrefixCounterIterator(ObjectNameIterator):
   def __init__(self, prefix):
@@ -665,6 +690,21 @@ def MultiStreamWrites(service):
 
   payload = GenerateWritePayload(MaxSizeInDistribution(size_distribution))
 
+  naming_scheme = FLAGS.object_naming_scheme
+
+  if naming_scheme == 'sequential_by_stream':
+    name_iterator_fn = lambda _, worker_num: PrefixCounterIterator(
+        'pkb_write_worker_%f_%s' % (time.time(), worker_num))
+  elif naming_scheme == 'approximately_sequential':
+    name_iterator_fn = lambda start_time, worker_num: \
+        PrefixTimestampSuffixIterator('pkb_writes_%s' % start_time,
+                                      '%s' % worker_num)
+  elif naming_scheme == 'sequential':
+    name_iterator = PrefixSharedCounterIterator('pkb_writes')
+    name_iterator_fn = lambda start_time, worker_num: name_iterator
+  else:
+    raise Exception('Invalid object naming scheme: %s' % naming_scheme)
+
   results = RunThreadedWorkers(
       WriteWorker,
       (service,
@@ -672,7 +712,7 @@ def MultiStreamWrites(service):
        size_distribution,
        FLAGS.objects_per_stream,
        FLAGS.start_time,
-       FLAGS.object_naming_scheme))
+       name_iterator_fn))
 
   # object_records is the data we leave on the VM for future reads. We
   # need to pass data to the reader so it will know what object names
@@ -800,7 +840,7 @@ def SleepUntilTime(when):
 
 def WriteWorker(service, payload,
                 size_distribution, num_objects,
-                start_time, naming_scheme, result_queue, worker_num):
+                start_time, name_iterator_fn, result_queue, worker_num):
   """Upload objects for the multi-stream writes benchmark.
 
   Args:
@@ -819,13 +859,7 @@ def WriteWorker(service, payload,
   latencies = []
   sizes = []
 
-  if naming_scheme == 'sequential_by_stream':
-    name_iterator = PrefixCounterIterator(
-        'pkb_write_worker_%f_%s' % (time.time(), worker_num))
-  elif naming_scheme == 'approximately_sequential':
-    name_iterator = PrefixTimestampSuffixIterator(
-        'pkb_writes_%s' % start_time,
-        '%s' % worker_num)
+  name_iterator = name_iterator_fn(start_time, worker_num)
   size_iterator = SizeDistributionIterator(size_distribution)
 
   payload_handle = cStringIO.StringIO(payload)
@@ -836,7 +870,6 @@ def WriteWorker(service, payload,
   for i in xrange(num_objects):
     object_name = name_iterator.next()
     object_size = size_iterator.next()
-
     try:
       start_time, latency = service.WriteObjectFromBuffer(
           FLAGS.bucket, object_name,
