@@ -421,13 +421,8 @@ class BenchmarkSpec(object):
 
   def Pickle(self):
     """Pickles the spec so that it can be unpickled on a subsequent run."""
-    # Remove the config. It cannot be pickled because of an issue with how
-    # gflags dynamically defines a Checker function for flags with a lower_bound
-    # or upper_bound.
-    config, self.config = self.config, None
     with open(self._GetPickleFilename(self.uid), 'wb') as pickle_file:
       pickle.dump(self, pickle_file, 2)
-    self.config = config
 
   @classmethod
   def GetBenchmarkSpec(cls, benchmark_module, config, uid):
@@ -451,7 +446,6 @@ class BenchmarkSpec(object):
       logging.error('Unable to unpickle spec file for benchmark %s.',
                     benchmark_module.BENCHMARK_NAME)
       raise e
-    spec.config = config
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.
     spec.deleted = False

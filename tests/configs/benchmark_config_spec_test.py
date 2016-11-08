@@ -443,9 +443,6 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
                               **self._kwargs)
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)
     self.assertEqual(result.description, 'Test description.')
-    self.assertIsInstance(result.flags, dict)
-    self.assertEqual(sorted(result.flags.keys()),
-                     sorted(flags.FLAGS.FlagDict().keys()))
     self.assertIsNot(result.flags, flags.FLAGS.FlagDict())
     self.assertIsInstance(result.vm_groups, dict)
     self.assertEqual(len(result.vm_groups), 1)
@@ -489,10 +486,8 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)
     self.assertEqual(result.description, 'Test description.')
     self.assertIsInstance(result.flags, dict)
-    self.assertEqual(sorted(result.flags.keys()),
-                     sorted(flags.FLAGS.FlagDict().keys()))
     self.assertIsNot(result.flags, flags.FLAGS.FlagDict())
-    self.assertEqual(result.flags['cloud'].value, 'AWS')
+    self.assertEqual(result.flags['cloud'], 'AWS')
     self.assertEqual(flags.FLAGS['cloud'].value, 'GCP')
     self.assertIsInstance(result.vm_groups, dict)
     self.assertEqual(len(result.vm_groups), 1)
