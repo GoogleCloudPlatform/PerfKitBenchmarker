@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import mock
 import re
 import unittest
 
@@ -109,20 +110,8 @@ class IntervalTimerTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     """GenerateSamples should return an empty list if Measure was not called."""
     timer = timing_util.IntervalTimer()
     self.assertEqual(timer.intervals, [])
-    samples = timer.GenerateSamples(
-        include_runtime=True, include_timestamps=True)
+    samples = timer.GenerateSamples()
     self.assertEqual(timer.intervals, [])
-    self.assertEqual(samples, [])
-
-  def testGenerateSamplesNoRuntimeNoTimestamps(self):
-    """No samples when include_runtime and include_timestamps are False."""
-    timer = timing_util.IntervalTimer()
-    with timer.Measure('First Interval'):
-      pass
-    with timer.Measure('Second Interval'):
-      pass
-    samples = timer.GenerateSamples(
-        include_runtime=False, include_timestamps=False)
     self.assertEqual(samples, [])
 
   def testGenerateSamplesRuntimeNoTimestamps(self):
@@ -136,31 +125,10 @@ class IntervalTimerTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     stop0 = timer.intervals[0][2]
     start1 = timer.intervals[1][1]
     stop1 = timer.intervals[1][2]
-    samples = timer.GenerateSamples(
-        include_runtime=True, include_timestamps=False)
+    samples = timer.GenerateSamples()
     exp_samples = [
         sample.Sample('First Runtime', stop0 - start0, 'seconds'),
         sample.Sample('Second Runtime', stop1 - start1, 'seconds')]
-    self.assertSampleListsEqualUpToTimestamp(samples, exp_samples)
-
-  def testGenerateSamplesTimestampsNoRuntime(self):
-    """Test generating timestamp samples but no runtime sample."""
-    timer = timing_util.IntervalTimer()
-    with timer.Measure('First'):
-      pass
-    with timer.Measure('Second'):
-      pass
-    start0 = timer.intervals[0][1]
-    stop0 = timer.intervals[0][2]
-    start1 = timer.intervals[1][1]
-    stop1 = timer.intervals[1][2]
-    samples = timer.GenerateSamples(
-        include_runtime=False, include_timestamps=True)
-    exp_samples = [
-        sample.Sample('First Start Timestamp', start0, 'seconds'),
-        sample.Sample('First Stop Timestamp', stop0, 'seconds'),
-        sample.Sample('Second Start Timestamp', start1, 'seconds'),
-        sample.Sample('Second Stop Timestamp', stop1, 'seconds')]
     self.assertSampleListsEqualUpToTimestamp(samples, exp_samples)
 
   def testGenerateSamplesRuntimeAndTimestamps(self):
@@ -174,8 +142,10 @@ class IntervalTimerTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     stop0 = timer.intervals[0][2]
     start1 = timer.intervals[1][1]
     stop1 = timer.intervals[1][2]
-    samples = timer.GenerateSamples(
-        include_runtime=True, include_timestamps=True)
+    with mock.patch(
+        'perfkitbenchmarker.timing_util.TimestampMeasurementsEnabled',
+        return_value=True):
+      samples = timer.GenerateSamples()
     exp_samples = [
         sample.Sample('First Runtime', stop0 - start0, 'seconds'),
         sample.Sample('First Start Timestamp', start0, 'seconds'),

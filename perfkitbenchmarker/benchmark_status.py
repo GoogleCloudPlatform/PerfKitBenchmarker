@@ -25,14 +25,11 @@ ALL = SUCCEEDED, FAILED, SKIPPED
 _COL_SEPARATOR = '  '
 
 
-def _CreateSummaryTable(run_status_tuples):
+def _CreateSummaryTable(benchmark_specs):
   """Converts statuses of benchmark runs into a formatted string table.
 
   Args:
-    run_status_tuples: List of (benchmark_name, benchmark_uid, status) tuples.
-        benchmark_name and benchmark_uid are strings that identify one run of a
-        benchmark, and status is a value from ALL. List must contain at least
-        one element.
+    benchmark_specs: List of BenchmarkSpecs.
 
   Returns:
     string. Multi-line string summarizing benchmark success statuses. Example:
@@ -44,6 +41,8 @@ def _CreateSummaryTable(run_status_tuples):
         cluster_boot  cluster_boot0  SKIPPED
         --------------------------------------
   """
+  run_status_tuples = [(spec.name, spec.uid, spec.status)
+                       for spec in benchmark_specs]
   assert run_status_tuples, ('run_status_tuples must contain at least one '
                              'element.')
   col_headers = 'Name', 'UID', 'Status'
@@ -63,14 +62,11 @@ def _CreateSummaryTable(run_status_tuples):
   return os.linesep.join(msg)
 
 
-def CreateSummary(run_status_tuples):
+def CreateSummary(benchmark_specs):
   """Logs a summary of benchmark run statuses.
 
   Args:
-    run_status_tuples: List of (benchmark_name, benchmark_uid, status) tuples.
-        benchmark_name and benchmark_uid are strings that identify one run of a
-        benchmark, and status is a value from ALL. List must contain at least
-        one element.
+    benchmark_specs: List of BenchmarkSpecs.
 
   Returns:
     string. Multi-line string summarizing benchmark success statuses. Example:
@@ -84,6 +80,8 @@ def CreateSummary(run_status_tuples):
         --------------------------------------
         Success rate: 33.33% (1/3)
   """
+  run_status_tuples = [(spec.name, spec.uid, spec.status)
+                       for spec in benchmark_specs]
   assert run_status_tuples, ('run_status_tuples must contain at least one '
                              'element.')
   benchmark_count = len(run_status_tuples)
@@ -91,7 +89,7 @@ def CreateSummary(run_status_tuples):
                                    if status == SUCCEEDED)
   return os.linesep.join((
       'Benchmark run statuses:',
-      _CreateSummaryTable(run_status_tuples),
+      _CreateSummaryTable(benchmark_specs),
       'Success rate: {0:.2f}% ({1}/{2})'.format(
           100. * successful_benchmark_count / benchmark_count,
           successful_benchmark_count, benchmark_count)))

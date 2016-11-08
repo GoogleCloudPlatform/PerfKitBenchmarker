@@ -104,7 +104,7 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
     # VM Creation depends on there being a BenchmarkSpec.
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         _BENCHMARK_NAME, flag_values=mocked_flags, vm_groups={})
-    self.spec = benchmark_spec.BenchmarkSpec(config_spec, _BENCHMARK_NAME,
+    self.spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec,
                                              _BENCHMARK_UID)
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 

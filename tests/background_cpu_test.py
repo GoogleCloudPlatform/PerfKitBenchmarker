@@ -69,7 +69,7 @@ class TestBackgroundWorkload(unittest.TestCase):
     config = configs.LoadConfig(benchmark_config_yaml, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         NAME, flag_values=self._mocked_flags, **config)
-    return benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
+    return benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
 
   def _CheckVmCallCounts(self, spec, working_groups, working_expected_counts,
                          non_working_groups, non_working_expected_counts):

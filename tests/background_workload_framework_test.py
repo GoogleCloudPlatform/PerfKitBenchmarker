@@ -60,20 +60,20 @@ class TestBackgroundWorkloadFramework(unittest.TestCase):
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         NAME, flag_values=self.mocked_flags, **config)
-    spec = benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
+    spec = benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
     vm0 = mock.MagicMock()
     vm1 = mock.MagicMock()
     spec.ConstructVirtualMachines()
     spec.vms = [vm0, vm1]
     timer = timing_util.IntervalTimer()
-    pkb.DoPreparePhase(ping_benchmark, NAME, spec, timer)
+    pkb.DoPreparePhase(spec, timer)
     for vm in spec.vms:
       self.assertEqual(vm.PrepareBackgroundWorkload.call_count, 1)
 
     with mock.patch(ping_benchmark.__name__ + '.Run'):
       vm0.StopBackgroundWorkload.side_effect = functools.partial(
           self._CheckAndIncrement, expected_last_call=0)
-      pkb.DoCleanupPhase(ping_benchmark, NAME, spec, timer)
+      pkb.DoCleanupPhase(spec, timer)
       for vm in spec.vms:
         self.assertEqual(vm.StartBackgroundWorkload.call_count, 1)
         self.assertEqual(vm.StopBackgroundWorkload.call_count, 1)

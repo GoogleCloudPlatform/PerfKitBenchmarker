@@ -242,7 +242,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         _BENCHMARK_NAME, flag_values=self._mocked_flags, vm_groups={})
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
-        config_spec, _BENCHMARK_NAME, _BENCHMARK_UID)
+        mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
   @contextlib.contextmanager
   def _PatchCriticalObjects(self):
