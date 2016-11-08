@@ -85,7 +85,7 @@ class _BenchmarkSpecTestCase(unittest.TestCase):
   def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         benchmark_name, flag_values=self._mocked_flags, **config_dict)
-    return benchmark_spec.BenchmarkSpec(config_spec, benchmark_name, UID)
+    return benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec, UID)
 
 
 class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):

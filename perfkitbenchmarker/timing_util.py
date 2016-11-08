@@ -44,7 +44,8 @@ MEASUREMENTS_ALL = OrderedDict([
 
 def EndToEndRuntimeMeasurementEnabled():
   """Returns whether end-to-end runtime measurement is globally enabled."""
-  return MEASUREMENTS_END_TO_END_RUNTIME in flags.FLAGS.timing_measurements
+  return (MEASUREMENTS_END_TO_END_RUNTIME in flags.FLAGS.timing_measurements or
+          RuntimeMeasurementsEnabled())
 
 
 def RuntimeMeasurementsEnabled():
@@ -98,14 +99,12 @@ flags.RegisterValidator(
     MEASUREMENTS_FLAG_NAME, ValidateMeasurementsFlag)
 
 
-def _GenerateIntervalSamples(interval, include_runtime, include_timestamps):
+def _GenerateIntervalSamples(interval, include_timestamps):
   """Generates Samples for a single interval timed by IntervalTimer.Measure.
 
   Args:
     interval: A (name, start_time, stop_time) tuple from a call to
       IntervalTimer.Measure.
-    include_runtime: A Boolean that controls whether an elapsed time Sample
-      is included in the generated list.
     include_timestamps: A Boolean that controls whether Samples containing the
       start and stop timestamps are added to the generated list.
 
@@ -117,9 +116,8 @@ def _GenerateIntervalSamples(interval, include_runtime, include_timestamps):
   name = interval[0]
   start_time = interval[1]
   stop_time = interval[2]
-  if include_runtime:
-    elapsed_time = stop_time - start_time
-    samples.append(sample.Sample(name + ' Runtime', elapsed_time, 'seconds'))
+  elapsed_time = stop_time - start_time
+  samples.append(sample.Sample(name + ' Runtime', elapsed_time, 'seconds'))
   if include_timestamps:
     samples.append(sample.Sample(
         name + ' Start Timestamp', start_time, 'seconds'))
@@ -151,14 +149,8 @@ class IntervalTimer(object):
     stop_time = time.time()
     self.intervals.append((name, start_time, stop_time))
 
-  def GenerateSamples(self, include_runtime, include_timestamps):
+  def GenerateSamples(self):
     """Generates Samples based on the times recorded in all calls to Measure.
-
-    Args:
-      include_runtime: A Boolean that controls whether per-interval elapsed time
-        Samples are included in the generated list.
-      include_timestamps: A Boolean that controls whether per-interval Samples
-        containing the start and stop timestamps are added to the list.
 
     Returns:
       A list of Samples. The list contains Samples for each interval that was
@@ -167,6 +159,7 @@ class IntervalTimer(object):
       timestamp. All Samples for one interval appear before any Samples from the
       next interval.
     """
+    include_timestamps = TimestampMeasurementsEnabled()
     return [
         sample for interval in self.intervals for sample in
-        _GenerateIntervalSamples(interval, include_runtime, include_timestamps)]
+        _GenerateIntervalSamples(interval, include_timestamps)]

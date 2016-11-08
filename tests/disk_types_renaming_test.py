@@ -42,7 +42,7 @@ class _DiskTypeRenamingTestCase(unittest.TestCase):
   def _CreateBenchmarkSpec(self, config_dict):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         _BENCHMARK_NAME, flag_values=self.mocked_flags, **config_dict)
-    spec = benchmark_spec.BenchmarkSpec(config_spec, _BENCHMARK_NAME,
+    spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec,
                                         _BENCHMARK_UID)
     spec.ConstructVirtualMachines()
     return spec

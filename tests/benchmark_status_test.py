@@ -19,9 +19,24 @@ import unittest
 from perfkitbenchmarker import benchmark_status
 
 
-_STATUS_TUPLES = [('iperf', 'iperf0', benchmark_status.SUCCEEDED),
-                  ('iperf', 'iperf1', benchmark_status.FAILED),
-                  ('cluster_boot', 'cluster_boot0', benchmark_status.SKIPPED)]
+class MockSpec(object):
+  """A mock BenchmarkSpec class.
+
+  We need to use this rather than a mock.MagicMock object because
+  the "name" attribute of MagicMocks is difficult to set.
+  """
+
+  def __init__(self, name, uid, status):
+    self.name = name
+    self.uid = uid
+    self.status = status
+
+
+_BENCHMARK_SPECS = [
+    MockSpec('iperf', 'iperf0', benchmark_status.SUCCEEDED),
+    MockSpec('iperf', 'iperf1', benchmark_status.FAILED),
+    MockSpec('cluster_boot', 'cluster_boot0', benchmark_status.SKIPPED)
+]
 _STATUS_TABLE = os.linesep.join((
     '--------------------------------------',
     'Name          UID            Status   ',
@@ -45,12 +60,12 @@ _STATUS_SUMMARY = os.linesep.join((
 class CreateSummaryTableTestCase(unittest.TestCase):
 
   def testCreateSummaryTable(self):
-    result = benchmark_status._CreateSummaryTable(_STATUS_TUPLES)
+    result = benchmark_status._CreateSummaryTable(_BENCHMARK_SPECS)
     self.assertEqual(result, _STATUS_TABLE)
 
 
 class CreateSummaryTestCase(unittest.TestCase):
 
   def testCreateSummary(self):
-    result = benchmark_status.CreateSummary(_STATUS_TUPLES)
+    result = benchmark_status.CreateSummary(_BENCHMARK_SPECS)
     self.assertEqual(result, _STATUS_SUMMARY)

@@ -146,7 +146,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     config = configs.LoadConfig(yaml_benchmark_config, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         NAME, flag_values=self.mocked_flags, **config)
-    spec = benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
+    spec = benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
     spec.ConstructVirtualMachines()
     return spec
 
