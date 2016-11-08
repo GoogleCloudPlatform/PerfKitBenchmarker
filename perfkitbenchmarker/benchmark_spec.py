@@ -455,5 +455,6 @@ class BenchmarkSpec(object):
     # Always let the spec be deleted after being unpickled so that
     # it's possible to run cleanup even if cleanup has already run.
     spec.deleted = False
+    spec.status = benchmark_status.SKIPPED
     context.SetThreadBenchmarkSpec(spec)
     return spec
