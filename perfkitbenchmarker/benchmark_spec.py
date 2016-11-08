@@ -87,10 +87,10 @@ class BenchmarkSpec(object):
 
     Args:
       benchmark_module: The benchmark module object.
-      benchmark_uid: An identifier unique to this run of the benchmark even
-          if the same benchmark is run multiple times with different configs.
       benchmark_config: BenchmarkConfigSpec. The configuration for the
           benchmark.
+      benchmark_uid: An identifier unique to this run of the benchmark even
+          if the same benchmark is run multiple times with different configs.
     """
     self.config = benchmark_config
     self.name = benchmark_module.BENCHMARK_NAME
@@ -426,12 +426,13 @@ class BenchmarkSpec(object):
 
   @classmethod
   def GetBenchmarkSpec(cls, benchmark_module, config, uid):
-    """Unpickles the spec and returns it.
+    """Unpickles or creates a BenchmarkSpec and returns it.
 
     Args:
-      name: The name of the benchmark (and the name of the pickled file).
-      config: BenchmarkConfigSpec. The benchmark configuration to use while
-          running the current stage.
+      benchmark_module: The benchmark module object.
+      config: BenchmarkConfigSpec. The configuration for the benchmark.
+      uid: An identifier unique to this run of the benchmark even if the same
+          benchmark is run multiple times with different configs.
 
     Returns:
       A BenchmarkSpec object.
