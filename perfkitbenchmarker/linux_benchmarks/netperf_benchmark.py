@@ -54,7 +54,7 @@ flag_util.DEFINE_integerlist('netperf_num_streams', flag_util.IntegerList([1]),
                              'Number of netperf processes to run. Netperf '
                              'will run once for each value in the list.')
 flags.DEFINE_integer('netperf_thinktime', 0,
-                     'Time in microseconds to do work for each request.')
+                     'Time in nanoseconds to do work for each request.')
 flags.DEFINE_integer('netperf_thinktime_array_size', 0,
                      'The size of the array to traverse for thinktime.')
 flags.DEFINE_integer('netperf_thinktime_run_length', 0,
@@ -217,9 +217,8 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name,
     logging.info('Netperf Results: %s', results)
     assert 'Throughput' in results
   except:
-    logging.info('Netperf ERROR: Failed to parse stdout. STDOUT: %s' %
-                 stdout)
-    return None
+    raise Exception('Netperf ERROR: Failed to parse stdout. STDOUT: %s' %
+                    stdout)
 
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
@@ -300,7 +299,6 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                  '-t {benchmark_name} -H {server_ip} -l {length} {confidence}'
                  ' -- '
                  '-P ,{{data_port}} '
-                 '-U {thinktime},{thinktime_array_size},{thinktime_run_length} '
                  '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
                  'P99_LATENCY,STDDEV_LATENCY,'
                  'MIN_LATENCY,MAX_LATENCY,'
@@ -309,10 +307,14 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                      benchmark_name=benchmark_name,
                      server_ip=server_ip,
                      length=FLAGS.netperf_test_length,
-                     thinktime=FLAGS.netperf_thinktime,
-                     thinktime_array_size=FLAGS.netperf_thinktime_array_size,
-                     thinktime_run_length=FLAGS.netperf_thinktime_run_length,
                      confidence=confidence, verbosity=verbosity)
+  if FLAGS.netperf_thinktime != 0:
+    netperf_cmd += (' -U {thinktime},{thinktime_array_size},'
+                    '{thinktime_run_length} ').format(
+                        thinktime=FLAGS.netperf_thinktime,
+                        thinktime_array_size=FLAGS.netperf_thinktime_array_size,
+                        thinktime_run_length=FLAGS.netperf_thinktime_run_length)
+
 
   # Run all of the netperf processes and collect their stdout
   # TODO: Record start times of netperf processes on the remote machine
@@ -334,15 +336,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                                        enable_latency_histograms)
                    for stdout in stdouts]
 
-  # Filter out failed netperf runs
-  parsed_output = [out for out in parsed_output if out is not None]
-
-  logging.info('%s out of %s netperf threads succeeded',
-               len(parsed_output), num_streams)
-
-  if len(parsed_output) == 0:
-    raise Exception('All netperf threads failed')
-  elif len(parsed_output) == 1:
+  if len(parsed_output) == 1:
     # Only 1 netperf thread
     throughput_sample, latency_samples, histogram = parsed_output[0]
     return [throughput_sample] + latency_samples
