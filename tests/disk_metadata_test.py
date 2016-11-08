@@ -43,7 +43,7 @@ class _DiskMetadataTestCase(unittest.TestCase):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         _BENCHMARK_NAME, flag_values=mock_flags.MockFlags(), vm_groups={})
     self.benchmark_spec = benchmark_spec.BenchmarkSpec(
-        config_spec, _BENCHMARK_NAME, _BENCHMARK_UID)
+        mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
 
 class GcpDiskMetadataTest(_DiskMetadataTestCase):

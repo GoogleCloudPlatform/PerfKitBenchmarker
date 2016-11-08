@@ -20,6 +20,7 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -35,10 +36,10 @@ flags.DEFINE_integer('benchmark_spec_test_flag', 0, 'benchmark_spec_test flag.')
 
 FLAGS = flags.FLAGS
 
-NAME = 'name'
+NAME = 'cluster_boot'
 UID = 'name0'
 SIMPLE_CONFIG = """
-name:
+cluster_boot:
   vm_groups:
     default:
       vm_spec:
@@ -48,7 +49,7 @@ name:
           project: my-project
 """
 MULTI_CLOUD_CONFIG = """
-name:
+cluster_boot:
   vm_groups:
     group1:
       cloud: AWS
@@ -69,7 +70,7 @@ static_vms:
     ip_address: 1.1.1.1
     ssh_private_key: /path/to/key1
     user_name: user1
-name:
+cluster_boot:
   vm_groups:
     group1:
       vm_spec: *default_single_core
@@ -86,7 +87,7 @@ name:
            - mount_point: /scratch
 """
 VALID_CONFIG_WITH_DISK_SPEC = """
-name:
+cluster_boot:
   vm_groups:
     default:
       disk_count: 3
@@ -100,7 +101,6 @@ name:
 """
 ALWAYS_SUPPORTED = 'iperf'
 NEVER_SUPPORTED = 'mysql_service'
-NO_SUPPORT_INFO = 'this_is_not_a_benchmark'
 
 
 class _BenchmarkSpecTestCase(unittest.TestCase):
@@ -121,7 +121,9 @@ class _BenchmarkSpecTestCase(unittest.TestCase):
   def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         benchmark_name, flag_values=self._mocked_flags, **config_dict)
-    return benchmark_spec.BenchmarkSpec(config_spec, benchmark_name, UID)
+    benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
+                             if b.BENCHMARK_NAME == benchmark_name))
+    return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, UID)
 
 
 class ConstructVmsTestCase(_BenchmarkSpecTestCase):
@@ -206,20 +208,16 @@ class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
       self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
       with self.assertRaises(ValueError):
         self.createBenchmarkSpec(config, NEVER_SUPPORTED)
-      with self.assertRaises(ValueError):
-        self.createBenchmarkSpec(config, NO_SUPPORT_INFO)
 
       self._mocked_flags.benchmark_compatibility_checking = 'permissive'
       self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED),
                       'benchmark is supported, mode is permissive')
       with self.assertRaises(ValueError):
         self.createBenchmarkSpec(config, NEVER_SUPPORTED)
-      self.assertTrue(self.createBenchmarkSpec(config, NO_SUPPORT_INFO))
 
       self._mocked_flags.benchmark_compatibility_checking = 'none'
       self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
       self.assertTrue(self.createBenchmarkSpec(config, NEVER_SUPPORTED))
-      self.assertTrue(self.createBenchmarkSpec(config, NO_SUPPORT_INFO))
 
 
 class RedirectGlobalFlagsTestCase(_BenchmarkSpecTestCase):
@@ -227,7 +225,7 @@ class RedirectGlobalFlagsTestCase(_BenchmarkSpecTestCase):
   def testNoFlagOverride(self):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         NAME, flag_values=FLAGS, vm_groups={})
-    spec = benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
+    spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec, UID)
     self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
     with spec.RedirectGlobalFlags():
       self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
@@ -239,7 +237,7 @@ class RedirectGlobalFlagsTestCase(_BenchmarkSpecTestCase):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         NAME, flag_values=FLAGS, flags={'benchmark_spec_test_flag': 1},
         vm_groups={})
-    spec = benchmark_spec.BenchmarkSpec(config_spec, NAME, UID)
+    spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec, UID)
     self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
     with spec.RedirectGlobalFlags():
       self.assertEqual(FLAGS.benchmark_spec_test_flag, 1)

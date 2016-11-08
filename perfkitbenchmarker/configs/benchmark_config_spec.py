@@ -418,7 +418,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
   Attributes:
     description: None or string. Description of the benchmark to run.
     name: Optional. The name of the benchmark
-    flags: flags.FlagValues. Values to use for each flag while executing the
+    flags: dict. Values to use for each flag while executing the
         benchmark.
     vm_groups: dict mapping VM group name string to _VmGroupSpec. Configurable
         options for each VM group used by the benchmark.
@@ -469,7 +469,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     result.update({
         'description': (option_decoders.StringDecoder, {'default': None}),
         'name': (option_decoders.StringDecoder, {'default': None}),
-        'flags': (FlagsDecoder, {}),
+        'flags': (option_decoders.TypeVerifier, {'default': None,
+                                                 'none_ok': True,
+                                                 'valid_types': (dict,)}),
         'vm_groups': (_VmGroupsDecoder, {'default': {}}),
         'spark_service': (_SparkServiceDecoder, {'default': None})})
     return result
@@ -490,8 +492,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     # Decode benchmark-specific flags first and use them while decoding the
     # rest of the BenchmarkConfigSpec's options.
     decoders = decoders.copy()
-    self.flags = decoders.pop('flags').Decode(config.pop('flags', None),
-                                              component_full_name, flag_values)
+    self.flags = config.get('flags')
     with self.RedirectFlags(flag_values):
       super(BenchmarkConfigSpec, self)._DecodeAndInit(
           component_full_name, config, decoders, flag_values)
@@ -504,5 +505,6 @@ class BenchmarkConfigSpec(spec.BaseSpec):
       flag_values: flags.FlagValues object. Within the enclosed code block,
           reads and writes to this object are redirected to self.flags.
     """
-    with flag_util.FlagDictSubstitution(flag_values, lambda: self.flags):
+    flags = FlagsDecoder().Decode(self.flags, 'flags', flag_values)
+    with flag_util.FlagDictSubstitution(flag_values, lambda: flags):
       yield
