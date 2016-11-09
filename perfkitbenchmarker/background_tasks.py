@@ -59,6 +59,7 @@ import functools
 import logging
 import os
 import Queue
+import signal
 import threading
 import time
 import traceback
@@ -409,6 +410,10 @@ def _ExecuteProcessTask(task):
     element is the exception traceback string, or None if the function
     succeeded.
   """
+  def handle_sigint(signum, frame):
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.default_int_handler(signum, frame)
+  signal.signal(signal.SIGINT, handle_sigint)
   task.Run()
   return task.return_value, task.traceback
 
@@ -631,6 +636,16 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency):
     errors.VmUtil.CalledProcessException: When an exception occurred in any
         of the called functions.
   """
-  return _RunParallelTasks(
-      target_arg_tuples, max_concurrency, _BackgroundProcessTaskManager,
-      errors.VmUtil.CalledProcessException)
+  def handle_sigint(signum, frame):
+    logging.error('Got SIGINT while executing parallel tasks. '
+                  'Waiting for tasks to clean up.')
+  old_handler = None
+  try:
+    old_handler = signal.signal(signal.SIGINT, handle_sigint)
+    ret_val = _RunParallelTasks(
+        target_arg_tuples, max_concurrency, _BackgroundProcessTaskManager,
+        errors.VmUtil.CalledProcessException)
+  finally:
+    if old_handler:
+      signal.signal(signal.SIGINT, old_handler)
+  return ret_val

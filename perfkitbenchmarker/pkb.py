@@ -59,15 +59,18 @@ import collections
 import getpass
 import itertools
 import logging
+import multiprocessing
 import sys
 import time
 import uuid
 
 from perfkitbenchmarker import archive
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
@@ -206,6 +209,10 @@ flags.DEFINE_integer(
 flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
+flags.DEFINE_integer(
+    'run_processes', 1,
+    'The number of parallel processes to use to run benchmarks.',
+    lower_bound=1)
 
 
 # Support for using a proxy in the cloud environment.
@@ -221,6 +228,7 @@ flags.DEFINE_string('ftp_proxy', '',
 
 MAX_RUN_URI_LENGTH = 8
 
+_TEARDOWN_EVENT = multiprocessing.Event()
 
 events.initialization_complete.connect(traces.RegisterAll)
 
@@ -460,6 +468,7 @@ def RunBenchmark(spec, collector):
   # Modify the logger prompt for messages logged within this function.
   label_extension = '{}({}/{})'.format(
       spec.name, spec.sequence_number, spec.total_benchmarks)
+  context.SetThreadBenchmarkSpec(spec)
   log_context = log_util.GetThreadLogContext()
   with log_context.ExtendLabel(label_extension):
     with spec.RedirectGlobalFlags():
@@ -507,6 +516,42 @@ def RunBenchmark(spec, collector):
         # Pickle spec to save final resource state.
         spec.Pickle()
   spec.status = benchmark_status.SUCCEEDED
+
+
+def RunBenchmarkTask(spec, collector):
+  """Task that executes RunBenchmark.
+
+  This is designed to be used with RunParallelProcesses.
+
+  Arguments:
+    spec: BenchmarkSpec. The spec to call RunBenchmark with.
+    collector: SamplesCollector. The collector to call RunBenchmark with.
+
+  Returns:
+    A tuple of BenchmarkSpec, list of samples.
+  """
+  if _TEARDOWN_EVENT.is_set():
+    return spec, []
+  # Many providers name resources using run_uris. When running multiple
+  # benchmarks in parallel, this causes name collisions on resources.
+  # By modifying the run_uri, we avoid the collisions.
+  if FLAGS.run_processes > 1:
+    FLAGS.run_uri = FLAGS.run_uri + str(spec.sequence_number)
+  try:
+    RunBenchmark(spec, collector)
+  except BaseException as e:
+    msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
+        spec.sequence_number, spec.total_benchmarks, spec.name, spec.uid)
+    if isinstance(e, KeyboardInterrupt) or FLAGS.stop_after_benchmark_failure:
+      logging.error('%s Execution will not continue.', msg)
+      _TEARDOWN_EVENT.set()
+    else:
+      logging.error('%s Execution will continue.', msg)
+  finally:
+    # We need to return both the spec and samples so that we know
+    # the status of the test and can publish any samples that
+    # haven't yet been published.
+    return spec, collector.samples
 
 
 def _LogCommandLineFlags():
@@ -579,18 +624,14 @@ def RunBenchmarks():
   collector = SampleCollector()
 
   try:
-    for spec in benchmark_specs:
-      try:
-        RunBenchmark(spec, collector)
-      except BaseException as e:
-        msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
-            spec.sequence_number, spec.total_benchmarks, spec.name, spec.uid)
-        if (isinstance(e, KeyboardInterrupt) or
-            FLAGS.stop_after_benchmark_failure):
-          logging.error('%s Execution will not continue.', msg)
-          break
-        else:
-          logging.error('%s Execution will continue.', msg)
+    tasks = [(RunBenchmarkTask, (spec, collector), {})
+             for spec in benchmark_specs]
+    spec_sample_tuples = background_tasks.RunParallelProcesses(
+        tasks, FLAGS.run_processes)
+    benchmark_specs, sample_lists = zip(*spec_sample_tuples)
+    for sample_list in sample_lists:
+      collector.samples.extend(sample_list)
+
   finally:
     if collector.samples:
       collector.PublishSamples()
