@@ -15,9 +15,10 @@
 
 """Module containing aerospike server installation and cleanup functions."""
 
-import time
+import logging
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
@@ -27,6 +28,8 @@ GIT_REPO = 'https://github.com/aerospike/aerospike-server.git'
 GIT_TAG = '3.7.5'
 AEROSPIKE_DIR = '%s/aerospike-server' % vm_util.VM_TMP_DIR
 AEROSPIKE_CONF_PATH = '%s/as/etc/aerospike_dev.conf' % AEROSPIKE_DIR
+
+AEROSPIKE_DEFAULT_TELNET_PORT = 3003
 
 MEMORY = 'memory'
 DISK = 'disk'
@@ -57,6 +60,46 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the memtier package on the VM."""
   _Install(vm)
+
+
+@vm_util.Retry(poll_interval=5, timeout=300,
+               retryable_exceptions=(errors.Resource.RetryableCreationError))
+def _WaitForServerUp(server):
+  """Block until the Aerospike server is up and responsive.
+
+  Will timeout after 5 minutes, and raise an exception. Before the timeout
+  expires any exceptions are caught and the status check is retried.
+
+  We check the status of the server by connecting to Aerospike's out
+  of band telnet management port and issue a 'status' command. This should
+  return 'ok' if the server is ready. Per the aerospike docs, this always
+  returns 'ok', i.e. if the server is not up the connection will fail or we
+  would get no response at all.
+
+  Args:
+    server: VirtualMachine Aerospike has been installed on.
+
+  Raises:
+    errors.Resource.RetryableCreationError when response is not 'ok' or if there
+      is an error connecting to the telnet port or otherwise running the remote
+      check command.
+  """
+  address = server.internal_ip
+  port = AEROSPIKE_DEFAULT_TELNET_PORT
+
+  logging.info("Trying to connect to Aerospike at %s:%s" % (address, port))
+  try:
+    out, _ = server.RemoteCommand(
+        '(echo -e "status\n" ; sleep 1)| netcat %s %s' % (address, port))
+    if out.startswith('ok'):
+      logging.info("Aerospike server status is OK. Server up and running.")
+      return
+  except errors.VirtualMachine.RemoteCommandError as e:
+    raise errors.Resource.RetryableCreationError(
+        "Aerospike server not up yet: %s." % str(e))
+  else:
+    raise errors.Resource.RetryableCreationError(
+        "Aerospike server not up yet. Expected 'ok' but got '%s'." % out)
 
 
 def ConfigureAndStart(server, seed_node_ips=None):
@@ -91,7 +134,8 @@ def ConfigureAndStart(server, seed_node_ips=None):
   server.RemoteCommand('cd %s && make init' % AEROSPIKE_DIR)
   server.RemoteCommand('cd %s; nohup sudo make start &> /dev/null &' %
                        AEROSPIKE_DIR)
-  time.sleep(5)  # Wait for server to come up
+  _WaitForServerUp(server)
+  logging.info("Aerospike server configured and started.")
 
 
 def Uninstall(vm):
