@@ -411,7 +411,10 @@ def _ExecuteProcessTask(task):
     succeeded.
   """
   def handle_sigint(signum, frame):
+    # Ignore any new SIGINTs since we are already tearing down.
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+    # Execute the default SIGINT handler which throws a KeyboardInterrupt
+    # in the main thread of the process.
     signal.default_int_handler(signum, frame)
   signal.signal(signal.SIGINT, handle_sigint)
   task.Run()
@@ -637,6 +640,8 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency):
         of the called functions.
   """
   def handle_sigint(signum, frame):
+    # Ignore any SIGINTS in the parent process, but let users know
+    # that the child processes are getting cleaned up.
     logging.error('Got SIGINT while executing parallel tasks. '
                   'Waiting for tasks to clean up.')
   old_handler = None
