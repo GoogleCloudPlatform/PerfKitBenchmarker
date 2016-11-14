@@ -17,12 +17,12 @@
 
 import posixpath
 
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 ANT_TAR_URL = ('archive.apache.org/dist/ant/binaries/'
                'apache-ant-1.9.6-bin.tar.gz')
 
-ANT_HOME_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ant')
+ANT_HOME_DIR = posixpath.join(INSTALL_DIR, 'ant')
 
 
 def _Install(vm):
@@ -33,7 +33,7 @@ def _Install(vm):
                    'wget {1} && '
                    'tar -zxf apache-ant-1.9.6-bin.tar.gz && '
                    'ln -s {0}/apache-ant-1.9.6/ {2}'.format(
-                       vm_util.VM_TMP_DIR, ANT_TAR_URL, ANT_HOME_DIR))
+                       INSTALL_DIR, ANT_TAR_URL, ANT_HOME_DIR))
 
 
 def YumInstall(vm):

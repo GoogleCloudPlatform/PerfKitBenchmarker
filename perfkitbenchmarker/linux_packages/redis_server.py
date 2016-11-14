@@ -16,7 +16,7 @@
 """Module containing redis installation and cleanup functions."""
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
 flags.DEFINE_integer('redis_total_num_processes', 1,
@@ -26,7 +26,7 @@ flags.DEFINE_integer('redis_total_num_processes', 1,
 
 REDIS_VERSION = '2.8.9'
 REDIS_TAR = 'redis-%s.tar.gz' % REDIS_VERSION
-REDIS_DIR = '%s/redis-%s' % (vm_util.VM_TMP_DIR, REDIS_VERSION)
+REDIS_DIR = '%s/redis-%s' % (INSTALL_DIR, REDIS_VERSION)
 REDIS_URL = 'http://download.redis.io/releases/' + REDIS_TAR
 REDIS_FIRST_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
@@ -37,8 +37,8 @@ def _Install(vm):
   """Installs the redis package on the VM."""
   vm.Install('build_tools')
   vm.Install('wget')
-  vm.RemoteCommand('wget %s -P %s' % (REDIS_URL, vm_util.VM_TMP_DIR))
-  vm.RemoteCommand('cd %s && tar xvfz %s' % (vm_util.VM_TMP_DIR, REDIS_TAR))
+  vm.RemoteCommand('wget %s -P %s' % (REDIS_URL, INSTALL_DIR))
+  vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, REDIS_TAR))
   vm.RemoteCommand('cd %s && make' % REDIS_DIR)
 
 

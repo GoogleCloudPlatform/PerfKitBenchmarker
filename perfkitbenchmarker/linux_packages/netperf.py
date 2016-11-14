@@ -19,7 +19,7 @@ import re
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 flags.DEFINE_integer(
     'netperf_histogram_buckets', 100,
@@ -32,7 +32,7 @@ flags.DEFINE_integer(
 FLAGS = flags.FLAGS
 NETPERF_TAR = 'netperf-2.6.0.tar.gz'
 NETPERF_URL = 'ftp://ftp.netperf.org/netperf/archive/%s' % NETPERF_TAR
-NETPERF_DIR = '%s/netperf-2.6.0' % vm_util.VM_TMP_DIR
+NETPERF_DIR = '%s/netperf-2.6.0' % INSTALL_DIR
 NETPERF_SRC_DIR = NETPERF_DIR + '/src'
 NETSERVER_PATH = NETPERF_SRC_DIR + '/netserver'
 NETPERF_PATH = NETPERF_SRC_DIR + '/netperf'
@@ -44,8 +44,8 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('curl')
   vm.RemoteCommand('curl %s -o %s/%s' % (
-      NETPERF_URL, vm_util.VM_TMP_DIR, NETPERF_TAR))
-  vm.RemoteCommand('cd %s && tar xvzf %s' % (vm_util.VM_TMP_DIR, NETPERF_TAR))
+      NETPERF_URL, INSTALL_DIR, NETPERF_TAR))
+  vm.RemoteCommand('cd %s && tar xvzf %s' % (INSTALL_DIR, NETPERF_TAR))
   # Modify netperf to print out all buckets in its histogram rather than
   # aggregating.
   vm.PushDataFile('netperf.patch', NETLIB_PATCH)
