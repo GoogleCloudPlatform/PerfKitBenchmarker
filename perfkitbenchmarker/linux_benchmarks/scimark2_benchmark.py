@@ -30,26 +30,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
-
-# Use this directory for all data stored in the VM for this test.
-SCIMARK2_PATH = '{0}/scimark2'.format(vm_util.VM_TMP_DIR)
-
-# Download location for both the C and Java tests.
-SCIMARK2_BASE_URL = 'http://math.nist.gov/scimark2'
-
-# Java-specific constants.
-SCIMARK2_JAVA_JAR = 'scimark2lib.jar'
-SCIMARK2_JAVA_MAIN = 'jnt.scimark2.commandline'
-
-# C-specific constants.
-SCIMARK2_C_ZIP = 'scimark2_1c.zip'
-SCIMARK2_C_SRC = '{0}/src'.format(SCIMARK2_PATH)
-# SciMark2 does not set optimization flags, it leaves this to the
-# discretion of the tester. The following gets good performance and
-# has been used for LLVM and GCC regression testing, see for example
-# https://llvm.org/bugs/show_bug.cgi?id=22589 .
-SCIMARK2_C_CFLAGS = '-O3 -march=native'
+from perfkitbenchmarker.linux_packages import scimark2
 
 BENCHMARK_NAME = 'scimark2'
 BENCHMARK_CONFIG = """
@@ -79,23 +60,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('Preparing SciMark2 on %s', vm)
-  vm.Install('build_tools')
-  vm.Install('wget')
-  vm.Install('openjdk')
-  vm.Install('unzip')
-  cmds = [
-      'rm -rf {0} && mkdir {0}'.format(SCIMARK2_PATH),
-      'wget {0}/{1} -O {2}/{1}'.format(
-          SCIMARK2_BASE_URL, SCIMARK2_JAVA_JAR, SCIMARK2_PATH),
-      'wget {0}/{1} -O {2}/{1}'.format(
-          SCIMARK2_BASE_URL, SCIMARK2_C_ZIP, SCIMARK2_PATH),
-      '(mkdir {0} && cd {0} && unzip {1}/{2})'.format(
-          SCIMARK2_C_SRC, SCIMARK2_PATH, SCIMARK2_C_ZIP),
-      '(cd {0} && make CFLAGS="{1}")'.format(
-          SCIMARK2_C_SRC, SCIMARK2_C_CFLAGS)
-  ]
-  for cmd in cmds:
-    vm.RemoteCommand(cmd, should_log=True)
+  vm.Install('scimark2')
 
 
 def Run(benchmark_spec):
@@ -120,13 +85,13 @@ def Run(benchmark_spec):
   # RESULT_START_REGEX as used below.
   cmds = [
       '(echo ";;; Java small"; cd {0} && java -cp {1} {2})'.format(
-          SCIMARK2_PATH, SCIMARK2_JAVA_JAR, SCIMARK2_JAVA_MAIN),
+          scimark2.PATH, scimark2.JAVA_JAR, scimark2.JAVA_MAIN),
       '(echo ";;; C small"; cd {0} && ./scimark2)'.format(
-          SCIMARK2_C_SRC),
+          scimark2.C_SRC),
       '(echo ";;; Java large"; cd {0} && java -cp {1} {2} -large)'.format(
-          SCIMARK2_PATH, SCIMARK2_JAVA_JAR, SCIMARK2_JAVA_MAIN),
+          scimark2.PATH, scimark2.JAVA_JAR, scimark2.JAVA_MAIN),
       '(echo ";;; C large"; cd {0} && ./scimark2 -large)'.format(
-          SCIMARK2_C_SRC),
+          scimark2.C_SRC),
   ]
   for cmd in cmds:
     stdout, _ = vm.RemoteCommand(cmd, should_log=True)

@@ -35,11 +35,11 @@ import uuid
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker.linux_packages import sysbench05plus
 
 FLAGS = flags.FLAGS
 flags.DEFINE_enum(
@@ -113,7 +113,6 @@ MYSQL_ROOT_USER = 'root'
 MYSQL_ROOT_PASSWORD_PREFIX = 'Perfkit8'
 MYSQL_PORT = '3306'
 
-NORMAL_SYSBENCH_PATH_PREFIX = '/usr'
 PREPARE_SCRIPT_PATH = '/share/doc/sysbench/tests/db/parallel_prepare.lua'
 OLTP_SCRIPT_PATH = '/share/doc/sysbench/tests/db/oltp.lua'
 
@@ -268,22 +267,6 @@ def ParseSysbenchOutput(sysbench_output, results, metadata):
         metadata))
 
 
-def _GetSysbenchCommandPrefix(os_type):
-  """Determines the prefix for a sysbench command based on the operating system.
-
-  Args:
-    os_type: string. Operating system of the machine on which the sysbench
-        command will be executed. Chosen from os_types.ALL.
-
-  Returns:
-    A string representing the sysbench command prefix.
-  """
-  if os_type == os_types.RHEL:
-    return vm_util.VM_TMP_DIR
-  else:
-    return NORMAL_SYSBENCH_PATH_PREFIX
-
-
 def _IssueSysbenchCommand(vm, duration):
   """Issues a sysbench run command given a vm and a duration.
 
@@ -298,7 +281,7 @@ def _IssueSysbenchCommand(vm, duration):
   """
   stdout = ''
   stderr = ''
-  oltp_script_path = _GetSysbenchCommandPrefix(vm.OS_TYPE) + OLTP_SCRIPT_PATH
+  oltp_script_path = sysbench05plus.PathPrefix(vm) + OLTP_SCRIPT_PATH
   if duration > 0:
     run_cmd_tokens = ['sysbench',
                       '--test=%s' % oltp_script_path,
@@ -362,8 +345,7 @@ def _RunSysbench(vm, metadata):
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
-  prepare_script_path = (_GetSysbenchCommandPrefix(vm.OS_TYPE) +
-                         PREPARE_SCRIPT_PATH)
+  prepare_script_path = sysbench05plus.PathPrefix(vm) + PREPARE_SCRIPT_PATH
   data_load_cmd_tokens = ['sysbench',
                           '--test=%s' % prepare_script_path,
                           '--mysql_svc_oltp_tables_count=%d' %

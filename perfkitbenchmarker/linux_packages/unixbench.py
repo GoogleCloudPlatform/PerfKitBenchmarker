@@ -15,20 +15,20 @@
 
 """Module containing UnixBench installation and cleanup functions."""
 
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 UNIXBENCH_TAR = 'v5.1.3.tar.gz'
 UNIXBENCH_URL = ('https://github.com/kdlucas/byte-unixbench/archive/'
                  + UNIXBENCH_TAR)
-UNIXBENCH_DIR = '%s/byte-unixbench-5.1.3/UnixBench' % vm_util.VM_TMP_DIR
+UNIXBENCH_DIR = '%s/byte-unixbench-5.1.3/UnixBench' % INSTALL_DIR
 
 
 def _Install(vm):
   """Installs the UnixBench package on the VM."""
   vm.Install('build_tools')
   vm.Install('wget')
-  vm.RemoteCommand('wget {0} -P {1}'.format(UNIXBENCH_URL, vm_util.VM_TMP_DIR))
-  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(vm_util.VM_TMP_DIR,
+  vm.RemoteCommand('wget {0} -P {1}'.format(UNIXBENCH_URL, INSTALL_DIR))
+  vm.RemoteCommand('cd {0} && tar xvzf {1}'.format(INSTALL_DIR,
                                                    UNIXBENCH_TAR))
 
 

@@ -15,9 +15,9 @@
 
 """Module containing OpenMPI installation and cleanup functions."""
 
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-MPI_DIR = '%s/openmpi-1.6.5' % vm_util.VM_TMP_DIR
+MPI_DIR = '%s/openmpi-1.6.5' % INSTALL_DIR
 MPI_TAR = 'openmpi-1.6.5.tar.gz'
 MPI_URL = 'http://www.open-mpi.org/software/ompi/v1.6/downloads/' + MPI_TAR
 
@@ -26,8 +26,8 @@ def _Install(vm):
   """Installs the OpenMPI package on the VM."""
   vm.Install('build_tools')
   vm.Install('wget')
-  vm.RemoteCommand('wget %s -P %s' % (MPI_URL, vm_util.VM_TMP_DIR))
-  vm.RemoteCommand('cd %s && tar xvfz %s' % (vm_util.VM_TMP_DIR, MPI_TAR))
+  vm.RemoteCommand('wget %s -P %s' % (MPI_URL, INSTALL_DIR))
+  vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, MPI_TAR))
   make_jobs = vm.num_cpus
   config_cmd = ('./configure --enable-static --disable-shared --disable-dlopen '
                 '--prefix=/usr')

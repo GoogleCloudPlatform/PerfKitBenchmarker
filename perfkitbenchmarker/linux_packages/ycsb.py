@@ -54,13 +54,14 @@ from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FLAGS = flags.FLAGS
 
 YCSB_VERSION = '0.9.0'
 YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases/'
                 'download/{0}/ycsb-{0}.tar.gz').format(YCSB_VERSION)
-YCSB_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'ycsb')
+YCSB_DIR = posixpath.join(INSTALL_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 
 _DEFAULT_PERCENTILES = 50, 75, 90, 95, 99, 99.9
@@ -587,7 +588,7 @@ class YCSBExecutor(object):
     """
     results = []
 
-    remote_path = posixpath.join(vm_util.VM_TMP_DIR,
+    remote_path = posixpath.join(INSTALL_DIR,
                                  os.path.basename(workload_file))
     kwargs.setdefault('threads', self._default_preload_threads)
     kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
@@ -722,7 +723,7 @@ class YCSBExecutor(object):
       if FLAGS.ycsb_timelimit:
         parameters['maxexecutiontime'] = FLAGS.ycsb_timelimit
       parameters.update(kwargs)
-      remote_path = posixpath.join(vm_util.VM_TMP_DIR,
+      remote_path = posixpath.join(INSTALL_DIR,
                                    os.path.basename(workload_file))
 
       with open(workload_file) as fp:

@@ -15,11 +15,11 @@
 
 """Module containing Silo installation and cleanup functions."""
 
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 GIT_REPO = 'https://github.com/stephentu/silo.git'
 GIT_TAG = '62d2d498984bf69d3b46a74e310e1fd12fd1f692'
-SILO_DIR = '%s/silo' % vm_util.VM_TMP_DIR
+SILO_DIR = '%s/silo' % INSTALL_DIR
 APT_PACKAGES = ('libjemalloc-dev libnuma-dev libdb++-dev '
                 'libmysqld-dev libaio-dev libssl-dev')
 YUM_PACKAGES = ('jemalloc-devel numactl-devel libdb-cxx-devel mysql-devel '
