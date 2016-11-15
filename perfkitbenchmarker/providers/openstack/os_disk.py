@@ -32,6 +32,8 @@ def CreateVolume(resource, name):
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
                            REMOTE_VOLUME_DEFAULT_SIZE_GB)
+  if FLAGS.openstack_volume_type:
+      vol_cmd.flags['type'] = FLAGS.openstack_volume_type
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
   return vol_resp
