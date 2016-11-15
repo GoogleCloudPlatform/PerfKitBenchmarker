@@ -18,6 +18,7 @@ import logging
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import utils as os_utils
 
@@ -30,7 +31,7 @@ def CreateVolume(resource, name):
   """Creates a remote (Cinder) block volume."""
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
-  vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
+  vol_cmd.flags['size'] = (resource.disk_spec.disk_size or
                            REMOTE_VOLUME_DEFAULT_SIZE_GB)
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
@@ -42,7 +43,7 @@ def CreateBootVolume(resource, name, image):
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['image'] = image
-  vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
+  vol_cmd.flags['size'] = (resource.disk_spec.disk_size or
                            GetImageMinDiskSize(resource, image))
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
@@ -79,6 +80,35 @@ def WaitForVolumeCreation(resource, volume_id):
   if resp['status'] != 'available':
     msg = 'Volume is not ready. Retrying to check status.'
     raise errors.Resource.RetryableCreationError(msg)
+
+
+class OpenStackDiskSpec(disk.BaseDiskSpec):
+  """Object holding the information needed to create an OpenStack disk.
+
+  Attributes:
+    disk_size: None or int. Size of the disk in GB.
+  """
+
+  CLOUD = providers.openstack
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(OpenStackDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['openstack_volume_size'].present \
+            and not flag_values['data_disk_size'].present:
+      config_values['disk_size'] = flag_values.openstack_volume_size
+    else:
+      config_values['disk_size'] = flag_values.data_disk_size
 
 
 class OpenStackDisk(disk.BaseDisk):
