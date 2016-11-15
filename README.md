@@ -980,6 +980,7 @@ Even with lots of comments we make to support more detailed documention.  You wi
 
 Integration Testing
 ===================
+If you wish to run unit or integration tests, ensure that you have `tox >= 2.0.0` installed.
 
 In addition to regular unit tests, which are run via
 [`hooks/check-everything`](hooks/check-everything), PerfKit Benchmarker has
