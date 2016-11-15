@@ -17,7 +17,7 @@
 set -euo pipefail
 
 if [[ -z $(command -v tox) ]]; then
-  >&2 echo "Missing tox. Install it via 'pip' to enable unit testing."
+  >&2 echo "Missing tox >= 2.0.0. Install it via 'pip' to enable unit testing."
   exit 1
 fi
 
