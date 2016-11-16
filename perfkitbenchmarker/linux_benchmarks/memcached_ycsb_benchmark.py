@@ -23,7 +23,6 @@ YCSB and workloads described in perfkitbenchmarker.linux_packages.ycsb.
 import functools
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memcached_server
