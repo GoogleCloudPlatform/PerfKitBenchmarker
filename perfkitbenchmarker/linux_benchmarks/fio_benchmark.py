@@ -34,6 +34,7 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
 
+PKB_FIO_LOG_FILE_NAME = 'pkb_fio_avg'
 LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
@@ -135,6 +136,19 @@ flags.DEFINE_integer('fio_runtime', 600,
 flags.DEFINE_list('fio_parameters', [],
                   'Parameters to apply to all PKB generated fio jobs. Each '
                   'member of the list should be of the form "param=value".')
+flags.DEFINE_boolean('fio_lat_log', False,
+                     'Whether to collect a latency log of the fio jobs.')
+flags.DEFINE_boolean('fio_bw_log', False,
+                     'Whether to collect a bandwidth log of the fio jobs.')
+flags.DEFINE_boolean('fio_iops_log', False,
+                     'Whether to collect an IOPS log of the fio jobs.')
+flags.DEFINE_integer('fio_log_avg_msec', 1000,
+                     'By default, this will average each log entry in the '
+                     'fio latency, bandwidth, and iops logs over the specified '
+                     'period of time in milliseconds. If set to 0, fio will '
+                     'log an entry for every IO that completes, this can grow '
+                     'very quickly in size and can cause performance overhead.',
+                     lower_bound=0)
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -373,6 +387,17 @@ def GetConfig(user_config):
   return config
 
 
+def GetLogFlags():
+  collect_logs = FLAGS.fio_lat_log or FLAGS.fio_bw_log or FLAGS.fio_iops_log
+  fio_log_flags = [(FLAGS.fio_lat_log, '--write_lat_log=%(filename)s',),
+                   (FLAGS.fio_bw_log, '--write_bw_log=%(filename)s',),
+                   (FLAGS.fio_iops_log, '--write_iops_log=%(filename)s',),
+                   (collect_logs, '--log_avg_msec=%(interval)d',)]
+  fio_command_flags = ' '.join([flag for given, flag in fio_log_flags if given])
+  return fio_command_flags % {'filename': PKB_FIO_LOG_FILE_NAME,
+                              'interval': FLAGS.fio_log_avg_msec}
+
+
 def CheckPrerequisites():
   """Perform flag checks."""
   WarnOnBadFlags()
@@ -452,6 +477,10 @@ def Run(benchmark_spec):
     fio_command = 'sudo %s --output-format=json --directory=%s %s' % (
         fio.FIO_PATH, mount_point, REMOTE_JOB_FILE_PATH)
 
+  collect_logs = any([FLAGS.fio_lat_log, FLAGS.fio_bw_log, FLAGS.fio_iops_log])
+  if collect_logs:
+    fio_command = ' '.join([fio_command, GetLogFlags()])
+
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
@@ -459,6 +488,9 @@ def Run(benchmark_spec):
 
   stdout, stderr = vm.RobustRemoteCommand(fio_command, should_log=True)
   samples = fio.ParseResults(job_file_string, json.loads(stdout))
+
+  if collect_logs:
+    vm.PullFile(vm_util.GetTempDir(), '%s_*.log' % PKB_FIO_LOG_FILE_NAME)
 
   return samples
 
