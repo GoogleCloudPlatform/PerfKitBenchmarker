@@ -165,6 +165,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.nic = AzureNIC(self.network.subnet,
                         self.name + '-nic')
     self.storage_account = self.network.storage_account
+    self.image = vm_spec.image or self.IMAGE_URN
 
     disk_spec = disk.BaseDiskSpec('azure_os_disk')
     self.os_disk = azure_disk.AzureDisk(disk_spec,
@@ -193,7 +194,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_cmd = (
         [azure.AZURE_PATH, 'vm', 'create',
          '--location', self.zone,
-         '--image-urn', self.IMAGE_URN,
+         '--image-urn', self.image,
          '--os-type', 'Linux',
          '--ssh-publickey-file', self.ssh_public_key,
          '--vm-size', self.machine_type,
