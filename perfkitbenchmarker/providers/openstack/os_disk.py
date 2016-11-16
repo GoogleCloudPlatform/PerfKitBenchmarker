@@ -26,12 +26,18 @@ REMOTE_VOLUME_DEFAULT_SIZE_GB = 50
 
 FLAGS = flags.FLAGS
 
+STANDARD = 'standard'
+
+DISK_TYPE = {
+    disk.STANDARD: STANDARD,
+}
+
 
 def CreateVolume(resource, name):
   """Creates a remote (Cinder) block volume."""
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
-  vol_cmd.flags['size'] = (resource.disk_spec.disk_size or
+  vol_cmd.flags['size'] = (resource.disk_size or
                            REMOTE_VOLUME_DEFAULT_SIZE_GB)
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
@@ -43,7 +49,7 @@ def CreateBootVolume(resource, name, image):
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['image'] = image
-  vol_cmd.flags['size'] = (resource.disk_spec.disk_size or
+  vol_cmd.flags['size'] = (resource.disk_size or
                            GetImageMinDiskSize(resource, image))
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
@@ -82,6 +88,9 @@ def WaitForVolumeCreation(resource, volume_id):
     raise errors.Resource.RetryableCreationError(msg)
 
 
+disk.RegisterDiskTypeMap(providers.OPENSTACK, DISK_TYPE)
+
+
 class OpenStackDiskSpec(disk.BaseDiskSpec):
   """Object holding the information needed to create an OpenStack disk.
 
@@ -89,7 +98,7 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
     disk_size: None or int. Size of the disk in GB.
   """
 
-  CLOUD = providers.openstack
+  CLOUD = providers.OPENSTACK
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
