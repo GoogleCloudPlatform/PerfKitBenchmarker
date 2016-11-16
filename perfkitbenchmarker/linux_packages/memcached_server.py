@@ -17,7 +17,6 @@
 
 import logging
 
-from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -112,7 +111,7 @@ def ConfigureAndStart(server):
 
   server.RemoteCommand('cd {mcdir}; ./memcached -m {size} '
                        '&> /dev/null &'.format(
-                       mcdir=MEMCACHED_DIR, size=FLAGS.memcached_size))
+                           mcdir=MEMCACHED_DIR, size=FLAGS.memcached_size))
   _WaitForServerUp(server)
   logging.info("memcached server configured and started.")
 
