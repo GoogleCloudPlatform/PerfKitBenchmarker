@@ -17,10 +17,10 @@
 
 
 def YumInstall(vm):
-  """Installs the curl package on the VM."""
+  """Installs the libevent package on the VM."""
   vm.InstallPackages('libevent-devel')
 
 
 def AptInstall(vm):
-  """Installs the curl package on the VM."""
+  """Installs the libevent package on the VM."""
   vm.InstallPackages('libevent-dev')
