@@ -119,7 +119,7 @@ def ConfigureAndStart(server):
 def StopMemcached(server):
   out, _ = server.RemoteCommand(
       '(echo -e "quit\n" ; sleep 1)| netcat %s %s' %
-      (server.internal_ip, memcached_server.MEMCACHED_PORT))
+      (server.internal_ip, MEMCACHED_PORT))
 
 
 def Uninstall(vm):
