@@ -33,7 +33,7 @@ GitHub has [a great tutorial](https://help.github.com/articles/fork-a-repo/) (we
 
 - Clone the repository:
 ```
-$ git clone git@github.com:<your-user-name>/PerfKitBenchmarker.git master && cd PerfKitBenchmarker
+$ git clone git@github.com:<your-user-name>/PerfKitBenchmarker.git -b master && cd PerfKitBenchmarker
 ```
 - Install Python 2.7.
 - Install [pip](https://pypi.python.org/pypi/pip):
