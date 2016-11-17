@@ -41,7 +41,6 @@ memcached_ycsb:
   vm_groups:
     servers:
       vm_spec: *default_single_core
-      disk_spec: *default_500_gb
       vm_count: null
     clients:
       vm_spec: *default_single_core
