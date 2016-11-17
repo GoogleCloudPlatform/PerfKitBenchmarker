@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,13 +24,13 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FLAGS = flags.FLAGS
 
-LATEST_URL = 'http://memcached.org/latest'
+LATEST_URL = 'http://memcached.org/files/memcached-1.4.33.tar.gz'
 MEMCACHED_DIR_NAME = 'memcached'
 MEMCACHED_DIR = '%s/%s' % (INSTALL_DIR, MEMCACHED_DIR_NAME)
 
 MEMCACHED_PORT = 11211
 
-flags.DEFINE_integer('memcached_size', 64,
+flags.DEFINE_integer('memcached_size_mb', 64,
                      'Size of memcached cache in megabytes.')
 
 
@@ -51,12 +51,12 @@ def _Install(vm):
 
 
 def YumInstall(vm):
-  """Installs the memtier package on the VM."""
+  """Installs the memcache package on the VM."""
   _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the memtier package on the VM."""
+  """Installs the memcache package on the VM."""
   _Install(vm)
 
 
@@ -83,7 +83,7 @@ def _WaitForServerUp(server):
   address = server.internal_ip
   port = MEMCACHED_PORT
 
-  logging.info("Trying to connect to memcached at %s:%s" % (address, port))
+  logging.info("Trying to connect to memcached at %s:%s", address, port)
   try:
     out, _ = server.RemoteCommand(
         '(echo -e "stats\n" ; sleep 1)| netcat %s %s' % (address, port))
@@ -111,9 +111,15 @@ def ConfigureAndStart(server):
 
   server.RemoteCommand('cd {mcdir}; ./memcached -m {size} '
                        '&> /dev/null &'.format(
-                           mcdir=MEMCACHED_DIR, size=FLAGS.memcached_size))
+                           mcdir=MEMCACHED_DIR, size=FLAGS.memcached_size_mb))
   _WaitForServerUp(server)
   logging.info("memcached server configured and started.")
+
+
+def StopMemcached(server):
+  out, _ = server.RemoteCommand(
+      '(echo -e "quit\n" ; sleep 1)| netcat %s %s' %
+      (server.internal_ip, memcached_server.MEMCACHED_PORT))
 
 
 def Uninstall(vm):

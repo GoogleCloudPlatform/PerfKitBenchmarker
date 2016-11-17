@@ -48,15 +48,6 @@ memcached_ycsb:
 """
 
 
-def GetConfig(user_config):
-  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
-  if FLAGS['ycsb_client_vms'].present:
-    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
-
-  return config
-
-
 def CheckPrerequisites():
   """Verifies that the required resources are present.
 
@@ -125,10 +116,5 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  def StopMemcached(server):
-    out, _ = server.RemoteCommand(
-        '(echo -e "quit\n" ; sleep 1)| netcat %s %s' %
-        (server.internal_ip, memcached_server.MEMCACHED_PORT))
-
   memcached_vms = benchmark_spec.vm_groups['servers']
-  vm_util.RunThreaded(StopMemcached, memcached_vms)
+  vm_util.RunThreaded(memcached_server.StopMemcached, memcached_vms)
