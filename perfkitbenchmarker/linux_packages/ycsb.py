@@ -100,6 +100,8 @@ flags.DEFINE_boolean('ycsb_reload_database', True,
                      'is already loaded.')
 flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.',
                      lower_bound=1)
+flags.DEFINE_integer('ycsb_server_vms', 1, 'Number of YCSB server VMs.',
+                     lower_bound=1)
 flags.DEFINE_list('ycsb_workload_files', ['workloada', 'workloadb'],
                   'Path to YCSB workload file to use during *run* '
                   'stage only. Comma-separated list')
