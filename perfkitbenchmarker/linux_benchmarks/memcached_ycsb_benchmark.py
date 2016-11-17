@@ -36,15 +36,27 @@ BENCHMARK_CONFIG = """
 memcached_ycsb:
   description: >
     Run YCSB against an memcached
-    installation. Specify the number of YCSB VMs with
-    --ycsb_client_vms.
+    installation. Specify the number of YCSB client VMs with
+    --ycsb_client_vms and the number of YCSB server VMS with
+    --ycsb_server_vms.
   vm_groups:
     servers:
       vm_spec: *default_single_core
-      vm_count: null
     clients:
       vm_spec: *default_single_core
 """
+
+
+def GetConfig(user_config):
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+
+  if FLAGS['ycsb_server_vms'].present:
+    config['vm_groups']['servers']['vm_count'] = FLAGS.ycsb_server_vms
+
+  return config
 
 
 def CheckPrerequisites():
@@ -68,8 +80,7 @@ def Prepare(benchmark_spec):
 
   # Memcached cluster
   memcached_vms = benchmark_spec.vm_groups['servers']
-  assert memcached_vms, 'No memcached VMs: {0}'.format(
-      benchmark_spec.vm_groups)
+  assert memcached_vms, 'No memcached VMs: {0}'.format(benchmark_spec.vm_groups)
 
   memcached_install_fns = [functools.partial(memcached_server.ConfigureAndStart,
                                              vm)
@@ -80,7 +91,7 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(lambda f: f(), memcached_install_fns + ycsb_install_fns)
   benchmark_spec.executor = ycsb.YCSBExecutor(
       'memcached',
-      **{'memcached.hosts': memcached_vms[0].internal_ip})
+      **{'memcached.hosts': ','.join([vm.internal_ip for vm in memcached_vms])})
 
 
 def Run(benchmark_spec):
@@ -98,7 +109,7 @@ def Run(benchmark_spec):
 
   metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
               'num_vms': len(memcached_vms),
-              'cache_size': FLAGS.memcached_size}
+              'cache_size': FLAGS.memcached_size_mb}
 
   samples = list(benchmark_spec.executor.LoadAndRun(loaders))
 

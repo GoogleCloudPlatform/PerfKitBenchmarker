@@ -24,7 +24,7 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FLAGS = flags.FLAGS
 
-LATEST_URL = 'http://memcached.org/files/memcached-1.4.33.tar.gz'
+DOWNLOAD_URL = 'http://memcached.org/files/memcached-1.4.33.tar.gz'
 MEMCACHED_DIR_NAME = 'memcached'
 MEMCACHED_DIR = '%s/%s' % (INSTALL_DIR, MEMCACHED_DIR_NAME)
 
@@ -39,7 +39,7 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('event')
   vm.RemoteCommand('cd {0} && wget {1} -O memcached.tar.gz'.format(
-                   INSTALL_DIR, LATEST_URL))
+                   INSTALL_DIR, DOWNLOAD_URL))
   out, _ = vm.RemoteCommand('cd %s && tar -xzvf memcached.tar.gz' % INSTALL_DIR)
   # The directory name should be the first line of stdout
   memcached_dir = out.split('\n', 1)[0]
