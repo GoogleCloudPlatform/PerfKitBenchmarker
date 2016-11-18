@@ -518,25 +518,27 @@ def RunBenchmark(spec, collector):
   spec.status = benchmark_status.SUCCEEDED
 
 
-def RunBenchmarkTask(spec, collector):
+def RunBenchmarkTask(spec):
   """Task that executes RunBenchmark.
 
   This is designed to be used with RunParallelProcesses.
 
   Arguments:
     spec: BenchmarkSpec. The spec to call RunBenchmark with.
-    collector: SamplesCollector. The collector to call RunBenchmark with.
 
   Returns:
     A tuple of BenchmarkSpec, list of samples.
   """
   if _TEARDOWN_EVENT.is_set():
     return spec, []
+
   # Many providers name resources using run_uris. When running multiple
   # benchmarks in parallel, this causes name collisions on resources.
   # By modifying the run_uri, we avoid the collisions.
   if FLAGS.run_processes > 1:
     FLAGS.run_uri = FLAGS.run_uri + str(spec.sequence_number)
+
+  collector = SampleCollector()
   try:
     RunBenchmark(spec, collector)
   except BaseException as e:
@@ -624,7 +626,7 @@ def RunBenchmarks():
   collector = SampleCollector()
 
   try:
-    tasks = [(RunBenchmarkTask, (spec, collector), {})
+    tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
     spec_sample_tuples = background_tasks.RunParallelProcesses(
         tasks, FLAGS.run_processes)
