@@ -1,3 +1,42 @@
+# 1.9.0
+
+New features:
+- Add config file imports and allow for circular imports and add documentation (GH-1163)
+- Add a way to run benchmarks in parallel (GH-1192)
+
+Enhancements:
+- ContainerizedDebianMixin: Ping to a fixed docker image and remove the sudo hack (GH-1171)
+- Auto detect  openjdk, libsnappy package versions (GH-1181)
+- Add flags to govern subnet creation and Optionally create only 1 subnet (GH-1182)
+- Install docker images as packages (GH-1184)
+- Call FLAGS.get_help if it's available (GH-1187)
+- Publish boot time samples for all tests (GH-1156)
+
+Bugfixes and maintenance updates:
+- Update requirements.txt to set version of contextlib2 (GH-1164)
+- Fix bug with config flags (GH-1165)
+- Updated the cloudsuite web-serving benchmark (thanks @nooshin-mirzadeh, GH-1166)
+- Fix load command parsing (GH-1168)
+- openstack: Open all TCP and UDP ports for the internal network (GH-1169)
+- Fix aerospike metadata (GH-1170)
+- Adjust aerospike default replication factor (GH-1172)
+- Try replacing FlagValues._flags instead of FlagValues.FlagDict first (GH-1175)
+- Fix ycsb aggregator (GH-1176)
+- Fix bug during cleanup phase of object_storage_service benchmark (GH-1178)
+- Netperf thinktime fixes and support think time in nanoseconds instead of microseconds (GH-1179, GH-1186, GH-1188)
+- Fix sysbench05plus installation on ubuntu16.04 (GH-1183)
+- Fix race condition in Aerospike benchmark (GH-1190)
+- Clean up some pickling, unpickling issues (GH-1191)
+- Calculate free ram with more robust /proc/meminfo instead of `free`(GH-1194)
+- Fix multithread netperf (GH-1149)
+- Multiple fixes and refactoring of the linux package management on vms (GH-1152)
+- Fix dstat metadata in Analyze (GH-1154)
+- Obey flag overrides for static vm specs (GH-1155)
+- Fix links in README file for OpenStack and Cloudstack setup steps (thanks @shakhat, GH-1157)
+- Fix issue with GetConfig using flags (GH-1160)
+- Remove scratch disk from netperf and object_storage_service benchmark (GH-1147, GH-1148)
+- Netperf changes to add num_streams metadata to samples (GH-1177)
+
 # 1.8.1
 
 Bugfixes and maintanence updates:
