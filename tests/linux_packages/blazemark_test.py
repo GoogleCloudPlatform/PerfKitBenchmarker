@@ -13,13 +13,9 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.packages.blazemark."""
 
-import json
 import os
 import unittest
 
-import mock
-
-from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import blazemark
 
