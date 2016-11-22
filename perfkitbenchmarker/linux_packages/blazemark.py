@@ -181,12 +181,9 @@ def RunTest(vm, test):
     A list of samples. Each sample if a 4-tuple of (benchmark_name, value, unit,
     metadata).
   """
-  additional_command = ''
-  if vm.num_cpus > 1:
-    additional_command = 'export BLAZE_NUM_THREADS=%s;' % vm.num_cpus
   out, _ = vm.RemoteCommand(
-      'cd %s; %s ./%s -only-blaze' % (
-          os.path.join(BLAZEMARK_DIR, 'bin'), additional_command, test))
+      'cd %s; export BLAZE_NUM_THREADS=%s; ./%s -only-blaze' % (
+          os.path.join(BLAZEMARK_DIR, 'bin'), vm.num_cpus, test))
   return _ParseResult(out, test)
 
 
@@ -209,11 +206,8 @@ def _Configure(vm):
 
 def _Install(vm):
   """Install blazemark."""
-  vm.Install('g++5')
-  vm.Install('build_tools')
-  vm.Install('boost')
-  vm.Install('blaze')
-  vm.Install('lapack')
+  for package in ['g++5', 'build_tools', 'boost', 'blaze', 'lapack']:
+    vm.Install(package)
   _Configure(vm)
 
 
