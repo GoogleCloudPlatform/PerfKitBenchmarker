@@ -536,7 +536,7 @@ def RunBenchmarkTask(spec):
   # benchmarks in parallel, this causes name collisions on resources.
   # By modifying the run_uri, we avoid the collisions.
   if FLAGS.run_processes > 1:
-    FLAGS.run_uri = FLAGS.run_uri + str(spec.sequence_number)
+    spec.config.flags['run_uri'] = FLAGS.run_uri + str(spec.sequence_number)
 
   collector = SampleCollector()
   try:
