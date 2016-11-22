@@ -38,7 +38,7 @@ memcached_ycsb:
     Run YCSB against an memcached
     installation. Specify the number of YCSB client VMs with
     --ycsb_client_vms and the number of YCSB server VMS with
-    --ycsb_server_vms.
+    --num_vms.
   vm_groups:
     servers:
       vm_spec: *default_single_core
@@ -53,8 +53,7 @@ def GetConfig(user_config):
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
 
-  if FLAGS['ycsb_server_vms'].present:
-    config['vm_groups']['servers']['vm_count'] = FLAGS.ycsb_server_vms
+  config['vm_groups']['servers']['vm_count'] = FLAGS.num_vms
 
   return config
 
