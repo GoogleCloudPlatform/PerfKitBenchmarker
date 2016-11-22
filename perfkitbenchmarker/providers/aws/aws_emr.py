@@ -32,7 +32,6 @@ import util
 FLAGS = flags.FLAGS
 
 DEFAULT_MACHINE_TYPE = 'm3.xlarge'
-RELEASE_LABEL = 'emr-4.5.0'
 READY_CHECK_SLEEP = 30
 READY_CHECK_TRIES = 60
 READY_STATE = 'WAITING'
@@ -46,6 +45,12 @@ WORKER_SG = 'EmrManagedSlaveSecurityGroup'
 
 # Certain machine types require a subnet.
 NEEDS_SUBNET = ['m4', 'c4']
+
+EMR_VERSION_MAP = {
+  spark_service.SPARK_1_6_1: 'emr-4.8.0',
+  spark_service.SPARK_1_6_2: 'emr-4.8.2',
+  spark_service.SPARK_2_0_2: 'emr-5.2.0',
+}
 
 
 class AwsSecurityGroup(resource.BaseResource):
@@ -157,9 +162,14 @@ class AwsEMR(spark_service.BaseSparkService):
         instance_properties.update({'EbsConfiguration': ebs_configuration})
       instance_groups.append(instance_properties)
 
+    # Set version from spec.
+    if self.spec.version is None or EMR_VERSION_MAP[self.spec.version] is None:
+      raise Exception('Spark version not provided or not supported on EMR.')
+    emr_version = EMR_VERSION_MAP[self.spec.version]
+
     # we need to store the cluster id.
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
-                             '--release-label', RELEASE_LABEL,
+                             '--release-label', emr_version,
                              '--use-default-roles',
                              '--instance-groups',
                              json.dumps(instance_groups),
