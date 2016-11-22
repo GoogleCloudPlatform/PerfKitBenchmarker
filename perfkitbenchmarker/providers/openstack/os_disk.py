@@ -113,8 +113,8 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
           provided config values.
     """
     super(OpenStackDiskSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['openstack_volume_size'].present \
-            and not flag_values['data_disk_size'].present:
+    if (flag_values['openstack_volume_size'].present
+        and not flag_values['data_disk_size'].present):
       config_values['disk_size'] = flag_values.openstack_volume_size
     else:
       config_values['disk_size'] = flag_values.data_disk_size
