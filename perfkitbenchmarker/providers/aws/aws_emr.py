@@ -47,9 +47,9 @@ WORKER_SG = 'EmrManagedSlaveSecurityGroup'
 NEEDS_SUBNET = ['m4', 'c4']
 
 EMR_VERSION_MAP = {
-  spark_service.SPARK_1_6_1: 'emr-4.8.0',
-  spark_service.SPARK_1_6_2: 'emr-4.8.2',
-  spark_service.SPARK_2_0_2: 'emr-5.2.0',
+    spark_service.SPARK_1_6_1: 'emr-4.8.0',
+    spark_service.SPARK_1_6_2: 'emr-4.8.2',
+    spark_service.SPARK_2_0_2: 'emr-5.2.0',
 }
 
 

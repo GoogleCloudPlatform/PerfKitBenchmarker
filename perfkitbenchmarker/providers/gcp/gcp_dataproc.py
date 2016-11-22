@@ -31,9 +31,9 @@ FLAGS = flags.FLAGS
 GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 DATAPROC_VERSION_MAP = {
-  spark_service.SPARK_1_6_1: None,
-  spark_service.SPARK_1_6_2: '1.0',
-  spark_service.SPARK_2_0_2: '1.1',
+    spark_service.SPARK_1_6_1: None,
+    spark_service.SPARK_1_6_2: '1.0',
+    spark_service.SPARK_2_0_2: '1.1',
 }
 
 
