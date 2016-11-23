@@ -22,8 +22,12 @@ http://icl.cs.utk.edu/hpcc/
 
 import re
 
+from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import openblas
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
+
+FLAGS = flags.FLAGS
 
 HPCC_TAR = 'hpcc-1.4.3.tar.gz'
 HPCC_URL = 'http://icl.cs.utk.edu/projectsfiles/hpcc/download/' + HPCC_TAR
@@ -32,11 +36,34 @@ MAKE_FLAVOR = 'Linux_PII_CBLAS'
 HPCC_MAKEFILE = 'Make.' + MAKE_FLAVOR
 HPCC_MAKEFILE_PATH = HPCC_DIR + '/hpl/' + HPCC_MAKEFILE
 
+# A dictionary of overridable objects in this package.
+# Key is the name of of the object under perfkitbenchmarker/data directory.
+# Value is the remote location on VM.
+OVERRIDABLE = {
+    'hpcc': '.'
+}
 
-def _Install(vm):
-  """Installs the HPCC package on the VM."""
+
+def CheckPrerequisites():
+  """Verifies that required resources are present.
+
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  if __name__.split('.')[-1] in FLAGS.override_packages:
+    for k, _ in OVERRIDABLE.items():
+      data.ResourcePath(k)
+
+
+def _Override(vm):
+  """Override hpcc binaries."""
+  for k, v in OVERRIDABLE.items():
+    vm.PushDataFile(k, v)
+
+
+def _Build(vm):
+  """Build hpcc binaries."""
   vm.Install('wget')
-  vm.Install('openmpi')
   vm.Install('openblas')
   vm.RemoteCommand('wget %s -P %s' % (HPCC_URL, INSTALL_DIR))
   vm.RemoteCommand('cd %s && tar xvfz %s' % (INSTALL_DIR, HPCC_TAR))
@@ -50,6 +77,16 @@ def _Install(vm):
       (re.escape(openblas.OPENBLAS_DIR), HPCC_MAKEFILE_PATH))
   vm.RemoteCommand(sed_cmd)
   vm.RemoteCommand('cd %s; make arch=Linux_PII_CBLAS' % HPCC_DIR)
+  vm.RemoteCommand('cp %s/hpcc hpcc' % HPCC_DIR)
+
+
+def _Install(vm):
+  """Installs the HPCC package on the VM."""
+  vm.Install('openmpi')
+  if __name__.split('.')[-1] in FLAGS.override_packages:
+    _Override(vm)
+  else:
+    _Build(vm)
 
 
 def YumInstall(vm):

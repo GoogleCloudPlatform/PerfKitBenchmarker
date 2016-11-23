@@ -36,8 +36,17 @@ See perfkitbenchmarker/package_managers.py for more information on how to use
 packages in benchmarks.
 """
 
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import import_util
 
+
+FLAGS = flags.FLAGS
+flags.DEFINE_list(
+    'override_packages', [],
+    'A list of packages overrided in PerfkitBenchmarker. Upload from data '
+    'directory instead of installing and building from VM. Mainly to work '
+    'around licensing issues and shorten package build time. Need support '
+    'from individual package. By default, packages will ignore this flag.')
 
 # Place to install stuff. Persists across reboots.
 INSTALL_DIR = '/opt/pkb'
