@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing fortran installation and cleanup functions."""
+"""Module containing cmake installation and cleanup functions."""
 
 
-def GetLibPath(vm):
-  """Get fortran library path."""
-  out, _ = vm.RemoteCommand('find /usr/lib/ | grep fortran.a')
-  return out[:-1]
+def _Install(vm):
+  """Installs the cmake package on the VM."""
+  vm.InstallPackages('cmake')
 
 
 def YumInstall(vm):
-  """Installs the fortran package on the VM."""
-  vm.InstallPackages('gcc-gfortran libgfortran')
+  """Installs the cmake package on the VM."""
+  _Install(vm)
 
 
 def AptInstall(vm):
-  """Installs the fortan package on the VM."""
-  vm.InstallPackages('gfortran')
+  """Installs the cmake package on the VM."""
+  _Install(vm)
