@@ -265,7 +265,7 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
       # Drop ">" from ">1000"
       if name.startswith('>'):
         name = name[1:]
-      val = float(val) if '.' in val else int(val)
+      val = float(val) if '.' in val or 'nan' in val.lower() else int(val)
       if name.isdigit():
         if val:
           op_result[data_type].append((int(name), val))
