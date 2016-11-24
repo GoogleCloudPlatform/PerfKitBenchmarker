@@ -171,7 +171,8 @@ class BenchmarkSetsTestCase(unittest.TestCase):
       self.assertIn(benchmark_tuple[0].BENCHMARK_NAME,
                     self.valid_benchmark_names)
     # make sure bonnie++ is a listed benchmark
-    self.assertTrue(self._ContainsModule('bonnieplusplus', benchmark_tuple_list))
+    self.assertTrue(self._ContainsModule('bonnieplusplus', 
+                                         benchmark_tuple_list))
 
   def testBenchmarkValidCommandLine3(self):
     # make sure the command with two benchmarks is processed correctly
