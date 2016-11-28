@@ -71,6 +71,7 @@ spark:
           boot_disk_size: 500
         AWS:
           machine_type: m4.xlarge
+          zone: us-east-1a
       vm_count: 2
 """
 
