@@ -97,10 +97,6 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
                      '--bash-completion=true')
 
     vm.RemoteCommand('mkdir -p .config')
-    vm.PushFile(
-        object_storage_service.FindCredentialFile(
-            '~/' + GCS_CREDENTIAL_LOCATION),
-        GCLOUD_CONFIG_PATH)
     vm.PushFile(object_storage_service.FindBotoFile(),
                 object_storage_service.DEFAULT_BOTO_LOCATION)
 
