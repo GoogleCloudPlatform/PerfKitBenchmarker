@@ -83,7 +83,6 @@ class AzureDisk(disk.BaseDisk):
     self.host_caching = FLAGS.azure_host_caching
     self.name = None
     self.vm_name = vm_name
-    self.lun = None
     self.resource_group = azure_network.GetResourceGroup()
     self.storage_account = storage_account
     # lun is Azure's abbreviation for "logical unit number"
@@ -120,6 +119,7 @@ class AzureDisk(disk.BaseDisk):
       _, _, retcode = vm_util.IssueCommand(
           [azure.AZURE_PATH, 'vm', 'disk', 'attach-new',
            '--host-caching', self.host_caching,
+           '--lun', str(self.lun),
            self.vm_name, str(self.disk_size)] +
           self.resource_group.args)
 
