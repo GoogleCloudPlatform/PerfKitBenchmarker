@@ -7,3 +7,6 @@
 *.swp
 /perfkitbenchmarker.egg-info
 /.tox
+*.iml
+/.idea
+/*git_ignore*
