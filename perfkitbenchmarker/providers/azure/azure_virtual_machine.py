@@ -26,6 +26,7 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import json
+import itertools
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -159,6 +160,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     self.max_local_disks = 1
+    self._lun_counter = itertools.count()
 
     self.resource_group = azure_network.GetResourceGroup()
     self.public_ip = AzurePublicIPAddress(self.zone, self.name + '-public-ip')
@@ -264,22 +266,23 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     disks = []
 
-    for disk_idx in xrange(disk_spec.num_striped_disks):
-      data_disk = azure_disk.AzureDisk(disk_spec, self.name,
-                                       self.machine_type, self.storage_account,
-                                       disk_idx)
+    for _ in xrange(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.LOCAL:
         # Local disk numbers start at 1 (0 is the system disk).
-        data_disk.disk_number = self.local_disk_counter + 1
+        disk_number = self.local_disk_counter + 1
         self.local_disk_counter += 1
+        lun = None
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
       else:
         # Remote disk numbers start at 1 + max_local disks (0 is the system disk
         # and local disks occupy [1, max_local_disks]).
-        data_disk.disk_number = (self.remote_disk_counter +
-                                 1 + self.max_local_disks)
+        disk_number = self.remote_disk_counter + 1 + self.max_local_disks
         self.remote_disk_counter += 1
+        lun = next(self._lun_counter)
+      data_disk = azure_disk.AzureDisk(disk_spec, self.name, self.machine_type,
+                                       self.storage_account, lun)
+      data_disk.disk_number = disk_number
       disks.append(data_disk)
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
