@@ -144,6 +144,7 @@ class BaseSparkService(resource.BaseResource):
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
     basic_data = {'spark_service': self.SERVICE_NAME,
+                  'spark_svc_cloud': self.CLOUD,
                   'spark_cluster_id': self.cluster_id}
     # TODO grab this information for user_managed clusters.
     if not self.user_managed:
