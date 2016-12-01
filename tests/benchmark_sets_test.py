@@ -170,7 +170,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     for benchmark_tuple in benchmark_tuple_list:
       self.assertIn(benchmark_tuple[0].BENCHMARK_NAME,
                     self.valid_benchmark_names)
-    # make sure bonnie++ is a listed benchmark
+    # make sure bonnieplusplus is a listed benchmark
     self.assertTrue(self._ContainsModule('bonnieplusplus',
                                          benchmark_tuple_list))
 
