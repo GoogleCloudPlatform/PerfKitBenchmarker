@@ -26,7 +26,7 @@ class KubernetesProviderInfo(provider_info.BaseProviderInfo):
                           'cassandra_stress', 'cluster_boot', 'fio',
                           'iperf', 'mesh_network', 'mongodb_ycsb',
                           'netperf', 'redis', 'sysbench_oltp']
-  UNSUPPORTED_BENCHMARKS = ['bonnie++', 'mysql_service']
+  UNSUPPORTED_BENCHMARKS = ['bonnieplusplus', 'mysql_service']
 
   CLOUD = providers.KUBERNETES
 
