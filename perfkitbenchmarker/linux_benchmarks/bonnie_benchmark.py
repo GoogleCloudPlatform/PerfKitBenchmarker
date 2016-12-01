@@ -21,9 +21,9 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 
 
-BENCHMARK_NAME = 'bonnie++'
+BENCHMARK_NAME = 'bonnieplusplus'
 BENCHMARK_CONFIG = """
-bonnie++:
+bonnieplusplus:
   description: >
       Runs Bonnie++. Running this benchmark inside
       a container is currently not supported,
