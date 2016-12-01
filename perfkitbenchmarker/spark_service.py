@@ -151,6 +151,11 @@ class BaseSparkService(resource.BaseResource):
       basic_data.update({'num_workers': str(self.spec.worker_group.vm_count),
                          'worker_machine_type':
                          str(self.spec.worker_group.vm_spec.machine_type)})
+
+    if self.spec.worker_group.vm_spec.num_local_ssds is not None and \
+                    self.spec.worker_group.vm_spec.num_local_ssds != 0:
+      basic_data.update(
+        {'ssd_count': str(self.spec.worker_group.vm_spec.num_local_ssds)})
     return basic_data
 
   @classmethod
