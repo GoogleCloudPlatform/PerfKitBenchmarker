@@ -76,11 +76,7 @@ class AzurePublicIPAddress(resource.BaseResource):
     return response['ipAddress']
 
   def _Delete(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'public-ip', 'delete',
-         '--resource-group', self.resource_group.name,
-         '--quiet',
-         self.name])
+    pass
 
 
 class AzureNIC(resource.BaseResource):
@@ -122,10 +118,7 @@ class AzureNIC(resource.BaseResource):
     return response['ipConfigurations'][0]['privateIPAddress']
 
   def _Delete(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'nic', 'delete',
-         '--quiet',
-         self.name] + self.resource_group.args)
+    pass
 
 
 class AzureVirtualMachineMetaClass(virtual_machine.AutoRegisterVmMeta):
@@ -161,6 +154,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     self.max_local_disks = 1
     self._lun_counter = itertools.count()
+    self._deleted = False
 
     self.resource_group = azure_network.GetResourceGroup()
     self.public_ip = AzurePublicIPAddress(self.zone, self.name + '-public-ip')
@@ -182,16 +176,6 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.public_ip.Create()
     self.nic.Create()
 
-  def _DeleteDependencies(self):
-    """Delete VM dependencies."""
-    if not self.os_disk.is_image:
-      self.os_disk.Delete()
-
-    # Delete the public IP after the NIC to avoid an error that you
-    # can't delete a public IP associated with a NIC.
-    self.nic.Delete()
-    self.public_ip.Delete()
-
   def _Create(self):
     create_cmd = (
         [azure.AZURE_PATH, 'vm', 'create',
@@ -203,6 +187,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
          '--public-ip-name', self.public_ip.name,
          '--storage-account-name', self.storage_account.name,
          '--admin-username', self.user_name,
+         '--availset-name', self.network.avail_set.name,
          self.name] +
         self.resource_group.args +
         self.network.vnet.args +
@@ -216,24 +201,21 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'vm', 'delete',
-         '--quiet',
-         self.name] + self.resource_group.args)
+    # The VM will be deleted when the resource group is.
+    self._deleted = True
 
+  @vm_util.Retry()
   def _Exists(self):
     """Returns true if the VM exists and attempts to get some data."""
+    if self._deleted:
+      return False
 
-    # 'azure vm show' returns 0 even if the VM exists, and the no-op
-    # 'set' trick doesn't work like it does for other resources
-    # because 'vm set' doesn't allow no-ops, so we are forced to
-    # actually parse the results of 'show'.
-    stdout, _, retcode = vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'vm', 'show',
          '--json',
          self.name] + self.resource_group.args)
 
-    return retcode == 0 and stdout != '{}\n'
+    return bool(json.loads(stdout))
 
   @vm_util.Retry()
   def _PostCreate(self):
