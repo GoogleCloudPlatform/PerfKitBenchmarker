@@ -88,6 +88,7 @@ class AzureDisk(disk.BaseDisk):
     # lun is Azure's abbreviation for "logical unit number"
     self.lun = lun
     self.is_image = is_image
+    self._deleted = False
 
     if self.disk_type == PREMIUM_STORAGE:
       self.metadata = PREMIUM_STORAGE_METADATA
@@ -133,13 +134,7 @@ class AzureDisk(disk.BaseDisk):
   def _Delete(self):
     """Deletes the disk."""
     assert not self.is_image
-
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'storage', 'blob', 'delete',
-         '--container', 'vhds',
-         '--quiet',
-         '%s.vhd' % self.name] +
-        self.storage_account.connection_args)
+    self._deleted = True
 
   def _GetDiskJSON(self):
     """Get Azure's JSON representation of the disk."""
@@ -161,6 +156,8 @@ class AzureDisk(disk.BaseDisk):
 
   def _Exists(self):
     """Returns true if the disk exists."""
+    if self._deleted:
+      return False
 
     # Since we don't do .Create() or .Delete() on disks with
     # is_image=True, we never call _Exists() on them either. The code
