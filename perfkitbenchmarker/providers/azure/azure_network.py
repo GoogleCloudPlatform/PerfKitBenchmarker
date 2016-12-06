@@ -21,7 +21,6 @@ the same project. See http://msdn.microsoft.com/library/azure/jj156007.aspx
 for more information about Azure Virtual Networks.
 """
 
-import logging
 import json
 import threading
 
@@ -84,7 +83,8 @@ class AzureResourceGroup(resource.BaseResource):
 
   def _Exists(self):
     _, _, retcode = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'resource', 'list', self.name])
+        [azure.AZURE_PATH, 'resource', 'list', self.name],
+        suppress_warning=True)
 
     return retcode == 0
 
@@ -93,6 +93,42 @@ class AzureResourceGroup(resource.BaseResource):
         [azure.AZURE_PATH, 'group', 'delete',
          '--quiet',
          self.name])
+
+
+class AzureAvailSet(resource.BaseResource):
+  """Object representing an Azure Availability Set."""
+
+  def __init__(self, name, location):
+    super(AzureAvailSet, self).__init__()
+    self.name = name
+    self.location = location
+    self.resource_group = GetResourceGroup()
+
+  def _Create(self):
+    """Create the availability set."""
+    create_cmd = [azure.AZURE_PATH,
+                  'availset',
+                  'create',
+                  self.resource_group.name,
+                  self.name]
+    if self.location:
+      create_cmd.append(self.location)
+    vm_util.IssueCommand(create_cmd)
+
+  def _Delete(self):
+    pass
+
+  @vm_util.Retry()
+  def _Exists(self):
+    """Returns True if the availability set exists."""
+    show_cmd = [azure.AZURE_PATH,
+                'availset',
+                'show',
+                '--json',
+                self.resource_group.name,
+                self.name]
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
+    return bool(json.loads(stdout))
 
 
 class AzureStorageAccount(resource.BaseResource):
@@ -157,10 +193,7 @@ class AzureStorageAccount(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the storage account."""
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'storage', 'account', 'delete',
-         '--quiet',
-         self.name] + self.resource_group.args)
+    pass
 
   def _Exists(self):
     """Returns true if the storage account exists."""
@@ -206,20 +239,18 @@ class AzureVirtualNetwork(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the virtual network."""
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'vnet', 'delete',
-         '--quiet',
-         self.name] + self.resource_group.args)
+    pass
 
+  @vm_util.Retry()
   def _Exists(self):
     """Returns true if the virtual network exists."""
-    stdout, _, retcode = vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'vnet', 'show',
          '--json',
          self.name] + self.resource_group.args,
         suppress_warning=True)
 
-    return retcode == 0 and stdout != '{}\n'
+    return bool(json.loads(stdout))
 
 
 class AzureSubnet(resource.BaseResource):
@@ -231,28 +262,24 @@ class AzureSubnet(resource.BaseResource):
     self.args = ['--vnet-subnet-name', self.name]
 
   def _Create(self):
-    logging.info('subnet._Create')
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'create',
          '--vnet-name', self.vnet.name,
          '--address-prefix', self.vnet.address_space,
          self.name] + self.resource_group.args)
 
+  @vm_util.Retry()
   def _Exists(self):
-    stdout, _, retcode = vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'show',
          '--vnet-name', self.vnet.name,
          '--json',
          self.name] + self.resource_group.args)
 
-    return retcode == 0 and stdout != '{}\n'
+    return bool(json.loads(stdout))
 
   def _Delete(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'delete',
-         '--vnet-name', self.vnet.name,
-         '--quiet',
-         self.name] + self.resource_group.args)
+    pass
 
 
 class AzureNetworkSecurityGroup(resource.BaseResource):
@@ -280,19 +307,17 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
          '--location', self.location,
          self.name] + self.resource_group.args)
 
+  @vm_util.Retry()
   def _Exists(self):
-    stdout, _, retcode = vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'nsg', 'show',
          '--json',
          self.name] + self.resource_group.args)
 
-    return retcode == 0 and stdout != '{}\n'
+    return bool(json.loads(stdout))
 
   def _Delete(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'nsg', 'delete',
-         '--quiet',
-         self.name] + self.resource_group.args)
+    pass
 
   def AttachToSubnet(self):
     vm_util.IssueRetryableCommand(
@@ -335,36 +360,6 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         + self.resource_group.args
         + self.args)
 
-  def DisallowAllPorts(self):
-    with self.rules_lock:
-      for port, rule in self.rules.iteritems():
-        vm_util.IssueRetryableCommand(
-            [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'delete',
-             '--quiet',
-             rule] +
-            self.resource_group.args +
-            self.args)
-      # Can't remove rules from self.rules in the for loop because the
-      # iterator errors when the underlying dictionary is changed
-      # during iteration.
-      self.rules = {}
-
-      if self.have_deny_all_rule:
-        return
-      # An NSG comes with some default rules, which we can't delete,
-      # so we create a new rule at higher priority than those.
-      vm_util.IssueRetryableCommand(
-          [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create',
-           'DenyAll',
-           '--access', 'Deny',
-           '--priority', '4095']
-          + self.resource_group.args
-          + self.args)
-      self.have_deny_all_rule = True
-
-
-ALL_NSGS = set()
-
 
 class AzureFirewall(network.BaseFirewall):
   """A fireall on Azure is a Network Security Group.
@@ -389,9 +384,7 @@ class AzureFirewall(network.BaseFirewall):
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
-
-    for nsg in ALL_NSGS:
-      nsg.DisallowAllPorts()
+    pass
 
 
 class AzureNetwork(network.BaseNetwork):
@@ -406,6 +399,7 @@ class AzureNetwork(network.BaseNetwork):
   def __init__(self, spec):
     super(AzureNetwork, self).__init__(spec)
     self.resource_group = GetResourceGroup()
+    self.avail_set = AzureAvailSet(self.resource_group.name, self.zone)
 
     # Storage account names must be 3-24 characters long and use
     # numbers and lower-case letters only, which leads us to this
@@ -419,7 +413,6 @@ class AzureNetwork(network.BaseNetwork):
     self.subnet = AzureSubnet(self.vnet, self.vnet.name + '-subnet')
     self.nsg = AzureNetworkSecurityGroup(self.zone, self.subnet,
                                          self.subnet.name + '-nsg')
-    ALL_NSGS.add(self.nsg)
 
   @vm_util.Retry()
   def Create(self):
@@ -429,6 +422,8 @@ class AzureNetwork(network.BaseNetwork):
     # BaseResource will prevent us from running the underlying Azure
     # commands more than once, so that is fine.
     self.resource_group.Create()
+
+    self.avail_set.Create()
 
     self.storage_account.Create()
 
@@ -441,15 +436,6 @@ class AzureNetwork(network.BaseNetwork):
 
   def Delete(self):
     """Deletes the network."""
-    self.subnet.Delete()
-
-    # Have to delete NSG after subnet or Azure will throw an error.
-    self.nsg.Delete()
-
-    self.vnet.Delete()
-
-    self.storage_account.Delete()
-
     # If the benchmark includes multiple zones, this will be called
     # multiple times, but there will be no bad effects from multiple
     # deletes.
