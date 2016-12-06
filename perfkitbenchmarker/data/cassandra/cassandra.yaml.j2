@@ -29,7 +29,7 @@ seed_provider:
     - class_name: org.apache.cassandra.locator.SimpleSeedProvider
       parameters:
           - seeds: "{{ seeds }}"
-concurrent_reads: 32
+concurrent_reads: {{ concurrent_reads }}
 concurrent_writes: {{ num_cpus * 8 }}
 concurrent_counter_writes: 32
 memtable_allocation_type: heap_buffers
