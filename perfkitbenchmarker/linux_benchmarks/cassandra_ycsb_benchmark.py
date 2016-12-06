@@ -174,7 +174,8 @@ def Run(benchmark_spec):
             'cassandra.deleteconsistencylevel': WRITE_CONSISTENCY}
 
   metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
-              'num_vms': len(cassandra_vms)}
+              'num_vms': len(cassandra_vms),
+              'concurrent_reads': FLAGS.cassandra_concurrent_reads}
 
   samples = list(benchmark_spec.executor.LoadAndRun(
       loaders, load_kwargs=kwargs, run_kwargs=kwargs))
