@@ -54,6 +54,9 @@ NODE_START_SLEEP = 5
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_integer('cassandra_concurrent_reads', 32,
+                     'Concurrent read requests each server accepts.')
+
 
 def CheckPrerequisites():
   """Verifies that the required resources are present.
@@ -140,7 +143,8 @@ def Configure(vm, seed_vms):
              'data_path': posixpath.join(vm.GetScratchDir(), 'cassandra'),
              'seeds': ','.join(vm.internal_ip for vm in seed_vms),
              'num_cpus': vm.num_cpus,
-             'cluster_name': 'Test cluster'}
+             'cluster_name': 'Test cluster',
+             'concurrent_reads': FLAGS.cassandra_concurrent_reads}
 
   for config_file in [CASSANDRA_ENV_TEMPLATE, CASSANDRA_YAML_TEMPLATE]:
     local_path = data.ResourcePath(config_file)

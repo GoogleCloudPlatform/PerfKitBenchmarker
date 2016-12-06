@@ -251,6 +251,7 @@ def GenerateMetadataFromFlags(benchmark_spec):
 
 
   metadata.update({
+      'concurrent_reads': FLAGS.cassandra_concurrent_reads,
       'num_data_nodes': len(vm_dict[CASSANDRA_GROUP]),
       'num_loader_nodes': len(vm_dict[CLIENT_GROUP]),
       'num_cassandra_stress_threads': FLAGS.num_cassandra_stress_threads,
