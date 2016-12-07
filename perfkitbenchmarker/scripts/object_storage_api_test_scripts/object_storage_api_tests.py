@@ -26,10 +26,10 @@ import cStringIO
 import json
 import logging
 import os
-import Queue
 import sys
+import multiprocessing as mp
+import Queue
 from threading import Thread
-import threading
 import string
 import random
 import time
@@ -574,48 +574,48 @@ def SingleStreamThroughputBenchmark(service):
     service.DeleteObjects(FLAGS.bucket, objects_written)
 
 
-def RunThreadedWorkers(worker, worker_args, per_thread_args=None):
-  """Run a worker function in many threads, then gather and return the results.
+def RunWorkerProcesses(worker, worker_args, per_process_args=None):
+  """Run a worker function in many processes, then gather and return the results
 
   Args:
     worker: either WriteWorker or ReadWorker. The worker function to call.
     worker_args: a tuple. The arguments to pass to the worker function. The
       result queue and stream number will be appended as the last two arguments.
-    per_thread_args: if given, an array with length equal to the
-      number of threads. Thread number i will be passed
-      per_thread_args[i] after its regular arguments and before the
+    per_process_args: if given, an array with length equal to the
+      number of processes. Process number i will be passed
+      per_process_args[i] after its regular arguments and before the
       result queue and stream number.
 
   Returns:
     A list of the results returned by the workers.
   """
 
-  result_queue = Queue.Queue()
+  result_queue = mp.Queue()
 
-  logging.info('Creating %s threads', FLAGS.num_streams)
-  if per_thread_args is None:
-    threads = [threading.Thread(target=worker,
-                                args=worker_args + (result_queue, i))
+  logging.info('Creating %s processes', FLAGS.num_streams)
+  if per_process_args is None:
+    processes = [mp.Process(target=worker,
+                            args=worker_args + (result_queue, i))
                for i in xrange(FLAGS.num_streams)]
   else:
-    threads = [threading.Thread(target=worker,
-                                args=worker_args +
-                                (per_thread_args[i],) +
-                                (result_queue, i))
+    processes = [mp.Process(target=worker,
+                            args=worker_args +
+                            (per_process_args[i],) +
+                            (result_queue, i))
                for i in xrange(FLAGS.num_streams)]
-  logging.info('Threads created. Starting threads.')
-  for thread in threads:
-    thread.start()
-  logging.info('Threads started.')
+  logging.info('Processes created. Starting processes.')
+  for process in processes:
+    process.start()
+  logging.info('Processes started.')
   while True:
     time.sleep(THREAD_STATUS_LOG_INTERVAL)
-    num_alive = sum((thread.isAlive() for thread in threads))
+    num_alive = sum((process.is_alive() for process in processes))
     if num_alive == 0:
       break
     else:
-      logging.info('%s of %s threads are still working.',
+      logging.info('%s of %s processes are still working.',
                    num_alive, FLAGS.num_streams)
-  logging.info('All threads complete.')
+  logging.info('All processes complete.')
 
   results = []
 
@@ -652,8 +652,8 @@ def MultiStreamWrites(service):
 
   [{"operation": "upload", "start_time": start_time_1,
     "latency": latency_1, "size": size_1, "stream_num": stream_num_1},
-   [{"operation": "upload", "start_time": start_time_2,
-    "latency": latency_2, "size": size_2, "stream_num": stream_num_2}
+   {"operation": "upload", "start_time": start_time_2,
+    "latency": latency_2, "size": size_2, "stream_num": stream_num_2},
    ...]
 
   Both kinds of output are written as JSON, for easy serialization and
@@ -665,7 +665,7 @@ def MultiStreamWrites(service):
 
   payload = GenerateWritePayload(MaxSizeInDistribution(size_distribution))
 
-  results = RunThreadedWorkers(
+  results = RunWorkerProcesses(
       WriteWorker,
       (service,
        payload,
@@ -693,28 +693,23 @@ def MultiStreamWrites(service):
       logging.info('Got exception %s while trying to write objects written '
                    'file.', ex)
 
-  # operation_records is the data we send back to the controller.
-  operation_records = []
-  for result in results:
-    operation = result['operation']
-    stream_num = result['stream_num']
-    for start_time, latency, size in zip(result['start_times'],
-                                         result['latencies'],
-                                         result['sizes']):
-      operation_records.append({'operation': operation,
-                                'start_time': start_time,
-                                'latency': latency,
-                                'size': size,
-                                'stream_num': stream_num})
+  logging.info('len(results) = %s', len(results))
 
+  # streams is the data we send back to the controller.
+  streams = []
+  for result in results:
+    result_keys = ('stream_num', 'start_times', 'latencies', 'sizes')
+    streams.append({k: result[k] for k in result_keys})
+
+  num_writes = sum([len(stream['start_times']) for stream in streams])
   num_writes_requested = FLAGS.objects_per_stream * FLAGS.num_streams
   min_writes_required = num_writes_requested * (1.0 - FAILURE_TOLERANCE)
-  if len(operation_records) < min_writes_required:
+  if num_writes < min_writes_required:
     raise LowAvailabilityError(
         'Wrote %s objects out of %s requested (%s requred)' %
-        (len(operation_records), num_writes_requested, min_writes_required))
+        (num_writes, num_writes_requested, min_writes_required))
 
-  json.dump(operation_records, sys.stdout, indent=0)
+  json.dump(streams, sys.stdout, indent=0)
 
 
 def MultiStreamReads(service):
@@ -751,21 +746,20 @@ def MultiStreamReads(service):
   objects_by_worker = [object_records[i::num_workers]
                        for i in xrange(num_workers)]
 
-  results = RunThreadedWorkers(
+  results = RunWorkerProcesses(
       ReadWorker,
       (service,
        FLAGS.start_time),
-      per_thread_args=objects_by_worker)
+      per_process_args=objects_by_worker)
 
   # send data back to the controller
   operation_records = []
   for result in results:
-    operation = result['operation']
     stream_num = result['stream_num']
     for start_time, latency, size in zip(result['start_times'],
                                          result['latencies'],
                                          result['sizes']):
-      operation_records.append({'operation': operation,
+      operation_records.append({'operation': 'download',
                                 'stream_num': stream_num,
                                 'start_time': start_time,
                                 'latency': latency,
@@ -810,7 +804,7 @@ def WriteWorker(service, payload,
     num_objects: the number of objects to upload.
     start_time: a POSIX timestamp. When to start uploading.
     naming_scheme: how to name objects. See flag.
-    result_queue: a Queue.Queue to record results in.
+    result_queue: a mp.Queue to record results in.
     worker_num: the thread number of this worker.
   """
 
@@ -850,8 +844,7 @@ def WriteWorker(service, payload,
       logging.info('Worker %s caught exception %s while writing object %s' %
                    (worker_num, e, object_name))
 
-  result_queue.put({'operation': 'upload',
-                    'object_names': object_names,
+  result_queue.put({'object_names': object_names,
                     'start_times': start_times,
                     'latencies': latencies,
                     'sizes': sizes,
@@ -880,8 +873,7 @@ def ReadWorker(service, start_time, object_records,
                    (worker_num, e, name))
 
 
-  result_queue.put({'operation': 'download',
-                    'start_times': start_times,
+  result_queue.put({'start_times': start_times,
                     'latencies': latencies,
                     'sizes': sizes,
                     'stream_num': worker_num + FLAGS.stream_num_start})
