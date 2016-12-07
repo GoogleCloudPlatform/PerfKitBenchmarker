@@ -596,13 +596,13 @@ def RunWorkerProcesses(worker, worker_args, per_process_args=None):
   if per_process_args is None:
     processes = [mp.Process(target=worker,
                             args=worker_args + (result_queue, i))
-               for i in xrange(FLAGS.num_streams)]
+                 for i in xrange(FLAGS.num_streams)]
   else:
     processes = [mp.Process(target=worker,
                             args=worker_args +
                             (per_process_args[i],) +
                             (result_queue, i))
-               for i in xrange(FLAGS.num_streams)]
+                 for i in xrange(FLAGS.num_streams)]
   logging.info('Processes created. Starting processes.')
   for process in processes:
     process.start()
