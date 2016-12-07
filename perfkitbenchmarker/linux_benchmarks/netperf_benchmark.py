@@ -398,8 +398,8 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
-  client_vm = vms[0] # Client aka "sending vm"
-  server_vm = vms[1] # Server aka "receiving vm"
+  client_vm = vms[0]  # Client aka "sending vm"
+  server_vm = vms[1]  # Server aka "receiving vm"
   logging.info('netperf running on %s', client_vm)
   results = []
   metadata = {
