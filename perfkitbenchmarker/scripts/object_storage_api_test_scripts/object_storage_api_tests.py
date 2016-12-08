@@ -591,41 +591,27 @@ def RunWorkerProcesses(worker, worker_args, per_process_args=None):
   """
 
   result_queue = mp.Queue()
+  num_streams = FLAGS.num_streams
 
   logging.info('Creating %s processes', FLAGS.num_streams)
   if per_process_args is None:
     processes = [mp.Process(target=worker,
                             args=worker_args + (result_queue, i))
-                 for i in xrange(FLAGS.num_streams)]
+                 for i in xrange(num_streams)]
   else:
     processes = [mp.Process(target=worker,
                             args=worker_args +
                             (per_process_args[i],) +
                             (result_queue, i))
-                 for i in xrange(FLAGS.num_streams)]
+                 for i in xrange(num_streams)]
   logging.info('Processes created. Starting processes.')
   for process in processes:
     process.start()
   logging.info('Processes started.')
-  while True:
-    time.sleep(THREAD_STATUS_LOG_INTERVAL)
-    num_alive = sum((process.is_alive() for process in processes))
-    if num_alive == 0:
-      break
-    else:
-      logging.info('%s of %s processes are still working.',
-                   num_alive, FLAGS.num_streams)
+
+  # Wait for all the results. Each worker will put one result onto the queue
+  results = [result_queue.get() for _ in range(num_streams)]
   logging.info('All processes complete.')
-
-  results = []
-
-  try:
-    while True:
-      res = result_queue.get_nowait()
-      results.append(res)
-  except Queue.Empty:
-    pass
-
   return results
 
 
@@ -843,6 +829,8 @@ def WriteWorker(service, payload,
     except Exception as e:
       logging.info('Worker %s caught exception %s while writing object %s' %
                    (worker_num, e, object_name))
+
+  logging.info('Worker %s finished writing its objects' % worker_num)
 
   result_queue.put({'object_names': object_names,
                     'start_times': start_times,
