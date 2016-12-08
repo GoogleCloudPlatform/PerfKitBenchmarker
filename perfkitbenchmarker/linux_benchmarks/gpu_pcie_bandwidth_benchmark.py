@@ -17,12 +17,12 @@
       (https://developer.nvidia.com/cuda-code-samples)
 """
 
-import re
-
 import numpy
+import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 
 
@@ -48,7 +48,7 @@ gpu_pcie_bandwidth:
           boot_disk_size: 20
         AWS:
           image: ami-a9d276c9
-          machine_type: p2.xlarge
+          machine_type: p2.8xlarge
           zone: us-west-2b
           boot_disk_size: 20
 """
@@ -81,21 +81,70 @@ def Prepare(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   vm.Install('cuda_toolkit_8')
+  cuda_toolkit_8.MaximizeGPUClockSpeed(vm)
 
 
-def ParseOutput(output):
-  matches = re.findall(r'\d+\s+(\d+\.?\d*)', output)
+def _ParseDeviceInfo(test_output):
+  """Parses the GPU device info from the CUDA device bandwidth test output.
+
+  Args:
+    test_output: The resulting output string from the bandwidth
+      test application.
+
+  Returns:
+    A dictionary mapping the device number to its name, for each
+    device available on the sytem.
+  """
+  matches = regex_util.ExtractAllMatches(r'Device\s*(\d):\s*(.*$)',
+                                         test_output, re.MULTILINE)
+  devices = {str(i[0]): str(i[1]) for i in matches}
+  return devices
+
+
+def _ParseOutputFromSingleIteration(test_output):
+  """Parses the output of the CUDA device bandwidth test.
+
+  Args:
+    test_output: The resulting output string from the bandwidth
+      test application.
+
+  Returns:
+    A dictionary containing the following values as floats:
+      * the device to host bandwidth
+      * the host to device bandwidth
+      * the device to device bandwidth
+    All units are in MB/s, as these are the units guaranteed to be output
+    by the test.
+  """
+  matches = regex_util.ExtractAllMatches(r'\d+\s+(\d+\.?\d*)', test_output)
   results = {}
   for i, metric in enumerate(BENCHMARK_METRICS):
     results[metric] = float(matches[i])
   return results
 
 
-def CalculateMetrics(samples):
-  metadata = {}
+def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
+  """Calculates stats given list of result dictionaries
+    (each item in the list represends the results from a single
+    iteration).
+
+  Args:
+    results: a list of result dictionaries. Each result dictionary
+      represents a single run of the CUDA device bandwidth test,
+      parsed by _ParseOutputFromSingleIteration().
+
+  Returns:
+    a list of sample.Samples containing the following stats for each
+    of the three bandwidth metrics (device to host, device to device,
+    and host to device):
+      * mean
+      * min
+      * max
+      * stddev
+  """
   results = []
   for metric in BENCHMARK_METRICS:
-    sequence = [x[metric] for x in samples]
+    sequence = [x[metric] for x in result_dicts]
     results.append(sample.Sample(
         metric + ', min', min(sequence), 'MB/s', metadata))
     results.append(sample.Sample(
@@ -118,14 +167,20 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   vm = benchmark_spec.vms[0]
-  cuda_toolkit_8.MaximizeGPUClockSpeed(vm)
-  run_command = '/usr/local/cuda-8.0/extras/demo_suite/bandwidthTest'
+  run_command = '%s/extras/demo_suite/bandwidthTest --device=all' %\
+      cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
+  iterations = FLAGS.gpu_pcie_bandwidth_iterations
+  metadata = {}
+  metadata['iterations'] = iterations
   samples = []
-  for i in range(FLAGS.gpu_pcie_bandwidth_iterations):
+  for i in range(iterations):
     stdout, _ = vm.RemoteCommand(run_command, should_log=True)
-    samples.append(ParseOutput(stdout))
-  return CalculateMetrics(samples)
+    samples.append(_ParseOutputFromSingleIteration(stdout))
+    if 'device_info' not in metadata:
+      metadata['device_info'] = _ParseDeviceInfo(stdout)
+  return _CalculateMetricsOverAllIterations(samples, metadata)
 
 
 def Cleanup(benchmark_spec):
-  pass
+  vm = benchmark_spec.vms[0]
+  vm.Uninstall('cuda_toolkit_8')
