@@ -28,7 +28,6 @@ import logging
 import os
 import sys
 import multiprocessing as mp
-import Queue
 from threading import Thread
 import string
 import random
