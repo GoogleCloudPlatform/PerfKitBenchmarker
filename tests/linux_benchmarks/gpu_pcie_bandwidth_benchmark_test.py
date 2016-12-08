@@ -31,10 +31,17 @@ class GpuBandwidthTestCase(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__), '../data',
                         'cuda_bandwidth_test_results.txt')
     with open(path) as fp:
-      self.contents = fp.read()
+      self.test_output = fp.read()
+
+  def testParseDeviceMetadata(self):
+    actual = gpu_pcie_bandwidth_benchmark.\
+        _ParseDeviceInfo(self.test_output)
+    expected = {'0': 'Tesla K80', '1': 'Tesla K80'}
+    self.assertEqual(expected, actual)
 
   def testParseCudaBandwidthTestResults(self):
-    results = gpu_pcie_bandwidth_benchmark.ParseOutput(self.contents)
+    results = gpu_pcie_bandwidth_benchmark.\
+        _ParseOutputFromSingleIteration(self.test_output)
     self.assertEqual(3, len(results))
     self.assertAlmostEqual(9254.7, results['Host to device bandwidth'])
     self.assertAlmostEqual(9686.1, results['Device to host bandwidth'])
@@ -50,7 +57,8 @@ class GpuBandwidthTestCase(unittest.TestCase):
         'Device to host bandwidth': 8500,
         'Device to device bandwidth': 152000
     }]
-    raw_metrics = gpu_pcie_bandwidth_benchmark.CalculateMetrics(raw_results)
+    raw_metrics = gpu_pcie_bandwidth_benchmark.\
+        _CalculateMetricsOverAllIterations(raw_results)
     metrics = {i[0]: i[1] for i in raw_metrics}
 
     self.assertAlmostEqual(8000, metrics['Host to device bandwidth, min'])

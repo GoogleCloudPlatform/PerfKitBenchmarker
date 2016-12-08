@@ -35,24 +35,17 @@ def MaximizeGPUClockSpeed(vm):
   vm.RemoteCommand('sudo nvidia-smi -ac 2505,875')
 
 
-def _Install(vm):
+def AptInstall(vm):
   """Installs CUDA toolkit 8 on the VM."""
   vm.Install('build_tools')
   vm.Install('wget')
-  wget_command = 'wget %s'
-  vm.RemoteCommand(wget_command % CUDA_TOOLKIT_UBUNTU_URL)
-  install_command = ('sudo dpkg -i %s')
-  vm.RemoteCommand(install_command % (CUDA_TOOLKIT_UBUNTU))
+  vm.RemoteCommand('wget %s' % CUDA_TOOLKIT_UBUNTU_URL)
+  vm.RemoteCommand('sudo dpkg -i %s' % CUDA_TOOLKIT_UBUNTU)
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo apt-get install -y cuda')
   vm.RemoteCommand('sudo reboot', ignore_failure=True)
   vm.WaitForBootCompletion()
   MaximizeGPUClockSpeed(vm)
-
-
-def AptInstall(vm):
-  """Installs the CUDA toolkit 8 on the VM."""
-  _Install(vm)
 
 
 def YumInstall(vm):

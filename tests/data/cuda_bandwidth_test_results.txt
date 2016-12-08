@@ -2,19 +2,20 @@
 Running on...
 
  Device 0: Tesla K80
+ Device 1: Tesla K80
  Quick Mode
 
- Host to Device Bandwidth, 1 Device(s)
+ Host to Device Bandwidth, 2 Device(s)
  PINNED Memory Transfers
    Transfer Size (Bytes)	Bandwidth(MB/s)
    33554432			9254.7
 
- Device to Host Bandwidth, 1 Device(s)
+ Device to Host Bandwidth, 2 Device(s)
  PINNED Memory Transfers
    Transfer Size (Bytes)	Bandwidth(MB/s)
    33554432			9686.1
 
- Device to Device Bandwidth, 1 Device(s)
+ Device to Device Bandwidth, 2 Device(s)
  PINNED Memory Transfers
    Transfer Size (Bytes)	Bandwidth(MB/s)
    33554432			155985.8
