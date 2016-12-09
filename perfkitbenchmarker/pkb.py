@@ -350,6 +350,7 @@ def DoProvisionPhase(spec, timer):
   logging.info('Provisioning resources for benchmark %s', spec.name)
   # spark service needs to go first, because it adds some vms.
   spec.ConstructSparkService()
+  spec.ConstructDpbService()
   spec.ConstructVirtualMachines()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
