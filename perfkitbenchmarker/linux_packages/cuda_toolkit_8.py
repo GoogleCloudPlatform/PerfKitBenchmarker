@@ -23,16 +23,16 @@ CUDA_TOOLKIT_UBUNTU_URL =\
 CUDA_TOOLKIT_INSTALL_DIR = '/usr/local/cuda'
 
 
-def MaximizeGPUClockSpeed(vm):
-  """Sets the K80 GPU clock to its maximum frequency and enables
-     persistence mode.
-     TODO: This clock speed is currently specific to K80 GPUs.
+def SetGPUClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
+  """Sets the K80 GPU memory and graphics clocks to the specified frequency
+     and enables persistence mode.
 
      Note that these settings are lost after reboot and this function
      must be called again if max clock speeds are desired.
   """
   vm.RemoteCommand('sudo nvidia-smi -pm 1')
-  vm.RemoteCommand('sudo nvidia-smi -ac 2505,875')
+  vm.RemoteCommand('sudo nvidia-smi -ac {},{}'.format(memory_clock_speed,
+                                                      graphics_clock_speed))
 
 
 def AptInstall(vm):
@@ -45,7 +45,6 @@ def AptInstall(vm):
   vm.RemoteCommand('sudo apt-get install -y cuda')
   vm.RemoteCommand('sudo reboot', ignore_failure=True)
   vm.WaitForBootCompletion()
-  MaximizeGPUClockSpeed(vm)
 
 
 def YumInstall(vm):

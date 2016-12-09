@@ -21,6 +21,7 @@ import numpy
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
@@ -29,6 +30,12 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 flags.DEFINE_integer('gpu_pcie_bandwidth_iterations', 30,
                      'number of iterations to run',
                      lower_bound=1)
+TESLA_K80_MAX_CLOCK_SPEEDS = [2505, 875]
+flag_util.DEFINE_integerlist('gpu_pcie_bandwidth_clock_speeds',
+                             flag_util.IntegerList(TESLA_K80_MAX_CLOCK_SPEEDS),
+                             'desired gpu clock speeds in the form\
+                             [memory clock, graphics clock]')
+
 
 FLAGS = flags.FLAGS
 
@@ -72,7 +79,7 @@ def CheckPrerequisites():
 
 
 def Prepare(benchmark_spec):
-  """Install CUDA toolkit 8
+  """Install CUDA toolkit 8 and set the clock speed.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -81,7 +88,6 @@ def Prepare(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   vm.Install('cuda_toolkit_8')
-  cuda_toolkit_8.MaximizeGPUClockSpeed(vm)
 
 
 def _ParseDeviceInfo(test_output):
@@ -157,7 +163,10 @@ def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
 
 
 def Run(benchmark_spec):
-  """Runs the CUDA PCIe benchmark
+  """Sets the GPU clock speed and runs the CUDA PCIe benchmark.
+     The clock speed is set in this function rather than Prepare()
+     so that the user can perform multiple runs with a specified
+     clock speed without having to re-prepare the VM.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -167,12 +176,17 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   vm = benchmark_spec.vms[0]
-  run_command = '%s/extras/demo_suite/bandwidthTest --device=all' %\
-      cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
+  cuda_toolkit_8.SetGPUClockSpeed(vm,
+                                  FLAGS.gpu_pcie_bandwidth_clock_speeds[0],
+                                  FLAGS.gpu_pcie_bandwidth_clock_speeds[1])
   iterations = FLAGS.gpu_pcie_bandwidth_iterations
+  samples = []
   metadata = {}
   metadata['iterations'] = iterations
-  samples = []
+  metadata['clock_speeds'] = [FLAGS.gpu_pcie_bandwidth_clock_speeds[0],
+                              FLAGS.gpu_pcie_bandwidth_clock_speeds[1]]
+  run_command = '%s/extras/demo_suite/bandwidthTest --device=all' %\
+      cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
   for i in range(iterations):
     stdout, _ = vm.RemoteCommand(run_command, should_log=True)
     samples.append(_ParseOutputFromSingleIteration(stdout))
