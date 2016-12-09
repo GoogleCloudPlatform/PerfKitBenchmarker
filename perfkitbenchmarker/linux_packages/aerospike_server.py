@@ -130,7 +130,8 @@ def ConfigureAndStart(server, seed_node_ips=None):
        'replication_factor': FLAGS.aerospike_replication_factor})
 
   for scratch_disk in server.scratch_disks:
-    server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
+    if scratch_disk.mount_point:
+      server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
 
   server.RemoteCommand('cd %s && make init' % AEROSPIKE_DIR)
   server.RemoteCommand('cd %s; nohup sudo make start &> /dev/null &' %
