@@ -15,6 +15,7 @@
 
 """Module containing CUDA toolkit 8 installation and cleanup functions."""
 
+from perfkitbenchmarker import regex_util
 
 CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604_8.0.44-1_amd64.deb'
 CUDA_TOOLKIT_UBUNTU_URL =\
@@ -23,16 +24,42 @@ CUDA_TOOLKIT_UBUNTU_URL =\
 CUDA_TOOLKIT_INSTALL_DIR = '/usr/local/cuda'
 
 
-def SetGPUClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
+def QueryNumberOfGpus(vm):
+  """Returns the number of Nvidia GPUs on the system"""
+  stdout, _ = vm.RemoteCommand("sudo nvidia-smi --query-gpu=count --id=0 "
+                               "--format=csv", should_log=True)
+  return int(stdout.split()[1])
+
+
+def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
   """Sets the K80 GPU memory and graphics clocks to the specified frequency
      and enables persistence mode.
 
-     Note that these settings are lost after reboot and this function
-     must be called again if max clock speeds are desired.
+     Note that these settings are lost after reboot.
   """
   vm.RemoteCommand('sudo nvidia-smi -pm 1')
   vm.RemoteCommand('sudo nvidia-smi -ac {},{}'.format(memory_clock_speed,
                                                       graphics_clock_speed))
+
+
+def QueryGpuClockSpeed(vm, device_id):
+  """Returns the user-specified values of the memory and graphics clock
+     in MHz for the specified GPU.
+
+     Args:
+      vm: virtual machine to operate on
+      device_id: id of GPU device to query
+
+    Returns:
+      Tuple of clock speeds in MHz in the form (memory clock, graphics clock).
+  """
+  query = "sudo nvidia-smi --query-gpu=clocks.applications.memory,"\
+      "clocks.applications.graphics --format=csv --id={0}".format(device_id)
+  stdout, _ = vm.RemoteCommand(query, should_log=True)
+  clock_speeds = stdout.splitlines()[1]
+  query = r'(\d*).*,\s*(\d*)'
+  matches = regex_util.ExtractAllMatches(query, clock_speeds)[0]
+  return (int(matches[0]), int(matches[1]))
 
 
 def AptInstall(vm):
