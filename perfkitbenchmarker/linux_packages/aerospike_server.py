@@ -91,7 +91,7 @@ def _WaitForServerUp(server):
   logging.info("Trying to connect to Aerospike at %s:%s" % (address, port))
   try:
     out, _ = server.RemoteCommand(
-        '(echo -e "status\n" ; sleep 1)| netcat %s %s' % (address, port))
+        '(echo -e "status\n" ; sleep 1)| netcat -q 1 %s %s' % (address, port))
     if out.startswith('ok'):
       logging.info("Aerospike server status is OK. Server up and running.")
       return
