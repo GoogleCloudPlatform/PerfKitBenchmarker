@@ -88,6 +88,7 @@ def ExtractAllMatches(regex, text, flags=0):
   Args:
     regex: string. Regular expression.
     text: string. Text to search.
+    flags: int. Flags to pass to re.findall().
   Returns:
     A list of tuples of strings that matched by 'regex' within 'text'.
   Raises:

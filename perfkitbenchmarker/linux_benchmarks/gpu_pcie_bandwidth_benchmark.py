@@ -55,7 +55,7 @@ gpu_pcie_bandwidth:
           boot_disk_size: 20
         AWS:
           image: ami-a9d276c9
-          machine_type: p2.8xlarge
+          machine_type: p2.xlarge
           zone: us-west-2b
           boot_disk_size: 20
 """
@@ -79,7 +79,7 @@ def CheckPrerequisites():
 
 
 def Prepare(benchmark_spec):
-  """Install CUDA toolkit 8 and set the clock speed.
+  """Install CUDA toolkit 8.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -98,8 +98,8 @@ def _ParseDeviceInfo(test_output):
       test application.
 
   Returns:
-    A dictionary mapping the device number to its name, for each
-    device available on the sytem.
+    A dictionary mapping the device number to its name, for every
+    device available on the system.
   """
   matches = regex_util.ExtractAllMatches(r'Device\s*(\d):\s*(.*$)',
                                          test_output, re.MULTILINE)
@@ -162,11 +162,33 @@ def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
   return results
 
 
+def _SetAndConfirmGpuClocks(benchmark_spec):
+  """Sets and confirms the GPU clocks with the values provided
+     in the gpu_pcie_bandwidth_clock_speeds flag. If a device
+     is queried and its clock speed does not allign with what
+     it was just set to, an expection will be raised.
+
+     Raises:
+      Exception if a GPU did not accept the provided clock speeds.
+  """
+  vm = benchmark_spec.vms[0]
+  desired_memory_clock = FLAGS.gpu_pcie_bandwidth_clock_speeds[0]
+  desired_graphics_clock = FLAGS.gpu_pcie_bandwidth_clock_speeds[1]
+  cuda_toolkit_8.SetGpuClockSpeed(vm,
+                                  desired_memory_clock,
+                                  desired_graphics_clock)
+  num_gpus = cuda_toolkit_8.QueryNumberOfGpus(vm)
+  for i in range(num_gpus):
+    if cuda_toolkit_8.QueryGpuClockSpeed(vm, i) != (desired_memory_clock,
+                                                    desired_graphics_clock):
+      raise Exception("Unrecoverable error setting "
+                      "GPU #{} clock speed to {},{}"
+                      .format(i, desired_memory_clock, desired_graphics_clock))
+
+
+
 def Run(benchmark_spec):
   """Sets the GPU clock speed and runs the CUDA PCIe benchmark.
-     The clock speed is set in this function rather than Prepare()
-     so that the user can perform multiple runs with a specified
-     clock speed without having to re-prepare the VM.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -176,9 +198,10 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   vm = benchmark_spec.vms[0]
-  cuda_toolkit_8.SetGPUClockSpeed(vm,
-                                  FLAGS.gpu_pcie_bandwidth_clock_speeds[0],
-                                  FLAGS.gpu_pcie_bandwidth_clock_speeds[1])
+  # Note:  The clock speed is set in this function rather than Prepare()
+  # so that the user can perform multiple runs with a specified
+  # clock speed without having to re-prepare the VM.
+  _SetAndConfirmGpuClocks(benchmark_spec)
   iterations = FLAGS.gpu_pcie_bandwidth_iterations
   samples = []
   metadata = {}
