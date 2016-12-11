@@ -14,7 +14,7 @@ BENCHMARK_CONFIG = """
 dpb_wordcount_benchmark:
   description: Run word count on dataflow and dataproc
   dpb_service:
-    service_type: emr
+    service_type: dataproc
     worker_group:
       vm_spec:
         GCP:
@@ -83,7 +83,7 @@ def Run(benchmark_spec):
     else:
         raise NotImplementedError
 
-    # TODO: Finalize What stats are we trying to gather, other than the end to end run
+    # TODO: Finalize What stats are we trying to gather, other than the end to end run time
     stats = dpb_service.SubmitJob(jarfile,
                                   classname,
                                   job_arguments=job_arguments,
