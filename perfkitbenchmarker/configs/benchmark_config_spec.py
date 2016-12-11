@@ -153,7 +153,8 @@ class _DpbServiceSpec(spec.BaseSpec):
             'service_type': (option_decoders.EnumDecoder, {
                 'default': dpb_service.DATAPROC,
                 'valid_values': [dpb_service.DATAPROC,
-                                 dpb_service.DATAFLOW]}),
+                                 dpb_service.DATAFLOW,
+                                 dpb_service.EMR]}),
             'worker_group': (_VmGroupSpecDecoder, {}),
             'worker_count': (option_decoders.IntDecoder,
                              {'default': dpb_service.DEFAULT_WORKER_COUNT, 'min': 2}),

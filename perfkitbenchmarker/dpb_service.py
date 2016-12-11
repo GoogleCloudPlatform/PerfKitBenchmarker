@@ -33,6 +33,7 @@ FLAGS = flags.FLAGS
 # supported data processing backend services
 DATAPROC = 'dataproc'
 DATAFLOW = 'dataflow'
+EMR = 'emr'
 
 DEFAULT_WORKER_COUNT = 2
 
