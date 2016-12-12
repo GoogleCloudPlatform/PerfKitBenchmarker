@@ -24,6 +24,7 @@ import os
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker import vm_util
 
@@ -33,6 +34,8 @@ GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 DATAFLOW_WC_JAR = ('/Users/saksena/dev/first-dataflow/target/'
                    'first-dataflow-bundled-0.1.jar')
+
+DATAFLOW_BLOCKING_RUNNER = 'BlockingDataflowPipelineRunner'
 
 class GcpDpbDataflow(dpb_service.BaseDpbService):
   """Object representing GCP Dataflow Service."""
@@ -63,20 +66,34 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     workerMachineType = self.spec.worker_group.vm_spec.machine_type
     numWorkers = self.spec.worker_count
     maxNumWorkers = self.spec.worker_count
+    cmd = []
 
-    full_cmd = 'java -cp {jarfile} {classname} ' \
-               '--stagingLocation=gs://saksena-df/staging/ ' \
-               '--output=gs://saksena-df/output ' \
-               '--runner=BlockingDataflowPipelineRunner ' \
-               '--workerMachineType={workerMachineType} ' \
-               '--numWorkers={numWorkers} --maxNumWorkers={maxNumWorkers} ' \
-               '--diskSizeGb=500'.\
-      format(jarfile = jarfile, classname = classname,
-             workerMachineType = workerMachineType, numWorkers = numWorkers,
-             maxNumWorkers = maxNumWorkers)
+    """Verify java executable is on the path"""
+    dataflow_executable = 'java'
+    if not vm_util.ExecutableOnPath(dataflow_executable):
+      raise errors.Setup.MissingExecutableError(
+        'Could not find required executable "%s"', dataflow_executable)
+    cmd.append(dataflow_executable)
 
-    print 'Full Command:', full_cmd
-    os.system(full_cmd)
+    cmd.append('-cp')
+
+    """Verify the presence of executable jar file"""
+    if not vm_util.FilePresent(jarfile):
+      raise errors.Setup.MissingExecutableError(
+        'Could not find required jarfile "%s"', jarfile)
+    cmd.append(jarfile)
+
+    cmd.append(classname)
+    cmd += job_arguments
+
+    cmd.append('--workerMachineType={workerMachineType}'.format(
+      workerMachineType=workerMachineType))
+    cmd.append('--numWorkers={numWorkers}'.format(
+      numWorkers=numWorkers))
+    cmd.append('--maxNumWorkers={maxNumWorkers}'.format(
+      maxNumWorkers=maxNumWorkers))
+    cmd.append('--diskSizeGb=500') # TODO Parametrize this based on vm_util
+    stdout, _, _ = vm_util.IssueCommand(cmd)
 
   def SetClusterProperty(self):
     pass

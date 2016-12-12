@@ -65,15 +65,22 @@ def Run(benchmark_spec):
     """
     Switch the parameters for submit job function of specific dpb service
     """
+    job_arguments = []
     if dpb_service.SERVICE_TYPE == 'dataproc':
         jarfile = gcp_dpb_dataproc.SPARK_SAMPLE_LOCATION
         classname = 'org.apache.spark.examples.JavaWordCount'
-        job_arguments = [FLAGS.gcs_input]
+        job_arguments.append(FLAGS.gcs_input)
         job_type = 'spark'
     elif dpb_service.SERVICE_TYPE == 'dataflow':
         jarfile = gcp_dpb_dataflow.DATAFLOW_WC_JAR
         classname = 'com.google.cloud.dataflow.examples.WordCount'
-        job_arguments = ['--stagingLocation=gs://saksena-df/staging/', '--output=gs://saksena-df/output', '--runner=BlockingDataflowPipelineRunner']
+        base_gs_dataflow_dir = 'gs://saksena-df' #TODO: generify this
+        job_arguments.append('--stagingLocation={0}/staging/'.format(
+            base_gs_dataflow_dir))
+        job_arguments.append('--output={0}/output/'.format(
+            base_gs_dataflow_dir))
+        job_arguments.append('--runner={0}'.format(
+            gcp_dpb_dataflow.DATAFLOW_BLOCKING_RUNNER))
         job_type = None
     elif dpb_service.SERVICE_TYPE == 'emr':
         jarfile = aws_dpb_emr.SPARK_SAMPLE_LOCATION
