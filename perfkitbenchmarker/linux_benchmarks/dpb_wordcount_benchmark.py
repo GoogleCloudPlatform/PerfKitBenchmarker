@@ -31,10 +31,10 @@ dpb_wordcount_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_string('gcs_input',
+flags.DEFINE_string('dpb_wordcount_gcs_input',
                     'gs://dataflow-samples/shakespeare/kinglear.txt',
                     'Input for word count')
-flags.DEFINE_string('s3_input',
+flags.DEFINE_string('dpb_wordcount_s3_input',
                     's3://pkb-shakespeare/kinglear.txt',
                     'Input for word count')
 
@@ -69,7 +69,7 @@ def Run(benchmark_spec):
     if dpb_service.SERVICE_TYPE == 'dataproc':
         jarfile = gcp_dpb_dataproc.SPARK_SAMPLE_LOCATION
         classname = 'org.apache.spark.examples.JavaWordCount'
-        job_arguments.append(FLAGS.gcs_input)
+        job_arguments.append(FLAGS.dpb_wordcount_gcs_input)
         job_type = 'spark'
     elif dpb_service.SERVICE_TYPE == 'dataflow':
         jarfile = gcp_dpb_dataflow.DATAFLOW_WC_JAR
@@ -85,7 +85,7 @@ def Run(benchmark_spec):
     elif dpb_service.SERVICE_TYPE == 'emr':
         jarfile = aws_dpb_emr.SPARK_SAMPLE_LOCATION
         classname = 'org.apache.spark.examples.JavaWordCount'
-        job_arguments = [FLAGS.s3_input]
+        job_arguments = [FLAGS.dpb_wordcount_s3_input]
         job_type = 'spark'
     else:
         raise NotImplementedError
