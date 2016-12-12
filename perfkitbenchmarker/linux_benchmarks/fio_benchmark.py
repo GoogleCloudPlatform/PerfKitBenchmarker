@@ -20,7 +20,6 @@ Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 
 import json
 import logging
-import os
 import posixpath
 import re
 import time
