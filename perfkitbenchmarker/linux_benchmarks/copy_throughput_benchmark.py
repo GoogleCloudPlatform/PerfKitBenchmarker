@@ -44,7 +44,8 @@ copy_throughput:
       vm_count: 1
 """
 
-CIPHER = 'aes128-cbc'
+# Preferred SCP ciphers, in order of preference:
+CIPHERS = ['aes128-cbc', 'aes128-ctr']
 
 DATA_FILE = 'cloud-storage-workload.sh'
 # size of all data
@@ -142,6 +143,22 @@ def RunDd(vms):
   return [sample.Sample('dd throughput', DATA_SIZE_IN_MB / time_used, UNIT)]
 
 
+def AvailableCiphers(vm):
+  """Returns the set of ciphers accepted by the vm's SSH server."""
+  ciphers, _ = vm.RemoteCommand('sshd -T | grep ^ciphers ')
+  return set(ciphers.split()[1].split(','))
+
+
+def ChooseSshCipher(vms):
+  """Returns the most-preferred cipher that's available to all vms."""
+  available = reduce(lambda a, b: a & b, [AvailableCiphers(vm) for vm in vms])
+  for cipher in CIPHERS:
+    if cipher in available:
+      return cipher
+  raise Exception('None of the preferred ciphers (%s) are available (%s).'
+                  % (CIPHERS, available))
+
+
 def RunScp(vms):
   """Run scp benchmark.
 
@@ -152,8 +169,9 @@ def RunScp(vms):
     A list of samples. Each sample is a 4-tuple of (benchmark_name, value, unit,
     metadata), as accepted by PerfKitBenchmarkerPublisher.AddSamples.
   """
-  result = RunScpSingleDirection(vms[0], vms[1])
-  result += RunScpSingleDirection(vms[1], vms[0])
+  cipher = ChooseSshCipher(vms)
+  result = RunScpSingleDirection(vms[0], vms[1], cipher)
+  result += RunScpSingleDirection(vms[1], vms[0], cipher)
   return result
 
 
@@ -163,7 +181,7 @@ MODE_FUNCTION_DICTIONARY = {
     'scp': RunScp}
 
 
-def RunScpSingleDirection(sending_vm, receiving_vm):
+def RunScpSingleDirection(sending_vm, receiving_vm, cipher):
   """Run scp from sending_vm to receiving_vm and parse results.
 
   If 'receiving_vm' is accessible via internal IP from 'sending_vm', throughput
@@ -173,6 +191,7 @@ def RunScpSingleDirection(sending_vm, receiving_vm):
   Args:
     sending_vm: The originating VM for the scp command.
     receiving_vm: The destination VM for the scp command.
+    cipher: Name of the SSH cipher to use.
 
   Returns:
     A list of sample.Sample objects.
@@ -187,7 +206,7 @@ def RunScpSingleDirection(sending_vm, receiving_vm):
   cmd_template = ('sudo sync; sudo sysctl vm.drop_caches=3; '
                   'time /usr/bin/scp -o StrictHostKeyChecking=no -i %s -c %s '
                   '%s %s@%%s:%%s/;') % (
-                      linux_virtual_machine.REMOTE_KEY_PATH, CIPHER,
+                      linux_virtual_machine.REMOTE_KEY_PATH, cipher,
                       '%s/data/*' % sending_vm.GetScratchDir(0),
                       receiving_vm.user_name)
 
