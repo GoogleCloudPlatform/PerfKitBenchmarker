@@ -66,6 +66,13 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     workerMachineType = self.spec.worker_group.vm_spec.machine_type
     numWorkers = self.spec.worker_count
     maxNumWorkers = self.spec.worker_count
+    if self.spec.worker_group.disk_spec and self.spec.worker_group.disk_spec.disk_size:
+      diskSizeGb = self.spec.worker_group.disk_spec.disk_size
+    elif self.spec.worker_group.vm_spec.boot_disk_size:
+      diskSizeGb = self.spec.worker_group.vm_spec.boot_disk_size
+    else:
+      diskSizeGb = None
+
     cmd = []
 
     """Verify java executable is on the path"""
@@ -92,7 +99,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       numWorkers=numWorkers))
     cmd.append('--maxNumWorkers={maxNumWorkers}'.format(
       maxNumWorkers=maxNumWorkers))
-    cmd.append('--diskSizeGb=500') # TODO Parametrize this based on vm_util
+
+    if diskSizeGb:
+      cmd.append('--diskSizeGb={diskSizeGb}'.format(diskSizeGb=diskSizeGb))
     stdout, _, _ = vm_util.IssueCommand(cmd)
 
   def SetClusterProperty(self):
