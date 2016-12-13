@@ -76,7 +76,7 @@ def ExtractIpv4Addresses(text):
   return match
 
 
-def ExtractAllMatches(regex, text):
+def ExtractAllMatches(regex, text, flags=0):
   """Extracts all matches from a regular expression matched within 'text'.
 
   Extracts all matches from a regular expression matched within 'text'. Please
@@ -88,12 +88,13 @@ def ExtractAllMatches(regex, text):
   Args:
     regex: string. Regular expression.
     text: string. Text to search.
+    flags: int. Flags to pass to re.findall().
   Returns:
     A list of tuples of strings that matched by 'regex' within 'text'.
   Raises:
     NoMatchError: when 'regex' does not match 'text'.
   """
-  match = re.findall(regex, text)
+  match = re.findall(regex, text, flags=flags)
   if not match:
     raise NoMatchError('No match for pattern "{0}" in "{1}"'.format(
         regex, text))
