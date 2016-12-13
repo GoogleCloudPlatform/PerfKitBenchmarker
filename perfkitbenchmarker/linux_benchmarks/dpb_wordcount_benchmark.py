@@ -24,12 +24,12 @@ dpb_wordcount_benchmark:
           machine_type: n1-standard-1
           boot_disk_size: 500
         AWS:
-          machine_type: m3.medium
+          machine_type: m1.medium
       disk_spec:
         GCP:
           disk_type: nodisk
         AWS:
-          disk_size: 1500
+          disk_size: 500
           disk_type: gp2
     worker_count: 2
 """
@@ -60,8 +60,6 @@ def Run(benchmark_spec):
     # Get handle to the dpb service
     dpb_service = benchmark_spec.dpb_service
 
-    # TODO: Based on benchmark level config or a flag the storage will either be in gs or the hdfs created
-
     """
     Create a file handle to contain the response from running the job on
     the dpb service
@@ -83,8 +81,9 @@ def Run(benchmark_spec):
     elif dpb_service.SERVICE_TYPE == 'dataflow':
         jarfile = gcp_dpb_dataflow.DATAFLOW_WC_JAR
         classname = 'com.google.cloud.dataflow.examples.WordCount'
-
-        # Validate and setup the output and staging directories for the job
+        """
+        Validate and setup the output and staging directories for the job
+        """
         if FLAGS.dpb_wordcount_out_fs != dpb_service.GCS_OUTPUT_FS:
           raise Exception('Invalid File System integration required for a '
                           'dataflow job')
@@ -95,7 +94,7 @@ def Run(benchmark_spec):
             base_gs_dataflow_dir))
         job_arguments.append('--output={0}/output/'.format(
             base_gs_dataflow_dir))
-
+        """Set the runner for the data flow job"""
         job_arguments.append('--runner={0}'.format(
             gcp_dpb_dataflow.DATAFLOW_BLOCKING_RUNNER))
         job_type = None
