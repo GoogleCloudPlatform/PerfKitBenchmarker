@@ -145,6 +145,8 @@ class IntegerListParser(flags.ArgumentParser):
       return inp
     elif isinstance(inp, list):
       return IntegerList(inp)
+    elif isinstance(inp, int):
+      return IntegerList([inp])
 
     def HandleNonIncreasing():
       if self.on_nonincreasing == IntegerListParser.WARN:
