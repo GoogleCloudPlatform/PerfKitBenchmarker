@@ -57,9 +57,33 @@ class GpuBandwidthTestCase(unittest.TestCase):
         'Device to host bandwidth': 8500,
         'Device to device bandwidth': 152000
     }]
-    raw_metrics = gpu_pcie_bandwidth_benchmark.\
+    samples = gpu_pcie_bandwidth_benchmark.\
         _CalculateMetricsOverAllIterations(raw_results)
-    metrics = {i[0]: i[1] for i in raw_metrics}
+    metrics = {i[0]: i[1] for i in samples}
+
+    sample = next(x for x in samples if x.metadata == {'iteration': 0}
+                  and x.metric == 'Host to device bandwidth')
+    self.assertAlmostEqual(9250, sample.value)
+
+    sample = next(x for x in samples if x.metadata == {'iteration': 0}
+                  and x.metric == 'Device to host bandwidth')
+    self.assertAlmostEqual(9000, sample.value)
+
+    sample = next(x for x in samples if x.metadata == {'iteration': 0}
+                  and x.metric == 'Device to device bandwidth')
+    self.assertAlmostEqual(155000, sample.value)
+
+    sample = next(x for x in samples if x.metadata == {'iteration': 1}
+                  and x.metric == 'Host to device bandwidth')
+    self.assertAlmostEqual(8000, sample.value)
+
+    sample = next(x for x in samples if x.metadata == {'iteration': 1}
+                  and x.metric == 'Device to host bandwidth')
+    self.assertAlmostEqual(8500, sample.value)
+
+    sample = next(x for x in samples if x.metadata == {'iteration': 1}
+                  and x.metric == 'Device to device bandwidth')
+    self.assertAlmostEqual(152000, sample.value)
 
     self.assertAlmostEqual(8000, metrics['Host to device bandwidth, min'])
     self.assertAlmostEqual(9250, metrics['Host to device bandwidth, max'])

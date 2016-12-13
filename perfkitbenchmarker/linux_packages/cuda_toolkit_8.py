@@ -17,11 +17,15 @@
 
 from perfkitbenchmarker import regex_util
 
+# TODO: Test the CUDA Ubuntu 14.04 installer, and if everything works ok,
+# automatically install the correct package depending on the OS image.
 CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604_8.0.44-1_amd64.deb'
-CUDA_TOOLKIT_UBUNTU_URL =\
-    'http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/%s' %\
-    CUDA_TOOLKIT_UBUNTU
+CUDA_TOOLKIT_UBUNTU_URL = (
+    'http://developer.download.nvidia.com/compute/cuda'
+    '/repos/ubuntu1604/x86_64/%s' % CUDA_TOOLKIT_UBUNTU)
 CUDA_TOOLKIT_INSTALL_DIR = '/usr/local/cuda'
+
+EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
 
 def QueryNumberOfGpus(vm):
@@ -36,6 +40,11 @@ def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
      and enables persistence mode.
 
      Note that these settings are lost after reboot.
+
+     Args:
+      vm: virtual machine to operate on
+      memory_clock_speed: desired speed of the memory clock, in MHz
+      graphics_clock_speed: desired speed of the graphics clock, in MHz
   """
   vm.RemoteCommand('sudo nvidia-smi -pm 1')
   vm.RemoteCommand('sudo nvidia-smi -ac {},{}'.format(memory_clock_speed,
@@ -53,12 +62,13 @@ def QueryGpuClockSpeed(vm, device_id):
     Returns:
       Tuple of clock speeds in MHz in the form (memory clock, graphics clock).
   """
-  query = "sudo nvidia-smi --query-gpu=clocks.applications.memory,"\
-      "clocks.applications.graphics --format=csv --id={0}".format(device_id)
+  query = ("sudo nvidia-smi --query-gpu=clocks.applications.memory,"
+           "clocks.applications.graphics --format=csv --id={0}"
+           .format(device_id))
   stdout, _ = vm.RemoteCommand(query, should_log=True)
   clock_speeds = stdout.splitlines()[1]
-  query = r'(\d*).*,\s*(\d*)'
-  matches = regex_util.ExtractAllMatches(query, clock_speeds)[0]
+  matches = regex_util.ExtractAllMatches(EXTRACT_CLOCK_SPEEDS_REGEX,
+                                         clock_speeds)[0]
   return (int(matches[0]), int(matches[1]))
 
 

@@ -33,13 +33,15 @@ flags.DEFINE_integer('gpu_pcie_bandwidth_iterations', 30,
 TESLA_K80_MAX_CLOCK_SPEEDS = [2505, 875]
 flag_util.DEFINE_integerlist('gpu_pcie_bandwidth_clock_speeds',
                              flag_util.IntegerList(TESLA_K80_MAX_CLOCK_SPEEDS),
-                             'desired gpu clock speeds in the form\
-                             [memory clock, graphics clock]')
+                             'desired gpu clock speeds in the form '
+                             '[memory clock, graphics clock]')
 
 
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'gpu_pcie_bandwidth'
+# Note on the config: gce_migrate_on_maintenance must be false,
+# because GCE does not support migrating the user's GPU state.
 BENCHMARK_CONFIG = """
 gpu_pcie_bandwidth:
   description: Runs NVIDIA's CUDA bandwidth test.
@@ -62,6 +64,10 @@ gpu_pcie_bandwidth:
 BENCHMARK_METRICS = ['Host to device bandwidth',
                      'Device to host bandwidth',
                      'Device to device bandwidth']
+
+
+class UnsupportedClockSpeedException(Exception):
+  pass
 
 
 def GetConfig(user_config):
@@ -135,43 +141,56 @@ def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
     iteration).
 
   Args:
-    results: a list of result dictionaries. Each result dictionary
+    result_dicts: a list of result dictionaries. Each result dictionary
       represents a single run of the CUDA device bandwidth test,
       parsed by _ParseOutputFromSingleIteration().
 
+    metadata: metadata dict to be added to each Sample.
+
   Returns:
-    a list of sample.Samples containing the following stats for each
-    of the three bandwidth metrics (device to host, device to device,
-    and host to device):
+    a list of sample.Samples containing the device to host bandwidth,
+    host to device bandwidth, and device to device bandwidth for each
+    iteration, along with the following stats for each bandwidth type:
       * mean
       * min
       * max
       * stddev
   """
-  results = []
+  samples = []
   for metric in BENCHMARK_METRICS:
     sequence = [x[metric] for x in result_dicts]
-    results.append(sample.Sample(
+    # Add a Sample for each iteration, and include the iteration number
+    # in the metadata.
+    for idx, measurement in enumerate(sequence):
+      metadata_copy = metadata.copy()
+      metadata_copy['iteration'] = idx
+      samples.append(sample.Sample(
+          metric, measurement, 'MB/s', metadata_copy))
+
+    samples.append(sample.Sample(
         metric + ', min', min(sequence), 'MB/s', metadata))
-    results.append(sample.Sample(
+    samples.append(sample.Sample(
         metric + ', max', max(sequence), 'MB/s', metadata))
-    results.append(sample.Sample(
+    samples.append(sample.Sample(
         metric + ', mean', numpy.mean(sequence), 'MB/s', metadata))
-    results.append(sample.Sample(
+    samples.append(sample.Sample(
         metric + ', stddev', numpy.std(sequence), 'MB/s', metadata))
-  return results
+  return samples
 
 
-def _SetAndConfirmGpuClocks(benchmark_spec):
+def _SetAndConfirmGpuClocks(vm):
   """Sets and confirms the GPU clocks with the values provided
      in the gpu_pcie_bandwidth_clock_speeds flag. If a device
      is queried and its clock speed does not allign with what
      it was just set to, an expection will be raised.
 
+     Args:
+      vm: the virtual machine to operate on.
+
      Raises:
-      Exception if a GPU did not accept the provided clock speeds.
+      UnsupportedClockSpeedException if a GPU did not accept the
+      provided clock speeds.
   """
-  vm = benchmark_spec.vms[0]
   desired_memory_clock = FLAGS.gpu_pcie_bandwidth_clock_speeds[0]
   desired_graphics_clock = FLAGS.gpu_pcie_bandwidth_clock_speeds[1]
   cuda_toolkit_8.SetGpuClockSpeed(vm,
@@ -181,10 +200,10 @@ def _SetAndConfirmGpuClocks(benchmark_spec):
   for i in range(num_gpus):
     if cuda_toolkit_8.QueryGpuClockSpeed(vm, i) != (desired_memory_clock,
                                                     desired_graphics_clock):
-      raise Exception("Unrecoverable error setting "
-                      "GPU #{} clock speed to {},{}"
-                      .format(i, desired_memory_clock, desired_graphics_clock))
-
+      raise UnsupportedClockSpeedException("Unrecoverable error setting "
+                                           "GPU #{} clock speed to {},{}"
+                                           .format(i, desired_memory_clock,
+                                                   desired_graphics_clock))
 
 
 def Run(benchmark_spec):
@@ -201,23 +220,29 @@ def Run(benchmark_spec):
   # Note:  The clock speed is set in this function rather than Prepare()
   # so that the user can perform multiple runs with a specified
   # clock speed without having to re-prepare the VM.
-  _SetAndConfirmGpuClocks(benchmark_spec)
-  iterations = FLAGS.gpu_pcie_bandwidth_iterations
-  samples = []
+  _SetAndConfirmGpuClocks(vm)
+  num_iterations = FLAGS.gpu_pcie_bandwidth_iterations
+  raw_results = []
   metadata = {}
-  metadata['iterations'] = iterations
-  metadata['clock_speeds'] = [FLAGS.gpu_pcie_bandwidth_clock_speeds[0],
-                              FLAGS.gpu_pcie_bandwidth_clock_speeds[1]]
-  run_command = '%s/extras/demo_suite/bandwidthTest --device=all' %\
-      cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
-  for i in range(iterations):
+  metadata['num_iterations'] = num_iterations
+  metadata['memory_clock_MHz'] = FLAGS.gpu_pcie_bandwidth_clock_speeds[0]
+  metadata['graphics_clock_MHz'] = FLAGS.gpu_pcie_bandwidth_clock_speeds[1]
+  run_command = ('%s/extras/demo_suite/bandwidthTest --device=all'
+                 % cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR)
+  for i in range(num_iterations):
     stdout, _ = vm.RemoteCommand(run_command, should_log=True)
-    samples.append(_ParseOutputFromSingleIteration(stdout))
+    raw_results.append(_ParseOutputFromSingleIteration(stdout))
     if 'device_info' not in metadata:
       metadata['device_info'] = _ParseDeviceInfo(stdout)
-  return _CalculateMetricsOverAllIterations(samples, metadata)
+  return _CalculateMetricsOverAllIterations(raw_results, metadata)
 
 
 def Cleanup(benchmark_spec):
+  """Uninstalls CUDA toolkit 8
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+  """
   vm = benchmark_spec.vms[0]
   vm.Uninstall('cuda_toolkit_8')
