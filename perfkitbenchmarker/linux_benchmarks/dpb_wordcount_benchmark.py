@@ -1,7 +1,7 @@
 import tempfile
 
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker.dpb_service import BaseDpbService
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
@@ -13,6 +13,9 @@ BENCHMARK_NAME = 'dpb_wordcount_benchmark'
 BENCHMARK_CONFIG = """
 dpb_wordcount_benchmark:
   description: Run word count on dataflow and dataproc
+  flags:
+    dpb_wordcount_out_fs: gs
+    dpb_wordcount_out_base: saksena-df
   dpb_service:
     service_type: dataproc
     worker_group:
@@ -37,6 +40,12 @@ flags.DEFINE_string('dpb_wordcount_gcs_input',
 flags.DEFINE_string('dpb_wordcount_s3_input',
                     's3://pkb-shakespeare/kinglear.txt',
                     'Input for word count')
+flags.DEFINE_enum('dpb_wordcount_out_fs', BaseDpbService.HDFS_OUTPUT_FS,
+                  [BaseDpbService.HDFS_OUTPUT_FS, BaseDpbService.GCS_OUTPUT_FS,
+                   BaseDpbService.S3_OUTPUT_FS],
+                  'File System to use for the job output')
+flags.DEFINE_string('dpb_wordcount_out_base', None,
+                    'Base directory for word count output')
 
 FLAGS = flags.FLAGS
 
@@ -74,11 +83,19 @@ def Run(benchmark_spec):
     elif dpb_service.SERVICE_TYPE == 'dataflow':
         jarfile = gcp_dpb_dataflow.DATAFLOW_WC_JAR
         classname = 'com.google.cloud.dataflow.examples.WordCount'
-        base_gs_dataflow_dir = 'gs://saksena-df' #TODO: generify this
+
+        # Validate and setup the output and staging directories for the job
+        if FLAGS.dpb_wordcount_out_fs != dpb_service.GCS_OUTPUT_FS:
+          raise Exception('Invalid File System integration required for a '
+                          'dataflow job')
+        if not FLAGS.dpb_wordcount_out_base:
+          raise Exception('Missing base output directory')
+        base_gs_dataflow_dir = 'gs://{0}'.format(FLAGS.dpb_wordcount_out_base)
         job_arguments.append('--stagingLocation={0}/staging/'.format(
             base_gs_dataflow_dir))
         job_arguments.append('--output={0}/output/'.format(
             base_gs_dataflow_dir))
+
         job_arguments.append('--runner={0}'.format(
             gcp_dpb_dataflow.DATAFLOW_BLOCKING_RUNNER))
         job_type = None

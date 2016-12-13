@@ -72,6 +72,10 @@ class BaseDpbService(resource.BaseResource):
   __metaclass__ = AutoRegisterDpbServiceMeta
 
   SERVICE_TYPE = 'abstract'
+  HDFS_OUTPUT_FS = 'hdfs'
+  GCS_OUTPUT_FS = 'gs'
+  S3_OUTPUT_FS = 's3'
+
 
   def __init__(self, dpb_service_spec):
     """Initialize the Dpb service object.
@@ -89,9 +93,7 @@ class BaseDpbService(resource.BaseResource):
   def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
                 job_stdout_file=None, job_arguments=None,
                 job_type=None):
-    """Submit a job to the spark service.
-
-    Submits a job and waits for it to complete.
+    """Submit a data processing job to the backend.
 
     Args:
       job_jar: Jar file to execute.
