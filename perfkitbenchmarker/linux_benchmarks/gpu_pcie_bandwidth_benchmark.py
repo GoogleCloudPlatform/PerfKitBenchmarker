@@ -65,6 +65,9 @@ BENCHMARK_METRICS = ['Host to device bandwidth',
                      'Device to host bandwidth',
                      'Device to device bandwidth']
 
+EXTRACT_BANDWIDTH_TEST_RESULTS_REGEX = r'\d+\s+(\d+\.?\d*)'
+EXTRACT_DEVICE_INFO_REGEX = r'Device\s*(\d):\s*(.*$)'
+
 
 class UnsupportedClockSpeedException(Exception):
   pass
@@ -90,7 +93,6 @@ def Prepare(benchmark_spec):
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
-
   """
   vm = benchmark_spec.vms[0]
   vm.Install('cuda_toolkit_8')
@@ -107,7 +109,7 @@ def _ParseDeviceInfo(test_output):
     A dictionary mapping the device number to its name, for every
     device available on the system.
   """
-  matches = regex_util.ExtractAllMatches(r'Device\s*(\d):\s*(.*$)',
+  matches = regex_util.ExtractAllMatches(EXTRACT_DEVICE_INFO_REGEX,
                                          test_output, re.MULTILINE)
   devices = {str(i[0]): str(i[1]) for i in matches}
   return devices
@@ -128,7 +130,8 @@ def _ParseOutputFromSingleIteration(test_output):
     All units are in MB/s, as these are the units guaranteed to be output
     by the test.
   """
-  matches = regex_util.ExtractAllMatches(r'\d+\s+(\d+\.?\d*)', test_output)
+  matches = regex_util.ExtractAllMatches(EXTRACT_BANDWIDTH_TEST_RESULTS_REGEX,
+                                         test_output)
   results = {}
   for i, metric in enumerate(BENCHMARK_METRICS):
     results[metric] = float(matches[i])
@@ -136,9 +139,10 @@ def _ParseOutputFromSingleIteration(test_output):
 
 
 def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
-  """Calculates stats given list of result dictionaries
-    (each item in the list represends the results from a single
-    iteration).
+  """Calculates stats given list of result dictionaries.
+
+    Each item in the list represends the results from a single
+    iteration.
 
   Args:
     result_dicts: a list of result dictionaries. Each result dictionary
@@ -179,17 +183,18 @@ def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
 
 
 def _SetAndConfirmGpuClocks(vm):
-  """Sets and confirms the GPU clocks with the values provided
-     in the gpu_pcie_bandwidth_clock_speeds flag. If a device
-     is queried and its clock speed does not allign with what
-     it was just set to, an expection will be raised.
+  """Sets and confirms the GPU clock speed.
 
-     Args:
-      vm: the virtual machine to operate on.
+  The clock values are provided in the gpu_pcie_bandwidth_clock_speeds
+  flag. If a device is queried and its clock speed does not allign with
+  what it was just set to, an expection will be raised.
 
-     Raises:
-      UnsupportedClockSpeedException if a GPU did not accept the
-      provided clock speeds.
+  Args:
+    vm: the virtual machine to operate on.
+
+  Raises:
+    UnsupportedClockSpeedException if a GPU did not accept the
+    provided clock speeds.
   """
   desired_memory_clock = FLAGS.gpu_pcie_bandwidth_clock_speeds[0]
   desired_graphics_clock = FLAGS.gpu_pcie_bandwidth_clock_speeds[1]
@@ -200,8 +205,8 @@ def _SetAndConfirmGpuClocks(vm):
   for i in range(num_gpus):
     if cuda_toolkit_8.QueryGpuClockSpeed(vm, i) != (desired_memory_clock,
                                                     desired_graphics_clock):
-      raise UnsupportedClockSpeedException("Unrecoverable error setting "
-                                           "GPU #{} clock speed to {},{}"
+      raise UnsupportedClockSpeedException('Unrecoverable error setting '
+                                           'GPU #{} clock speed to {},{}'
                                            .format(i, desired_memory_clock,
                                                    desired_graphics_clock))
 

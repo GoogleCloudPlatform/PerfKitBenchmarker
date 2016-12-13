@@ -30,21 +30,21 @@ EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
 def QueryNumberOfGpus(vm):
   """Returns the number of Nvidia GPUs on the system"""
-  stdout, _ = vm.RemoteCommand("sudo nvidia-smi --query-gpu=count --id=0 "
-                               "--format=csv", should_log=True)
+  stdout, _ = vm.RemoteCommand('sudo nvidia-smi --query-gpu=count --id=0 '
+                               '--format=csv', should_log=True)
   return int(stdout.split()[1])
 
 
 def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
-  """Sets the K80 GPU memory and graphics clocks to the specified frequency
-     and enables persistence mode.
+  """Sets the memory and graphics clocks to the specified frequency.
 
-     Note that these settings are lost after reboot.
+  Persistence mode is enabled as well. Note that these settings are
+  lost after reboot.
 
-     Args:
-      vm: virtual machine to operate on
-      memory_clock_speed: desired speed of the memory clock, in MHz
-      graphics_clock_speed: desired speed of the graphics clock, in MHz
+  Args:
+    vm: virtual machine to operate on
+    memory_clock_speed: desired speed of the memory clock, in MHz
+    graphics_clock_speed: desired speed of the graphics clock, in MHz
   """
   vm.RemoteCommand('sudo nvidia-smi -pm 1')
   vm.RemoteCommand('sudo nvidia-smi -ac {},{}'.format(memory_clock_speed,
@@ -52,18 +52,19 @@ def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
 
 
 def QueryGpuClockSpeed(vm, device_id):
-  """Returns the user-specified values of the memory and graphics clock
-     in MHz for the specified GPU.
+  """Returns the user-specified values of the memory and graphics clock.
 
-     Args:
-      vm: virtual machine to operate on
-      device_id: id of GPU device to query
+  All clock values are in MHz.
 
-    Returns:
-      Tuple of clock speeds in MHz in the form (memory clock, graphics clock).
+  Args:
+    vm: virtual machine to operate on
+    device_id: id of GPU device to query
+
+  Returns:
+    Tuple of clock speeds in MHz in the form (memory clock, graphics clock).
   """
-  query = ("sudo nvidia-smi --query-gpu=clocks.applications.memory,"
-           "clocks.applications.graphics --format=csv --id={0}"
+  query = ('sudo nvidia-smi --query-gpu=clocks.applications.memory,'
+           'clocks.applications.graphics --format=csv --id={0}'
            .format(device_id))
   stdout, _ = vm.RemoteCommand(query, should_log=True)
   clock_speeds = stdout.splitlines()[1]
@@ -102,8 +103,9 @@ def CheckPrerequisites():
 
 def Uninstall(vm):
   """Removes the CUDA toolkit.
-     Note that reinstallation does not work correctly, i.e. you cannot reinstall
-     CUDA by calling _Install() again.
+
+  Note that reinstallation does not work correctly, i.e. you cannot reinstall
+  CUDA by calling _Install() again.
   """
   vm.RemoteCommand('rm %s' % CUDA_TOOLKIT_UBUNTU)
   vm.RemoteCommand('sudo rm -rf %s' % CUDA_TOOLKIT_INSTALL_DIR)
