@@ -114,20 +114,12 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
                              self.cluster_id)
-    # TODO test this claim
-    # If we don't put this here, zone is automatically added, which
-    # breaks the dataproc clusters delete
-    cmd.flags['zone'] = []
     cmd.Issue()
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
                              self.cluster_id)
-    # TODO test this claim
-    # If we don't put this here, zone is automatically added to
-    # the command, which breaks dataproc clusters describe
-    cmd.flags['zone'] = []
     _, _, retcode = cmd.Issue()
     return retcode == 0
 
@@ -137,10 +129,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
                 job_type=None):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
-    # TODO test this claim
-    # If we don't put this here, zone is auotmatically added to the command
-    # which breaks dataproc jobs submit
-    cmd.flags['zone'] = []
 
     if classname:
       cmd.flags['jars'] = jarfile
