@@ -30,22 +30,34 @@ from perfkitbenchmarker import resource
 _DPB_SERVICE_REGISTRY = {}
 FLAGS = flags.FLAGS
 
-# supported data processing backend services
+"""
+Supported data processing backend services
+"""
 DATAPROC = 'dataproc'
 DATAFLOW = 'dataflow'
 EMR = 'emr'
 
 DEFAULT_WORKER_COUNT = 2
 
+"""
+Supported applications that can be enabled on the dpb service
+"""
 FLINK = 'flink'
 HIVE = 'hive'
 
+"""
+Metrics and Status related metadata
+"""
 SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
 
+"""
+Job types that are supported on the dpb service backends
+"""
 SPARK_JOB_TYPE = 'spark'
 HADOOP_JOB_TYPE = 'hadoop'
+DATAFLOW_JOB_TYPE = 'dataflow' # TODO: decide how to pass this along or maybe we should be using the beam sdk as a job type to
 
 
 def GetDpbServiceClass(dpb_service_type):

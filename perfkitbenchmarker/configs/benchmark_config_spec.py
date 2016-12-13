@@ -122,8 +122,8 @@ class _DpbServiceSpec(spec.BaseSpec):
       static_cluster_id: if user has created a cluster, the id of the cluster.
       worker_group: Vm group spec for workers.
       worker_count: the number of workers part of the dpb cluster
-      initialization_actions: An enumerated list of post creation actions that need
-      to be performed on the cluster
+      applications: An enumerated list of applications that need
+      to be enabled on the dpb service
     """
 
     def __init__(self, component_full_name, flag_values=None, **kwargs):
@@ -142,9 +142,9 @@ class _DpbServiceSpec(spec.BaseSpec):
           to construct in order to decode the named option.
           TODO: 1. Add support for EMR dpb service
                 2. replace hard coded min value with a config value
-                3. Rename initialization actions to applications
                 4. Figure out the static_cluster_id (how to set it and then
                 how to use a flag to override it
+                - Support a list of applications as opposed to a single application
         """
         result = super(_DpbServiceSpec, cls)._GetOptionDecoderConstructions()
         result.update({
@@ -158,7 +158,7 @@ class _DpbServiceSpec(spec.BaseSpec):
             'worker_group': (_VmGroupSpecDecoder, {}),
             'worker_count': (option_decoders.IntDecoder,
                              {'default': dpb_service.DEFAULT_WORKER_COUNT, 'min': 2}),
-            'initialization_actions': (option_decoders.EnumDecoder, {
+            'applications': (option_decoders.EnumDecoder, {
                 'default': [],
                 'valid_values': [dpb_service.FLINK, dpb_service.HIVE]})
         })

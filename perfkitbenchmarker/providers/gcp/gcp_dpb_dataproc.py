@@ -86,9 +86,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # The number of worker machines in the cluster
     cmd.flags['num-workers'] = self.spec.worker_count
 
-    ## can configure initialization actions here
-    if self.spec.initialization_actions:
-      logging.info('Provider specific mechanism to include the requested applications')
+    # Initialize applications on the dataproc cluster
+    if self.spec.applications:
+      logging.info('Include the requested applications')
 
     # TODO: cleanup the setup and then the comment
     # There is only one group the worker group now
