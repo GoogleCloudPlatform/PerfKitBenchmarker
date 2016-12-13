@@ -80,6 +80,17 @@ class FlagsDecoder(option_decoders.TypeVerifier):
     return merged_flag_values.FlagDict()
 
 
+class _ApplicationListDecoder(option_decoders.ListDecoder):
+    """Decodes the list of applications to be enabled on the dpb service."""
+    def __init__(self, **kwargs):
+        super(_ApplicationListDecoder, self).__init__(default=None,
+                                                      item_decoder=
+                                                      option_decoders.EnumDecoder(
+                                                          [dpb_service.FLINK,
+                                                           dpb_service.HIVE]),
+                                                      **kwargs)
+
+
 class _DpbServiceDecoder(option_decoders.TypeVerifier):
     """Validates the dpb(data processing backend) service dictionary of a
     benchmark config object."""
@@ -158,9 +169,7 @@ class _DpbServiceSpec(spec.BaseSpec):
             'worker_group': (_VmGroupSpecDecoder, {}),
             'worker_count': (option_decoders.IntDecoder,
                              {'default': dpb_service.DEFAULT_WORKER_COUNT, 'min': 2}),
-            'applications': (option_decoders.EnumDecoder, {
-                'default': [],
-                'valid_values': [dpb_service.FLINK, dpb_service.HIVE]})
+            'applications': (_ApplicationListDecoder, {})
         })
         return result
 
