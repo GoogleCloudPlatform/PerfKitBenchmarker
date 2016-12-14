@@ -545,8 +545,7 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
 
   def __init__(self, vm_spec):
     super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
-    user_name_set = FLAGS['aws_user_name'].present
-    self.user_name = FLAGS.aws_user_name if user_name_set else 'ec2-user'
+    self.user_name = FLAGS.aws_user_name if FLAGS['aws_user_name'].present else 'ec2-user'
 
 
 class WindowsAwsVirtualMachine(AwsVirtualMachine,
