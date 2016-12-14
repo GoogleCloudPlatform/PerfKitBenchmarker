@@ -90,23 +90,21 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if self.spec.applications:
       logging.info('Include the requested applications')
 
-    # TODO: cleanup the setup and then the comment
-    # There is only one group the worker group now
-    # I think the spec is the one copying the worker configuration to the
-    # master configuration
+    for role in ['worker', 'master']:
+      # Set machine type
+      if self.spec.worker_group.vm_spec.machine_type:
+        self.add_to_cmd(cmd, '{0}-machine-type'.format(role),
+                self.spec.worker_group.vm_spec.machine_type)
 
-    for group_type, group_spec in [
-        ('worker', self.spec.worker_group)]:
-      flag_name = group_type + '-machine-type'
-      cmd.flags[flag_name] = group_spec.vm_spec.machine_type
+      # Set boot_disk_size
+      if self.spec.worker_group.vm_spec.boot_disk_size:
+        self.add_to_cmd(cmd, '{0}-boot-disk-size'.format(role),
+                self.spec.worker_group.vm_spec.boot_disk_size)
 
-      if group_spec.vm_spec.num_local_ssds:
-        ssd_flag = 'num-{0}-local-ssds'.format(group_type)
-        cmd.flags[ssd_flag] = group_spec.vm_spec.num_local_ssds
-
-      if group_spec.vm_spec.boot_disk_size:
-        disk_flag = group_type + '-boot-disk-size'
-        cmd.flags[disk_flag] = group_spec.vm_spec.boot_disk_size
+      # Set ssd count
+      if self.spec.worker_group.vm_spec.num_local_ssds:
+        self.add_to_cmd(cmd, 'num-{0}-local-ssds'.format(role),
+                self.spec.worker_group.vm_spec.num_local_ssds)
 
     cmd.Issue()
 
@@ -156,10 +154,12 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def SetClusterProperty(self):
     pass
 
+  def add_to_cmd(self, cmd, cmd_property, cmd_value):
+    flag_name = cmd_property
+    cmd.flags[flag_name] = cmd_value
 """
 TODO:
 1. Add the stats for the cluster creation time
-2. Rename initialization actions to applications
 3. Maybe add a validate function to verify that we the
 bare requirements of job submit working
 4. Improve upon the _GetStats method. Figure out the stats
