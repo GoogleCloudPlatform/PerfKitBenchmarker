@@ -728,7 +728,7 @@ def ListConsistencyBenchmark(results, metadata, vm, command_builder,
                                    metadata)
 
 
-def LoadWorkerOutput(output, streams_per_vm):
+def LoadWorkerOutput(output):
   """Load output from worker processes to our internal format.
 
   Args:
@@ -863,7 +863,7 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
 
   output = _RunMultiStreamProcesses(vms, command_builder, cmd_args,
                                     streams_per_vm)
-  start_times, latencies, sizes = LoadWorkerOutput(output, streams_per_vm)
+  start_times, latencies, sizes = LoadWorkerOutput(output)
   _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
                              size_distribution.iterkeys(), results,
                              metadata=metadata)
@@ -1082,6 +1082,8 @@ def PrepareVM(vm, service):
     logging.info('Uploading %s to %s', path, vm)
     vm.PushFile(path, '/tmp/run/')
 
+  service.PrepareVM(vm)
+
 
 def CleanupVM(vm):
   vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
@@ -1105,9 +1107,7 @@ def Prepare(benchmark_spec):
   service.PrepareService(FLAGS.object_storage_region)
 
   vms = benchmark_spec.vms
-  for vm in vms:
-    PrepareVM(vm, service)
-    service.PrepareVM(vm)
+  vm_util.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
 
   # We would like to always cleanup server side states when exception happens.
   benchmark_spec.always_call_cleanup = True
