@@ -558,7 +558,8 @@ def RunBenchmarkTask(spec):
 
 def _LogCommandLineFlags():
   result = []
-  for flag in FLAGS.FlagDict().values():
+  for name in FLAGS:
+    flag = FLAGS[name]
     if flag.present:
       result.append(flag.Serialize())
   logging.info('Flag values:\n%s', '\n'.join(result))
