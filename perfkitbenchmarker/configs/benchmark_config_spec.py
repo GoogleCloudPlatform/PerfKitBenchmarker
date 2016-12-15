@@ -76,7 +76,10 @@ class FlagsDecoder(option_decoders.TypeVerifier):
                 'Invalid {0}.{1} value: "{2}" (of type "{3}").{4}{5}'.format(
                     self._GetOptionFullName(component_full_name), key, value,
                     value.__class__.__name__, os.linesep, e))
-    return merged_flag_values.FlagDict()
+    if hasattr(merged_flag_values, '_flags'):
+      return merged_flag_values._flags()  # pylint: disable=protected-access
+    else:
+      return merged_flag_values.FlagDict()
 
 
 class _PerCloudConfigSpec(spec.BaseSpec):
