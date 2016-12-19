@@ -32,6 +32,9 @@ from perfkitbenchmarker.linux_packages import ycsb
 # See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
 flags.DEFINE_string('mongodb_writeconcern', 'acknowledged',
                     'MongoDB write concern.')
+flags.DEFINE_integer('mongodb_readahead_kb', None,
+                     'Configure block device readahead settings.')
+
 
 FLAGS = flags.FLAGS
 
@@ -69,6 +72,9 @@ def _PrepareServer(vm):
       "sudo sed -i -e '/bind_ip/ s/^/#/; s,^dbpath=.*,dbpath=%s,' %s" %
       (data_dir,
        vm.GetPathToConfig('mongodb_server')))
+  if FLAGS.mongodb_readahead_kb is not None:
+    vm.SetReadAhead(FLAGS.mongodb_readahead_kb * 2,
+                    [d.GetDevicePath() for d in vm.scratch_disks])
   vm.RemoteCommand('sudo service %s restart' %
                    vm.GetServiceName('mongodb_server'))
 
@@ -116,6 +122,9 @@ def Run(benchmark_spec):
   samples = list(benchmark_spec.executor.LoadAndRun(
       benchmark_spec.vm_groups['clients'],
       load_kwargs=kwargs, run_kwargs=kwargs))
+  if FLAGS.mongodb_readahead_kb is not None:
+    for s in samples:
+      s.metadata['readahdead_kb'] = FLAGS.mongodb_readahead_kb
   return samples
 
 
