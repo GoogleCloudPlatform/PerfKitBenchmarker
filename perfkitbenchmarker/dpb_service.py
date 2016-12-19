@@ -56,13 +56,6 @@ SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
 
-"""
-Job types that are supported on the dpb service backends
-"""
-SPARK_JOB_TYPE = 'spark'
-HADOOP_JOB_TYPE = 'hadoop'
-DATAFLOW_JOB_TYPE = 'dataflow' # TODO: decide how to pass this along or maybe we should be using the beam sdk as a job type to
-
 
 def GetDpbServiceClass(dpb_service_type):
   """Get the Data Processing Backend class corresponding to 'service_type'."""
@@ -92,6 +85,12 @@ class BaseDpbService(resource.BaseResource):
   GCS_OUTPUT_FS = 'gs'
   S3_OUTPUT_FS = 's3'
 
+  """
+  Job types that are supported on the dpb service backends
+  """
+  SPARK_JOB_TYPE = 'spark'
+  HADOOP_JOB_TYPE = 'hadoop'
+  DATAFLOW_JOB_TYPE = 'dataflow'
 
   def __init__(self, dpb_service_spec):
     """Initialize the Dpb service object.

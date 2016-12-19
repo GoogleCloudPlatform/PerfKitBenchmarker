@@ -77,7 +77,7 @@ def Run(benchmark_spec):
         jarfile = gcp_dpb_dataproc.SPARK_SAMPLE_LOCATION
         classname = 'org.apache.spark.examples.JavaWordCount'
         job_arguments.append(FLAGS.dpb_wordcount_gcs_input)
-        job_type = 'spark'
+        job_type = dpb_service.SPARK_JOB_TYPE
     elif dpb_service.SERVICE_TYPE == 'dataflow':
         jarfile = gcp_dpb_dataflow.DATAFLOW_WC_JAR
         classname = 'com.google.cloud.dataflow.examples.WordCount'
@@ -97,12 +97,12 @@ def Run(benchmark_spec):
         """Set the runner for the data flow job"""
         job_arguments.append('--runner={0}'.format(
             gcp_dpb_dataflow.DATAFLOW_BLOCKING_RUNNER))
-        job_type = None
+        job_type = dpb_service.DATAFLOW_JOB_TYPE
     elif dpb_service.SERVICE_TYPE == 'emr':
         jarfile = aws_dpb_emr.SPARK_SAMPLE_LOCATION
         classname = 'org.apache.spark.examples.JavaWordCount'
         job_arguments = [FLAGS.dpb_wordcount_s3_input]
-        job_type = 'spark'
+        job_type = dpb_service.SPARK_JOB_TYPE
     else:
         raise NotImplementedError
 
