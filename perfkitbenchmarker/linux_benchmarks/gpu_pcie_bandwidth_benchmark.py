@@ -60,6 +60,10 @@ gpu_pcie_bandwidth:
           machine_type: p2.xlarge
           zone: us-west-2b
           boot_disk_size: 20
+        Azure:
+          image: Canonical:UbuntuServer:16.04.0-LTS:latest
+          machine_type: Standard_NC6
+          zone: eastus
 """
 BENCHMARK_METRICS = ['Host to device bandwidth',
                      'Device to host bandwidth',
