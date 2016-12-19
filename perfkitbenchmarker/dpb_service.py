@@ -34,34 +34,43 @@ flags.DEFINE_string('static_dpb_service_instance', None,
 _DPB_SERVICE_REGISTRY = {}
 FLAGS = flags.FLAGS
 
-"""
-Supported data processing backend services
-"""
+
+# List of supported data processing backend services
 DATAPROC = 'dataproc'
 DATAFLOW = 'dataflow'
 EMR = 'emr'
 
+# Default number of workers to be used in the dpb service implementation
 DEFAULT_WORKER_COUNT = 2
 
-"""
-Supported applications that can be enabled on the dpb service
-"""
+
+# List of supported applications that can be enabled on the dpb service
 FLINK = 'flink'
 HIVE = 'hive'
 
-"""
-Metrics and Status related metadata
-"""
+
+# Metrics and Status related metadata
 SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
 
 
 def GetDpbServiceClass(dpb_service_type):
-  """Get the Data Processing Backend class corresponding to 'service_type'."""
+  """Gets the Data Processing Backend class corresponding to 'service_type'.
+
+  Args:
+    dpb_service_type: String service type as specified in configuration
+
+  Returns:
+    Implementation class corresponding to the argument dpb_service_type
+
+  Raises:
+    Exception: An invalid data processing backend service type was provided
+  """
   if dpb_service_type in _DPB_SERVICE_REGISTRY:
     return _DPB_SERVICE_REGISTRY.get(dpb_service_type)
   else:
+    # TODO(saksena): Make the exception specific to dpb service
     raise Exception('No Data Processing Backend service found for {0}'.format(
         dpb_service_type))
 
@@ -87,9 +96,7 @@ class BaseDpbService(resource.BaseResource):
   GCS_OUTPUT_FS = 'gs'
   S3_OUTPUT_FS = 's3'
 
-  """
-  Job types that are supported on the dpb service backends
-  """
+  # Job types that are supported on the dpb service backends
   SPARK_JOB_TYPE = 'spark'
   HADOOP_JOB_TYPE = 'hadoop'
   DATAFLOW_JOB_TYPE = 'dataflow'
@@ -101,8 +108,8 @@ class BaseDpbService(resource.BaseResource):
       dpb_service_spec: spec of the dpb service.
     """
     is_user_managed = dpb_service_spec.static_dpb_service_instance is not None
-    """ Hand over the actual creation to the resource module which treats the
-    user_managed resources in a speacial manner and skips creation attempt"""
+    # Hand over the actual creation to the resource module which treats the
+    # user_managed resources in a speacial manner and skips creation attempt
     super(BaseDpbService, self).__init__(user_managed=is_user_managed)
     self.spec = dpb_service_spec
     self.cluster_id = dpb_service_spec.static_dpb_service_instance

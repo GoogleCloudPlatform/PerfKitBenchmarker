@@ -66,10 +66,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def _Create(self):
         """Creates the cluster."""
         name = 'pkb_' + FLAGS.run_uri
-        """
-        TODO(saksena): Move this to a configuration value, potentially related
-        to providers' cluster support details
-        """
+
+        # TODO(saksena): Move this to a configuration value, potentially
+        # related to providers' cluster support details
         RELEASE_LABEL = 'emr-5.2.0'
 
         # Set up ebs details if disk_spec is present int he config
