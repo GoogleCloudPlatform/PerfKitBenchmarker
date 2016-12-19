@@ -105,7 +105,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         instance_groups.append(core_instances)
         instance_groups.append(master_instance)
 
-        # Create the log bucket
+        # Create the log bucket to hold job's log output
         logs_bucket = FLAGS.aws_emr_loguri or self._CreateLogBucket()
 
         cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
@@ -180,7 +180,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def SubmitJob(self, jarfile, classname, job_poll_interval=5,
                   job_arguments=None, job_stdout_file=None,
                   job_type=None):
-
+        """See base class."""
         @vm_util.Retry(timeout=600,
                        poll_interval=job_poll_interval, fuzz=0)
         def WaitForStep(step_id):
