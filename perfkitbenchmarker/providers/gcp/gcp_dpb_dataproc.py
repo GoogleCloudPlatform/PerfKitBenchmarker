@@ -13,7 +13,8 @@
 # limitations under the License.
 """Module containing class for GCP's dataproc service.
 
-Clusters can be created, have jobs submitted to them and deleted.
+Clusters can be created, have jobs submitted to them and deleted. See details
+at https://cloud.google.com/dataproc/
 """
 
 import datetime
