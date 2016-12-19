@@ -34,8 +34,7 @@ GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                          'spark-examples.jar')
 
-# TODO change this to invalid states or something
-DELETED_STATES = ['TERMINATED_WITH_ERRORS', 'TERMINATED']
+INVALID_STATES = ['TERMINATED_WITH_ERRORS', 'TERMINATED']
 READY_CHECK_SLEEP = 30
 READY_CHECK_TRIES = 60
 READY_STATE = 'WAITING'
@@ -144,7 +143,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         if rc != 0:
             return False
         result = json.loads(stdout)
-        if result['Cluster']['Status']['State'] in DELETED_STATES:
+        if result['Cluster']['Status']['State'] in INVALID_STATES:
             return False
         else:
             return True
@@ -157,7 +156,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                                  self.cluster_id]
         stdout, _, rc = vm_util.IssueCommand(cmd)
         result = json.loads(stdout)
-        # TODO: Handle error patterns when spinning up emr clusters
+        # TODO(saksena): Handle error outcomees when spinning up emr clusters
         return result['Cluster']['Status']['State'] == READY_STATE
 
 

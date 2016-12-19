@@ -187,7 +187,7 @@ class _DpbServiceSpec(spec.BaseSpec):
         if flag_values['static_dpb_service_instance'].present:
             config_values['static_dpb_service_instance'] = (
                 flag_values.static_dpb_service_instance)
-        # TODO: Figure out the zones(how to set it and then how to use a flag to override it)
+        # TODO(saksena): Update the documentation for zones assignment
         if flag_values['zones'].present:
             for group in ('worker_group'):
                 if group in config_values:
