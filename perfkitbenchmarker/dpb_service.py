@@ -155,7 +155,6 @@ class BaseDpbService(resource.BaseResource):
 
 """
 TODO:
-1. emr support
 2. pkb managed support
 4. implement a get metadata method in the concrete derived implementations
 
