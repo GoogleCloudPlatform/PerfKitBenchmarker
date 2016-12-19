@@ -591,6 +591,17 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         time.sleep(end_time - time.time())
       self.RemoteCommand('pkill -9 sysbench')
 
+  def SetReadAhead(self, num_sectors, devices):
+    """Set read-ahead value for block devices.
+
+    Args:
+      num_sectors: int. Number of sectors of read ahead.
+      devices: list of strings. A list of block devices.
+    """
+    self.RemoteCommand(
+        'sudo blockdev --setra {0} {1}; sudo blockdev --setfra {0} {1};'.format(
+            num_sectors, ' '.join(devices)))
+
 
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
