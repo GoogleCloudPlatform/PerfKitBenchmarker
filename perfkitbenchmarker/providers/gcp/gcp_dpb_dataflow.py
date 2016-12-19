@@ -59,9 +59,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     """See base class."""
     pass
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=None,
-                job_arguments=None, job_stdout_file=None,
-                job_type=None):
+  def submit_job(self, jarfile, classname, job_poll_interval=None,
+                 job_arguments=None, job_stdout_file=None,
+                 job_type=None):
     """See base class."""
     worker_machine_type = self.spec.worker_group.vm_spec.machine_type
     num_workers = self.spec.worker_count

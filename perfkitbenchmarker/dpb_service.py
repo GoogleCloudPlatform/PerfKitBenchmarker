@@ -115,9 +115,9 @@ class BaseDpbService(resource.BaseResource):
     self.cluster_id = dpb_service_spec.static_dpb_service_instance
 
   @abc.abstractmethod
-  def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
-                job_stdout_file=None, job_arguments=None,
-                job_type=None):
+  def submit_job(self, job_jar, class_name, job_poll_interval=None,
+                 job_stdout_file=None, job_arguments=None,
+                 job_type=None):
     """Submit a data processing job to the backend.
 
     Args:
@@ -141,8 +141,7 @@ class BaseDpbService(resource.BaseResource):
     """
     pass
 
-
-  def GetMetadata(self):
+  def get_metadata(self):
     """Return a dictionary of the metadata for this cluster."""
     basic_data = {'dpb_service': self.SERVICE_TYPE,
                   'dpb_cluster_id': self.cluster_id}

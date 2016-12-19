@@ -123,9 +123,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     return retcode == 0
 
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=None,
-                job_arguments=None, job_stdout_file=None,
-                job_type=None):
+  def submit_job(self, jarfile, classname, job_poll_interval=None,
+                 job_arguments=None, job_stdout_file=None,
+                 job_type=None):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
 
