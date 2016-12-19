@@ -62,7 +62,8 @@ def GetDpbServiceClass(dpb_service_type):
   if dpb_service_type in _DPB_SERVICE_REGISTRY:
     return _DPB_SERVICE_REGISTRY.get(dpb_service_type)
   else:
-    raise Exception('No Data Processing Backend service found for {0}'.format(dpb_service_type))
+    raise Exception('No Data Processing Backend service found for {0}'.format(
+        dpb_service_type))
 
 
 class AutoRegisterDpbServiceMeta(abc.ABCMeta):
@@ -72,7 +73,8 @@ class AutoRegisterDpbServiceMeta(abc.ABCMeta):
     if hasattr(cls, 'SERVICE_TYPE') and cls.SERVICE_TYPE is not None:
       _DPB_SERVICE_REGISTRY[cls.SERVICE_TYPE] = cls
     else:
-      raise Exception('BaseDpbService subclasses must have a SERVICE_TYPE attribute.')
+      raise Exception('BaseDpbService concrete subclasses must have a '
+                      'SERVICE_TYPE attribute.')
 
 
 class BaseDpbService(resource.BaseResource):
@@ -151,11 +153,3 @@ class BaseDpbService(resource.BaseResource):
     deleted.
     """
     raise NotImplementedError()
-
-
-"""
-TODO:
-2. pkb managed support
-4. implement a get metadata method in the concrete derived implementations
-
-"""

@@ -15,10 +15,7 @@
 Clusters can be created and deleted.
 """
 
-import datetime
 import json
-import re
-import os
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -40,6 +37,7 @@ READY_CHECK_TRIES = 60
 READY_STATE = 'WAITING'
 JOB_WAIT_SLEEP = 30
 
+
 class AwsDpbEmr(dpb_service.BaseDpbService):
     """Object representing a AWS EMR cluster.
 
@@ -53,7 +51,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     def __init__(self, dpb_service_spec):
         super(AwsDpbEmr, self).__init__(dpb_service_spec)
-        self.project =  None
+        self.project = None
         self.cmd_prefix = util.AWS_PREFIX
 
     def _CreateLogBucket(self):
@@ -83,18 +81,18 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
             assert self.spec.worker_group.disk_spec.mount_point is None
             assert self.spec.worker_group.disk_spec.iops is None
             ebs_configuration = {'EbsBlockDeviceConfigs': [
-                {'VolumeSpecification':
-                     {'SizeInGB': self.spec.worker_group.disk_spec.disk_size,
-                      'VolumeType': self.spec.worker_group.disk_spec.disk_type},
-                 'VolumesPerInstance':
-                     self.spec.worker_group.disk_spec.num_striped_disks}]}
+                {'VolumeSpecification': {
+                    'SizeInGB': self.spec.worker_group.disk_spec.disk_size,
+                    'VolumeType': self.spec.worker_group.disk_spec.disk_type},
+                    'VolumesPerInstance':
+                        self.spec.worker_group.disk_spec.num_striped_disks}]}
 
         # Create the specification for the master and the worker nodes
         instance_groups = []
         core_instances = {'InstanceCount': self.spec.worker_count,
                           'InstanceGroupType': 'CORE',
                           'InstanceType':
-                                self.spec.worker_group.vm_spec.machine_type}
+                              self.spec.worker_group.vm_spec.machine_type}
         if ebs_configuration:
             core_instances.update({'EbsConfiguration': ebs_configuration})
 
@@ -203,10 +201,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                 arg_spec = '[' + ','.join(job_arguments) + ']'
                 step_list.append('Args=' + arg_spec)
         else:
-            # assumption is that the spark job will always have a jar and a class
+            # assumption: spark job will always have a jar and a class
             arg_list = ['--class', classname, jarfile]
             if job_arguments:
-                arg_list += job_arguments # since there can be many
+                arg_list += job_arguments
             arg_spec = '[' + ','.join(arg_list) + ']'
             step_type_spec = 'Type=Spark'
             step_list = [step_type_spec, 'Args=' + arg_spec]

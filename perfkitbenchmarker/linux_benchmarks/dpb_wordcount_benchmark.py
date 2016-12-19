@@ -2,7 +2,6 @@ import tempfile
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.dpb_service import BaseDpbService
-from perfkitbenchmarker import sample
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
@@ -49,12 +48,14 @@ flags.DEFINE_string('dpb_wordcount_out_base', None,
 
 FLAGS = flags.FLAGS
 
+
 def GetConfig(user_config):
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(benchmark_spec):
     pass
+
 
 def Run(benchmark_spec):
     # Get handle to the dpb service
@@ -106,14 +107,15 @@ def Run(benchmark_spec):
     else:
         raise NotImplementedError
 
-    # TODO: Finalize What stats are we trying to gather, other than the end to end run time
-    stats = dpb_service.SubmitJob(jarfile,
-                                  classname,
-                                  job_arguments=job_arguments,
-                                  job_stdout_file=stdout_file,
-                                  job_type=job_type)
+    # TODO(saksena): Finalize stats and end to end run time
+    dpb_service.SubmitJob(jarfile,
+                          classname,
+                          job_arguments=job_arguments,
+                          job_stdout_file=stdout_file,
+                          job_type=job_type)
     results = []
     return results
+
 
 def Cleanup(benchmark_spec):
     pass

@@ -83,12 +83,11 @@ class FlagsDecoder(option_decoders.TypeVerifier):
 class _ApplicationListDecoder(option_decoders.ListDecoder):
     """Decodes the list of applications to be enabled on the dpb service."""
     def __init__(self, **kwargs):
-        super(_ApplicationListDecoder, self).__init__(default=None,
-                                                      item_decoder=
-                                                      option_decoders.EnumDecoder(
-                                                          [dpb_service.FLINK,
-                                                           dpb_service.HIVE]),
-                                                      **kwargs)
+        super(_ApplicationListDecoder, self).__init__(
+            default=None,
+            item_decoder=option_decoders.EnumDecoder([dpb_service.FLINK,
+                                                      dpb_service.HIVE]),
+            **kwargs)
 
 
 class _DpbServiceDecoder(option_decoders.TypeVerifier):
@@ -105,8 +104,8 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
           value: dict Dpb Service config dictionary
           component_full_name: string.  Fully qualified name of the configurable
           component containing the config option.
-          flag_values: flags.FlagValues.  Runtime flag values to be propagated to
-            BaseSpec constructors.
+          flag_values: flags.FlagValues.  Runtime flag values to be propagated
+          to BaseSpec constructors.
         Returns:
           _DpbServiceSpec Build from the config passed in in value.
         Raises:
@@ -148,17 +147,14 @@ class _DpbServiceSpec(spec.BaseSpec):
 
 
         Returns:
-          dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
-          The pair specifies a decoder class and its __init__() keyword arguments
-          to construct in order to decode the named option.
-          TODO: 1. Add support for EMR dpb service
-                2. replace hard coded min value with a config value
-                - Support a list of applications as opposed to a single application
+          dict. Maps option name string to a (ConfigOptionDecoder class, dict)
+           pair. The pair specifies a decoder class and its __init__() keyword
+           arguments to construct in order to decode the named option.
         """
         result = super(_DpbServiceSpec, cls)._GetOptionDecoderConstructions()
         result.update({
             'static_dpb_service_instance': (option_decoders.StringDecoder,
-                                  {'default': None, 'none_ok': True}),
+                                            {'default': None, 'none_ok': True}),
             'service_type': (option_decoders.EnumDecoder, {
                 'default': dpb_service.DATAPROC,
                 'valid_values': [dpb_service.DATAPROC,
@@ -166,7 +162,8 @@ class _DpbServiceSpec(spec.BaseSpec):
                                  dpb_service.EMR]}),
             'worker_group': (_VmGroupSpecDecoder, {}),
             'worker_count': (option_decoders.IntDecoder,
-                             {'default': dpb_service.DEFAULT_WORKER_COUNT, 'min': 2}),
+                             {'default': dpb_service.DEFAULT_WORKER_COUNT,
+                              'min': 2}),
             'applications': (_ApplicationListDecoder, {})
         })
         return result
@@ -178,8 +175,8 @@ class _DpbServiceSpec(spec.BaseSpec):
         Can be overridden by derived classes to add support for specific flags.
 
         Args:
-          config_values: dict mapping config option names to provided values. May
-              be modified by this function.
+          config_values: dict mapping config option names to provided values.
+            May be modified by this function.
           flag_values: flags.FlagValues. Runtime flags that may override the
               provided config values.
         """

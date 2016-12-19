@@ -30,6 +30,7 @@ DATAFLOW_WC_JAR = ('/Users/saksena/dev/first-dataflow/target/'
 
 DATAFLOW_BLOCKING_RUNNER = 'BlockingDataflowPipelineRunner'
 
+
 class GcpDpbDataflow(dpb_service.BaseDpbService):
   """Object representing GCP Dataflow Service."""
 
@@ -38,7 +39,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataflow, self).__init__(dpb_service_spec)
-    self.project =  None # self.spec.master_group.vm_spec.project
+    self.project = None
 
   @staticmethod
   def _GetStats(stdout):
@@ -74,7 +75,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     dataflow_executable = 'java'
     if not vm_util.ExecutableOnPath(dataflow_executable):
       raise errors.Setup.MissingExecutableError(
-        'Could not find required executable "%s"', dataflow_executable)
+          'Could not find required executable "%s"', dataflow_executable)
     cmd.append(dataflow_executable)
 
     cmd.append('-cp')
@@ -82,18 +83,18 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     """Verify the presence of executable jar file"""
     if not vm_util.FilePresent(jarfile):
       raise errors.Setup.MissingExecutableError(
-        'Could not find required jarfile "%s"', jarfile)
+          'Could not find required jarfile "%s"', jarfile)
     cmd.append(jarfile)
 
     cmd.append(classname)
     cmd += job_arguments
 
     cmd.append('--workerMachineType={workerMachineType}'.format(
-      workerMachineType=workerMachineType))
+        workerMachineType=workerMachineType))
     cmd.append('--numWorkers={numWorkers}'.format(
-      numWorkers=numWorkers))
+        numWorkers=numWorkers))
     cmd.append('--maxNumWorkers={maxNumWorkers}'.format(
-      maxNumWorkers=maxNumWorkers))
+        maxNumWorkers=maxNumWorkers))
 
     if diskSizeGb:
       cmd.append('--diskSizeGb={diskSizeGb}'.format(diskSizeGb=diskSizeGb))
