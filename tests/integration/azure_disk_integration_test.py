@@ -45,7 +45,7 @@ class AzureScratchDiskIntegrationTest(unittest.TestCase):
                 'vm_spec': {
                     'Azure': {
                         'machine_type': 'Standard_DS2',
-                        'zone': 'East US'
+                        'zone': 'eastus'
                     }
                 },
                 'disk_spec': {
@@ -71,7 +71,7 @@ class AzureScratchDiskIntegrationTest(unittest.TestCase):
                 'vm_spec': {
                     'Azure': {
                         'machine_type': 'Standard_D2',
-                        'zone': 'East US'
+                        'zone': 'eastus'
                     }
                 },
                 'disk_spec': {
@@ -93,7 +93,7 @@ class AzureScratchDiskIntegrationTest(unittest.TestCase):
                 'vm_spec': {
                     'Azure': {
                         'machine_type': 'Standard_D1',
-                        'zone': 'East US'
+                        'zone': 'eastus'
                     }
                 },
                 'disk_spec': {
