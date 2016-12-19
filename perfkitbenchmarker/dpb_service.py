@@ -27,6 +27,10 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
 
+flags.DEFINE_string('static_dpb_service_instance', None,
+                    'If set, the name of the pre created dpb implementation,'
+                    'assumed to be ready.')
+
 _DPB_SERVICE_REGISTRY = {}
 FLAGS = flags.FLAGS
 
@@ -95,11 +99,11 @@ class BaseDpbService(resource.BaseResource):
     Args:
       dpb_service_spec: spec of the dpb service.
     """
-    # TODO: Test how an existing cluster will work run_uri, etc.
-    is_user_managed = dpb_service_spec.static_cluster_id is not None
+    is_user_managed = dpb_service_spec.static_dpb_service_instance is not None
+    """ Hand over the actual creation to the resource module"""
     super(BaseDpbService, self).__init__(user_managed=is_user_managed)
     self.spec = dpb_service_spec
-    self.cluster_id = dpb_service_spec.static_cluster_id
+    self.cluster_id = dpb_service_spec.static_dpb_service_instance
 
   @abc.abstractmethod
   def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
@@ -153,7 +157,6 @@ class BaseDpbService(resource.BaseResource):
 TODO:
 1. emr support
 2. pkb managed support
-3. turn off azure setup
 4. implement a get metadata method in the concrete derived implementations
 
 """

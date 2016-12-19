@@ -130,7 +130,7 @@ class _DpbServiceSpec(spec.BaseSpec):
     Attributes:
 
       service_type: string.  pkb_managed or dataflow,dataproc,emr, etc.
-      static_cluster_id: if user has created a cluster, the id of the cluster.
+      static_dpb_service_instance: if user has pre created a container, the id
       worker_group: Vm group spec for workers.
       worker_count: the number of workers part of the dpb cluster
       applications: An enumerated list of applications that need
@@ -153,13 +153,11 @@ class _DpbServiceSpec(spec.BaseSpec):
           to construct in order to decode the named option.
           TODO: 1. Add support for EMR dpb service
                 2. replace hard coded min value with a config value
-                4. Figure out the static_cluster_id (how to set it and then
-                how to use a flag to override it
                 - Support a list of applications as opposed to a single application
         """
         result = super(_DpbServiceSpec, cls)._GetOptionDecoderConstructions()
         result.update({
-            'static_cluster_id': (option_decoders.StringDecoder,
+            'static_dpb_service_instance': (option_decoders.StringDecoder,
                                   {'default': None, 'none_ok': True}),
             'service_type': (option_decoders.EnumDecoder, {
                 'default': dpb_service.DATAPROC,
@@ -186,10 +184,9 @@ class _DpbServiceSpec(spec.BaseSpec):
               provided config values.
         """
         super(_DpbServiceSpec, cls)._ApplyFlags(config_values, flag_values)
-        # TODO: Figure out the static_cluster_id (how to set it and then how to use a flag to override it)
-        # if flag_values['dpb_static_cluster_id'].present:
-        #     config_values['static_cluster_id'] = (
-        #         flag_values.spark_static_cluster_id)
+        if flag_values['static_dpb_service_instance'].present:
+            config_values['static_dpb_service_instance'] = (
+                flag_values.static_dpb_service_instance)
         # TODO: Figure out the zones(how to set it and then how to use a flag to override it)
         if flag_values['zones'].present:
             for group in ('worker_group'):
