@@ -99,7 +99,8 @@ class BaseDpbService(resource.BaseResource):
       dpb_service_spec: spec of the dpb service.
     """
     is_user_managed = dpb_service_spec.static_dpb_service_instance is not None
-    """ Hand over the actual creation to the resource module"""
+    """ Hand over the actual creation to the resource module which treats the
+    user_managed resources in a speacial manner and skips creation attempt"""
     super(BaseDpbService, self).__init__(user_managed=is_user_managed)
     self.spec = dpb_service_spec
     self.cluster_id = dpb_service_spec.static_dpb_service_instance
