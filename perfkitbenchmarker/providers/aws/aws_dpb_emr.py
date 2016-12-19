@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing class for AWS's EMR service.
-clusters can be created and deleted.
+Clusters can be created and deleted.
 """
 
 import datetime
@@ -69,8 +69,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         """Creates the cluster."""
         name = 'pkb_' + FLAGS.run_uri
         """
-        TODO: Move this to a flag configuration, potentially related to
-        providers' cluster support details
+        TODO(saksena): Move this to a configuration value, potentially related
+        to providers' cluster support details
         """
         RELEASE_LABEL = 'emr-5.2.0'
 

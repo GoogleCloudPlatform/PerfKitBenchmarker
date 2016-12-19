@@ -105,7 +105,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       if self.spec.worker_group.vm_spec.num_local_ssds:
         self.add_to_cmd(cmd, 'num-{0}-local-ssds'.format(role),
                 self.spec.worker_group.vm_spec.num_local_ssds)
-
+    # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
 
   def _Delete(self):
@@ -157,11 +157,3 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def add_to_cmd(self, cmd, cmd_property, cmd_value):
     flag_name = cmd_property
     cmd.flags[flag_name] = cmd_value
-"""
-TODO:
-1. Add the stats for the cluster creation time
-3. Maybe add a validate function to verify that we the
-bare requirements of job submit working
-4. Improve upon the _GetStats method. Figure out the stats
-that should be pulled out (STATUS, various times)
-"""

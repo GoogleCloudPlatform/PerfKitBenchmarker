@@ -11,21 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing class for GCP's spark service.
-
-Spark clusters can be created and deleted.
+"""Module containing class for GCP's dataflow service.
+No Clusters can be created or destroyed, since it is a managed solution
 """
-
-import datetime
-import json
-import re
-import os
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -50,7 +43,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
   @staticmethod
   def _GetStats(stdout):
     """
-    TODO: Hook up the metrics API of dataflow to retrieve performance metrics
+    TODO(saksena): Hook up the metrics API of dataflow to retrieve performance
+    metrics when available
     """
     pass
 
@@ -66,7 +60,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     workerMachineType = self.spec.worker_group.vm_spec.machine_type
     numWorkers = self.spec.worker_count
     maxNumWorkers = self.spec.worker_count
-    if self.spec.worker_group.disk_spec and self.spec.worker_group.disk_spec.disk_size:
+    if self.spec.worker_group.disk_spec and \
+            self.spec.worker_group.disk_spec.disk_size:
       diskSizeGb = self.spec.worker_group.disk_spec.disk_size
     elif self.spec.worker_group.vm_spec.boot_disk_size:
       diskSizeGb = self.spec.worker_group.vm_spec.boot_disk_size
