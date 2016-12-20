@@ -177,9 +177,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         else:
             return None
 
-    def submit_job(self, jarfile, classname, job_poll_interval=5,
-                   job_arguments=None, job_stdout_file=None,
-                   job_type=None):
+    def SubmitJob(self, jarfile, classname, job_poll_interval=5,
+                  job_arguments=None, job_stdout_file=None,
+                  job_type=None):
         """See base class."""
         @vm_util.Retry(timeout=600,
                        poll_interval=job_poll_interval, fuzz=0)

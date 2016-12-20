@@ -127,11 +127,11 @@ def Run(benchmark_spec):
         raise NotImplementedError
 
     # TODO(saksena): Finalize stats and end to end run time
-    dpb_service.submit_job(jarfile,
-                           classname,
-                           job_arguments=job_arguments,
-                           job_stdout_file=stdout_file,
-                           job_type=job_type)
+    dpb_service.SubmitJob(jarfile,
+                          classname,
+                          job_arguments=job_arguments,
+                          job_stdout_file=stdout_file,
+                          job_type=job_type)
     results = []
     return results
 
