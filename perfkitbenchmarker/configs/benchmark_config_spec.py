@@ -125,17 +125,14 @@ class _DpbServiceSpec(spec.BaseSpec):
     When there are flags for these attributes, the convention is that
     the flag is prefixed with dpb.
 
-
     Attributes:
-
       service_type: string.  pkb_managed or dataflow,dataproc,emr, etc.
       static_dpb_service_instance: if user has pre created a container, the id
       worker_group: Vm group spec for workers.
-      worker_count: the number of workers part of the dpb cluster
+      worker_count: the number of workers part of the dpb service
       applications: An enumerated list of applications that need
-      to be enabled on the dpb service
+        to be enabled on the dpb service
     """
-
     def __init__(self, component_full_name, flag_values=None, **kwargs):
         super(_DpbServiceSpec, self).__init__(component_full_name,
                                               flag_values=flag_values,
@@ -144,7 +141,6 @@ class _DpbServiceSpec(spec.BaseSpec):
     @classmethod
     def _GetOptionDecoderConstructions(cls):
         """Gets decoder classes and constructor args for each configurable option.
-
 
         Returns:
           dict. Maps option name string to a (ConfigOptionDecoder class, dict)
