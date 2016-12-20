@@ -80,10 +80,11 @@ class FlagsDecoder(option_decoders.TypeVerifier):
     return merged_flag_values.FlagDict()
 
 
-class _ApplicationListDecoder(option_decoders.ListDecoder):
+class _DpbApplicationListDecoder(option_decoders.ListDecoder):
     """Decodes the list of applications to be enabled on the dpb service."""
+
     def __init__(self, **kwargs):
-        super(_ApplicationListDecoder, self).__init__(
+        super(_DpbApplicationListDecoder, self).__init__(
             default=None,
             item_decoder=option_decoders.EnumDecoder([dpb_service.FLINK,
                                                       dpb_service.HIVE]),
@@ -160,7 +161,7 @@ class _DpbServiceSpec(spec.BaseSpec):
             'worker_count': (option_decoders.IntDecoder,
                              {'default': dpb_service.DEFAULT_WORKER_COUNT,
                               'min': 2}),
-            'applications': (_ApplicationListDecoder, {})
+            'applications': (_DpbApplicationListDecoder, {})
         })
         return result
 

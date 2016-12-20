@@ -18,7 +18,6 @@ In order to benchmark Data Processing Backend services such as Google
 Cloud Platform's Dataproc and Dataflow or Amazon's EMR, we create a
 BaseDpbService class.  Classes to wrap specific backend services are in
 the corresponding provider directory as a subclass of BaseDpbService.
-
 """
 
 import abc
@@ -109,7 +108,7 @@ class BaseDpbService(resource.BaseResource):
     """
     is_user_managed = dpb_service_spec.static_dpb_service_instance is not None
     # Hand over the actual creation to the resource module which treats the
-    # user_managed resources in a speacial manner and skips creation attempt
+    # user_managed resources in a special manner and skips creation attempt
     super(BaseDpbService, self).__init__(user_managed=is_user_managed)
     self.spec = dpb_service_spec
     self.cluster_id = dpb_service_spec.static_dpb_service_instance
