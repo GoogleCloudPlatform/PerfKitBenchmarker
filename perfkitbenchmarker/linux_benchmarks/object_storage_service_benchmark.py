@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -121,6 +121,9 @@ flags.DEFINE_enum('object_storage_object_naming_scheme', 'sequential_by_stream',
                   'approximately_sequential: object names from all '
                   'streams will roughly increase together.')
 
+flags.DEFINE_string('object_storage_worker_output', None,
+                    'If set, the worker threads\' output will be written to the'
+                    'path provided.')
 
 FLAGS = flags.FLAGS
 
@@ -864,6 +867,9 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
   output = _RunMultiStreamProcesses(vms, command_builder, cmd_args,
                                     streams_per_vm)
   start_times, latencies, sizes = LoadWorkerOutput(output)
+  if FLAGS.object_storage_worker_output:
+    with open(FLAGS.object_storage_worker_output, 'w') as out_file:
+      out_file.write(json.dumps(output))
   _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
                              size_distribution.iterkeys(), results,
                              metadata=metadata)
@@ -1085,7 +1091,8 @@ def PrepareVM(vm, service):
   service.PrepareVM(vm)
 
 
-def CleanupVM(vm):
+def CleanupVM(vm, service):
+  service.CleanupVM(vm)
   vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
   vm.RemoteCommand('sudo rm -rf /tmp/run/')
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
@@ -1215,9 +1222,7 @@ def Cleanup(benchmark_spec):
   buckets = benchmark_spec.buckets
   vms = benchmark_spec.vms
 
-  for vm in vms:
-    service.CleanupVM(vm)
-    CleanupVM(vm)
+  vm_util.RunThreaded(lambda vm: CleanupVM(vm, service), vms)
 
   for bucket in buckets:
     service.DeleteBucket(bucket)
