@@ -147,8 +147,15 @@ class SelectionUpdate:
     all_active_latencies = np.concatenate(active_latencies)
 
     qps = len(all_active_latencies) / (end - start)
+    latency_min = min(all_active_latencies)
+    latency_max = max(all_active_latencies)
+    latency_avg = sum(all_active_latencies) / len(all_active_latencies)
+    latency_stddev = np.std(all_active_latencies)
 
-    text_str = 'Duration: %s\nQPS: %s' % (end - start, qps)
+    text_str = ('Duration: %s\nQPS: %s\nlatency min: %s\nlatency max: %s\n'
+                'latency avg: %s\nlatency stddev: %s'
+                % (end - start, qps, latency_min, latency_max,
+                   latency_avg, latency_stddev))
 
     # place a text box in upper left in axes coords
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
