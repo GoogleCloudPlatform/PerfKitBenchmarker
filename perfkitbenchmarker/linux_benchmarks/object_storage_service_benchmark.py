@@ -329,6 +329,8 @@ class DraggableXRange:
 
   def on_press(self, event):
     'on button press we will see if the mouse is over us and store some data'
+    import matplotlib.pyplot as plt
+
     if self.span is not None:
       return
 
@@ -351,6 +353,8 @@ class DraggableXRange:
 
   def on_motion(self, event):
     'on motion we will move the rect if the mouse is over us'
+    import matplotlib.pyplot as plt
+
     if self.span is None:
       return
 
@@ -414,9 +418,31 @@ class SelectionUpdate:
     if start is None:
       assert end is None
       return
+
+    active_start_indexes = []
+    for start_time in start_times:
+      for i in xrange(len(start_time)):
+        if start_time[i] >= start:
+          active_start_indexes.append(i)
+          break
+    active_stop_indexes = []
+    for start_time, latency in zip(start_times, latencies):
+      for i in xrange(len(start_time) - 1, -1, -1):
+        if start_time[i] + latency[i] <= end:
+          active_stop_indexes.append(i + 1)
+          break
+    active_latencies = [
+        latencies[i][active_start_indexes[i]:active_stop_indexes[i]]
+        for i in xrange(num_streams)]
+    all_active_latencies = np.concatenate(active_latencies)
+
+    qps = len(all_active_latencies) / (end - start)
+
+    text_str = 'QPS: %s' % qps
+
     # place a text box in upper left in axes coords
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    self.text = self.ax.text(0.05, 0.95, 'start: %s\nend: %s' % (start, end),
+    self.text = self.ax.text(0.05, 0.95, text_str,
                         transform=self.ax.transAxes, fontsize=14,
                         verticalalignment='top', bbox=props)
     # redraw just the text
@@ -445,7 +471,8 @@ def _GenerateObjectTimeline(file_name, start_times, latencies):
   ax.margins(0.1)
   plt.savefig(file_name, bbox_inches='tight', dpi=1200)
 
-  selection = DraggableXRange(fig, SelectionUpdate(fig, ax))
+  selection = DraggableXRange(fig, SelectionUpdate(fig, ax, start_times,
+                                                   latencies))
   selection.connect()
   plt.show()
   selection.disconnect()
