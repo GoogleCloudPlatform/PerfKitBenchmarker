@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -121,10 +121,9 @@ flags.DEFINE_enum('object_storage_object_naming_scheme', 'sequential_by_stream',
                   'approximately_sequential: object names from all '
                   'streams will roughly increase together.')
 
-flags.DEFINE_string('object_storage_timeline', None,
-                    'If set, a timeline of object writes will be created at the'
+flags.DEFINE_string('object_storage_worker_output', None,
+                    'If set, the worker threads\' output will be written to the'
                     'path provided.')
-
 
 FLAGS = flags.FLAGS
 
@@ -309,175 +308,6 @@ def MultiThreadStartDelay(num_vms, threads_per_vm):
       MULTISTREAM_DELAY_PER_STREAM * threads_per_vm)
 
 
-class DraggableXRange:
-  def __init__(self, figure, update):
-    self.figure = figure
-    self.span = None
-    self.start = None
-    self.end = None
-    self.background = None
-    self.update = update
-
-  def connect(self):
-    'connect to all the events we need'
-    self.cidpress = self.figure.canvas.mpl_connect(
-        'button_press_event', self.on_press)
-    self.cidrelease = self.figure.canvas.mpl_connect(
-        'button_release_event', self.on_release)
-    self.cidmotion = self.figure.canvas.mpl_connect(
-        'motion_notify_event', self.on_motion)
-
-  def on_press(self, event):
-    'on button press we will see if the mouse is over us and store some data'
-    import matplotlib.pyplot as plt
-
-    if self.span is not None:
-      return
-
-    self.start = event.xdata
-    self.end = event.xdata
-    self.span = plt.axvspan(self.start, self.end, color='blue', alpha=0.5)
-
-    # draw everything but the selected rectangle and store the pixel buffer
-    canvas = self.figure.canvas
-    axes = self.span.axes
-    canvas.draw()
-    self.background = canvas.copy_from_bbox(self.span.axes.bbox)
-
-    # now redraw just the rectangle
-    axes.draw_artist(self.span)
-    # and blit just the redrawn area
-    canvas.blit(axes.bbox)
-
-    self.update(self.start, self.end)
-
-  def on_motion(self, event):
-    'on motion we will move the rect if the mouse is over us'
-    import matplotlib.pyplot as plt
-
-    if self.span is None:
-      return
-
-    self.span.remove()
-
-    self.end = event.xdata
-    self.span = plt.axvspan(self.start, self.end, color='blue', alpha=0.5)
-
-    canvas = self.figure.canvas
-    axes = self.span.axes
-    # restore the background region
-    canvas.restore_region(self.background)
-    # Save the new background
-    self.background = canvas.copy_from_bbox(self.span.axes.bbox)
-
-    # redraw just the current rectangle
-    axes.draw_artist(self.span)
-    # blit just the redrawn area
-    canvas.blit(axes.bbox)
-
-    self.update(self.start, self.end)
-
-  def on_release(self, event):
-    'on release we reset the press data'
-    if self.span is None:
-      return
-
-    self.span.remove()
-
-    self.start = None
-    self.end = None
-    self.span = None
-    self.background = None
-
-    # redraw the full figure
-    self.figure.canvas.draw()
-
-    self.update(self.start, self.end)
-
-  def disconnect(self):
-    'disconnect all the stored connection ids'
-    self.figure.canvas.mpl_disconnect(self.cidpress)
-    self.figure.canvas.mpl_disconnect(self.cidrelease)
-    self.figure.canvas.mpl_disconnect(self.cidmotion)
-
-
-class SelectionUpdate:
-  def __init__(self, figure, ax, start_times, latencies):
-    self.text = None
-    self.figure = figure
-    self.ax = ax
-    self.start_times = start_times
-    self.latencies = latencies
-
-  def update(self, start, end):
-    if self.text is not None or start is None:
-      axes = self.text.axes
-      self.text.remove()
-      self.text = None
-      self.figure.canvas.blit(axes.bbox)
-    if start is None:
-      assert end is None
-      return
-
-    active_start_indexes = []
-    for start_time in start_times:
-      for i in xrange(len(start_time)):
-        if start_time[i] >= start:
-          active_start_indexes.append(i)
-          break
-    active_stop_indexes = []
-    for start_time, latency in zip(start_times, latencies):
-      for i in xrange(len(start_time) - 1, -1, -1):
-        if start_time[i] + latency[i] <= end:
-          active_stop_indexes.append(i + 1)
-          break
-    active_latencies = [
-        latencies[i][active_start_indexes[i]:active_stop_indexes[i]]
-        for i in xrange(num_streams)]
-    all_active_latencies = np.concatenate(active_latencies)
-
-    qps = len(all_active_latencies) / (end - start)
-
-    text_str = 'QPS: %s' % qps
-
-    # place a text box in upper left in axes coords
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    self.text = self.ax.text(0.05, 0.95, text_str,
-                        transform=self.ax.transAxes, fontsize=14,
-                        verticalalignment='top', bbox=props)
-    # redraw just the text
-    self.text.axes.draw_artist(self.text)
-    # blit just the redrawn area
-    self.figure.canvas.blit(self.text.axes.bbox)
-
-
-def _GenerateObjectTimeline(file_name, start_times, latencies):
-  import matplotlib.collections as mplc
-  import matplotlib.pyplot as plt
-  segments = []
-  colors = []
-  for i, worker_times in enumerate(zip(start_times, latencies)):
-    # w_start_times and w_latencies correspond with a single worker process
-    # np.vstack().T behaves like zip() here
-    for j, (start_time, latency) in enumerate(np.vstack(worker_times).T):
-      segments.append([(start_time, i), (start_time + latency, i)])
-      # Alternate between red and blue
-      colors.append((0.5 * (j % 2) + 0.5, 0, 0, 1))
-  lc = mplc.LineCollection(segments, colors=colors, linewidths=2)
-  #lc.set_edgecolor('none')
-  fig, ax = plt.subplots(figsize=(30, 5))
-  ax.add_collection(lc)
-  ax.autoscale()
-  ax.margins(0.1)
-  plt.savefig(file_name, bbox_inches='tight', dpi=1200)
-
-  selection = DraggableXRange(fig, SelectionUpdate(fig, ax, start_times,
-                                                   latencies))
-  selection.connect()
-  plt.show()
-  selection.disconnect()
-
-
 def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
                                all_sizes, results, metadata=None):
   """Read and process results from the api_multistream worker process.
@@ -503,10 +333,6 @@ def _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
   assert len(start_times) == num_streams
   assert len(latencies) == num_streams
   assert len(sizes) == num_streams
-
-  if FLAGS.object_storage_timeline:
-    _GenerateObjectTimeline(FLAGS.object_storage_timeline,
-                            start_times, latencies)
 
   if metadata is None:
     metadata = {}
@@ -1041,6 +867,9 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
   output = _RunMultiStreamProcesses(vms, command_builder, cmd_args,
                                     streams_per_vm)
   start_times, latencies, sizes = LoadWorkerOutput(output)
+  if FLAGS.object_storage_worker_output:
+    with open(FLAGS.object_storage_worker_output, 'w') as out_file:
+      out_file.write(json.dumps(output))
   _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
                              size_distribution.iterkeys(), results,
                              metadata=metadata)
