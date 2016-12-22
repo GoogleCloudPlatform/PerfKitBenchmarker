@@ -22,6 +22,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.data import FileResourceLoader
 
 FLAGS = flags.FLAGS
 
@@ -31,6 +32,8 @@ DATAFLOW_WC_JAR = ('/Users/saksena/dev/first-dataflow/target/'
                    'first-dataflow-bundled-0.1.jar')
 
 DATAFLOW_BLOCKING_RUNNER = 'BlockingDataflowPipelineRunner'
+
+DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
 
 
 class GcpDpbDataflow(dpb_service.BaseDpbService):
@@ -86,9 +89,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     cmd.append('-cp')
 
     # Needed to verify the presence of an executable jar
-    if not vm_util.FilePresent(jarfile):
-      raise errors.Setup.MissingExecutableError(
-          'Could not find required jarfile "%s"' % jarfile)
+    if not FileResourceLoader(jarfile).ResourceExists:
+      raise errors.Setup.MissingExecutableError('Could not find required '
+                                                'jarfile "%s"' % jarfile)
     cmd.append(jarfile)
 
     cmd.append(classname)

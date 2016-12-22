@@ -117,11 +117,6 @@ def GenTempDir():
   temp_dir.CreateTemporaryDirectories()
 
 
-def FilePresent(file_path):
-  """Checks for the presence of a given filepath"""
-  return os.path.isfile(file_path)
-
-
 def SSHKeyGen():
   """Create PerfKitBenchmarker SSH keys in the tmp dir of the current run."""
   if not os.path.isdir(GetTempDir()):

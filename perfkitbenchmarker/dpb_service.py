@@ -91,9 +91,9 @@ class BaseDpbService(resource.BaseResource):
   __metaclass__ = AutoRegisterDpbServiceMeta
 
   SERVICE_TYPE = 'abstract'
-  HDFS_OUTPUT_FS = 'hdfs'
-  GCS_OUTPUT_FS = 'gs'
-  S3_OUTPUT_FS = 's3'
+  HDFS_FS = 'hdfs'
+  GCS_FS = 'gs'
+  S3_FS = 's3'
 
   # Job types that are supported on the dpb service backends
   SPARK_JOB_TYPE = 'spark'

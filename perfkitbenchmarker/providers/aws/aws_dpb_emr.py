@@ -17,16 +17,14 @@ Clusters can be created and deleted.
 
 import json
 
+from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import vm_util
 
 import util
 
 FLAGS = flags.FLAGS
-
-GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                          'spark-examples.jar')

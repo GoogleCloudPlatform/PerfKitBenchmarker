@@ -94,18 +94,18 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     for role in ['worker', 'master']:
       # Set machine type
       if self.spec.worker_group.vm_spec.machine_type:
-        self.add_to_cmd(cmd, '{0}-machine-type'.format(role),
-                        self.spec.worker_group.vm_spec.machine_type)
+        self._AddToCmd(cmd, '{0}-machine-type'.format(role),
+                       self.spec.worker_group.vm_spec.machine_type)
 
       # Set boot_disk_size
       if self.spec.worker_group.vm_spec.boot_disk_size:
-        self.add_to_cmd(cmd, '{0}-boot-disk-size'.format(role),
-                        self.spec.worker_group.vm_spec.boot_disk_size)
+        self._AddToCmd(cmd, '{0}-boot-disk-size'.format(role),
+                       self.spec.worker_group.vm_spec.boot_disk_size)
 
       # Set ssd count
       if self.spec.worker_group.vm_spec.num_local_ssds:
-        self.add_to_cmd(cmd, 'num-{0}-local-ssds'.format(role),
-                        self.spec.worker_group.vm_spec.num_local_ssds)
+        self._AddToCmd(cmd, 'num-{0}-local-ssds'.format(role),
+                       self.spec.worker_group.vm_spec.num_local_ssds)
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
 
@@ -154,6 +154,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def SetClusterProperty(self):
     pass
 
-  def add_to_cmd(self, cmd, cmd_property, cmd_value):
+  def _AddToCmd(self, cmd, cmd_property, cmd_value):
     flag_name = cmd_property
     cmd.flags[flag_name] = cmd_value

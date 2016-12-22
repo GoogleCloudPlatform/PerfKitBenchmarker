@@ -94,6 +94,7 @@ class _DpbApplicationListDecoder(option_decoders.ListDecoder):
 class _DpbServiceDecoder(option_decoders.TypeVerifier):
     """Validates the dpb(data processing backend) service dictionary of a
     benchmark config object."""
+
     def __init__(self, **kwargs):
         super(_DpbServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
@@ -134,6 +135,7 @@ class _DpbServiceSpec(spec.BaseSpec):
       applications: An enumerated list of applications that need
         to be enabled on the dpb service
     """
+
     def __init__(self, component_full_name, flag_values=None, **kwargs):
         super(_DpbServiceSpec, self).__init__(component_full_name,
                                               flag_values=flag_values,

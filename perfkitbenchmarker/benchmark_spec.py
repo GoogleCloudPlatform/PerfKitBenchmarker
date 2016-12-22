@@ -137,12 +137,10 @@ class BenchmarkSpec(object):
     """Create the dpb_service object and create groups for its vms."""
     if self.config.dpb_service is None:
       return
-    dpb_service_spec = self.config.dpb_service
-    cloud = dpb_service_spec.worker_group.cloud
-    providers.LoadProvider(cloud)
-    service_type = dpb_service_spec.service_type
-    dpb_service_class = dpb_service.GetDpbServiceClass(service_type)
-    self.dpb_service = dpb_service_class(dpb_service_spec)
+    providers.LoadProvider(self.config.dpb_service.worker_group.cloud)
+    dpb_service_class = dpb_service.GetDpbServiceClass(
+      self.config.dpb_service.service_type)
+    self.dpb_service = dpb_service_class(self.config.dpb_service)
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
