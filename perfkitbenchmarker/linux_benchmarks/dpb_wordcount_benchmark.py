@@ -96,7 +96,7 @@ def CheckPrerequisites():
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
   if (FLAGS.dpb_wordcount_input is None and
-              FLAGS.dpb_wordcount_fs != BaseDpbService.GCS_FS):
+          FLAGS.dpb_wordcount_fs != BaseDpbService.GCS_FS):
     raise ResourceNotFound
 
 

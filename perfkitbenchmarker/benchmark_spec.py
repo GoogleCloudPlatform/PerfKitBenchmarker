@@ -139,7 +139,7 @@ class BenchmarkSpec(object):
       return
     providers.LoadProvider(self.config.dpb_service.worker_group.cloud)
     dpb_service_class = dpb_service.GetDpbServiceClass(
-      self.config.dpb_service.service_type)
+        self.config.dpb_service.service_type)
     self.dpb_service = dpb_service_class(self.config.dpb_service)
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
