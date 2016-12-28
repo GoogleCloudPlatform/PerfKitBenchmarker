@@ -24,12 +24,16 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.data import FileResourceLoader
 
+flags.DEFINE_string('dpb_dataflow_staging_location', None,
+                    'Google Cloud Storage bucket for Dataflow to stage the '
+                    'binary and any temporary files. You must create this '
+                    'bucket ahead of time, before running your pipeline.')
+
+flags.DEFINE_string('dpb_dataflow_jar', None, 'Executable jar for the dataflow job')
+
 FLAGS = flags.FLAGS
 
 GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
-
-DATAFLOW_WC_JAR = ('/Users/saksena/dev/first-dataflow/target/'
-                   'first-dataflow-bundled-0.1.jar')
 
 DATAFLOW_BLOCKING_RUNNER = 'BlockingDataflowPipelineRunner'
 
@@ -87,11 +91,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     cmd.append(dataflow_executable)
 
     cmd.append('-cp')
-
-    # Needed to verify the presence of an executable jar
-    if not FileResourceLoader(jarfile).ResourceExists:
-      raise errors.Setup.MissingExecutableError('Could not find required '
-                                                'jarfile "%s"' % jarfile)
     cmd.append(jarfile)
 
     cmd.append(classname)

@@ -46,7 +46,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   CLOUD = providers.GCP
   SERVICE_TYPE = 'dataproc'
 
-
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataproc, self).__init__(dpb_service_spec)
     self.project = None

@@ -92,32 +92,37 @@ class _DpbApplicationListDecoder(option_decoders.ListDecoder):
 
 
 class _DpbServiceDecoder(option_decoders.TypeVerifier):
-    """Validates the dpb(data processing backend) service dictionary of a
-    benchmark config object."""
+  """Validates the dpb(data processing backend) service dictionary of a
+  benchmark config object."""
 
-    def __init__(self, **kwargs):
-        super(_DpbServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
+  def __init__(self, **kwargs):
+      super(_DpbServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
-    def Decode(self, value, component_full_name, flag_values):
-        """Verifies dpb(data processing backend) service dictionary of a
-        benchmark config object.
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies dpb(data processing backend) service dictionary of a
+    benchmark config object.
 
-        Args:
-          value: dict Dpb Service config dictionary
-          component_full_name: string.  Fully qualified name of the configurable
-          component containing the config option.
-          flag_values: flags.FlagValues.  Runtime flag values to be propagated
-          to BaseSpec constructors.
-        Returns:
-          _DpbServiceSpec Build from the config passed in in value.
-        Raises:
-          errors.Config.InvalidateValue upon invalid input value.
-        """
-        dpb_service_config = super(_DpbServiceDecoder, self).Decode(
-            value, component_full_name, flag_values)
-        result = _DpbServiceSpec(self._GetOptionFullName(component_full_name),
-                                 flag_values, **dpb_service_config)
-        return result
+    Args:
+      value: dict Dpb Service config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+      component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated
+      to BaseSpec constructors.
+    Returns:
+      _DpbServiceSpec Build from the config passed in in value.
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    dpb_service_config = super(_DpbServiceDecoder, self).Decode(
+      value, component_full_name, flag_values)
+    if dpb_service_config['service_type'] == dpb_service.DATAFLOW:
+      if flag_values.dpb_dataflow_jar is None:
+        raise errors.Config.InvalidValue('Dataflow jar missing.')
+      if flag_values.dpb_dataflow_staging_location is None:
+        raise errors.Config.InvalidValue('Dataflow Staging location missing.')
+    result = _DpbServiceSpec(self._GetOptionFullName(component_full_name),
+                             flag_values, **dpb_service_config)
+    return result
 
 
 class _DpbServiceSpec(spec.BaseSpec):

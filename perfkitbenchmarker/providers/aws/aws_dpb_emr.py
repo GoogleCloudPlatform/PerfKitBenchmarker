@@ -220,7 +220,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         metrics = {}
 
         result = WaitForStep(step_id)
-        print 'Result:', result
         pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
         start_time = result['Step']['Status']['Timeline']['StartDateTime']
         end_time = result['Step']['Status']['Timeline']['EndDateTime']

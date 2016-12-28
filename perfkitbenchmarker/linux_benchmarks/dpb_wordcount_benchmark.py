@@ -22,7 +22,10 @@ used as arguments to the dpb service creation commands and the concrete
 implementations (dataproc, emr, dataflow, etc.) control using the disk size
 during the cluster setup.
 
-The output directory to capture the word count results will be stored in
+dpb_wordcount_out_base: The output directory to capture the word count results
+
+For dataflow jobs, please build the dpb_dataflow_jar based on
+https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
 """
 
 import copy
@@ -30,9 +33,11 @@ import datetime
 import tempfile
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.data import ResourceNotFound
+from perfkitbenchmarker.data import FileResourceLoader
 from perfkitbenchmarker.dpb_service import BaseDpbService
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
@@ -61,15 +66,15 @@ dpb_wordcount_benchmark:
     worker_count: 2
 """
 
-word_count_configuration = dict(
+WORD_COUNT_CONFIGURATION = dict(
     [
-        ('dataproc', (gcp_dpb_dataproc.SPARK_SAMPLE_LOCATION,
+        (dpb_service.DATAPROC, (gcp_dpb_dataproc.SPARK_SAMPLE_LOCATION,
                       'org.apache.spark.examples.JavaWordCount',
                       BaseDpbService.SPARK_JOB_TYPE)),
-        ('dataflow', (gcp_dpb_dataflow.DATAFLOW_WC_JAR,
+        (dpb_service.DATAFLOW, (None,
                       'com.google.cloud.dataflow.examples.WordCount',
                       BaseDpbService.DATAFLOW_JOB_TYPE)),
-        ('emr', (aws_dpb_emr.SPARK_SAMPLE_LOCATION,
+        (dpb_service.EMR, (aws_dpb_emr.SPARK_SAMPLE_LOCATION,
                  'org.apache.spark.examples.JavaWordCount',
                  BaseDpbService.SPARK_JOB_TYPE))
     ]
@@ -97,7 +102,10 @@ def CheckPrerequisites():
   """
   if (FLAGS.dpb_wordcount_input is None and
           FLAGS.dpb_wordcount_fs != BaseDpbService.GCS_FS):
-    raise ResourceNotFound
+    raise errors.Config.InvalidValue('Invalid default input directory.')
+  if FLAGS.dpb_dataflow_jar:
+    if not FileResourceLoader(FLAGS.dpb_dataflow_jar).ResourceExists:
+      raise errors.Config.InvalidValue('Dataflow jar missing.')
 
 
 def Prepare(benchmark_spec):
@@ -114,7 +122,7 @@ def Run(benchmark_spec):
                                       FLAGS.dpb_wordcount_input)
 
   # Get handle to the dpb service
-  dpb_service = benchmark_spec.dpb_service
+  dpb_service_instance = benchmark_spec.dpb_service
 
   # Create a file handle to contain the response from running the job on
   # the dpb service
@@ -125,32 +133,29 @@ def Run(benchmark_spec):
 
   # Switch the parameters for submit job function of specific dpb service
   job_arguments = []
-  jarfile, classname, job_type = _GetJobArguments(dpb_service.SERVICE_TYPE)
+  jarfile, classname, job_type = _GetJobArguments(dpb_service_instance.SERVICE_TYPE)
 
-  if dpb_service.SERVICE_TYPE == 'dataflow':
-    # Validate and setup the output and staging directories for the job
-    if FLAGS.dpb_wordcount_fs != dpb_service.GCS_FS:
-      raise Exception('Invalid File System integration required for a '
-                      'dataflow job. GCS is the only supported fs.')
-    if not FLAGS.dpb_wordcount_out_base:
-      raise Exception('Missing base output directory')
-    base_gs_dataflow_dir = 'gs://{}'.format(FLAGS.dpb_wordcount_out_base)
-    job_arguments.append('--stagingLocation={}/staging/'.format(
-        base_gs_dataflow_dir))
-    job_arguments.append('--output={}/output/'.format(base_gs_dataflow_dir))
-    # Set the runner for the data flow job
+  if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+    jarfile = FLAGS.dpb_dataflow_jar
+    job_arguments.append('--stagingLocation={}'.format(
+        FLAGS.dpb_dataflow_staging_location))
     job_arguments.append('--runner={}'.format(
         gcp_dpb_dataflow.DATAFLOW_BLOCKING_RUNNER))
+    if not FLAGS.dpb_wordcount_out_base:
+      base_out = FLAGS.dpb_dataflow_staging_location
+    else:
+      base_out = 'gs://{}'.format(FLAGS.dpb_wordcount_out_base)
+    job_arguments.append('--output={}/output/'.format(base_out))
   else:
     job_arguments = [input_location]
 
   # TODO (saksena): Finalize more stats to gather
   results = []
-  metadata = copy.copy(dpb_service.GetMetadata())
+  metadata = copy.copy(dpb_service_instance.GetMetadata())
   metadata.update({'input_location': input_location})
 
   start = datetime.datetime.now()
-  dpb_service.SubmitJob(jarfile,
+  dpb_service_instance.SubmitJob(jarfile,
                         classname,
                         job_arguments=job_arguments,
                         job_stdout_file=stdout_file,
@@ -167,7 +172,7 @@ def Cleanup(benchmark_spec):
 
 def _GetJobArguments(dpb_service_type):
   """Returns the arguments for word count job based on runtime service."""
-  if dpb_service_type not in word_count_configuration:
+  if dpb_service_type not in WORD_COUNT_CONFIGURATION:
     raise NotImplementedError
   else:
-    return word_count_configuration[dpb_service_type]
+    return WORD_COUNT_CONFIGURATION[dpb_service_type]
