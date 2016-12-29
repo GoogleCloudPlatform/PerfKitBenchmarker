@@ -27,6 +27,7 @@ import uuid
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import os_types
@@ -108,6 +109,7 @@ class BenchmarkSpec(object):
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
     self.always_call_cleanup = False
     self.spark_service = None
+    self.dpb_service = None
 
     self._zone_index = 0
 
@@ -130,6 +132,15 @@ class BenchmarkSpec(object):
     """
     with self.config.RedirectFlags(FLAGS):
       yield
+
+  def ConstructDpbService(self):
+    """Create the dpb_service object and create groups for its vms."""
+    if self.config.dpb_service is None:
+      return
+    providers.LoadProvider(self.config.dpb_service.worker_group.cloud)
+    dpb_service_class = dpb_service.GetDpbServiceClass(
+        self.config.dpb_service.service_type)
+    self.dpb_service = dpb_service_class(self.config.dpb_service)
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
@@ -309,6 +320,8 @@ class BenchmarkSpec(object):
       vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
     if self.spark_service:
       self.spark_service.Create()
+    if self.dpb_service:
+      self.dpb_service.Create()
 
   def Delete(self):
     if self.deleted:
@@ -316,6 +329,9 @@ class BenchmarkSpec(object):
 
     if self.spark_service:
       self.spark_service.Delete()
+
+    if self.dpb_service:
+      self.dpb_service.Delete()
 
     if self.vms:
       try:
