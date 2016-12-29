@@ -69,14 +69,14 @@ dpb_wordcount_benchmark:
 WORD_COUNT_CONFIGURATION = dict(
     [
         (dpb_service.DATAPROC, (gcp_dpb_dataproc.SPARK_SAMPLE_LOCATION,
-                      'org.apache.spark.examples.JavaWordCount',
-                      BaseDpbService.SPARK_JOB_TYPE)),
+                                'org.apache.spark.examples.JavaWordCount',
+                                BaseDpbService.SPARK_JOB_TYPE)),
         (dpb_service.DATAFLOW, (None,
-                      'com.google.cloud.dataflow.examples.WordCount',
-                      BaseDpbService.DATAFLOW_JOB_TYPE)),
+                                'com.google.cloud.dataflow.examples.WordCount',
+                                BaseDpbService.DATAFLOW_JOB_TYPE)),
         (dpb_service.EMR, (aws_dpb_emr.SPARK_SAMPLE_LOCATION,
-                 'org.apache.spark.examples.JavaWordCount',
-                 BaseDpbService.SPARK_JOB_TYPE))
+                           'org.apache.spark.examples.JavaWordCount',
+                           BaseDpbService.SPARK_JOB_TYPE))
     ]
 )
 
@@ -133,7 +133,8 @@ def Run(benchmark_spec):
 
   # Switch the parameters for submit job function of specific dpb service
   job_arguments = []
-  jarfile, classname, job_type = _GetJobArguments(dpb_service_instance.SERVICE_TYPE)
+  jarfile, classname, job_type = _GetJobArguments(
+      dpb_service_instance.SERVICE_TYPE)
 
   if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
     jarfile = FLAGS.dpb_dataflow_jar
@@ -155,11 +156,10 @@ def Run(benchmark_spec):
   metadata.update({'input_location': input_location})
 
   start = datetime.datetime.now()
-  dpb_service_instance.SubmitJob(jarfile,
-                        classname,
-                        job_arguments=job_arguments,
-                        job_stdout_file=stdout_file,
-                        job_type=job_type)
+  dpb_service_instance.SubmitJob(jarfile, classname,
+                                 job_arguments=job_arguments,
+                                 job_stdout_file=stdout_file,
+                                 job_type=job_type)
   end_time = datetime.datetime.now()
   run_time = (end_time - start).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))

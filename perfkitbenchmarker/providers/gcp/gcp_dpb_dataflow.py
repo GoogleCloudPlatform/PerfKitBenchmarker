@@ -22,14 +22,13 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.data import FileResourceLoader
 
 flags.DEFINE_string('dpb_dataflow_staging_location', None,
                     'Google Cloud Storage bucket for Dataflow to stage the '
                     'binary and any temporary files. You must create this '
                     'bucket ahead of time, before running your pipeline.')
 
-flags.DEFINE_string('dpb_dataflow_jar', None, 'Executable jar for the dataflow job')
+flags.DEFINE_string('dpb_dataflow_jar', None, 'Executable jar for the job')
 
 FLAGS = flags.FLAGS
 

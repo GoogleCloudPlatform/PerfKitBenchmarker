@@ -114,7 +114,7 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
       errors.Config.InvalidValue upon invalid input value.
     """
     dpb_service_config = super(_DpbServiceDecoder, self).Decode(
-      value, component_full_name, flag_values)
+        value, component_full_name, flag_values)
     if dpb_service_config['service_type'] == dpb_service.DATAFLOW:
       if flag_values.dpb_dataflow_jar is None:
         raise errors.Config.InvalidValue('Dataflow jar missing.')
