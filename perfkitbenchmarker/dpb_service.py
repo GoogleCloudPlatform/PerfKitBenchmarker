@@ -29,6 +29,7 @@ from perfkitbenchmarker import resource
 flags.DEFINE_string('static_dpb_service_instance', None,
                     'If set, the name of the pre created dpb implementation,'
                     'assumed to be ready.')
+flags.DEFINE_string('dpb_log_level', 'FATAL', 'Manipulate service log level')
 
 _DPB_SERVICE_REGISTRY = {}
 FLAGS = flags.FLAGS

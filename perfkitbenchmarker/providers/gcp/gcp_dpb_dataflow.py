@@ -101,6 +101,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     if disk_size_gb:
       cmd.append('--diskSizeGb={}'.format(disk_size_gb))
+    cmd.append('--defaultWorkerLogLevel={}'.format(FLAGS.dpb_log_level))
     stdout, _, _ = vm_util.IssueCommand(cmd)
 
   def SetClusterProperty(self):
