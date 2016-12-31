@@ -33,7 +33,7 @@ from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
-
+from perfkitbenchmarker.dpb_service import BaseDpbService
 
 _DEFAULT_DISK_COUNT = 1
 _DEFAULT_VM_COUNT = 1
@@ -118,6 +118,9 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
     """
     dpb_service_config = super(_DpbServiceDecoder, self).Decode(
         value, component_full_name, flag_values)
+    if dpb_service_config['service_type'] == dpb_service.EMR:
+        if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
+            raise errors.Config.InvalidValue('EMR service requires S3.')
     if dpb_service_config['service_type'] == dpb_service.DATAFLOW:
       if flag_values.dpb_dataflow_jar is None:
         raise errors.Config.InvalidValue('Dataflow jar missing.')
