@@ -137,6 +137,8 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
     if flag_values['profitbricks_boot_volume_size'].present:
       config_values['boot_volume_size'] = \
           flag_values.profitbricks_boot_volume_size
+    if flag_values['availability_zone'].present:
+      config_values['availability_zone'] = flag_values.availability_zone
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -153,7 +155,8 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
         'location': (option_decoders.StringDecoder, {'default': 'us/las'}),
         'boot_volume_type': (option_decoders.StringDecoder, {'default': 'HDD'}),
         'boot_volume_size': (option_decoders.IntDecoder, {'default': 10,
-                                                          'min': 10})})
+                                                          'min': 10}),
+        'availability_zone': (option_decoders.StringDecoder, {'default': 'AUTO'})})
     return result
 
 
