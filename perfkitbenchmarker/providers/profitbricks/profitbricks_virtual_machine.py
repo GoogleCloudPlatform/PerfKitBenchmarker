@@ -194,6 +194,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.boot_volume_size = vm_spec.boot_volume_size
         self.location = vm_spec.location
         self.user_name = 'root'
+        self.availability_zone = vm_spec.availability_zone
         self.header = {
             'Authorization': 'Basic %s' % self.user_token,
             'Content-Type': 'application/vnd.profitbricks.resource+json',
@@ -228,7 +229,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
                                 'image': self.image,
                                 'type': self.boot_volume_type,
                                 'sshKeys': [public_key],
-                                'availabilityZone': 'AUTO'
+                                'availabilityZone': self.availability_zone
                             }
                         }
                     ]
