@@ -197,6 +197,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.header = {
             'Authorization': 'Basic %s' % self.user_token,
             'Content-Type': 'application/vnd.profitbricks.resource+json',
+            'User-Agent': 'profitbricks-perfkitbenchmarker',
         }
 
     def _Create(self):
@@ -226,7 +227,8 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
                                 'name': 'boot volume',
                                 'image': self.image,
                                 'type': self.boot_volume_type,
-                                'sshKeys': [public_key]
+                                'sshKeys': [public_key],
+                                'availabilityZone': 'AUTO'
                             }
                         }
                     ]
