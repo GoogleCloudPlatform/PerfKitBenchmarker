@@ -143,9 +143,8 @@ class OpenStackFloatingIPPool(object):
   def associate(self, vm):
     with self._floating_ip_lock:
       floating_ip_obj = self._get_or_create(vm)
-      cmd = utils.OpenStackCLICommand(vm, OSC_FLOATING_IP_CMD, 'add',
-                                      floating_ip_obj.floating_ip_address,
-                                      vm.id)
+      cmd = utils.OpenStackCLICommand(vm, 'server add floating ip', vm.id,
+                                      floating_ip_obj.floating_ip_address)
       del cmd.flags['format']  # Command does not support json output format
       _, stderr, _ = cmd.Issue()
       if stderr:
