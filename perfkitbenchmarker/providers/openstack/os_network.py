@@ -36,7 +36,7 @@ UDP = 'udp'
 
 FLOATING_IP_ADDRESS = 'floating_ip_address'
 FLOATING_IP_ID = 'id'
-FLOATING_NETWORK_ID = 'floating_ip_network'
+FLOATING_NETWORK_ID = 'floating_network_id'
 
 FLOATING_IP_KEYS = (FLOATING_IP_ADDRESS, FLOATING_IP_ID, FLOATING_NETWORK_ID,)
 
@@ -67,6 +67,7 @@ class OpenStackFirewall(network.BaseFirewall):
       if stderr:
         cmd = utils.OpenStackCLICommand(self, OSC_SEC_GROUP_CMD, 'create',
                                         SC_GROUP_NAME)
+        del cmd.flags['format']  # Command does not support json output
         cmd.Issue()
 
   def AllowICMP(self, vm, icmp_type=-1, icmp_code=-1, source_range=None):
