@@ -179,6 +179,7 @@ class SelectionUpdate:
 
 
 def GenerateObjectTimeline(file_name, start_times, latencies):
+  print("Generating object timeline")
   assert len(start_times) == len(latencies)
   num_streams = len(start_times)
   segments = []
@@ -196,12 +197,14 @@ def GenerateObjectTimeline(file_name, start_times, latencies):
       #colors.append((0.5 * (j % 2) + 0.5, 0, 0, 1))
   #lc = mplc.LineCollection(segments, colors=colors,
   #                         linewidths = 1.0)
-  lc = mplc.PatchCollection(segments)
+  lc = mplc.PatchCollection(segments, match_original=True)
   fig, ax = plt.subplots(figsize=(30, 5))
   ax.add_collection(lc)
   ax.autoscale()
   ax.margins(0.1)
+  print("Saving figure as %s" % file_name)
   plt.savefig(file_name, bbox_inches='tight', dpi=1200)
+  print("Figured saved. Rendering figure...")
 
   selection = DraggableXRange(fig, SelectionUpdate(fig, ax, start_times,
                                                    latencies))
@@ -259,8 +262,10 @@ def LoadWorkerOutput(output):
 
 def main():
   worker_output = None
+  print("Reading worker output")
   with open(sys.argv[1], 'r') as worker_out_file:
     worker_output = json.loads(worker_out_file.read())
+  print("Parsing worker output")
   start_times, latencies, _ = LoadWorkerOutput(worker_output)
   GenerateObjectTimeline(sys.argv[2], start_times, latencies)
 
