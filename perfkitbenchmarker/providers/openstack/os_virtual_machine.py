@@ -80,6 +80,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.floating_ip = None
     self.firewall = None
     self.public_network = None
+    self.floating_network_id = None
     self.subnet_id = None
 
   @property
@@ -92,7 +93,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CheckPrerequisites()
     self.firewall = os_network.OpenStackFirewall.GetFirewall()
     self.public_network = os_network.OpenStackFloatingIPPool(
-        self.floating_ip_pool_name)
+        self.floating_network_id)
     self._UploadSSHPublicKey()
     source_range = self._GetInternalNetworkCIDR()
     self.firewall.AllowPort(self, os_network.MIN_PORT, os_network.MAX_PORT,
@@ -198,30 +199,27 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                '--openstack_network and --openstack_floating_ip_pool flags.')
       raise errors.Error(msg)
 
-    self._CheckNetworkExists()
+    self._CheckNetworkExists(self.network_name)
 
     if self.floating_ip_pool_name:
-      self._CheckFloatingIPNetworkExists()
+      floating_network_dict = self._CheckFloatingIPNetworkExists(
+          self.floating_ip_pool_name)
+      self.floating_network_id = floating_network_dict['id']
 
-  def _CheckFloatingIPNetworkExists(self):
-    cmd = os_utils.OpenStackCLICommand(self, 'ip', 'floating', 'pool', 'list')
-    stdout, stderr, _ = cmd.Issue()
-    resp = json.loads(stdout)
-    for flip_pool in resp:
-      if flip_pool['Name'] == self.floating_ip_pool_name:
-        break
-    else:
-      raise errors.Config.InvalidValue(' '.join(
-          ('Floating IP pool %s could not be found.'
-           % self.floating_ip_pool_name,
-           'For valid floating IP pools run '
-           '"openstack ip floating pool list".',)))
+  def _CheckFloatingIPNetworkExists(self, floating_network_name_or_id):
+    network = self._CheckNetworkExists(floating_network_name_or_id)
+    if network['router:external'] != 'External':
+      raise errors.Config.InvalidValue('Network "%s" is not External'
+                                       % self.floating_ip_pool_name)
+    return network
 
-  def _CheckNetworkExists(self):
+  def _CheckNetworkExists(self, network_name_or_id):
     cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',
-                                       self.network_name)
-    err_msg = VALIDATION_ERROR_MESSAGE.format('Network', self.network_name)
-    self._IssueCommandCheck(cmd, err_msg)
+                                       network_name_or_id)
+    err_msg = VALIDATION_ERROR_MESSAGE.format('Network', network_name_or_id)
+    stdout = self._IssueCommandCheck(cmd, err_msg)
+    network = json.loads(stdout)
+    return network
 
   def _IssueCommandCheck(self, cmd, err_msg=None):
     """Issues command and, if stderr is non-empty, raises an error message
@@ -343,7 +341,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.floating_ip_pool_name:
       self.floating_ip = self._AllocateFloatingIP()
       self.internal_ip = self.ip_address
-      self.ip_address = self.floating_ip['ip']
+      self.ip_address = self.floating_ip.floating_ip_address
 
   def _GetNetworkIPAddress(self, server_dict, network_name):
     addresses = server_dict['addresses'].split(',')
@@ -367,7 +365,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _AllocateFloatingIP(self):
     floating_ip = self.public_network.associate(self)
-    logging.info('floating-ip associated: {}'.format(floating_ip['ip']))
+    logging.info('floating-ip associated: {}'.format(
+        floating_ip.floating_ip_address))
     return floating_ip
 
   def CreateScratchDisk(self, disk_spec):
