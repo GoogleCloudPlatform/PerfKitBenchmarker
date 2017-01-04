@@ -310,19 +310,23 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       return hint_temp % server_group['id']
 
   def _CreateServerGroup(self, group_name):
-    nova_cmd = [FLAGS.openstack_nova_path, 'server-group-create',
-                group_name, FLAGS.openstack_scheduler_policy]
-    stdout, _, _ = vm_util.IssueCommand(nova_cmd, suppress_warning=True)
-    server_group = os_utils.ParseServerGroupTable(stdout)
+    cmd = os_utils.OpenStackCLICommand(self, 'server group', 'create',
+                                       group_name)
+    cmd.flags['policy'] = FLAGS.opestack_scheduler_policy
+    stdout, stderr, _ = cmd.Issue()
+    if stderr:
+      raise errors.Error(stderr)
+    server_group = json.loads(stdout)
     return server_group
 
   def _DeleteServerGroup(self):
     with self._lock:
       if self.zone in self.deleted_server_group_set:
         return
-      nova_cmd = [FLAGS.openstack_nova_path, 'server-group-delete',
-                  self.server_group_id]
-      vm_util.IssueCommand(nova_cmd, suppress_warning=True)
+      cmd = os_utils.OpenStackCLICommand(self, 'server group', 'delete',
+                                         self.server_group_id)
+      del cmd.flags['format']  # delete does not support json output
+      cmd.Issue()
       self.deleted_server_group_set.add(self.zone)
       if self.zone in self.created_server_group_dict:
         del self.created_server_group_dict[self.zone]
