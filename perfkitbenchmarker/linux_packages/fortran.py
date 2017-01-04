@@ -15,6 +15,12 @@
 """Module containing fortran installation and cleanup functions."""
 
 
+def GetLibPath(vm):
+  """Get fortran library path."""
+  out, _ = vm.RemoteCommand('find /usr/lib/ | grep fortran.a')
+  return out[:-1]
+
+
 def YumInstall(vm):
   """Installs the fortran package on the VM."""
   vm.InstallPackages('gcc-gfortran libgfortran')

@@ -163,15 +163,16 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testBenchmarkValidCommandLine2(self):
     # make sure the standard_set plus a listed benchmark expands
     # to a valid set of benchmarks
-    self.mock_flags.benchmarks = ['standard_set', 'bonnie++']
+    self.mock_flags.benchmarks = ['standard_set', 'bonnieplusplus']
     benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
     self.assertIsNotNone(benchmark_tuple_list)
     self.assertGreater(len(benchmark_tuple_list), 0)
     for benchmark_tuple in benchmark_tuple_list:
       self.assertIn(benchmark_tuple[0].BENCHMARK_NAME,
                     self.valid_benchmark_names)
-    # make sure bonnie++ is a listed benchmark
-    self.assertTrue(self._ContainsModule('bonnie++', benchmark_tuple_list))
+    # make sure bonnieplusplus is a listed benchmark
+    self.assertTrue(self._ContainsModule('bonnieplusplus',
+                                         benchmark_tuple_list))
 
   def testBenchmarkValidCommandLine3(self):
     # make sure the command with two benchmarks is processed correctly

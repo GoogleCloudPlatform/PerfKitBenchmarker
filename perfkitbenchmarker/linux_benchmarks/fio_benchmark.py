@@ -22,6 +22,7 @@ import json
 import logging
 import posixpath
 import re
+import time
 
 import jinja2
 
@@ -394,7 +395,9 @@ def GetLogFlags():
                    (FLAGS.fio_iops_log, '--write_iops_log=%(filename)s',),
                    (collect_logs, '--log_avg_msec=%(interval)d',)]
   fio_command_flags = ' '.join([flag for given, flag in fio_log_flags if given])
-  return fio_command_flags % {'filename': PKB_FIO_LOG_FILE_NAME,
+  now = time.time()
+  filename_base = '%s_%s' % (PKB_FIO_LOG_FILE_NAME, str(now))
+  return fio_command_flags % {'filename': filename_base,
                               'interval': FLAGS.fio_log_avg_msec}
 
 

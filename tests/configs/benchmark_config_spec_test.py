@@ -38,6 +38,10 @@ _GCP_AWS_VM_CONFIG = {'GCP': {'machine_type': 'n1-standard-1'},
 _GCP_AWS_DISK_CONFIG = {'GCP': {}, 'AWS': {}}
 
 
+def _GetFlagDict(flag_values):
+  return {name: flag_values[name] for name in flag_values}
+
+
 class FlagsDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
@@ -53,7 +57,7 @@ class FlagsDecoderTestCase(unittest.TestCase):
     self.assertEqual(len(result), 1)
     self.assertEqual(result['test_flag'].value, expected_flag_value)
     self.assertEqual(result['test_flag'].present, expected_flag_present)
-    self.assertIsNot(result, self._flag_values.FlagDict())
+    self.assertIsNot(result, _GetFlagDict(self._flag_values))
 
   def testNone(self):
     result = self._decoder.Decode(None, _COMPONENT, self._flag_values)
@@ -443,7 +447,7 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
                               **self._kwargs)
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)
     self.assertEqual(result.description, 'Test description.')
-    self.assertIsNot(result.flags, flags.FLAGS.FlagDict())
+    self.assertIsNot(result.flags, _GetFlagDict(flags.FLAGS))
     self.assertIsInstance(result.vm_groups, dict)
     self.assertEqual(len(result.vm_groups), 1)
     self.assertIsInstance(result.vm_groups['default'],
@@ -486,7 +490,7 @@ class BenchmarkConfigSpecTestCase(unittest.TestCase):
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)
     self.assertEqual(result.description, 'Test description.')
     self.assertIsInstance(result.flags, dict)
-    self.assertIsNot(result.flags, flags.FLAGS.FlagDict())
+    self.assertIsNot(result.flags, _GetFlagDict(flags.FLAGS))
     self.assertEqual(result.flags['cloud'], 'AWS')
     self.assertEqual(flags.FLAGS['cloud'].value, 'GCP')
     self.assertIsInstance(result.vm_groups, dict)

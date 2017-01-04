@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,24 +71,71 @@ HOST_RELEASED_STATES = frozenset(['released', 'released-permanent-failure'])
 KNOWN_HOST_STATES = HOST_EXISTS_STATES | HOST_RELEASED_STATES
 
 
-def GetBlockDeviceMap(machine_type):
+def GetRootBlockDeviceSpecForImage(image_id):
+  """ Queries the CLI and returns the root block device specification as a dict.
+
+  Args:
+    image_id: The EC2 image id to query
+
+  Returns:
+    The root block device specification as returned by the AWS cli,
+    as a Python dict. If the image is not found, or if the response
+    is malformed, an exception will be raised.
+  """
+  command = util.AWS_PREFIX + [
+      'ec2',
+      'describe-images',
+      '--image-ids=%s' % image_id,
+      '--query', 'Images[]']
+  stdout, _ = util.IssueRetryableCommand(command)
+  images = json.loads(stdout)
+  assert images
+  assert len(images) == 1, \
+      'Expected to receive only one image description for %s' % image_id
+  image_spec = images[0]
+  root_device_name = image_spec['RootDeviceName']
+  block_device_mappings = image_spec['BlockDeviceMappings']
+  root_block_device_dict = next((x for x in block_device_mappings if
+                                 x['DeviceName'] == root_device_name))
+  return root_block_device_dict
+
+
+def GetBlockDeviceMap(machine_type, root_volume_size_gb=None, image_id=None):
   """Returns the block device map to expose all devices for a given machine.
 
   Args:
     machine_type: The machine type to create a block device map for.
+    root_volume_size: The desired size of the root volume, in GiB,
+      or None to the default provided by AWS.
+    image: The image id (AMI) to use in order to lookup the default
+      root device specs. This is only required if root_volume_size
+      is specified.
 
   Returns:
     The json representation of the block device map for a machine compatible
     with the AWS CLI, or if the machine type has no local disks, it will
-    return None.
+    return None. If root_volume_size_gb and image_id are provided, the block
+    device map will include the specification for the root volume.
   """
+  mappings = []
+  if root_volume_size_gb is not None:
+    if image_id is None:
+      raise ValueError(
+          "image_id must be provided if root_volume_size_gb is specified")
+    root_block_device = GetRootBlockDeviceSpecForImage(image_id)
+    root_block_device['Ebs']['VolumeSize'] = root_volume_size_gb
+    # The 'Encrypted' key must be removed or the CLI will complain
+    root_block_device['Ebs'].pop('Encrypted')
+    mappings.append(root_block_device)
+
   if machine_type in NUM_LOCAL_VOLUMES:
-    mappings = [{'VirtualName': 'ephemeral%s' % i,
-                 'DeviceName': '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)}
-                for i in xrange(NUM_LOCAL_VOLUMES[machine_type])]
+    for i in xrange(NUM_LOCAL_VOLUMES[machine_type]):
+      mappings.append({
+          'VirtualName': 'ephemeral%s' % i,
+          'DeviceName': '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)})
+  if len(mappings):
     return json.dumps(mappings)
-  else:
-    return None
+  return None
 
 
 def IsPlacementGroupCompatible(machine_type):
@@ -181,6 +228,8 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     super(AwsVmSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['aws_dedicated_hosts'].present:
       config_values['use_dedicated_host'] = flag_values.aws_dedicated_hosts
+    if flag_values['aws_boot_disk_size'].present:
+      config_values['boot_disk_size'] = flag_values.aws_boot_disk_size
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -194,7 +243,9 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     result = super(AwsVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'use_dedicated_host': (option_decoders.BooleanDecoder,
-                               {'default': False})})
+                               {'default': False}),
+        'boot_disk_size': (option_decoders.IntDecoder, {'default': None})})
+
     return result
 
 
@@ -226,6 +277,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
+    self.boot_disk_size = vm_spec.boot_disk_size
     self.client_token = str(uuid.uuid4())
     self.host = None
     self.id = None
@@ -370,8 +422,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     elif IsPlacementGroupCompatible(self.machine_type):
       placement.append('GroupName=%s' % self.network.placement_group.name)
     placement = ','.join(placement)
-    block_device_map = GetBlockDeviceMap(self.machine_type)
-
+    block_device_map = GetBlockDeviceMap(self.machine_type,
+                                         self.boot_disk_size,
+                                         self.image)
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'run-instances',
@@ -492,7 +545,8 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
 
   def __init__(self, vm_spec):
     super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
-    self.user_name = 'ec2-user'
+    user_name_set = FLAGS['aws_user_name'].present
+    self.user_name = FLAGS.aws_user_name if user_name_set else 'ec2-user'
 
 
 class WindowsAwsVirtualMachine(AwsVirtualMachine,

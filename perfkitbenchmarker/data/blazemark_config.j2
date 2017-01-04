@@ -1,0 +1,164 @@
+#==================================================================================================
+#
+#  Configfile file for the Blaze benchmark suite
+#
+#  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+#
+#  This file is part of the Blaze library. You can redistribute it and/or modify it under
+#  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
+#  forms, with or without modification, are permitted provided that the following conditions
+#  are met:
+#
+#  1. Redistributions of source code must retain the above copyright notice, this list of
+#     conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice, this list
+#     of conditions and the following disclaimer in the documentation and/or other materials
+#     provided with the distribution.
+#  3. Neither the names of the Blaze development group nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without specific
+#     prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+#  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+#  SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+#  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+#  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+#  BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+#  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+#  DAMAGE.
+#
+#==================================================================================================
+
+# Compiler selection
+# This variable specifies the compiler used for the compilation of all benchmarks.
+CXX={{ compiler }}
+
+# Special compiler flags
+# This variable specifies the compiler flags used for the compilation of all benchmarks.
+CXXFLAGS={{ compiler_flags }}
+
+# Special include directives
+# This variable can be used to specify special/additional include-related compiler directives.
+INCLUDE_DIRECTIVES=
+
+# Special library directives
+# This variable can be used to specify special/additional library-related compiler directives.
+LIBRARY_DIRECTIVES=
+
+# Configuration of the boost library
+# The boost library (see www.boost.org) is precondition for the Blaze library and the
+# Blaze benchmark suite, i.e., it is not possible to compile the library without boost.
+# Blaze requires you to have at least the boost version 1.54.0 or higher installed on
+# your system. In case the boost include directory is not set, it is assumed that the
+# boost headers are installed in standard paths (as for instance '/usr/include/boost').
+# Additionally, it is necessary to specify the library path of the boost libraries and
+# the name of the boost system and thread libraries (as for instance 'boost_thread-mt').
+# In case the library path is not explicitly specified, it is assumed that the libraries
+# are installed in standard paths (for example '/usr/lib/' or '/usr/lib64/'). If the
+# name of a library is not specified, it is assumed that the library has a default name
+# ('libboost_system.*' and 'libboost_thread.*', respectively).
+BOOST_INCLUDE_PATH=
+BOOST_LIBRARY_PATH=
+BOOST_SYSTEM_LIBRARY=
+BOOST_THREAD_LIBRARY=
+
+# Configuration of the BLAS library (optional)
+# The Blaze as well as the MTL library offer the possibilty to use a BLAS library for
+# certain linear algebra operations (such as for instance matrix-matrix multiplications).
+# If the BLAS switch is set to 'yes', both libraries will use BLAS functions accordingly.
+# Additionally, all BLAS benchmark kernels will be included in the compilation process.
+# If BLAS is activated, per default it is assumed that the BLAS include file is called
+# 'cblas.h' and is installed in standard paths (as for instance '/usr/include/cblas.h').
+# Both default settings can be changed by explicitly specifying the BLAS include path
+# and the name of the BLAS include file. Additionally, the BLAS library path has to
+# be specified (otherwise it is assumed that the library resides in standard paths)
+# and the BLAS libraries have to be specified (for example '-lf77blas -lcblas -latlas'
+# for the ATLAS library). If the BLAS switch is set to 'no', the Blaze and the MTL
+# libraries use their default implementations of the according operations and the
+# BLAS benchmarks will be excluded from compilation.
+BLAS="no"
+BLAS_INCLUDE_PATH=
+BLAS_INCLUDE_FILE=
+BLAS_LIBRARY_PATH=
+BLAS_LIBRARIES=
+
+# Configuration of the LAPACK library (optional)
+# The Blaze library requires a LAPACK library for the matrix inversion benchmark. For
+# this benchmark it is mandatory to specify the LAPACK library path and the required
+# LAPACK libraries.
+LAPACK_LIBRARY_PATH={{ lapack_path }}
+LAPACK_LIBRARIES={{ lapack_libs }}
+
+# Configuration of the Blitz++ library (optional)
+# With this setting it is possible to include the Blitz++ expression template library
+# to the benchmark process of the Blaze benchmark suite. The Blaze benchmark suite
+# requires Blitz++ 0.10 or any newer version. If the switch is set to 'yes' all Blitz++
+# kernels are included in the compilation process. In case the Blitz++ include directory
+# is not set, Blaze expects the according headers in the subdirectory 'blitz' in standard
+# paths (for example '/usr/include/blitz'). In case the Blitz++ library path is not
+# specified, Blaze expects the library in standard paths (as for instance '/usr/lib').
+BLITZ="no"
+BLITZ_INCLUDE_PATH=
+BLITZ_LIBRARY_PATH=
+
+# Configuration of the GMM++ library (optional)
+# This switch configures the GMM++ benchmarks. At least GMM++ 4.1 is required for the
+# compilation of the GMM++ benchmarks. If this switch is set to 'yes' all GMM++ kernels
+# are included in the compilation process. If the ATLAS BLAS library is installed some
+# of GMM's algorithms can be accelerated by optimized ATLAS routines. In case the GMM++
+# include directory is not set, Blaze expects the according headers in the standard paths
+# (for example '/usr/include/gmm').
+GMM="no"
+GMM_ATLAS_INSTALLED="no"
+GMM_INCLUDE_PATH=
+
+# Configuration of the Armadillo library (optional)
+# The following switch includes or excludes all benchmark kernels for the Armadillo
+# library. For a correct compilation, at least Armadillo 2.4.2 is required. If the switch
+# is set to 'yes' all Armadillo kernels are included in the compilation process. In case
+# the Armadillo include directory is not set, Blaze expects the according headers in the
+# standard paths (as for instance '/usr/include/'). Optionally it is possible to specify
+# the path of the Armadillo library. If a path is specified, the Armadillo library with
+# the standard name 'libarmadillo.*' will be considered during the linking process.
+ARMADILLO="no"
+ARMADILLO_INCLUDE_PATH=
+ARMADILLO_LIBRARY_PATH=
+
+# Configuration of the FLENS library (optional)
+# This switch includes all FLENS (Flexible Library for Efficient Numerical Solutions)
+# benchmarks kernels in the compilation process. The Blaze benchmark suite requires you
+# to install at least FLENS-2012-08-28. If the switch is set to 'yes' all FLENS kernels
+# are included in the compilation process. Note that in this case you are required to
+# use a C++-11 conform compiler (such as for instance GCC 4.7 or Intel 12.1.2). If either
+# the ATLAS, GOTO BLAS, or Intel MKL library is installed the according switch can be
+# set to 'yes' in order to accelerate several of FLENS kernels by an optimized BLAS
+# implementation. Note however that only one of these switches can be set to 'yes'. In
+# case the FLENS include directory is not set, Blaze expects the according headers in
+# the standard paths (for example '/usr/include/flens').
+FLENS="no"
+FLENS_ATLAS_INSTALLED="no"
+FLENS_GOTO_INSTALLED="no"
+FLENS_MKL_INSTALLED="no"
+FLENS_INCLUDE_PATH=
+
+# Configuration of the MTL library (optional)
+# This setting triggers the compilation of all benchmark kernels for the MTL library.
+# The Blaze benchmark suite requires at least MTL 4.0 in order compile. If the switch
+# is set to 'yes' all MTL kernels are included in the compilation process. In case the
+# MTL include directory is not set, Blaze expects the according headers in the boost
+# directories (as for instance 'boost/numeric/mtl').
+MTL="no"
+MTL_INCLUDE_PATH=
+
+# Configuration of the Eigen library (optional)
+# This switch includes or excludes all benchmark kernels for the Eigen library. The Blaze
+# benchmark suite requires at least Eigen 3.1, but also works with any newer version. If
+# the switch is set to 'yes' all Eigen kernels are included in the compilation process.
+# In case the Intel MKL is installed, some of Eigen's algorithms are silently substituted
+# with calls to Intel MKL routines. In case the Eigen include directory is not set, Blaze
+# expects the according headers in standard paths (for example '/usr/include/Eigen').
+EIGEN="no"
+EIGEN_MKL_INSTALLED="no"
+EIGEN_INCLUDE_PATH=

@@ -1,0 +1,38 @@
+[
+    {
+        "VirtualizationType": "hvm", 
+        "Name": "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20161020", 
+        "Hypervisor": "xen", 
+        "SriovNetSupport": "simple", 
+        "ImageId": "ami-a9d276c9", 
+        "State": "available", 
+        "BlockDeviceMappings": [
+            {
+                "DeviceName": "/dev/sda1", 
+                "Ebs": {
+                    "DeleteOnTermination": true, 
+                    "SnapshotId": "snap-826344d5", 
+                    "VolumeSize": 8, 
+                    "VolumeType": "gp2", 
+                    "Encrypted": false
+                }
+            }, 
+            {
+                "DeviceName": "/dev/sdb", 
+                "VirtualName": "ephemeral0"
+            }, 
+            {
+                "DeviceName": "/dev/sdc", 
+                "VirtualName": "ephemeral1"
+            }
+        ], 
+        "Architecture": "x86_64", 
+        "ImageLocation": "099720109477/ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-20161020", 
+        "RootDeviceType": "ebs", 
+        "OwnerId": "099720109477", 
+        "RootDeviceName": "/dev/sda1", 
+        "CreationDate": "2016-10-21T09:20:11.000Z", 
+        "Public": true, 
+        "ImageType": "machine"
+    }
+]

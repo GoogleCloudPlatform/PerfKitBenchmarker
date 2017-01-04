@@ -311,3 +311,11 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
                  'assign mount=%s\n' % disk_spec.mount_point)
 
     self._RunDiskpartScript(script)
+
+  def SetReadAhead(self, num_sectors, devices):
+    """Set read-ahead value for block devices.
+    Args:
+      num_sectors: int. Number of sectors of read ahead.
+      devices: list of strings. A list of block devices.
+    """
+    raise NotImplementedError()

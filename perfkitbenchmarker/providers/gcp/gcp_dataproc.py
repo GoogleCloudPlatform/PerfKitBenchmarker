@@ -174,3 +174,10 @@ class GcpDataproc(spark_service.BaseSparkService):
 
   def SetClusterProperty(self):
     pass
+
+  def GetMetadata(self):
+    basic_data = super(GcpDataproc, self).GetMetadata()
+    if self.spec.worker_group.vm_spec.num_local_ssds:
+      basic_data.update({'ssd_count':
+                        str(self.spec.worker_group.vm_spec.num_local_ssds)})
+    return basic_data
