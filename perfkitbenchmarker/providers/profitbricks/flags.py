@@ -26,7 +26,7 @@ DE_FRA = 'de/fra'
 HDD = 'HDD'
 SSD = 'SSD'
 
-#Availability zones for volumes
+# Availability zones for volumes
 AUTO = 'AUTO'
 ZONE_1 = 'ZONE_1'
 ZONE_2 = 'ZONE_2'
@@ -57,5 +57,6 @@ flags.DEFINE_integer('profitbricks_boot_volume_size',
 flags.DEFINE_enum('availability_zone',
                   AUTO,
                   [AUTO, ZONE_1, ZONE_2, ZONE_2],
-                  ('Direct a storage volume to be created in one of three zones per data center (AUTO, '
+                  ('Direct a storage volume to be created in one of three '
+                   'zones per data center (AUTO, '
                    'ZONE_1, ZONE_2, ZONE_3)'))

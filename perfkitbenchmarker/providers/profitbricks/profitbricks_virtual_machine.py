@@ -156,7 +156,8 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
         'boot_volume_type': (option_decoders.StringDecoder, {'default': 'HDD'}),
         'boot_volume_size': (option_decoders.IntDecoder, {'default': 10,
                                                           'min': 10}),
-        'availability_zone': (option_decoders.StringDecoder, {'default': 'AUTO'})})
+        'availability_zone': (option_decoders.StringDecoder,
+                              {'default': 'AUTO'})})
     return result
 
 
