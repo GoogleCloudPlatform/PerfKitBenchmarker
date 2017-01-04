@@ -18,6 +18,7 @@ import json
 import numpy as np
 import matplotlib.collections as mplc
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpl_patches
 import sys
 
 
@@ -41,6 +42,9 @@ class DraggableXRange:
 
   def on_press(self, event):
     'on button press we will see if the mouse is over us and store some data'
+    if event.button != 3:
+      # Only continue for right mouse button
+      return
     if self.span is not None:
       return
 
@@ -87,6 +91,9 @@ class DraggableXRange:
 
   def on_release(self, event):
     'on release we reset the press data'
+    if event.button != 3:
+      # Only continue for right mouse button
+      return
     if self.span is None:
       return
 
@@ -129,6 +136,9 @@ class SelectionUpdate:
 
     start, end = min(start, end), max(start, end)
 
+    if start == end:
+      return
+
     active_start_indexes = []
     for start_time in self.start_times:
       for i in xrange(len(start_time)):
@@ -169,16 +179,24 @@ class SelectionUpdate:
 
 
 def GenerateObjectTimeline(file_name, start_times, latencies):
+  assert len(start_times) == len(latencies)
+  num_streams = len(start_times)
   segments = []
   colors = []
   for i, worker_times in enumerate(zip(start_times, latencies)):
     # w_start_times and w_latencies correspond with a single worker process
     # np.vstack().T behaves like zip() here
     for j, (start_time, latency) in enumerate(np.vstack(worker_times).T):
-      segments.append([(start_time, i), (start_time + latency, i)])
-      # Alternate between red and blue
-      colors.append((0.5 * (j % 2) + 0.5, 0, 0, 1))
-  lc = mplc.LineCollection(segments, colors=colors, linewidths=10)
+      # segments.append([(start_time, i), (start_time + latency, i)])
+      rect = mpl_patches.Rectangle((start_time, i + 0.5), latency, 1.0,
+                                   color=(0.5 * (j % 2) + 0.5, 0, 0),
+                                   linewidth=0)
+      segments.append(rect)
+      # Alternate between red and dark red
+      #colors.append((0.5 * (j % 2) + 0.5, 0, 0, 1))
+  #lc = mplc.LineCollection(segments, colors=colors,
+  #                         linewidths = 1.0)
+  lc = mplc.PatchCollection(segments)
   fig, ax = plt.subplots(figsize=(30, 5))
   ax.add_collection(lc)
   ax.autoscale()
