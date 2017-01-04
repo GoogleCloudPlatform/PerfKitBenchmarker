@@ -1,3 +1,52 @@
+# v1.10.0
+
+External contributions:
+- Re-write flag_util_test.py so it's easier to read (thanks @yilei GH-1244)
+- Fix bug that prevents running bonnie++ on Azure (thanks @rgodha GH-1218)
+- Add kernel compile benchmark (thanks @maggiejiao GH-1215, GH-1255)
+- Change the documentation to reflect that work should be on master (thanks
+  @besanradwan GH-1209)
+- Add flags to capture latency, bandwidth and IOPS logs in Fio benchmark (thanks @meteorfox GH-1205)
+- Re-add 'vm_util' object to fix broken master branch (thanks @vhe182 GH-1196)
+- Add EPEL Repo to Silo Installation (thanks @akrzos GH-1153)
+
+New features:
+- Add GPU PCIe bandwidth test (GH-1234, GH-1250, GH-1252, GH-1254)
+- Add blazemark (GH-1145)
+- Add simple memcached ycsb benchmark based on aerospike ycsb benchmark (GH-1199)
+- Add scimark2 installation package (GH-1185)
+
+Enhancements:
+- Use FLAGS.aws_user_name if set for Rhel (GH-1249)
+- Fio enhancements (GH-1246)
+- Use aes128-ctr if aes128-cbc isn't available (GH-1242)
+- Make aeropsike able to run with raw devices on static vms (GH-1243)
+- Add some metadata to netperf samples (GH-1236)
+- Remove unneeded Azure code and add availability sets (GH-1232)
+- Add cassandra read concurrency flag (GH-1233)
+- Add a metadata attribute 'ssd_count' to spark_service (GH-1229)
+- Add a metadata attribute 'spark_svc_cloud' to spark_service (GH-1226)
+- Add ability to specify boot_disk_size in AWS vm spec (GH-1231)
+- Add a metadata attribute 'spark_svc_cloud' (GH-1236)
+- Set a default zone for the spark test to allow for subnet creation (GH-1222)
+- Update the location of the spark examples jar on the emr cluster (GH-1222)
+- Persist package installation across reboots (GH-1185)
+- Allow mongodb_ycsb to specify readahead settings (GH-1256)
+
+Bug fixes and maintenance updates:
+- Close Aersospike connection in 1 second (GH-1241)
+- Fix bug with having multiple Azure data disks (GH-1223)
+- Fix aws spark service (GH-1222)
+- Add some git ignore entries (GH-1222)
+- Fix gcs credential conflict (GH-1221)
+- Fix bug with run_processes (GH-1212)
+- Remove collector from RunBenchmarkTask args (GH-1210)
+- Add the minimum tox version to the "tox is not installed" message (GH-1201)
+- Move sysbench05plus path prefix logic into package (GH-1185)
+- Fix bug with specifying Azure image (GH-1204)
+- Fix two files that were failing boilerplate check (GH-1203)
+- Update README.md (GH-1200)
+
 # 1.9.0
 
 New features:
@@ -924,7 +973,6 @@ Fixes:
 * Fixed corner cases in SPEC 2006 causing it to fail on large instances.
 
 # v0.1
-
 * Support static vms (i.e. machine not provisioned via Cloud APIs. We call all machines VMs). All static VMs provided will be used before any non-static VMs are provisioned.
 * See static_virtual_machine.py for detailed description.
 * Added copy benchmark.
