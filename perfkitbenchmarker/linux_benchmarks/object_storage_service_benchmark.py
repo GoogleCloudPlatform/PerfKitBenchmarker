@@ -905,7 +905,7 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
                        'download')
   except Exception as ex:
     logging.info('MultiStreamRead test failed with exception %s. Still '
-                 'recording write data.', ex.msg)
+                 'recording write data: %s', ex)
 
   logging.info('Finished multi-stream read test.')
 
