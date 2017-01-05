@@ -57,6 +57,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   deleted_keypair_set = set()
   created_server_group_dict = {}
   deleted_server_group_set = set()
+  floating_network_id = None
 
   def __init__(self, vm_spec):
     """Initialize an OpenStack virtual machine.
@@ -80,7 +81,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.floating_ip = None
     self.firewall = None
     self.public_network = None
-    self.floating_network_id = None
     self.subnet_id = None
 
   @property
@@ -93,7 +93,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CheckPrerequisites()
     self.firewall = os_network.OpenStackFirewall.GetFirewall()
     self.public_network = os_network.OpenStackFloatingIPPool(
-        self.floating_network_id)
+        OpenStackVirtualMachine.floating_network_id)
     self._UploadSSHPublicKey()
     source_range = self._GetInternalNetworkCIDR()
     self.firewall.AllowPort(self, os_network.MIN_PORT, os_network.MAX_PORT,
@@ -204,7 +204,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.floating_ip_pool_name:
       floating_network_dict = self._CheckFloatingIPNetworkExists(
           self.floating_ip_pool_name)
-      self.floating_network_id = floating_network_dict['id']
+      OpenStackVirtualMachine.floating_network_id = floating_network_dict['id']
 
   def _CheckFloatingIPNetworkExists(self, floating_network_name_or_id):
     network = self._CheckNetworkExists(floating_network_name_or_id)
