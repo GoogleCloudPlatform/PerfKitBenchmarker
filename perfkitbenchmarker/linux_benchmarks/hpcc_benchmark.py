@@ -82,6 +82,7 @@ def CheckPrerequisites():
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
   data.ResourcePath(HPCCINF_FILE)
+  hpcc.CheckPrerequisites()
 
 
 def CreateMachineFile(vms):
@@ -165,7 +166,6 @@ def Prepare(benchmark_spec):
   PrepareHpcc(master_vm)
   CreateHpccinf(master_vm, benchmark_spec)
   CreateMachineFile(vms)
-  master_vm.RemoteCommand('cp %s/hpcc hpcc' % hpcc.HPCC_DIR)
 
   for vm in vms[1:]:
     vm.Install('fortran')
