@@ -138,7 +138,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # stdout of the job.  We set the driver log level to FATAL
     # to suppress those messages, and we can then separate, hopefully
     # the job standard out from the log messages.
-    cmd.flags['driver-log-levels'] = 'root=FATAL'
+    cmd.flags['driver-log-levels'] = 'root={}'.format(FLAGS.dpb_log_level)
 
     if job_arguments:
       cmd.additional_flags = ['--'] + job_arguments

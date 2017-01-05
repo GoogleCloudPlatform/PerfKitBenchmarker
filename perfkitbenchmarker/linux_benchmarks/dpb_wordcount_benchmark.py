@@ -30,6 +30,7 @@ https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
 
 import copy
 import datetime
+import os
 import tempfile
 
 from perfkitbenchmarker import configs
@@ -37,7 +38,6 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.data import FileResourceLoader
 from perfkitbenchmarker.dpb_service import BaseDpbService
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
@@ -103,9 +103,8 @@ def CheckPrerequisites():
   if (FLAGS.dpb_wordcount_input is None and
           FLAGS.dpb_wordcount_fs != BaseDpbService.GCS_FS):
     raise errors.Config.InvalidValue('Invalid default input directory.')
-  if FLAGS.dpb_dataflow_jar:
-    if not FileResourceLoader(FLAGS.dpb_dataflow_jar).ResourceExists:
-      raise errors.Config.InvalidValue('Dataflow jar missing.')
+  if FLAGS.dpb_dataflow_jar and not os.path.exists(FLAGS.dpb_dataflow_jar):
+    raise errors.Config.InvalidValue('Dataflow jar missing.')
 
 
 def Prepare(benchmark_spec):
@@ -142,6 +141,7 @@ def Run(benchmark_spec):
         FLAGS.dpb_dataflow_staging_location))
     job_arguments.append('--runner={}'.format(
         gcp_dpb_dataflow.DATAFLOW_BLOCKING_RUNNER))
+    job_arguments.append('--inputFile={}'.format(input_location))
     if not FLAGS.dpb_wordcount_out_base:
       base_out = FLAGS.dpb_dataflow_staging_location
     else:
