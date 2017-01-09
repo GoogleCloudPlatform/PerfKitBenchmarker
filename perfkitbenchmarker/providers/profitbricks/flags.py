@@ -26,6 +26,12 @@ DE_FRA = 'de/fra'
 HDD = 'HDD'
 SSD = 'SSD'
 
+# Availability zones for volumes
+AUTO = 'AUTO'
+ZONE_1 = 'ZONE_1'
+ZONE_2 = 'ZONE_2'
+ZONE_3 = 'ZONE_3'
+
 flags.DEFINE_string('profitbricks_config',
                     os.getenv('PROFITBRICKS_CONFIG',
                               '~/.config/profitbricks-auth.cfg'),
@@ -47,3 +53,10 @@ flags.DEFINE_enum('profitbricks_boot_volume_type',
 flags.DEFINE_integer('profitbricks_boot_volume_size',
                      10,
                      ('Choose the boot volume size in GB.'))
+
+flags.DEFINE_enum('availability_zone',
+                  AUTO,
+                  [AUTO, ZONE_1, ZONE_2, ZONE_2],
+                  ('Direct a storage volume to be created in one of three '
+                   'zones per data center (AUTO, '
+                   'ZONE_1, ZONE_2, ZONE_3)'))
