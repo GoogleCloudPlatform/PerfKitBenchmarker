@@ -13,20 +13,18 @@
 # limitations under the License.
 """"Module containing classes related to OpenStack Networking."""
 
+from collections import namedtuple
 import json
 import threading
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import utils
 from perfkitbenchmarker import providers
 
 
-NOVA_FLOAT_IP_LIST_CMD = 'floating-ip-list'
-OSC_IP_CMD = 'ip'
-OSC_FLOATING_SUBCMD = 'floating'
+OSC_FLOATING_IP_CMD = 'floating ip'
 OSC_SEC_GROUP_CMD = 'security group'
 OSC_SEC_GROUP_RULE_CMD = 'security group rule'
 
@@ -36,10 +34,19 @@ ICMP = 'icmp'
 TCP = 'tcp'
 UDP = 'udp'
 
+FLOATING_IP_ADDRESS = 'floating_ip_address'
+FLOATING_IP_ID = 'id'
+FLOATING_NETWORK_ID = 'floating_network_id'
+
+FLOATING_IP_KEYS = (FLOATING_IP_ADDRESS, FLOATING_IP_ID, FLOATING_NETWORK_ID,)
+
 FLAGS = flags.FLAGS
 
 MAX_PORT = 65535
 MIN_PORT = 1
+
+
+OpenStackFloatingIP = namedtuple('OpenStackFloatingIP', FLOATING_IP_KEYS)
 
 
 class OpenStackFirewall(network.BaseFirewall):
@@ -60,6 +67,7 @@ class OpenStackFirewall(network.BaseFirewall):
       if stderr:
         cmd = utils.OpenStackCLICommand(self, OSC_SEC_GROUP_CMD, 'create',
                                         SC_GROUP_NAME)
+        del cmd.flags['format']  # Command does not support json output
         cmd.Issue()
 
   def AllowICMP(self, vm, icmp_type=-1, icmp_code=-1, source_range=None):
@@ -129,54 +137,65 @@ class OpenStackFloatingIPPool(object):
 
   _floating_ip_lock = threading.Lock()  # Guards floating IP allocation/release
 
-  def __init__(self, pool_name):
-    self.ip_pool_name = pool_name
+  def __init__(self, floating_network_id):
+    self.floating_network_id = floating_network_id
 
   def associate(self, vm):
     with self._floating_ip_lock:
-      floating_ip = self._get_or_create(vm)
-      cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD, OSC_FLOATING_SUBCMD,
-                                      'add', floating_ip['ip'], vm.id)
+      floating_ip_obj = self._get_or_create(vm)
+      cmd = utils.OpenStackCLICommand(vm, 'server add floating ip', vm.id,
+                                      floating_ip_obj.floating_ip_address)
       del cmd.flags['format']  # Command does not support json output format
       _, stderr, _ = cmd.Issue()
       if stderr:
         raise errors.Error(stderr)
-      return floating_ip
+      return floating_ip_obj
 
   def _get_or_create(self, vm):
-    list_cmd = [FLAGS.openstack_nova_path, NOVA_FLOAT_IP_LIST_CMD]
-    stdout, stderr, _ = vm_util.IssueCommand(list_cmd)
-    floating_ip_dict_list = utils.ParseFloatingIPTable(stdout)
+    list_cmd = utils.OpenStackCLICommand(vm, OSC_FLOATING_IP_CMD, 'list')
+    stdout, stderr, _ = list_cmd.Issue()
+    if stderr:
+      raise errors.Error(stderr)
+    floating_ip_dict_list = json.loads(stdout)
+
     for floating_ip_dict in floating_ip_dict_list:
-      if (floating_ip_dict['pool'] == self.ip_pool_name and
-              floating_ip_dict['instance_id'] is None):
-        return floating_ip_dict
+      if (floating_ip_dict['Floating Network'] == self.floating_network_id
+              and floating_ip_dict['Port'] is None):
+        # Due to inconsistent output, we need to convert the keys
+        floating_ip_obj = OpenStackFloatingIP(
+            floating_ip_address=floating_ip_dict['Floating IP Address'],
+            floating_network_id=floating_ip_dict['Floating Network'],
+            id=floating_ip_dict['ID']
+        )
+        return floating_ip_obj
     return self._allocate(vm)
 
   def _allocate(self, vm):
-    cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD, OSC_FLOATING_SUBCMD,
-                                    'create', self.ip_pool_name)
+    cmd = utils.OpenStackCLICommand(vm, OSC_FLOATING_IP_CMD, 'create',
+                                    self.floating_network_id)
     stdout, stderr, _ = cmd.Issue()
     if stderr.strip():  # Strip spaces
       raise errors.Config.InvalidValue(
-          'Could not allocate a floating ip from the pool "%s".'
-          % self.ip_pool_name)
+          'Could not allocate a floating ip from the floating network "%s".'
+          % self.floating_network_id)
     floating_ip_dict = json.loads(stdout)
-    # Convert OSC format to nova's format
-    floating_ip_dict['ip'] = floating_ip_dict['floating_ip_address']
-    del floating_ip_dict['floating_ip_address']
-    return floating_ip_dict
+    # Extract subset of returned keys
+    floating_ip_obj = OpenStackFloatingIP(
+        floating_ip_address=floating_ip_dict['floating_ip_address'],
+        floating_network_id=floating_ip_dict['floating_network_id'],
+        id=floating_ip_dict['id']
+    )
+    return floating_ip_obj
 
-  def release(self, vm, floating_ip_dict):
-    cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD, OSC_FLOATING_SUBCMD, 'show',
-                                    floating_ip_dict['id'])
+  def release(self, vm, floating_ip_obj):
+    cmd = utils.OpenStackCLICommand(vm, OSC_FLOATING_IP_CMD, 'show',
+                                    floating_ip_obj.id)
     stdout, stderr, _ = cmd.Issue(suppress_warning=True)
     if stderr:
       return  # Not found, moving on
-    updated_floating_ip_dict = json.loads(stdout)
+    floating_ip_dict = json.loads(stdout)
     with self._floating_ip_lock:
-      delete_cmd = utils.OpenStackCLICommand(vm, OSC_IP_CMD,
-                                             OSC_FLOATING_SUBCMD, 'delete',
-                                             updated_floating_ip_dict['id'])
+      delete_cmd = utils.OpenStackCLICommand(vm, OSC_FLOATING_IP_CMD, 'delete',
+                                             floating_ip_dict['id'])
       del delete_cmd.flags['format']  # Command not support json output format
       stdout, stderr, _ = delete_cmd.Issue(suppress_warning=True)
