@@ -71,8 +71,8 @@ class GceDisk(disk.BaseDisk):
     cmd.flags['type'] = self.disk_type
     if self.image:
       cmd.flags['image'] = self.image
-      if FLAGS.image_project:
-        cmd.flags['image-project'] = FLAGS.image_project
+    if FLAGS.image_project:
+      cmd.flags['image-project'] = FLAGS.image_project
     cmd.Issue()
 
   def _Delete(self):
