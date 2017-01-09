@@ -18,7 +18,9 @@ import logging
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.openstack import utils as os_utils
 
 REMOTE_VOLUME_DEFAULT_SIZE_GB = 50
@@ -81,6 +83,34 @@ def WaitForVolumeCreation(resource, volume_id):
   if resp['status'] != 'available':
     msg = 'Volume is not ready. Retrying to check status.'
     raise errors.Resource.RetryableCreationError(msg)
+
+
+class OpenStackDiskSpec(disk.BaseDiskSpec):
+  """Object holding the information needed to create an OpenStackDisk.
+
+  Attributes:
+    volume_type: None or string. Volume type to be used to create a
+       block storage volume.
+  """
+
+  CLOUD = providers.OPENSTACK
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    super(OpenStackDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['openstack_volume_type'].present:
+      config_values['volume_type'] = flag_values.openstack_volume_type
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    decoders = super(OpenStackDiskSpec, cls)._GetOptionDecoderConstructions()
+    decoders.update(
+        {
+            'volume_type': (option_decoders.StringDecoder,
+                            {'default': None, 'none_ok': True},)
+        }
+    )
+    return decoders
 
 
 class OpenStackDisk(disk.BaseDisk):
