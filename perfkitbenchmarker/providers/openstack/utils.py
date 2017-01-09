@@ -15,53 +15,10 @@
 
 from collections import OrderedDict
 
-import re
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-
-FIVE_COLUMNS_ROW_REGEX = r'\|\s+(.*)\|\s+(.*)\|\s+(.*)\|\s+(.*)\|\s+(.*)\|'
-FIVE_COLUMNS_PATTERN = re.compile(FIVE_COLUMNS_ROW_REGEX)
-
-
-def ParseNovaTable(output, regex_pattern, key_names):
-  stdout_lines = output.split('\n')
-  groups = (regex_pattern.match(line) for line in stdout_lines)
-  tuples = (g.groups() for g in groups if g)
-  dict_list = []
-  try:
-    next(tuples)  # Skip table header
-    tuples = (map(lambda v: v.strip(), t) for t in tuples)
-    dict_list = [dict(zip(key_names, t)) for t in tuples]
-  except StopIteration:
-    pass  # Empty list
-  return dict_list
-
-
-def ParseServerGroupTable(output):
-  """Returns a dict with key/values returned from a Nova CLI formatted table.
-
-  Returns:
-    dict with key/value of the server-group.
-  """
-  keys = ('id', 'name', 'policies', 'members', 'metadata',)
-  server_group_list = ParseNovaTable(output, FIVE_COLUMNS_PATTERN, keys)
-  assert len(server_group_list) == 1, 'Server group is not unique.'
-  return server_group_list[0]
-
-
-def ParseFloatingIPTable(output):
-  """Returns a list of dicts with floating IPs."""
-  keys = ('id', 'ip', 'instance_id', 'fixed_ip', 'pool',)
-  floating_ip_list = ParseNovaTable(output, FIVE_COLUMNS_PATTERN, keys)
-  for floating_ip in floating_ip_list:
-    if floating_ip['instance_id'] == '-':
-      floating_ip['instance_id'] = None
-    if floating_ip['fixed_ip'] == '-':
-      floating_ip['fixed_ip'] = None
-  return floating_ip_list
 
 
 class OpenStackCLICommand(object):
