@@ -13,4 +13,4 @@
 # limitations under the License.
 """ProfitBricks cloud provider implementation."""
 
-PROFITBRICKS_API = 'https://api.profitbricks.com/rest/v2'
+PROFITBRICKS_API = 'https://api.profitbricks.com/cloudapi/v3/'

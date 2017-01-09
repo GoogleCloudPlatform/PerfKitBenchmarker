@@ -137,6 +137,8 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
     if flag_values['profitbricks_boot_volume_size'].present:
       config_values['boot_volume_size'] = \
           flag_values.profitbricks_boot_volume_size
+    if flag_values['availability_zone'].present:
+      config_values['availability_zone'] = flag_values.availability_zone
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -153,7 +155,9 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
         'location': (option_decoders.StringDecoder, {'default': 'us/las'}),
         'boot_volume_type': (option_decoders.StringDecoder, {'default': 'HDD'}),
         'boot_volume_size': (option_decoders.IntDecoder, {'default': 10,
-                                                          'min': 10})})
+                                                          'min': 10}),
+        'availability_zone': (option_decoders.StringDecoder,
+                              {'default': 'AUTO'})})
     return result
 
 
@@ -194,9 +198,11 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.boot_volume_size = vm_spec.boot_volume_size
         self.location = vm_spec.location
         self.user_name = 'root'
+        self.availability_zone = vm_spec.availability_zone
         self.header = {
             'Authorization': 'Basic %s' % self.user_token,
             'Content-Type': 'application/vnd.profitbricks.resource+json',
+            'User-Agent': 'profitbricks-perfkitbenchmarker',
         }
 
     def _Create(self):
@@ -226,7 +232,8 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
                                 'name': 'boot volume',
                                 'image': self.image,
                                 'type': self.boot_volume_type,
-                                'sshKeys': [public_key]
+                                'sshKeys': [public_key],
+                                'availabilityZone': self.availability_zone
                             }
                         }
                     ]
