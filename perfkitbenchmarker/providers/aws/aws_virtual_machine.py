@@ -71,11 +71,12 @@ HOST_RELEASED_STATES = frozenset(['released', 'released-permanent-failure'])
 KNOWN_HOST_STATES = HOST_EXISTS_STATES | HOST_RELEASED_STATES
 
 
-def GetRootBlockDeviceSpecForImage(image_id):
+def GetRootBlockDeviceSpecForImage(image_id, region):
   """ Queries the CLI and returns the root block device specification as a dict.
 
   Args:
     image_id: The EC2 image id to query
+    region: The EC2 region in which the image resides
 
   Returns:
     The root block device specification as returned by the AWS cli,
@@ -85,6 +86,7 @@ def GetRootBlockDeviceSpecForImage(image_id):
   command = util.AWS_PREFIX + [
       'ec2',
       'describe-images',
+      '--region=%s' % region,
       '--image-ids=%s' % image_id,
       '--query', 'Images[]']
   stdout, _ = util.IssueRetryableCommand(command)
@@ -100,7 +102,8 @@ def GetRootBlockDeviceSpecForImage(image_id):
   return root_block_device_dict
 
 
-def GetBlockDeviceMap(machine_type, root_volume_size_gb=None, image_id=None):
+def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
+                      image_id=None, region=None):
   """Returns the block device map to expose all devices for a given machine.
 
   Args:
@@ -110,6 +113,8 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None, image_id=None):
     image: The image id (AMI) to use in order to lookup the default
       root device specs. This is only required if root_volume_size
       is specified.
+    region: The region which contains the specified image. This is only
+      required if image_id is specified.
 
   Returns:
     The json representation of the block device map for a machine compatible
@@ -122,7 +127,10 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None, image_id=None):
     if image_id is None:
       raise ValueError(
           "image_id must be provided if root_volume_size_gb is specified")
-    root_block_device = GetRootBlockDeviceSpecForImage(image_id)
+    if region is None:
+      raise ValueError(
+          "region must be provided if image_id is specified")
+    root_block_device = GetRootBlockDeviceSpecForImage(image_id, region)
     root_block_device['Ebs']['VolumeSize'] = root_volume_size_gb
     # The 'Encrypted' key must be removed or the CLI will complain
     root_block_device['Ebs'].pop('Encrypted')
@@ -424,7 +432,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     placement = ','.join(placement)
     block_device_map = GetBlockDeviceMap(self.machine_type,
                                          self.boot_disk_size,
-                                         self.image)
+                                         self.image,
+                                         self.region)
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'run-instances',
