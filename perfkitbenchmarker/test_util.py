@@ -14,6 +14,7 @@
 """Functions and classes to make testing easier."""
 
 import os
+import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import flags
@@ -102,11 +103,12 @@ def assertDiskMounts(benchmark_config, mount_point):
   assert len(benchmark_config['vm_groups']) == 1
   vm_group = benchmark_config['vm_groups'].itervalues().next()
   assert vm_group.get('num_vms', 1) == 1
-
+  m = mock.MagicMock()
+  m.BENCHMARK_NAME = _BENCHMARK_NAME
   config_spec = benchmark_config_spec.BenchmarkConfigSpec(
       _BENCHMARK_NAME, flag_values=flags.FLAGS, **benchmark_config)
-  spec = benchmark_spec.BenchmarkSpec(config_spec, _BENCHMARK_NAME,
-                                      _BENCHMARK_UID)
+  spec = benchmark_spec.BenchmarkSpec(
+      m, config_spec, _BENCHMARK_UID)
   with spec.RedirectGlobalFlags():
     try:
       spec.ConstructVirtualMachines()

@@ -91,7 +91,7 @@ def _WaitForServerUp(server):
   logging.info("Trying to connect to Aerospike at %s:%s" % (address, port))
   try:
     out, _ = server.RemoteCommand(
-        '(echo -e "status\n" ; sleep 1)| netcat %s %s' % (address, port))
+        '(echo -e "status\n" ; sleep 1)| netcat -q 1 %s %s' % (address, port))
     if out.startswith('ok'):
       logging.info("Aerospike server status is OK. Server up and running.")
       return
@@ -130,7 +130,8 @@ def ConfigureAndStart(server, seed_node_ips=None):
        'replication_factor': FLAGS.aerospike_replication_factor})
 
   for scratch_disk in server.scratch_disks:
-    server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
+    if scratch_disk.mount_point:
+      server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
 
   server.RemoteCommand('cd %s && make init' % AEROSPIKE_DIR)
   server.RemoteCommand('cd %s; nohup sudo make start &> /dev/null &' %

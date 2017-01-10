@@ -69,6 +69,14 @@ flags.DEFINE_integer('memory_size_mb',
                      None,
                      'The amount of memory in MB on each machine to use. By '
                      'default it will use the entire system\'s memory.')
+flags.DEFINE_string('hpcc_binary', None,
+                    'The path of prebuilt hpcc binary to use. If not provided, '
+                    'this benchmark built its own using OpenBLAS.')
+flags.DEFINE_list('hpcc_mpi_env', [],
+                  'Comma seperated list containing environment variables '
+                  'to use with mpirun command. e.g. '
+                  'MKL_DEBUG_CPU_TYPE=7,MKL_ENABLE_INSTRUCTIONS=AVX512')
+
 
 
 def GetConfig(user_config):
@@ -82,6 +90,8 @@ def CheckPrerequisites():
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
   data.ResourcePath(HPCCINF_FILE)
+  if FLAGS['hpcc_binary'].present:
+    data.ResourcePath(FLAGS.hpcc_binary)
 
 
 def CreateMachineFile(vms):
@@ -152,6 +162,22 @@ def PrepareHpcc(vm):
   vm.Install('hpcc')
 
 
+def PrepareBinaries(vms):
+  """Prepare binaries on all vms."""
+  master_vm = vms[0]
+  if FLAGS.hpcc_binary:
+    master_vm.PushFile(
+        data.ResourcePath(FLAGS.hpcc_binary), './hpcc')
+  else:
+    master_vm.RemoteCommand('cp %s/hpcc hpcc' % hpcc.HPCC_DIR)
+
+  for vm in vms[1:]:
+    vm.Install('fortran')
+    master_vm.MoveFile(vm, 'hpcc', 'hpcc')
+    master_vm.MoveFile(vm, '/usr/bin/orted', 'orted')
+    vm.RemoteCommand('sudo mv orted /usr/bin/orted')
+
+
 def Prepare(benchmark_spec):
   """Install HPCC on the target vms.
 
@@ -165,13 +191,16 @@ def Prepare(benchmark_spec):
   PrepareHpcc(master_vm)
   CreateHpccinf(master_vm, benchmark_spec)
   CreateMachineFile(vms)
-  master_vm.RemoteCommand('cp %s/hpcc hpcc' % hpcc.HPCC_DIR)
+  PrepareBinaries(vms)
 
-  for vm in vms[1:]:
-    vm.Install('fortran')
-    master_vm.MoveFile(vm, 'hpcc', 'hpcc')
-    master_vm.MoveFile(vm, '/usr/bin/orted', 'orted')
-    vm.RemoteCommand('sudo mv orted /usr/bin/orted')
+
+def UpdateMetadata(metadata):
+  """Update metadata with hpcc-related flag values."""
+  metadata['memory_size_mb'] = FLAGS.memory_size_mb
+  if FLAGS['hpcc_binary'].present:
+    metadata['override_binary'] = FLAGS.hpcc_binary
+  if FLAGS['hpcc_mpi_env'].present:
+    metadata['mpi_env'] = FLAGS.hpcc_mpi_env
 
 
 def ParseOutput(hpcc_output, benchmark_spec):
@@ -186,12 +215,11 @@ def ParseOutput(hpcc_output, benchmark_spec):
     A list of samples to be published (in the same format as Run() returns).
   """
   results = []
-
   metadata = dict()
   match = re.search('HPLMaxProcs=([0-9]*)', hpcc_output)
   metadata['num_cpus'] = match.group(1)
   metadata['num_machines'] = len(benchmark_spec.vms)
-  metadata['memory_size_mb'] = FLAGS.memory_size_mb
+  UpdateMetadata(metadata)
   value = regex_util.ExtractFloat('HPL_Tflops=([0-9]*\\.[0-9]*)', hpcc_output)
   results.append(sample.Sample('HPL Throughput', value, 'Tflops', metadata))
 
@@ -224,10 +252,10 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   master_vm = vms[0]
   num_processes = len(vms) * master_vm.num_cpus
-
+  mpi_env = ' '.join(['-x %s' % v for v in FLAGS.hpcc_mpi_env])
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '
-             '"ssh -o StrictHostKeyChecking=no" ./hpcc' %
-             (num_processes, MACHINEFILE))
+             '"ssh -o StrictHostKeyChecking=no" %s ./hpcc' %
+             (num_processes, MACHINEFILE, mpi_env))
   master_vm.RobustRemoteCommand(mpi_cmd)
   logging.info('HPCC Results:')
   stdout, _ = master_vm.RemoteCommand('cat hpccoutf.txt', should_log=True)

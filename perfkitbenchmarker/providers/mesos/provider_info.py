@@ -28,7 +28,7 @@ class MesosProviderInfo(provider_info.BaseProviderInfo):
                           'iperf', 'mongodb_ycsb', 'netperf', 'oldisim', 'ping',
                           'redis', 'redis_ycsb', 'scimark2', 'silo',
                           'sysbench_oltp']
-  UNSUPPORTED_BENCHMARKS = ['bonnie++', 'mysql_service']
+  UNSUPPORTED_BENCHMARKS = ['bonnieplusplus', 'mysql_service']
 
   CLOUD = providers.MESOS
 

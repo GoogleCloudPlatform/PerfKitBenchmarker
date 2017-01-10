@@ -120,7 +120,11 @@ class FlagDictSubstitutionTestCase(unittest.TestCase):
     flag_values_copy.test_flag = 1
     self.assertFlagState(flag_values, 0, False)
     self.assertFlagState(flag_values_copy, 1, False)
-    with flag_util.FlagDictSubstitution(flag_values, flag_values_copy.FlagDict):
+    if hasattr(flag_values_copy, '_flags'):
+      flag_dict_func = flag_values_copy._flags
+    else:
+      flag_dict_func = flag_values_copy.FlagDict
+    with flag_util.FlagDictSubstitution(flag_values, flag_dict_func):
       self.assertFlagState(flag_values, 1, False)
       self.assertFlagState(flag_values_copy, 1, False)
       flag_values.test_flag = 2

@@ -20,6 +20,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.openstack import utils as os_utils
 
 FLAGS = flags.FLAGS
@@ -36,6 +37,8 @@ def CreateVolume(resource, name):
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['size'] = resource.disk_size
+  if FLAGS.openstack_volume_type:
+      vol_cmd.flags['type'] = FLAGS.openstack_volume_type
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
   return vol_resp
@@ -89,10 +92,13 @@ disk.RegisterDiskTypeMap(providers.OPENSTACK, DISK_TYPE)
 
 
 class OpenStackDiskSpec(disk.BaseDiskSpec):
-  """Object holding the information needed to create an OpenStack disk.
+  """Object holding the information needed to create an OpenStackDisk.
 
   Attributes:
     disk_size: None or int. Size of the disk in GB.
+    volume_type: None or string. Volume type to be used to create a
+       block storage volume.
+
   """
 
   CLOUD = providers.OPENSTACK
@@ -115,6 +121,19 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
       config_values['disk_size'] = flag_values.openstack_volume_size
     else:
       config_values['disk_size'] = flag_values.data_disk_size
+    if flag_values['openstack_volume_type'].present:
+      config_values['volume_type'] = flag_values.openstack_volume_type
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    decoders = super(OpenStackDiskSpec, cls)._GetOptionDecoderConstructions()
+    decoders.update(
+        {
+            'volume_type': (option_decoders.StringDecoder,
+                            {'default': None, 'none_ok': True},)
+        }
+    )
+    return decoders
 
 
 class OpenStackDisk(disk.BaseDisk):

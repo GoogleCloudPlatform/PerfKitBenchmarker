@@ -709,7 +709,7 @@ OpenStack | nova | |
 CloudStack | QC-1 | |
 Rackspace | IAD | OnMetal machine-types are available only in IAD zone
 Kubernetes | k8s | |
-ProfitBricks | ZONE_1 | Additional zones: ZONE_2
+ProfitBricks | AUTO | Additional zones: ZONE_1, ZONE_2, or ZONE_3
 
 Example:
 
