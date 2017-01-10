@@ -328,7 +328,7 @@ def _CreateBenchmarkSpecs():
     if check_prereqs:
       try:
         with config.RedirectFlags(FLAGS):
-          check_prereqs()
+          check_prereqs(config)
       except:
         logging.exception('Prerequisite check failed for %s', name)
         raise

@@ -401,7 +401,7 @@ def GetLogFlags():
                               'interval': FLAGS.fio_log_avg_msec}
 
 
-def CheckPrerequisites():
+def CheckPrerequisites(benchmark_config):
   """Perform flag checks."""
   WarnOnBadFlags()
 
