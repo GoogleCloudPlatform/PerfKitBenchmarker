@@ -54,7 +54,8 @@ flags.DEFINE_boolean('openstack_boot_from_volume', False,
                      'Boot from volume instead of an image')
 
 flags.DEFINE_integer('openstack_volume_size', None,
-                     'Size of the volume (GB)')
+                     '(DEPRECATED: Use data_disk_size) '
+                     'Size of the volume (GB).')
 
 flags.DEFINE_string('openstack_volume_type',
                     default=None,

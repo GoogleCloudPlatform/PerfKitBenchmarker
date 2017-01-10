@@ -23,17 +23,20 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.openstack import utils as os_utils
 
-REMOTE_VOLUME_DEFAULT_SIZE_GB = 50
-
 FLAGS = flags.FLAGS
+
+STANDARD = 'standard'
+
+DISK_TYPE = {
+    disk.STANDARD: STANDARD,
+}
 
 
 def CreateVolume(resource, name):
   """Creates a remote (Cinder) block volume."""
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
-  vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
-                           REMOTE_VOLUME_DEFAULT_SIZE_GB)
+  vol_cmd.flags['size'] = resource.disk_size
   if FLAGS.openstack_volume_type:
       vol_cmd.flags['type'] = FLAGS.openstack_volume_type
   stdout, _, _ = vol_cmd.Issue()
@@ -46,7 +49,7 @@ def CreateBootVolume(resource, name, image):
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['image'] = image
-  vol_cmd.flags['size'] = (FLAGS.openstack_volume_size or
+  vol_cmd.flags['size'] = (resource.disk_size or
                            GetImageMinDiskSize(resource, image))
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
@@ -59,7 +62,7 @@ def GetImageMinDiskSize(resource, image):
   stdout, _, _ = image_cmd.Issue()
   image_resp = json.loads(stdout)
   volume_size = max((int(image_resp['min_disk']),
-                     REMOTE_VOLUME_DEFAULT_SIZE_GB,))
+                     resource.disk_size,))
   return volume_size
 
 
@@ -85,19 +88,39 @@ def WaitForVolumeCreation(resource, volume_id):
     raise errors.Resource.RetryableCreationError(msg)
 
 
+disk.RegisterDiskTypeMap(providers.OPENSTACK, DISK_TYPE)
+
+
 class OpenStackDiskSpec(disk.BaseDiskSpec):
   """Object holding the information needed to create an OpenStackDisk.
 
   Attributes:
+    disk_size: None or int. Size of the disk in GB.
     volume_type: None or string. Volume type to be used to create a
        block storage volume.
+
   """
 
   CLOUD = providers.OPENSTACK
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
     super(OpenStackDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    if (flag_values['openstack_volume_size'].present
+            and not flag_values['data_disk_size'].present):
+      config_values['disk_size'] = flag_values.openstack_volume_size
+    else:
+      config_values['disk_size'] = flag_values.data_disk_size
     if flag_values['openstack_volume_type'].present:
       config_values['volume_type'] = flag_values.openstack_volume_type
 
