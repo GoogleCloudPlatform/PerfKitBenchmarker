@@ -104,7 +104,7 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites():
+def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
 
   Raises:

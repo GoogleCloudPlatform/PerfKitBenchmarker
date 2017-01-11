@@ -68,7 +68,7 @@ def GetConfig(user_config):
   return config
 
 
-def CheckPrerequisites():
+def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
 
   Raises:

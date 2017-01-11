@@ -951,7 +951,7 @@ def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
   logging.info('Finished multi-stream write test.')
 
 
-def CheckPrerequisites():
+def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
 
   Raises:
