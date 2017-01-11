@@ -86,7 +86,7 @@ def GetConfig(user_config):
     return config
 
 
-def CheckPrerequisites():
+def CheckPrerequisites(benchmark_config):
     # Before YCSB Cloud Datastore supports Application Default Credential,
     # we should always make sure valid credential flags are set.
     if not FLAGS.jdbc_ycsb_db_driver:
