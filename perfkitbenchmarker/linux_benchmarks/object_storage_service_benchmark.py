@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -121,6 +121,9 @@ flags.DEFINE_enum('object_storage_object_naming_scheme', 'sequential_by_stream',
                   'approximately_sequential: object names from all '
                   'streams will roughly increase together.')
 
+flags.DEFINE_string('object_storage_worker_output', None,
+                    'If set, the worker threads\' output will be written to the'
+                    'path provided.')
 
 FLAGS = flags.FLAGS
 
@@ -762,39 +765,21 @@ def LoadWorkerOutput(output):
   latencies = []
   sizes = []
 
-  prev_stream_num = None
   for worker_out in output:
     json_out = json.loads(worker_out)
-    num_records = len(json_out)
 
-    assert (not prev_stream_num or
-            json_out[0]['stream_num'] == prev_stream_num + 1)
-    prev_stream_num = prev_stream_num + 1 if prev_stream_num else 0
+    for stream in json_out:
+      assert len(stream['start_times']) == len(stream['latencies'])
+      assert len(stream['latencies']) == len(stream['sizes'])
 
-    start_time = np.zeros([num_records], dtype=np.float64)
-    latency = np.zeros([num_records], dtype=np.float64)
-    size = np.zeros([num_records], dtype=np.int64)
-
-    prev_start = None
-    prev_latency = None
-    for i in xrange(num_records):
-      start_time[i] = json_out[i]['start_time']
-      latency[i] = json_out[i]['latency']
-      size[i] = json_out[i]['size']
-
-      assert i == 0 or start_time[i] >= (prev_start + prev_latency)
-      prev_start = start_time[i]
-      prev_latency = latency[i]
-    start_times.append(start_time)
-    latencies.append(latency)
-    sizes.append(size)
+      start_times.append(np.asarray(stream['start_times'], dtype=np.float64))
+      latencies.append(np.asarray(stream['latencies'], dtype=np.float64))
+      sizes.append(np.asarray(stream['sizes'], dtype=np.int64))
 
   return start_times, latencies, sizes
 
 
-def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
-                             streams_per_vm, num_streams):
-
+def _RunMultiStreamProcesses(vms, command_builder, cmd_args, streams_per_vm):
   """Runs all of the multistream read or write processes and doesn't return
      until they complete.
 
@@ -803,26 +788,24 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
     command_builder: an APIScriptCommandBuilder.
     cmd_args: arguments for the command_builder.
     streams_per_vm: number of threads per vm.
-    num_streams: total number of threads to launch.
   """
 
-  output = [None] * num_streams
+  output = [None] * len(vms)
 
-  def RunOneProcess(proc_idx):
-    vm_idx = proc_idx // streams_per_vm
+  def RunOneProcess(vm_idx):
     logging.info('Running on VM %s.', vm_idx)
     cmd = command_builder.BuildCommand(
-        cmd_args + ['--stream_num_start=%s' % proc_idx])
+        cmd_args + ['--stream_num_start=%s' % (vm_idx * streams_per_vm)])
     out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
-    output[proc_idx] = out
+    output[vm_idx] = out
 
-  # Each process has a thread managing it.
+  # Each vm/process has a thread managing it.
   threads = [
-      threading.Thread(target=RunOneProcess, args=(i,))
-      for i in xrange(num_streams)]
+      threading.Thread(target=RunOneProcess, args=(vm_idx,))
+      for vm_idx in xrange(len(vms))]
   for thread in threads:
     thread.start()
-  logging.info('Started %s processes.', num_streams)
+  logging.info('Started %s processes.', len(vms))
   # Wait for the threads to finish
   for thread in threads:
     thread.join()
@@ -832,7 +815,6 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
 
 def _MultiStreamOneWay(results, metadata, vms, command_builder,
                        bucket_name, operation):
-
   """Measures multi-stream latency and throughput in one direction.
 
   Args:
@@ -856,7 +838,6 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
                FLAGS.object_storage_object_sizes, size_distribution)
 
   streams_per_vm = FLAGS.object_storage_streams_per_vm
-  num_streams = streams_per_vm * len(vms)
 
   start_time = (
       time.time() +
@@ -868,7 +849,7 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
       '--bucket=%s' % bucket_name,
       '--objects_per_stream=%s' % (
           FLAGS.object_storage_multistream_objects_per_stream),
-      '--num_streams=1',
+      '--num_streams=%s' % streams_per_vm,
       '--start_time=%s' % start_time,
       '--objects_written_file=%s' % objects_written_file]
 
@@ -884,8 +865,11 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
                     'Value is: \'' + operation + '\'')
 
   output = _RunMultiStreamProcesses(vms, command_builder, cmd_args,
-                                    streams_per_vm, num_streams)
+                                    streams_per_vm)
   start_times, latencies, sizes = LoadWorkerOutput(output)
+  if FLAGS.object_storage_worker_output:
+    with open(FLAGS.object_storage_worker_output, 'w') as out_file:
+      out_file.write(json.dumps(output))
   _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
                              size_distribution.iterkeys(), results,
                              metadata=metadata)
@@ -921,7 +905,7 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
                        'download')
   except Exception as ex:
     logging.info('MultiStreamRead test failed with exception %s. Still '
-                 'recording write data.', ex.msg)
+                 'recording write data: %s', ex)
 
   logging.info('Finished multi-stream read test.')
 
@@ -1104,8 +1088,11 @@ def PrepareVM(vm, service):
     logging.info('Uploading %s to %s', path, vm)
     vm.PushFile(path, '/tmp/run/')
 
+  service.PrepareVM(vm)
 
-def CleanupVM(vm):
+
+def CleanupVM(vm, service):
+  service.CleanupVM(vm)
   vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
   vm.RemoteCommand('sudo rm -rf /tmp/run/')
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
@@ -1127,9 +1114,7 @@ def Prepare(benchmark_spec):
   service.PrepareService(FLAGS.object_storage_region)
 
   vms = benchmark_spec.vms
-  for vm in vms:
-    PrepareVM(vm, service)
-    service.PrepareVM(vm)
+  vm_util.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
 
   # We would like to always cleanup server side states when exception happens.
   benchmark_spec.always_call_cleanup = True
@@ -1237,9 +1222,7 @@ def Cleanup(benchmark_spec):
   buckets = benchmark_spec.buckets
   vms = benchmark_spec.vms
 
-  for vm in vms:
-    service.CleanupVM(vm)
-    CleanupVM(vm)
+  vm_util.RunThreaded(lambda vm: CleanupVM(vm, service), vms)
 
   for bucket in buckets:
     service.DeleteBucket(bucket)
