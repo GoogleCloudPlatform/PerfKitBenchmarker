@@ -575,7 +575,7 @@ class UnsupportedProviderCommandBuilder(APIScriptCommandBuilder):
 
 
 def OneByteRWBenchmark(results, metadata, vm, command_builder,
-                       service, bucket_name, regional_bucket_name):
+                       service, bucket_name):
   """A benchmark for small object latency.
 
   Args:
@@ -585,45 +585,37 @@ def OneByteRWBenchmark(results, metadata, vm, command_builder,
     command_builder: an APIScriptCommandBuilder.
     service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
-    regional_bucket_name: the secondary bucket to benchmark.
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
     test script.
   """
 
-  buckets = [bucket_name]
-  if regional_bucket_name is not None:
-    buckets.append(regional_bucket_name)
+  one_byte_rw_cmd = command_builder.BuildCommand([
+      '--bucket=%s' % bucket_name,
+      '--scenario=OneByteRW'])
 
-  for bucket in buckets:
-    one_byte_rw_cmd = command_builder.BuildCommand([
-        '--bucket=%s' % bucket,
-        '--scenario=OneByteRW'])
+  _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
+  logging.info('OneByteRW raw result is %s', raw_result)
 
-    _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
-    logging.info('OneByteRW raw result is %s', raw_result)
+  for up_and_down in ['upload', 'download']:
+    search_string = 'One byte %s - (.*)' % up_and_down
+    result_string = re.findall(search_string, raw_result)
+    sample_name = ONE_BYTE_LATENCY % up_and_down
 
-    for up_and_down in ['upload', 'download']:
-      search_string = 'One byte %s - (.*)' % up_and_down
-      result_string = re.findall(search_string, raw_result)
-      sample_name = ONE_BYTE_LATENCY % up_and_down
-      if bucket == regional_bucket_name:
-        sample_name = 'regional %s' % sample_name
-
-      if len(result_string) > 0:
-        _JsonStringToPercentileResults(results,
-                                       result_string[0],
-                                       sample_name,
-                                       LATENCY_UNIT,
-                                       metadata)
-      else:
-        raise ValueError('Unexpected test outcome from OneByteRW api test: '
-                         '%s.' % raw_result)
+    if len(result_string) > 0:
+      _JsonStringToPercentileResults(results,
+                                     result_string[0],
+                                     sample_name,
+                                     LATENCY_UNIT,
+                                     metadata)
+    else:
+      raise ValueError('Unexpected test outcome from OneByteRW api test: '
+                       '%s.' % raw_result)
 
 
 def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
-                                    service, bucket_name, regional_bucket_name):
+                                    service, bucket_name):
   """A benchmark for large object throughput.
 
   Args:
@@ -633,7 +625,6 @@ def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
     command_builder: an APIScriptCommandBuilder.
     service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
-    regional_bucket_name: the secondary bucket to benchmark.
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
@@ -669,7 +660,7 @@ def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
 
 
 def ListConsistencyBenchmark(results, metadata, vm, command_builder,
-                             service, bucket_name, regional_bucket_name):
+                             service, bucket_name):
   """A benchmark for bucket list consistency.
 
   Args:
@@ -679,7 +670,6 @@ def ListConsistencyBenchmark(results, metadata, vm, command_builder,
     command_builder: an APIScriptCommandBuilder.
     service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
-    regional_bucket_name: the secondary bucket to benchmark.
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
@@ -960,7 +950,7 @@ def _AppendPercentilesToResults(output_results, input_results, metric_name,
 
 
 def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
-                           service, bucket, regional_bucket):
+                           service, bucket):
   """A benchmark for CLI tool throughput.
 
   We will upload and download a set of files from/to a local directory
@@ -973,7 +963,6 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
     command_builder: an APIScriptCommandBuilder.
     service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
-    regional_bucket_name: the secondary bucket to benchmark.
 
   Raises:
     NotEnoughResultsError: if we failed too many times to upload or download.
@@ -1121,29 +1110,18 @@ def Prepare(benchmark_spec):
 
   # Make the bucket(s)
   bucket_name = 'pkb%s' % FLAGS.run_uri
-  if FLAGS.storage != 'GCP':
+  if FLAGS.storage != 'GCP' or not FLAGS.object_storage_gcs_multiregion:
     service.MakeBucket(bucket_name)
-    buckets = [bucket_name]
   else:
-    # TODO(nlavine): make GCP bucket name handling match other
-    # providers. Leaving it inconsistent for now to match previous
-    # behavior, but should change it after a reasonable deprecation
-    # period.
+    # Use a GCS multiregional bucket
     multiregional_service = gcs.GoogleCloudStorageService()
     multiregional_service.PrepareService(FLAGS.object_storage_gcs_multiregion
                                          or DEFAULT_GCS_MULTIREGION)
     multiregional_service.MakeBucket(bucket_name)
 
-    region = FLAGS.object_storage_region or gcs.DEFAULT_GCP_REGION
-    regional_bucket_name = 'pkb%s-%s' % (FLAGS.run_uri, region)
-    regional_service = gcs.GoogleCloudStorageService()
-    regional_service.PrepareService(region)
-    regional_service.MakeBucket(regional_bucket_name)
-    buckets = [bucket_name, regional_bucket_name]
-
   # Save the service and the buckets for later
   benchmark_spec.service = service
-  benchmark_spec.buckets = buckets
+  benchmark_spec.buckets = [bucket_name]
 
 
 def Run(benchmark_spec):
@@ -1187,7 +1165,6 @@ def Run(benchmark_spec):
         test_script_path, STORAGE_TO_API_SCRIPT_DICT[FLAGS.storage], service)
   except KeyError:
     command_builder = UnsupportedProviderCommandBuilder(FLAGS.storage)
-  regional_bucket_name = buckets[1] if len(buckets) == 2 else None
 
   for name, benchmark in [('cli', CLIThroughputBenchmark),
                           ('api_data', OneByteRWBenchmark),
@@ -1195,7 +1172,7 @@ def Run(benchmark_spec):
                           ('api_namespace', ListConsistencyBenchmark)]:
     if FLAGS.object_storage_scenario in {name, 'all'}:
       benchmark(results, metadata, vms[0], command_builder,
-                service, buckets[0], regional_bucket_name)
+                service, buckets[0])
 
   # MultiStreamRW and MultiStreamWrite are the only benchmarks that support
   # multiple VMs, so they have a slightly different calling convention than the
