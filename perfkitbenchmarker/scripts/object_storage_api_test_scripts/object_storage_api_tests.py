@@ -737,27 +737,21 @@ def MultiStreamReads(service):
        FLAGS.start_time),
       per_process_args=objects_by_worker)
 
-  # send data back to the controller
-  operation_records = []
+  # streams is the data we send back to the controller.
+  streams = []
   for result in results:
-    stream_num = result['stream_num']
-    for start_time, latency, size in zip(result['start_times'],
-                                         result['latencies'],
-                                         result['sizes']):
-      operation_records.append({'operation': 'download',
-                                'stream_num': stream_num,
-                                'start_time': start_time,
-                                'latency': latency,
-                                'size': size})
+    result_keys = ('stream_num', 'start_times', 'latencies', 'sizes')
+    streams.append({k: result[k] for k in result_keys})
 
-  num_reads_requested = len(object_records)
+  num_reads = sum([len(stream['start_times']) for stream in streams])
+  num_reads_requested = FLAGS.objects_per_stream * FLAGS.num_streams
   min_reads_required = num_reads_requested * (1.0 - FAILURE_TOLERANCE)
-  if len(operation_records) < min_reads_required:
+  if num_reads < min_reads_required:
     raise LowAvailabilityError(
         'Read %s objects out of %s requested (%s requred)' %
-        (len(operation_records), num_reads_requested, min_reads_required))
+        (num_reads, num_reads_requested, min_reads_required))
 
-  json.dump(operation_records, sys.stdout, indent=0)
+  json.dump(streams, sys.stdout, indent=0)
 
 
 def SleepUntilTime(when):

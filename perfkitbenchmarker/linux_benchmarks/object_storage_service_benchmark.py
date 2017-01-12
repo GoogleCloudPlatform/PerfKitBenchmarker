@@ -890,12 +890,8 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
   logging.info('Finished multi-stream write test. Starting '
                'multi-stream read test.')
 
-  try:
-    _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
-                       'download')
-  except Exception as ex:
-    logging.info('MultiStreamRead test failed with exception %s. Still '
-                 'recording write data: %s', ex)
+  _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
+                     'download')
 
   logging.info('Finished multi-stream read test.')
 
