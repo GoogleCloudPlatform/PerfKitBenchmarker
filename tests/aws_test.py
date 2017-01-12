@@ -181,6 +181,7 @@ class AwsGetBlockDeviceMapTestCase(unittest.TestCase):
     desired_root_volume_size_gb = 35
     machine_type = 'c1.medium'
     image_id = 'ami-a9d276c9'
+    region = 'us-west-2'
     expected = [{'DeviceName': '/dev/sda1',
                  'Ebs': {'SnapshotId': 'snap-826344d5',
                          'DeleteOnTermination': True,
@@ -189,7 +190,7 @@ class AwsGetBlockDeviceMapTestCase(unittest.TestCase):
                 {'DeviceName': '/dev/xvdb',
                  'VirtualName': 'ephemeral0'}]
     actual = json.loads(aws_virtual_machine.GetBlockDeviceMap(
-        machine_type, desired_root_volume_size_gb, image_id))
+        machine_type, desired_root_volume_size_gb, image_id, region))
     self.assertEqual(actual, expected)
 
 
@@ -208,6 +209,7 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(unittest.TestCase):
   def testOk(self):
     util.IssueRetryableCommand.side_effect = [(self.describeImageOutput, None)]
     image_id = 'ami-a9d276c9'
+    region = 'us-west-2'
     expected = {
         'DeviceName': '/dev/sda1',
         'Ebs': {
@@ -218,5 +220,6 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(unittest.TestCase):
             'Encrypted': False
         }
     }
-    actual = aws_virtual_machine.GetRootBlockDeviceSpecForImage(image_id)
+    actual = aws_virtual_machine.GetRootBlockDeviceSpecForImage(image_id,
+                                                                region)
     self.assertEqual(actual, expected)
