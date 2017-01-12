@@ -112,14 +112,17 @@ flags.DEFINE_integer('object_storage_list_consistency_iterations', 200,
                      'should be used (>=200).')
 flags.DEFINE_enum('object_storage_object_naming_scheme', 'sequential_by_stream',
                   ['sequential_by_stream',
-                   'approximately_sequential'],
+                   'approximately_sequential',
+                   'sequential'],
                   'How objects will be named. Only applies to the '
                   'api_multistream benchmark. '
                   'sequential_by_stream: object names from each stream '
                   'will be sequential, but different streams will have '
                   'different name prefixes. '
                   'approximately_sequential: object names from all '
-                  'streams will roughly increase together.')
+                  'streams will roughly increase together.'
+                  'sequential: object names will be completely sequential in '
+                  'time')
 
 
 FLAGS = flags.FLAGS
