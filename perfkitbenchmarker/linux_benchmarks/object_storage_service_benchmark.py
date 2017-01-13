@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -121,6 +121,9 @@ flags.DEFINE_enum('object_storage_object_naming_scheme', 'sequential_by_stream',
                   'approximately_sequential: object names from all '
                   'streams will roughly increase together.')
 
+flags.DEFINE_string('object_storage_worker_output', None,
+                    'If set, the worker threads\' output will be written to the'
+                    'path provided.')
 
 FLAGS = flags.FLAGS
 
@@ -572,7 +575,7 @@ class UnsupportedProviderCommandBuilder(APIScriptCommandBuilder):
 
 
 def OneByteRWBenchmark(results, metadata, vm, command_builder,
-                       service, bucket_name, regional_bucket_name):
+                       service, bucket_name):
   """A benchmark for small object latency.
 
   Args:
@@ -582,45 +585,37 @@ def OneByteRWBenchmark(results, metadata, vm, command_builder,
     command_builder: an APIScriptCommandBuilder.
     service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
-    regional_bucket_name: the secondary bucket to benchmark.
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
     test script.
   """
 
-  buckets = [bucket_name]
-  if regional_bucket_name is not None:
-    buckets.append(regional_bucket_name)
+  one_byte_rw_cmd = command_builder.BuildCommand([
+      '--bucket=%s' % bucket_name,
+      '--scenario=OneByteRW'])
 
-  for bucket in buckets:
-    one_byte_rw_cmd = command_builder.BuildCommand([
-        '--bucket=%s' % bucket,
-        '--scenario=OneByteRW'])
+  _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
+  logging.info('OneByteRW raw result is %s', raw_result)
 
-    _, raw_result = vm.RemoteCommand(one_byte_rw_cmd)
-    logging.info('OneByteRW raw result is %s', raw_result)
+  for up_and_down in ['upload', 'download']:
+    search_string = 'One byte %s - (.*)' % up_and_down
+    result_string = re.findall(search_string, raw_result)
+    sample_name = ONE_BYTE_LATENCY % up_and_down
 
-    for up_and_down in ['upload', 'download']:
-      search_string = 'One byte %s - (.*)' % up_and_down
-      result_string = re.findall(search_string, raw_result)
-      sample_name = ONE_BYTE_LATENCY % up_and_down
-      if bucket == regional_bucket_name:
-        sample_name = 'regional %s' % sample_name
-
-      if len(result_string) > 0:
-        _JsonStringToPercentileResults(results,
-                                       result_string[0],
-                                       sample_name,
-                                       LATENCY_UNIT,
-                                       metadata)
-      else:
-        raise ValueError('Unexpected test outcome from OneByteRW api test: '
-                         '%s.' % raw_result)
+    if len(result_string) > 0:
+      _JsonStringToPercentileResults(results,
+                                     result_string[0],
+                                     sample_name,
+                                     LATENCY_UNIT,
+                                     metadata)
+    else:
+      raise ValueError('Unexpected test outcome from OneByteRW api test: '
+                       '%s.' % raw_result)
 
 
 def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
-                                    service, bucket_name, regional_bucket_name):
+                                    service, bucket_name):
   """A benchmark for large object throughput.
 
   Args:
@@ -630,7 +625,6 @@ def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
     command_builder: an APIScriptCommandBuilder.
     service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
-    regional_bucket_name: the secondary bucket to benchmark.
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
@@ -666,7 +660,7 @@ def SingleStreamThroughputBenchmark(results, metadata, vm, command_builder,
 
 
 def ListConsistencyBenchmark(results, metadata, vm, command_builder,
-                             service, bucket_name, regional_bucket_name):
+                             service, bucket_name):
   """A benchmark for bucket list consistency.
 
   Args:
@@ -676,7 +670,6 @@ def ListConsistencyBenchmark(results, metadata, vm, command_builder,
     command_builder: an APIScriptCommandBuilder.
     service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
-    regional_bucket_name: the secondary bucket to benchmark.
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
@@ -762,39 +755,21 @@ def LoadWorkerOutput(output):
   latencies = []
   sizes = []
 
-  prev_stream_num = None
   for worker_out in output:
     json_out = json.loads(worker_out)
-    num_records = len(json_out)
 
-    assert (not prev_stream_num or
-            json_out[0]['stream_num'] == prev_stream_num + 1)
-    prev_stream_num = prev_stream_num + 1 if prev_stream_num else 0
+    for stream in json_out:
+      assert len(stream['start_times']) == len(stream['latencies'])
+      assert len(stream['latencies']) == len(stream['sizes'])
 
-    start_time = np.zeros([num_records], dtype=np.float64)
-    latency = np.zeros([num_records], dtype=np.float64)
-    size = np.zeros([num_records], dtype=np.int64)
-
-    prev_start = None
-    prev_latency = None
-    for i in xrange(num_records):
-      start_time[i] = json_out[i]['start_time']
-      latency[i] = json_out[i]['latency']
-      size[i] = json_out[i]['size']
-
-      assert i == 0 or start_time[i] >= (prev_start + prev_latency)
-      prev_start = start_time[i]
-      prev_latency = latency[i]
-    start_times.append(start_time)
-    latencies.append(latency)
-    sizes.append(size)
+      start_times.append(np.asarray(stream['start_times'], dtype=np.float64))
+      latencies.append(np.asarray(stream['latencies'], dtype=np.float64))
+      sizes.append(np.asarray(stream['sizes'], dtype=np.int64))
 
   return start_times, latencies, sizes
 
 
-def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
-                             streams_per_vm, num_streams):
-
+def _RunMultiStreamProcesses(vms, command_builder, cmd_args, streams_per_vm):
   """Runs all of the multistream read or write processes and doesn't return
      until they complete.
 
@@ -803,26 +778,24 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
     command_builder: an APIScriptCommandBuilder.
     cmd_args: arguments for the command_builder.
     streams_per_vm: number of threads per vm.
-    num_streams: total number of threads to launch.
   """
 
-  output = [None] * num_streams
+  output = [None] * len(vms)
 
-  def RunOneProcess(proc_idx):
-    vm_idx = proc_idx // streams_per_vm
+  def RunOneProcess(vm_idx):
     logging.info('Running on VM %s.', vm_idx)
     cmd = command_builder.BuildCommand(
-        cmd_args + ['--stream_num_start=%s' % proc_idx])
+        cmd_args + ['--stream_num_start=%s' % (vm_idx * streams_per_vm)])
     out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=True)
-    output[proc_idx] = out
+    output[vm_idx] = out
 
-  # Each process has a thread managing it.
+  # Each vm/process has a thread managing it.
   threads = [
-      threading.Thread(target=RunOneProcess, args=(i,))
-      for i in xrange(num_streams)]
+      threading.Thread(target=RunOneProcess, args=(vm_idx,))
+      for vm_idx in xrange(len(vms))]
   for thread in threads:
     thread.start()
-  logging.info('Started %s processes.', num_streams)
+  logging.info('Started %s processes.', len(vms))
   # Wait for the threads to finish
   for thread in threads:
     thread.join()
@@ -832,7 +805,6 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args,
 
 def _MultiStreamOneWay(results, metadata, vms, command_builder,
                        bucket_name, operation):
-
   """Measures multi-stream latency and throughput in one direction.
 
   Args:
@@ -856,7 +828,6 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
                FLAGS.object_storage_object_sizes, size_distribution)
 
   streams_per_vm = FLAGS.object_storage_streams_per_vm
-  num_streams = streams_per_vm * len(vms)
 
   start_time = (
       time.time() +
@@ -868,7 +839,7 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
       '--bucket=%s' % bucket_name,
       '--objects_per_stream=%s' % (
           FLAGS.object_storage_multistream_objects_per_stream),
-      '--num_streams=1',
+      '--num_streams=%s' % streams_per_vm,
       '--start_time=%s' % start_time,
       '--objects_written_file=%s' % objects_written_file]
 
@@ -884,8 +855,11 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
                     'Value is: \'' + operation + '\'')
 
   output = _RunMultiStreamProcesses(vms, command_builder, cmd_args,
-                                    streams_per_vm, num_streams)
+                                    streams_per_vm)
   start_times, latencies, sizes = LoadWorkerOutput(output)
+  if FLAGS.object_storage_worker_output:
+    with open(FLAGS.object_storage_worker_output, 'w') as out_file:
+      out_file.write(json.dumps(output))
   _ProcessMultiStreamResults(start_times, latencies, sizes, operation,
                              size_distribution.iterkeys(), results,
                              metadata=metadata)
@@ -916,12 +890,8 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
   logging.info('Finished multi-stream write test. Starting '
                'multi-stream read test.')
 
-  try:
-    _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
-                       'download')
-  except Exception as ex:
-    logging.info('MultiStreamRead test failed with exception %s. Still '
-                 'recording write data.', ex.msg)
+  _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
+                     'download')
 
   logging.info('Finished multi-stream read test.')
 
@@ -976,7 +946,7 @@ def _AppendPercentilesToResults(output_results, input_results, metric_name,
 
 
 def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
-                           service, bucket, regional_bucket):
+                           service, bucket):
   """A benchmark for CLI tool throughput.
 
   We will upload and download a set of files from/to a local directory
@@ -989,7 +959,6 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
     command_builder: an APIScriptCommandBuilder.
     service: an ObjectStorageService.
     bucket_name: the primary bucket to benchmark.
-    regional_bucket_name: the secondary bucket to benchmark.
 
   Raises:
     NotEnoughResultsError: if we failed too many times to upload or download.
@@ -1104,8 +1073,11 @@ def PrepareVM(vm, service):
     logging.info('Uploading %s to %s', path, vm)
     vm.PushFile(path, '/tmp/run/')
 
+  service.PrepareVM(vm)
 
-def CleanupVM(vm):
+
+def CleanupVM(vm, service):
+  service.CleanupVM(vm)
   vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
   vm.RemoteCommand('sudo rm -rf /tmp/run/')
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
@@ -1127,38 +1099,25 @@ def Prepare(benchmark_spec):
   service.PrepareService(FLAGS.object_storage_region)
 
   vms = benchmark_spec.vms
-  for vm in vms:
-    PrepareVM(vm, service)
-    service.PrepareVM(vm)
+  vm_util.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
 
   # We would like to always cleanup server side states when exception happens.
   benchmark_spec.always_call_cleanup = True
 
   # Make the bucket(s)
   bucket_name = 'pkb%s' % FLAGS.run_uri
-  if FLAGS.storage != 'GCP':
+  if FLAGS.storage != 'GCP' or not FLAGS.object_storage_gcs_multiregion:
     service.MakeBucket(bucket_name)
-    buckets = [bucket_name]
   else:
-    # TODO(nlavine): make GCP bucket name handling match other
-    # providers. Leaving it inconsistent for now to match previous
-    # behavior, but should change it after a reasonable deprecation
-    # period.
+    # Use a GCS multiregional bucket
     multiregional_service = gcs.GoogleCloudStorageService()
     multiregional_service.PrepareService(FLAGS.object_storage_gcs_multiregion
                                          or DEFAULT_GCS_MULTIREGION)
     multiregional_service.MakeBucket(bucket_name)
 
-    region = FLAGS.object_storage_region or gcs.DEFAULT_GCP_REGION
-    regional_bucket_name = 'pkb%s-%s' % (FLAGS.run_uri, region)
-    regional_service = gcs.GoogleCloudStorageService()
-    regional_service.PrepareService(region)
-    regional_service.MakeBucket(regional_bucket_name)
-    buckets = [bucket_name, regional_bucket_name]
-
   # Save the service and the buckets for later
   benchmark_spec.service = service
-  benchmark_spec.buckets = buckets
+  benchmark_spec.buckets = [bucket_name]
 
 
 def Run(benchmark_spec):
@@ -1202,7 +1161,6 @@ def Run(benchmark_spec):
         test_script_path, STORAGE_TO_API_SCRIPT_DICT[FLAGS.storage], service)
   except KeyError:
     command_builder = UnsupportedProviderCommandBuilder(FLAGS.storage)
-  regional_bucket_name = buckets[1] if len(buckets) == 2 else None
 
   for name, benchmark in [('cli', CLIThroughputBenchmark),
                           ('api_data', OneByteRWBenchmark),
@@ -1210,7 +1168,7 @@ def Run(benchmark_spec):
                           ('api_namespace', ListConsistencyBenchmark)]:
     if FLAGS.object_storage_scenario in {name, 'all'}:
       benchmark(results, metadata, vms[0], command_builder,
-                service, buckets[0], regional_bucket_name)
+                service, buckets[0])
 
   # MultiStreamRW and MultiStreamWrite are the only benchmarks that support
   # multiple VMs, so they have a slightly different calling convention than the
@@ -1237,9 +1195,7 @@ def Cleanup(benchmark_spec):
   buckets = benchmark_spec.buckets
   vms = benchmark_spec.vms
 
-  for vm in vms:
-    service.CleanupVM(vm)
-    CleanupVM(vm)
+  vm_util.RunThreaded(lambda vm: CleanupVM(vm, service), vms)
 
   for bucket in buckets:
     service.DeleteBucket(bucket)
