@@ -59,6 +59,11 @@ flags.DEFINE_string(
     None,
     'A path to write newline-delimited JSON results '
     'Default: write to a run-specific temporary directory')
+flags.DEFINE_enum(
+    'json_write_mode',
+    'wb',
+    ['wb', 'ab'],
+    'Open mode for file specified by --json_path. Default: overwrite file')
 flags.DEFINE_boolean(
     'collapse_labels',
     True,
@@ -679,6 +684,7 @@ class SampleCollector(object):
     default_json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
     publishers.append(NewlineDelimitedJSONPublisher(
         FLAGS.json_path or default_json_path,
+        mode=FLAGS.json_write_mode,
         collapse_labels=FLAGS.collapse_labels))
     if FLAGS.bigquery_table:
       publishers.append(BigQueryPublisher(
