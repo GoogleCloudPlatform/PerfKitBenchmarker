@@ -109,6 +109,7 @@ class _BenchmarkSpecTestCase(unittest.TestCase):
     self._mocked_flags = mock_flags.MockFlags()
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
+    self._mocked_flags.temp_dir = 'tmp'
     p = mock.patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(p.stop)
