@@ -95,6 +95,7 @@ class TestBackgroundNetworkWorkload(unittest.TestCase):
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self.mocked_flags.os_type = os_types.DEBIAN
     self.mocked_flags.cloud = providers.GCP
+    self.mocked_flags.temp_dir = 'tmp'
     p = patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(p.stop)

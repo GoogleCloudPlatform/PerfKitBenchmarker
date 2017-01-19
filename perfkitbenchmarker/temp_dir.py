@@ -42,7 +42,8 @@ def GetAllRunsDirPath():
 
 def GetRunDirPath(run_uri=None):
   """Gets path to the directory containing files specific to a PKB run."""
-  return os.path.join(FLAGS.temp_dir, _RUNS, run_uri or str(flags.FLAGS.run_uri))
+  return os.path.join(
+      FLAGS.temp_dir, _RUNS, run_uri or str(flags.FLAGS.run_uri))
 
 
 def GetVersionDirPath(version=version.VERSION):
