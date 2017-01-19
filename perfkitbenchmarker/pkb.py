@@ -263,7 +263,9 @@ def _ParseFlags(argv=sys.argv):
   try:
     argv = FLAGS(argv)
   except flags.FlagsError as e:
-    logging.error('%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
+    logging.error(e)
+    logging.info('For usage instructions, use --helpmatch={module_name}')
+    logging.info('For example, ./pkb.py --helpmatch=benchmarks.fio')
     sys.exit(1)
 
 
