@@ -104,7 +104,7 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Delete a DigitalOcean VM instance."""
 
     response, retcode = util.DoctlAndParse(
-        ['compute', 'droplet', 'delete', self.droplet_id])
+        ['compute', 'droplet', 'delete', self.droplet_id, '--force'])
     # The command doesn't return the HTTP status code, and the error
     # format is very difficult to parse, so we string
     # search. TODO(noahl): parse the error message.
