@@ -60,6 +60,7 @@ import getpass
 import itertools
 import logging
 import multiprocessing
+import re
 import sys
 import time
 import uuid
@@ -213,7 +214,9 @@ flags.DEFINE_integer(
     'run_processes', 1,
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
-
+flags.DEFINE_string(
+    'helpmatch', '',
+    'Shows only flags defined in a module whose name matches the given regex.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -262,6 +265,24 @@ def _ParseFlags(argv=sys.argv):
   except flags.FlagsError as e:
     logging.error('%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
+
+
+def _PrintHelp(matches=None):
+  """Prints help for flags defined in matching modules.
+
+  Args:
+    matches regex string or None. Filters help to only those whose name
+      matched the regex. If None then all flags are printed.
+  """
+  if not matches:
+    print FLAGS
+  else:
+    flags_by_module = FLAGS.FlagsByModuleDict()
+    modules = sorted(flags_by_module)
+    regex = re.compile(matches)
+    for module_name in modules:
+      if regex.search(module_name):
+        print FLAGS.ModuleHelp(module_name)
 
 
 def CheckVersionFlag():
@@ -695,6 +716,9 @@ def Main():
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
   _ParseFlags()
+  if FLAGS.helpmatch:
+    _PrintHelp(FLAGS.helpmatch)
+    return 0
   CheckVersionFlag()
   SetUpPKB()
   return RunBenchmarks()
