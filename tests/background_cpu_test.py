@@ -60,6 +60,7 @@ class TestBackgroundWorkload(unittest.TestCase):
     self._mocked_flags = mock_flags.PatchTestCaseFlags(self)
     self._mocked_flags.cloud = providers.GCP
     self._mocked_flags.os_type = os_types.DEBIAN
+    self._mocked_flags.temp_dir = 'tmp'
     p = patch(util.__name__ + '.GetDefaultProject')
     p.start()
     self.addCleanup(context.SetThreadBenchmarkSpec, None)

@@ -31,20 +31,24 @@ _VERSIONS = 'versions'
 
 _TEMP_DIR = os.path.join(tempfile.gettempdir(), _PERFKITBENCHMARKER)
 
+flags.DEFINE_string('temp_dir', _TEMP_DIR, 'Temp directory PKB uses.')
+FLAGS = flags.FLAGS
+
 
 def GetAllRunsDirPath():
   """Gets path to the directory containing the states of all PKB runs."""
-  return os.path.join(_TEMP_DIR, _RUNS)
+  return os.path.join(FLAGS.temp_dir, _RUNS)
 
 
 def GetRunDirPath(run_uri=None):
   """Gets path to the directory containing files specific to a PKB run."""
-  return os.path.join(_TEMP_DIR, _RUNS, run_uri or str(flags.FLAGS.run_uri))
+  return os.path.join(
+      FLAGS.temp_dir, _RUNS, run_uri or str(flags.FLAGS.run_uri))
 
 
 def GetVersionDirPath(version=version.VERSION):
   """Gets path to the directory containing files specific to a PKB version."""
-  return os.path.join(_TEMP_DIR, _VERSIONS, version)
+  return os.path.join(FLAGS.temp_dir, _VERSIONS, version)
 
 
 def CreateTemporaryDirectories():

@@ -96,6 +96,7 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
     mocked_flags.cloud = providers.AWS
     mocked_flags.os_type = os_types.DEBIAN
     mocked_flags.run_uri = 'aaaaaa'
+    mocked_flags.temp_dir = 'tmp'
     p = mock.patch('perfkitbenchmarker.providers.aws.'
                    'util.IssueRetryableCommand')
     p.start()
