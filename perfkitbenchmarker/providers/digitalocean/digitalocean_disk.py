@@ -100,7 +100,7 @@ class DigitalOceanBlockStorageDisk(disk.BaseDisk):
   def _Delete(self):
     response, retcode = util.DoctlAndParse(
         ['compute', 'volume', 'delete',
-         self.volume_id])
+         self.volume_id, '--force'])
     if retcode:
       raise errors.Resource.RetryableDeletionError(
           'Error deleting disk: %s' % (response,))
