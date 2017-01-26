@@ -667,7 +667,7 @@ class InfluxDBPublisher(SamplePublisher):
     for sample in samples:
       formated_samples.append(self._ConstructSample(sample))
     self._Publish(formated_samples)
-    
+
   def _Publish(self, formated_samples):
     try:
       self._CreateDB()
@@ -679,18 +679,19 @@ class InfluxDBPublisher(SamplePublisher):
   def _ConstructSample(self, sample):
     timestamp = str(int((10 ** 9) * sample['timestamp']))
     measurement = 'perfkitbenchmarker'
-    
+
     tag_set_metadata = ''
     if 'metadata' in sample:
       if sample['metadata']:
         tag_set_metadata = ','.join(self._FormatToKeyValue(sample['metadata']))
-    tag_keys = ('test','official', 'owner','run_uri','sample_uri', 'metric', 'unit',)
+    tag_keys = ('test', 'official', 'owner', 'run_uri', 'sample_uri',
+                'metric', 'unit')
     tag_set = ','.join(self._FormatToKeyValue({k: sample[k] for k in tag_keys}))
     if tag_set_metadata:
       tag_set += ',' + tag_set_metadata
 
     field_set = '%s=%s' % ('value', sample['value'])
-    
+
     sample_constructed_body = '%s,%s %s %s' % (measurement, tag_set,
                                                field_set, timestamp)
     return sample_constructed_body
@@ -704,7 +705,7 @@ class InfluxDBPublisher(SamplePublisher):
   def _CreateDB(self):
     successful_http_request_codes = [200, 202, 204]
     header = {'Content-type': 'application/x-www-form-urlencoded',
-               'Accept': 'text/plain'}
+              'Accept': 'text/plain'}
     params = urllib.urlencode({'q': 'CREATE DATABASE ' + self.influx_db_name})
     conn = httplib.HTTPConnection(self.influx_uri)
     conn.request('POST', '/query?' + params, headers=header)
@@ -724,14 +725,15 @@ class InfluxDBPublisher(SamplePublisher):
     params = data
     header = {"Content-type": "application/octet-stream"}
     conn = httplib.HTTPConnection(self.influx_uri)
-    conn.request('POST', '/write?' + 'db=' + self.influx_db_name, params, headers=header)
+    conn.request('POST', '/write?' + 'db=' + self.influx_db_name, params,
+                 headers=header)
     response = conn.getresponse()
     response_status = response.status
     response_response = response.response
     if response_status in successful_http_request_codes:
       logging.debug('writing samples to publisher: writing samples.')
     else:
-      logging.debug(create_db_status,
+      logging.debug(response_status,
                     'Request could not be completed due to: ',
                     response_response)
       raise httplib.HTTPException
@@ -798,7 +800,7 @@ class SampleCollector(object):
                                                es_type=FLAGS.es_type))
     if FLAGS.influx_uri:
       publishers.append(InfluxDBPublisher(influx_uri=FLAGS.influx_uri,
-                                          influx_db_name=FLAGS.influx_db_name))  
+                                          influx_db_name=FLAGS.influx_db_name))
 
     return publishers
 
