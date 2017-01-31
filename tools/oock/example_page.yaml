@@ -11,24 +11,20 @@ latency_vs_size_sizes: &latency_vs_size_sizes
 ################################################################################
 chart_specs:
   p50_upload_latency_vs_size:
-    columns: [[number, size], [number, GCS], [number, S3], [number, ABS]]
     data_source:
       path: latency_vs_size_in_region.json
-      label_column:
-        source: metadata
-        field: object_size_B
-        parse: int(object_size_B)
-        order: increasing
-      series_columns:
-      - select: { metadata: [cloud] }
-        condition: cloud == 'GCP'
-        parse: float(value) * 1000.0
-      - select: { metadata: [cloud] }
-        condition: cloud == 'AWS'
-        parse: float(value) * 1000.0
-      - select: { metadata: [cloud], sample: [value] }
-        condition: cloud == 'Azure' and value < 5
-        parse: float(value) * 1000.0
+      extract:
+        type: key_value
+        key_order: increasing
+        key:
+          select: { metadata: [object_size_B] }
+          parse: int(object_size_B)
+        value:
+          select: { sample: [value] }
+          parse: float(value)
+        group_by:
+          select: { metadata: [cloud] }
+          parse: "{'GCP': 'GCS', 'AWS': 'S3', 'Azure': 'ABS'}[cloud]"
       filters:
       - select: { sample: [metric] }
         condition: metric == 'Multi-stream upload latency p50'
@@ -36,66 +32,52 @@ chart_specs:
         condition: ["object_size_B != 'distribution' and ",
                     "int(object_size_B) in ", *latency_vs_size_sizes]
       - select: { metadata: [zone] }
-        condition:
-          zone == 'us-west1-a' or zone == 'us-west-1a' or zone == 'westus'
+        condition: zone in ['us-west1-a', 'us-west-1a', 'westus']
       - select: { metadata: [regional_bucket_location] }
         condition:
-        - "regional_bucket_location == 'us-west1' or "
-        - "regional_bucket_location == 'us-west-1' or "
-        - "regional_bucket_location == 'westus'"
+          regional_bucket_location in ['us-west1', 'us-west-1', 'westus']
       - select: { metadata: [objects_per_stream] }
         condition: objects_per_stream == '10000'
     type: visualization.LineChart
     options:
-      hAxis: {format: short, maxValue: 256000000, title: object size}
-      height: 600
-      interpolateNulls: true
-      legend: {position: inside}
       title: p50 upload latency vs object size
-      vAxis: {maxValue: 8000, title: latency (ms)}
       width: 800
+      height: 600
+      legend: {position: inside}
+      hAxis: {format: short, maxValue: 256000000, title: object size}
+      vAxis: {maxValue: 8, title: latency (seconds)}
 
-  p50_download_latency_vs_size:
-    columns: [[number, size], [number, GCS], [number, S3], [number, ABS]]
+  cross_zone_upload_latency_distribution_gcs:
     data_source:
-      path: latency_vs_size_in_region.json
-      label_column:
-        source: metadata
-        field: object_size_B
-        parse: int(object_size_B)
-        order: increasing
-      series_columns:
+      path: cross_zone_variance.gcs.json
+      extract:
+        type: pair_list
+        key_order: increasing
+        pair_list:
+          select: { metadata: [histogram, interval] }
+          parse:
+          - "[[int(t * float(interval) * 1000.0), int(c)]"
+          - " for t, c in enumerate(histogram.split(',')) if t < 20]"
+        group_by:
+          select: { metadata: [zone] }
+          parse: zone
+      filters:
       - select: { metadata: [cloud] }
         condition: cloud == 'GCP'
-        parse: float(value) * 1000.0
-      - select: { metadata: [cloud] }
-        condition: cloud == 'AWS'
-        parse: float(value) * 1000.0
-      - select: { metadata: [cloud], sample: [value] }
-        condition: cloud == 'Azure' and value < 5
-        parse: float(value) * 1000.0
-      filters:
       - select: { sample: [metric] }
-        condition: metric == 'Multi-stream download latency p50'
+        condition: metric == 'Multi-stream upload latency histogram'
       - select: { metadata: [object_size_B] }
-        condition: ["object_size_B != 'distribution' and ",
-                    "int(object_size_B) in ", *latency_vs_size_sizes]
-      - select: { metadata: [zone] }
-        condition:
-          zone == 'us-west1-a' or zone == 'us-west-1a' or zone == 'westus'
-      - select: { metadata: [regional_bucket_location] }
-        condition:
-        - "regional_bucket_location == 'us-west1' or "
-        - "regional_bucket_location == 'us-west-1' or "
-        - "regional_bucket_location == 'westus'"
+        condition: object_size_B == '1'
+      - select: { metadata: [zone, regional_bucket_location] }
+        condition: zone[:-2] == regional_bucket_location
       - select: { metadata: [objects_per_stream] }
-        condition: objects_per_stream == '10000'
+        condition: objects_per_stream == '1000'
     type: visualization.LineChart
     options:
-      hAxis: {format: short, maxValue: 256000000, title: object size}
-      height: 600
-      interpolateNulls: true
-      legend: {position: inside}
-      title: p50 download latency vs object size
-      vAxis: {maxValue: 8000, title: latency (ms)}
+      title: GCP 1B upload cross zone latency distributions
       width: 800
+      height: 600
+      legend: {position: right}
+      hAxis: {title: latency (ms)}
+      vAxis: {title: object count}
+      areaOpacity: 0.1

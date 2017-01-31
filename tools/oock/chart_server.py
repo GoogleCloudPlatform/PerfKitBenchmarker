@@ -4,10 +4,12 @@ import os
 import sys
 import yaml
 
+from collections import defaultdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from itertools import accumulate
 
 from page_gen import (build_chart_html, cell_to_js, build_data_table_js,
-                      build_chart_js, build_chart_page)
+                      build_chart_js, build_chart_page, get_cell_type)
 
 def pull_chart_data(data_source):
   from filter_utils import filter_by, filter_by_label, get_label, select_filter
@@ -24,6 +26,17 @@ def pull_chart_data(data_source):
     lambda_args = select_sample + select_metadata
     select_filter(samples, select_sample, select_metadata,
                   eval('lambda %s: %s' % (','.join(lambda_args), condition)))
+  
+  def _select_then_parse(sample, select, parse):
+    if type(parse) is list:
+      parse = ''.join(parse)
+    select_sample = select.get('sample') or []
+    select_metadata = select.get('metadata') or []
+    lambda_args = select_sample + select_metadata
+    lambda_arg_values = [sample[key] for key in select_sample] + \
+                        [get_label(sample, key) for key in select_metadata]
+    f = eval('lambda %s: %s' % (','.join(lambda_args), parse))
+    return f(*lambda_arg_values)
 
   # Filter by sample key/values
   for f in data_source['filters']:
@@ -31,86 +44,128 @@ def pull_chart_data(data_source):
     condition = ''.join(f['condition'])
     _filter_select_and_condition(samples, select, condition)
 
-  # Build an empty data table with only labels filled out (first column)
-  label_column = data_source['label_column']
-  label_column_field = label_column['field']
-  label_column_parse = eval('lambda %s: %s' % (label_column_field,
-                                               label_column['parse']))
-  if label_column['source'] == 'metadata':
-    extract_label = lambda s: get_label(s, label_column_field)
+  # Group and extract data
+  extract = data_source['extract']
+  group_by_select = extract['group_by']['select']
+  group_by_parse = extract['group_by']['parse']
+  data_dict = defaultdict() # {group: {key: [values_at_key]}}
+  data_dict.default_factory = lambda: defaultdict(list)
+  if extract['type'] == 'key_value':
+    extract_key_select = extract['key']['select']
+    extract_key_parse = extract['key']['parse']
+    extract_value_select = extract['value']['select']
+    extract_value_parse = extract['value']['parse']
+    for sample in samples:
+      group = _select_then_parse(sample, group_by_select, group_by_parse)
+      key = _select_then_parse(sample, extract_key_select, extract_key_parse)
+      value = _select_then_parse(sample, extract_value_select,
+                                 extract_value_parse)
+      data_dict[group][key].append(value)
+  elif extract['type'] == 'pair_list':
+    extract_pl_select = extract['pair_list']['select']
+    extract_pl_parse = extract['pair_list']['parse']
+    for sample in samples:
+      group = _select_then_parse(sample, group_by_select, group_by_parse)
+      pair_list = _select_then_parse(sample, extract_pl_select,
+                                     extract_pl_parse)
+      for key, value in pair_list:
+        data_dict[group][key].append(value)
   else:
-    assert label_column['source'] == 'sample'
-    extract_label = lambda s: sample[label_column_field]
+    raise Exception('Invalid data extraction type: %s' % extract['type'])
 
-  # Extract data by column
-  data = []
-  num_series_columns = len(data_source['series_columns']) - 1
-  for i, series_column in enumerate(data_source['series_columns']):
-    s = samples[:]
-    # Create the lambda used to parse this series column's cells
-    series_column_parse = eval('lambda value: ' + series_column['parse'])
-    # Filter using this series column's condition
-    select = series_column['select']
-    condition = series_column['condition']
-    if type(condition) is list:
-      # If the condition is actually a list of strings, join them
-      condition = ''.join(condition)
-    _filter_select_and_condition(s, select, condition)
-    # Build rows out of each remaining sample
-    for sample in s:
-      row = [label_column_parse(extract_label(sample))]
-      row += [None] * i
-      row.append(series_column_parse(sample['value']))
-      row += [None] * (num_series_columns - i)
-      data.append(row)
-  # Sort rows by label if the label column contains numbers
-  if label_column.get('order') is not None:
-    data = sorted(data, key=lambda x: x[0])
-    if label_column['order'] == 'decreasing':
-      data = reversed(data)
+  # Build the data array
+  data_array = []
+  num_value_columns = len(data_dict)
+  column_to_group = []
+  for column_num, (group, data) in enumerate(data_dict.items()):
+    column_to_group.append(group)
+    for key, values in data.items():
+      for value in values:
+        row = [key]
+        row += [None] * column_num
+        row.append(value)
+        row += [None] * (num_value_columns - column_num - 1)
+        data_array.append(row)
+
+  # Infer the columns and their types
+  columns = [[None, 'keys']] + [[None, group] for group in column_to_group]
+  for row in data_array:
+    for i, cell in enumerate(row):
+      if columns[i][0] is None:
+        columns[i][0] = get_cell_type(cell)
+    if None not in (column[0] for column in columns):
+      break
+
+  # Sort rows by key column
+  if extract.get('key_order') is not None:
+    data_array = sorted(data_array, key=lambda x: x[0])
+    if extract['key_order'] == 'decreasing':
+      data_array = reversed(data_array)
     else:
-      assert label_column['order'] == 'increasing'
-  return data
+      assert extract['key_order'] == 'increasing', \
+             "Invalid key ordering: %s" % label_column['key_order']
+    # Collapse nulls in the data array
+    collapsed_data = []
+    work_row = None
+    for i in range(len(data_array) - 1):
+      if work_row is not None and work_row[0] != data_array[i][0]:
+        collapsed_data.append(work_row)
+        work_row = None
+      if work_row is None:
+        if data_array[i][0] == data_array[i+1][0]:
+          work_row = data_array[i][:]
+        else:
+          collapsed_data.append(data_array[i][:])
+        continue
+      for j in range(len(work_row)):
+        if work_row[j] is None and data_array[i][j] is not None:
+          work_row[j] = data_array[i][j]
+    data_array = collapsed_data
+
+  return data_array, columns
 
 class ChartPage:
-  def __init__(self, chart_specs_path):
+  def __init__(self, page_spec_path):
+    self.page_spec_path = page_spec_path
+    self.last_page_spec_update = None
     self.chart_specs = None
-    self.chart_specs_path = chart_specs_path
-    self.last_chart_specs_update = None
+    self.chart_order = None
     
   def refresh_chart_data(self):
-    self.refresh_chart_specs()
+    self.refresh_page_spec()
     for chart in self.chart_specs:
       modified_time = os.path.getmtime(chart['data_source']['path'])
       if modified_time != chart['data_source']['last_update']:
         # Need to pull from this data source again
         print("Refreshing chart data for: " + chart['name'])
         chart['data_source']['last_update'] = modified_time
-        chart['data'] = pull_chart_data(chart['data_source'])
+        chart['data'], chart['columns'] = pull_chart_data(chart['data_source'])
 
-  def refresh_chart_specs(self):
-    modified_time = os.path.getmtime(self.chart_specs_path)
-    if modified_time != self.last_chart_specs_update:
+  def refresh_page_spec(self):
+    modified_time = os.path.getmtime(self.page_spec_path)
+    if modified_time != self.last_page_spec_update:
       print("Refreshing chart specs")
-      self.last_chart_specs_update = modified_time
-      chart_specs = None
-      with open(self.chart_specs_path) as chart_specs_file:
+      self.last_page_spec_update = modified_time
+      page_spec = None
+      with open(self.page_spec_path) as page_spec_file:
         # Try to parse the chart page spec yaml
         try:
-          chart_specs = yaml.load(chart_specs_file.read())
+          page_spec = yaml.load(page_spec_file.read())
         except:
           sys.stderr.write("ERROR: Chart page spec yaml is not valid yaml\n")
-      if chart_specs is None:
+      if page_spec is None:
         sys.stderr.write("ERROR: Failed to read the chart page spec yaml\n")
       else:
-        chart_specs = chart_specs['chart_specs']
+        chart_specs = page_spec['chart_specs']
+        chart_order = page_spec.get('chart_order') or chart_specs.keys()
         for chart_name, chart in chart_specs.items():
           # Set some fields we need chart specs to have internally
           chart['name'] = chart_name
           chart['data_source']['last_update'] = None
           chart['data'] = []
         # Convert the chart_specs dictionary into a list
-        self.chart_specs = [chart_spec for chart_spec in chart_specs.values()]
+        self.chart_specs = [chart_specs[chart_name]
+                            for chart_name in chart_order]
 
 def ChartServerFactory(chart_page):
   class ChartServer(BaseHTTPRequestHandler):
@@ -147,13 +202,13 @@ def ChartServerFactory(chart_page):
         
 def main():
   if len(sys.argv) != 2:
-    print("Usage: python3 chart_server.py <chart_specs_json>")
+    print("Usage: python3 chart_server.py <page_spec_yaml>")
     exit()
 
   port = 8080
-  chart_specs_path = sys.argv[1]
+  page_spec_path = sys.argv[1]
 
-  chart_page = ChartPage(chart_specs_path)
+  chart_page = ChartPage(page_spec_path)
 
   server_address = ('0.0.0.0', port)
   chart_server = ChartServerFactory(chart_page)

@@ -25,6 +25,16 @@ def cell_to_js(cell):
     return "'%s'" % cell
   return None
 
+def get_cell_type(cell):
+  cell_type = type(cell)
+  if cell_type is int or cell_type is float:
+    return 'number'
+  elif cell_type is bool:
+    return 'boolean'
+  elif cell_type is str:
+    return 'string'
+  return None
+
 def build_data_table_js(columns, rows):
   js_code = 'var data = new google.visualization.DataTable();'
   # Add columns
