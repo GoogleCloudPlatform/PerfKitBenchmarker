@@ -404,3 +404,94 @@ class CSVPublisherTestCase(unittest.TestCase):
     rows = list(reader)
     self.assertEqual(['key1', 'key3'], reader.fieldnames[-2:])
     self.assertEqual(3, len(rows))
+
+
+  class InfluxDBPublisherTestCase(unittest.TestCase):
+    def setUp(self):
+      self.db_name = 'test_db'
+      self.db_uri = 'test'
+      self.mock_db = publisher.InfluxDBPublisher(self.db_uri, self.db_name)
+      self.no_meta = {'test': 'testa', 'metric': '3', 'official': 47.0,
+                      'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
+                      'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123}
+      self.empty_meta = {'test': 'testb', 'metric': '2', 'official': 14.0,
+                         'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+                         'run_uri': 'bba3', 'sample_uri': 'bb',
+                         'timestamp': 55, 'metadata': {}}
+      self.with_meta = {'test': 'testc', 'metric': '1', 'official': 1.0,
+                        'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+                        'run_uri': '323', 'sample_uri': '33',
+                        'timestamp': 123, 'metadata':
+                        {'info': '1', 'more_info': '2', 'bar': 'foo'}}
+
+    def testFormatToKeyValue(self):
+      no_meta = self.mock_db._FormatToKeyValue(self.no_meta)
+      empty_meta = self.mock_db._FormatToKeyValue(self.empty_meta)
+      with_meta = self.mock_db._FormatToKeyValue(self.with_meta)
+
+      self.assertEqual(no_meta,
+                       ['owner=Rackspace', 'unit=us', 'run_uri=5rtw',
+                        'test=testa', 'timestamp=123', 'metric=3',
+                        'official=47.0', 'value=non', 'sample_uri=5r'])
+      self.assertEqual(empty_meta,
+                       ['owner=Rackspace', 'unit=MB', 'run_uri=bba3',
+                        'test=testb', 'timestamp=55', 'metric=2',
+                        'official=14.0', 'metadata={}', 'value=non',
+                        'sample_uri=bb'])
+      self.assertEqual(with_meta,
+                       ['owner=Rackspace', 'unit=MB', 'run_uri=323',
+                        'test=testc', 'timestamp=123', 'metric=1',
+                        'official=1.0', "metadata={'info': '1', \
+                        'bar': 'foo', 'more_info': '2'}", 'value=non',
+                        'sample_uri=33'])
+
+    def testConstructSample(self):
+      no_meta = self.mock_db._ConstructSample(self.no_meta)
+      empty_meta = self.mock_db._ConstructSample(self.empty_meta)
+      with_meta = self.mock_db._ConstructSample(self.with_meta)
+
+      self.assertEqual(no_meta,
+                       'perfkitbenchmarker,metric=3,official=47.0,\
+                       owner=Rackspace,run_uri=5rtw,test=testa,\
+                       unit=us,sample_uri=5r value=non 123000000000')
+      self.assertEqual(empty_meta,
+                       'perfkitbenchmarker,metric=2,official=14.0,\
+                       owner=Rackspace,run_uri=bba3,test=testb,unit=MB,\
+                       sample_uri=bb value=non 55000000000')
+      self.assertEqual(with_meta,
+                       'perfkitbenchmarker,metric=1,official=1.0,\
+                       owner=Rackspace,run_uri=323,test=testc,unit=MB,\
+                       sample_uri=33,info=1,bar=foo,\
+                       more_info=2 value=non 123000000000')
+
+    def testAggregationOfSamples(self):
+      sample_data = [{'test': 'testc', 'metric': '1', 'official': 1.0,
+                     'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+                      'run_uri': '323', 'sample_uri': '33', 'timestamp': 123,
+                      'metadata':
+                      {'info': '1', 'more_info': '2', 'bar': 'foo'}},
+                     {'test': 'testb', 'metric': '2', 'official': 14.0,
+                      'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+                      'run_uri': 'bba3', 'sample_uri': 'bb', 'timestamp': 55,
+                      'metadata': {}},
+                     {'test': 'testa', 'metric': '3', 'official': 47.0,
+                     'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
+                      'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123}]
+      formated_samples = []
+      for data in sample_data:
+        formated_samples.append(self.mock_db._ConstructSample(sample))
+        self.assertEqual(formated_samples, 'perfkitbenchmarker,metric=1,\
+                                          official=1.0,owner=Rackspace,\
+                                          run_uri=323,test=testc,unit=MB,\
+                                          sample_uri=33,info=1,bar=foo,\
+                                          more_info=2 value=non \
+                                          123000000000\nperfkitbenchmarker,\
+                                          metric=2,official=14.0,\
+                                          owner=Rackspace,run_uri=bba3,\
+                                          test=testb,unit=MB,sample_uri=bb \
+                                          value=non \
+                                          55000000000\nperfkitbenchmarker,\
+                                          metric=3,official=47.0,owner=\
+                                          Rackspace,run_uri=5rtw,test=testa,\
+                                          unit=us,sample_uri=5r \
+                                          value=non 123000000000')

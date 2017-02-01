@@ -115,7 +115,8 @@ flags.DEFINE_multistring(
 
 flags.DEFINE_string(
     'influx_uri', 'localhost:8086',
-    'The Influx DB endpoint for queries address and port')
+    'The Influx DB address and port. Expects the format hostname:port'
+    'If port is not passed in it assumes port 80.')
 
 flags.DEFINE_string(
     'influx_db_name', 'perfkit',
@@ -672,7 +673,7 @@ class InfluxDBPublisher(SamplePublisher):
     try:
       self._CreateDB()
       body = ' \n '.join(formated_samples)
-      self._writeData(body)
+      self._WriteData(body)
     except (IOError, httplib.HTTPException) as http_exception:
       logging.debug("Error connecting to the database: ", http_exception)
 
@@ -710,14 +711,13 @@ class InfluxDBPublisher(SamplePublisher):
     conn = httplib.HTTPConnection(self.influx_uri)
     conn.request('POST', '/query?' + params, headers=header)
     response = conn.getresponse()
-    response_status = response.status
-    response_response = response.response
-    if response_status in successful_http_request_codes:
+    conn.close()
+    if response.status in successful_http_request_codes:
       logging.debug('Success!', self.influx_db_name, ' DB Created')
     else:
-      logging.debug(response_status,
+      logging.debug(response.status,
                     'Request could not be completed due to: ',
-                    response_response)
+                    response.response)
       raise httplib.HTTPException
 
   def _WriteData(self, data):
@@ -728,14 +728,13 @@ class InfluxDBPublisher(SamplePublisher):
     conn.request('POST', '/write?' + 'db=' + self.influx_db_name, params,
                  headers=header)
     response = conn.getresponse()
-    response_status = response.status
-    response_response = response.response
-    if response_status in successful_http_request_codes:
-      logging.debug('writing samples to publisher: writing samples.')
+    conn.close()
+    if response.status in successful_http_request_codes:
+      logging.debug('Writing samples to publisher: writing samples.')
     else:
-      logging.debug(response_status,
+      logging.debug(response.status,
                     'Request could not be completed due to: ',
-                    response_response)
+                    response.response)
       raise httplib.HTTPException
 
 
