@@ -973,10 +973,10 @@ will default to the pre-set defaults, identified below, if no uri or DB name is 
 the user is required to at the very least call the `--influx_uri` flag to publish data to Influx.
 
 
-Flag | Notes | Defaults 
------|-----------------
-`--influx_uri`         | The Influx DB address and port. Expects the format hostname:port | localhost:8086
-`--influx_db_name`     | The name of Influx DB database that you wish to publish to or create | perfkit
+| Flag               | Notes                                                                | Default        |
+|--------------------|----------------------------------------------------------------------|----------------|
+| `--influx_uri`     | The Influx DB address and port. Expects the format hostname:port     | localhost:8086 |
+| `--influx_db_name` | The name of Influx DB database that you wish to publish to or create | perfkit        |
 
 How to Extend PerfKit Benchmarker
 =================
