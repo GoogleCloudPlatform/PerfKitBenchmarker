@@ -478,20 +478,16 @@ class CSVPublisherTestCase(unittest.TestCase):
                      'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
                       'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123}]
       formated_samples = []
+      expected_output = ('perfkitbenchmarker,metric=1,official=1.0,'
+                         'owner=Rackspace,run_uri=323,test=testc,unit=MB,'
+                         'sample_uri=33,info=1,bar=foo,more_info=2 value=non '
+                         '123000000000\nperfkitbenchmarker,metric=2,'
+                         'official=14.0,owner=Rackspace,run_uri=bba3,'
+                         'test=testb,unit=MB,sample_uri=bb value=non '
+                         '55000000000\nperfkitbenchmarker,metric=3,'
+                         'official=47.0,owner=Rackspace,run_uri=5rtw,'
+                         'test=testa,unit=us,sample_uri=5r '
+                         'value=non 123000000000')
       for data in sample_data:
         formated_samples.append(self.mock_db._ConstructSample(sample))
-        self.assertEqual(formated_samples, 'perfkitbenchmarker,metric=1,\
-                                          official=1.0,owner=Rackspace,\
-                                          run_uri=323,test=testc,unit=MB,\
-                                          sample_uri=33,info=1,bar=foo,\
-                                          more_info=2 value=non \
-                                          123000000000\nperfkitbenchmarker,\
-                                          metric=2,official=14.0,\
-                                          owner=Rackspace,run_uri=bba3,\
-                                          test=testb,unit=MB,sample_uri=bb \
-                                          value=non \
-                                          55000000000\nperfkitbenchmarker,\
-                                          metric=3,official=47.0,owner=\
-                                          Rackspace,run_uri=5rtw,test=testa,\
-                                          unit=us,sample_uri=5r \
-                                          value=non 123000000000')
+        self.assertEqual(formated_samples, expected_output)
