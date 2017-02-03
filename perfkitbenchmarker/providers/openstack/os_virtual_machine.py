@@ -312,7 +312,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _CreateServerGroup(self, group_name):
     cmd = os_utils.OpenStackCLICommand(self, 'server group', 'create',
                                        group_name)
-    cmd.flags['policy'] = FLAGS.opestack_scheduler_policy
+    cmd.flags['policy'] = FLAGS.openstack_scheduler_policy
     stdout, stderr, _ = cmd.Issue()
     if stderr:
       raise errors.Error(stderr)
