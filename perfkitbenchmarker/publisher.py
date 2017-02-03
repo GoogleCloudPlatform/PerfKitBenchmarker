@@ -717,7 +717,7 @@ class InfluxDBPublisher(SamplePublisher):
     else:
       logging.debug(response.status,
                     'Request could not be completed due to: ',
-                    response.response)
+                    response.reason)
       raise httplib.HTTPException
 
   def _WriteData(self, data):
@@ -734,7 +734,7 @@ class InfluxDBPublisher(SamplePublisher):
     else:
       logging.debug(response.status,
                     'Request could not be completed due to: ',
-                    response.response)
+                    response.reason)
       raise httplib.HTTPException
 
 
