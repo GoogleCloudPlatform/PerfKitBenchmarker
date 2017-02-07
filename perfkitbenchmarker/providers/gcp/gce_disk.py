@@ -113,4 +113,7 @@ class GceDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    return '/dev/disk/by-id/google-%s' % self.name
+    if FLAGS.gce_ssd_interface == 'SCSI':
+      return '/dev/disk/by-id/google-%s' % self.name
+    elif FLAGS.gce_ssd_interface == 'nvme':
+      return '/dev/%s' % self.name
