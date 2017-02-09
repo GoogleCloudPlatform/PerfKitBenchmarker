@@ -149,6 +149,10 @@ class Benchmarks(object):
 class Resource(object):
   """Errors related to resource creation and deletion."""
 
+  class CreationError(Error):
+    """An error on creation which is not retryable."""
+    pass
+
   class RetryableCreationError(Error):
     pass
 

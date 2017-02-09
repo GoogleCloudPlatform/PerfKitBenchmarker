@@ -121,7 +121,7 @@ flags.DEFINE_list(
     'Zones that will be appended to the "zones" list. This is functionally '
     'the same, but allows flag matrices to have two zone axes.')
 # TODO(user): note that this is currently very GCE specific. Need to create a
-#    module which can traslate from some generic types to provider specific
+#    module which can translate from some generic types to provider specific
 #    nomenclature.
 flags.DEFINE_string('machine_type', None, 'Machine '
                     'types that will be created for benchmarks that don\'t '
