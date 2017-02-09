@@ -60,7 +60,7 @@ class AzureResourceGroup(resource.BaseResource):
     super(AzureResourceGroup, self).__init__()
     self.name = 'pkb%s-%s' % (run_uri, spec_uid)
     # Storage account names can't include separator characters :(.
-    self.storage_account_prefix = 'pkb%s%s' % (run_uri, spec_uid)
+    self.storage_account_prefix = 'pkb%s' % run_uri
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
@@ -134,6 +134,8 @@ class AzureAvailSet(resource.BaseResource):
 class AzureStorageAccount(resource.BaseResource):
   """Object representing an Azure Storage Account."""
 
+  total_storage_accounts = 0
+
   def __init__(self, storage_type, location, name,
                kind=None, access_tier=None):
     super(AzureStorageAccount, self).__init__()
@@ -142,6 +144,8 @@ class AzureStorageAccount(resource.BaseResource):
     self.resource_group = GetResourceGroup()
     self.location = location
     self.kind = kind or 'Storage'
+
+    AzureStorageAccount.total_storage_accounts += 1
 
     if kind == 'BlobStorage':
       self.access_tier = access_tier or 'Hot'
@@ -193,7 +197,13 @@ class AzureStorageAccount(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the storage account."""
-    pass
+    delete_cmd = [azure.AZURE_PATH,
+                  'storage',
+                  'account',
+                  'delete',
+                  self.name,
+                  '--quiet'] + self.resource_group.args
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the storage account exists."""
@@ -404,7 +414,7 @@ class AzureNetwork(network.BaseNetwork):
     # Storage account names must be 3-24 characters long and use
     # numbers and lower-case letters only, which leads us to this
     # awful naming scheme.
-    suffix = '%sstorage' % self.zone
+    suffix = 'storage%d' % AzureStorageAccount.total_storage_accounts
     self.storage_account = AzureStorageAccount(
         FLAGS.azure_storage_type, self.zone,
         self.resource_group.storage_account_prefix[:24 - len(suffix)] + suffix)
