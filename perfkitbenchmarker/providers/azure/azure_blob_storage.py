@@ -20,9 +20,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 
-flags.DEFINE_string('azure_lib_version', None,
-                    'Use a particular version of azure client lib, e.g.: 1.0.2')
-
 FLAGS = flags.FLAGS
 
 DEFAULT_AZURE_REGION = 'eastus2'
