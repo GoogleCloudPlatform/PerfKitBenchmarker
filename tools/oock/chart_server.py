@@ -68,6 +68,10 @@ def pull_chart_data(data_source):
       group = _select_then_parse(sample, group_by_select, group_by_parse)
       pair_list = _select_then_parse(sample, extract_pl_select,
                                      extract_pl_parse)
+      if group in data_dict:
+        print("WARNING: overwriting existing pair_list group: %s. There can "
+              "only be one sample per group for pair_list extractors. Ensure "
+              "there are no duplicates!" % group)
       for key, value in pair_list:
         data_dict[group][key].append(value)
   else:
@@ -76,9 +80,15 @@ def pull_chart_data(data_source):
   # Build the data array
   data_array = []
   num_value_columns = len(data_dict)
-  column_to_group = []
-  for column_num, (group, data) in enumerate(data_dict.items()):
-    column_to_group.append(group)
+  column_to_group = extract.get('column_order') or list(data_dict.keys())
+  if num_value_columns != len(column_to_group):
+    column_to_group = list(data_dict.keys())
+    print(column_to_group)
+    print("WARNING: failed to use column_order because the data is missing "
+          "some columns.")
+  assert num_value_columns == len(column_to_group)
+  for column_num, group in enumerate(column_to_group):
+    data = data_dict[group]
     for key, values in data.items():
       for value in values:
         row = [key]
@@ -105,21 +115,14 @@ def pull_chart_data(data_source):
       assert extract['key_order'] == 'increasing', \
              "Invalid key ordering: %s" % label_column['key_order']
     # Collapse nulls in the data array
-    collapsed_data = []
-    work_row = None
-    for i in range(len(data_array) - 1):
-      if work_row is not None and work_row[0] != data_array[i][0]:
-        collapsed_data.append(work_row)
-        work_row = None
-      if work_row is None:
-        if data_array[i][0] == data_array[i+1][0]:
-          work_row = data_array[i][:]
-        else:
-          collapsed_data.append(data_array[i][:])
-        continue
-      for j in range(len(work_row)):
-        if work_row[j] is None and data_array[i][j] is not None:
-          work_row[j] = data_array[i][j]
+    collapsed_data = [data_array[0][:]]
+    for row in data_array[1:]:
+      if collapsed_data[-1][0] == row[0]:
+        for i in range(len(row)):
+          if collapsed_data[-1][i] is None and row[i] is not None:
+            collapsed_data[-1][i] = row[i] 
+      else:
+        collapsed_data.append(row[:])
     data_array = collapsed_data
 
   return data_array, columns
@@ -185,7 +188,7 @@ def ChartServerFactory(chart_page):
       # Build chart_specs with only the fields required for build_chart_page
       keys = ['name', 'type', 'columns', 'data', 'options']
       chart_specs = [{key: c[key] for key in keys}
-                     for c in self.chart_page.chart_specs]
+                     for c in self.chart_page.chart_specs if len(c['data']) > 0]
 
       html = build_chart_page(chart_specs)
       self.wfile.write(str.encode(html))

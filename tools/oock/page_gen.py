@@ -1,7 +1,7 @@
 import json
 
 def build_chart_html(js_code, chart_elements):
-  chart_divs = ''.join('<div id="' + str(e) + '"></div>'
+  chart_divs = ''.join('<div id="%s_img"></div><div id="%s"></div>' % (e, e)
                        for e in chart_elements)
   chart_html = '<html><head>'
   chart_html += ('<script type="text/javascript" '
@@ -54,9 +54,11 @@ def build_chart_js(element_id, chart_type, columns, rows, chart_options=None):
     chart_options_json = '{}'
   js_code = 'function draw_' + element_id + '(){'
   js_code += build_data_table_js(columns, rows)
-  js_code += ("new google." + chart_type + "("
-              "document.getElementById('" + element_id + "'))"
-              ".draw(data,JSON.parse('" + chart_options_json + "'));")
+  js_code += ("var chart = new google." + chart_type + "("
+              "document.getElementById('" + element_id + "'));")
+  js_code += "chart.draw(data,JSON.parse('" + chart_options_json + "'));"
+  js_code += "document.getElementById('%s_img').outerHTML=" % element_id
+  js_code += "'<a href=\"'+chart.getImageURI()+'\"> %s image</a>';" % element_id
   js_code += '}'
   return js_code
 
