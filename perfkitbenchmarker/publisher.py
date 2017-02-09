@@ -15,6 +15,7 @@
 """Classes to collect and publish performance samples to various sinks."""
 
 import abc
+import collections
 import copy
 import csv
 import httplib
@@ -672,7 +673,7 @@ class InfluxDBPublisher(SamplePublisher):
   def _Publish(self, formated_samples):
     try:
       self._CreateDB()
-      body = ' \n '.join(formated_samples)
+      body = '\n'.join(formated_samples)
       self._WriteData(body)
     except (IOError, httplib.HTTPException) as http_exception:
       logging.debug("Error connecting to the database: ", http_exception)
@@ -687,7 +688,8 @@ class InfluxDBPublisher(SamplePublisher):
         tag_set_metadata = ','.join(self._FormatToKeyValue(sample['metadata']))
     tag_keys = ('test', 'official', 'owner', 'run_uri', 'sample_uri',
                 'metric', 'unit')
-    tag_set = ','.join(self._FormatToKeyValue({k: sample[k] for k in tag_keys}))
+    ordered_tags = collections.OrderedDict([(k, sample[k]) for k in tag_keys])
+    tag_set = ','.join(self._FormatToKeyValue(ordered_tags))
     if tag_set_metadata:
       tag_set += ',' + tag_set_metadata
 
