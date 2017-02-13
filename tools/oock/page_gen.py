@@ -86,15 +86,12 @@ def build_chart_page(chart_specs):
   js_code += "google.charts.setOnLoadCallback(draw_charts_mangle_mangle);"
   js_code += "function draw_charts_mangle_mangle(){"
   for chart in chart_specs:
-    js_code += "draw_" + chart['name'] + "();"
+    js_code += "draw_" + chart.name + "();"
   js_code += "}"
   # Create the individual functions to draw each chart
   for chart in chart_specs:
-    chart_options = None
-    if 'options' in chart:
-      chart_options = chart['options']
-    js_code += build_chart_js(chart['name'], chart['type'], 
-                              chart['columns'], chart['data'], chart_options)
+    js_code += build_chart_js(chart.name, chart.type, 
+                              chart.columns, chart.data, chart.options)
   html_code = build_chart_html(js_code,
-                               [chart['name'] for chart in chart_specs])
+                               [chart.name for chart in chart_specs])
   return html_code
