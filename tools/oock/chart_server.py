@@ -271,13 +271,14 @@ class ChartPage:
   def __init__(self, page_spec_path):
     self.page_spec_path = page_spec_path
     self.last_page_spec_update = None
-    self.chart_specs = None
+    self.chart_specs = {}
+    self.chart_spec_dicts = {} # Chart specs dicts directly from the yaml
     self.chart_order = None
     self.sample_sources = {} # Cache sample sources
     
   def maybe_refresh_chart_data(self):
     self.maybe_refresh_page_spec()
-    for chart in self.chart_specs:
+    for chart in self.chart_specs.values():
       chart.maybe_refresh_data(self.sample_sources)
 
   def maybe_refresh_page_spec(self):
@@ -296,11 +297,17 @@ class ChartPage:
         sys.stderr.write("ERROR: Failed to read the chart page spec yaml\n")
       else:
         chart_specs = page_spec['chart_specs']
-        chart_order = page_spec.get('chart_order') or chart_specs.keys()
-        # Convert the chart_specs dictionary into a list of ChartSpecs
-        self.chart_specs = [build_chart_spec(chart_name,
-                                             chart_specs[chart_name])
-                            for chart_name in chart_order]
+        self.chart_order = page_spec.get('chart_order') or chart_specs.keys()
+        # Build the chart specs that need to be built
+        for chart_name in chart_specs.keys():
+          if chart_name in self.chart_spec_dicts and \
+             chart_specs[chart_name] == self.chart_spec_dicts[chart_name]:
+            # Skip unchanged chart spec
+            continue
+          print("Rebuilding chart spec for %s" % chart_name)
+          self.chart_specs[chart_name] = \
+              build_chart_spec(chart_name, chart_specs[chart_name])
+          self.chart_spec_dicts[chart_name] = chart_specs[chart_name]
 
 def ChartServerFactory(chart_page):
   class ChartServer(BaseHTTPRequestHandler):
@@ -317,7 +324,11 @@ def ChartServerFactory(chart_page):
       self.chart_page.maybe_refresh_chart_data()
       self._set_headers()
 
-      html = build_chart_page(self.chart_page.chart_specs)
+      # Build list of chart specs in the proper order
+      chart_specs = [self.chart_page.chart_specs[name]
+                     for name in self.chart_page.chart_order]
+
+      html = build_chart_page(chart_specs)
       self.wfile.write(str.encode(html))
 
     def do_HEAD(self):
