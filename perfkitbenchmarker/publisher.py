@@ -715,11 +715,11 @@ class InfluxDBPublisher(SamplePublisher):
     response = conn.getresponse()
     conn.close()
     if response.status in successful_http_request_codes:
-      logging.debug('Success!', self.influx_db_name, ' DB Created')
+      logging.debug('Success!' + self.influx_db_name + ' DB Created')
     else:
-      logging.debug(response.status,
-                    'Request could not be completed due to: ',
-                    response.reason)
+      logging.debug(response.status
+                    + 'Request could not be completed due to: '
+                    + response.reason)
       raise httplib.HTTPException
 
   def _WriteData(self, data):
@@ -734,9 +734,9 @@ class InfluxDBPublisher(SamplePublisher):
     if response.status in successful_http_request_codes:
       logging.debug('Writing samples to publisher: writing samples.')
     else:
-      logging.debug(response.status,
-                    'Request could not be completed due to: ',
-                    response.reason)
+      logging.debug(response.status
+                    + 'Request could not be completed due to: '
+                    + response.reason)
       raise httplib.HTTPException
 
 
