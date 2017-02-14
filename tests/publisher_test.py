@@ -424,10 +424,15 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
                 'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
                 'run_uri': '323', 'sample_uri': '33',
                 'timestamp': 123}
+    sample_4 = {'test': 'testc', 'metric': 'some,metric', 'official': 1.0,
+                'value': 'non', 'unit': 'Some MB', 'owner': 'Rackspace',
+                'run_uri': '323', 'sample_uri': '33',
+                'timestamp': 123}
 
     sample_1_formatted_key_value = self.test_db._FormatToKeyValue(sample_1)
     sample_2_formatted_key_value = self.test_db._FormatToKeyValue(sample_2)
     sample_3_formatted_key_value = self.test_db._FormatToKeyValue(sample_3)
+    sample_4_formatted_key_value = self.test_db._FormatToKeyValue(sample_4)
 
     expected_sample_1 = ['owner=Rackspace', 'unit=us', 'run_uri=5rtw',
                          'test=testa', 'timestamp=123', 'metric=3',
@@ -438,10 +443,14 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
     expected_sample_3 = ['owner=Rackspace', 'unit=MB', 'run_uri=323',
                          'test=testc', 'timestamp=123', 'metric=1',
                          'official=1.0', 'value=non', 'sample_uri=33']
+    expected_sample_4 = ['owner=Rackspace', 'unit=Some\ MB', 'run_uri=323',
+                         'test=testc', 'timestamp=123', 'metric=some\,metric',
+                         'official=1.0', 'value=non', 'sample_uri=33']
 
     self.assertItemsEqual(sample_1_formatted_key_value, expected_sample_1)
     self.assertItemsEqual(sample_2_formatted_key_value, expected_sample_2)
     self.assertItemsEqual(sample_3_formatted_key_value, expected_sample_3)
+    self.assertItemsEqual(sample_4_formatted_key_value, expected_sample_4)
 
   def testConstructSample(self):
     sample_with_metadata = {

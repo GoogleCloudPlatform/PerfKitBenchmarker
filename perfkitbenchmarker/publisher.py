@@ -702,6 +702,9 @@ class InfluxDBPublisher(SamplePublisher):
   def _FormatToKeyValue(self, sample):
     key_value_pairs = []
     for k, v in sample.iteritems():
+      v = str(v)
+      v = v.replace(',', '\,')
+      v = v.replace(' ', '\ ')
       key_value_pairs.append('%s=%s' % (k, v))
     return key_value_pairs
 
