@@ -2,8 +2,8 @@ PerfKit Benchmarker
 ==================
 
 PerfKit Benchmarker is an open effort to define a canonical set of benchmarks to measure and compare cloud
-offerings.  It's designed to operate via vendor provided command line tools. The benchmarks are not
-tuned (ie the defaults) because this is what most users will use.  This should help us drive to great defaults.
+offerings.  It's designed to operate via vendor provided command line tools. The benchmark default settings are not
+tuned for any particular platform or instance type. These settings are recommended for consistency across services.
 Only in the rare case where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
