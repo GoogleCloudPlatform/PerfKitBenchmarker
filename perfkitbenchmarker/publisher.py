@@ -676,7 +676,7 @@ class InfluxDBPublisher(SamplePublisher):
       body = '\n'.join(formated_samples)
       self._WriteData(body)
     except (IOError, httplib.HTTPException) as http_exception:
-      logging.debug("Error connecting to the database: ", http_exception)
+      logging.error('Error connecting to the database:  %s', http_exception)
 
   def _ConstructSample(self, sample):
     timestamp = str(int((10 ** 9) * sample['timestamp']))
@@ -715,11 +715,10 @@ class InfluxDBPublisher(SamplePublisher):
     response = conn.getresponse()
     conn.close()
     if response.status in successful_http_request_codes:
-      logging.debug('Success!' + self.influx_db_name + ' DB Created')
+      logging.debug('Success! %s DB Created', self.influx_db_name)
     else:
-      logging.debug(response.status
-                    + 'Request could not be completed due to: '
-                    + response.reason)
+      logging.error('%d Request could not be completed due to: %s',
+                    response.status, response.reason)
       raise httplib.HTTPException
 
   def _WriteData(self, data):
@@ -734,9 +733,8 @@ class InfluxDBPublisher(SamplePublisher):
     if response.status in successful_http_request_codes:
       logging.debug('Writing samples to publisher: writing samples.')
     else:
-      logging.debug(response.status
-                    + 'Request could not be completed due to: '
-                    + response.reason)
+      logging.error('%d Request could not be completed due to: %s %s',
+                    response.status, response.reason, data)
       raise httplib.HTTPException
 
 
