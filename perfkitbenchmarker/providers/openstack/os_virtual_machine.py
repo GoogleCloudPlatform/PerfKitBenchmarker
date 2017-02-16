@@ -342,6 +342,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     stdout, _, _ = show_cmd.Issue()
     server_dict = json.loads(stdout)
     self.ip_address = self._GetNetworkIPAddress(server_dict, self.network_name)
+    self.internal_ip = self.ip_address
     if self.floating_ip_pool_name:
       self.floating_ip = self._AllocateFloatingIP()
       self.internal_ip = self.ip_address
