@@ -515,7 +515,6 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
     self.test_db.PublishSamples(samples)
     mock_publish_method.assert_called_once_with(expected)
 
-
   @mock.patch.object(publisher.InfluxDBPublisher, '_WriteData')
   @mock.patch.object(publisher.InfluxDBPublisher, '_CreateDB')
   def testPublish(self, mock_create_db, mock_write_data):
