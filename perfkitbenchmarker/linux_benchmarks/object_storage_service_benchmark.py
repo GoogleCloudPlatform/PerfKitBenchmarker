@@ -172,6 +172,8 @@ object_storage_service:
     default:
       vm_spec: *default_single_core
       vm_count: null
+  flags:
+    gcloud_scopes: https://www.googleapis.com/auth/devstorage.read_write
 """
 
 DATA_FILE = 'cloud-storage-workload.sh'
