@@ -658,6 +658,15 @@ class ElasticsearchPublisher(SamplePublisher):
 
 
 class InfluxDBPublisher(SamplePublisher):
+  """Publisher writes samples to InfluxDB.
+
+  Attributes:
+    influx_uri: Takes in type string. Consists of the Influx DB address and
+      port.Expects the format hostname:port
+    influx_db_name: Takes in tupe string.
+      Consists of the name of Influx DB database that you wish to publish to or
+      create.
+  """
 
   def __init__(self, influx_uri=None, influx_db_name=None):
     # set to default above in flags unless changed
@@ -711,6 +720,9 @@ class InfluxDBPublisher(SamplePublisher):
     return key_value_pairs
 
   def _CreateDB(self):
+    """This method is idempotent. If the DB already exists it will simply
+    return a 200 code without re-creating it.
+    """
     successful_http_request_codes = [200, 202, 204]
     header = {'Content-type': 'application/x-www-form-urlencoded',
               'Accept': 'text/plain'}
