@@ -963,6 +963,21 @@ Flag | Notes
 `--es_index`       | The Elasticsearch index name to store documents (default: perfkit)
 `--es_type`        | The Elasticsearch document type (default: result)
 
+Using InfluxDB Publisher
+=================
+No additional packages need to be installed in order to publish Perfkit data to an InfluxDB
+server.
+
+InfluxDB Publisher takes in the flags for the Influx uri and the Influx DB name. The publisher
+will default to the pre-set defaults, identified below, if no uri or DB name is set. However,
+the user is required to at the very least call the `--influx_uri` flag to publish data to Influx.
+
+
+| Flag               | Notes                                                                | Default        |
+|--------------------|----------------------------------------------------------------------|----------------|
+| `--influx_uri`     | The Influx DB address and port. Expects the format hostname:port     | localhost:8086 |
+| `--influx_db_name` | The name of Influx DB database that you wish to publish to or create | perfkit        |
+
 How to Extend PerfKit Benchmarker
 =================
 First start with the [CONTRIBUTING.md](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)

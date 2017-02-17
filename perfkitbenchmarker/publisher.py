@@ -15,8 +15,10 @@
 """Classes to collect and publish performance samples to various sinks."""
 
 import abc
+import collections
 import copy
 import csv
+import httplib
 import io
 import itertools
 import json
@@ -26,6 +28,7 @@ import operator
 import pprint
 import sys
 import time
+import urllib
 import uuid
 
 from perfkitbenchmarker import disk
@@ -110,6 +113,15 @@ flags.DEFINE_multistring(
     'A colon separated key-value pair that will be added to the labels field '
     'of all samples as metadata. Multiple key-value pairs may be specified '
     'by separating each pair by commas.')
+
+flags.DEFINE_string(
+    'influx_uri', 'localhost:8086',
+    'The Influx DB address and port. Expects the format hostname:port'
+    'If port is not passed in it assumes port 80.')
+
+flags.DEFINE_string(
+    'influx_db_name', 'perfkit',
+    'Name of Influx DB database that you wish to publish to or create')
 
 DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
@@ -645,6 +657,104 @@ class ElasticsearchPublisher(SamplePublisher):
     return res
 
 
+class InfluxDBPublisher(SamplePublisher):
+  """Publisher writes samples to InfluxDB.
+
+  Attributes:
+    influx_uri: Takes in type string. Consists of the Influx DB address and
+      port.Expects the format hostname:port
+    influx_db_name: Takes in tupe string.
+      Consists of the name of Influx DB database that you wish to publish to or
+      create.
+  """
+
+  def __init__(self, influx_uri=None, influx_db_name=None):
+    # set to default above in flags unless changed
+    self.influx_uri = influx_uri
+    self.influx_db_name = influx_db_name
+
+  def PublishSamples(self, samples):
+    formated_samples = []
+    for sample in samples:
+      formated_samples.append(self._ConstructSample(sample))
+    self._Publish(formated_samples)
+
+  def _Publish(self, formated_samples):
+    try:
+      self._CreateDB()
+      body = '\n'.join(formated_samples)
+      self._WriteData(body)
+    except (IOError, httplib.HTTPException) as http_exception:
+      logging.error('Error connecting to the database:  %s', http_exception)
+
+  def _ConstructSample(self, sample):
+    timestamp = str(int((10 ** 9) * sample['timestamp']))
+    measurement = 'perfkitbenchmarker'
+
+    tag_set_metadata = ''
+    if 'metadata' in sample:
+      if sample['metadata']:
+        tag_set_metadata = ','.join(self._FormatToKeyValue(sample['metadata']))
+    tag_keys = ('test', 'official', 'owner', 'run_uri', 'sample_uri',
+                'metric', 'unit')
+    ordered_tags = collections.OrderedDict([(k, sample[k]) for k in tag_keys])
+    tag_set = ','.join(self._FormatToKeyValue(ordered_tags))
+    if tag_set_metadata:
+      tag_set += ',' + tag_set_metadata
+
+    field_set = '%s=%s' % ('value', sample['value'])
+
+    sample_constructed_body = '%s,%s %s %s' % (measurement, tag_set,
+                                               field_set, timestamp)
+    return sample_constructed_body
+
+  def _FormatToKeyValue(self, sample):
+    key_value_pairs = []
+    for k, v in sample.iteritems():
+      if v == '':
+        v = '\\"\\"'
+      v = str(v)
+      v = v.replace(',', '\,')
+      v = v.replace(' ', '\ ')
+      key_value_pairs.append('%s=%s' % (k, v))
+    return key_value_pairs
+
+  def _CreateDB(self):
+    """This method is idempotent. If the DB already exists it will simply
+    return a 200 code without re-creating it.
+    """
+    successful_http_request_codes = [200, 202, 204]
+    header = {'Content-type': 'application/x-www-form-urlencoded',
+              'Accept': 'text/plain'}
+    params = urllib.urlencode({'q': 'CREATE DATABASE ' + self.influx_db_name})
+    conn = httplib.HTTPConnection(self.influx_uri)
+    conn.request('POST', '/query?' + params, headers=header)
+    response = conn.getresponse()
+    conn.close()
+    if response.status in successful_http_request_codes:
+      logging.debug('Success! %s DB Created', self.influx_db_name)
+    else:
+      logging.error('%d Request could not be completed due to: %s',
+                    response.status, response.reason)
+      raise httplib.HTTPException
+
+  def _WriteData(self, data):
+    successful_http_request_codes = [200, 202, 204]
+    params = data
+    header = {"Content-type": "application/octet-stream"}
+    conn = httplib.HTTPConnection(self.influx_uri)
+    conn.request('POST', '/write?' + 'db=' + self.influx_db_name, params,
+                 headers=header)
+    response = conn.getresponse()
+    conn.close()
+    if response.status in successful_http_request_codes:
+      logging.debug('Writing samples to publisher: writing samples.')
+    else:
+      logging.error('%d Request could not be completed due to: %s %s',
+                    response.status, response.reason, data)
+      raise httplib.HTTPException
+
+
 class SampleCollector(object):
   """A performance sample collector.
 
@@ -704,6 +814,9 @@ class SampleCollector(object):
       publishers.append(ElasticsearchPublisher(es_uri=FLAGS.es_uri,
                                                es_index=FLAGS.es_index,
                                                es_type=FLAGS.es_type))
+    if FLAGS.influx_uri:
+      publishers.append(InfluxDBPublisher(influx_uri=FLAGS.influx_uri,
+                                          influx_db_name=FLAGS.influx_db_name))
 
     return publishers
 
