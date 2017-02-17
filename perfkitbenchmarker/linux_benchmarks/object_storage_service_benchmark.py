@@ -84,6 +84,9 @@ flags.DEFINE_enum('object_storage_scenario', 'all',
                   'api_multistream_writes: runs API-based benchmarking with '
                   'multiple upload streams.')
 
+flags.DEFINE_string('object_storage_bucket_name', None,
+                    'If set, the bucket will be created with this name')
+
 flags.DEFINE_enum('cli_test_size', 'normal',
                   ['normal', 'large'],
                   'size of the cli tests. Normal means a mixture of various \n'
@@ -1235,8 +1238,11 @@ def Prepare(benchmark_spec):
   # Make the bucket(s)
   if benchmark_spec.read_objects is not None:
     bucket_name = benchmark_spec.read_objects['bucket_name']
+    if FLAGS.object_storage_bucket_name is not None:
+      logging.warning('--object_storage_bucket_name ignored because '
+                      '--object_storage_read_objects was specified')
   else:
-    bucket_name = 'pkb%s' % FLAGS.run_uri
+    bucket_name = FLAGS.object_storage_bucket_name or 'pkb%s' % FLAGS.run_uri
     if FLAGS.storage != 'GCP' or not FLAGS.object_storage_gcs_multiregion:
       service.MakeBucket(bucket_name)
     else:
