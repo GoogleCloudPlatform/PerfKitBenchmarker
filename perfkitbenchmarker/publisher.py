@@ -18,6 +18,7 @@ import abc
 import collections
 import copy
 import csv
+import fcntl
 import httplib
 import io
 import itertools
@@ -457,6 +458,7 @@ class NewlineDelimitedJSONPublisher(SamplePublisher):
     logging.info('Publishing %d samples to %s', len(samples),
                  self.file_path)
     with open(self.file_path, self.mode) as fp:
+      fcntl.flock(fp, fcntl.LOCK_EX)
       for sample in samples:
         sample = sample.copy()
         if self.collapse_labels:
