@@ -115,9 +115,9 @@ flags.DEFINE_multistring(
     'by separating each pair by commas.')
 
 flags.DEFINE_string(
-    'influx_uri', 'localhost:8086',
+    'influx_uri', None,
     'The Influx DB address and port. Expects the format hostname:port'
-    'If port is not passed in it assumes port 80.')
+    'If port is not passed in it assumes port 80. e.g. localhost:8086')
 
 flags.DEFINE_string(
     'influx_db_name', 'perfkit',
