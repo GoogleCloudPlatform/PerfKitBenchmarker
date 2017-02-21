@@ -19,6 +19,18 @@ def aggregate_data(data_dict, method):
     for group_data in data_dict.values():
       for values in group_data.values():
         values[:] = [sum(values)]
+  elif method == 'average':
+    for group_data in data_dict.values():
+      for values in group_data.values():
+        values[:] = [sum(values) / len(values)]
+  elif method == 'min':
+    for group_data in data_dict.values():
+      for values in group_data.values():
+        values[:] = [min(values)]
+  elif method == 'max':
+    for group_data in data_dict.values():
+      for values in group_data.values():
+        values[:] = [max(values)]
 
 def build_data_array(data_dict, column_to_group):
   # Get the column order
