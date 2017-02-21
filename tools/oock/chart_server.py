@@ -75,11 +75,22 @@ def collapse_data_array(data_array):
   # Collapse nulls in the data array
   collapsed_data = [data_array[0][:]]
   for row in data_array[1:]:
-    if collapsed_data[-1][0] == row[0]:
-      for i in range(len(row)):
-        if collapsed_data[-1][i] is None and row[i] is not None:
-          collapsed_data[-1][i] = row[i] 
-    else:
+    # 'collapsed' keeps track of the number of cells that didn't find a home in
+    # collapsed_data
+    collapsed = 0
+    for i in range(1, len(row)):
+      if row[i] is not None:
+        collapsed += 1 # Need to find an empty slot for this cell
+        for c_row in reversed(range(0, len(collapsed_data))):
+          if collapsed_data[c_row][0] == row[0] and \
+              collapsed_data[-1][i] is None:
+            # Found a row with an empty slot for this cell
+            collapsed_data[-1][i] = row[i] 
+            row[i] = None
+            collapsed -= 1
+            break;
+    if collapsed != 0:
+      assert collapsed > 0, "Something went terribly wrong"
       collapsed_data.append(row[:])
   return collapsed_data
 
