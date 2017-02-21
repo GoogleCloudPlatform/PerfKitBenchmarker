@@ -212,16 +212,25 @@ class SampleSource:
   def __init__(self, path):
     self.path = path
     self.last_refresh = None
+    self.next_seek = 0
     self.samples = []
 
-  def maybe_refresh(self):
+  def maybe_refresh(self, full_reload=True):
     modified_time = os.path.getmtime(self.path)
     if modified_time != self.last_refresh:
       # Need to pull from this data source again
       print("Reloading %s" % self.path)
       samples = None
       with open(self.path) as samples_json:
-        samples = [json.loads(s) for s in samples_json.read().split('\n') if s]
+        if full_reload:
+          samples = [json.loads(s)
+                     for s in samples_json.read().split('\n') if s]
+          self.next_seek = 0
+        else:
+          samples_json.seek(self.next_seek)
+          samples_json_str = samples_json.read()
+          self.next_seek += len(samples_json_str)
+          samples += [json.loads(s) for s in samples_json_str.split('\n') if s]
       if samples is None:
         print("ERROR: Failed to reload %s" % self.path)
       else:
@@ -236,24 +245,43 @@ class SampleSource:
         self.last_refresh = modified_time
 
 class DataSource:
-  def __init__(self, path, extractor, filters):
+  def __init__(self, path, extractor, filters, full_reload=True):
     self.path = path
     self.extractor = extractor
     self.filters = filters
 
+    self.filtered_samples = []
+
+    # Stuff for processing only new samples
+    self.full_reload = full_reload
+    self.last_samples_checkpoint = 0
+
   def extract_data_array(self, samples):
-    samples = samples[:] # Copy the array so we don't modify the original
+    if self.full_reload:
+      samples = samples[:] # Copy the array so we don't modify the original
+      self.last_samples_checkpoint = 0
+    else:
+      samples = samples[self.last_samples_checkpoint:]
+      self.last_samples_checkpoint += len(samples)
+
     # Filter out irrelevant samples
     for f in self.filters:
       f.filter(samples)
+
+    if self.full_reload:
+      self.filtered_samples = samples
+    else:
+      self.filtered_samples += samples
+
     # Extract and group data
-    return self.extractor.extract_data_array(samples)
+    return self.extractor.extract_data_array(self.filtered_samples)
 
 def build_data_source(init_dict):
   path = init_dict['path']
   extractor = build_extractor(init_dict['extract'])
   filters = [build_filter(f) for f in init_dict['filters']]
-  return DataSource(path, extractor, filters)
+  full_reload = init_dict.get('full_reload') or True
+  return DataSource(path, extractor, filters, full_reload)
 
 class ChartSpec:
   def __init__(self, name, data_source, chart_type, options):
@@ -272,7 +300,7 @@ class ChartSpec:
       # Sample source that we haven't seen yet - create it
       sample_sources[sample_source_path] = SampleSource(sample_source_path)
     sample_source = sample_sources[sample_source_path]
-    sample_source_updated = sample_source.maybe_refresh()
+    sample_source.maybe_refresh(self.data_source.full_reload)
 
     if self.last_extract == sample_source.last_refresh:
       # Data hasn't changed since last extraction, no need to extract it again
