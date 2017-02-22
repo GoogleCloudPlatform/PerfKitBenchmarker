@@ -239,7 +239,7 @@ class SampleSource:
           samples_json.seek(self.next_seek)
           samples_json_str = samples_json.read()
           self.next_seek += len(samples_json_str)
-          samples += [json.loads(s) for s in samples_json_str.split('\n') if s]
+          samples = [json.loads(s) for s in samples_json_str.split('\n') if s]
       if samples is None:
         print("ERROR: Failed to reload %s" % self.path)
       else:
@@ -250,8 +250,11 @@ class SampleSource:
           # Turn the fields into a [[key, value], ...]
           key_values = [field.split(':', 1) for field in fields]
           sample['metadata'] = { k: v for k, v in key_values }
-        self.samples = samples
         self.last_refresh = modified_time
+        if full_reload:
+          self.samples = samples
+        else:
+          self.samples += samples
 
 class DataSource:
   def __init__(self, path, extractor, filters, full_reload=True):
@@ -289,7 +292,10 @@ def build_data_source(init_dict):
   path = init_dict['path']
   extractor = build_extractor(init_dict['extract'])
   filters = [build_filter(f) for f in init_dict['filters']]
-  full_reload = init_dict.get('full_reload') or True
+  full_reload = init_dict.get('full_reload')
+  if full_reload is None:
+    # Default to full reloads
+    full_reload = True
   return DataSource(path, extractor, filters, full_reload)
 
 class ChartSpec:
