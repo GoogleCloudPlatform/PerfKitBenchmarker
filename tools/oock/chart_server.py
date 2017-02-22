@@ -20,6 +20,14 @@ def aggregate_data(data_dict, method):
     for group_data in data_dict.values():
       for values in group_data.values():
         values[:] = [sum(values)]
+  elif method == 'sum_then_percent':
+    total_sums = { group: 0 for group in data_dict.keys() }
+    for group, group_data in data_dict.items():
+      for values in group_data.values():
+        total_sums[group] += sum(values)
+    for group, group_data in data_dict.items():
+      for values in group_data.values():
+        values[:] = [sum(values) * 100.0 / total_sums[group]]
   elif method == 'average':
     for group_data in data_dict.values():
       for values in group_data.values():
