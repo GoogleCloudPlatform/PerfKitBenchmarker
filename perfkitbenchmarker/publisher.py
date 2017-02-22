@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,6 +33,7 @@ import uuid
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 
@@ -655,14 +658,16 @@ class SampleCollector(object):
     samples: A list of Sample objects.
     metadata_providers: A list of MetadataProvider objects. Metadata providers
       to use.  Defaults to DEFAULT_METADATA_PROVIDERS.
-    publishers: A list of SamplePublisher objects. If not specified, defaults to
-      a LogPublisher, PrettyPrintStreamPublisher, NewlineDelimitedJSONPublisher,
-      a BigQueryPublisher if FLAGS.bigquery_table is specified, and a
-      CloudStoragePublisher if FLAGS.cloud_storage_bucket is specified. See
-      SampleCollector._DefaultPublishers.
+    publishers: A list of SamplePublisher objects to publish to.
+    publishers_from_flags: If True, construct publishers based on FLAGS and add
+      those to the publishers list.
+    add_default_publishers: If True, add a LogPublisher,
+      PrettyPrintStreamPublisher, and NewlineDelimitedJSONPublisher targeting
+      the run directory to the publishers list.
     run_uri: A unique tag for the run.
   """
-  def __init__(self, metadata_providers=None, publishers=None):
+  def __init__(self, metadata_providers=None, publishers=None,
+               publishers_from_flags=True, add_default_publishers=True):
     self.samples = []
 
     if metadata_providers is not None:
@@ -670,10 +675,11 @@ class SampleCollector(object):
     else:
       self.metadata_providers = DEFAULT_METADATA_PROVIDERS
 
-    if publishers is not None:
-      self.publishers = publishers
-    else:
-      self.publishers = SampleCollector._DefaultPublishers()
+    self.publishers = publishers.copy()
+    if publishers_from_flags:
+      publishers.extend(SampleCollector._PublishersFromFlags())
+    if add_default_publishers:
+      publishers.extend(SampleCollector._DefaultPublishers())
 
     logging.debug('Using publishers: {0}'.format(self.publishers))
 
@@ -681,11 +687,27 @@ class SampleCollector(object):
   def _DefaultPublishers(cls):
     """Gets a list of default publishers."""
     publishers = [LogPublisher(), PrettyPrintStreamPublisher()]
+
+    # Publish to the default JSON path even if we will also publish to a
+    # different path due to flags.
     default_json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
     publishers.append(NewlineDelimitedJSONPublisher(
-        FLAGS.json_path or default_json_path,
+        default_json_path,
         mode=FLAGS.json_write_mode,
         collapse_labels=FLAGS.collapse_labels))
+
+    return publishers
+
+  @classmethod
+  def _PublishersFromFlags(cls):
+    publishers = []
+
+    if FLAGS.json_path:
+      publishers.append(NewlineDelimitedJSONPublisher(
+          FLAGS.json_path,
+          mode=FLAGS.json_write_mode,
+          collapse_labels=FLAGS.collapse_labels))
+
     if FLAGS.bigquery_table:
       publishers.append(BigQueryPublisher(
           FLAGS.bigquery_table,
@@ -736,3 +758,56 @@ class SampleCollector(object):
     for publisher in self.publishers:
       publisher.PublishSamples(self.samples)
     self.samples = []
+
+
+def RepublishJSONSamples(path):
+  """Read samples from a JSON file and re-export them.
+
+  Args:
+    path: the path to the JSON file.
+  """
+
+  samples = []
+  with open(path, 'r') as file:
+    for line in file:
+      try:
+        raw_dict = json.loads(line)
+        labels = raw_dict.pop('labels')
+        metadata = dict()
+        # labels is a comma-seprated list of key, value pairs
+        for pair in labels.split(','):
+          # Need to strip leading and trailing '|' from each pair
+          key, _, value = pair[1:-1].partition(':')
+          metadata[key] = value
+        raw_dict['metadata'] = metadata
+        samples.append(raw_dict)
+      except Exception as e:
+        logging.info('Exception processing sample %s', line)
+        logging.info('Exception was: %s', e)
+        raise e
+
+  # We can't use a SampleCollector because SampleCollector.AddSamples depends on
+  # having a benchmark and a benchmark_spec.
+  publishers = SampleCollector._PublishersFromFlags()
+  for publisher in publishers:
+    publisher.PublishSamples(samples)
+
+
+if __name__ == '__main__':
+  log_util.ConfigureBasicLogging()
+
+  try:
+    argv = FLAGS(sys.argv)
+  except flags.FlagsError as e:
+    logging.error(e)
+    logging.info('Flag error. Usage: publisher.py <flags> path-to-json-file')
+    sys.exit(1)
+
+  if len(argv) != 2:
+    logging.info('Argument number error. Usage: publisher.py <flags> '
+                 'path-to-json-file')
+    sys.exit(1)
+
+  json_path = argv[1]
+
+  RepublishJSONSamples(json_path)
