@@ -11,6 +11,7 @@ from itertools import accumulate
 from filter_utils import select_filter
 from page_gen import (build_chart_html, cell_to_js, build_data_table_js,
                       build_chart_js, build_chart_page, get_cell_type)
+from util import dict_inherit
 
 ########################################
 
@@ -351,6 +352,11 @@ class ChartPage:
         self.chart_order = page_spec.get('chart_order') or chart_specs.keys()
         # Build the chart specs that need to be built
         for chart_name in chart_specs.keys():
+          # Apply inheritance
+          base = chart_specs[chart_name].get('inherit')
+          if base:
+            chart_specs[chart_name] = dict_inherit(base,
+                                                   chart_specs[chart_name])
           if chart_name in self.chart_spec_dicts and \
              chart_specs[chart_name] == self.chart_spec_dicts[chart_name]:
             # Skip unchanged chart spec
