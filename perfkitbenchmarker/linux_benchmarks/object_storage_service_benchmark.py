@@ -859,7 +859,7 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args, streams_per_vm):
 
 
 def _MultiStreamOneWay(results, metadata, vms, command_builder,
-                       bucket_name, operation):
+                       service, bucket_name, operation):
   """Measures multi-stream latency and throughput in one direction.
 
   Args:
@@ -868,6 +868,8 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
     vms: the VMs to run the benchmark on.
     command_builder: an APIScriptCommandBuilder.
     bucket_name: the primary bucket to benchmark.
+    operation: 'upload' or 'download'
+    service: The provider's ObjectStorageService
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
@@ -927,17 +929,25 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
     # [[object1_name, object1_size],[object2_name, object2_size],...]
     outs = vm_util.RunThreaded(
         lambda vm: vm.RemoteCommand('cat ' + objects_written_file), vms)
+    maybe_storage_account = ''
+    maybe_resource_group = ''
+    if FLAGS.storage == 'Azure':
+      maybe_storage_account = '"azure_storage_account": "%s", ' % \
+                              service.storage_account.name
+      maybe_resource_group = '"azure_resource_group": "%s", ' % \
+                             service.resource_group.name
     # Merge the objects written from all the VMs into a single string
-    objects_written_json = '{"bucket_name": "%s", "objects_written": %s}' % \
-                           (bucket_name,
-                            '[' + ','.join([out for out, _ in outs]) + ']')
+    objects_written_json = \
+        '{%s%s"bucket_name": "%s", "objects_written": %s}' % \
+        (maybe_storage_account, maybe_resource_group, bucket_name,
+         '[' + ','.join([out for out, _ in outs]) + ']')
     # Write the file
     with open(objects_written_path_local, 'w') as objects_written_file_local:
       objects_written_file_local.write(objects_written_json)
 
 
 def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
-                           bucket_name):
+                           service, bucket_name):
 
   """A benchmark for multi-stream read/write latency and throughput.
 
@@ -955,20 +965,20 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
 
   logging.info('Starting multi-stream write test on %s VMs.', len(vms))
 
-  _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
-                     'upload')
+  _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                     bucket_name, 'upload')
 
   logging.info('Finished multi-stream write test. Starting '
                'multi-stream read test.')
 
-  _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
-                     'download')
+  _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                     bucket_name, 'download')
 
   logging.info('Finished multi-stream read test.')
 
 
 def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
-                              bucket_name):
+                              service, bucket_name):
 
   """A benchmark for multi-stream write latency and throughput.
 
@@ -986,14 +996,14 @@ def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
 
   logging.info('Starting multi-stream write test on %s VMs.', len(vms))
 
-  _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
-                     'upload')
+  _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                     bucket_name, 'upload')
 
   logging.info('Finished multi-stream write test.')
 
 
 def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
-                             bucket_name, read_objects):
+                             service, bucket_name, read_objects):
 
   """A benchmark for multi-stream read latency and throughput.
 
@@ -1035,8 +1045,8 @@ def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
     raise Exception("Failed to upload the objects written files to the VMs: "
                     "%s" % e)
 
-  _MultiStreamOneWay(results, metadata, vms, command_builder, bucket_name,
-                     'download')
+  _MultiStreamOneWay(results, metadata, vms, command_builder, service,
+                     bucket_name, 'download')
 
   logging.info('Finished multi-stream read test.')
 
@@ -1213,14 +1223,6 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
 
-  providers.LoadProvider(FLAGS.storage)
-
-  service = object_storage_service.GetObjectStorageClass(FLAGS.storage)()
-  service.PrepareService(FLAGS.object_storage_region)
-
-  vms = benchmark_spec.vms
-  vm_util.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
-
   # We would like to always cleanup server side states when exception happens.
   benchmark_spec.always_call_cleanup = True
 
@@ -1234,6 +1236,23 @@ def Prepare(benchmark_spec):
       benchmark_spec.read_objects = json.loads(read_objects_file.read())
     assert benchmark_spec.read_objects is not None, \
         "Failed to read the file specified by --object_storag_read_objects"
+
+  # Load the provider and its object storage service
+  providers.LoadProvider(FLAGS.storage)
+
+  service = object_storage_service.GetObjectStorageClass(FLAGS.storage)()
+  if FLAGS.storage == 'Azure' and FLAGS.object_storage_read_objects is not None:
+    service.PrepareService(
+        FLAGS.object_storage_region,
+        # On Azure, use an existing storage account if we
+        # are reading existing objects
+        (benchmark_spec.read_objects['azure_storage_account'],
+         benchmark_spec.read_objects['azure_resource_group']))
+  else:
+    service.PrepareService(FLAGS.object_storage_region)
+
+  vms = benchmark_spec.vms
+  vm_util.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
 
   # Make the bucket(s)
   if benchmark_spec.read_objects is not None:
@@ -1313,12 +1332,13 @@ def Run(benchmark_spec):
                           ('api_multistream_writes',
                            MultiStreamWriteBenchmark)]:
     if FLAGS.object_storage_scenario in {name, 'all'}:
-      benchmark(results, metadata, vms, command_builder, buckets[0])
+      benchmark(results, metadata, vms, command_builder, benchmark_spec.service,
+                buckets[0])
 
   # MultiStreamRead has the additional 'read_objects' parameter
   if FLAGS.object_storage_scenario in {'api_multistream_reads', 'all'}:
     MultiStreamReadBenchmark(results, metadata, vms, command_builder,
-                             buckets[0],
+                             benchmark_spec.service, buckets[0],
                              benchmark_spec.read_objects['objects_written'])
 
   return results
@@ -1343,5 +1363,4 @@ def Cleanup(benchmark_spec):
      not FLAGS.object_storage_dont_delete_bucket:
     for bucket in buckets:
       service.DeleteBucket(bucket)
-
-  service.CleanupService()
+    service.CleanupService()

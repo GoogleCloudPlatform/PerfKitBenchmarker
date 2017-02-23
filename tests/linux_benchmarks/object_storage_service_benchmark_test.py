@@ -37,6 +37,7 @@ class TestBuildCommands(unittest.TestCase):
     vm.RobustRemoteCommand = mock.MagicMock(return_value=('', ''))
 
     command_builder = mock.MagicMock()
+    service = mock.MagicMock()
 
     with mock.patch(time.__name__ + '.time', return_value=1.0):
       with mock.patch(object_storage_service_benchmark.__name__ +
@@ -44,7 +45,7 @@ class TestBuildCommands(unittest.TestCase):
         with mock.patch(object_storage_service_benchmark.__name__ +
                         '.LoadWorkerOutput', return_value=(None, None, None)):
           object_storage_service_benchmark.MultiStreamRWBenchmark(
-              [], {}, [vm], command_builder, 'bucket')
+              [], {}, [vm], command_builder, service, 'bucket')
 
     self.assertEqual(
         command_builder.BuildCommand.call_args_list[0],
