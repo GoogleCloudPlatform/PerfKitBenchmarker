@@ -150,6 +150,12 @@ flags.DEFINE_integer('fio_log_avg_msec', 1000,
                      'log an entry for every IO that completes, this can grow '
                      'very quickly in size and can cause performance overhead.',
                      lower_bound=0)
+flags.DEFINE_boolean('fio_hist_log', False,
+                     'Whether to collect clat histogram.')
+flags.DEFINE_integer('fio_log_hist_msec', 1000,
+                     'Same as fio_log_avg_msec, but logs entires for '
+                     'completion latency histograms. If set to 0, histogram '
+                     'logging is disabled.')
 
 
 FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = {
@@ -388,17 +394,21 @@ def GetConfig(user_config):
   return config
 
 
-def GetLogFlags():
+def GetLogFlags(log_file_base):
   collect_logs = FLAGS.fio_lat_log or FLAGS.fio_bw_log or FLAGS.fio_iops_log
   fio_log_flags = [(FLAGS.fio_lat_log, '--write_lat_log=%(filename)s',),
                    (FLAGS.fio_bw_log, '--write_bw_log=%(filename)s',),
                    (FLAGS.fio_iops_log, '--write_iops_log=%(filename)s',),
+                   (FLAGS.fio_hist_log, '--write_hist_log=%(filename)s',),
                    (collect_logs, '--log_avg_msec=%(interval)d',)]
   fio_command_flags = ' '.join([flag for given, flag in fio_log_flags if given])
-  now = time.time()
-  filename_base = '%s_%s' % (PKB_FIO_LOG_FILE_NAME, str(now))
-  return fio_command_flags % {'filename': filename_base,
-                              'interval': FLAGS.fio_log_avg_msec}
+  if FLAGS.fio_hist_log:
+    fio_command_flags = ' '.join([
+        fio_command_flags, '--log_hist_msec=%(hist_interval)d'])
+
+  return fio_command_flags % {'filename': log_file_base,
+                              'interval': FLAGS.fio_log_avg_msec,
+                              'hist_interval': FLAGS.fio_log_hist_msec}
 
 
 def CheckPrerequisites(benchmark_config):
@@ -480,9 +490,12 @@ def Run(benchmark_spec):
     fio_command = 'sudo %s --output-format=json --directory=%s %s' % (
         fio.FIO_PATH, mount_point, REMOTE_JOB_FILE_PATH)
 
-  collect_logs = any([FLAGS.fio_lat_log, FLAGS.fio_bw_log, FLAGS.fio_iops_log])
+  collect_logs = any([FLAGS.fio_lat_log, FLAGS.fio_bw_log, FLAGS.fio_iops_log,
+                      FLAGS.fio_hist_log])
+
   if collect_logs:
-    fio_command = ' '.join([fio_command, GetLogFlags()])
+    log_file_base = '%s_%s' % (PKB_FIO_LOG_FILE_NAME, str(time.time()))
+    fio_command = ' '.join([fio_command, GetLogFlags(log_file_base)])
 
   # TODO(user): This only gives results at the end of a job run
   #      so the program pauses here with no feedback to the user.
@@ -490,10 +503,11 @@ def Run(benchmark_spec):
   logging.info('FIO Results:')
 
   stdout, stderr = vm.RobustRemoteCommand(fio_command, should_log=True)
-  samples = fio.ParseResults(job_file_string, json.loads(stdout))
-
   if collect_logs:
     vm.PullFile(vm_util.GetTempDir(), '%s_*.log' % PKB_FIO_LOG_FILE_NAME)
+
+  samples = fio.ParseResults(job_file_string, json.loads(stdout),
+                             log_file_base=log_file_base)
 
   return samples
 
