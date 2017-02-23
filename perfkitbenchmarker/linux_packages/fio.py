@@ -13,17 +13,22 @@
 # limitations under the License.
 
 """Module containing fio installation, cleanup, parsing functions."""
+import csv
 import ConfigParser
 import io
+import json
 import time
 
+from collections import Counter
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FIO_DIR = '%s/fio' % INSTALL_DIR
 GIT_REPO = 'http://git.kernel.dk/fio.git'
-GIT_TAG = 'fio-2.7'
+GIT_TAG = 'fio-2.17'
 FIO_PATH = FIO_DIR + '/fio'
 FIO_CMD_PREFIX = '%s --output-format=json' % FIO_PATH
 SECTION_REGEX = r'\[(\w+)\]\n([\w\d\n=*$/]+)'
@@ -35,6 +40,9 @@ CMD_PARAMETER_REGEX = r'--([\S]+)\s*'
 CMD_PARAMETER_REPL_REGEX = r'\1\n'
 CMD_STONEWALL_PARAMETER = '--stonewall'
 JOB_STONEWALL_PARAMETER = 'stonewall'
+# Defined in fio
+DATA_DIRECTION = {0: 'read', 1: 'write', 2: 'trim'}
+HIST_BUCKET_START_IDX = 3
 
 
 def _Install(vm):
@@ -47,13 +55,13 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the fio package on the VM."""
-  vm.InstallPackages('libaio-devel libaio bc')
+  vm.InstallPackages('libaio-devel libaio bc zlib-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the fio package on the VM."""
-  vm.InstallPackages('libaio-dev libaio1 bc')
+  vm.InstallPackages('libaio-dev libaio1 bc zlib1g-dev')
   _Install(vm)
 
 
@@ -115,13 +123,15 @@ def FioParametersToJob(fio_parameters):
                                 JOB_STONEWALL_PARAMETER)
 
 
-def ParseResults(job_file, fio_json_result, base_metadata=None):
+def ParseResults(job_file, fio_json_result, base_metadata=None,
+                 log_file_base=''):
   """Parse fio json output into samples.
 
   Args:
     job_file: The contents of the fio job file.
     fio_json_result: Fio results in json format.
     base_metadata: Extra metadata to annotate the samples with.
+    log_file_base: String. Base name for fio log files.
 
   Returns:
     A list of sample.Sample objects.
@@ -131,16 +141,16 @@ def ParseResults(job_file, fio_json_result, base_metadata=None):
   # come from the same fio run.
   timestamp = time.time()
   parameter_metadata = ParseJobFile(job_file)
-  io_modes = ['read', 'write', 'trim']
-  for job in fio_json_result['jobs']:
+  io_modes = DATA_DIRECTION.values()
+  for (idx, job) in enumerate(fio_json_result['jobs']):
     job_name = job['jobname']
+    parameters = parameter_metadata[job_name]
+    parameters['fio_job'] = job_name
+    if base_metadata:
+      parameters.update(base_metadata)
     for mode in io_modes:
       if job[mode]['io_bytes']:
         metric_name = '%s:%s' % (job_name, mode)
-        parameters = parameter_metadata[job_name]
-        if base_metadata:
-          parameters.update(base_metadata)
-        parameters['fio_job'] = job_name
         bw_metadata = {
             'bw_min': job[mode]['bw_min'],
             'bw_max': job[mode]['bw_max'],
@@ -200,6 +210,11 @@ def ParseResults(job_file, fio_json_result, base_metadata=None):
         samples.append(
             sample.Sample('%s:iops' % metric_name,
                           job[mode]['iops'], '', parameters, timestamp))
+    if flags.FLAGS.fio_hist_log:
+      # Parse histograms
+      hist = vm_util.PrependTempDir(
+          '%s_clat_hist.%s.log' % (log_file_base, str(idx + 1)))
+      samples += _ParseHistogram(hist, job_name, parameters)
   return samples
 
 
@@ -217,3 +232,92 @@ def DeleteParameterFromJobFile(job_file, parameter):
     return regex_util.Substitute(r'%s=[\w\d_/]+\n' % parameter, '', job_file)
   except regex_util.NoMatchError:
     return job_file
+
+
+def _PlatIdxToVal(idx, edge=0.5, fio_io_u_plat_bits=6, fio_io_u_plat_val=64):
+  """Computes upper/lower bound of the bucket.
+
+  Copy-pasted from fio/tools/hist/fiologparser_hist.py _plat_idx_to_val method,
+  which copy-pasted from fio/stat.c.
+
+  Args:
+    idx: int. Index of the columns in histogam.
+    edge: double. Fractional value in the range [0,1] indicating how
+      far into the bin we wish to compute the latency value of.
+    fio_io_u_plat_bits: int. Contant defined in fio/stat.h.
+    fio_io_u_plat_val: int. Constant defined in fio/stat.h.
+
+  Returns:
+    float. Mean of the histogram bucket in microsecond.
+  """
+  if (idx < (fio_io_u_plat_val << 1)):
+    return idx
+  error_bits = (idx >> fio_io_u_plat_bits) - 1
+  base = 1 << (error_bits + fio_io_u_plat_bits)
+  k = idx % fio_io_u_plat_val
+  return base + (k + edge) * (1 << error_bits)
+
+
+def _PlatIdxToValCoarse(idx, edge=0.5, coarseness=0, fio_io_u_plat_bits=6,
+                        fio_io_u_plat_val=64):
+  """Compute mean for fio histogram bucket.
+
+  Copy-pasted from fio/tools/hist/fiologparser_hist.py
+  _plat_idx_to_val_coarse method.
+
+  Args:
+    idx: int. Index of the columns in histogam.
+    edge: double. Fractional value in the range [0,1] indicating how
+      far into the bin we wish to compute the latency value of.
+    coarseness: int. fio parameter define histogram sizes.
+      Default to 0, not exposed in PKB.
+    fio_io_u_plat_bits: int. Contant defined in fio/stat.h.
+    fio_io_u_plat_val: int. Constant defined in fio/stat.h.
+
+  Returns:
+    float. Mean of the histogram bucket in microsecond.
+  """
+  stride = 1 << coarseness
+  idx = idx * stride
+  lower = _PlatIdxToVal(idx, edge=0.0)
+  upper = _PlatIdxToVal(idx + stride, edge=1.0)
+  return lower + (upper - lower) * edge
+
+
+def _ParseHistogram(hist, metric_prefix='', additional_metadata={}):
+  """Aggregates histogram reported by fio.
+
+  Args:
+    hist: String. File name of fio histogram log. Format:
+      time (msec), data direction (0: read, 1: write, 2: trim), block size,
+      bin 0, .., etc
+    metric_prefix: String. Prefix of the metric name to use.
+    additional_metadata: dict. Additional metadata attaching to Sample.
+
+  Returns:
+    samples.Sample object that reports fio histogram.
+  """
+  aggregates = dict()
+  with open(hist) as f:
+    reader = csv.reader(f, delimiter=',')
+    for r in reader:
+      # Use (data direction, block size) as key
+      key = (DATA_DIRECTION[int(r[1])], int(r[2]))
+
+      hist_list = []
+      for idx, v in enumerate(r[HIST_BUCKET_START_IDX:]):
+        if int(v):
+          hist_list.append((_PlatIdxToValCoarse(idx), int(v)))
+      todict = dict(hist_list)
+      if key not in aggregates:
+        aggregates[key] = Counter()
+      aggregates[key].update(todict)
+  samples = []
+  for (rw, bs) in aggregates.keys():
+    metadata = {'histogram': json.dumps(aggregates[(rw, bs)])}
+    metadata.update(additional_metadata)
+    samples.append(
+        sample.Sample(
+            ':'.join([metric_prefix, str(bs), rw, 'histogram']),
+            0, 'us', metadata))
+  return samples
