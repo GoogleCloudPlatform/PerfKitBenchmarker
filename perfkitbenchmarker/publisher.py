@@ -767,24 +767,14 @@ def RepublishJSONSamples(path):
     path: the path to the JSON file.
   """
 
-  samples = []
   with open(path, 'r') as file:
-    for line in file:
-      try:
-        raw_dict = json.loads(line)
-        labels = raw_dict.pop('labels')
-        metadata = dict()
-        # labels is a comma-seprated list of key, value pairs
-        for pair in labels.split(','):
-          # Need to strip leading and trailing '|' from each pair
-          key, _, value = pair[1:-1].partition(':')
-          metadata[key] = value
-        raw_dict['metadata'] = metadata
-        samples.append(raw_dict)
-      except Exception as e:
-        logging.info('Exception processing sample %s', line)
-        logging.info('Exception was: %s', e)
-        raise e
+    samples = [json.loads(s) for s in file if s]
+  for sample in samples:
+    # Chop '|' at the beginning and end of labels and split labels by '|,|'
+    fields = sample.pop('labels')[1:-1].split('|,|')
+    # Turn the fields into [[key, value], ...]
+    key_values = [field.split(':', 1) for field in fields]
+    sample['metadata'] = {k: v for k, v in key_values}
 
   # We can't use a SampleCollector because SampleCollector.AddSamples depends on
   # having a benchmark and a benchmark_spec.
