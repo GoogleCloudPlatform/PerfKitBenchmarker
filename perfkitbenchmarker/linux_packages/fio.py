@@ -20,7 +20,6 @@ import json
 import time
 
 from collections import Counter
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -44,13 +43,26 @@ JOB_STONEWALL_PARAMETER = 'stonewall'
 DATA_DIRECTION = {0: 'read', 1: 'write', 2: 'trim'}
 HIST_BUCKET_START_IDX = 3
 
+# Patch fiologparser to return mean bucket.
+FIO_HIST_LOG_PARSER_PATCH = 'fiologparser_hist.patch'
+FIO_HIST_LOG_PARSER_PATH = '%s/tools/hist' % FIO_DIR
+FIO_HIST_LOG_PARSER = 'fiologparser_hist.py'
+
 
 def _Install(vm):
   """Installs the fio package on the VM."""
-  vm.Install('build_tools')
+  for p in ['build_tools', 'python', 'pip']:
+    vm.Install(p)
+  vm.RemoteCommand('sudo pip install pandas numpy')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, FIO_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(FIO_DIR, GIT_TAG))
   vm.RemoteCommand('cd {0} && ./configure && make'.format(FIO_DIR))
+  vm.PushDataFile(FIO_HIST_LOG_PARSER_PATCH)
+  vm.RemoteCommand(
+      'cp {log_parser_path}/{log_parser} ./; patch {log_parser} {patch}'.format(
+          log_parser_path=FIO_HIST_LOG_PARSER_PATH,
+          log_parser=FIO_HIST_LOG_PARSER,
+          patch=FIO_HIST_LOG_PARSER_PATCH))
 
 
 def YumInstall(vm):
@@ -124,7 +136,7 @@ def FioParametersToJob(fio_parameters):
 
 
 def ParseResults(job_file, fio_json_result, base_metadata=None,
-                 log_file_base=''):
+                 log_file_base='', bin_vals=[]):
   """Parse fio json output into samples.
 
   Args:
@@ -132,6 +144,9 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
     fio_json_result: Fio results in json format.
     base_metadata: Extra metadata to annotate the samples with.
     log_file_base: String. Base name for fio log files.
+    bin_vals: A 2-D list of int. Each list represents a list of
+      bin values in histgram log. Calculated from remote VM using
+      fio/tools/hist/fiologparser_hist.py
 
   Returns:
     A list of sample.Sample objects.
@@ -210,12 +225,27 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
         samples.append(
             sample.Sample('%s:iops' % metric_name,
                           job[mode]['iops'], '', parameters, timestamp))
-    if flags.FLAGS.fio_hist_log:
+    if log_file_base and bin_vals:
       # Parse histograms
-      hist = vm_util.PrependTempDir(
+      hist_file_path = vm_util.PrependTempDir(
           '%s_clat_hist.%s.log' % (log_file_base, str(idx + 1)))
-      samples += _ParseHistogram(hist, job_name, parameters)
+      samples += _ParseHistogram(
+          hist_file_path, bin_vals[idx], job_name, parameters)
   return samples
+
+
+def ComputeHistogramBinVals(vm, log_file):
+  """Calculate bin values for histogram.
+
+  Args:
+    vm: VirtualMachine object.
+    log_file: String. Name of the log file.
+
+  Returns:
+    A list of float. Representing the mean value of the bin.
+  """
+  return [float(v) for v in vm.RemoteCommand(
+      './%s %s' % (FIO_HIST_LOG_PARSER, log_file))[0].split()]
 
 
 def DeleteParameterFromJobFile(job_file, parameter):
@@ -234,63 +264,15 @@ def DeleteParameterFromJobFile(job_file, parameter):
     return job_file
 
 
-def _PlatIdxToVal(idx, edge=0.5, fio_io_u_plat_bits=6, fio_io_u_plat_val=64):
-  """Computes upper/lower bound of the bucket.
-
-  Copy-pasted from fio/tools/hist/fiologparser_hist.py _plat_idx_to_val method,
-  which copy-pasted from fio/stat.c.
-
-  Args:
-    idx: int. Index of the columns in histogam.
-    edge: double. Fractional value in the range [0,1] indicating how
-      far into the bin we wish to compute the latency value of.
-    fio_io_u_plat_bits: int. Contant defined in fio/stat.h.
-    fio_io_u_plat_val: int. Constant defined in fio/stat.h.
-
-  Returns:
-    float. Mean of the histogram bucket in microsecond.
-  """
-  if (idx < (fio_io_u_plat_val << 1)):
-    return idx
-  error_bits = (idx >> fio_io_u_plat_bits) - 1
-  base = 1 << (error_bits + fio_io_u_plat_bits)
-  k = idx % fio_io_u_plat_val
-  return base + (k + edge) * (1 << error_bits)
-
-
-def _PlatIdxToValCoarse(idx, edge=0.5, coarseness=0, fio_io_u_plat_bits=6,
-                        fio_io_u_plat_val=64):
-  """Compute mean for fio histogram bucket.
-
-  Copy-pasted from fio/tools/hist/fiologparser_hist.py
-  _plat_idx_to_val_coarse method.
-
-  Args:
-    idx: int. Index of the columns in histogam.
-    edge: double. Fractional value in the range [0,1] indicating how
-      far into the bin we wish to compute the latency value of.
-    coarseness: int. fio parameter define histogram sizes.
-      Default to 0, not exposed in PKB.
-    fio_io_u_plat_bits: int. Contant defined in fio/stat.h.
-    fio_io_u_plat_val: int. Constant defined in fio/stat.h.
-
-  Returns:
-    float. Mean of the histogram bucket in microsecond.
-  """
-  stride = 1 << coarseness
-  idx = idx * stride
-  lower = _PlatIdxToVal(idx, edge=0.0)
-  upper = _PlatIdxToVal(idx + stride, edge=1.0)
-  return lower + (upper - lower) * edge
-
-
-def _ParseHistogram(hist, metric_prefix='', additional_metadata={}):
+def _ParseHistogram(hist, mean_bin_vals, metric_prefix='',
+                    additional_metadata={}):
   """Aggregates histogram reported by fio.
 
   Args:
     hist: String. File name of fio histogram log. Format:
       time (msec), data direction (0: read, 1: write, 2: trim), block size,
       bin 0, .., etc
+    mean_bin_vals: List of float. Representing the mean value of each bucket.
     metric_prefix: String. Prefix of the metric name to use.
     additional_metadata: dict. Additional metadata attaching to Sample.
 
@@ -307,7 +289,7 @@ def _ParseHistogram(hist, metric_prefix='', additional_metadata={}):
       hist_list = []
       for idx, v in enumerate(r[HIST_BUCKET_START_IDX:]):
         if int(v):
-          hist_list.append((_PlatIdxToValCoarse(idx), int(v)))
+          hist_list.append((mean_bin_vals[idx], int(v)))
       todict = dict(hist_list)
       if key not in aggregates:
         aggregates[key] = Counter()

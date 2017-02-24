@@ -493,6 +493,7 @@ def Run(benchmark_spec):
   collect_logs = any([FLAGS.fio_lat_log, FLAGS.fio_bw_log, FLAGS.fio_iops_log,
                       FLAGS.fio_hist_log])
 
+  log_file_base = ''
   if collect_logs:
     log_file_base = '%s_%s' % (PKB_FIO_LOG_FILE_NAME, str(time.time()))
     fio_command = ' '.join([fio_command, GetLogFlags(log_file_base)])
@@ -503,11 +504,17 @@ def Run(benchmark_spec):
   logging.info('FIO Results:')
 
   stdout, stderr = vm.RobustRemoteCommand(fio_command, should_log=True)
+  bin_vals = []
   if collect_logs:
-    vm.PullFile(vm_util.GetTempDir(), '%s_*.log' % PKB_FIO_LOG_FILE_NAME)
-
+    vm.PullFile(vm_util.GetTempDir(), '%s*.log' % log_file_base)
+    if FLAGS.fio_hist_log:
+      num_logs = int(vm.RemoteCommand(
+          'ls %s_clat_hist.*.log | wc -l' % log_file_base)[0])
+      bin_vals += [fio.ComputeHistogramBinVals(
+          vm, '%s_clat_hist.%s.log' % (
+              log_file_base, idx + 1)) for idx in range(num_logs)]
   samples = fio.ParseResults(job_file_string, json.loads(stdout),
-                             log_file_base=log_file_base)
+                             log_file_base=log_file_base, bin_vals=bin_vals)
 
   return samples
 
