@@ -137,10 +137,10 @@ flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
                     'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
-    [log_util.DEBUG, log_util.INFO],
+    log_util.LOG_LEVELS.keys(),
     'The log level to run at.')
 flags.DEFINE_enum(
-    'file_log_level', log_util.DEBUG, [log_util.DEBUG, log_util.INFO],
+    'file_log_level', log_util.DEBUG, log_util.LOG_LEVELS.keys(),
     'Anything logged at this level or higher will be written to the log file.')
 flags.DEFINE_integer('duration_in_seconds', None,
                      'duration of benchmarks. '
