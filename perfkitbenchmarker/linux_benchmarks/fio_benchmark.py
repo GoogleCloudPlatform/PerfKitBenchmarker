@@ -153,7 +153,7 @@ flags.DEFINE_integer('fio_log_avg_msec', 1000,
 flags.DEFINE_boolean('fio_hist_log', False,
                      'Whether to collect clat histogram.')
 flags.DEFINE_integer('fio_log_hist_msec', 1000,
-                     'Same as fio_log_avg_msec, but logs entires for '
+                     'Same as fio_log_avg_msec, but logs entries for '
                      'completion latency histograms. If set to 0, histogram '
                      'logging is disabled.')
 
