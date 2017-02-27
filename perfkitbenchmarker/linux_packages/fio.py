@@ -20,6 +20,7 @@ import json
 import time
 
 from collections import Counter
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -57,12 +58,14 @@ def _Install(vm):
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, FIO_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(FIO_DIR, GIT_TAG))
   vm.RemoteCommand('cd {0} && ./configure && make'.format(FIO_DIR))
-  vm.PushDataFile(FIO_HIST_LOG_PARSER_PATCH)
-  vm.RemoteCommand(
-      'cp {log_parser_path}/{log_parser} ./; patch {log_parser} {patch}'.format(
-          log_parser_path=FIO_HIST_LOG_PARSER_PATH,
-          log_parser=FIO_HIST_LOG_PARSER,
-          patch=FIO_HIST_LOG_PARSER_PATCH))
+  if flags.FLAGS.fio_hist_log:
+    vm.PushDataFile(FIO_HIST_LOG_PARSER_PATCH)
+    vm.RemoteCommand(
+        ('cp {log_parser_path}/{log_parser} ./; '
+         'patch {log_parser} {patch}').format(
+             log_parser_path=FIO_HIST_LOG_PARSER_PATH,
+             log_parser=FIO_HIST_LOG_PARSER,
+             patch=FIO_HIST_LOG_PARSER_PATCH))
 
 
 def YumInstall(vm):
