@@ -25,6 +25,7 @@ import json
 import logging
 import uuid
 import threading
+import time
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -525,8 +526,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         ('KeyName', 'perfkit-key-%s' % FLAGS.run_uri),
         ('Placement', placement)])
     if block_device_map:
-      print 'RAW block_device_map'
-      print block_device_map
       launch_specification['BlockDeviceMappings'] = json.loads(
           block_device_map, object_pairs_hook=collections.OrderedDict)
     launch_specification['NetworkInterfaces'] = network_interface
@@ -538,7 +537,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--client-token=%s' % self.client_token,
         '--launch-specification=%s' % json.dumps(launch_specification,
                                                  separators=(',', ':'))]
-    print ' '.join(create_cmd)
     stdout, stderr, _ = vm_util.IssueCommand(create_cmd)
     create_response = json.loads(stdout)
     self.spot_instance_request_id =\
@@ -563,6 +561,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       elif status_code == "fulfilled":
         self.id = sir_response[0]['InstanceId']
         break
+
+      time.sleep(2)
 
   def _Delete(self):
     """Delete a VM instance."""
