@@ -542,6 +542,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.spot_instance_request_id =\
         create_response['SpotInstanceRequests'][0]['SpotInstanceRequestId']
 
+    util.AddDefaultTags(self.spot_instance_request_id, self.region)
+
     while True:
       describe_sir_cmd = util.AWS_PREFIX + [
           'ec2',
