@@ -1,0 +1,25 @@
+--- /opt/pkb/fio/tools/hist/fiologparser_hist.py	2017-02-23 23:37:28.423750424 +0000
++++ fiologparser_hist_new.py	2017-02-23 23:52:45.566326546 +0000
+@@ -282,7 +282,7 @@
+     # calculate the corresponding 'coarseness' parameter used to generate
+     # those files, and calculate the appropriate bin latency values:
+     with open(ctx.FILE[0], 'r') as fp:
+-        global bin_vals,lower_bin_vals,upper_bin_vals,__HIST_COLUMNS,__TOTAL_COLUMNS
++        global bin_vals,lower_bin_vals,upper_bin_vals,mean_bin_vals,__HIST_COLUMNS,__TOTAL_COLUMNS
+         __TOTAL_COLUMNS = len(fp.readline().split(','))
+         __HIST_COLUMNS = __TOTAL_COLUMNS - __NON_HIST_COLUMNS
+ 
+@@ -291,10 +291,12 @@
+         bin_vals = np.array(map(lambda x: plat_idx_to_val_coarse(x, coarseness), np.arange(__HIST_COLUMNS)), dtype=float)
+         lower_bin_vals = np.array(map(lambda x: plat_idx_to_val_coarse(x, coarseness, 0.0), np.arange(__HIST_COLUMNS)), dtype=float)
+         upper_bin_vals = np.array(map(lambda x: plat_idx_to_val_coarse(x, coarseness, 1.0), np.arange(__HIST_COLUMNS)), dtype=float)
++        mean_bin_vals = np.array(map(lambda x: plat_idx_to_val_coarse(x, coarseness, 0.5), np.arange(__HIST_COLUMNS)), dtype=float)
+ 
+     fps = [open(f, 'r') for f in ctx.FILE]
+     gen = histogram_generator(ctx, fps, ctx.buff_size)
+-
++    print '\n'.join(map(lambda x: str(x), mean_bin_vals.tolist()))
++    return
+     print(', '.join(columns))
+ 
+     try:
