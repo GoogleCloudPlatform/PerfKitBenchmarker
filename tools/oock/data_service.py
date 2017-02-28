@@ -243,8 +243,7 @@ class SampleSource:
       samples = None
       with open(self.path) as samples_json:
         if full_reload:
-          samples = [json.loads(s)
-                     for s in samples_json.read().split('\n') if s]
+          samples = [json.loads(s) for s in samples_json if s]
           self.next_seek = 0
         else:
           samples_json.seek(self.next_seek)
