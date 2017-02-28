@@ -1,0 +1,38 @@
+<html>
+    <head>
+        <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+        <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+
+<script type="text/javascript">
+google.charts.load('current', {'packages':['corechart','line','scatter']});
+google.charts.setOnLoadCallback(draw_charts_mangle_mangle);
+
+function draw_charts_mangle_mangle() {
+{% for cur_chart in charts %}
+    $.ajax({
+        url: "data/{{ cur_chart.data_source|safe }}",
+        dataType: "json",
+        success: function (jsonData) {
+            var data = new google.visualization.DataTable(jsonData);
+            var chart = new google.visualization.LineChart(document.getElementById('{{ cur_chart.name|safe }}'));
+
+            chart.draw(data, {{ cur_chart.options|safe }});
+
+            document.getElementById('{{ cur_chart.name|safe }}_img')
+                    .outerHTML='<a href="'+chart.getImageURI()+'"> {{ cur_chart.name|safe }} image</a>';
+        }
+    });
+{% endfor %}
+}
+
+</script>
+
+    </head>
+    <body>
+    {% for cur_chart in charts %}
+        <div id="{{ cur_chart.name }}_img"></div>
+        <div id="{{ cur_chart.name }}"
+             style="width: {{ cur_chart.width|string }}px; height: {{ cur_chart.height|string }}px; background-color: gray;"></div>
+    {% endfor %}
+    </body>
+</html>
