@@ -20,7 +20,7 @@ class ChartPage:
     self.page_spec_path = page_spec_path
     self.last_page_spec_update = None
     self.chart_specs = {}
-    self.chart_order = []
+    self.charts_layout = []
     self.subpages = {}
 
   def maybe_refresh_page_spec(self):
@@ -41,7 +41,14 @@ class ChartPage:
         sys.stderr.write("ERROR: Failed to read the chart page spec yaml\n")
       else:
         chart_specs = page_spec['chart_specs']
-        self.chart_order = page_spec.get('chart_order') or chart_specs.keys()
+        self.charts_layout = page_spec.get('charts_layout') or \
+            [[chart_name] for chart_name in chart_specs.keys()]
+        # Make sure rows in charts_layout with only a single cell are lists also
+        for i, row in enumerate(self.charts_layout):
+          if type(row) is str:
+            self.charts_layout[i] = [row]
+          else:
+            assert type(row) is list
         # Build the chart specs that need to be built
         for chart_name in chart_specs.keys():
           chart = chart_specs[chart_name]
@@ -103,9 +110,10 @@ def main():
           for subpage_name, subpage in page.subpages.items():
             page_queue.append(('%s/%s' % (path, subpage_name), subpage))
           # Generate page HTML
-          chart_specs = [page.chart_specs[name]
-                         for name in page.chart_order]
-          page_context = {'charts': chart_specs}
+          page_context = {
+            'charts': page.chart_specs,
+            'charts_layout': page.charts_layout
+          }
           page_store[path] = pickle.dumps(page_context)
 
       # Only try to refresh page spec every second

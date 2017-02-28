@@ -8,7 +8,7 @@ google.charts.load('current', {'packages':['corechart','line','scatter']});
 google.charts.setOnLoadCallback(draw_charts_mangle_mangle);
 
 function draw_charts_mangle_mangle() {
-{% for cur_chart in charts %}
+{% for cur_chart in charts.values() %}
     $.ajax({
         url: "data/{{ cur_chart.data_source|safe }}",
         dataType: "json",
@@ -18,21 +18,30 @@ function draw_charts_mangle_mangle() {
 
             chart.draw(data, {{ cur_chart.options|safe }});
 
+            var chart_image_link = '<a href="'+chart.getImageURI()+'"> {{ cur_chart.name|safe }} image</a>';
             document.getElementById('{{ cur_chart.name|safe }}_img')
-                    .outerHTML='<a href="'+chart.getImageURI()+'"> {{ cur_chart.name|safe }} image</a>';
+                    .outerHTML = chart_image_link;
         }
     });
 {% endfor %}
 }
 
 </script>
-
     </head>
     <body>
-    {% for cur_chart in charts %}
-        <div id="{{ cur_chart.name }}_img"></div>
-        <div id="{{ cur_chart.name }}"
-             style="width: {{ cur_chart.width|string }}px; height: {{ cur_chart.height|string }}px; background-color: gray;"></div>
-    {% endfor %}
+      <table>
+      {% for chart_row in charts_layout %}
+        <tr>
+        {% for chart_name in chart_row %}
+        {% set cur_chart = charts[chart_name] %}
+          <td>
+            <div id="{{ cur_chart.name }}_img">Loading {{ cur_chart.name }}...</div>
+            <div id="{{ cur_chart.name }}"
+                 style="width: {{ cur_chart.width|string }}px; height: {{ cur_chart.height|string }}px; background-color: gray;"></div>
+          </td>
+        {% endfor %}
+        </tr>
+      {% endfor %}
+      <table>
     </body>
 </html>
