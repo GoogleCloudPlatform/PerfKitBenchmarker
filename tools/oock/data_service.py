@@ -410,14 +410,8 @@ def build_google_charts_data_array(columns, data):
              for col_type, col_name in columns],
     'rows': [{'c': [{ 'v': value } for value in row]} for row in data]
   }
-        
-def main():
-  if len(sys.argv) != 2:
-    print("Usage: python3 data_service.py <data_sources_yaml>")
-    exit()
 
-  spec_path = sys.argv[1]
-
+def run_data_service(host, port, spec_path):
   data_source_mgr = DataSourceManager(spec_path)
   # Do the initial load of the data
   data_source_mgr.maybe_refresh_data()
@@ -437,14 +431,20 @@ def main():
       time.sleep(10)
 
   data_refresh_proc = mp.Process(target=_data_refresh)
+  data_refresh_proc.daemon = True
   data_refresh_proc.start()
 
   # Start the data server
-  data_server = ThreadedTCPServer(('localhost', 22422), DataServerHandler)
+  data_server = ThreadedTCPServer((host, port), DataServerHandler)
   data_server.data_store = data_store
   data_server.serve_forever()
-
-  data_refresh_proc.join()
+        
+def main():
+  if len(sys.argv) != 2:
+    print("Usage: python3 data_service.py <data_sources_yaml>")
+    exit()
+  spec_path = sys.argv[1]
+  run_data_service('localhost', 22422, spec_path)
 
 ########################################
 

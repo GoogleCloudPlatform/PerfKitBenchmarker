@@ -69,6 +69,8 @@ class ChartPage:
         return True
     return False
 
+########################################
+
 class PageServerHandler(socketserver.BaseRequestHandler):
   def handle(self):
     page_store = self.server.page_store
@@ -83,22 +85,17 @@ class PageServerHandler(socketserver.BaseRequestHandler):
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
   pass
-        
-def main():
-  if len(sys.argv) != 2:
-    print("Usage: python3 chart_server.py <page_spec_yaml>")
-    exit()
 
-  page_spec_path = sys.argv[1]
+########################################
 
+def run_page_service(host, port, page_spec_path):
   # Create the shared page store
   mp_manager = mp.Manager()
   page_store = mp_manager.dict()
 
-  root_page = ChartPage(page_spec_path)
-
   # Start the page spec refresher
   def _chart_page_refresh():
+    root_page = ChartPage(page_spec_path)
     while True:
       if root_page.maybe_refresh_page_spec():
         # Page spec was updated - rebuild the pages
@@ -115,17 +112,24 @@ def main():
             'charts_layout': page.charts_layout
           }
           page_store[path] = pickle.dumps(page_context)
-
       # Only try to refresh page spec every second
       time.sleep(1)
 
   chart_page_refresh_proc = mp.Process(target=_chart_page_refresh)
+  chart_page_refresh_proc.daemon = True
   chart_page_refresh_proc.start()
 
   # Start the page server
-  page_server = ThreadedTCPServer(('localhost', 22423), PageServerHandler)
+  page_server = ThreadedTCPServer((host, port), PageServerHandler)
   page_server.page_store = page_store
   page_server.serve_forever()
+        
+def main():
+  if len(sys.argv) != 2:
+    print("Usage: python3 chart_server.py <page_spec_yaml>")
+    exit()
+  page_spec_path = sys.argv[1]
+  run_page_service('localhost', 22423, page_spec_path)
 
 ########################################
 
