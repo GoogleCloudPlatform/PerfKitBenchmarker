@@ -13,17 +13,22 @@
 # limitations under the License.
 
 """Module containing fio installation, cleanup, parsing functions."""
+import csv
 import ConfigParser
 import io
+import json
 import time
 
+from collections import Counter
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FIO_DIR = '%s/fio' % INSTALL_DIR
 GIT_REPO = 'http://git.kernel.dk/fio.git'
-GIT_TAG = 'fio-2.7'
+GIT_TAG = 'fio-2.17'
 FIO_PATH = FIO_DIR + '/fio'
 FIO_CMD_PREFIX = '%s --output-format=json' % FIO_PATH
 SECTION_REGEX = r'\[(\w+)\]\n([\w\d\n=*$/]+)'
@@ -35,25 +40,43 @@ CMD_PARAMETER_REGEX = r'--([\S]+)\s*'
 CMD_PARAMETER_REPL_REGEX = r'\1\n'
 CMD_STONEWALL_PARAMETER = '--stonewall'
 JOB_STONEWALL_PARAMETER = 'stonewall'
+# Defined in fio
+DATA_DIRECTION = {0: 'read', 1: 'write', 2: 'trim'}
+HIST_BUCKET_START_IDX = 3
+
+# Patch fiologparser to return mean bucket.
+FIO_HIST_LOG_PARSER_PATCH = 'fiologparser_hist.patch'
+FIO_HIST_LOG_PARSER_PATH = '%s/tools/hist' % FIO_DIR
+FIO_HIST_LOG_PARSER = 'fiologparser_hist.py'
 
 
 def _Install(vm):
   """Installs the fio package on the VM."""
-  vm.Install('build_tools')
+  for p in ['build_tools', 'python', 'pip']:
+    vm.Install(p)
+  vm.RemoteCommand('sudo pip install pandas numpy')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, FIO_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(FIO_DIR, GIT_TAG))
   vm.RemoteCommand('cd {0} && ./configure && make'.format(FIO_DIR))
+  if flags.FLAGS.fio_hist_log:
+    vm.PushDataFile(FIO_HIST_LOG_PARSER_PATCH)
+    vm.RemoteCommand(
+        ('cp {log_parser_path}/{log_parser} ./; '
+         'patch {log_parser} {patch}').format(
+             log_parser_path=FIO_HIST_LOG_PARSER_PATH,
+             log_parser=FIO_HIST_LOG_PARSER,
+             patch=FIO_HIST_LOG_PARSER_PATCH))
 
 
 def YumInstall(vm):
   """Installs the fio package on the VM."""
-  vm.InstallPackages('libaio-devel libaio bc')
+  vm.InstallPackages('libaio-devel libaio bc zlib-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the fio package on the VM."""
-  vm.InstallPackages('libaio-dev libaio1 bc')
+  vm.InstallPackages('libaio-dev libaio1 bc zlib1g-dev')
   _Install(vm)
 
 
@@ -115,13 +138,18 @@ def FioParametersToJob(fio_parameters):
                                 JOB_STONEWALL_PARAMETER)
 
 
-def ParseResults(job_file, fio_json_result, base_metadata=None):
+def ParseResults(job_file, fio_json_result, base_metadata=None,
+                 log_file_base='', bin_vals=[]):
   """Parse fio json output into samples.
 
   Args:
     job_file: The contents of the fio job file.
     fio_json_result: Fio results in json format.
     base_metadata: Extra metadata to annotate the samples with.
+    log_file_base: String. Base name for fio log files.
+    bin_vals: A 2-D list of int. Each list represents a list of
+      bin values in histgram log. Calculated from remote VM using
+      fio/tools/hist/fiologparser_hist.py
 
   Returns:
     A list of sample.Sample objects.
@@ -131,16 +159,16 @@ def ParseResults(job_file, fio_json_result, base_metadata=None):
   # come from the same fio run.
   timestamp = time.time()
   parameter_metadata = ParseJobFile(job_file)
-  io_modes = ['read', 'write', 'trim']
-  for job in fio_json_result['jobs']:
+  io_modes = DATA_DIRECTION.values()
+  for (idx, job) in enumerate(fio_json_result['jobs']):
     job_name = job['jobname']
+    parameters = parameter_metadata[job_name]
+    parameters['fio_job'] = job_name
+    if base_metadata:
+      parameters.update(base_metadata)
     for mode in io_modes:
       if job[mode]['io_bytes']:
         metric_name = '%s:%s' % (job_name, mode)
-        parameters = parameter_metadata[job_name]
-        if base_metadata:
-          parameters.update(base_metadata)
-        parameters['fio_job'] = job_name
         bw_metadata = {
             'bw_min': job[mode]['bw_min'],
             'bw_max': job[mode]['bw_max'],
@@ -200,7 +228,27 @@ def ParseResults(job_file, fio_json_result, base_metadata=None):
         samples.append(
             sample.Sample('%s:iops' % metric_name,
                           job[mode]['iops'], '', parameters, timestamp))
+    if log_file_base and bin_vals:
+      # Parse histograms
+      hist_file_path = vm_util.PrependTempDir(
+          '%s_clat_hist.%s.log' % (log_file_base, str(idx + 1)))
+      samples += _ParseHistogram(
+          hist_file_path, bin_vals[idx], job_name, parameters)
   return samples
+
+
+def ComputeHistogramBinVals(vm, log_file):
+  """Calculate bin values for histogram.
+
+  Args:
+    vm: VirtualMachine object.
+    log_file: String. Name of the log file.
+
+  Returns:
+    A list of float. Representing the mean value of the bin.
+  """
+  return [float(v) for v in vm.RemoteCommand(
+      './%s %s' % (FIO_HIST_LOG_PARSER, log_file))[0].split()]
 
 
 def DeleteParameterFromJobFile(job_file, parameter):
@@ -217,3 +265,44 @@ def DeleteParameterFromJobFile(job_file, parameter):
     return regex_util.Substitute(r'%s=[\w\d_/]+\n' % parameter, '', job_file)
   except regex_util.NoMatchError:
     return job_file
+
+
+def _ParseHistogram(hist, mean_bin_vals, metric_prefix='',
+                    additional_metadata={}):
+  """Aggregates histogram reported by fio.
+
+  Args:
+    hist: String. File name of fio histogram log. Format:
+      time (msec), data direction (0: read, 1: write, 2: trim), block size,
+      bin 0, .., etc
+    mean_bin_vals: List of float. Representing the mean value of each bucket.
+    metric_prefix: String. Prefix of the metric name to use.
+    additional_metadata: dict. Additional metadata attaching to Sample.
+
+  Returns:
+    samples.Sample object that reports fio histogram.
+  """
+  aggregates = dict()
+  with open(hist) as f:
+    reader = csv.reader(f, delimiter=',')
+    for r in reader:
+      # Use (data direction, block size) as key
+      key = (DATA_DIRECTION[int(r[1])], int(r[2]))
+
+      hist_list = []
+      for idx, v in enumerate(r[HIST_BUCKET_START_IDX:]):
+        if int(v):
+          hist_list.append((mean_bin_vals[idx], int(v)))
+      todict = dict(hist_list)
+      if key not in aggregates:
+        aggregates[key] = Counter()
+      aggregates[key].update(todict)
+  samples = []
+  for (rw, bs) in aggregates.keys():
+    metadata = {'histogram': json.dumps(aggregates[(rw, bs)])}
+    metadata.update(additional_metadata)
+    samples.append(
+        sample.Sample(
+            ':'.join([metric_prefix, str(bs), rw, 'histogram']),
+            0, 'us', metadata))
+  return samples
