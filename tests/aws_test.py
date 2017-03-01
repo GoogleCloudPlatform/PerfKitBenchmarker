@@ -22,8 +22,10 @@ import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
@@ -89,7 +91,13 @@ class AwsVpcExistsTestCase(unittest.TestCase):
     self.assertTrue(self.vpc._Exists())
 
 
-class AwsVirtualMachineExistsTestCase(unittest.TestCase):
+class AwsVirtualMachineTestCase(unittest.TestCase):
+
+  def openJsonData(self, filename):
+    path = os.path.join(os.path.dirname(__file__),
+                        'data', filename)
+    with open(path) as f:
+      return f.read()
 
   def setUp(self):
     mocked_flags = mock_flags.PatchTestCaseFlags(self)
@@ -101,6 +109,10 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
                    'util.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
+    p2 = mock.patch('perfkitbenchmarker.'
+                    'vm_util.IssueCommand')
+    p2.start()
+    self.addCleanup(p2.stop)
 
     # VM Creation depends on there being a BenchmarkSpec.
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
@@ -111,12 +123,21 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
 
     self.vm = aws_virtual_machine.AwsVirtualMachine(
         aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS', zone='us-east-1a',
-                                      machine_type='c3.large'))
+                                      machine_type='c3.large',
+                                      spot_price=123.45))
     self.vm.id = 'i-foo'
-    path = os.path.join(os.path.dirname(__file__),
-                        'data', 'aws-describe-instance.json')
-    with open(path) as f:
-      self.response = f.read()
+    self.vm.image = 'ami-12345'
+    self.vm.client_token = '00000000-1111-2222-3333-444444444444'
+    network_mock = mock.MagicMock()
+    network_mock.subnet = mock.MagicMock(id='subnet-id')
+    placement_group = mock.MagicMock()
+    placement_group.name = 'placement_group_name'
+    network_mock.placement_group = placement_group
+    self.vm.network = network_mock
+
+    self.response = self.openJsonData('aws-describe-instance.json')
+    self.sir_response =\
+        self.openJsonData('aws-describe-spot-instance-requests.json')
 
   def testInstancePresent(self):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]
@@ -128,6 +149,67 @@ class AwsVirtualMachineExistsTestCase(unittest.TestCase):
     state['Name'] = 'shutting-down'
     util.IssueRetryableCommand.side_effect = [(json.dumps(response), None)]
     self.assertFalse(self.vm._Exists())
+
+  def testCreateSpot(self):
+    vm_util.IssueCommand.side_effect = [(self.sir_response, None, None),
+                                        (self.sir_response, None, None)]
+
+    self.vm._CreateSpot()
+
+    vm_util.IssueCommand.assert_any_call(
+        ['aws',
+         '--output',
+         'json',
+         'ec2',
+         'request-spot-instances',
+         '--region=us-east-1',
+         '--spot-price=123.45',
+         '--client-token=00000000-1111-2222-3333-444444444444',
+         '--launch-specification='
+         '{"ImageId":"ami-12345","InstanceType":"c3.large",'
+         '"KeyName":"perfkit-key-aaaaaa",'
+         '"Placement":{'
+         '"AvailabilityZone":"us-east-1a",'
+         '"GroupName":"placement_group_name"},'
+         '"BlockDeviceMappings":['
+         '{"VirtualName":"ephemeral0","DeviceName":"/dev/xvdb"},'
+         '{"VirtualName":"ephemeral1","DeviceName":"/dev/xvdc"}],'
+         '"NetworkInterfaces":[{"DeviceIndex":0,'
+         '"AssociatePublicIpAddress":true,"SubnetId":"subnet-id"}]}'])
+    vm_util.IssueCommand.assert_called_with(
+        ['aws',
+         '--output',
+         'json',
+         'ec2',
+         'describe-spot-instance-requests',
+         '--spot-instance-request-ids=sir-3wri5sgk'])
+
+  def testCreateSpotLowPriceFails(self):
+    response_low = json.loads(self.sir_response)
+    response_low['SpotInstanceRequests'][0]['Status']['Code'] = 'price-too-low'
+    response_low['SpotInstanceRequests'][0]['Status']['Message'] = \
+        'Your price is too low.'
+    response_cancel = (
+        '{"CancelledSpotInstanceRequests":'
+        '[{"State": "cancelled","SpotInstanceRequestId":"sir-2mcg43gk"}]}')
+    vm_util.IssueCommand.side_effect = [(self.sir_response, None, None),
+                                        (json.dumps(response_low), None, None),
+                                        (response_cancel, None, None)]
+
+    self.assertRaises(errors.Resource.CreationError, self.vm._CreateSpot)
+
+    def testDeleteCancelsSpotInstanceRequest(self):
+      self.vm.spot_instance_request_id = 'sir-abc'
+
+      self.vm._Delete()
+
+      vm_util.IssueCommand.assert_called_with(
+          ['aws',
+           '--output',
+           'json',
+           'ec2',
+           'cancel-spot-instance-requests',
+           '--spot-instance-request-ids=sir-abc'])
 
 
 class AwsIsRegionTestCase(unittest.TestCase):

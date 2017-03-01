@@ -1,0 +1,43 @@
+{
+    "SpotInstanceRequests": [
+        {
+            "Status": {
+                "UpdateTime": "2017-02-07T17:26:17.000Z", 
+                "Code": "fulfilled", 
+                "Message": "Your Spot request is fulfilled."
+            }, 
+            "ProductDescription": "Linux/UNIX", 
+            "InstanceId": "i-011682c24ab1c267e", 
+            "SpotInstanceRequestId": "sir-3wri5sgk", 
+            "State": "active", 
+            "LaunchedAvailabilityZone": "us-east-1c", 
+            "LaunchSpecification": {
+                "Placement": {
+                    "AvailabilityZone": "us-east-1c"
+                }, 
+                "ImageId": "ami-af22d9b9", 
+                "KeyName": "perfkit-key-0ebe1f3b", 
+                "SecurityGroups": [
+                    {
+                        "GroupName": "default", 
+                        "GroupId": "sg-4ed14a27"
+                    }
+                ], 
+                "Monitoring": {
+                    "Enabled": false
+                }, 
+                "InstanceType": "c4.4xlarge", 
+                "NetworkInterfaces": [
+                    {
+                        "SubnetId": "subnet-f22f7edf", 
+                        "DeviceIndex": 0, 
+                        "AssociatePublicIpAddress": true
+                    }
+                ]
+            }, 
+            "Type": "one-time", 
+            "CreateTime": "2017-02-07T17:26:06.000Z", 
+            "SpotPrice": "0.200000"
+        }
+    ]
+}
