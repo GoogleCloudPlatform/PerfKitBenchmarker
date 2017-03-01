@@ -242,7 +242,7 @@ class SampleSource:
       print("Reloading %s" % self.path)
       samples = None
       with open(self.path) as samples_json:
-        if full_reload:
+        if full_reload or self.last_refresh is None:
           samples = [json.loads(s) for s in samples_json if s]
           self.next_seek = 0
         else:
@@ -253,6 +253,7 @@ class SampleSource:
       if samples is None:
         print("ERROR: Failed to reload %s" % self.path)
       else:
+        print("Finished reading %s. Building samples..." % self.path)
         # Build the 'metadata' dict field from the 'labels' text field
         for sample in samples:
           # Chop of '|' at the beginning and end, split by '|,|', and remove
@@ -266,6 +267,7 @@ class SampleSource:
           self.samples = samples
         else:
           self.samples += samples
+        print("Finished reloading %s" % self.path)
 
 class DataSource:
   def __init__(self, path, extractor, filters, full_reload=True):
@@ -366,22 +368,22 @@ class DataSourceManager:
       if spec is None:
         sys.stderr.write("ERROR: Failed to read the data sources spec yaml\n")
       else:
-        data_sources = spec['data_sources']
+        chart_specs = spec['chart_specs']
         # Build the data sources that need to be built
-        for name in data_sources.keys():
+        for name in chart_specs.keys():
           # Apply inheritance
-          base = data_sources[name].get('inherit')
+          base = chart_specs[name].get('inherit')
           if base:
-            data_sources[name] = dict_inherit(base, data_sources[name])
+            chart_specs[name] = dict_inherit(base, chart_specs[name])
+          # Get the data source
+          data_source = chart_specs[name]['data_source']
           if name in self.data_source_dicts and \
-             data_sources[name] == self.data_source_dicts[name]:
+             data_source == self.data_source_dicts[name]:
             # Skip unchanged data source
             continue
           print("Rebuilding data source %s" % name)
-          self.data_sources[name] = build_data_source(data_sources[name])
-          self.data_source_dicts[name] = data_sources[name]
-
-########################################
+          self.data_sources[name] = build_data_source(data_source)
+          self.data_source_dicts[name] = data_source
 
 ########################################
 
@@ -414,6 +416,7 @@ def run_data_service(host, port, spec_path):
   data_source_mgr = DataSourceManager(spec_path)
   # Do the initial load of the data
   data_source_mgr.maybe_refresh_data()
+  print("Finished loading data")
 
   # Create the shared data store
   mp_manager = mp.Manager()

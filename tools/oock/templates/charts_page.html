@@ -14,7 +14,7 @@ function draw_charts_mangle_mangle() {
         dataType: "json",
         success: function (jsonData) {
             var data = new google.visualization.DataTable(jsonData);
-            var chart = new google.visualization.LineChart(document.getElementById('{{ cur_chart.name|safe }}'));
+            var chart = new google.{{ cur_chart.type }}(document.getElementById('{{ cur_chart.name|safe }}'));
 
             chart.draw(data, {{ cur_chart.options|safe }});
 

@@ -58,6 +58,7 @@ class ChartPage:
             chart = dict_inherit(base, chart_specs[chart_name])
           # Build chart spec
           print("Building chart spec for %s" % chart_name)
+          chart['data_source'] = chart_name
           chart['name'] = chart_name
           chart['width'] = chart['options'].get('width') or 400
           chart['height'] = chart['options'].get('height') or \
