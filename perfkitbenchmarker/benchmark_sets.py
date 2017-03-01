@@ -227,7 +227,7 @@ def GetBenchmarksFromFlags():
                        (benchmark_name, FLAGS.os_type))
 
     # We need to remove the 'flag_matrix', 'flag_matrix_defs', and
-    # 'flag_matrix_filters' keys from the config dictionairy since
+    # 'flag_matrix_filters' keys from the config dictionary since
     # they aren't actually part of the config spec and will cause
     # errors if they are left in.
     flag_matrix_name = benchmark_config.pop(
