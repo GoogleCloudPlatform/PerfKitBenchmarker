@@ -32,7 +32,7 @@ def select_filter(samples, keys, label_keys, f):
   """
   def select_f(s):
     values = [s[key] for key in keys]
-    label_values = [s['metadata'][label] for label in label_keys]
+    label_values = [s['metadata'].get(label) for label in label_keys]
     return f(*(values + label_values))
   samples[:] = [s for s in samples if select_f(s)]
 
@@ -48,7 +48,7 @@ def filter_by_label_value(samples, label, value):
   Keeps only samples where the value corresponding to the specified label in 
   sample['metadata'] is equal to the specified value.
   """
-  filter_by(samples, 'metadata', lambda s: s[label] == value)
+  filter_by(samples, 'metadata', lambda s: s.get(label) == value)
 
 def filter_by_label(samples, label, f):
   """
@@ -62,13 +62,13 @@ def filter_by_label(samples, label, f):
     label: the label to filter by
     f: the lambda
   """
-  def label_search(s):
+  def metadata_search(s):
     match = re.search('\\|%s:([^\\|]*)\\|' % label, s)
     if not match:
       return False
     else:
       return f(match.group(1))
-  filter_by(samples, 'labels', label_search)
+  filter_by(samples, 'metadata', lambda s: f(s.get(label)))
 
 def one(samples):
   """
