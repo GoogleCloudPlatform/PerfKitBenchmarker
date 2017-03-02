@@ -29,8 +29,8 @@ function draw_charts_mangle_mangle() {
 </script>
     </head>
     <body>
-      <table>
       {% for chart_row in charts_layout %}
+      <table>
         <tr>
         {% for chart_name in chart_row %}
         {% set cur_chart = charts[chart_name] %}
@@ -41,7 +41,7 @@ function draw_charts_mangle_mangle() {
           </td>
         {% endfor %}
         </tr>
-      {% endfor %}
       <table>
+      {% endfor %}
     </body>
 </html>
