@@ -867,9 +867,9 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
     metadata: a dictionary of metadata to add to samples.
     vms: the VMs to run the benchmark on.
     command_builder: an APIScriptCommandBuilder.
+    service: The provider's ObjectStorageService
     bucket_name: the primary bucket to benchmark.
     operation: 'upload' or 'download'
-    service: The provider's ObjectStorageService
 
   Raises:
     ValueError if an unexpected test outcome is found from the API
@@ -956,6 +956,7 @@ def MultiStreamRWBenchmark(results, metadata, vms, command_builder,
     metadata: a dictionary of metadata to add to samples.
     vms: the VMs to run the benchmark on.
     command_builder: an APIScriptCommandBuilder.
+    service: The provider's ObjectStorageService
     bucket_name: the primary bucket to benchmark.
 
   Raises:
@@ -987,6 +988,7 @@ def MultiStreamWriteBenchmark(results, metadata, vms, command_builder,
     metadata: a dictionary of metadata to add to samples.
     vms: the VMs to run the benchmark on.
     command_builder: an APIScriptCommandBuilder.
+    service: The provider's ObjectStorageService
     bucket_name: the primary bucket to benchmark.
 
   Raises:
@@ -1012,6 +1014,7 @@ def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
     metadata: a dictionary of metadata to add to samples.
     vms: the VMs to run the benchmark on.
     command_builder: an APIScriptCommandBuilder.
+    service: The provider's ObjectStorageService
     bucket_name: the primary bucket to benchmark.
     read_objects: List of lists of [object_name, object_size]. In the outermost
       list, each element corresponds to a VM's worker process.
@@ -1232,6 +1235,7 @@ def Prepare(benchmark_spec):
     with open(FLAGS.object_storage_read_objects) as read_objects_file:
       # Format of json structure is:
       # {"bucket_name": <bucket_name>,
+      #  ... any other provider-specific context needed
       #  "objects_written": <objects_written_array>}
       benchmark_spec.read_objects = json.loads(read_objects_file.read())
     assert benchmark_spec.read_objects is not None, \
@@ -1242,6 +1246,10 @@ def Prepare(benchmark_spec):
 
   service = object_storage_service.GetObjectStorageClass(FLAGS.storage)()
   if FLAGS.storage == 'Azure' and FLAGS.object_storage_read_objects is not None:
+    # Storage provider is azure and we are reading existing objects.
+    # Need to prepare the ObjectStorageService with the existing storage
+    # account and resource group associated with the bucket containing our
+    # objects
     service.PrepareService(
         FLAGS.object_storage_region,
         # On Azure, use an existing storage account if we
@@ -1254,26 +1262,28 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm_util.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
 
-  # Make the bucket(s)
   if benchmark_spec.read_objects is not None:
+    # Using an existing bucket
     bucket_name = benchmark_spec.read_objects['bucket_name']
     if FLAGS.object_storage_bucket_name is not None:
       logging.warning('--object_storage_bucket_name ignored because '
                       '--object_storage_read_objects was specified')
   else:
+    # Make the bucket(s)
     bucket_name = FLAGS.object_storage_bucket_name or 'pkb%s' % FLAGS.run_uri
-    if FLAGS.storage != 'GCP' or not FLAGS.object_storage_gcs_multiregion:
-      service.MakeBucket(bucket_name)
-    else:
+    if FLAGS.storage == 'GCP' and FLAGS.object_storage_gcs_multiregion:
       # Use a GCS multiregional bucket
       multiregional_service = gcs.GoogleCloudStorageService()
       multiregional_service.PrepareService(FLAGS.object_storage_gcs_multiregion
                                            or DEFAULT_GCS_MULTIREGION)
       multiregional_service.MakeBucket(bucket_name)
+    else:
+      # Use a regular bucket
+      service.MakeBucket(bucket_name)
 
-  # Save the service and the buckets for later
+  # Save the service and the bucket name for later
   benchmark_spec.service = service
-  benchmark_spec.buckets = [bucket_name]
+  benchmark_spec.bucket_name = bucket_name
 
 
 def Run(benchmark_spec):
@@ -1292,7 +1302,7 @@ def Run(benchmark_spec):
                FLAGS.object_storage_scenario, FLAGS.storage)
 
   service = benchmark_spec.service
-  buckets = benchmark_spec.buckets
+  bucket_name = benchmark_spec.bucket_name
 
   metadata = {'storage_provider': FLAGS.storage}
 
@@ -1324,7 +1334,7 @@ def Run(benchmark_spec):
                           ('api_namespace', ListConsistencyBenchmark)]:
     if FLAGS.object_storage_scenario in {name, 'all'}:
       benchmark(results, metadata, vms[0], command_builder,
-                service, buckets[0])
+                service, bucket_name)
 
   # MultiStreamRW and MultiStreamWrite support multiple VMs, so they have a
   # slightly different calling convention than the others.
@@ -1333,12 +1343,12 @@ def Run(benchmark_spec):
                            MultiStreamWriteBenchmark)]:
     if FLAGS.object_storage_scenario in {name, 'all'}:
       benchmark(results, metadata, vms, command_builder, benchmark_spec.service,
-                buckets[0])
+                bucket_name)
 
   # MultiStreamRead has the additional 'read_objects' parameter
   if FLAGS.object_storage_scenario in {'api_multistream_reads', 'all'}:
     MultiStreamReadBenchmark(results, metadata, vms, command_builder,
-                             benchmark_spec.service, buckets[0],
+                             benchmark_spec.service, bucket_name,
                              benchmark_spec.read_objects['objects_written'])
 
   return results
@@ -1353,14 +1363,14 @@ def Cleanup(benchmark_spec):
   """
 
   service = benchmark_spec.service
-  buckets = benchmark_spec.buckets
+  bucket_name = benchmark_spec.bucket_name
   vms = benchmark_spec.vms
 
   vm_util.RunThreaded(lambda vm: CleanupVM(vm, service), vms)
 
-  # Only clean up buckets if we're not saving the objects for a later run
-  if FLAGS.object_storage_objects_written_file is None and \
-     not FLAGS.object_storage_dont_delete_bucket:
-    for bucket in buckets:
-      service.DeleteBucket(bucket)
+  # Only clean up bucket if we're not saving the objects for a later run
+  keep_bucket = FLAGS.object_storage_objects_written_file is not None or \
+      FLAGS.object_storage_dont_delete_bucket
+  if not keep_bucket:
+    service.DeleteBucket(bucket_name)
     service.CleanupService()
