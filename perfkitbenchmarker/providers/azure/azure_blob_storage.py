@@ -20,9 +20,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 
-flags.DEFINE_string('azure_lib_version', None,
-                    'Use a particular version of azure client lib, e.g.: 1.0.2')
-
 FLAGS = flags.FLAGS
 
 DEFAULT_AZURE_REGION = 'eastus2'
@@ -38,10 +35,27 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
 
   STORAGE_NAME = providers.AZURE
 
-  def PrepareService(self, location):
+  def PrepareService(self, location,
+                     existing_storage_account_and_resource_group=None):
     # abs is "Azure Blob Storage"
     prefix = 'pkb%sabs' % FLAGS.run_uri
-    self.resource_group = azure_network.GetResourceGroup()
+
+    # Maybe extract existing storage account and resource group names
+    existing_storage_account, existing_resource_group = None, None
+    if existing_storage_account_and_resource_group:
+      existing_storage_account, existing_resource_group = \
+          existing_storage_account_and_resource_group
+      assert existing_storage_account is not None
+      assert existing_resource_group is not None
+    storage_account_name = existing_storage_account or prefix + 'storage'
+    resource_group_name = existing_resource_group or prefix + '-resource-group'
+
+    # We use a separate resource group so that our buckets can optionally stick
+    # around after PKB runs. This is useful for things like cold reads tests
+    self.resource_group = \
+        azure_network.AzureResourceGroup(resource_group_name,
+                                         existing_resource_group is not None)
+    self.resource_group.Create()
 
     # We use a different Azure storage account than the VM account
     # because a) we need to be able to set the storage class
@@ -51,12 +65,15 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     self.storage_account = azure_network.AzureStorageAccount(
         FLAGS.azure_storage_type,
         location or DEFAULT_AZURE_REGION,
-        prefix + 'storage',
-        kind=FLAGS.azure_blob_account_kind)
+        storage_account_name,
+        kind=FLAGS.azure_blob_account_kind,
+        resource_group=self.resource_group,
+        use_existing=existing_storage_account is not None)
     self.storage_account.Create()
 
   def CleanupService(self):
     self.storage_account.Delete()
+    self.resource_group.Delete()
 
   def MakeBucket(self, bucket):
     vm_util.IssueRetryableCommand([
