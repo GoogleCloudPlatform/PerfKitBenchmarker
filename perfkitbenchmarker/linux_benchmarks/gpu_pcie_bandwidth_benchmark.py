@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import numpy
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
@@ -30,11 +29,6 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 flags.DEFINE_integer('gpu_pcie_bandwidth_iterations', 30,
                      'number of iterations to run',
                      lower_bound=1)
-TESLA_K80_MAX_CLOCK_SPEEDS = [2505, 875]
-flag_util.DEFINE_integerlist('gpu_pcie_bandwidth_clock_speeds',
-                             flag_util.IntegerList(TESLA_K80_MAX_CLOCK_SPEEDS),
-                             'desired gpu clock speeds in the form '
-                             '[memory clock, graphics clock]')
 
 
 FLAGS = flags.FLAGS
@@ -71,10 +65,6 @@ BENCHMARK_METRICS = ['Host to device bandwidth',
 
 EXTRACT_BANDWIDTH_TEST_RESULTS_REGEX = r'\d+\s+(\d+\.?\d*)'
 EXTRACT_DEVICE_INFO_REGEX = r'Device\s*(\d):\s*(.*$)'
-
-
-class UnsupportedClockSpeedException(Exception):
-  pass
 
 
 def GetConfig(user_config):
@@ -186,35 +176,6 @@ def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
   return samples
 
 
-def _SetAndConfirmGpuClocks(vm):
-  """Sets and confirms the GPU clock speed.
-
-  The clock values are provided in the gpu_pcie_bandwidth_clock_speeds
-  flag. If a device is queried and its clock speed does not allign with
-  what it was just set to, an expection will be raised.
-
-  Args:
-    vm: the virtual machine to operate on.
-
-  Raises:
-    UnsupportedClockSpeedException if a GPU did not accept the
-    provided clock speeds.
-  """
-  desired_memory_clock = FLAGS.gpu_pcie_bandwidth_clock_speeds[0]
-  desired_graphics_clock = FLAGS.gpu_pcie_bandwidth_clock_speeds[1]
-  cuda_toolkit_8.SetGpuClockSpeed(vm,
-                                  desired_memory_clock,
-                                  desired_graphics_clock)
-  num_gpus = cuda_toolkit_8.QueryNumberOfGpus(vm)
-  for i in range(num_gpus):
-    if cuda_toolkit_8.QueryGpuClockSpeed(vm, i) != (desired_memory_clock,
-                                                    desired_graphics_clock):
-      raise UnsupportedClockSpeedException('Unrecoverable error setting '
-                                           'GPU #{} clock speed to {},{}'
-                                           .format(i, desired_memory_clock,
-                                                   desired_graphics_clock))
-
-
 def Run(benchmark_spec):
   """Sets the GPU clock speed and runs the CUDA PCIe benchmark.
 
@@ -229,14 +190,14 @@ def Run(benchmark_spec):
   # Note:  The clock speed is set in this function rather than Prepare()
   # so that the user can perform multiple runs with a specified
   # clock speed without having to re-prepare the VM.
-  _SetAndConfirmGpuClocks(vm)
+  cuda_toolkit_8.SetAndConfirmGpuClocks(vm)
   num_iterations = FLAGS.gpu_pcie_bandwidth_iterations
   raw_results = []
   metadata = {}
   metadata['num_iterations'] = num_iterations
   metadata['num_gpus'] = cuda_toolkit_8.QueryNumberOfGpus(vm)
-  metadata['memory_clock_MHz'] = FLAGS.gpu_pcie_bandwidth_clock_speeds[0]
-  metadata['graphics_clock_MHz'] = FLAGS.gpu_pcie_bandwidth_clock_speeds[1]
+  metadata['memory_clock_MHz'] = FLAGS.gpu_clock_speeds[0]
+  metadata['graphics_clock_MHz'] = FLAGS.gpu_clock_speeds[1]
   run_command = ('%s/extras/demo_suite/bandwidthTest --device=all'
                  % cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR)
   for i in range(num_iterations):
