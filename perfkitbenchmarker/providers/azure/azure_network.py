@@ -48,7 +48,7 @@ def GetResourceGroup():
   try:
     return spec.azure_resource_group
   except AttributeError:
-    group = AzureResourceGroup(FLAGS.run_uri, spec.uid)
+    group = AzureResourceGroup('pkb%s-%s' % (FLAGS.run_uri, spec.uid))
     spec.azure_resource_group = group
     return group
 
@@ -56,11 +56,10 @@ def GetResourceGroup():
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
 
-  def __init__(self, run_uri, spec_uid):
+  def __init__(self, name, use_existing=False):
     super(AzureResourceGroup, self).__init__()
-    self.name = 'pkb%s-%s' % (run_uri, spec_uid)
-    # Storage account names can't include separator characters :(.
-    self.storage_account_prefix = 'pkb%s%s' % (run_uri, spec_uid)
+    self.name = name
+    self.use_existing = use_existing
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
@@ -70,16 +69,17 @@ class AzureResourceGroup(resource.BaseResource):
     self.args = ['--resource-group', self.name]
 
   def _Create(self):
-    # A resource group can own resources in multiple zones, but the
-    # group itself needs to have a location. Therefore,
-    # FLAGS.zones[0].
-    _, _, retcode = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'group', 'create',
-         self.name, self.location])
+    if not self.use_existing:
+      # A resource group can own resources in multiple zones, but the
+      # group itself needs to have a location. Therefore,
+      # FLAGS.zones[0].
+      _, _, retcode = vm_util.IssueCommand(
+          [azure.AZURE_PATH, 'group', 'create',
+           self.name, self.location])
 
-    if retcode:
-      raise errors.RetryableCreationError(
-          'Error creating Azure resource group')
+      if retcode:
+        raise errors.RetryableCreationError(
+            'Error creating Azure resource group')
 
   def _Exists(self):
     _, _, retcode = vm_util.IssueCommand(
@@ -134,14 +134,20 @@ class AzureAvailSet(resource.BaseResource):
 class AzureStorageAccount(resource.BaseResource):
   """Object representing an Azure Storage Account."""
 
+  total_storage_accounts = 0
+
   def __init__(self, storage_type, location, name,
-               kind=None, access_tier=None):
+               kind=None, access_tier=None, resource_group=None,
+               use_existing=False):
     super(AzureStorageAccount, self).__init__()
     self.storage_type = storage_type
     self.name = name
-    self.resource_group = GetResourceGroup()
+    self.resource_group = resource_group or GetResourceGroup()
     self.location = location
     self.kind = kind or 'Storage'
+    self.use_existing = use_existing
+
+    AzureStorageAccount.total_storage_accounts += 1
 
     if kind == 'BlobStorage':
       self.access_tier = access_tier or 'Hot'
@@ -152,20 +158,21 @@ class AzureStorageAccount(resource.BaseResource):
 
   def _Create(self):
     """Creates the storage account."""
-    create_cmd = [azure.AZURE_PATH,
-                  'storage',
-                  'account',
-                  'create',
-                  '--kind', self.kind,
-                  '--sku-name', self.storage_type,
-                  self.name] + self.resource_group.args
-    if self.location:
-      create_cmd.extend(
-          ['--location', self.location])
-    if self.kind == 'BlobStorage':
-      create_cmd.extend(
-          ['--access-tier', self.access_tier])
-    vm_util.IssueCommand(create_cmd)
+    if not self.use_existing:
+      create_cmd = [azure.AZURE_PATH,
+                    'storage',
+                    'account',
+                    'create',
+                    '--kind', self.kind,
+                    '--sku-name', self.storage_type,
+                    self.name] + self.resource_group.args
+      if self.location:
+        create_cmd.extend(
+            ['--location', self.location])
+      if self.kind == 'BlobStorage':
+        create_cmd.extend(
+            ['--access-tier', self.access_tier])
+      vm_util.IssueCommand(create_cmd)
 
   def _PostCreate(self):
     """Get our connection string and our keys."""
@@ -193,7 +200,13 @@ class AzureStorageAccount(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the storage account."""
-    pass
+    delete_cmd = [azure.AZURE_PATH,
+                  'storage',
+                  'account',
+                  'delete',
+                  self.name,
+                  '--quiet'] + self.resource_group.args
+    vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the storage account exists."""
@@ -401,13 +414,16 @@ class AzureNetwork(network.BaseNetwork):
     self.resource_group = GetResourceGroup()
     self.avail_set = AzureAvailSet(self.resource_group.name, self.zone)
 
+    # Storage account names can't include separator characters :(.
+    storage_account_prefix = 'pkb%s' % FLAGS.run_uri
+
     # Storage account names must be 3-24 characters long and use
     # numbers and lower-case letters only, which leads us to this
     # awful naming scheme.
-    suffix = '%sstorage' % self.zone
+    suffix = 'storage%d' % AzureStorageAccount.total_storage_accounts
     self.storage_account = AzureStorageAccount(
         FLAGS.azure_storage_type, self.zone,
-        self.resource_group.storage_account_prefix[:24 - len(suffix)] + suffix)
+        storage_account_prefix[:24 - len(suffix)] + suffix)
     prefix = '%s-%s' % (self.resource_group.name, self.zone)
     self.vnet = AzureVirtualNetwork(self.zone, prefix + '-vnet')
     self.subnet = AzureSubnet(self.vnet, self.vnet.name + '-subnet')
