@@ -12,9 +12,8 @@ def main():
 
   page_spec = sys.argv[1]
 
-  # Launch the page and data services
-  data_service_proc, page_service_proc = \
-      start_services(page_spec, page_spec)
+  # Launch the services
+  page_service_proc = start_services(page_spec)
 
   dispatcher = wsgi.WSGIPathInfoDispatcher({'/': app})
   server = wsgi.WSGIServer(('0.0.0.0', 8080), wsgi_app=dispatcher)
@@ -23,7 +22,6 @@ def main():
     server.start()
   except KeyboardInterrupt:
     server.stop()
-    data_service_proc.terminate()
     page_service_proc.terminate()
 
 ########################################

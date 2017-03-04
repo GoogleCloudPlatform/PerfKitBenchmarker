@@ -12,7 +12,7 @@ from itertools import accumulate
 
 from filter_utils import select_filter
 from service_util import ServiceConnection
-from util import dict_inherit
+from util import dict_inherit, js_date
 
 ########################################
 
@@ -50,7 +50,10 @@ def build_data_array(data_dict, column_to_group):
     elif cell_type is bool:
       return 'boolean'
     elif cell_type is str:
-      return 'string'
+      if cell.startswith('Date(') and cell.endswith(')'):
+        return 'datetime'
+      else:
+        return 'string'
     return None
 
   # Get the column order
@@ -297,13 +300,14 @@ class DataSource:
 
     if self.last_refresh == sample_source.last_refresh:
       # Data hasn't changed since last extraction, no need to extract it again
-      return
+      return False
 
     # Extract the data
     data, columns = self.extract_data_array(sample_source.samples)
     self.data = data
     self.columns = columns
     self.last_refresh = sample_source.last_refresh
+    return True
 
   def extract_data_array(self, samples):
     if self.full_reload:
@@ -337,74 +341,6 @@ def build_data_source(init_dict):
 
 ########################################
 
-class DataSourceManager:
-  def __init__(self, spec_path):
-    self.spec_path = spec_path
-    self.last_spec_update = None
-
-    self.sample_sources = {} # Cache sample sources
-    self.data_sources = {}
-    self.data_source_dicts = {} # Data source dicts directly from the yaml
-    
-  def maybe_refresh_data(self):
-    self.maybe_refresh_spec()
-    for data_source in self.data_sources.values():
-      data_source.maybe_refresh_data(self.sample_sources)
-
-  def maybe_refresh_spec(self):
-    modified_time = os.path.getmtime(self.spec_path)
-    if modified_time != self.last_spec_update:
-      print("Refreshing data sources")
-      self.last_spec_update = modified_time
-      spec = None
-
-      with open(self.spec_path) as spec_file:
-        # Try to parse the data sources spec yaml
-        try:
-          spec = yaml.load(spec_file.read())
-        except:
-          sys.stderr.write("ERROR: Data sources spec yaml is not valid yaml\n")
-
-      if spec is None:
-        sys.stderr.write("ERROR: Failed to read the data sources spec yaml\n")
-      else:
-        chart_specs = spec['chart_specs']
-        # Build the data sources that need to be built
-        for name in chart_specs.keys():
-          # Apply inheritance
-          base = chart_specs[name].get('inherit')
-          if base:
-            chart_specs[name] = dict_inherit(base, chart_specs[name])
-          # Get the data source
-          data_source = chart_specs[name]['data_source']
-          if name in self.data_source_dicts and \
-             data_source == self.data_source_dicts[name]:
-            # Skip unchanged data source
-            continue
-          print("Rebuilding data source %s" % name)
-          self.data_sources[name] = build_data_source(data_source)
-          self.data_source_dicts[name] = data_source
-
-########################################
-
-class DataServerHandler(socketserver.BaseRequestHandler):
-  def handle(self):
-    request = ServiceConnection(self.request)
-    data_store = self.server.data_store
-
-    data_source_name = request.recv_str()
-    data_array = data_store[data_source_name]
-    data_array_json = json.dumps(data_array)
-
-    print("Sending data for %s to %s" % (data_source_name,
-                                         self.request.getsockname()))
-    request.send_str(data_array_json)
-
-class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-  pass
-
-########################################
-
 def build_google_charts_data_array(columns, data):
   return {
     'cols': [{ 'label': col_name, 'type': col_type }
@@ -412,43 +348,28 @@ def build_google_charts_data_array(columns, data):
     'rows': [{'c': [{ 'v': value } for value in row]} for row in data]
   }
 
-def run_data_service(host, port, spec_path):
-  data_source_mgr = DataSourceManager(spec_path)
-  # Do the initial load of the data
-  data_source_mgr.maybe_refresh_data()
-  print("Finished loading data")
+def run_data_refresh_loop(data_source_store, data_store):
+  data_sources = {}
+  data_source_specs = {}
+  sample_sources = {}
 
-  # Create the shared data store
-  mp_manager = mp.Manager()
-  data_store = mp_manager.dict()
-
-  # Start the data refresher
-  def _data_refresh():
-    while True:
-      data_source_mgr.maybe_refresh_data()
-      for name, data_source in data_source_mgr.data_sources.items():
+  while True:
+    # Maybe refresh specs
+    for name, data_source_spec in data_source_store.items():
+      data_source_spec = data_source_spec.copy()
+      # Check if this data source is new or modified
+      if name in data_source_specs and \
+          data_source_spec == data_source_specs[name]:
+        # Skip unchanged data source
+        continue
+      print("Data source %s has been modified" % name)
+      data_source_specs[name] = data_source_spec
+      data_sources[name] = build_data_source(data_source_spec)
+    # Maybe refresh data sources and build data arrays
+    for name, data_source in data_sources.items():
+      if data_source.maybe_refresh_data(sample_sources):
+        print("Refreshed data source: %s" % name)
         data_array = build_google_charts_data_array(data_source.columns,
                                                     data_source.data)
         data_store[name] = data_array
-      time.sleep(10)
-
-  data_refresh_proc = mp.Process(target=_data_refresh)
-  data_refresh_proc.daemon = True
-  data_refresh_proc.start()
-
-  # Start the data server
-  data_server = ThreadedTCPServer((host, port), DataServerHandler)
-  data_server.data_store = data_store
-  data_server.serve_forever()
-        
-def main():
-  if len(sys.argv) != 2:
-    print("Usage: python3 data_service.py <data_sources_yaml>")
-    exit()
-  spec_path = sys.argv[1]
-  run_data_service('localhost', 22422, spec_path)
-
-########################################
-
-if __name__ == "__main__":
-  main()
+    time.sleep(5)
