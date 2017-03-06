@@ -319,10 +319,15 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   # Run all of the netperf processes and collect their stdout
   # TODO: Record start times of netperf processes on the remote machine
 
+  # Give the remote script the max possible test length plus 5 minutes to
+  # complete
+  remote_cmd_timeout = \
+      FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
   remote_script_path = '/tmp/run/%s' % REMOTE_SCRIPT
   remote_cmd = '%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' % \
                (remote_script_path, netperf_cmd, num_streams, PORT_START)
-  remote_stdout, _ = vm.RemoteCommand(remote_cmd)
+  remote_stdout, _ = vm.RemoteCommand(remote_cmd,
+                                      timeout=remote_cmd_timeout)
 
   # Decode stdouts, stderrs, and return codes from remote command's stdout
   stdouts, stderrs, return_codes = json.loads(remote_stdout)
