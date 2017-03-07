@@ -474,8 +474,6 @@ def Run(benchmark_spec):
   vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
 
   if AgainstDevice():
-    #fio_command = 'sudo %s --filename=/dev/nvme0n1:/dev/nvme1n1:/dev/nvme2n1:/dev/nvme3n1:/dev/nvme4n1:/dev/nvme5n1:/dev/nvme6n1:/dev/nvme7n1 --output-format=json %s' % (
-    #    fio.FIO_PATH, REMOTE_JOB_FILE_PATH)
     fio_command = 'sudo %s --output-format=json --filename=%s %s' % (
         fio.FIO_PATH, disk.GetDevicePath(), REMOTE_JOB_FILE_PATH)
   else:

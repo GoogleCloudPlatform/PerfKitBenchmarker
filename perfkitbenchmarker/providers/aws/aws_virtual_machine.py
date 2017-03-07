@@ -137,11 +137,12 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
     root_block_device['Ebs'].pop('Encrypted')
     mappings.append(root_block_device)
 
-  #if machine_type in NUM_LOCAL_VOLUMES:
-  #  for i in xrange(NUM_LOCAL_VOLUMES[machine_type]):
-  #    mappings.append({
-  #        'VirtualName': 'ephemeral%s' % i,
-  #        'DeviceName': '/dev/nvme%sn1' % i})
+  if (machine_type in NUM_LOCAL_VOLUMES and
+      not aws_disk.LocalDriveIsNvme(machine_type)):
+    for i in xrange(NUM_LOCAL_VOLUMES[machine_type]):
+      mappings.append({
+          'VirtualName': 'ephemeral%s' % i,
+          'DeviceName': '/dev/nvme%sn1' % i})
   if len(mappings):
     return json.dumps(mappings)
   return None
@@ -295,6 +296,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise ValueError(
           'In order to use dedicated hosts, you must specify an availability '
           'zone, not a region ("zone" was %s).' % self.zone)
+    if self.machine_type[:2].lower() == 'i3' and not FLAGS['image'].present:
+      #TODO(user): Remove this check when pkb defaults to ubuntu-1604.
+      raise ValueError(
+          'In order to use i3 instances, you must specify --image.')
 
   @property
   def host_list(self):
@@ -452,7 +457,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.user_data:
       create_cmd.append('--user-data=%s' % self.user_data)
     _, stderr, _ = vm_util.IssueCommand(create_cmd)
-
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       logging.warning(
           'Creation failed due to insufficient host capacity. A new host will '
@@ -541,7 +545,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
-  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-amd64-*'
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-*'
 
 
 class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
