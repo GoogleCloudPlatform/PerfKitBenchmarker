@@ -137,11 +137,11 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
     root_block_device['Ebs'].pop('Encrypted')
     mappings.append(root_block_device)
 
-  if machine_type in NUM_LOCAL_VOLUMES:
-    for i in xrange(NUM_LOCAL_VOLUMES[machine_type]):
-      mappings.append({
-          'VirtualName': 'ephemeral%s' % i,
-          'DeviceName': '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)})
+  #if machine_type in NUM_LOCAL_VOLUMES:
+  #  for i in xrange(NUM_LOCAL_VOLUMES[machine_type]):
+  #    mappings.append({
+  #        'VirtualName': 'ephemeral%s' % i,
+  #        'DeviceName': '/dev/nvme%sn1' % i})
   if len(mappings):
     return json.dumps(mappings)
   return None

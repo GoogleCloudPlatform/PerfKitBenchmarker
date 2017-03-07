@@ -250,6 +250,7 @@ class AwsDisk(disk.BaseDisk):
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
     if self.disk_type == disk.LOCAL:
-      return '/dev/xvd%s' % self.device_letter
+      #return '/dev/xvd%s' % self.device_letter
+      return '/dev/nvme%sn1' % str(ord(self.device_letter) - ord('b'))
     else:
       return '/dev/xvdb%s' % self.device_letter
