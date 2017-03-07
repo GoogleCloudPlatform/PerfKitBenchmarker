@@ -217,7 +217,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
-      self.Install('python')
+      self.RemoteCommand('sudo apt-get install python -y')
     self.SetFiles()
     self.DoSysctls()
     self.BurnCpu()
