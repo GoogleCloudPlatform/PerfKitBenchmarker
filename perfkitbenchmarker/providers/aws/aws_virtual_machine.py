@@ -142,7 +142,7 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
     for i in xrange(NUM_LOCAL_VOLUMES[machine_type]):
       mappings.append({
           'VirtualName': 'ephemeral%s' % i,
-          'DeviceName': '/dev/nvme%sn1' % i})
+          'DeviceName': '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)})
   if len(mappings):
     return json.dumps(mappings)
   return None
