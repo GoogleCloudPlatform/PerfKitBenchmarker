@@ -297,7 +297,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'In order to use dedicated hosts, you must specify an availability '
           'zone, not a region ("zone" was %s).' % self.zone)
     if self.machine_type[:2].lower() == 'i3' and not FLAGS['image'].present:
-      #TODO(user): Remove this check when pkb defaults to ubuntu-1604.
+      # TODO(user): Remove this check when pkb defaults to ubuntu-1604.
       raise ValueError(
           'In order to use i3 instances, you must specify --image.')
 
