@@ -256,7 +256,7 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
 
 
 def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
-                 env=None, timeout=DEFAULT_TIMEOUT, input=None):
+                 env=None, timeout=DEFAULT_TIMEOUT, cwd=None, use_shell=False):
   """Tries running the provided command once.
 
   Args:
@@ -285,12 +285,13 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
 
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
+  working_dir = cwd if cwd else '.'
 
-  shell_value = RunningOnWindows()
+  shell_value = RunningOnWindows() or use_shell
   with tempfile.TemporaryFile() as tf_out, tempfile.TemporaryFile() as tf_err:
     process = subprocess.Popen(cmd, env=env, shell=shell_value,
                                stdin=subprocess.PIPE, stdout=tf_out,
-                               stderr=tf_err)
+                               stderr=tf_err, cwd=working_dir)
 
     def _KillProcess():
       logging.error('IssueCommand timed out after %d seconds. '

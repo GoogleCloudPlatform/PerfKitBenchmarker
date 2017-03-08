@@ -20,6 +20,7 @@ at https://cloud.google.com/dataproc/
 import datetime
 import json
 import logging
+import os
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -33,6 +34,8 @@ GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                          'spark-examples.jar')
+
+SPARK_RUNNER = 'SparkRunner'
 
 
 class GcpDpbDataproc(dpb_service.BaseDpbService):
@@ -86,6 +89,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # The number of worker machines in the cluster
     cmd.flags['num-workers'] = self.spec.worker_count
 
+    # Beam Spark Runner supports only Spark 1.6.x
+    cmd.flags['image-version'] = '1.0'
+
     # Initialize applications on the dataproc cluster
     if self.spec.applications:
       logging.info('Include the requested applications')
@@ -121,11 +127,15 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     _, _, retcode = cmd.Issue()
     return retcode == 0
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=None,
+  def SubmitJob(self, classname, job_poll_interval=None,
                 job_arguments=None, job_stdout_file=None,
                 job_type=None):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
+
+    jarfile = os.path.join(
+      self.beam_dir,
+      'examples/java/target/beam-examples-java-bundled-0.7.0-SNAPSHOT.jar')
 
     if classname:
       cmd.flags['jars'] = jarfile
@@ -140,8 +150,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # the job standard out from the log messages.
     cmd.flags['driver-log-levels'] = 'root={}'.format(FLAGS.dpb_log_level)
 
-    if job_arguments:
-      cmd.additional_flags = ['--'] + job_arguments
+    cmd.additional_flags = job_arguments if job_arguments else []
+    cmd.additional_flags.append('--runner={}'.format(SPARK_RUNNER))
 
     stdout, stderr, retcode = cmd.Issue(timeout=None)
     if retcode != 0:

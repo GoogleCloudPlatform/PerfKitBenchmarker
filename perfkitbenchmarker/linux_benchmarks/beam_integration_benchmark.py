@@ -39,13 +39,13 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.dpb_service import BaseDpbService
 
-BENCHMARK_NAME = 'dpb_wordcount_benchmark'
+BENCHMARK_NAME = 'beam_integration_benchmark'
 
 BENCHMARK_CONFIG = """
-dpb_wordcount_benchmark:
+beam_integration_benchmark:
   description: Run word count on dataflow and dataproc
   dpb_service:
-    service_type: dataproc
+    service_type: dataflow
     worker_group:
       vm_spec:
         GCP:
@@ -62,28 +62,8 @@ dpb_wordcount_benchmark:
     worker_count: 2
 """
 
-WORD_COUNT_CONFIGURATION = dict(
-    [
-        (dpb_service.DATAPROC, ('org.apache.beam.examples.WordCount',
-                                BaseDpbService.SPARK_JOB_TYPE)),
-        (dpb_service.DATAFLOW, ('org.apache.beam.examples.WordCountIT',
-                                BaseDpbService.DATAFLOW_JOB_TYPE)),
-        # TODO: Reenable when EMR has support for Beam.
-        # (dpb_service.EMR, ('org.apache.beam.examples.WordCount',
-        #                    BaseDpbService.SPARK_JOB_TYPE))
-    ]
-)
-
-flags.DEFINE_string('dpb_wordcount_input', None, 'Input for word count')
-flags.DEFINE_enum('dpb_wordcount_fs', BaseDpbService.GCS_FS,
-                  [BaseDpbService.GCS_FS, BaseDpbService.S3_FS],
-                  'File System to use for the job output')
-flags.DEFINE_string('dpb_wordcount_out_base', None,
-                    'Base directory for word count output')
-flags.DEFINE_string('dpb_dataflow_staging_location', None,
-                    'Google Cloud Storage bucket for Dataflow to stage the '
-                    'binary and any temporary files. You must create this '
-                    'bucket ahead of time, before running your pipeline.')
+flags.DEFINE_string('dpb_it_class', 'org.apache.beam.examples.WordCountIT', 'Path to IT class')
+flags.DEFINE_string('dpb_it_args', None, 'Args to provide to the IT')
 
 FLAGS = flags.FLAGS
 
@@ -92,15 +72,14 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(benchmark_config):
+def CheckPrerequisites(config):
   """Verifies that the required resources are present.
 
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  if (FLAGS.dpb_wordcount_input is None and
-          FLAGS.dpb_wordcount_fs != BaseDpbService.GCS_FS):
-    raise errors.Config.InvalidValue('Invalid default input directory.')
+  if FLAGS.dpb_it_args is None:
+    raise errors.Config.InvalidValue('No args provided.')
 
 
 def Prepare(benchmark_spec):
@@ -108,7 +87,6 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
-
   # Get handle to the dpb service
   dpb_service_instance = benchmark_spec.dpb_service
 
@@ -120,26 +98,16 @@ def Run(benchmark_spec):
   stdout_file.close()
 
   # Switch the parameters for submit job function of specific dpb service
-  job_arguments = []
-  classname, job_type = _GetJobArguments(
-      dpb_service_instance.SERVICE_TYPE)
-
-  metadata = copy.copy(dpb_service_instance.GetMetadata())
+  job_arguments = ['"{}"'.format(arg) for arg in FLAGS.dpb_it_args.split(',')]
+  classname = FLAGS.dpb_it_class
 
   if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
-    job_arguments.append('"--gcpTempLocation={}"'.format(
-        FLAGS.dpb_dataflow_staging_location))
-    job_arguments.append('"--tempRoot={}"'.format(
-        FLAGS.dpb_dataflow_staging_location))
-    job_arguments.append('"--project={}"'.format(FLAGS.project))
+    job_type = BaseDpbService.DATAFLOW_JOB_TYPE
   else:
-    input_location = FLAGS.dpb_wordcount_input
-    job_arguments.append('--inputFile={}'.format(input_location))
-    job_arguments.append('--output=output/output')
-    metadata.update({'input_location': input_location})
+    raise NotImplementedError('Currently only works against Dataflow.')
 
-  # TODO (saksena): Finalize more stats to gather
   results = []
+  metadata = copy.copy(dpb_service_instance.GetMetadata())
 
   start = datetime.datetime.now()
   dpb_service_instance.SubmitJob(classname,
@@ -155,10 +123,3 @@ def Run(benchmark_spec):
 def Cleanup(benchmark_spec):
   pass
 
-
-def _GetJobArguments(dpb_service_type):
-  """Returns the arguments for word count job based on runtime service."""
-  if dpb_service_type not in WORD_COUNT_CONFIGURATION:
-    raise NotImplementedError
-  else:
-    return WORD_COUNT_CONFIGURATION[dpb_service_type]
