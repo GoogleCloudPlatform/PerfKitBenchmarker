@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import fcntl
 import json
 import multiprocessing as mp
 import os
@@ -245,6 +246,7 @@ class SampleSource:
       print("Reloading %s" % self.path)
       samples = None
       with open(self.path) as samples_json:
+        fcntl.flock(samples_json, fcntl.LOCK_EX)
         if full_reload or self.last_refresh is None:
           samples = [json.loads(s) for s in samples_json if s]
           self.next_seek = 0
