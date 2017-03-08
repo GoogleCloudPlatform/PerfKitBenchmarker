@@ -30,8 +30,9 @@ CONFIG_TEMPLATE = 'blazemark_config.j2'
 CONFIG = 'config'
 
 THROUGHPUT_HEADER_REGEX = (
-    r'(\w+[\w\- ]+\w+)\s*(\([0-9.]+% filled\))*\s*\[([\w/]+)\]:([0-9\s.]+)')
-THROUGHPUT_RESULT_REGEX = r'([0-9]+)\s*([0-9.]+)'
+    r'(\w+[\w\- ]+\w+)\s*(\([0-9.]+% filled\))*\s*[\[\(]'
+    '([\w/]+)[\]\)]:([0-9\s.e\-+]+)')
+THROUGHPUT_RESULT_REGEX = r'([0-9]+)\s*([0-9.e\-+]+)'
 FILLED_REGEX = r'([0-9.]+)% filled'
 
 LIBS = frozenset([
@@ -159,6 +160,7 @@ def _ParseResult(out, test):
     if filled:
       metadata['% filled'] = regex_util.ExtractFloat(FILLED_REGEX, filled)
     unit = m[-2]
+    print m
     for v in regex_util.ExtractAllMatches(THROUGHPUT_RESULT_REGEX, m[-1]):
       metadata['N'] = int(v[0])
       results.append(sample.Sample(
@@ -184,7 +186,12 @@ def RunTest(vm, test):
   out, _ = vm.RemoteCommand(
       'cd %s; export BLAZE_NUM_THREADS=%s; ./%s -only-blaze' % (
           os.path.join(BLAZEMARK_DIR, 'bin'), vm.num_cpus, test))
-  return _ParseResult(out, test)
+  ret = []
+  try:
+    ret = _ParseResult(out, test)
+  except regex_util.NoMatchError:
+    logging.exception('Parsing failed for %s.\n', test)
+  return ret
 
 
 def _Configure(vm):
