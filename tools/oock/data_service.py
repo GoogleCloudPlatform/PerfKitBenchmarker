@@ -369,9 +369,13 @@ def run_data_refresh_loop(data_source_store, data_store):
       data_sources[name] = build_data_source(data_source_spec)
     # Maybe refresh data sources and build data arrays
     for name, data_source in data_sources.items():
-      if data_source.maybe_refresh_data(sample_sources):
-        print("Refreshed data source: %s" % name)
-        data_array = build_google_charts_data_array(data_source.columns,
-                                                    data_source.data)
-        data_store[name] = data_array
+      try:
+        if data_source.maybe_refresh_data(sample_sources):
+          print("Refreshed data source: %s" % name)
+          data_array = build_google_charts_data_array(data_source.columns,
+                                                      data_source.data)
+          data_store[name] = data_array
+      except Exception as e:
+        print("ERROR: Failed to refresh data source %s:" % name)
+        print(e)
     time.sleep(5)
