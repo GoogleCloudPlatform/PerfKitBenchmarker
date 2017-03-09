@@ -160,7 +160,6 @@ def _ParseResult(out, test):
     if filled:
       metadata['% filled'] = regex_util.ExtractFloat(FILLED_REGEX, filled)
     unit = m[-2]
-    print m
     for v in regex_util.ExtractAllMatches(THROUGHPUT_RESULT_REGEX, m[-1]):
       metadata['N'] = int(v[0])
       results.append(sample.Sample(
