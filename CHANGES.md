@@ -1,3 +1,43 @@
+# v1.11.0
+
+External contributions:
+- Add ability to publish to InfluxDB (thanks @besanradwan GH-1278)
+- Always set internal IP-Address on OpenStack VMs (thanks @yremmet GH-1228)
+- Add CloudSuite data-analytics benchmark (thanks @ivonindza GH-1285)
+- README.md updates (thanks @ianmaddox GH-1291)
+- Fix a small typo in the anti-affinity FLAG lookup (thanks @joelio GH-1284)
+- Add helpmatch usage instructions (thanks @meteorfox GH-1268)
+- Deprecate flag openstack_volume_size (thanks @vhe182 GH-1220)
+- Add openStack_volume_type option decoder (thanks @meteorfox GH-1267)
+- Add ProfitBricks cloud api v3 support (thanks @aajdinov GH-1264)
+- Upgrade OpenStack CLI dependency to 3.6.0 (thanks @meteorfox GH-1265)
+- Enable OpenStack Cinder Volume Type Option (thanks @rossmartyn04 GH-1197)
+
+New features:
+- Add dpb_wordcount_benchmark (GH-1253)
+
+Enhancements:
+- Object storage storage service cold reads support, various improvements (GH-1290, GH-1274)
+- Add support for AWS Spot Instances (GH-1288)
+- Bump fio version to v2.17 and enable histogram (GH-1300)
+- Let publisher.py republish already-collected samples (GH 1299)
+- Allow specifying temp dir (GH-1277)
+- Add --json_write_mode (GH-1276)
+- Allow override hpcc binaries. (GH-1269)
+
+Bug fixes and maintenance updates:
+- Lock samples json file before writing to it (GH-1265)
+- Fixed exception caused by publishers being None (GH-1302)
+- Add error and warning log level options to reduce log size (GH-1301)
+- Use force for DigitalOcean deletes (GH-1281)
+- Print helpmatch usage instructions (GH-1280)
+- Fix fio parser regex (GH-1275)
+- Specify AWS region when calling describe-images (GH 1273)
+- Make CheckPrerequisites more comprehensive (GH-1272)
+- If the image_project flag is set always use it in disk creation (GH-1271)
+- Minor bug fixes and configuration improvements (GH-1262)
+
+
 # v1.10.0
 
 External contributions:
