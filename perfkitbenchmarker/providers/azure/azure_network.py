@@ -78,7 +78,7 @@ class AzureResourceGroup(resource.BaseResource):
            self.name, self.location])
 
       if retcode:
-        raise errors.RetryableCreationError(
+        raise errors.Resource.RetryableCreationError(
             'Error creating Azure resource group')
 
   def _Exists(self):
