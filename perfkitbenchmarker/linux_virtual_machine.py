@@ -217,6 +217,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
+      self.InstallPackages('python')
     self.SetFiles()
     self.DoSysctls()
     self.BurnCpu()

@@ -95,6 +95,11 @@ def LocalDiskIsHDD(machine_type):
   return machine_type[:2].lower() in LOCAL_HDD_PREFIXES
 
 
+def LocalDriveIsNvme(machine_type):
+  """Check if the machine type uses NVMe driver."""
+  return machine_type[:2].lower() == 'i3'
+
+
 AWS = 'AWS'
 disk.RegisterDiskTypeMap(AWS, DISK_TYPE)
 
@@ -153,7 +158,7 @@ class AwsDisk(disk.BaseDisk):
     self.region = util.GetRegionFromZone(zone)
     self.device_letter = None
     self.attached_vm_id = None
-
+    self.machine_type = machine_type
     if self.disk_type != disk.LOCAL:
       self.metadata = DISK_METADATA[self.disk_type]
     else:
@@ -250,6 +255,8 @@ class AwsDisk(disk.BaseDisk):
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
     if self.disk_type == disk.LOCAL:
+      if LocalDriveIsNvme(self.machine_type):
+        return '/dev/nvme%sn1' % str(ord(self.device_letter) - ord('b'))
       return '/dev/xvd%s' % self.device_letter
     else:
       return '/dev/xvdb%s' % self.device_letter
