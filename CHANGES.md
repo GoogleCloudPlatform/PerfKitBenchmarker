@@ -4,26 +4,26 @@ External contributions:
 - Add ability to publish to InfluxDB (thanks @besanradwan GH-1278)
 - Always set internal IP-Address on OpenStack VMs (thanks @yremmet GH-1228)
 - Add CloudSuite data-analytics benchmark (thanks @ivonindza GH-1285)
-- README.md updates (thanks @ianmaddox GH-1291)
+- Update README.md (thanks @ianmaddox GH-1291)
 - Fix a small typo in the anti-affinity FLAG lookup (thanks @joelio GH-1284)
-- Add helpmatch usage instructions (thanks @meteorfox GH-1268)
 - Deprecate flag openstack_volume_size (thanks @vhe182 GH-1220)
-- Add openStack_volume_type option decoder (thanks @meteorfox GH-1267)
 - Add ProfitBricks cloud api v3 support (thanks @aajdinov GH-1264)
-- Upgrade OpenStack CLI dependency to 3.6.0 (thanks @meteorfox GH-1265)
 - Enable OpenStack Cinder Volume Type Option (thanks @rossmartyn04 GH-1197)
 
 New features:
 - Add dpb_wordcount_benchmark (GH-1253)
 
 Enhancements:
-- Object storage storage service cold reads support, various improvements (GH-1290, GH-1274)
+- Add helpmatch usage instructions (GH-1268)
+- Add openStack_volume_type option decoder (GH-1267)
+- Upgrade OpenStack CLI dependency to 3.6.0 (GH-1265)
+- Add object storage service cold reads support, various improvements (GH-1290, GH-1274)
 - Add support for AWS Spot Instances (GH-1288)
 - Bump fio version to v2.17 and enable histogram (GH-1300)
 - Let publisher.py republish already-collected samples (GH 1299)
 - Allow specifying temp dir (GH-1277)
 - Add --json_write_mode (GH-1276)
-- Allow override hpcc binaries. (GH-1269)
+- Allow override hpcc binaries (GH-1269)
 
 Bug fixes and maintenance updates:
 - Lock samples json file before writing to it (GH-1265)
@@ -34,7 +34,7 @@ Bug fixes and maintenance updates:
 - Fix fio parser regex (GH-1275)
 - Specify AWS region when calling describe-images (GH 1273)
 - Make CheckPrerequisites more comprehensive (GH-1272)
-- If the image_project flag is set always use it in disk creation (GH-1271)
+- Use image_project flag in disk creation if set (GH-1271)
 - Minor bug fixes and configuration improvements (GH-1262)
 
 
