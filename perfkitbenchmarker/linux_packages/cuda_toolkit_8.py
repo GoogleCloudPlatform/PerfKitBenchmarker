@@ -32,7 +32,7 @@ FLAGS = flags.FLAGS
 
 # TODO: Test the CUDA Ubuntu 14.04 installer, and if everything works ok,
 # automatically install the correct package depending on the OS image.
-CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604_8.0.44-1_amd64.deb'
+CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604_8.0.61-1_amd64.deb'
 CUDA_TOOLKIT_UBUNTU_URL = (
     'http://developer.download.nvidia.com/compute/cuda'
     '/repos/ubuntu1604/x86_64/%s' % CUDA_TOOLKIT_UBUNTU)
@@ -116,8 +116,22 @@ def QueryGpuClockSpeed(vm, device_id):
   return (int(matches[0]), int(matches[1]))
 
 
+def _CheckNvidiaSmiExists(vm):
+  """Returns whether nvidia-smi is installed or not"""
+  resp, _ = vm.RemoteHostCommand('command -v nvidia-smi',
+                                 ignore_failure=True,
+                                 suppress_warning=True)
+  if resp.rstrip() == "":
+    return False
+  return True
+
+
 def AptInstall(vm):
-  """Installs CUDA toolkit 8 on the VM."""
+  """Installs CUDA toolkit 8 on the VM if not already installed"""
+  if _CheckNvidiaSmiExists(vm):
+    SetAndConfirmGpuClocks(vm)  # Max out clocks if CUDA is already installed
+    return
+
   vm.Install('build_tools')
   vm.Install('wget')
   vm.RemoteCommand('wget %s' % CUDA_TOOLKIT_UBUNTU_URL)
