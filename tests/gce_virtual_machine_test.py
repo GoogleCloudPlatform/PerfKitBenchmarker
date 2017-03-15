@@ -267,7 +267,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
   def testImageProjectFlag(self):
     """Tests that custom image_project flag is supported."""
     with self._PatchCriticalObjects() as issue_command:
-      self._mocked_flags.image_project = 'bar'
+      self._mocked_flags['image_project'].Parse('bar')
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
           machine_type='test_machine_type')

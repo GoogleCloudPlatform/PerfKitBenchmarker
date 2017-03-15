@@ -55,10 +55,12 @@ disk.RegisterDiskTypeMap(GCP, DISK_TYPE)
 class GceDisk(disk.BaseDisk):
   """Object representing an GCE Disk."""
 
-  def __init__(self, disk_spec, name, zone, project, image=None):
+  def __init__(self, disk_spec, name, zone, project,
+               image=None, image_project=None):
     super(GceDisk, self).__init__(disk_spec)
     self.attached_vm_name = None
     self.image = image
+    self.image_project = image_project
     self.name = name
     self.zone = zone
     self.project = project
@@ -71,8 +73,8 @@ class GceDisk(disk.BaseDisk):
     cmd.flags['type'] = self.disk_type
     if self.image:
       cmd.flags['image'] = self.image
-    if FLAGS.image_project:
-      cmd.flags['image-project'] = FLAGS.image_project
+    if self.image_project:
+      cmd.flags['image-project'] = self.image_project
     cmd.Issue()
 
   def _Delete(self):
