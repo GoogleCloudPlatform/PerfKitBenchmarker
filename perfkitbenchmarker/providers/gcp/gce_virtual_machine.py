@@ -268,6 +268,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size
     self.boot_disk_type = vm_spec.boot_disk_type
+    self.id = None
 
   def _GenerateCreateCommand(self, ssh_keys_path):
     """Generates a command to create the VM instance.
@@ -358,6 +359,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                                          'describe', self.name)
     stdout, _, _ = getinstance_cmd.Issue()
     response = json.loads(stdout)
+    self.id = response['id']
     network_interface = response['networkInterfaces'][0]
     self.internal_ip = network_interface['networkIP']
     self.ip_address = network_interface['accessConfigs'][0]['natIP']
