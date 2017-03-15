@@ -45,7 +45,8 @@ gpu_pcie_bandwidth:
     default:
       vm_spec:
         GCP:
-          image: /ubuntu-os-cloud/ubuntu-1604-xenial-v20161115
+          image: ubuntu-1604-xenial-v20161115
+          image_project: ubuntu-os-cloud
           machine_type: n1-standard-4-k80x1
           zone: us-east1-d
           boot_disk_size: 200
