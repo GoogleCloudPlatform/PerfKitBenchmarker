@@ -51,7 +51,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.name = self.name.replace('_', '-')
     self.user_name = FLAGS.username
     self.image = self.image or UBUNTU_IMAGE
-
+    
   def _CreateDependencies(self):
     self._CheckPrerequisites()
     self._CreateSecret()
@@ -358,7 +358,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     # character in file name. Thus 'authorizedkey' is passed which
     # is later properly moved to 'authorized_keys'.
     public_key = "/bin/mkdir /root/.ssh\n" + \
-                 "mv /tmp/authorizedkey /root/.ssh/authorized_keys\n"
+                 "/bin/cp /tmp/authorizedkey /root/.ssh/authorized_keys\n"
     container_boot_commands = public_key + "/usr/sbin/sshd -D"
 
     container = {
