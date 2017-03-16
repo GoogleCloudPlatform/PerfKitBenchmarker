@@ -21,25 +21,15 @@ the corresponding provider directory as a subclass of BaseDpbService.
 """
 
 import abc
-import os
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import vm_util
 
 
 flags.DEFINE_string('static_dpb_service_instance', None,
                     'If set, the name of the pre created dpb implementation,'
                     'assumed to be ready.')
 flags.DEFINE_string('dpb_log_level', 'FATAL', 'Manipulate service log level')
-flags.DEFINE_string('dpb_maven_binary', 'mvn',
-                    'Set to use a different mvn binary than is on the PATH.')
-flags.DEFINE_string('dpb_beam_location', None,
-                    'Location of already checked out Beam codebase.')
-flags.DEFINE_string('dpb_beam_it_module', None,
-                    'Module containing integration test.')
-flags.DEFINE_string('dpb_beam_it_profile', None,
-                    'Profile to activate integration test.')
 
 _DPB_SERVICE_REGISTRY = {}
 FLAGS = flags.FLAGS
@@ -110,8 +100,7 @@ class BaseDpbService(resource.BaseResource):
   SPARK_JOB_TYPE = 'spark'
   HADOOP_JOB_TYPE = 'hadoop'
   DATAFLOW_JOB_TYPE = 'dataflow'
-
-  install_command = "{0} clean install -DskipTests -Dcheckstyle.skip=true -P{1}"
+  BEAM_JOB_TYPE = 'beam'
 
   def __init__(self, dpb_service_spec):
     """Initialize the Dpb service object.
@@ -125,32 +114,9 @@ class BaseDpbService(resource.BaseResource):
     super(BaseDpbService, self).__init__(user_managed=is_user_managed)
     self.spec = dpb_service_spec
     self.cluster_id = dpb_service_spec.static_dpb_service_instance
-    if FLAGS.dpb_beam_location is None:
-      self.beam_dir = os.path.join(vm_util.GetTempDir(), 'beam')
-    else:
-      self.beam_dir = FLAGS.dpb_beam_location
-    self.mvn_command = FLAGS.dpb_maven_binary
-    self._InitializeBeamJars()
-
-  def _InitializeBeamJars(self):
-    vm_util.GenTempDir()
-    if FLAGS.dpb_beam_location is None:
-      vm_util.IssueCommand(['git clone https://github.com/apache/beam.git'],
-                           cwd=vm_util.GetTempDir(),
-                           use_shell=True)
-    if self.SERVICE_TYPE is DATAFLOW:
-      vm_util.IssueCommand(
-        [self.install_command.format(self.mvn_command, 'dataflow-runner')],
-        cwd=self.beam_dir,
-        use_shell=True)
-    elif self.SERVICE_TYPE is DATAPROC:
-      vm_util.IssueCommand(
-        [self.install_command.format(self.mvn_command, 'spark-runner')],
-        cwd=self.beam_dir,
-        use_shell=True)
 
   @abc.abstractmethod
-  def SubmitJob(self, class_name, job_poll_interval=None,
+  def SubmitJob(self, job_jar, class_name, job_poll_interval=None,
                 job_stdout_file=None, job_arguments=None,
                 job_type=None):
     """Submit a data processing job to the backend.

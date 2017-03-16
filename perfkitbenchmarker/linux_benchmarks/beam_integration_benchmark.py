@@ -32,6 +32,8 @@ import copy
 import datetime
 import tempfile
 
+import beam_benchmark_helper
+
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -72,7 +74,7 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(config):
+def CheckPrerequisites(benchmark_spec):
   """Verifies that the required resources are present.
 
   Raises:
@@ -80,9 +82,12 @@ def CheckPrerequisites(config):
   """
   if FLAGS.dpb_it_args is None:
     raise errors.Config.InvalidValue('No args provided.')
+  if benchmark_spec.SERVICE_TYPE != dpb_service.DATAFLOW:
+    raise NotImplementedError('Currently only works against Dataflow.')
 
 
 def Prepare(benchmark_spec):
+  beam_benchmark_helper.InitializeBeamRepo(benchmark_spec)
   pass
 
 
@@ -101,16 +106,13 @@ def Run(benchmark_spec):
   job_arguments = ['"{}"'.format(arg) for arg in FLAGS.dpb_it_args.split(',')]
   classname = FLAGS.dpb_it_class
 
-  if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
-    job_type = BaseDpbService.DATAFLOW_JOB_TYPE
-  else:
-    raise NotImplementedError('Currently only works against Dataflow.')
+  job_type = BaseDpbService.BEAM_JOB_TYPE
 
   results = []
   metadata = copy.copy(dpb_service_instance.GetMetadata())
 
   start = datetime.datetime.now()
-  dpb_service_instance.SubmitJob(classname,
+  dpb_service_instance.SubmitJob('', classname,
                                  job_arguments=job_arguments,
                                  job_stdout_file=stdout_file,
                                  job_type=job_type)
