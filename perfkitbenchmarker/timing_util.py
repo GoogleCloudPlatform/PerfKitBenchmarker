@@ -18,7 +18,6 @@ from contextlib import contextmanager
 import time
 
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import flags_validators
 from perfkitbenchmarker import sample
 
 
@@ -73,15 +72,15 @@ def ValidateMeasurementsFlag(options_list):
     the documented requirements.
 
   Raises:
-    flags_validators.Error: If the list of options provided as the value for
+    flags.ValidationError: If the list of options provided as the value for
       the flag does not meet the documented requirements.
   """
   for option in options_list:
     if option not in MEASUREMENTS_ALL:
-      raise flags_validators.Error(
+      raise flags.ValidationError(
           '%s: Invalid value for --%s' % (option, MEASUREMENTS_FLAG_NAME))
     if option == MEASUREMENTS_NONE and len(options_list) != 1:
-      raise flags_validators.Error(
+      raise flags.ValidationError(
           '%s: Cannot combine with other --%s options' % (
               option, MEASUREMENTS_FLAG_NAME))
   return True
@@ -95,7 +94,7 @@ flags.DEFINE_list(
         '|'.join(MEASUREMENTS_ALL),
         ' '.join(['%s: %s' % (option, description) for option, description in
                   MEASUREMENTS_ALL.iteritems()])))
-flags.RegisterValidator(
+flags.register_validator(
     MEASUREMENTS_FLAG_NAME, ValidateMeasurementsFlag)
 
 

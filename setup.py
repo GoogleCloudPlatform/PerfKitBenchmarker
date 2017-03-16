@@ -20,6 +20,6 @@ setup(
     license='Apache 2.0',
     packages=find_packages(exclude=['tests']),
     scripts=['pkb.py'],
-    install_requires=['python-gflags==3.0.4',
+    install_requires=['python-gflags==3.1.1',
                       'jinja2>=2.7',
                       'setuptools'])

@@ -279,12 +279,12 @@ def _PrintHelp(matches=None):
   if not matches:
     print FLAGS
   else:
-    flags_by_module = FLAGS.FlagsByModuleDict()
+    flags_by_module = FLAGS.flags_by_module_dict()
     modules = sorted(flags_by_module)
     regex = re.compile(matches)
     for module_name in modules:
       if regex.search(module_name):
-        print FLAGS.ModuleHelp(module_name)
+        print FLAGS.module_help(module_name)
 
 
 def CheckVersionFlag():
