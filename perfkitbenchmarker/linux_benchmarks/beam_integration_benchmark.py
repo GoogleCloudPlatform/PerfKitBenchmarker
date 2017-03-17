@@ -54,8 +54,8 @@ beam_integration_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_string('dpb_it_class', 'org.apache.beam.examples.WordCountIT', 'Path to IT class')
-flags.DEFINE_string('dpb_it_args', None, 'Args to provide to the IT')
+flags.DEFINE_string('beam_it_class', 'org.apache.beam.examples.WordCountIT', 'Path to IT class')
+flags.DEFINE_string('beam_it_args', None, 'Args to provide to the IT')
 
 FLAGS = flags.FLAGS
 
@@ -70,7 +70,7 @@ def CheckPrerequisites(benchmark_spec):
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  if FLAGS.dpb_it_args is None:
+  if FLAGS.beam_it_args is None:
     raise errors.Config.InvalidValue('No args provided.')
   if benchmark_spec.dpb_service.service_type != dpb_service.DATAFLOW:
     raise NotImplementedError('Currently only works against Dataflow.')
@@ -88,13 +88,13 @@ def Run(benchmark_spec):
   # Create a file handle to contain the response from running the job on
   # the dpb service
   stdout_file = tempfile.NamedTemporaryFile(suffix='.stdout',
-                                            prefix='dpb_wordcount_benchmark',
+                                            prefix='beam_integration_benchmark',
                                             delete=False)
   stdout_file.close()
 
   # Switch the parameters for submit job function of specific dpb service
-  job_arguments = ['"{}"'.format(arg) for arg in FLAGS.dpb_it_args.split(',')]
-  classname = FLAGS.dpb_it_class
+  job_arguments = ['"{}"'.format(arg) for arg in FLAGS.beam_it_args.split(',')]
+  classname = FLAGS.beam_it_class
 
   job_type = BaseDpbService.BEAM_JOB_TYPE
 

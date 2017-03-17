@@ -75,12 +75,12 @@ def InitializeBeamRepo(benchmark_spec):
 
 def BuildMavenCommand(benchmark_spec, classname, job_arguments):
   cmd = []
-  dataflow_executable = FLAGS.maven_binary
+  maven_executable = FLAGS.maven_binary
 
-  if not vm_util.ExecutableOnPath(dataflow_executable):
+  if not vm_util.ExecutableOnPath(maven_executable):
     raise errors.Setup.MissingExecutableError(
-      'Could not find required executable "%s"' % dataflow_executable)
-  cmd.append(dataflow_executable)
+      'Could not find required executable "%s"' % maven_executable)
+  cmd.append(maven_executable)
 
   cmd.append('-e')
   cmd.append('verify')
