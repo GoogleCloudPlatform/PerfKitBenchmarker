@@ -1,3 +1,23 @@
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Helper methods for Apache Beam benchmarks.
+
+This file contains methods which are common to all Beam benchmarks and
+executions.
+"""
+
 import os
 
 from perfkitbenchmarker import dpb_service
@@ -16,33 +36,41 @@ flags.DEFINE_string('beam_it_module', None,
 flags.DEFINE_string('beam_it_profile', None,
                     'Profile to activate integration test.')
 flags.DEFINE_string('git_binary', 'git', 'Path to git binary.')
+flags.DEFINE_string('beam_version', None, 'Version of Beam to download. Use'
+                                          ' tag from Github as value.')
 
 FLAGS = flags.FLAGS
 
-CLONE_COMMAND = '{0} clone https://github.com/apache/beam.git'
+BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
 INSTALL_COMMAND = "{0} clean install -DskipTests -Dcheckstyle.skip=true -P{1}"
 
 
 def InitializeBeamRepo(benchmark_spec):
   vm_util.GenTempDir()
   if FLAGS.beam_location is None:
-    vm_util.IssueCommand([CLONE_COMMAND.format(FLAGS.git_binary)],
+    clone_command = [
+      FLAGS.git_binary,
+      'clone',
+      BEAM_REPO_LOCATION,
+    ]
+    if FLAGS.beam_version:
+      clone_command.append('--branch={}'.format(FLAGS.beam_version))
+      clone_command.append('--single-branch')
+    joined_cmd = ' '.join(clone_command)
+    vm_util.IssueCommand([joined_cmd],
                          cwd=vm_util.GetTempDir(),
                          use_shell=True)
     beam_dir = os.path.join(vm_util.GetTempDir(), 'beam')
   else:
     beam_dir = FLAGS.beam_location
 
-  if benchmark_spec.SERVICE_TYPE is dpb_service.DATAFLOW:
+  if benchmark_spec.dpb_service.SERVICE_TYPE == dpb_service.DATAFLOW:
     vm_util.IssueCommand(
       [INSTALL_COMMAND.format(FLAGS.maven_binary, 'dataflow-runner')],
       cwd=beam_dir,
       use_shell=True)
-  elif benchmark_spec.SERVICE_TYPE is dpb_service.DATAPROC:
-    vm_util.IssueCommand(
-      [INSTALL_COMMAND.format(FLAGS.maven_binary, 'spark-runner')],
-      cwd=beam_dir,
-      use_shell=True)
+  else:
+    raise NotImplementedError('Unsupported Runner')
 
 
 def BuildMavenCommand(benchmark_spec, classname, job_arguments):
@@ -59,11 +87,11 @@ def BuildMavenCommand(benchmark_spec, classname, job_arguments):
   cmd.append('-Dit.test={}'.format(classname))
   cmd.append('-DskipITs=false')
 
-  if FLAGS.dpb_beam_it_module:
-    cmd.append('-pl {}'.format(FLAGS.dpb_beam_it_module))
+  if FLAGS.beam_it_module:
+    cmd.append('-pl {}'.format(FLAGS.beam_it_module))
 
-  if FLAGS.dpb_beam_it_profile:
-    cmd.append('-P{}'.format(FLAGS.dpb_beam_it_profile))
+  if FLAGS.beam_it_profile:
+    cmd.append('-P{}'.format(FLAGS.beam_it_profile))
 
   beam_args = job_arguments if job_arguments else []
 
@@ -80,5 +108,5 @@ def BuildMavenCommand(benchmark_spec, classname, job_arguments):
   full_cmd = ' '.join(cmd)
 
   # TODO: This is temporary, find a better way.
-  beam_dir = FLAGS.beam_location if FLAGS.beam_location else os.path.join(vm_util.getTempDir(), 'beam')
+  beam_dir = FLAGS.beam_location if FLAGS.beam_location else os.path.join(vm_util.GetTempDir(), 'beam')
   return full_cmd, beam_dir

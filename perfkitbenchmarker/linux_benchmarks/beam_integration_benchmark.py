@@ -12,28 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs the word count job on data processing backends.
+"""Generic benchmark running Apache Beam Integration Tests as benchmarks.
 
-WordCount example reads text files and counts how often words occur. The input
-is text files and the output is text files, each line of which contains a word
-and the count of how often it occurs, separated by a tab.
-The disk size parameters that are being passed as part of vm_spec are actually
-used as arguments to the dpb service creation commands and the concrete
-implementations (dataproc, emr, dataflow, etc.) control using the disk size
-during the cluster setup.
-
-dpb_wordcount_out_base: The output directory to capture the word count results
-
-For dataflow jobs, please build the dpb_dataflow_jar based on
-https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
+This benchmark provides the piping necessary to run Apache Beam Integration
+Tests as benchmarks. It provides the minimum additional configuration necessary
+to get the benchmark going.
 """
 
 import copy
 import datetime
 import tempfile
 
-import beam_benchmark_helper
-
+from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -82,7 +72,7 @@ def CheckPrerequisites(benchmark_spec):
   """
   if FLAGS.dpb_it_args is None:
     raise errors.Config.InvalidValue('No args provided.')
-  if benchmark_spec.SERVICE_TYPE != dpb_service.DATAFLOW:
+  if benchmark_spec.dpb_service.service_type != dpb_service.DATAFLOW:
     raise NotImplementedError('Currently only works against Dataflow.')
 
 

@@ -17,12 +17,12 @@ No Clusters can be created or destroyed, since it is a managed solution
 See details at: https://cloud.google.com/dataflow/
 """
 
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_benchmarks import beam_benchmark_helper
 
 flags.DEFINE_string('dpb_dataflow_staging_location', None,
                     'Google Cloud Storage bucket for Dataflow to stage the '
