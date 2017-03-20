@@ -41,11 +41,18 @@ flags.DEFINE_string('beam_version', None, 'Version of Beam to download. Use'
 
 FLAGS = flags.FLAGS
 
+SUPPORTED_RUNNERS = [
+  dpb_service.DATAFLOW,
+]
+
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
 INSTALL_COMMAND = "{0} clean install -DskipTests -Dcheckstyle.skip=true -P{1}"
 
 
 def InitializeBeamRepo(benchmark_spec):
+  if benchmark_spec.dpb_service.SERVICE_TYPE not in SUPPORTED_RUNNERS:
+    raise NotImplementedError('Unsupported Runner')
+
   vm_util.GenTempDir()
   if FLAGS.beam_location is None:
     clone_command = [
@@ -69,11 +76,12 @@ def InitializeBeamRepo(benchmark_spec):
       [INSTALL_COMMAND.format(FLAGS.maven_binary, 'dataflow-runner')],
       cwd=beam_dir,
       use_shell=True)
-  else:
-    raise NotImplementedError('Unsupported Runner')
 
 
 def BuildMavenCommand(benchmark_spec, classname, job_arguments):
+  if benchmark_spec.service_type not in SUPPORTED_RUNNERS:
+    raise NotImplementedError('Unsupported Runner')
+
   cmd = []
   maven_executable = FLAGS.maven_binary
 
@@ -96,12 +104,10 @@ def BuildMavenCommand(benchmark_spec, classname, job_arguments):
   beam_args = job_arguments if job_arguments else []
 
   if benchmark_spec.service_type == dpb_service.DATAFLOW:
-    cmd.append('-Pdataflow-runner')
+    cmd.append('-P{}'.format('dataflow-runner'))
     beam_args.append('"--runner=org.apache.beam.runners.'
                      'dataflow.testing.TestDataflowRunner"')
     beam_args.append('"--defaultWorkerLogLevel={}"'.format(FLAGS.dpb_log_level))
-  else:
-    raise NotImplementedError('Unsupported Runner Specified')
 
   cmd.append("-DintegrationTestPipelineOptions="
              "'[{}]'".format(','.join(beam_args)))
