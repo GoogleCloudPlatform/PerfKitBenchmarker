@@ -72,7 +72,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     """See base class."""
 
     if job_type == self.BEAM_JOB_TYPE:
-      full_cmd, beam_dir = beam_benchmark_helper.BuildMavenCommand(self.spec, classname, job_arguments)
+      full_cmd, beam_dir = beam_benchmark_helper.BuildMavenCommand(
+          self.spec, classname, job_arguments)
       stdout, _, _ = vm_util.IssueCommand([full_cmd],
                                           cwd=beam_dir,
                                           use_shell=True, timeout=600)

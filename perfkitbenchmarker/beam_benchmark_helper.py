@@ -42,7 +42,7 @@ flags.DEFINE_string('beam_version', None, 'Version of Beam to download. Use'
 FLAGS = flags.FLAGS
 
 SUPPORTED_RUNNERS = [
-  dpb_service.DATAFLOW,
+    dpb_service.DATAFLOW,
 ]
 
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
@@ -56,9 +56,9 @@ def InitializeBeamRepo(benchmark_spec):
   vm_util.GenTempDir()
   if FLAGS.beam_location is None:
     clone_command = [
-      FLAGS.git_binary,
-      'clone',
-      BEAM_REPO_LOCATION,
+        FLAGS.git_binary,
+        'clone',
+        BEAM_REPO_LOCATION,
     ]
     if FLAGS.beam_version:
       clone_command.append('--branch={}'.format(FLAGS.beam_version))
@@ -73,9 +73,9 @@ def InitializeBeamRepo(benchmark_spec):
 
   if benchmark_spec.dpb_service.SERVICE_TYPE == dpb_service.DATAFLOW:
     vm_util.IssueCommand(
-      [INSTALL_COMMAND.format(FLAGS.maven_binary, 'dataflow-runner')],
-      cwd=beam_dir,
-      use_shell=True)
+        [INSTALL_COMMAND.format(FLAGS.maven_binary, 'dataflow-runner')],
+        cwd=beam_dir,
+        use_shell=True)
 
 
 def BuildMavenCommand(benchmark_spec, classname, job_arguments):
@@ -87,7 +87,7 @@ def BuildMavenCommand(benchmark_spec, classname, job_arguments):
 
   if not vm_util.ExecutableOnPath(maven_executable):
     raise errors.Setup.MissingExecutableError(
-      'Could not find required executable "%s"' % maven_executable)
+        'Could not find required executable "%s"' % maven_executable)
   cmd.append(maven_executable)
 
   cmd.append('-e')
@@ -114,5 +114,6 @@ def BuildMavenCommand(benchmark_spec, classname, job_arguments):
   full_cmd = ' '.join(cmd)
 
   # TODO: This is temporary, find a better way.
-  beam_dir = FLAGS.beam_location if FLAGS.beam_location else os.path.join(vm_util.GetTempDir(), 'beam')
+  beam_dir = FLAGS.beam_location if FLAGS.beam_location else os.path.join(
+      vm_util.GetTempDir(), 'beam')
   return full_cmd, beam_dir

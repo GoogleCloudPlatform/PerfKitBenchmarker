@@ -54,7 +54,10 @@ beam_integration_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_string('beam_it_class', 'org.apache.beam.examples.WordCountIT', 'Path to IT class')
+flags.DEFINE_string(
+    'beam_it_class',
+    'org.apache.beam.examples.WordCountIT',
+    'Path to IT class')
 flags.DEFINE_string('beam_it_args', None, 'Args to provide to the IT')
 
 FLAGS = flags.FLAGS
@@ -114,4 +117,3 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
   pass
-
