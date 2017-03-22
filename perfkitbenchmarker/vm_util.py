@@ -256,7 +256,7 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
 
 
 def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
-                 env=None, timeout=DEFAULT_TIMEOUT, cwd=None, use_shell=False):
+                 env=None, timeout=DEFAULT_TIMEOUT, cwd=None):
   """Tries running the provided command once.
 
   Args:
@@ -278,7 +278,6 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
         contain what had already been written to them before the process was
         killed.
     cwd: Directory in which to execute the command.
-    use_shell: Whether to execute this command via the shell.
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
@@ -288,7 +287,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
-  shell_value = RunningOnWindows() or use_shell
+  shell_value = RunningOnWindows()
   with tempfile.TemporaryFile() as tf_out, tempfile.TemporaryFile() as tf_err:
     process = subprocess.Popen(cmd, env=env, shell=shell_value,
                                stdin=subprocess.PIPE, stdout=tf_out,

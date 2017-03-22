@@ -37,7 +37,8 @@ flags.DEFINE_string('beam_it_profile', None,
                     'Profile to activate integration test.')
 flags.DEFINE_string('git_binary', 'git', 'Path to git binary.')
 flags.DEFINE_string('beam_version', None, 'Version of Beam to download. Use'
-                                          ' tag from Github as value.')
+                                          ' tag from Github as value. If not'
+                                          ' specified, will use HEAD.')
 
 FLAGS = flags.FLAGS
 
@@ -46,7 +47,7 @@ SUPPORTED_RUNNERS = [
 ]
 
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
-INSTALL_COMMAND = "{0} clean install -DskipTests -Dcheckstyle.skip=true -P{1}"
+INSTALL_COMMAND_ARGS = ["clean", "install", "-DskipTests", "-Dcheckstyle.skip=true"]
 
 
 def InitializeBeamRepo(benchmark_spec):
@@ -63,19 +64,16 @@ def InitializeBeamRepo(benchmark_spec):
     if FLAGS.beam_version:
       clone_command.append('--branch={}'.format(FLAGS.beam_version))
       clone_command.append('--single-branch')
-    joined_cmd = ' '.join(clone_command)
-    vm_util.IssueCommand([joined_cmd],
-                         cwd=vm_util.GetTempDir(),
-                         use_shell=True)
+    vm_util.IssueCommand(clone_command, cwd=vm_util.GetTempDir())
     beam_dir = os.path.join(vm_util.GetTempDir(), 'beam')
   else:
     beam_dir = FLAGS.beam_location
 
   if benchmark_spec.dpb_service.SERVICE_TYPE == dpb_service.DATAFLOW:
-    vm_util.IssueCommand(
-        [INSTALL_COMMAND.format(FLAGS.maven_binary, 'dataflow-runner')],
-        cwd=beam_dir,
-        use_shell=True)
+    mvn_command = [FLAGS.maven_binary]
+    mvn_command.extend(INSTALL_COMMAND_ARGS)
+    mvn_command.append('-Pdataflow-runner')
+    vm_util.IssueCommand(mvn_command, cwd=beam_dir)
 
 
 def BuildMavenCommand(benchmark_spec, classname, job_arguments):
@@ -96,7 +94,8 @@ def BuildMavenCommand(benchmark_spec, classname, job_arguments):
   cmd.append('-DskipITs=false')
 
   if FLAGS.beam_it_module:
-    cmd.append('-pl {}'.format(FLAGS.beam_it_module))
+    cmd.append('-pl')
+    cmd.append(FLAGS.beam_it_module)
 
   if FLAGS.beam_it_profile:
     cmd.append('-P{}'.format(FLAGS.beam_it_profile))
@@ -110,10 +109,9 @@ def BuildMavenCommand(benchmark_spec, classname, job_arguments):
     beam_args.append('"--defaultWorkerLogLevel={}"'.format(FLAGS.dpb_log_level))
 
   cmd.append("-DintegrationTestPipelineOptions="
-             "'[{}]'".format(','.join(beam_args)))
-  full_cmd = ' '.join(cmd)
+             "[{}]".format(','.join(beam_args)))
 
   # TODO: This is temporary, find a better way.
   beam_dir = FLAGS.beam_location if FLAGS.beam_location else os.path.join(
       vm_util.GetTempDir(), 'beam')
-  return full_cmd, beam_dir
+  return cmd, beam_dir

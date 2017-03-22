@@ -71,10 +71,13 @@ def CheckPrerequisites(benchmark_spec):
   """Verifies that the required resources are present.
 
   Raises:
-    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+    perfkitbenchmarker.errors.Config.InvalidValue: If no Beam args are provided.
+    NotImplementedError: If an invalid runner is specified.
   """
   if FLAGS.beam_it_args is None:
-    raise errors.Config.InvalidValue('No args provided.')
+    raise errors.Config.InvalidValue(
+        'No args provided. To run with default class (WordCountIT), must'
+        'provide --beam_it_args=--tempRoot=<temp dir, e.g. gs://my-dir/temp>.')
   if benchmark_spec.dpb_service.service_type != dpb_service.DATAFLOW:
     raise NotImplementedError('Currently only works against Dataflow.')
 
