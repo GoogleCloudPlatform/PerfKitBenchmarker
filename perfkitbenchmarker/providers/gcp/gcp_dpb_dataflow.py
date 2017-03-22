@@ -74,7 +74,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if job_type == self.BEAM_JOB_TYPE:
       full_cmd, beam_dir = beam_benchmark_helper.BuildMavenCommand(
           self.spec, classname, job_arguments)
-      stdout, _, _ = vm_util.IssueCommand(full_cmd, cwd=beam_dir, timeout=600)
+      stdout, _, retcode = vm_util.IssueCommand(full_cmd, cwd=beam_dir,
+                                                timeout=600)
+      assert retcode == 0, "Integration Test Failed."
       return
 
     worker_machine_type = self.spec.worker_group.vm_spec.machine_type
