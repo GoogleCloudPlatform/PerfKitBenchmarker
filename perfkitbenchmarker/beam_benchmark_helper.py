@@ -78,6 +78,10 @@ def InitializeBeamRepo(benchmark_spec):
     vm_util.IssueCommand(clone_command, cwd=vm_util.GetTempDir())
     beam_dir = os.path.join(vm_util.GetTempDir(), 'beam')
   else:
+    if not os.path.exists(FLAGS.beam_location):
+      raise errors.Config.InvalidValue(
+        'Directory indicated by beam_location does not exist: '
+        '{}.'.format(FLAGS.beam_location))
     beam_dir = FLAGS.beam_location
 
   if benchmark_spec.dpb_service.SERVICE_TYPE == dpb_service.DATAFLOW:
