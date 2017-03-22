@@ -121,11 +121,6 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
     if dpb_service_config['service_type'] == dpb_service.EMR:
         if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
             raise errors.Config.InvalidValue('EMR service requires S3.')
-    if dpb_service_config['service_type'] == dpb_service.DATAFLOW:
-      if flag_values.dpb_dataflow_jar is None:
-        raise errors.Config.InvalidValue('Dataflow jar missing.')
-      if flag_values.dpb_dataflow_staging_location is None:
-        raise errors.Config.InvalidValue('Dataflow Staging location missing.')
     result = _DpbServiceSpec(self._GetOptionFullName(component_full_name),
                              flag_values, **dpb_service_config)
     return result

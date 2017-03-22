@@ -17,10 +17,11 @@ No Clusters can be created or destroyed, since it is a managed solution
 See details at: https://cloud.google.com/dataflow/
 """
 
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_string('dpb_dataflow_staging_location', None,
@@ -69,6 +70,15 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
                 job_arguments=None, job_stdout_file=None,
                 job_type=None):
     """See base class."""
+
+    if job_type == self.BEAM_JOB_TYPE:
+      full_cmd, beam_dir = beam_benchmark_helper.BuildMavenCommand(
+          self.spec, classname, job_arguments)
+      stdout, _, retcode = vm_util.IssueCommand(full_cmd, cwd=beam_dir,
+                                                timeout=FLAGS.beam_it_timeout)
+      assert retcode == 0, "Integration Test Failed."
+      return
+
     worker_machine_type = self.spec.worker_group.vm_spec.machine_type
     num_workers = self.spec.worker_count
     max_num_workers = self.spec.worker_count
