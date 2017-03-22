@@ -75,7 +75,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       full_cmd, beam_dir = beam_benchmark_helper.BuildMavenCommand(
           self.spec, classname, job_arguments)
       stdout, _, retcode = vm_util.IssueCommand(full_cmd, cwd=beam_dir,
-                                                timeout=600)
+                                                timeout=FLAGS.beam_it_timeout)
       assert retcode == 0, "Integration Test Failed."
       return
 
