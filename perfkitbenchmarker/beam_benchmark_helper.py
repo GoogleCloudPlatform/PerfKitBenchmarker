@@ -47,10 +47,20 @@ SUPPORTED_RUNNERS = [
 ]
 
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
-INSTALL_COMMAND_ARGS = ["clean", "install", "-DskipTests", "-Dcheckstyle.skip=true"]
+INSTALL_COMMAND_ARGS = ["clean", "install", "-DskipTests",
+                        "-Dcheckstyle.skip=true"]
 
 
 def InitializeBeamRepo(benchmark_spec):
+  """Ensures environment is prepared for running Beam benchmarks.
+
+  In the absence of FLAGS.beam_location, initializes the beam source code base
+  by checking out the repository from github. Specific branch selection is
+  supported.
+
+  Args:
+    benchmark_spec: The PKB spec for the benchmark to run.
+  """
   if benchmark_spec.dpb_service.SERVICE_TYPE not in SUPPORTED_RUNNERS:
     raise NotImplementedError('Unsupported Runner')
 
@@ -77,6 +87,17 @@ def InitializeBeamRepo(benchmark_spec):
 
 
 def BuildMavenCommand(benchmark_spec, classname, job_arguments):
+  """ Constructs a maven command for the benchmark.
+
+  Args:
+    benchmark_spec: The PKB spec for the benchmark to run.
+    classname: The classname of the class to run.
+    job_arguments: The additional job arguments provided for the run.
+
+  Returns:
+    cmd: Array containing the built command.
+    beam_dir: The directory in which to run the command.
+  """
   if benchmark_spec.service_type not in SUPPORTED_RUNNERS:
     raise NotImplementedError('Unsupported Runner')
 
