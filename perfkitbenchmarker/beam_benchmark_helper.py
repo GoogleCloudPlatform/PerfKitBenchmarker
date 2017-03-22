@@ -80,8 +80,8 @@ def InitializeBeamRepo(benchmark_spec):
   else:
     if not os.path.exists(FLAGS.beam_location):
       raise errors.Config.InvalidValue(
-        'Directory indicated by beam_location does not exist: '
-        '{}.'.format(FLAGS.beam_location))
+          'Directory indicated by beam_location does not exist: '
+          '{}.'.format(FLAGS.beam_location))
     beam_dir = FLAGS.beam_location
 
   if benchmark_spec.dpb_service.SERVICE_TYPE == dpb_service.DATAFLOW:
