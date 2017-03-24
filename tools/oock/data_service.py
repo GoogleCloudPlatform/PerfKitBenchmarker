@@ -4,8 +4,10 @@ import json
 import multiprocessing as mp
 import os
 import socketserver
+import statistics
 import sys
 import time
+import traceback
 import yaml
 
 from collections import defaultdict
@@ -30,10 +32,18 @@ def aggregate_data(data_dict, method):
     for group, group_data in data_dict.items():
       for values in group_data.values():
         values[:] = [sum(values) * 100.0 / total_sums[group]]
+  elif method == 'coefficient_of_variation':
+    for group, group_data in data_dict.items():
+      for values in group_data.values():
+        mean = abs(statistics.mean(values))
+        if len(values) > 1 and mean > 0.0:
+          values[:] = [statistics.stdev(values) / mean]
+        else:
+          values[:] = [0]
   elif method == 'average':
     for group_data in data_dict.values():
       for values in group_data.values():
-        values[:] = [sum(values) / len(values)]
+        values[:] = [statistics.mean(values)]
   elif method == 'min':
     for group_data in data_dict.values():
       for values in group_data.values():
@@ -377,5 +387,5 @@ def run_data_refresh_loop(data_source_store, data_store):
           data_store[name] = data_array
       except Exception as e:
         print("ERROR: Failed to refresh data source %s:" % name)
-        print(e)
+        traceback.print_exc()
     time.sleep(5)

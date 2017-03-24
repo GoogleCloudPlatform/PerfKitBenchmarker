@@ -14,6 +14,8 @@ from page_service import run_page_service
 
 app = Flask(__name__)
 
+SERVICE_PORT = 22422
+
 ########################################
 # app context stuff
 ########################################
@@ -25,7 +27,7 @@ def connect_service(host, port):
 
 def get_page_service_connection():
   if not hasattr(g, 'page_service'):
-    g.page_service = connect_service('localhost', 22422)
+    g.page_service = connect_service('localhost', SERVICE_PORT)
   return g.page_service
 
 @app.teardown_appcontext
@@ -58,7 +60,7 @@ def chart_page(path):
   return make_response(html)
 
 @app.route('/data/<string:data_source_name>')
-def index_page(data_source_name):
+def chart_data(data_source_name):
   page_service = get_page_service_connection()
 
   page_service.send_str('data_source %s' % data_source_name)
@@ -73,13 +75,13 @@ def index_page(data_source_name):
 def start_services(page_spec):
   # Start page service
   page_service_proc = mp.Process(target=run_page_service,
-                                 args=('localhost', 22422, page_spec))
+                                 args=('localhost', SERVICE_PORT, page_spec))
   page_service_proc.start()
 
   return page_service_proc
 
 def main():
-  if len(sys.argv) != 3:
+  if len(sys.argv) != 2:
     print("Usage: python3 chart_server.py <page_spec>")
     exit()
 
@@ -90,7 +92,7 @@ def main():
 
   # Start webserver
   try:
-    app.run()
+    app.run(host='0.0.0.0', port=80)
   except KeyboardInterrupt:
     page_service_proc.terminate()
 

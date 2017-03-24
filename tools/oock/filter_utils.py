@@ -3,6 +3,7 @@
 import json
 import re
 import sys
+import traceback
 
 def filter_by(samples, key, f):
   """
@@ -31,9 +32,13 @@ def select_filter(samples, keys, label_keys, f):
        label_keys
   """
   def select_f(s):
-    values = [s[key] for key in keys]
-    label_values = [s['metadata'].get(label) for label in label_keys]
-    return f(*(values + label_values))
+    try:
+      values = [s[key] for key in keys]
+      label_values = [s['metadata'].get(label) for label in label_keys]
+      return f(*(values + label_values))
+    except:
+      print("Failed to filter sample: \n%s" % s)
+      traceback.print_exc()
   samples[:] = [s for s in samples if select_f(s)]
 
 def filter_by_value(samples, key, value):
