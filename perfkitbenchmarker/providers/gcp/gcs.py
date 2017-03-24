@@ -46,8 +46,8 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     if self.location:
       command.extend(['-l', self.location])
     if self.location and '-' in self.location:
-      # regional buckets are always DRA
-      command.extend(['-c', 'DRA'])
+      # regional buckets
+      command.extend(['-c', 'regional'])
     elif FLAGS.object_storage_storage_class is not None:
       command.extend(['-c', FLAGS.object_storage_storage_class])
     command.extend(['gs://%s' % bucket])
