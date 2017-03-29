@@ -34,7 +34,7 @@ class HelpTest(unittest.TestCase):
 class HelpXMLTest(unittest.TestCase):
   def testHelpXML(self):
     with open(os.devnull, 'w') as out:
-      flags.FLAGS.WriteHelpInXMLFormat(outfile=out)
+      flags.FLAGS.write_help_in_xml_format(outfile=out)
 
 
 if __name__ == '__main__':

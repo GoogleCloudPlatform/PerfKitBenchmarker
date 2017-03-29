@@ -16,7 +16,7 @@ import mock
 import re
 import unittest
 
-from perfkitbenchmarker import flags_validators
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker import timing_util
@@ -29,14 +29,14 @@ class ValidateMeasurementsFlagTestCase(unittest.TestCase):
     """Passing an unrecognized value is not allowed."""
     exp_str = 'test: Invalid value for --timing_measurements'
     exp_regex = r'^%s$' % re.escape(exp_str)
-    with self.assertRaisesRegexp(flags_validators.Error, exp_regex):
+    with self.assertRaisesRegexp(flags.ValidationError, exp_regex):
       timing_util.ValidateMeasurementsFlag(['test'])
 
   def testNoneWithAnother(self):
     """Passing none with another value is not allowed."""
     exp_str = 'none: Cannot combine with other --timing_measurements options'
     exp_regex = r'^%s$' % re.escape(exp_str)
-    with self.assertRaisesRegexp(flags_validators.Error, exp_regex):
+    with self.assertRaisesRegexp(flags.ValidationError, exp_regex):
       timing_util.ValidateMeasurementsFlag(['none', 'runtimes'])
 
   def testValid(self):
