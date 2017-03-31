@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,24 +25,26 @@ from perfkitbenchmarker import units
 
 FLAGS = flags.FLAGS
 
-INTEGER_GROUP_REGEXP = re.compile(r'(\d+)(-(\d+))?$')
+INTEGER_GROUP_REGEXP = re.compile(r'(\d+)(-(\d+))?(-(\d+))?$')
 
 
 class IntegerList(object):
   """An immutable list of nonnegative integers.
 
   The list contains either single integers (ex: 5) or ranges (ex:
-  8-12). The list can include as many elements as will fit in
+  8-12). Additionally, the user can provide a step to the range like so:
+  8-24-2. The list can include as many elements as will fit in
   memory. Furthermore, the memory required to hold a range will not
   grow with the size of the range.
 
   Make a list with
     lst = IntegerList(groups)
 
-  where groups is a list whose elements are either single integers or
+  where groups is a list whose elements are either single integers,
   2-tuples holding the low and high bounds of a range
-  (inclusive). (Ex: [5, (8,12)] represents the integer list
-  5,8,9,10,11,12.)
+  (inclusive), or 3-tuples holding the low and high bounds, followed
+  by the step size. (Ex: [5, (8,12)] represents the integer list
+  5,8,9,10,11,12, and [(8-14-2)] represents the list 8,10,12,14.)
 
   """
 
@@ -54,7 +56,7 @@ class IntegerList(object):
       if isinstance(elt, int) or isinstance(elt, long):
         length += 1
       if isinstance(elt, tuple):
-        length += elt[1] - elt[0] + 1
+        length += len(self._CreateXrangeFromTuple(elt))
 
     self.length = length
 
@@ -75,12 +77,13 @@ class IntegerList(object):
         group_idx += 1
         idx -= 1
       else:
-        group_len = group[1] - group[0] + 1
+        group_len = len(self._CreateXrangeFromTuple(group))
         if idx >= group_len:
           group_idx += 1
           idx -= group_len
         else:
-          return group[0] + idx
+          step = 1 if len(group) == 2 else group[2]
+          return group[0] + idx * step
 
     if isinstance(self.groups[group_idx], tuple):
       return self.groups[group_idx][0]
@@ -92,19 +95,25 @@ class IntegerList(object):
       if isinstance(group, int) or isinstance(group, long):
         yield group
       else:
-        low, high = group
-        for val in xrange(low, high + 1):
+        for val in self._CreateXrangeFromTuple(group):
           yield val
 
   def __str__(self):
       return IntegerListSerializer().Serialize(self)
+
+  def _CreateXrangeFromTuple(self, input_tuple):
+    start = input_tuple[0]
+    stop_inclusive = input_tuple[1] + 1
+    step = 1 if len(input_tuple) == 2 else input_tuple[2]
+    return xrange(start, stop_inclusive, step)
 
 
 class IntegerListParser(flags.ArgumentParser):
   """Parse a string containing a comma-separated list of nonnegative integers.
 
   The list may contain single integers and dash-separated ranges. For
-  example, "1,3,5-7" parses to [1,3,5,6,7].
+  example, "1,3,5-7" parses to [1,3,5,6,7] and "1-7-3" parses to
+  [1,4,7].
 
   Can pass the flag on_nonincreasing to the constructor to tell it
   what to do if the list is nonincreasing. Options are
@@ -171,11 +180,12 @@ class IntegerListParser(flags.ArgumentParser):
       else:
         low = int(match.group(1))
         high = int(match.group(3))
+        step = int(match.group(5)) if match.group(5) is not None else 1
 
         if high <= low or (len(result) > 0 and low <= result[-1]):
           HandleNonIncreasing()
 
-        result.append((low, high))
+        result.append((low, high, step))
 
     return IntegerList(result)
 
@@ -184,9 +194,14 @@ class IntegerListParser(flags.ArgumentParser):
 
 
 class IntegerListSerializer(flags.ArgumentSerializer):
+  def _SerializeRange(self, val):
+    if len(val) == 2:
+      return '%s-%s' % (val[0], val[1])
+    return '%s-%s-%s' % (val[0], val[1], val[2])
+
   def Serialize(self, il):
     return ','.join([str(val) if isinstance(val, int) or isinstance(val, long)
-                     else '%s-%s' % (val[0], val[1])
+                     else self._SerializeRange(val)
                      for val in il.groups])
 
 
