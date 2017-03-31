@@ -25,34 +25,34 @@ class RunStageParserTestCase(unittest.TestCase):
 
   def testEmpty(self):
     with self.assertRaises(ValueError):
-      self._parser.Parse('')
+      self._parser.parse('')
 
   def testInvalidItem(self):
     with self.assertRaises(ValueError):
-      self._parser.Parse('provision,fake_stage')
+      self._parser.parse('provision,fake_stage')
 
   def testAllAndIndividualStages(self):
     with self.assertRaises(ValueError):
-      self._parser.Parse('provision,all')
+      self._parser.parse('provision,all')
 
   def testIncorrectOrder(self):
     with self.assertRaises(ValueError):
-      self._parser.Parse('provision,run')
+      self._parser.parse('provision,run')
     with self.assertRaises(ValueError):
-      self._parser.Parse('teardown,provision')
+      self._parser.parse('teardown,provision')
 
   def testAll(self):
-    self.assertEqual(self._parser.Parse('all'),
+    self.assertEqual(self._parser.parse('all'),
                      ['provision', 'prepare', 'run', 'cleanup', 'teardown'])
 
   def testIndividual(self):
-    self.assertEqual(self._parser.Parse('prepare'), ['prepare'])
+    self.assertEqual(self._parser.parse('prepare'), ['prepare'])
 
   def testMultiple(self):
-    self.assertEqual(self._parser.Parse('prepare,run'), ['prepare', 'run'])
+    self.assertEqual(self._parser.parse('prepare,run'), ['prepare', 'run'])
 
   def testList(self):
-    self.assertEqual(self._parser.Parse(['prepare', 'run']), ['prepare', 'run'])
+    self.assertEqual(self._parser.parse(['prepare', 'run']), ['prepare', 'run'])
 
 
 if __name__ == '__main__':

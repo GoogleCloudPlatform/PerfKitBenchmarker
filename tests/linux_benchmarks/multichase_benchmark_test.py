@@ -28,19 +28,19 @@ class MemorySizeParserTestCase(unittest.TestCase):
 
   def testParseNoUnits(self):
     with self.assertRaises(ValueError):
-      self._parser.Parse('10')
+      self._parser.parse('10')
 
   def testParseInvalidUnits(self):
     with self.assertRaises(ValueError):
-      self._parser.Parse('20 seconds')
+      self._parser.parse('20 seconds')
 
   def testParseExplicitMemory(self):
-    q = self._parser.Parse('30 GiB')
+    q = self._parser.parse('30 GiB')
     self.assertEqual(q.magnitude, 30)
     self.assertEqual(q.units, units.Unit('gibibyte'))
 
   def testParsePercent(self):
-    q = self._parser.Parse('40%')
+    q = self._parser.parse('40%')
     self.assertEqual(q.magnitude, 40)
     self.assertEqual(q.units, units.percent)
 

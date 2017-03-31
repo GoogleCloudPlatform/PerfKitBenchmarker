@@ -115,8 +115,8 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def testWindowsVMCausesError(self):
     """ windows vm with background_cpu_threads raises exception """
-    self._mocked_flags['background_cpu_threads'].Parse(1)
-    self._mocked_flags['os_type'].Parse(os_types.WINDOWS)
+    self._mocked_flags['background_cpu_threads'].parse(1)
+    self._mocked_flags['os_type'].parse(os_types.WINDOWS)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
@@ -128,7 +128,7 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVM(self):
     """ Check that the background_cpu_threads causes calls """
-    self._mocked_flags['background_cpu_threads'].Parse(1)
+    self._mocked_flags['background_cpu_threads'].parse(1)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     self._CheckVMFromSpec(spec, working_groups=(_GROUP_1, _GROUP_2))
@@ -144,7 +144,7 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadWindows(self):
     """ Test that nothing happens with the vanilla config """
-    self._mocked_flags['os_type'].Parse(os_types.WINDOWS)
+    self._mocked_flags['os_type'].parse(os_types.WINDOWS)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     for vm in spec.vms:
@@ -154,7 +154,7 @@ class TestBackgroundWorkload(unittest.TestCase):
 
   def testBackgroundWorkloadVanillaConfigFlag(self):
     """ Check that the background_cpu_threads flags overrides the config """
-    self._mocked_flags['background_cpu_threads'].Parse(2)
+    self._mocked_flags['background_cpu_threads'].parse(2)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
     for vm in spec.vms:

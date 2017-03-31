@@ -97,7 +97,7 @@ class IntegerList(object):
           yield val
 
   def __str__(self):
-      return IntegerListSerializer().Serialize(self)
+      return IntegerListSerializer().serialize(self)
 
 
 class IntegerListParser(flags.ArgumentParser):
@@ -128,7 +128,7 @@ class IntegerListParser(flags.ArgumentParser):
 
     self.on_nonincreasing = on_nonincreasing
 
-  def Parse(self, inp):
+  def parse(self, inp):
     """Parse an integer list.
 
     Args:
@@ -179,12 +179,12 @@ class IntegerListParser(flags.ArgumentParser):
 
     return IntegerList(result)
 
-  def Type(self):
+  def flag_type(self):
     return 'integer list'
 
 
 class IntegerListSerializer(flags.ArgumentSerializer):
-  def Serialize(self, il):
+  def serialize(self, il):
     return ','.join([str(val) if isinstance(val, int) or isinstance(val, long)
                      else '%s-%s' % (val[0], val[1])
                      for val in il.groups])
@@ -248,7 +248,7 @@ class UnitsParser(flags.ArgumentParser):
       convertible_to: Either an individual unit specification or a series of
           unit specifications, where each unit specification is either a string
           (e.g. 'byte') or a units.Unit. The parser input must be convertible to
-          at least one of the specified Units, or the Parse() method will raise
+          at least one of the specified Units, or the parse() method will raise
           a ValueError.
     """
     if isinstance(convertible_to, (basestring, units.Unit)):
@@ -256,7 +256,7 @@ class UnitsParser(flags.ArgumentParser):
     else:
       self.convertible_to = [units.Unit(u) for u in convertible_to]
 
-  def Parse(self, inp):
+  def parse(self, inp):
     """Parse the input.
 
     Args:
@@ -296,7 +296,7 @@ class UnitsParser(flags.ArgumentParser):
 
 
 class UnitsSerializer(flags.ArgumentSerializer):
-  def Serialize(self, units):
+  def serialize(self, units):
     return str(units)
 
 
@@ -394,7 +394,7 @@ class YAMLParser(flags.ArgumentParser):
 
   syntactic_help = 'A YAML expression.'
 
-  def Parse(self, inp):
+  def parse(self, inp):
     """Parse the input.
 
     Args:
@@ -422,7 +422,7 @@ class YAMLParser(flags.ArgumentParser):
 
 class YAMLSerializer(flags.ArgumentSerializer):
 
-  def Serialize(self, val):
+  def serialize(self, val):
     return yaml.dump(val)
 
 
