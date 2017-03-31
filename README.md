@@ -39,7 +39,7 @@ In its current release these are the benchmarks that are executed:
   - `bonnie++`: [GPL v2](http://www.coker.com.au/bonnie++/readme.html)
   - `cassandra_ycsb`: [Apache v2](http://cassandra.apache.org/)
   - `cassandra_stress`: [Apache v2](http://cassandra.apache.org/)
-  - `cloudsuite3.0`: [CloudSuite 3.0 license](http://cloudsuite.ch/licenses/)
+  - `cloudsuite3.0`: [CloudSuite 3.0 license](http://cloudsuite.ch/pages/license/)
   - `cluster_boot`: MIT License
   - `coremark`: [EEMBC](https://www.eembc.org/)
   - `copy_throughput`: Apache v2
