@@ -32,6 +32,10 @@ class TestIntegerList(unittest.TestCase):
     il = flag_util.IntegerList([1, (2, 5), 9])
     self.assertEqual(len(il), 6)
 
+  def testRangeLengthWithStep(self):
+    il = flag_util.IntegerList([1, (2, 7, 2), 9])
+    self.assertEqual(len(il), 5)
+
   def testSimpleGetItem(self):
     il = flag_util.IntegerList([1, 2, 3])
     self.assertEqual(il[0], 1)
@@ -49,9 +53,20 @@ class TestIntegerList(unittest.TestCase):
     self.assertEqual(il[2], 3)
     self.assertEqual(il[5], 9)
 
+  def testRangeWithStepGetItem(self):
+    il = flag_util.IntegerList([1, (2, 7, 2), 9])
+    self.assertEqual(il[1], 2)
+    self.assertEqual(il[2], 4)
+    self.assertEqual(il[3], 6)
+    self.assertEqual(il[4], 9)
+
   def testIter(self):
     il = flag_util.IntegerList([1, (2, 5), 9])
     self.assertEqual(list(il), [1, 2, 3, 4, 5, 9])
+
+  def testIterWithStep(self):
+    il = flag_util.IntegerList([1, (2, 6, 2), 9])
+    self.assertEqual(list(il), [1, 2, 4, 6, 9])
 
 
 class TestParseIntegerList(unittest.TestCase):
@@ -64,9 +79,16 @@ class TestParseIntegerList(unittest.TestCase):
   def testIntegerRange(self):
     self.assertEqual(list(self.ilp.Parse('3-5')), [3, 4, 5])
 
+  def testIntegerRangeWithStep(self):
+    self.assertEqual(list(self.ilp.Parse('2-7-2')), [2, 4, 6])
+
   def testIntegerList(self):
     self.assertEqual(list(self.ilp.Parse('3-5,8,10-12')),
                      [3, 4, 5, 8, 10, 11, 12])
+
+  def testIntegerListWithRangeAndStep(self):
+    self.assertEqual(list(self.ilp.Parse('3-5,8,10-15-2')),
+                     [3, 4, 5, 8, 10, 12, 14])
 
   def testNoInteger(self):
     with self.assertRaises(ValueError):
@@ -96,6 +118,12 @@ class TestParseIntegerList(unittest.TestCase):
     with self.assertRaises(ValueError):
       ilp.Parse('3-1')
 
+  def testNonIncreasingRangeWithStep(self):
+    ilp = flag_util.IntegerListParser(
+        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
+    with self.assertRaises(ValueError):
+      ilp.Parse('3-1-2')
+
 
 class TestIntegerListSerializer(unittest.TestCase):
   def testSerialize(self):
@@ -104,6 +132,13 @@ class TestIntegerListSerializer(unittest.TestCase):
 
     self.assertEqual(ser.Serialize(il),
                      '1,2-5,9')
+
+  def testSerializeWithStep(self):
+    ser = flag_util.IntegerListSerializer()
+    il = flag_util.IntegerList([1, (2, 5, 2), 9])
+
+    self.assertEqual(ser.Serialize(il),
+                     '1,2-5-2,9')
 
 
 class FlagDictSubstitutionTestCase(unittest.TestCase):
