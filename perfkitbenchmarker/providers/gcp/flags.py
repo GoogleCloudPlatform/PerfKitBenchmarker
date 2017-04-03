@@ -62,3 +62,11 @@ flags.DEFINE_integer('gce_boot_disk_size', None,
                      'The boot disk size in GB for GCP VMs.')
 flags.DEFINE_enum('gce_boot_disk_type', None, ['pd-standard', 'pd-ssd'],
                   'The boot disk type for GCP VMs.')
+flags.DEFINE_integer(
+    'gcp_num_vms_per_host', None,
+    'The number of VMs per dedicated host. If None, VMs will be packed on a '
+    'single host until no more can be packed at which point a new host will '
+    'be created.')
+flags.DEFINE_string(
+    'gcp_host_type', None,
+    'The host type of all sole tenant hosts that get created.')

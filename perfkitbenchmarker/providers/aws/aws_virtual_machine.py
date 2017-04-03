@@ -252,8 +252,6 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
           provided config values.
     """
     super(AwsVmSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['aws_dedicated_hosts'].present:
-      config_values['use_dedicated_host'] = flag_values.aws_dedicated_hosts
     if flag_values['aws_boot_disk_size'].present:
       config_values['boot_disk_size'] = flag_values.aws_boot_disk_size
     if flag_values['aws_spot_instances'].present:
@@ -272,8 +270,6 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(AwsVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'use_dedicated_host': (option_decoders.BooleanDecoder,
-                               {'default': False}),
         'use_spot_instance': (option_decoders.BooleanDecoder,
                               {'default': False}),
         'spot_price': (option_decoders.FloatDecoder, {'default': 0.0}),
@@ -656,7 +652,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       dict mapping string property key to value.
     """
     result = super(AwsVirtualMachine, self).GetMachineTypeDict()
-    result['dedicated_host'] = self.use_dedicated_host
     result['spot_instance'] = self.use_spot_instance
     result['spot_price'] = self.spot_price
     return result

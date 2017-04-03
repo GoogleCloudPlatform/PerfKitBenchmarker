@@ -24,9 +24,12 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+import collections
+import itertools
 import json
 import logging
 import re
+import threading
 import yaml
 
 from perfkitbenchmarker import disk
@@ -35,6 +38,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
@@ -51,6 +55,8 @@ SCSI = 'SCSI'
 UBUNTU_IMAGE = 'ubuntu-14-04'
 RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
+_INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
+                               'to fulfill the request.')
 
 
 class MemoryDecoder(option_decoders.StringDecoder):
@@ -217,6 +223,10 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['project'] = flag_values.project
     if flag_values['image_project'].present:
       config_values['image_project'] = flag_values.image_project
+    if flag_values['gcp_host_type'].present:
+      config_values['host_type'] = flag_values.gcp_host_type
+    if flag_values['gcp_num_vms_per_host'].present:
+      config_values['num_vms_per_host'] = flag_values.gcp_num_vms_per_host
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -236,8 +246,51 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
         'boot_disk_type': (option_decoders.StringDecoder, {'default': None}),
         'project': (option_decoders.StringDecoder, {'default': None}),
-        'image_project': (option_decoders.StringDecoder, {'default': None})})
+        'image_project': (option_decoders.StringDecoder, {'default': None}),
+        'host_type': (option_decoders.StringDecoder,
+                      {'default': 'n1-host-64-416'}),
+        'num_vms_per_host': (option_decoders.IntDecoder, {'default': None})})
     return result
+
+
+class GceSoleTenantHost(resource.BaseResource):
+  """Object representing a GCE sole tenant host.
+
+  Attributes:
+    name: string. The name of the sole tenant host.
+    host_type: string. The host type of the host.
+    zone: string. The zone of the host.
+  """
+
+  _counter = itertools.count()
+
+  def __init__(self, host_type, zone, project):
+    super(GceSoleTenantHost, self).__init__()
+    self.name = 'pkb-%s-%s' % (FLAGS.run_uri, self._counter.next())
+    self.host_type = host_type
+    self.zone = zone
+    self.project = project
+    self.fill_fraction = 0.0
+
+  def _Create(self):
+    """Creates the host."""
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy', 'hosts',
+                             'create', self.name)
+    cmd.flags['host-type'] = self.host_type
+    cmd.Issue()
+
+  def _Exists(self):
+    """Returns True if the host exists."""
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy', 'hosts',
+                             'describe', self.name)
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
+
+  def _Delete(self):
+    """Deletes the host."""
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy', 'hosts',
+                             'delete', self.name)
+    cmd.Issue()
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -248,6 +301,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_IMAGE = None
   BOOT_DISK_SIZE_GB = 10
   BOOT_DISK_TYPE = gce_disk.PD_STANDARD
+
+  _host_lock = threading.Lock()
+  deleted_hosts = set()
+  host_map = collections.defaultdict(list)
 
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
@@ -275,6 +332,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.boot_disk_size = vm_spec.boot_disk_size
     self.boot_disk_type = vm_spec.boot_disk_type
     self.id = None
+    self.host = None
+    self.use_dedicated_host = vm_spec.use_dedicated_host
+    self.host_type = vm_spec.host_type
+    self.num_vms_per_host = vm_spec.num_vms_per_host
+
+  @property
+  def host_list(self):
+    """Returns the list of hosts that are compatible with this VM."""
+    return self.host_map[(self.project, self.zone)]
 
   def _GenerateCreateCommand(self, ssh_keys_path):
     """Generates a command to create the VM instance.
@@ -285,7 +351,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
-    cmd = util.GcloudCommand(self, 'compute', 'instances', 'create', self.name)
+    args = ['alpha'] if self.host else []
+    args.extend(['compute', 'instances', 'create', self.name])
+
+    cmd = util.GcloudCommand(self, *args)
     if self.network.subnet_resource is not None:
       cmd.flags['subnet'] = self.network.subnet_resource.name
     else:
@@ -303,6 +372,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['machine-type'] = self.machine_type
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
+    if self.host:
+      cmd.flags['sole-tenancy-host'] = self.host.name
 
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
@@ -342,6 +413,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a GCE VM instance."""
+    num_hosts = len(self.host_list)
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
     with vm_util.NamedTemporaryFile(dir=vm_util.GetTempDir(),
@@ -349,7 +421,20 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       tf.write('%s:%s\n' % (self.user_name, public_key))
       tf.close()
       create_cmd = self._GenerateCreateCommand(tf.name)
-      create_cmd.Issue()
+      _, stderr, retcode = create_cmd.Issue()
+
+    if (self.use_dedicated_host and retcode and
+        _INSUFFICIENT_HOST_CAPACITY in stderr):
+      logging.warning(
+          'Creation failed due to insufficient host capacity. A new host will '
+          'be created and instance creation will be retried.')
+      with self._host_lock:
+        if num_hosts == len(self.host_list):
+          host = GceSoleTenantHost(self.host_type, self.zone, self.project)
+          self.host_list.append(host)
+          host.Create()
+        self.host = self.host_list[-1]
+      raise errors.Resource.RetryableCreationError()
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
@@ -357,6 +442,27 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Create necessary VM access rules *prior* to creating the VM, such that it
     # doesn't affect boot time.
     self.AllowRemoteAccessPorts()
+
+    if self.use_dedicated_host:
+      with self._host_lock:
+        if (not self.host_list or (self.num_vms_per_host and
+                                   self.host_list[-1].fill_fraction +
+                                   1.0 / self.num_vms_per_host > 1.0)):
+          host = GceSoleTenantHost(self.host_type, self.zone, self.project)
+          self.host_list.append(host)
+          host.Create()
+        self.host = self.host_list[-1]
+        if self.num_vms_per_host:
+          self.host.fill_fraction += 1.0 / self.num_vms_per_host
+
+  def _DeleteDependencies(self):
+    if self.host:
+      with self._host_lock:
+        if self.host in self.host_list:
+          self.host_list.remove(self.host)
+        if self.host not in self.deleted_hosts:
+          self.host.Delete()
+          self.deleted_hosts.add(self.host)
 
   @vm_util.Retry()
   def _PostCreate(self):
@@ -437,6 +543,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       attr_value = getattr(self, attr_name)
       if attr_value:
         result[attr_name] = attr_value
+    if self.use_dedicated_host:
+      result['host_type'] = self.host_type
+      result['num_vms_per_host'] = self.num_vms_per_host
     return result
 
 
