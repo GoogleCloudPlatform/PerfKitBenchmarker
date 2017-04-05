@@ -772,6 +772,9 @@ class DebianMixin(BaseLinuxMixin):
   @vm_util.Retry()
   def InstallPackages(self, packages):
     """Installs packages using the apt package manager."""
+    if not self._apt_updated:
+      self.AptUpdate()
+      self._apt_updated = True
     try:
       install_command = ('sudo DEBIAN_FRONTEND=\'noninteractive\' '
                          '/usr/bin/apt-get -y install %s' % (packages))
