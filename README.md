@@ -154,7 +154,7 @@ $ sudo pip install -r requirements.txt
 
 ## Cloud account setup
 
-This section describes the setup steps needed for each cloud system.  
+This section describes the setup steps needed for each cloud system. Note that you only need to perform setup steps on the clouds you wish to test. If you only want to test Google Cloud, you only need to install and configure `gcloud`.
 * [Google Cloud](#install-gcloud-and-setup-authentication)
 * [OpenStack](#install-openstack-cli-client-and-setup-authentication)
 * [Kubernetes](#kubernetes-configuration-and-credentials)
