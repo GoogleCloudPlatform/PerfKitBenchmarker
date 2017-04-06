@@ -62,9 +62,22 @@ class AwsFirewall(network.BaseFirewall):
     """
     if vm.is_static:
       return
+    self.AllowPortInSecurityGroup(vm.region, vm.group_id, start_port, end_port)
+
+  def AllowPortInSecurityGroup(self, region, security_group,
+                               start_port, end_port=None):
+    """Opens a port on the firewall for a security group.
+
+    Args:
+      region: The region of the security group
+      security_group: The security group in which to open the ports
+      start_port: The first local port to open in a range.
+      end_port: The last local port to open in a range. If None, only start_port
+        will be opened.
+    """
     if end_port is None:
       end_port = start_port
-    entry = (start_port, end_port, vm.group_id)
+    entry = (start_port, end_port, region, security_group)
     if entry in self.firewall_set:
       return
     with self._lock:
@@ -73,8 +86,8 @@ class AwsFirewall(network.BaseFirewall):
       authorize_cmd = util.AWS_PREFIX + [
           'ec2',
           'authorize-security-group-ingress',
-          '--region=%s' % vm.region,
-          '--group-id=%s' % vm.group_id,
+          '--region=%s' % region,
+          '--group-id=%s' % security_group,
           '--port=%s-%s' % (start_port, end_port),
           '--cidr=0.0.0.0/0']
       util.IssueRetryableCommand(

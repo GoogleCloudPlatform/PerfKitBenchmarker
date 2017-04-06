@@ -1,0 +1,104 @@
+--------------------------------------------------------------------------
+[[26222,1],0]: A high-performance Open MPI point-to-point messaging module
+was unable to find any relevant network interfaces:
+
+Module: OpenFabrics (openib)
+  Host: pkb-8ecbd234-0
+
+Another transport will be used instead, although this may result in
+lower performance.
+--------------------------------------------------------------------------
+MPI Task 3/7 starting....
+MPI Task 4/7 starting....
+MPI Task 5/7 starting....
+MPI Task 0/7 starting....
+MPI Task 1/7 starting....
+MPI Task 2/7 starting....
+MPI Task 7/7 starting....
+MPI Task 6/7 starting....
+Chose device: name='Tesla K80' index=3
+Chose device: name='Tesla K80' index=2
+Chose device: name='Tesla K80' index=0
+Chose device: name='Tesla K80' index=4
+Chose device: name='Tesla K80' index=5
+Chose device: name='Tesla K80' index=6
+Chose device: name='Tesla K80' index=1
+Chose device: name='Tesla K80' index=7
+Running single precision test
+
+Performing stencil operation on host for later comparison with CUDA output
+Depending on host capabilities, this may take a while.
+[pkb-8ecbd234-0:14126] 7 more processes have sent help message help-mpi-btl-base.txt / btl:no-nics
+[pkb-8ecbd234-0:14126] Set MCA parameter "orte_base_help_aggregate" to 0 to see all help / error messages
+Performing 1 warmup passes...done.
+
+Performing stencil operation on chosen device, 10 passes.
+Depending on chosen device, this may take a while.
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+
+
+DP supported
+
+Performing stencil operation on host for later comparison with CUDA output
+Depending on host capabilities, this may take a while.
+Performing 1 warmup passes...done.
+
+Performing stencil operation on chosen device, 10 passes.
+Depending on chosen device, this may take a while.
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+0 validation errors
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+test	atts	units	median	mean	stddev	min	max	
+DP_Sten2D(max)	1000:20480x20480:8x256	GFLOPS	477.932	477.8	0.550849	477.001	478.372	
+DP_Sten2D(mean)	1000:20480x20480:8x256	GFLOPS	474.159	474.128	0.387471	473.525	474.683	
+DP_Sten2D(median)	1000:20480x20480:8x256	GFLOPS	474.761	474.766	0.387158	473.983	475.413	
+DP_Sten2D(min)	1000:20480x20480:8x256	GFLOPS	469.598	469.515	0.705443	468.441	470.401	
+DP_Sten2D(stddev)	1000:20480x20480:8x256	GFLOPS	2.51807	2.56063	0.47209	1.92695	3.40233	
+SP_Sten2D(max)	1000:20480x20480:8x256	GFLOPS	759.905	759.831	0.540096	759.164	760.451	
+SP_Sten2D(mean)	1000:20480x20480:8x256	GFLOPS	750.569	750.593	0.231939	750.154	750.948	
+SP_Sten2D(median)	1000:20480x20480:8x256	GFLOPS	753.795	754.187	0.89327	753.268	755.918	
+SP_Sten2D(min)	1000:20480x20480:8x256	GFLOPS	735.214	735.517	0.824177	734.892	737.452	
+SP_Sten2D(stddev)	1000:20480x20480:8x256	GFLOPS	9.13922	9.14991	0.588605	8.13804	10.3033	
+
+Note: results marked with (*) had missing values such as
+might occur with a mixture of architectural capabilities.
+
+Detecting outliers based on per-process mean values.
+
+Mild outliers (>1.5 IQR from 1st/3rd quartile):
+None.
+
+Extreme outliers (>3.0 IQR from 1st/3rd quartile):
+None.
