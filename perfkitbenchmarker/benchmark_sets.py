@@ -25,9 +25,6 @@ from perfkitbenchmarker import windows_benchmarks
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('flag_matrix', None,
-                    'The name of the flag matrix to run.')
-
 MESSAGE = 'message'
 BENCHMARK_LIST = 'benchmark_list'
 STANDARD_SET = 'standard_set'
@@ -227,31 +224,24 @@ def GetBenchmarksFromFlags():
       raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
                        (benchmark_name, FLAGS.os_type))
 
-    # We need to remove the 'flag_matrix', 'flag_matrix_defs', and
-    # 'flag_matrix_filters' keys from the config dictionary since
-    # they aren't actually part of the config spec and will cause
-    # errors if they are left in.
-    flag_matrix_name = benchmark_config.pop(
-        'flag_matrix', None)
-    flag_matrix_name = FLAGS.flag_matrix or flag_matrix_name
-    flag_matrix = benchmark_config.pop(
-        'flag_matrix_defs', {}).get(flag_matrix_name, {})
-    flag_matrix_filter = benchmark_config.pop(
-        'flag_matrix_filters', {}).get(flag_matrix_name)
+    # We need to remove the 'flag_filter' key from the config dictionary
+    # since it isn't actually part of the config spec and will cause
+    # errors if it is left in.
+    flags = benchmark_config.get('flags', {})
+    flag_filter = benchmark_config.pop('flag_filter', {})
 
     flag_axes = []
-    for flag, values in flag_matrix.iteritems():
+    for flag, values in flags.iteritems():
+      if not isinstance(values, list):
+        values = [values]
       flag_axes.append([{flag: v} for v in values])
 
     for flag_config in itertools.product(*flag_axes):
       config = copy.copy(benchmark_config)
-      config_local_flags = config.get('flags', {})
       config['flags'] = copy.deepcopy(configs.GetConfigFlags())
-      config['flags'].update(config_local_flags)
       for setting in flag_config:
         config['flags'].update(setting)
-      if (flag_matrix_filter and not eval(
-          flag_matrix_filter, {}, config['flags'])):
+      if (flag_filter and not eval(flag_filter, {}, config['flags'])):
           continue
       benchmark_config_list.append((benchmark_module, config))
 

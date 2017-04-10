@@ -32,11 +32,9 @@ internal_iprf:
 """
 MATRIX_CONFIG = """
 netperf:
-  flag_matrix: GCP
-  flag_matrix_defs:
-    GCP:
-      machine_type: [n1-standard-1, n1-standard-4]
-      zones: [us-central1-a, us-central1-b]
+  flags:
+    machine_type: [n1-standard-1, n1-standard-4]
+    zones: [us-central1-a, us-central1-b]
 """
 EXPECTED_FLAGS = [
     {'machine_type': 'n1-standard-1', 'zones': 'us-central1-a'},
@@ -46,13 +44,10 @@ EXPECTED_FLAGS = [
 ]
 FILTER_CONFIG = """
 netperf:
-  flag_matrix: GCP
-  flag_matrix_filters:
-    GCP: "machine_type == 'n1-standard-1' and zones == 'us-central1-a'"
-  flag_matrix_defs:
-    GCP:
-      machine_type: [n1-standard-1, n1-standard-4]
-      zones: [us-central1-a, us-central1-b]
+  flag_filter: "machine_type == 'n1-standard-1' and zones == 'us-central1-a'"
+  flags:
+    machine_type: [n1-standard-1, n1-standard-4]
+    zones: [us-central1-a, us-central1-b]
 """
 FLAG_PRECEDENCE_CONFIG = """
 flags:
@@ -61,12 +56,8 @@ flags:
   netperf_max_iter: 3
 netperf:
   flags:
-    netperf_benchmarks: UDP_RR
+    netperf_benchmarks: TCP_STREAM
     netperf_test_length: 40
-  flag_matrix: test_matrix
-  flag_matrix_defs:
-    test_matrix:
-      netperf_benchmarks: [TCP_STREAM]
 """
 
 
