@@ -66,8 +66,8 @@ class AwsDiskSpecTestCase(unittest.TestCase):
 
   def testPresentFlagsOverrideConfigs(self):
     flags = mock_flags.MockFlags()
-    flags['aws_provisioned_iops'].Parse(2000)
-    flags['data_disk_size'].Parse(100)
+    flags['aws_provisioned_iops'].parse(2000)
+    flags['data_disk_size'].parse(100)
     spec = aws_disk.AwsDiskSpec(_COMPONENT, flags, disk_size=75, iops=1000)
     self.assertEqual(spec.disk_size, 100)
     self.assertEqual(spec.iops, 2000)

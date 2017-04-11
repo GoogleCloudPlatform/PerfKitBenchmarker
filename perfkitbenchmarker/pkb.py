@@ -585,7 +585,7 @@ def _LogCommandLineFlags():
   for name in FLAGS:
     flag = FLAGS[name]
     if flag.present:
-      result.append(flag.Serialize())
+      result.append(flag.serialize())
   logging.info('Flag values:\n%s', '\n'.join(result))
 
 

@@ -74,16 +74,16 @@ class TestParseIntegerList(unittest.TestCase):
     self.ilp = flag_util.IntegerListParser()
 
   def testOneInteger(self):
-    self.assertEqual(list(self.ilp.Parse('3')), [3])
+    self.assertEqual(list(self.ilp.parse('3')), [3])
 
   def testIntegerRange(self):
-    self.assertEqual(list(self.ilp.Parse('3-5')), [3, 4, 5])
+    self.assertEqual(list(self.ilp.parse('3-5')), [3, 4, 5])
 
   def testIntegerRangeWithStep(self):
     self.assertEqual(list(self.ilp.Parse('2-7-2')), [2, 4, 6])
 
   def testIntegerList(self):
-    self.assertEqual(list(self.ilp.Parse('3-5,8,10-12')),
+    self.assertEqual(list(self.ilp.parse('3-5,8,10-12')),
                      [3, 4, 5, 8, 10, 11, 12])
 
   def testIntegerListWithRangeAndStep(self):
@@ -92,31 +92,31 @@ class TestParseIntegerList(unittest.TestCase):
 
   def testNoInteger(self):
     with self.assertRaises(ValueError):
-      self.ilp.Parse('a')
+      self.ilp.parse('a')
 
   def testBadRange(self):
     with self.assertRaises(ValueError):
-      self.ilp.Parse('3-a')
+      self.ilp.parse('3-a')
 
   def testBadList(self):
     with self.assertRaises(ValueError):
-      self.ilp.Parse('3-5,8a')
+      self.ilp.parse('3-5,8a')
 
   def testTrailingComma(self):
     with self.assertRaises(ValueError):
-      self.ilp.Parse('3-5,')
+      self.ilp.parse('3-5,')
 
   def testNonIncreasingEntries(self):
     ilp = flag_util.IntegerListParser(
         on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
     with self.assertRaises(ValueError):
-      ilp.Parse('3,2,1')
+      ilp.parse('3,2,1')
 
   def testNonIncreasingRange(self):
     ilp = flag_util.IntegerListParser(
         on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
     with self.assertRaises(ValueError):
-      ilp.Parse('3-1')
+      ilp.parse('3-1')
 
   def testNonIncreasingRangeWithStep(self):
     ilp = flag_util.IntegerListParser(
@@ -130,7 +130,7 @@ class TestIntegerListSerializer(unittest.TestCase):
     ser = flag_util.IntegerListSerializer()
     il = flag_util.IntegerList([1, (2, 5), 9])
 
-    self.assertEqual(ser.Serialize(il),
+    self.assertEqual(ser.serialize(il),
                      '1,2-5,9')
 
   def testSerializeWithStep(self):
@@ -180,50 +180,50 @@ class TestUnitsParser(unittest.TestCase):
     self.up = flag_util.UnitsParser('byte')
 
   def testParser(self):
-    self.assertEqual(self.up.Parse('10KiB'), 10 * 1024 * units.byte)
+    self.assertEqual(self.up.parse('10KiB'), 10 * 1024 * units.byte)
 
   def testQuantity(self):
     quantity = 1.0 * units.byte
-    self.assertEqual(self.up.Parse(quantity), quantity)
+    self.assertEqual(self.up.parse(quantity), quantity)
 
   def testBadExpression(self):
     with self.assertRaises(ValueError):
-      self.up.Parse('asdf')
+      self.up.parse('asdf')
 
   def testUnitlessExpression(self):
     with self.assertRaises(ValueError):
-      self.up.Parse('10')
+      self.up.parse('10')
 
   def testBytes(self):
-    q = self.up.Parse('1B')
+    q = self.up.parse('1B')
     self.assertEqual(q.magnitude, 1.0)
     self.assertEqual(q.units, {'byte': 1.0})
 
   def testBytesWithPrefix(self):
-    q = self.up.Parse('2KB').to(units.byte)
+    q = self.up.parse('2KB').to(units.byte)
     self.assertEqual(q.magnitude, 2000.0)
     self.assertEqual(q.units, {'byte': 1.0})
 
   def testWrongUnit(self):
     with self.assertRaises(ValueError):
-      self.up.Parse('1m')
+      self.up.parse('1m')
 
   def testConvertibleToUnit(self):
     up = flag_util.UnitsParser(convertible_to=units.byte)
-    self.assertEqual(up.Parse('10KiB'), 10 * 1024 * units.byte)
+    self.assertEqual(up.parse('10KiB'), 10 * 1024 * units.byte)
 
   def testConvertibleToSeries(self):
     up = flag_util.UnitsParser(convertible_to=(units.byte, 'second'))
-    self.assertEqual(up.Parse('10 MB'), 10 * units.Unit('megabyte'))
-    self.assertEqual(up.Parse('10 minutes'), 10 * units.Unit('minute'))
+    self.assertEqual(up.parse('10 MB'), 10 * units.Unit('megabyte'))
+    self.assertEqual(up.parse('10 minutes'), 10 * units.Unit('minute'))
     with self.assertRaises(ValueError):
-      up.Parse('1 meter')
+      up.parse('1 meter')
 
   def testPercent(self):
     up = flag_util.UnitsParser(convertible_to=units.percent)
-    self.assertEqual(up.Parse('100%'), 100 * units.percent)
+    self.assertEqual(up.parse('100%'), 100 * units.percent)
     with self.assertRaises(ValueError):
-      up.Parse('10KiB')
+      up.parse('10KiB')
 
 
 class TestStringToBytes(unittest.TestCase):
@@ -280,16 +280,16 @@ class TestYAMLParser(unittest.TestCase):
     self.parser = flag_util.YAMLParser()
 
   def testValidString(self):
-    self.assertEqual(self.parser.Parse('[1, 2, 3]'),
+    self.assertEqual(self.parser.parse('[1, 2, 3]'),
                      [1, 2, 3])
 
   def testPreParsedYAML(self):
-    self.assertEqual(self.parser.Parse([1, 2, 3]),
+    self.assertEqual(self.parser.parse([1, 2, 3]),
                      [1, 2, 3])
 
   def testBadYAML(self):
     with self.assertRaises(ValueError):
-      self.parser.Parse('{a')
+      self.parser.parse('{a')
 
 
 if __name__ == '__main__':
