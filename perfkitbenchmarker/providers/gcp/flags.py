@@ -70,3 +70,8 @@ flags.DEFINE_integer(
 flags.DEFINE_string(
     'gcp_host_type', None,
     'The host type of all sole tenant hosts that get created.')
+flags.DEFINE_enum(
+    'gcp_min_cpu_platform', None,
+    ['sandybridge', 'ivybridge', 'haswell', 'broadwell', 'skylake'],
+    'When specified, the VM will have either the specified '
+    'architecture or a newer one. Architecture availability is zone dependent.')

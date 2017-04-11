@@ -227,6 +227,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['host_type'] = flag_values.gcp_host_type
     if flag_values['gcp_num_vms_per_host'].present:
       config_values['num_vms_per_host'] = flag_values.gcp_num_vms_per_host
+    if flag_values['gcp_min_cpu_platform'].present:
+      config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -249,7 +251,9 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'image_project': (option_decoders.StringDecoder, {'default': None}),
         'host_type': (option_decoders.StringDecoder,
                       {'default': 'n1-host-64-416'}),
-        'num_vms_per_host': (option_decoders.IntDecoder, {'default': None})})
+        'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
+        'min_cpu_platform': (option_decoders.StringDecoder, {'default': None})
+    })
     return result
 
 
@@ -336,6 +340,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.host_type = vm_spec.host_type
     self.num_vms_per_host = vm_spec.num_vms_per_host
+    self.min_cpu_platform = vm_spec.min_cpu_platform
 
   @property
   def host_list(self):
@@ -351,7 +356,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
-    args = ['alpha'] if self.host else []
+    args = ['alpha'] if (self.host or self.min_cpu_platform) else []
     args.extend(['compute', 'instances', 'create', self.name])
 
     cmd = util.GcloudCommand(self, *args)
@@ -374,6 +379,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['no-restart-on-failure'] = True
     if self.host:
       cmd.flags['sole-tenancy-host'] = self.host.name
+    if self.min_cpu_platform:
+      cmd.flags['min-cpu-platform'] = self.min_cpu_platform
 
     metadata_from_file = {'sshKeys': ssh_keys_path}
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
