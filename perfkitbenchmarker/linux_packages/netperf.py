@@ -41,6 +41,8 @@ NETLIB_PATCH = NETPERF_SRC_DIR + '/netperf.patch'
 
 def _Install(vm):
   """Installs the netperf package on the VM."""
+  vm.Install('pip')
+  vm.RemoteCommand('sudo pip install python-gflags==2.0')
   vm.Install('build_tools')
   vm.Install('curl')
   vm.RemoteCommand('curl %s -o %s/%s' % (
