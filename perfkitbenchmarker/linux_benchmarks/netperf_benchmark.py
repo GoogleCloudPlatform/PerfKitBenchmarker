@@ -126,10 +126,6 @@ def Prepare(benchmark_spec):
                        netserver_path=netperf.NETSERVER_PATH)
   vms[1].RemoteCommand(netserver_cmd)
 
-  # Install some stuff on the client vm
-  vms[0].Install('pip')
-  vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
-
   # Create a scratch directory for the remote test script
   vms[0].RemoteCommand('sudo mkdir -p /tmp/run/')
   vms[0].RemoteCommand('sudo chmod 777 /tmp/run/')
