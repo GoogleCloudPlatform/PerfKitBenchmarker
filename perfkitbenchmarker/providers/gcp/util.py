@@ -124,3 +124,61 @@ class GcloudCommand(object):
     if hasattr(resource, 'zone') and resource.zone:
       self.flags['zone'] = resource.zone
     self.additional_flags.extend(FLAGS.additional_gcloud_flags or ())
+
+
+class GCPLocation(object):
+  """A GCP location.
+
+  This class may represent a zone, region, or continent.
+  """
+
+  MULTIREGION = 'multiregion'
+  REGION = 'region'
+  ZONE = 'zone'
+
+  def __init__(self, name):
+    parts = name.split('-')
+    if len(parts) == 0 or len(parts) > 3:
+      raise ValueError('%s is not a valid GCP Location' % name)
+
+    self._multiregion = parts[0]
+    self._region = parts[1] if len(parts) > 1 else None
+    self._zone = parts[2] if len(parts) > 2 else None
+
+  def asMultiRegion(self):
+    return self._multiregion
+
+  def asRegion(self):
+    if self._region is not None:
+      return '%s-%s' % (self._multiregion, self._region)
+    else:
+      raise ValueError('Location %s has no region' % self)
+
+  def asZone(self):
+    if self._zone is not None:
+      return '%s-%s-%s' % (self._multiregion, self._region, self._zone)
+    else:
+      raise ValueError('Location %s has no region' % self)
+
+  def kind(self):
+    if self._zone is not None:
+      return self.ZONE
+    elif self._region is not None:
+      return self.REGION
+    else:
+      return self.MULTIREGION
+
+  def asGCSMultiRegion(self):
+    if self._multiregion == 'europe':
+      return 'eu'
+    else:
+      return self._multiregion
+
+  def __str__(self):
+    val = self._multiregion
+    if self._region is not None:
+      val = val + '-' + self._region
+      if self._zone is not None:
+        val = val + '-' + self._zone
+
+    return val
