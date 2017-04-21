@@ -108,6 +108,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._remote_command_script_upload_lock = threading.Lock()
     self._has_remote_command_script = False
 
+  def _CreateVmTmpDir(self):
+        self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+
   def _PushRobustCommandScripts(self):
     """Pushes the scripts required by RobustRemoteCommand to this VM.
 
@@ -208,7 +211,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def PrepareVMEnvironment(self):
     self.SetupProxy()
-    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    self._CreateVmTmpDir()
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
     if self.install_packages:
@@ -408,6 +411,17 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         raise errors.VirtualMachine.RemoteCommandError(error_text)
 
     return stdout, stderr
+
+  def _Reboot(self):
+    """OS-specific implementation of reboot command"""
+    self.RemoteCommand('sudo reboot', ignore_failure=True)
+
+  def _AfterReboot(self):
+    """Performs any OS-specific setup on the VM following reboot.
+
+    This will be called after every call to Reboot().
+    """
+    self._CreateVmTmpDir()
 
   def MoveFile(self, target, source_path, remote_path=''):
     self.MoveHostFile(target, source_path, remote_path)
@@ -888,7 +902,7 @@ class ContainerizedDebianMixin(DebianMixin):
 
   def PrepareVMEnvironment(self):
     """Initializes docker before proceeding with preparation."""
-    self.RemoteHostCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    self._CreateVmTmpDir()
     if not self._CheckDockerExists():
       self.Install('docker')
     self.InitDocker()

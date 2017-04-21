@@ -395,6 +395,24 @@ class BaseOsMixin(object):
     except:
       raise
 
+  def Reboot(self):
+    """Reboot the VM."""
+    self._Reboot()
+    self.WaitForBootCompletion()
+    self._AfterReboot()
+
+  @abc.abstractmethod
+  def _Reboot(self):
+    """OS-specific implementation of reboot command"""
+    raise NotImplementedError()
+
+  def _AfterReboot(self):
+    """Performs any OS-specific setup on the VM following reboot.
+
+    This will be called after every call to Reboot().
+    """
+    pass
+
   @abc.abstractmethod
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.
