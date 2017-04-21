@@ -108,6 +108,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._remote_command_script_upload_lock = threading.Lock()
     self._has_remote_command_script = False
 
+  def _CreateVmTmpDir(self):
+        self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+
   def _PushRobustCommandScripts(self):
     """Pushes the scripts required by RobustRemoteCommand to this VM.
 
@@ -115,6 +118,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """
     with self._remote_command_script_upload_lock:
       if not self._has_remote_command_script:
+        self._CreateVmTmpDir()
         for f in (EXECUTE_COMMAND, WAIT_FOR_COMMAND):
           self.PushDataFile(f, os.path.join(vm_util.VM_TMP_DIR,
                                             os.path.basename(f)))
@@ -208,7 +212,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def PrepareVMEnvironment(self):
     self.SetupProxy()
-    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    self._CreateVmTmpDir()
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
     if self.install_packages:
@@ -885,7 +889,7 @@ class ContainerizedDebianMixin(DebianMixin):
 
   def PrepareVMEnvironment(self):
     """Initializes docker before proceeding with preparation."""
-    self.RemoteHostCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    self._CreateVmTmpDir()
     if not self._CheckDockerExists():
       self.Install('docker')
     self.InitDocker()
