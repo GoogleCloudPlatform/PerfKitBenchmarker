@@ -19,10 +19,11 @@ from perfkitbenchmarker import flags
 DEBIAN = 'debian'
 JUJU = 'juju'
 RHEL = 'rhel'
+SLES = 'sles'
 UBUNTU_CONTAINER = 'ubuntu_container'
 WINDOWS = 'windows'
 
-LINUX_OS_TYPES = DEBIAN, JUJU, RHEL, UBUNTU_CONTAINER
+LINUX_OS_TYPES = DEBIAN, JUJU, RHEL, SLES, UBUNTU_CONTAINER
 WINDOWS_OS_TYPES = WINDOWS,
 ALL = LINUX_OS_TYPES + WINDOWS_OS_TYPES
 

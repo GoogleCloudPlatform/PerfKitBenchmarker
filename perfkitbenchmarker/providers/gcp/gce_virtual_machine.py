@@ -54,6 +54,7 @@ NVME = 'nvme'
 SCSI = 'SCSI'
 UBUNTU_IMAGE = 'ubuntu-14-04'
 RHEL_IMAGE = 'rhel-7'
+SLES_IMAGE = 'sles-12-sp2-v20170412'
 WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
@@ -569,6 +570,11 @@ class DebianBasedGceVirtualMachine(GceVirtualMachine,
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  linux_vm.RhelMixin):
   DEFAULT_IMAGE = RHEL_IMAGE
+
+
+class SlesBasedGceVirtualMachine(GceVirtualMachine,
+                                 linux_vm.SlesMixin):
+  DEFAULT_IMAGE = SLES_IMAGE
 
 
 class WindowsGceVirtualMachine(GceVirtualMachine,
