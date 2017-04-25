@@ -1,0 +1,32 @@
+<html>
+  <head>
+
+<style>
+div.status-cell-succeeded {
+width: 32px; height: 32px;
+  background-color: green;
+}
+div.status-cell-failed {
+  width: 32px; height: 32px;
+  background-color: red;
+}
+div.status-cell-skipped {
+  width: 32px; height: 32px;
+  background-color: gray;
+}
+</style>
+
+<script type="text/javascript">
+</script>
+
+  </head>
+  <body>
+    <h1>PKB Scheduler Dashboard</h1>
+  {% for category, benchmark_names in categories.items() %}
+    <h3>{{ category }}</h3>
+  {% for benchmark in benchmark_names %}
+    <a href="/run/{{ benchmark }}">{{ benchmark }}</a><br>
+  {% endfor %}
+  {% endfor %}
+  </body>
+</html>

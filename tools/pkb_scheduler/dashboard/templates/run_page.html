@@ -1,0 +1,55 @@
+<html>
+  <head>
+
+<style>
+div.status-cell-succeeded {
+width: 32px; height: 32px;
+  background-color: green;
+}
+div.status-cell-failed {
+  width: 32px; height: 32px;
+  background-color: red;
+}
+div.status-cell-skipped {
+  width: 32px; height: 32px;
+  background-color: gray;
+}
+div.status-cell-mixed {
+  width: 32px; height: 32px;
+  background-color: yellow;
+}
+</style>
+
+<script type="text/javascript">
+</script>
+
+  </head>
+  <body>
+    <h1>PKB Scheduler Dashboard</h1>
+  {% for category, benchmark_names in categories.items() %}
+    <h3>{{ category }}</h3>
+  {% for benchmark in benchmark_names %}
+    <a href="/run/{{ benchmark }}">{{ benchmark }}</a><br>
+  {% endfor %}
+  {% endfor %}
+    <hr>
+    <h1 style="margin-top: 0;">{{ category }} - {{ benchmark_name }} at {{ timestamp }}</h1>
+    <ul>
+    {% set parent_stack = [status_array] %}
+    {% for flag_value, status in status_array.statuses|dictsort recursive %}
+      {% set parent = parent_stack[-1] %}
+      {% set status = {'SUCCEEDED': 'succeeded', 'FAILED': 'failed', 'SKIPPED': 'skipped', 'mixed': 'mixed'}[status] %}
+      <li>{{ parent.flag_name }} = {{ flag_value }}
+      {% set subarray = parent.subarrays[flag_value] %}
+      {% if subarray %}
+      {% do parent_stack.append(subarray) %}
+        <ul>{{ loop(subarray.statuses|dictsort) }}</ul>
+      {% do parent_stack.pop() %}
+      {% else %}
+        <div class="{{ 'status-cell-%s' % status }}"/>
+      {% endif %}
+      </li>
+    {% endfor %}
+    </ul>
+  </body>
+</html>

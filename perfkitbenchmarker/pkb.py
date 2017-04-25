@@ -58,6 +58,7 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
 import collections
 import getpass
 import itertools
+import json
 import logging
 import multiprocessing
 import re
@@ -214,6 +215,13 @@ flags.DEFINE_integer(
     'run_processes', 1,
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
+flags.DEFINE_string(
+    'completion_status_file', None,
+    'If specified, this file will contain the completion status of each '
+    'benchmark that ran (SUCCEEDED, FAILED, or SKIPPED). The file has one json '
+    'object per line, each with the following format:\n'
+    '{ "name": <benchmark name>, "flags": <flags dictionary>, '
+    '"status": <completion status> }')
 flags.DEFINE_string(
     'helpmatch', '',
     'Shows only flags defined in a module whose name matches the given regex.')
@@ -678,6 +686,17 @@ def RunBenchmarks():
     archive.ArchiveRun(vm_util.GetTempDir(), FLAGS.archive_bucket,
                        gsutil_path=FLAGS.gsutil_path,
                        prefix=FLAGS.run_uri + '_')
+
+  if FLAGS.completion_status_file:
+    with open(FLAGS.completion_status_file, 'w') as status_file:
+      for spec in benchmark_specs:
+        status_dict = {
+            'name': spec.name,
+            'flags': spec.config.flags,
+            'status': spec.status
+        }
+        status_file.write(json.dumps(status_dict) + '\n')
+
   all_benchmarks_succeeded = all(spec.status == benchmark_status.SUCCEEDED
                                  for spec in benchmark_specs)
   return 0 if all_benchmarks_succeeded else 1

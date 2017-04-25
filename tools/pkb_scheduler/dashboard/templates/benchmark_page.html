@@ -1,0 +1,44 @@
+<html>
+  <head>
+
+<style>
+div.status-cell-succeeded {
+width: 32px; height: 32px;
+  background-color: green;
+}
+div.status-cell-failed {
+  width: 32px; height: 32px;
+  background-color: red;
+}
+div.status-cell-skipped {
+  width: 32px; height: 32px;
+  background-color: gray;
+}
+</style>
+
+<script type="text/javascript">
+</script>
+
+  </head>
+  <body>
+    <h1>PKB Scheduler Dashboard</h1>
+  {% for category, benchmark_names in categories.items() %}
+    <h3>{{ category }}</h3>
+  {% for benchmark in benchmark_names %}
+    <a href="/run/{{ benchmark }}">{{ benchmark }}</a><br>
+  {% endfor %}
+  {% endfor %}
+    <hr>
+    <h1 style="margin-top: 0;">{{ category }} - {{ benchmark_name }}</h1>
+    <!-- Most recent run -->
+    <h2>Most Recent Run</h2>
+    {% set timestamp = runs[0] %}
+    <a href="/run/{{ benchmark_name }}/{{ timestamp }}">{{ timestamp }}</a>
+    <!-- Historical runs -->
+    <h2>Historical Runs</h2>
+    {% for timestamp in runs[1:] %}
+      <a href="/run/{{ benchmark_name }}/{{ timestamp }}">{{ timestamp }}</a>
+      <br>
+    {% endfor %}
+  </body>
+</html>
