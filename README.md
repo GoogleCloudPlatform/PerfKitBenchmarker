@@ -14,7 +14,7 @@ This README is designed to give you the information you need to get running with
 * [Governing rules] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
 * [Community meeting decks and notes] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
 * [Design documents] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
-* You are always welcome to [open an issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) as well to contact us.
+* You are always welcome to [open an issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues), or to join us on #PerfKitBenchmarker on freenode to discuss issues you're having, pull requests, or anything else related to PerfKitBenchmarker
 
 
 Known Issues
