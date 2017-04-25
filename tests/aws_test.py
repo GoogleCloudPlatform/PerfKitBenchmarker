@@ -180,6 +180,7 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
         ['aws',
          '--output',
          'json',
+         '--region=us-east-1',
          'ec2',
          'describe-spot-instance-requests',
          '--spot-instance-request-ids=sir-3wri5sgk'])
@@ -207,6 +208,7 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
           ['aws',
            '--output',
            'json',
+           '--region=us-east-1',
            'ec2',
            'cancel-spot-instance-requests',
            '--spot-instance-request-ids=sir-abc'])
