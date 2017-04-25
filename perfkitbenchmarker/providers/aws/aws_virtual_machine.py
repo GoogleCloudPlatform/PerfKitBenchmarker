@@ -547,6 +547,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     while True:
       describe_sir_cmd = util.AWS_PREFIX + [
+          '--region=%s' % self.region,
           'ec2',
           'describe-spot-instance-requests',
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
@@ -578,6 +579,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_util.IssueCommand(delete_cmd)
     if hasattr(self, 'spot_instance_request_id'):
       cancel_cmd = util.AWS_PREFIX + [
+          '--region=%s' % self.region,
           'ec2',
           'cancel-spot-instance-requests',
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
