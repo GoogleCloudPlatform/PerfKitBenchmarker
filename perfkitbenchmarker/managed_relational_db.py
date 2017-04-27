@@ -28,9 +28,11 @@ _MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
 
 
+# TODO: Implement DEFAULT BACKUP_START_TIME for instances.
+
+
 def generateRandomDbPassword():
   """Generate a random password 10 characters in length."""
-
   return str(uuid.uuid4())[:10]
 
 
@@ -104,4 +106,5 @@ class BaseManagedRelationalDb(resource.BaseResource):
     Returns:
       database password
     """
-    return self.spec.database_password
+    pass
+
