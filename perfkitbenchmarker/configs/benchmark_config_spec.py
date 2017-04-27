@@ -30,6 +30,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import spark_service
+from perfkitbenchmarker import managed_db
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -284,6 +285,68 @@ class _StaticVmListDecoder(option_decoders.ListDecoder):
         default=list, item_decoder=_StaticVmDecoder(), **kwargs)
 
 
+class _ManagedDbSpec(spec.BaseSpec):
+  """Configurable options of a managed database service.
+
+  We may add more options here, such as disk specs, as necessary.
+  When there are flags for these attributes, the convention is that
+  the flag is prefixed with spark.  For example, the static_cluster_id
+  is overriden by the flag spark_static_cluster_id
+
+  Attributes:
+    flavor
+    replicated
+    database_name
+  """
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_ManagedDbSpec, self).__init__(component_full_name,
+                                         flag_values=flag_values,
+                                         **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments
+      to construct in order to decode the named option.
+    """
+    result = super(_ManagedDbSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'cloud': (option_decoders.EnumDecoder, {
+            'valid_values': providers.VALID_CLOUDS}),
+        'replicated': (option_decoders.BooleanDecoder, {
+          'default': True}),
+        'flavor': (option_decoders.EnumDecoder, {
+            'valid_values': [managed_db.MYSQL,
+                             managed_db.POSTGRES]}),
+        'version': (option_decoders.StringDecoder, {
+            'default': '5.7'})})
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(_ManagedDbSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['managed_db_flavor'].present:
+      config_values['flavor'] = (
+          flag_values.managed_db_flavor)
+    if flag_values['managed_db_version'].present:
+      config_values['version'] = (
+          flag_values.managed_db_version)
+
+
 class _SparkServiceSpec(spec.BaseSpec):
   """Configurable options of an Apache Spark Service.
 
@@ -531,6 +594,32 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _ManagedDbDecoder(option_decoders.TypeVerifier):
+  """Validates the managed_db dictionary of a benchmark config object."""
+  def __init__(self, **kwargs):
+    super(_ManagedDbDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies managed_db_service dictionary of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+      component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+    Returns:
+      _ManagedDbServiceSpec Build from the config passed in in value.
+    Raises:
+      errors.Config.InvalidateValue upon invalid input value.
+    """
+    managed_db_config = super(_ManagedDbDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    result = _ManagedDbSpec(self._GetOptionFullName(component_full_name),
+                               flag_values, **managed_db_config)
+    return result
+
+
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -594,7 +683,8 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'vm_groups': (_VmGroupsDecoder, {'default': {}}),
         'spark_service': (_SparkServiceDecoder, {'default': None}),
         'container_cluster': (_VmGroupSpecDecoder, {'default': None}),
-        'dpb_service': (_DpbServiceDecoder, {'default': None})})
+        'dpb_service': (_DpbServiceDecoder, {'default': None}),
+        'managed_database': (_ManagedDbDecoder, {'default': None})})
     return result
 
   def _DecodeAndInit(self, component_full_name, config, decoders, flag_values):
