@@ -87,7 +87,7 @@ BENCHMARK_SETS = {
             'multichase', 'mesh_network', 'mongodb_ycsb', 'netperf',
             'object_storage_service', 'oldisim', 'ping', 'redis_ycsb',
             'stencil2d', 'speccpu2006', 'sysbench_oltp', 'tomcat_wrk',
-            'unixbench']
+            'unixbench', 'dbtest']
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',
