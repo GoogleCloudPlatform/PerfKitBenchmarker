@@ -58,6 +58,7 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
 import collections
 import getpass
 import itertools
+import json
 import logging
 import multiprocessing
 import re
@@ -94,6 +95,7 @@ from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
 from perfkitbenchmarker.publisher import SampleCollector
 
 LOG_FILE_NAME = 'pkb.log'
+COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
 FLAGS = flags.FLAGS
@@ -214,6 +216,13 @@ flags.DEFINE_integer(
     'run_processes', 1,
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
+flags.DEFINE_string(
+    'completion_status_file', None,
+    'If specified, this file will contain the completion status of each '
+    'benchmark that ran (SUCCEEDED, FAILED, or SKIPPED). The file has one json '
+    'object per line, each with the following format:\n'
+    '{ "name": <benchmark name>, "flags": <flags dictionary>, '
+    '"status": <completion status> }')
 flags.DEFINE_string(
     'helpmatch', '',
     'Shows only flags defined in a module whose name matches the given regex.')
@@ -360,6 +369,30 @@ def _CreateBenchmarkSpecs():
         benchmark_module, config, uid))
 
   return specs
+
+
+def _WriteCompletionStatusFile(benchmark_specs, status_file):
+  """Writes a completion status file.
+
+  The file has one json object per line, each with the following format:
+
+  {
+    "name": <benchmark name>,
+    "status": <completion status>,
+    "flags": <flags dictionary>
+  }
+
+  Args:
+    benchmark_specs: The list of BenchmarkSpecs that ran.
+    status_file: The file object to write the json structures to.
+  """
+  for spec in benchmark_specs:
+    # OrderedDict so that we preserve key order in json file
+    status_dict = collections.OrderedDict()
+    status_dict['name'] = spec.name
+    status_dict['status'] = spec.status
+    status_dict['flags'] = spec.config.flags
+    status_file.write(json.dumps(status_dict) + '\n')
 
 
 def DoProvisionPhase(spec, timer):
@@ -668,6 +701,8 @@ def RunBenchmarks():
 
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
+    logging.info('Completion statuses can be found at: %s',
+                 vm_util.PrependTempDir(COMPLETION_STATUS_FILE_NAME))
 
 
   if stages.TEARDOWN not in FLAGS.run_stage:
@@ -678,6 +713,16 @@ def RunBenchmarks():
     archive.ArchiveRun(vm_util.GetTempDir(), FLAGS.archive_bucket,
                        gsutil_path=FLAGS.gsutil_path,
                        prefix=FLAGS.run_uri + '_')
+
+  # Write completion status file(s)
+  completion_status_file_name = (
+      vm_util.PrependTempDir(COMPLETION_STATUS_FILE_NAME))
+  with open(completion_status_file_name, 'w') as status_file:
+    _WriteCompletionStatusFile(benchmark_specs, status_file)
+  if FLAGS.completion_status_file:
+    with open(FLAGS.completion_status_file, 'w') as status_file:
+      _WriteCompletionStatusFile(benchmark_specs, status_file)
+
   all_benchmarks_succeeded = all(spec.status == benchmark_status.SUCCEEDED
                                  for spec in benchmark_specs)
   return 0 if all_benchmarks_succeeded else 1
