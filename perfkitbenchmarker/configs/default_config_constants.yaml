@@ -79,7 +79,7 @@ default_500_gb: &default_500_gb
     disk_size: 500
     mount_point: /scratch
   Kubernetes:
-    disk_type: standard
+    disk_type: emptyDir
     disk_size: 500
     mount_point: /scratch
   Mesos:
