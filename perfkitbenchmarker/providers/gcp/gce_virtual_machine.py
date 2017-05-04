@@ -270,7 +270,7 @@ class GceSoleTenantHost(resource.BaseResource):
 
   def __init__(self, host_type, zone, project):
     super(GceSoleTenantHost, self).__init__()
-    self.name = 'pkb-%s-%s' % (FLAGS.run_uri, self._counter.next())
+    self.name = 'pkb-host-%s-%s' % (FLAGS.run_uri, self._counter.next())
     self.host_type = host_type
     self.zone = zone
     self.project = project
@@ -431,7 +431,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       _, stderr, retcode = create_cmd.Issue()
 
     if (self.use_dedicated_host and retcode and
-        _INSUFFICIENT_HOST_CAPACITY in stderr):
+        _INSUFFICIENT_HOST_CAPACITY in stderr and not self.num_vms_per_host):
       logging.warning(
           'Creation failed due to insufficient host capacity. A new host will '
           'be created and instance creation will be retried.')
