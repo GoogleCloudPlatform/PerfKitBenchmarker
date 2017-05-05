@@ -18,9 +18,7 @@ This is a set of benchmarks that measures performance of MySQL Databases on
 managed MySQL services.
 
 - On AWS, we will use RDS+MySQL.
-- On GCP, we will use Cloud SQL v2 (Performance Edition). As of July 2015, you
- will need to request to whitelist your GCP project to get access to Cloud SQL
- v2. Follow instructions on your GCP's project console to do that.
+- On GCP, we will use Cloud SQL v2 (Performance Edition).
 
 As other cloud providers deliver a managed MySQL service, we will add it here.
 
