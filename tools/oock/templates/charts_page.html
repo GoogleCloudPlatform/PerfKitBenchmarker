@@ -1,0 +1,60 @@
+<html>
+    <head>
+        <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+        <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+
+<script type="text/javascript">
+google.charts.load('current', {'packages':['corechart','line','scatter']});
+google.charts.setOnLoadCallback(draw_charts_mangle_mangle);
+
+function draw_charts_mangle_mangle() {
+{% for cur_chart in charts.values() %}
+    $.ajax({
+        url: "/data/{{ cur_chart.data_source|safe }}",
+        dataType: "json",
+        success: function (jsonData) {
+            var data = new google.visualization.DataTable(jsonData);
+            data.sort({column: 0, desc: false});
+            var chart = new google.{{ cur_chart.type }}(document.getElementById('{{ cur_chart.name|safe }}'));
+
+            chart.draw(data, {{ cur_chart.options|safe }});
+
+            var chart_image_link = '<a href="'+chart.getImageURI()+'"> {{ cur_chart.name|safe }} image</a>';
+            document.getElementById('{{ cur_chart.name|safe }}_img')
+                    .outerHTML = chart_image_link;
+        }
+    });
+{% endfor %}
+}
+
+</script>
+    </head>
+    <body>
+    {% for subpage_path, subpage_title in subpages %}
+      <a href="/charts/{{ subpage_path }}">{{ subpage_title }}</a><br>
+    {% endfor %}
+    <hr>
+    <header>
+    {% for ancestor_title, ancestor_path in ancestors %}
+      <h3 style="display: inline-block; margin-bottom: 0;">
+        <a href="/charts/{{ ancestor_path }}">{{ ancestor_title }}</a><span> &gt; </span>
+      </h3>
+    {% endfor %}
+    <h1 style="margin-top: 0;">{{ title }}</h1>
+    </header>
+      {% for chart_row in charts_layout %}
+      <table>
+        <tr>
+        {% for chart_name in chart_row %}
+        {% set cur_chart = charts[chart_name] %}
+          <td>
+            <div id="{{ cur_chart.name }}_img">Loading {{ cur_chart.name }}...</div>
+            <div id="{{ cur_chart.name }}"
+                 style="width: {{ cur_chart.width|string }}px; height: {{ cur_chart.height|string }}px; background-color: gray;"></div>
+          </td>
+        {% endfor %}
+        </tr>
+      <table>
+      {% endfor %}
+    </body>
+</html>
