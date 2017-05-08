@@ -50,7 +50,7 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-NVME = 'nvme'
+NVME = 'NVME'
 SCSI = 'SCSI'
 UBUNTU_IMAGE = 'ubuntu-14-04'
 RHEL_IMAGE = 'rhel-7'
@@ -409,7 +409,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if not FLAGS.gce_migrate_on_maintenance:
       cmd.flags['maintenance-policy'] = 'TERMINATE'
-    ssd_interface_option = NVME if NVME in self.image else SCSI
+    ssd_interface_option = FLAGS.gce_ssd_interface
     cmd.flags['local-ssd'] = (['interface={0}'.format(ssd_interface_option)] *
                               self.max_local_disks)
     if FLAGS.gcloud_scopes:
@@ -510,7 +510,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     for i in xrange(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.LOCAL:
-        name = 'local-ssd-%d' % self.local_disk_counter
+        name = ''
+        if FLAGS.gce_ssd_interface == SCSI:
+          name = 'local-ssd-%d' % self.local_disk_counter
+        elif FLAGS.gce_ssd_interface == NVME:
+          name = 'nvme0n%d' % (self.local_disk_counter + 1)
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
         # Local disk numbers start at 1 (0 is the system disk).
         data_disk.disk_number = self.local_disk_counter + 1
