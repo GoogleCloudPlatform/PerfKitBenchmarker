@@ -593,6 +593,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
                                                  'valid_types': (dict,)}),
         'vm_groups': (_VmGroupsDecoder, {'default': {}}),
         'spark_service': (_SparkServiceDecoder, {'default': None}),
+        'container_cluster': (_VmGroupSpecDecoder, {'default': None}),
         'dpb_service': (_DpbServiceDecoder, {'default': None})})
     return result
 

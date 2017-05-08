@@ -25,6 +25,7 @@ import threading
 import uuid
 
 from perfkitbenchmarker import benchmark_status
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
@@ -110,6 +111,7 @@ class BenchmarkSpec(object):
     self.always_call_cleanup = False
     self.spark_service = None
     self.dpb_service = None
+    self.container_cluster = None
 
     self._zone_index = 0
 
@@ -132,6 +134,16 @@ class BenchmarkSpec(object):
     """
     with self.config.RedirectFlags(FLAGS):
       yield
+
+  def ConstructContainerCluster(self):
+    """Create the container cluster."""
+    if self.config.container_cluster is None:
+      return
+    cloud = self.config.container_cluster.cloud
+    providers.LoadProvider(cloud)
+    container_cluster_class = container_service.GetContainerClusterClass(cloud)
+    self.container_cluster = container_cluster_class(
+        self.config.container_cluster)
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""
@@ -310,6 +322,9 @@ class BenchmarkSpec(object):
     networks = [self.networks[key] for key in sorted(self.networks.iterkeys())]
     vm_util.RunThreaded(lambda net: net.Create(), networks)
 
+    if self.container_cluster:
+      self.container_cluster.Create()
+
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
       sshable_vms = [vm for vm in self.vms if vm.OS_TYPE != os_types.WINDOWS]
@@ -353,6 +368,9 @@ class BenchmarkSpec(object):
       except Exception:
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
+    if self.container_cluster:
+      self.container_cluster.Delete()
+
     self.deleted = True
 
   def StartBackgroundWorkload(self):
