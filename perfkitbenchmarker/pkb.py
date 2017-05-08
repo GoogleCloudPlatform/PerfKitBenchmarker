@@ -404,6 +404,7 @@ def DoProvisionPhase(spec, timer):
       provisioning.
   """
   logging.info('Provisioning resources for benchmark %s', spec.name)
+  spec.ConstructContainerCluster()
   # spark service needs to go first, because it adds some vms.
   spec.ConstructSparkService()
   spec.ConstructDpbService()

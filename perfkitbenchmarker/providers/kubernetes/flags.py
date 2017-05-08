@@ -32,12 +32,6 @@ flags.DEFINE_list('ceph_monitors', [],
                   'Must be provided when Ceph scratch disk is required. '
                   'Example: "127.0.0.1:6789,192.168.1.1:6789"')
 
-flags.DEFINE_string('kubeconfig', None,
-                    'Path to kubeconfig to be used by kubectl')
-
-flags.DEFINE_string('kubectl', 'kubectl',
-                    'Path to kubectl tool')
-
 flags.DEFINE_string('username', 'root',
                     'User name that Perfkit will attempt to use in order to '
                     'SSH into Docker instance.')
