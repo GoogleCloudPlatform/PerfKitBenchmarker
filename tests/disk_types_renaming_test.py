@@ -105,6 +105,7 @@ class AwsDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
                 'cloud': 'AWS',
                 'vm_spec': {
                     'AWS': {
+                        'machine_type': 'test_machine_type',
                         'zone': 'us-east-1a'
                     }
                 },
@@ -127,6 +128,7 @@ class AwsDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
                 'cloud': 'AWS',
                 'vm_spec': {
                     'AWS': {
+                        'machine_type': 'test_machine_type',
                         'zone': 'us-east-1a'
                     }
                 },
@@ -149,6 +151,7 @@ class AwsDiskTypeRenamingTest(_DiskTypeRenamingTestCase):
                 'cloud': 'AWS',
                 'vm_spec': {
                     'AWS': {
+                        'machine_type': 'test_machine_type',
                         'zone': 'us-east-1a'
                     }
                 },

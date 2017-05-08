@@ -404,3 +404,142 @@ class CSVPublisherTestCase(unittest.TestCase):
     rows = list(reader)
     self.assertEqual(['key1', 'key3'], reader.fieldnames[-2:])
     self.assertEqual(3, len(rows))
+
+
+class InfluxDBPublisherTestCase(unittest.TestCase):
+  def setUp(self):
+    self.db_name = 'test_db'
+    self.db_uri = 'test'
+    self.test_db = publisher.InfluxDBPublisher(self.db_uri, self.db_name)
+
+  def testFormatToKeyValue(self):
+    sample_1 = {'test': 'testa', 'metric': '3', 'official': 47.0,
+                'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
+                'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123}
+    sample_2 = {'test': 'testb', 'metric': '2', 'official': 14.0,
+                'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+                'run_uri': 'bba3', 'sample_uri': 'bb',
+                'timestamp': 55}
+    sample_3 = {'test': 'testc', 'metric': '1', 'official': 1.0,
+                'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+                'run_uri': '323', 'sample_uri': '33',
+                'timestamp': 123}
+    sample_4 = {'test': 'testc', 'metric': 'some,metric', 'official': 1.0,
+                'value': 'non', 'unit': 'Some MB', 'owner': 'Rackspace',
+                'run_uri': '323', 'sample_uri': '33',
+                'timestamp': 123}
+    sample_5 = {'test': 'testc', 'metric': 'some,metric', 'official': 1.0,
+                'value': 'non', 'unit': '', 'owner': 'Rackspace',
+                'run_uri': '323', 'sample_uri': '',
+                'timestamp': 123}
+
+    sample_1_formatted_key_value = self.test_db._FormatToKeyValue(sample_1)
+    sample_2_formatted_key_value = self.test_db._FormatToKeyValue(sample_2)
+    sample_3_formatted_key_value = self.test_db._FormatToKeyValue(sample_3)
+    sample_4_formatted_key_value = self.test_db._FormatToKeyValue(sample_4)
+    sample_5_formatted_key_value = self.test_db._FormatToKeyValue(sample_5)
+
+    expected_sample_1 = ['owner=Rackspace', 'unit=us', 'run_uri=5rtw',
+                         'test=testa', 'timestamp=123', 'metric=3',
+                         'official=47.0', 'value=non', 'sample_uri=5r']
+    expected_sample_2 = ['owner=Rackspace', 'unit=MB', 'run_uri=bba3',
+                         'test=testb', 'timestamp=55', 'metric=2',
+                         'official=14.0', 'value=non', 'sample_uri=bb']
+    expected_sample_3 = ['owner=Rackspace', 'unit=MB', 'run_uri=323',
+                         'test=testc', 'timestamp=123', 'metric=1',
+                         'official=1.0', 'value=non', 'sample_uri=33']
+    expected_sample_4 = ['owner=Rackspace', 'unit=Some\ MB', 'run_uri=323',
+                         'test=testc', 'timestamp=123', 'metric=some\,metric',
+                         'official=1.0', 'value=non', 'sample_uri=33']
+    expected_sample_5 = ['owner=Rackspace', 'unit=\\"\\"', 'run_uri=323',
+                         'test=testc', 'timestamp=123', 'metric=some\,metric',
+                         'official=1.0', 'value=non', 'sample_uri=\\"\\"']
+
+    self.assertItemsEqual(sample_1_formatted_key_value, expected_sample_1)
+    self.assertItemsEqual(sample_2_formatted_key_value, expected_sample_2)
+    self.assertItemsEqual(sample_3_formatted_key_value, expected_sample_3)
+    self.assertItemsEqual(sample_4_formatted_key_value, expected_sample_4)
+    self.assertItemsEqual(sample_5_formatted_key_value, expected_sample_5)
+
+  def testConstructSample(self):
+    sample_with_metadata = {
+        'test': 'testc', 'metric': '1', 'official': 1.0,
+        'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+        'run_uri': '323', 'sample_uri': '33',
+        'timestamp': 123,
+        'metadata': collections.OrderedDict([('info', '1'),
+                                            ('more_info', '2'),
+                                            ('bar', 'foo')])}
+
+    constructed_sample = self.test_db._ConstructSample(sample_with_metadata)
+
+    sample_results = ('perfkitbenchmarker,test=testc,official=1.0,'
+                      'owner=Rackspace,run_uri=323,sample_uri=33,'
+                      'metric=1,unit=MB,info=1,more_info=2,bar=foo '
+                      'value=non 123000000000')
+
+    self.assertEqual(constructed_sample, sample_results)
+
+  @mock.patch.object(publisher.InfluxDBPublisher, '_Publish')
+  def testPublishSamples(self, mock_publish_method):
+    samples = [
+        {'test': 'testc', 'metric': '1', 'official': 1.0,
+         'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+         'run_uri': '323', 'sample_uri': '33', 'timestamp': 123,
+         'metadata': collections.OrderedDict([('info', '1'),
+                                              ('more_info', '2'),
+                                              ('bar', 'foo')])
+         },
+        {'test': 'testb', 'metric': '2', 'official': 14.0,
+         'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+         'run_uri': 'bba3', 'sample_uri': 'bb', 'timestamp': 55,
+         'metadata': collections.OrderedDict()
+         },
+        {'test': 'testa', 'metric': '3', 'official': 47.0,
+         'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
+         'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123
+         }
+    ]
+
+    expected = [
+        ('perfkitbenchmarker,test=testc,official=1.0,owner=Rackspace,'
+         'run_uri=323,sample_uri=33,metric=1,unit=MB,info=1,more_info=2,'
+         'bar=foo value=non 123000000000'),
+        ('perfkitbenchmarker,test=testb,official=14.0,owner=Rackspace,'
+         'run_uri=bba3,sample_uri=bb,metric=2,unit=MB value=non 55000000000'),
+        ('perfkitbenchmarker,test=testa,official=47.0,owner=Rackspace,'
+         'run_uri=5rtw,sample_uri=5r,metric=3,unit=us value=non 123000000000')
+    ]
+
+    mock_publish_method.return_value = None
+    self.test_db.PublishSamples(samples)
+    mock_publish_method.assert_called_once_with(expected)
+
+  @mock.patch.object(publisher.InfluxDBPublisher, '_WriteData')
+  @mock.patch.object(publisher.InfluxDBPublisher, '_CreateDB')
+  def testPublish(self, mock_create_db, mock_write_data):
+    formatted_samples = [
+        ('perfkitbenchmarker,test=testc,official=1.0,owner=Rackspace,'
+         'run_uri=323,sample_uri=33,metric=1,unit=MB,info=1,more_info=2,'
+         'bar=foo value=non 123000000000'),
+        ('perfkitbenchmarker,test=testb,official=14.0,owner=Rackspace,'
+         'run_uri=bba3,sample_uri=bb,metric=2,unit=MB value=non 55000000000'),
+        ('perfkitbenchmarker,test=testa,official=47.0,owner=Rackspace,'
+         'run_uri=5rtw,sample_uri=5r,metric=3,unit=us value=non 123000000000')
+    ]
+
+    expected_output = ('perfkitbenchmarker,test=testc,official=1.0,'
+                       'owner=Rackspace,run_uri=323,sample_uri=33,metric=1,'
+                       'unit=MB,info=1,more_info=2,bar=foo value=non '
+                       '123000000000\nperfkitbenchmarker,test=testb,'
+                       'official=14.0,owner=Rackspace,run_uri=bba3,'
+                       'sample_uri=bb,metric=2,unit=MB value=non 55000000000\n'
+                       'perfkitbenchmarker,test=testa,official=47.0,'
+                       'owner=Rackspace,run_uri=5rtw,sample_uri=5r,'
+                       'metric=3,unit=us value=non 123000000000')
+
+    mock_create_db.return_value = None
+    mock_write_data.return_value = None
+    self.test_db._Publish(formatted_samples)
+    mock_create_db.assert_called_once()
+    mock_write_data.assert_called_once_with(expected_output)

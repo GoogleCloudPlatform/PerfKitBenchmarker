@@ -18,9 +18,7 @@ This is a set of benchmarks that measures performance of MySQL Databases on
 managed MySQL services.
 
 - On AWS, we will use RDS+MySQL.
-- On GCP, we will use Cloud SQL v2 (Performance Edition). As of July 2015, you
- will need to request to whitelist your GCP project to get access to Cloud SQL
- v2. Follow instructions on your GCP's project console to do that.
+- On GCP, we will use Cloud SQL v2 (Performance Edition).
 
 As other cloud providers deliver a managed MySQL service, we will add it here.
 
@@ -112,9 +110,6 @@ OFF = 'off'
 MYSQL_ROOT_USER = 'root'
 MYSQL_ROOT_PASSWORD_PREFIX = 'Perfkit8'
 MYSQL_PORT = '3306'
-
-PREPARE_SCRIPT_PATH = '/share/doc/sysbench/tests/db/parallel_prepare.lua'
-OLTP_SCRIPT_PATH = '/share/doc/sysbench/tests/db/oltp.lua'
 
 SYSBENCH_RESULT_NAME_DATA_LOAD = 'sysbench data load time'
 SYSBENCH_RESULT_NAME_TPS = 'sysbench tps'
@@ -281,9 +276,9 @@ def _IssueSysbenchCommand(vm, duration):
   """
   stdout = ''
   stderr = ''
-  oltp_script_path = sysbench05plus.PathPrefix(vm) + OLTP_SCRIPT_PATH
+  oltp_script_path = sysbench05plus.OLTP_SCRIPT_PATH
   if duration > 0:
-    run_cmd_tokens = ['sysbench',
+    run_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
                       '--test=%s' % oltp_script_path,
                       '--mysql_svc_oltp_tables_count=%d' %
                       FLAGS.mysql_svc_oltp_tables_count,
@@ -345,8 +340,8 @@ def _RunSysbench(vm, metadata):
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
-  prepare_script_path = sysbench05plus.PathPrefix(vm) + PREPARE_SCRIPT_PATH
-  data_load_cmd_tokens = ['sysbench',
+  prepare_script_path = sysbench05plus.PREPARE_SCRIPT_PATH
+  data_load_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
                           '--test=%s' % prepare_script_path,
                           '--mysql_svc_oltp_tables_count=%d' %
                           FLAGS.mysql_svc_oltp_tables_count,

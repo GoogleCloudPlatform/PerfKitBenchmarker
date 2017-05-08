@@ -44,7 +44,7 @@ class _MockFlag(object):
     self.validators = ()
     self.value = None
 
-  def Parse(self, argument):
+  def parse(self, argument):
     self.present = True
     self.value = argument
 

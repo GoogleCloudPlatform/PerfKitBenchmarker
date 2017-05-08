@@ -18,10 +18,11 @@ flags.DEFINE_string('openstack_cli_path',
                     default='openstack',
                     help='The path to the OpenStack CLI binary.')
 
-flags.DEFINE_string('openstack_additional_flags',
-                    default=[],
-                    help='Additional flags to pass to every OpenStack CLI '
-                         'command. See "openstack --help" for more.')
+flags.DEFINE_list('openstack_additional_flags',
+                  default=[],
+                  help='Additional comma separated flags to pass to every '
+                       'OpenStack CLI command. See "openstack --help" for '
+                       'more.')
 
 flags.DEFINE_string('openstack_public_network', None,
                     '(DEPRECATED: Use openstack_floating_ip_pool) '

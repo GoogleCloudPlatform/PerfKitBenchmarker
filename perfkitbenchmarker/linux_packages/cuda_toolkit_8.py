@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,16 +16,32 @@
 """Module containing CUDA toolkit 8 installation and cleanup functions."""
 
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import flag_util
+
+
+TESLA_K80_MAX_CLOCK_SPEEDS = [2505, 875]
+flag_util.DEFINE_integerlist('gpu_clock_speeds',
+                             flag_util.IntegerList(TESLA_K80_MAX_CLOCK_SPEEDS),
+                             'desired gpu clock speeds in the form '
+                             '[memory clock, graphics clock]')
+
+
+FLAGS = flags.FLAGS
+
 
 # TODO: Test the CUDA Ubuntu 14.04 installer, and if everything works ok,
 # automatically install the correct package depending on the OS image.
-CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604_8.0.44-1_amd64.deb'
+CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604_8.0.61-1_amd64.deb'
 CUDA_TOOLKIT_UBUNTU_URL = (
     'http://developer.download.nvidia.com/compute/cuda'
     '/repos/ubuntu1604/x86_64/%s' % CUDA_TOOLKIT_UBUNTU)
 CUDA_TOOLKIT_INSTALL_DIR = '/usr/local/cuda'
-
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
+
+
+class UnsupportedClockSpeedException(Exception):
+  pass
 
 
 def QueryNumberOfGpus(vm):
@@ -33,6 +49,33 @@ def QueryNumberOfGpus(vm):
   stdout, _ = vm.RemoteCommand('sudo nvidia-smi --query-gpu=count --id=0 '
                                '--format=csv', should_log=True)
   return int(stdout.split()[1])
+
+
+def SetAndConfirmGpuClocks(vm):
+  """Sets and confirms the GPU clock speed.
+
+  The clock values are provided in the gpu_pcie_bandwidth_clock_speeds
+  flag. If a device is queried and its clock speed does not allign with
+  what it was just set to, an expection will be raised.
+
+  Args:
+    vm: the virtual machine to operate on.
+
+  Raises:
+    UnsupportedClockSpeedException if a GPU did not accept the
+    provided clock speeds.
+  """
+  desired_memory_clock = FLAGS.gpu_clock_speeds[0]
+  desired_graphics_clock = FLAGS.gpu_clock_speeds[1]
+  SetGpuClockSpeed(vm, desired_memory_clock, desired_graphics_clock)
+  num_gpus = QueryNumberOfGpus(vm)
+  for i in range(num_gpus):
+    if QueryGpuClockSpeed(vm, i) != (desired_memory_clock,
+                                     desired_graphics_clock):
+      raise UnsupportedClockSpeedException('Unrecoverable error setting '
+                                           'GPU #{} clock speed to {},{}'
+                                           .format(i, desired_memory_clock,
+                                                   desired_graphics_clock))
 
 
 def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
@@ -73,8 +116,26 @@ def QueryGpuClockSpeed(vm, device_id):
   return (int(matches[0]), int(matches[1]))
 
 
+def _CheckNvidiaSmiExists(vm):
+  """Returns whether nvidia-smi is installed or not"""
+  resp, _ = vm.RemoteHostCommand('command -v nvidia-smi',
+                                 ignore_failure=True,
+                                 suppress_warning=True)
+  if resp.rstrip() == "":
+    return False
+  return True
+
+
+def DoPostInstallActions(vm):
+    SetAndConfirmGpuClocks(vm)
+
+
 def AptInstall(vm):
-  """Installs CUDA toolkit 8 on the VM."""
+  """Installs CUDA toolkit 8 on the VM if not already installed"""
+  if _CheckNvidiaSmiExists(vm):
+    DoPostInstallActions(vm)
+    return
+
   vm.Install('build_tools')
   vm.Install('wget')
   vm.RemoteCommand('wget %s' % CUDA_TOOLKIT_UBUNTU_URL)
@@ -83,6 +144,7 @@ def AptInstall(vm):
   vm.RemoteCommand('sudo apt-get install -y cuda')
   vm.RemoteCommand('sudo reboot', ignore_failure=True)
   vm.WaitForBootCompletion()
+  DoPostInstallActions(vm)
 
 
 def YumInstall(vm):

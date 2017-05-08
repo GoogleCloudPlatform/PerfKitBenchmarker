@@ -58,6 +58,7 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
 import collections
 import getpass
 import itertools
+import json
 import logging
 import multiprocessing
 import re
@@ -94,6 +95,7 @@ from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
 from perfkitbenchmarker.publisher import SampleCollector
 
 LOG_FILE_NAME = 'pkb.log'
+COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
 FLAGS = flags.FLAGS
@@ -121,7 +123,7 @@ flags.DEFINE_list(
     'Zones that will be appended to the "zones" list. This is functionally '
     'the same, but allows flag matrices to have two zone axes.')
 # TODO(user): note that this is currently very GCE specific. Need to create a
-#    module which can traslate from some generic types to provider specific
+#    module which can translate from some generic types to provider specific
 #    nomenclature.
 flags.DEFINE_string('machine_type', None, 'Machine '
                     'types that will be created for benchmarks that don\'t '
@@ -137,10 +139,10 @@ flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
                     'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
     'log_level', log_util.INFO,
-    [log_util.DEBUG, log_util.INFO],
+    log_util.LOG_LEVELS.keys(),
     'The log level to run at.')
 flags.DEFINE_enum(
-    'file_log_level', log_util.DEBUG, [log_util.DEBUG, log_util.INFO],
+    'file_log_level', log_util.DEBUG, log_util.LOG_LEVELS.keys(),
     'Anything logged at this level or higher will be written to the log file.')
 flags.DEFINE_integer('duration_in_seconds', None,
                      'duration of benchmarks. '
@@ -215,6 +217,13 @@ flags.DEFINE_integer(
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
 flags.DEFINE_string(
+    'completion_status_file', None,
+    'If specified, this file will contain the completion status of each '
+    'benchmark that ran (SUCCEEDED, FAILED, or SKIPPED). The file has one json '
+    'object per line, each with the following format:\n'
+    '{ "name": <benchmark name>, "flags": <flags dictionary>, '
+    '"status": <completion status> }')
+flags.DEFINE_string(
     'helpmatch', '',
     'Shows only flags defined in a module whose name matches the given regex.')
 
@@ -279,12 +288,12 @@ def _PrintHelp(matches=None):
   if not matches:
     print FLAGS
   else:
-    flags_by_module = FLAGS.FlagsByModuleDict()
+    flags_by_module = FLAGS.flags_by_module_dict()
     modules = sorted(flags_by_module)
     regex = re.compile(matches)
     for module_name in modules:
       if regex.search(module_name):
-        print FLAGS.ModuleHelp(module_name)
+        print FLAGS.module_help(module_name)
 
 
 def CheckVersionFlag():
@@ -362,6 +371,30 @@ def _CreateBenchmarkSpecs():
   return specs
 
 
+def _WriteCompletionStatusFile(benchmark_specs, status_file):
+  """Writes a completion status file.
+
+  The file has one json object per line, each with the following format:
+
+  {
+    "name": <benchmark name>,
+    "status": <completion status>,
+    "flags": <flags dictionary>
+  }
+
+  Args:
+    benchmark_specs: The list of BenchmarkSpecs that ran.
+    status_file: The file object to write the json structures to.
+  """
+  for spec in benchmark_specs:
+    # OrderedDict so that we preserve key order in json file
+    status_dict = collections.OrderedDict()
+    status_dict['name'] = spec.name
+    status_dict['status'] = spec.status
+    status_dict['flags'] = spec.config.flags
+    status_file.write(json.dumps(status_dict) + '\n')
+
+
 def DoProvisionPhase(spec, timer):
   """Performs the Provision phase of benchmark execution.
 
@@ -371,6 +404,7 @@ def DoProvisionPhase(spec, timer):
       provisioning.
   """
   logging.info('Provisioning resources for benchmark %s', spec.name)
+  spec.ConstructContainerCluster()
   # spark service needs to go first, because it adds some vms.
   spec.ConstructSparkService()
   spec.ConstructDpbService()
@@ -585,7 +619,7 @@ def _LogCommandLineFlags():
   for name in FLAGS:
     flag = FLAGS[name]
     if flag.present:
-      result.append(flag.Serialize())
+      result.append(flag.serialize())
   logging.info('Flag values:\n%s', '\n'.join(result))
 
 
@@ -668,6 +702,8 @@ def RunBenchmarks():
 
     logging.info('Complete logs can be found at: %s',
                  vm_util.PrependTempDir(LOG_FILE_NAME))
+    logging.info('Completion statuses can be found at: %s',
+                 vm_util.PrependTempDir(COMPLETION_STATUS_FILE_NAME))
 
 
   if stages.TEARDOWN not in FLAGS.run_stage:
@@ -678,6 +714,16 @@ def RunBenchmarks():
     archive.ArchiveRun(vm_util.GetTempDir(), FLAGS.archive_bucket,
                        gsutil_path=FLAGS.gsutil_path,
                        prefix=FLAGS.run_uri + '_')
+
+  # Write completion status file(s)
+  completion_status_file_name = (
+      vm_util.PrependTempDir(COMPLETION_STATUS_FILE_NAME))
+  with open(completion_status_file_name, 'w') as status_file:
+    _WriteCompletionStatusFile(benchmark_specs, status_file)
+  if FLAGS.completion_status_file:
+    with open(FLAGS.completion_status_file, 'w') as status_file:
+      _WriteCompletionStatusFile(benchmark_specs, status_file)
+
   all_benchmarks_succeeded = all(spec.status == benchmark_status.SUCCEEDED
                                  for spec in benchmark_specs)
   return 0 if all_benchmarks_succeeded else 1

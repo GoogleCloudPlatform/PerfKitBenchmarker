@@ -51,13 +51,13 @@ class MockFlagsTestCase(unittest.TestCase):
     self.assertEqual(self.flags['test_flag'].value, 5)
 
   def testSetViaParse(self):
-    self.flags['test_flag'].Parse(5)
+    self.flags['test_flag'].parse(5)
     self.assertTrue(self.flags['test_flag'].present)
     self.assertEqual(self.flags['test_flag'].value, 5)
 
   def testCopy(self):
     copied_flags = copy.deepcopy(self.flags)
-    copied_flags['test_flag'].Parse(5)
+    copied_flags['test_flag'].parse(5)
     self.assertFalse(self.flags['test_flag'].present)
     self.assertIsNone(self.flags['test_flag'].value)
     self.assertTrue(copied_flags['test_flag'].present)
@@ -71,7 +71,7 @@ class PatchFlagsTestCase(unittest.TestCase):
     self.flags = mock_flags.MockFlags()
 
   def testGetFlag(self):
-    self.flags['test_flag'].Parse(5)
+    self.flags['test_flag'].parse(5)
     with mock_flags.PatchFlags(self.flags):
       self.assertEqual(FLAGS.test_flag, 5)
       self.assertTrue(FLAGS['test_flag'].present)

@@ -25,22 +25,37 @@ class BlazemarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
   maxDiff = None
 
   def setUp(self):
-    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
-    result_path = os.path.join(data_dir, 'blazemark-output.txt')
-    with open(result_path) as result_file:
-      self.out = result_file.read()
+    self.data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
 
   def testParseResult(self):
-    results = blazemark._ParseResult(self.out, 'test')
-    self.assertEqual(14, len(results))  # 14 results
-    self.assertEqual('test_C-like_Throughput', results[0].metric)
-    self.assertEqual(1115.44, results[0].value)
-    self.assertEqual('MFlop/s', results[0].unit)
-    self.assertEqual({'N': 100}, results[0].metadata)
-    self.assertEqual('test_Eigen_Throughput', results[-1].metric)
-    self.assertEqual(209.899, results[-1].value)
-    self.assertEqual('MFlop/s', results[-1].unit)
-    self.assertEqual({'N': 10000000}, results[-1].metadata)
+    result_path = os.path.join(self.data_dir, 'blazemark-output.txt')
+    with open(result_path) as result_file:
+      out = result_file.read()
+      results = blazemark._ParseResult(out, 'test')
+      self.assertEqual(14, len(results))  # 14 results
+      self.assertEqual('test_C-like_Throughput', results[0].metric)
+      self.assertEqual(1115.44, results[0].value)
+      self.assertEqual('MFlop/s', results[0].unit)
+      self.assertEqual({'N': 100}, results[0].metadata)
+      self.assertEqual('test_Eigen_Throughput', results[-1].metric)
+      self.assertEqual(209.899, results[-1].value)
+      self.assertEqual('MFlop/s', results[-1].unit)
+      self.assertEqual({'N': 10000000}, results[-1].metadata)
+
+  def testParseExpResult(self):
+    result_path = os.path.join(self.data_dir, 'blazemark-output2.txt')
+    with open(result_path) as result_file:
+      out = result_file.read()
+      results = blazemark._ParseResult(out, 'test')
+      self.assertEqual(10, len(results))  # 10 results
+      self.assertEqual('test_Blaze_Throughput', results[0].metric)
+      self.assertEqual(float('3.03424e-08'), results[0].value)
+      self.assertEqual('Seconds', results[0].unit)
+      self.assertEqual({'N': 3}, results[0].metadata)
+      self.assertEqual('test_Blaze_Throughput', results[-1].metric)
+      self.assertEqual(31.9121, results[-1].value)
+      self.assertEqual('Seconds', results[-1].unit)
+      self.assertEqual({'N': 2000}, results[-1].metadata)
 
 
 if __name__ == '__main__':

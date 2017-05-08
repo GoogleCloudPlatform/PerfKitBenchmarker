@@ -179,7 +179,8 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _CreateVm(self):
     vm_spec = aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS',
-                                            zone='us-east-1a')
+                                            zone='us-east-1a',
+                                            machine_type='test_machine_type')
     return aws_virtual_machine.DebianBasedAwsVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):

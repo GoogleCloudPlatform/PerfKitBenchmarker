@@ -32,12 +32,6 @@ flags.DEFINE_list('ceph_monitors', [],
                   'Must be provided when Ceph scratch disk is required. '
                   'Example: "127.0.0.1:6789,192.168.1.1:6789"')
 
-flags.DEFINE_string('kubeconfig', '',
-                    'Path to kubeconfig to be used by kubectl')
-
-flags.DEFINE_string('kubectl', 'kubectl',
-                    'Path to kubectl tool')
-
 flags.DEFINE_string('username', 'root',
                     'User name that Perfkit will attempt to use in order to '
                     'SSH into Docker instance.')
@@ -46,8 +40,6 @@ flags.DEFINE_boolean('docker_in_privileged_mode', True,
                      'If set to True, will attempt to create Docker containers '
                      'in a privileged mode. Note that some benchmarks execute '
                      'commands which are only allowed in privileged mode.')
-
-flags.DEFINE_list('kubernetes_nodes', [],
-                  'IP addresses of Kubernetes Nodes. These need to be '
-                  'accessible from the machine running Perfkit '
-                  'benchmarker. Example: "10.20.30.40,10.20.30.41"')
+flags.DEFINE_boolean('kubernetes_anti_affinity', True,
+                     'If set to True, PKB pods will not be scheduled on the '
+                     'same nodes as other PKB pods.')

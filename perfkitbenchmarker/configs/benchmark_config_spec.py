@@ -71,7 +71,7 @@ class FlagsDecoder(option_decoders.TypeVerifier):
                   self._GetOptionFullName(component_full_name), key))
         if not merged_flag_values[key].present:
           try:
-            merged_flag_values[key].Parse(value)
+            merged_flag_values[key].parse(value)
           except flags.IllegalFlagValue as e:
             raise errors.Config.InvalidValue(
                 'Invalid {0}.{1} value: "{2}" (of type "{3}").{4}{5}'.format(
@@ -121,11 +121,6 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
     if dpb_service_config['service_type'] == dpb_service.EMR:
         if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
             raise errors.Config.InvalidValue('EMR service requires S3.')
-    if dpb_service_config['service_type'] == dpb_service.DATAFLOW:
-      if flag_values.dpb_dataflow_jar is None:
-        raise errors.Config.InvalidValue('Dataflow jar missing.')
-      if flag_values.dpb_dataflow_staging_location is None:
-        raise errors.Config.InvalidValue('Dataflow Staging location missing.')
     result = _DpbServiceSpec(self._GetOptionFullName(component_full_name),
                              flag_values, **dpb_service_config)
     return result
@@ -598,6 +593,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
                                                  'valid_types': (dict,)}),
         'vm_groups': (_VmGroupsDecoder, {'default': {}}),
         'spark_service': (_SparkServiceDecoder, {'default': None}),
+        'container_cluster': (_VmGroupSpecDecoder, {'default': None}),
         'dpb_service': (_DpbServiceDecoder, {'default': None})})
     return result
 

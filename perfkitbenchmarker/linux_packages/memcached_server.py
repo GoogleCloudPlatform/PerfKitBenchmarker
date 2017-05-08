@@ -122,6 +122,11 @@ def StopMemcached(server):
       (server.internal_ip, MEMCACHED_PORT))
 
 
+def FlushMemcachedServer(ip, port):
+  vm_util.IssueCommand(
+      '(echo -e "flush_all\n" ; sleep 1)| netcat %s %s' % (ip, port))
+
+
 def Uninstall(vm):
   vm.RemoteCommand('pkill memcached')
   vm.RemoteCommand('rm -rf %s' % MEMCACHED_DIR)

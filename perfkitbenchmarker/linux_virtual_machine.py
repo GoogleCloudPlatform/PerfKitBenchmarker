@@ -217,6 +217,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
+      self.InstallPackages('python')
     self.SetFiles()
     self.DoSysctls()
     self.BurnCpu()
@@ -771,6 +772,9 @@ class DebianMixin(BaseLinuxMixin):
   @vm_util.Retry()
   def InstallPackages(self, packages):
     """Installs packages using the apt package manager."""
+    if not self._apt_updated:
+      self.AptUpdate()
+      self._apt_updated = True
     try:
       install_command = ('sudo DEBIAN_FRONTEND=\'noninteractive\' '
                          '/usr/bin/apt-get -y install %s' % (packages))

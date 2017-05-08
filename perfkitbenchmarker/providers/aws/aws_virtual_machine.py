@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from collections import OrderedDict
 
 """Class to represent an AWS Virtual Machine object.
 
@@ -24,6 +25,7 @@ import json
 import logging
 import uuid
 import threading
+import time
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -45,7 +47,7 @@ HVM = 'HVM'
 PV = 'PV'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
 PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['c3', 'c4', 'cc2', 'cg1', 'g2', 'cr1', 'r3', 'hi1', 'i2'])
+    ['c3', 'c4', 'cc2', 'cg1', 'g2', 'cr1', 'r3', 'hi1', 'i2', 'i3'])
 NUM_LOCAL_VOLUMES = {
     'c1.medium': 1, 'c1.xlarge': 4,
     'c3.large': 2, 'c3.xlarge': 2, 'c3.2xlarge': 2, 'c3.4xlarge': 2,
@@ -58,7 +60,8 @@ NUM_LOCAL_VOLUMES = {
     'm3.medium': 1, 'm3.large': 1, 'm3.xlarge': 2, 'm3.2xlarge': 2,
     'r3.large': 1, 'r3.xlarge': 1, 'r3.2xlarge': 1, 'r3.4xlarge': 1,
     'r3.8xlarge': 2, 'd2.xlarge': 3, 'd2.2xlarge': 6, 'd2.4xlarge': 12,
-    'd2.8xlarge': 24, 'x1.32xlarge': 2,
+    'd2.8xlarge': 24, 'x1.32xlarge': 2, 'i3.large': 1, 'i3.xlarge': 1,
+    'i3.2xlarge': 1, 'i3.4xlarge': 2, 'i3.8xlarge': 4, 'i3.16xlarge': 8
 }
 DRIVE_START_LETTER = 'b'
 INSTANCE_EXISTS_STATUSES = frozenset(
@@ -69,6 +72,19 @@ HOST_EXISTS_STATES = frozenset(
     ['available', 'under-assessment', 'permanent-failure'])
 HOST_RELEASED_STATES = frozenset(['released', 'released-permanent-failure'])
 KNOWN_HOST_STATES = HOST_EXISTS_STATES | HOST_RELEASED_STATES
+
+# See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-bid-status.html
+SPOT_INSTANCE_REQUEST_HOLDING_STATUSES = frozenset(
+    ['capacity-not-available', 'capacity-oversubscribed', 'price-too-low',
+     'not-scheduled-yet', 'launch-group-constraint', 'az-group-constraint',
+     'placement-group-constraint', 'constraint-not-fulfillable'])
+SPOT_INSTANCE_REQUEST_TERMINAL_STATUSES = frozenset(
+    ['schedule-expired', 'canceled-before-fulfillment', 'bad-parameters',
+     'system-error', 'request-canceled-and-instance-running',
+     'marked-for-termination', 'instance-terminated-by-price',
+     'instance-terminated-by-user', 'instance-terminated-no-capacity',
+     'instance-terminated-capacity-oversubscribed',
+     'instance-terminated-launch-group-constraint'])
 
 
 def GetRootBlockDeviceSpecForImage(image_id, region):
@@ -136,11 +152,13 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
     root_block_device['Ebs'].pop('Encrypted')
     mappings.append(root_block_device)
 
-  if machine_type in NUM_LOCAL_VOLUMES:
+  if (machine_type in NUM_LOCAL_VOLUMES and
+      not aws_disk.LocalDriveIsNvme(machine_type)):
     for i in xrange(NUM_LOCAL_VOLUMES[machine_type]):
-      mappings.append({
-          'VirtualName': 'ephemeral%s' % i,
-          'DeviceName': '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)})
+      od = OrderedDict()
+      od['VirtualName'] = 'ephemeral%s' % i
+      od['DeviceName'] = '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
+      mappings.append(od)
   if len(mappings):
     return json.dumps(mappings)
   return None
@@ -234,10 +252,12 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
           provided config values.
     """
     super(AwsVmSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['aws_dedicated_hosts'].present:
-      config_values['use_dedicated_host'] = flag_values.aws_dedicated_hosts
     if flag_values['aws_boot_disk_size'].present:
       config_values['boot_disk_size'] = flag_values.aws_boot_disk_size
+    if flag_values['aws_spot_instances'].present:
+      config_values['use_spot_instance'] = flag_values.aws_spot_instances
+    if flag_values['aws_spot_price'].present:
+      config_values['spot_price'] = flag_values.aws_spot_price
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -250,8 +270,9 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(AwsVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'use_dedicated_host': (option_decoders.BooleanDecoder,
-                               {'default': False}),
+        'use_spot_instance': (option_decoders.BooleanDecoder,
+                              {'default': False}),
+        'spot_price': (option_decoders.FloatDecoder, {'default': 0.0}),
         'boot_disk_size': (option_decoders.IntDecoder, {'default': None})})
 
     return result
@@ -285,6 +306,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
+    self.use_spot_instance = vm_spec.use_spot_instance
+    self.spot_price = vm_spec.spot_price
     self.boot_disk_size = vm_spec.boot_disk_size
     self.client_token = str(uuid.uuid4())
     self.host = None
@@ -294,6 +317,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise ValueError(
           'In order to use dedicated hosts, you must specify an availability '
           'zone, not a region ("zone" was %s).' % self.zone)
+    if self.machine_type[:2].lower() == 'i3' and not self.image:
+      # TODO(user): Remove this check when pkb defaults to ubuntu-1604.
+      raise ValueError(
+          'In order to use i3 instances, you must specify --image.')
+
+    if self.use_spot_instance and self.spot_price <= 0.0:
+      raise ValueError(
+          'In order to use spot instances you must specify a spot price '
+          'greater than 0.0.')
 
   @property
   def host_list(self):
@@ -421,6 +453,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a VM instance."""
+    if self.use_spot_instance:
+      self._CreateSpot()
+    else:
+      self._CreateOnDemand()
+
+  def _CreateOnDemand(self):
+    """Create an OnDemand VM instance."""
     placement = []
     if not util.IsRegion(self.zone):
       placement.append('AvailabilityZone=%s' % self.zone)
@@ -451,7 +490,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.user_data:
       create_cmd.append('--user-data=%s' % self.user_data)
     _, stderr, _ = vm_util.IssueCommand(create_cmd)
-
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       logging.warning(
           'Creation failed due to insufficient host capacity. A new host will '
@@ -465,6 +503,71 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.client_token = str(uuid.uuid4())
       raise errors.Resource.RetryableCreationError()
 
+  def _CreateSpot(self):
+    """Create a Spot VM instance."""
+    placement = OrderedDict()
+    if not util.IsRegion(self.zone):
+      placement['AvailabilityZone'] = self.zone
+    if self.use_dedicated_host:
+      raise errors.Resource.CreationError(
+          'Tenancy=host is not supported for Spot Instances')
+    elif IsPlacementGroupCompatible(self.machine_type):
+      placement['GroupName'] = self.network.placement_group.name
+    block_device_map = GetBlockDeviceMap(self.machine_type,
+                                         self.boot_disk_size,
+                                         self.image,
+                                         self.region)
+    network_interface = [OrderedDict([
+        ('DeviceIndex', 0),
+        ('AssociatePublicIpAddress', True),
+        ('SubnetId', self.network.subnet.id)])]
+    launch_specification = OrderedDict([
+        ('ImageId', self.image),
+        ('InstanceType', self.machine_type),
+        ('KeyName', 'perfkit-key-%s' % FLAGS.run_uri),
+        ('Placement', placement)])
+    if block_device_map:
+      launch_specification['BlockDeviceMappings'] = json.loads(
+          block_device_map, object_pairs_hook=collections.OrderedDict)
+    launch_specification['NetworkInterfaces'] = network_interface
+    create_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'request-spot-instances',
+        '--region=%s' % self.region,
+        '--spot-price=%s' % self.spot_price,
+        '--client-token=%s' % self.client_token,
+        '--launch-specification=%s' % json.dumps(launch_specification,
+                                                 separators=(',', ':'))]
+    stdout, stderr, _ = vm_util.IssueCommand(create_cmd)
+    create_response = json.loads(stdout)
+    self.spot_instance_request_id =\
+        create_response['SpotInstanceRequests'][0]['SpotInstanceRequestId']
+
+    util.AddDefaultTags(self.spot_instance_request_id, self.region)
+
+    while True:
+      describe_sir_cmd = util.AWS_PREFIX + [
+          '--region=%s' % self.region,
+          'ec2',
+          'describe-spot-instance-requests',
+          '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
+      stdout, stderr, _ = vm_util.IssueCommand(describe_sir_cmd)
+
+      sir_response = json.loads(stdout)['SpotInstanceRequests']
+      assert len(sir_response) == 1, 'Expected exactly 1 SpotInstanceRequest'
+
+      status_code = sir_response[0]['Status']['Code']
+
+      if status_code in SPOT_INSTANCE_REQUEST_HOLDING_STATUSES or \
+         status_code in SPOT_INSTANCE_REQUEST_TERMINAL_STATUSES:
+        message = sir_response[0]['Status']['Message']
+        raise errors.Resource.CreationError(message)
+      elif status_code == "fulfilled":
+        self.id = sir_response[0]['InstanceId']
+        break
+
+      time.sleep(2)
+
   def _Delete(self):
     """Delete a VM instance."""
     if self.id:
@@ -474,14 +577,31 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--region=%s' % self.region,
           '--instance-ids=%s' % self.id]
       vm_util.IssueCommand(delete_cmd)
+    if hasattr(self, 'spot_instance_request_id'):
+      cancel_cmd = util.AWS_PREFIX + [
+          '--region=%s' % self.region,
+          'ec2',
+          'cancel-spot-instance-requests',
+          '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
+      vm_util.IssueCommand(cancel_cmd)
+
 
   def _Exists(self):
     """Returns true if the VM exists."""
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-instances',
-        '--region=%s' % self.region,
-        '--filter=Name=client-token,Values=%s' % self.client_token]
+        '--region=%s' % self.region]
+
+    if self.use_spot_instance:
+      if self.id:
+        describe_cmd.append('--instance-id=%s' % self.id)
+      else:
+        return False
+    else:
+      describe_cmd.append(
+          '--filter=Name=client-token,Values=%s' % self.client_token)
+
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     reservations = response['Reservations']
@@ -534,7 +654,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       dict mapping string property key to value.
     """
     result = super(AwsVirtualMachine, self).GetMachineTypeDict()
-    result['dedicated_host'] = self.use_dedicated_host
+    result['spot_instance'] = self.use_spot_instance
+    result['spot_price'] = self.spot_price
     return result
 
 

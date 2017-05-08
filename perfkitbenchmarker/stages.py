@@ -49,7 +49,7 @@ class RunStageParser(flags.ListParser):
     super(RunStageParser, self).__init__(*args, **kwargs)
     self.syntactic_help = _SYNTACTIC_HELP
 
-  def Parse(self, argument):
+  def parse(self, argument):
     """Parses a list of stages.
 
     Args:
@@ -62,7 +62,7 @@ class RunStageParser(flags.ListParser):
       ValueError: If argument does not conform to the guidelines explained in
           syntactic_help.
     """
-    stage_list = super(RunStageParser, self).Parse(argument)
+    stage_list = super(RunStageParser, self).parse(argument)
 
     if not stage_list:
       raise ValueError('Unable to parse {0}. Stage list cannot be '

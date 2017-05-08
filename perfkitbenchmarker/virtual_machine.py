@@ -41,6 +41,10 @@ _VM_SPEC_REGISTRY = {}
 _VM_REGISTRY = {}
 
 
+flags.DEFINE_boolean(
+    'dedicated_hosts', False,
+    'If True, use hosts that only have VMs from the same '
+    'benchmark running on them.')
 flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
                   'via the provider\'s AddMetadata function. It expects'
                   'key:value pairs')
@@ -134,6 +138,8 @@ class BaseVmSpec(spec.BaseSpec):
     if flag_values['background_network_ip_type'].present:
       config_values['background_network_ip_type'] = (
           flag_values.background_network_ip_type)
+    if flag_values['dedicated_hosts'].present:
+      config_values['use_dedicated_host'] = flag_values.dedicated_hosts
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -156,6 +162,8 @@ class BaseVmSpec(spec.BaseSpec):
                                                          'default': None}),
         'zone': (option_decoders.StringDecoder, {'none_ok': True,
                                                  'default': None}),
+        'use_dedicated_host': (option_decoders.BooleanDecoder,
+                               {'default': False}),
         'background_network_mbits_per_sec': (option_decoders.IntDecoder, {
             'none_ok': True, 'default': None}),
         'background_network_ip_type': (option_decoders.EnumDecoder, {
@@ -236,6 +244,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.background_network_mbits_per_sec = (
         vm_spec.background_network_mbits_per_sec)
     self.background_network_ip_type = vm_spec.background_network_ip_type
+    self.use_dedicated_host = None
 
     self.network = None
     self.firewall = None
@@ -312,6 +321,8 @@ class BaseVirtualMachine(resource.BaseResource):
     result = {}
     if self.machine_type is not None:
       result['machine_type'] = self.machine_type
+    if self.use_dedicated_host is not None:
+      result['dedicated_host'] = self.use_dedicated_host
     return result
 
 

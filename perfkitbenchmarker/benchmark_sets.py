@@ -86,7 +86,8 @@ BENCHMARK_SETS = {
             'fio', 'gpu_pcie_bandwidth', 'hadoop_terasort', 'hpcc', 'iperf',
             'multichase', 'mesh_network', 'mongodb_ycsb', 'netperf',
             'object_storage_service', 'oldisim', 'ping', 'redis_ycsb',
-            'speccpu2006', 'sysbench_oltp', 'tomcat_wrk', 'unixbench']
+            'stencil2d', 'speccpu2006', 'sysbench_oltp', 'tomcat_wrk',
+            'unixbench']
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',
@@ -143,7 +144,8 @@ BENCHMARK_SETS = {
     },
     'cloudsuite_set': {
         MESSAGE: 'CloudSuite benchmark set.',
-        BENCHMARK_LIST: ['cloudsuite_data_caching',
+        BENCHMARK_LIST: ['cloudsuite_data_analytics',
+                         'cloudsuite_data_caching',
                          'cloudsuite_graph_analytics',
                          'cloudsuite_in_memory_analytics',
                          'cloudsuite_media_streaming',
@@ -226,7 +228,7 @@ def GetBenchmarksFromFlags():
                        (benchmark_name, FLAGS.os_type))
 
     # We need to remove the 'flag_matrix', 'flag_matrix_defs', and
-    # 'flag_matrix_filters' keys from the config dictionairy since
+    # 'flag_matrix_filters' keys from the config dictionary since
     # they aren't actually part of the config spec and will cause
     # errors if they are left in.
     flag_matrix_name = benchmark_config.pop(

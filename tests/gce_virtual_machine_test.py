@@ -162,7 +162,7 @@ class GceVmSpecTestCase(unittest.TestCase):
 
   def testStringMachineTypeFlagOverride(self):
     flags = mock_flags.MockFlags()
-    flags['machine_type'].Parse('n1-standard-8')
+    flags['machine_type'].parse('n1-standard-8')
     result = gce_virtual_machine.GceVmSpec(
         _COMPONENT, flag_values=flags,
         machine_type={'cpus': 1, 'memory': '7.5GiB'})
@@ -172,7 +172,7 @@ class GceVmSpecTestCase(unittest.TestCase):
 
   def testCustomMachineTypeFlagOverride(self):
     flags = mock_flags.MockFlags()
-    flags['machine_type'].Parse('{cpus: 1, memory: 7.5GiB}')
+    flags['machine_type'].parse('{cpus: 1, memory: 7.5GiB}')
     result = gce_virtual_machine.GceVmSpec(
         _COMPONENT, flag_values=flags, machine_type='n1-standard-8')
     self.assertEqual(result.machine_type, None)
@@ -197,7 +197,8 @@ class GceVirtualMachineTestCase(unittest.TestCase):
         _COMPONENT, machine_type='test_machine_type', project='p')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(vm.GetMachineTypeDict(), {
-        'machine_type': 'test_machine_type', 'project': 'p'})
+        'dedicated_host': False, 'machine_type': 'test_machine_type',
+        'project': 'p'})
 
   def testVmWithMachineTypePreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
@@ -205,15 +206,16 @@ class GceVirtualMachineTestCase(unittest.TestCase):
         project='p')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(vm.GetMachineTypeDict(), {
-        'machine_type': 'test_machine_type', 'preemptible': True,
-        'project': 'p'})
+        'dedicated_host': False, 'machine_type': 'test_machine_type',
+        'preemptible': True, 'project': 'p'})
 
   def testCustomVmNonPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
         'cpus': 1, 'memory': '1.0GiB'}, project='p')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertEqual(vm.GetMachineTypeDict(),
-                     {'cpus': 1, 'memory_mib': 1024, 'project': 'p'})
+                     {'cpus': 1, 'memory_mib': 1024, 'project': 'p',
+                      'dedicated_host': False})
 
   def testCustomVmPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
@@ -221,9 +223,9 @@ class GceVirtualMachineTestCase(unittest.TestCase):
         preemptible=True,
         project='fakeproject')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertEqual(vm.GetMachineTypeDict(), {'cpus': 1, 'memory_mib': 1024,
-                                               'project': 'fakeproject',
-                                               'preemptible': True})
+    self.assertEqual(vm.GetMachineTypeDict(),
+                     {'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
+                      'dedicated_host': False, 'preemptible': True})
 
 
 class GCEVMFlagsTestCase(unittest.TestCase):
@@ -247,7 +249,9 @@ class GCEVMFlagsTestCase(unittest.TestCase):
   @contextlib.contextmanager
   def _PatchCriticalObjects(self):
     """A context manager that patches a few critical objects with mocks."""
-    with mock.patch(vm_util.__name__ + '.IssueCommand') as issue_command, \
+    retval = ('', '', 0)
+    with mock.patch(vm_util.__name__ + '.IssueCommand',
+                    return_value=retval) as issue_command, \
             mock.patch('__builtin__.open'), \
             mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
             mock.patch(util.__name__ + '.GetDefaultProject'):
@@ -255,7 +259,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
 
   def testPreemptibleVMFlag(self):
     with self._PatchCriticalObjects() as issue_command:
-      self._mocked_flags['gce_preemptible_vms'].Parse(True)
+      self._mocked_flags['gce_preemptible_vms'].parse(True)
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
           machine_type='test_machine_type')
@@ -267,7 +271,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
   def testImageProjectFlag(self):
     """Tests that custom image_project flag is supported."""
     with self._PatchCriticalObjects() as issue_command:
-      self._mocked_flags.image_project = 'bar'
+      self._mocked_flags['image_project'].parse('bar')
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
           machine_type='test_machine_type')

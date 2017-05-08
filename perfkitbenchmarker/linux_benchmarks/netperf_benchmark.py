@@ -64,7 +64,7 @@ flags.DEFINE_integer('netperf_thinktime_run_length', 0,
 ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR']
 flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
                   'The netperf benchmark(s) to run.')
-flags.RegisterValidator(
+flags.register_validator(
     'netperf_benchmarks',
     lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS))
 
@@ -126,18 +126,11 @@ def Prepare(benchmark_spec):
                        netserver_path=netperf.NETSERVER_PATH)
   vms[1].RemoteCommand(netserver_cmd)
 
-  # Install some stuff on the client vm
-  vms[0].Install('pip')
-  vms[0].RemoteCommand('sudo pip install python-gflags==2.0')
-
-  # Create a scratch directory for the remote test script
-  vms[0].RemoteCommand('sudo mkdir -p /tmp/run/')
-  vms[0].RemoteCommand('sudo chmod 777 /tmp/run/')
   # Copy remote test script to client
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vms[0])
-  vms[0].PushFile(path, '/tmp/run/')
-  vms[0].RemoteCommand('sudo chmod 777 /tmp/run/%s' % REMOTE_SCRIPT)
+  vms[0].PushFile(path)
+  vms[0].RemoteCommand('sudo chmod 777 %s' % REMOTE_SCRIPT)
 
 
 def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
@@ -319,10 +312,14 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   # Run all of the netperf processes and collect their stdout
   # TODO: Record start times of netperf processes on the remote machine
 
-  remote_script_path = '/tmp/run/%s' % REMOTE_SCRIPT
-  remote_cmd = '%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' % \
-               (remote_script_path, netperf_cmd, num_streams, PORT_START)
-  remote_stdout, _ = vm.RemoteCommand(remote_cmd)
+  # Give the remote script the max possible test length plus 5 minutes to
+  # complete
+  remote_cmd_timeout = \
+      FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
+  remote_cmd = ('./%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' %
+                (REMOTE_SCRIPT, netperf_cmd, num_streams, PORT_START))
+  remote_stdout, _ = vm.RemoteCommand(remote_cmd,
+                                      timeout=remote_cmd_timeout)
 
   # Decode stdouts, stderrs, and return codes from remote command's stdout
   stdouts, stderrs, return_codes = json.loads(remote_stdout)
@@ -441,4 +438,4 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vms[1].RemoteCommand('sudo killall netserver')
-  vms[0].RemoteCommand('sudo rm -rf /tmp/run/')
+  vms[0].RemoteCommand('sudo rm -rf %s' % REMOTE_SCRIPT)
