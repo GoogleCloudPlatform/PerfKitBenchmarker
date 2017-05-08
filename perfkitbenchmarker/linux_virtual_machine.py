@@ -1234,3 +1234,98 @@ class JujuMixin(DebianMixin):
       for unit in self.units:
         unit.controller = self
         self.JujuAddMachine(unit)
+
+
+class SlesMixin(BaseLinuxMixin):
+  """Class holding SLES specific VM methods and attributes."""
+
+  OS_TYPE = os_types.SLES
+
+  def OnStartup(self):
+    """Create user group named $USER and add $USER to it.
+    """
+    self.RemoteCommand("sudo groupadd $USER; sudo usermod -a -G $USER $USER")
+
+  def SnapshotPackages(self):
+    """Grabs a snapshot of the currently installed packages."""
+    raise Exception("Snapshotting packages is not implemented yet for SLES "
+                    "guests")
+
+  def RestorePackages(self):
+    """Restores the currently installed packages to those snapshotted."""
+    raise Exception("Snapshotting packages is not implemented yet for SLES "
+                    "guests")
+
+  def HasPackage(self, package):
+    """Returns True iff the package is available for installation."""
+    return self.TryRemoteCommand('zypper search -x %s' % package,
+                                 suppress_warning=True)
+
+  def InstallPackages(self, packages):
+    """Installs packages using the yum package manager."""
+    self.RemoteCommand('sudo zypper in -y %s' % packages)
+
+  def Install(self, package_name):
+    """Installs a PerfKit package on the VM."""
+    if not self.install_packages:
+      return
+    if package_name not in self._installed_packages:
+      package = linux_packages.PACKAGES[package_name]
+      if hasattr(package, 'ZypperInstall'):
+        package.ZypperInstall(self)
+      elif hasattr(package, 'Install'):
+        package.Install(self)
+      else:
+        raise KeyError('Package %s has no install method for SLES.' %
+                       package_name)
+      self._installed_packages.add(package_name)
+
+  def Uninstall(self, package_name):
+    """Uninstalls a PerfKit package on the VM."""
+    package = linux_packages.PACKAGES[package_name]
+    if hasattr(package, 'ZypperUninstall'):
+      package.ZypperUninstall(self)
+    elif hasattr(package, 'Uninstall'):
+      package.Uninstall(self)
+
+  def GetPathToConfig(self, package_name):
+    """Returns the path to the config file for PerfKit packages.
+
+    This function is mostly useful when config files locations
+    don't match across distributions (such as mysql). Packages don't
+    need to implement it if this is not the case.
+    """
+    package = linux_packages.PACKAGES[package_name]
+    return package.ZypperGetPathToConfig(self)
+
+  def GetServiceName(self, package_name):
+    """Returns the service name of a PerfKit package.
+
+    This function is mostly useful when service names don't
+    match across distributions (such as mongodb). Packages don't
+    need to implement it if this is not the case.
+    """
+    package = linux_packages.PACKAGES[package_name]
+    return package.ZypperGetServiceName(self)
+
+  def SetupProxy(self):
+    """Sets up proxy configuration variables for the cloud environment."""
+    super(SlesMixin, self).SetupProxy()
+    proxy_file = "/etc/sysconfig/proxy"
+
+    any_proxies = False
+    self.RemoteCommand("sudo su -c \"echo -e '' > %s\"" % proxy_file)
+
+    if FLAGS.http_proxy:
+      any_proxies = True
+      self.RemoteCommand("sudo su -c \"echo -e 'HTTP_PROXY=\"%s\";' | "
+                         "sudo tee -a %s\"" % (
+                             FLAGS.http_proxy, proxy_file))
+    if FLAGS.https_proxy:
+      any_proxies = True
+      self.RemoteCommand("sudo su -c \"echo -e 'HTTPS_PROXY=\"%s\";' | "
+                         "sudo tee -a %s\"" % (
+                             FLAGS.https_proxy, proxy_file))
+    self.RemoteCommand("sudo su -c \"echo -e 'PROXY_ENABLED=%s' | "
+                       "sudo tee -a %s\"" % (
+                           "\"yes\"" if any_proxies else "\"no\"", proxy_file))
