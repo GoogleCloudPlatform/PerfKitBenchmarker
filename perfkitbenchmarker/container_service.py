@@ -36,7 +36,6 @@ flags.DEFINE_string('kubectl', 'kubectl',
                     'Path to kubectl tool')
 
 
-
 def GetContainerClusterClass(cloud):
   return _CLUSTER_REGISTRY[cloud]
 
