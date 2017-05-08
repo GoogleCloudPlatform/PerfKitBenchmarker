@@ -49,6 +49,9 @@ DISK_METADATA = {
     }
 }
 
+SCSI = "SCSI"
+NVME = "NVME"
+
 disk.RegisterDiskTypeMap(GCP, DISK_TYPE)
 
 
@@ -115,4 +118,7 @@ class GceDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    return '/dev/disk/by-id/google-%s' % self.name
+    if FLAGS.gce_ssd_interface == SCSI:
+      return '/dev/disk/by-id/google-%s' % self.name
+    elif FLAGS.gce_ssd_interface == NVME:
+      return '/dev/%s' % self.name
