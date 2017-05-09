@@ -142,8 +142,7 @@ def AptInstall(vm):
   vm.RemoteCommand('sudo dpkg -i %s' % CUDA_TOOLKIT_UBUNTU)
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo apt-get install -y cuda')
-  vm.RemoteCommand('sudo reboot', ignore_failure=True)
-  vm.WaitForBootCompletion()
+  vm.Reboot()
   DoPostInstallActions(vm)
 
 
