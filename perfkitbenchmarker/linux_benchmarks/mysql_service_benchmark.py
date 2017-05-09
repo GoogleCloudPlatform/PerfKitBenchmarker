@@ -22,6 +22,25 @@ managed MySQL services.
 
 As other cloud providers deliver a managed MySQL service, we will add it here.
 
+As of May 2017 to make this benchmark run for GCP you must install the
+gcloud beta component. This is necessary because creating a Cloud SQL instance
+with a non-default storage size is in beta right now. This can be removed when
+this feature is part of the default components.
+See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
+for more information.
+To run this benchmark for GCP it is required to install a non-default gcloud
+component. Otherwise this benchmark will fail.
+
+To ensure that gcloud beta is installed, type
+        'gcloud components list'
+into the terminal. This will output all components and status of each.
+Make sure that
+  name: gcloud Beta Commands
+  id:  beta
+has status: Installed.
+If not, run
+        'gcloud components install beta'
+to install it. This will allow this benchmark to properly create an instance.
 """
 import json
 import logging
@@ -61,6 +80,8 @@ flags.DEFINE_integer('sysbench_latency_percentile', 99,
 flags.DEFINE_integer('sysbench_report_interval', 2,
                      'The interval, in seconds, we ask sysbench to report '
                      'results.')
+flags.DEFINE_integer('storage_size', 100,
+                     'Storage size for SQL instance in GB.')
 
 BENCHMARK_NAME = 'mysql_service'
 BENCHMARK_CONFIG = """
@@ -89,14 +110,6 @@ RDS_CORE_TO_DB_CLASS_MAP = {
 RDS_DB_ENGINE = 'MySQL'
 RDS_DB_ENGINE_VERSION = '5.6.23'
 RDS_DB_STORAGE_TYPE_GP2 = 'gp2'
-# Storage IOPS capacity of the DB instance.
-# Currently this is fixed because the cloud provider GCP does not support
-# changing this setting. As soon as it supports changing the storage size, we
-# will expose a flag here to allow caller to select a storage size.
-# Default GCP storage size is 1TB PD-SSD which supports 10K Read or 15K Write
-# IOPS (12.5K mixed).
-# To support 12.5K IOPS on EBS-GP, we need 4170 GB disk.
-RDS_DB_STORAGE_GP2_SIZE = '4170'
 
 # A list of status strings that are possible during RDS DB creation.
 RDS_DB_CREATION_PENDING_STATUS = frozenset(
@@ -128,6 +141,10 @@ RESPONSE_TIME_TOKENS = ['min', 'avg', 'max', 'percentile']
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+
+class StorageSizeFlagError(Exception):
+  pass
 
 
 class DBStatusQueryError(Exception):
@@ -440,6 +457,7 @@ class RDSMySQLBenchmark(object):
 
     # Get a list of zones and pick one that's different from the zone VM is in.
     new_subnet_zone = None
+    self._ValidateSize(FLAGS.storage_size)
     get_zones_cmd = util.AWS_PREFIX + ['ec2', 'describe-availability-zones']
     stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
     response = json.loads(stdout)
@@ -504,7 +522,7 @@ class RDSMySQLBenchmark(object):
         '--engine', RDS_DB_ENGINE,
         '--engine-version', RDS_DB_ENGINE_VERSION,
         '--storage-type', RDS_DB_STORAGE_TYPE_GP2,
-        '--allocated-storage', RDS_DB_STORAGE_GP2_SIZE,
+        '--allocated-storage', FLAGS.storage_size,
         '--vpc-security-group-ids', vm.group_id,
         '--master-username', vm.db_instance_master_user,
         '--master-user-password', vm.db_instance_master_password,
@@ -558,6 +576,18 @@ class RDSMySQLBenchmark(object):
     logging.info('Successfully created an RDS DB instance. Address is %s',
                  vm.db_instance_address)
     logging.info('Complete output is:\n %s', response)
+
+  def _ValidateSize(self, size):
+    """Validate flag for storage size and throw exception if invalid.
+
+    AWS supports storage sizes from 1GB to 16TB currently.
+
+    Args:
+      size: (GB).
+    """
+    if size < 1 or size > 16000:
+      raise StorageSizeFlagError('Storage size flag given is not valid. '
+                                 'Must be between 1 and 16000 GB for AWS.')
 
   def Cleanup(self, vm):
     """Clean up RDS instances, cleanup the extra subnet created for the
@@ -668,13 +698,23 @@ class GoogleCloudSQLBenchmark(object):
     logging.info('Preparing MySQL Service benchmarks for Google Cloud SQL.')
 
     vm.db_instance_name = 'pkb%s' % FLAGS.run_uri
+    self._ValidateSize(FLAGS.storage_size)
     db_tier = 'db-n1-standard-%s' % FLAGS.mysql_svc_db_instance_cores
     # Currently, we create DB instance in the same zone as the test VM.
     db_instance_zone = vm.zone
     # Currently GCP REQUIRES you to connect to the DB instance via external IP
     # (i.e., using external IPs of the DB instance AND the VM instance).
     authorized_network = '%s/32' % vm.ip_address
+    # Please install gcloud component beta for this to work. See note in
+    # module level docstring.
+    # This is necessary only because creating a SQL instance with a non-default
+    # storage size is in beta right now in gcloud. This can be removed when
+    # this feature is part of the default components. See
+    # https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
+    # for more information. When this flag is allowed in the default gcloud
+    # components the create_db_cmd below can be updated.
     create_db_cmd = [FLAGS.gcloud_path,
+                     'beta',
                      'sql',
                      'instances',
                      'create', vm.db_instance_name,
@@ -689,14 +729,11 @@ class GoogleCloudSQLBenchmark(object):
                      '--tier=%s' % db_tier,
                      '--gce-zone=%s' % db_instance_zone,
                      '--database-version=%s' % GCP_MY_SQL_VERSION,
-                     '--pricing-plan=%s' % GCP_PRICING_PLAN]
+                     '--pricing-plan=%s' % GCP_PRICING_PLAN,
+                     '--storage-size=%d' % FLAGS.storage_size]
 
     stdout, _, _ = vm_util.IssueCommand(create_db_cmd)
-    response = json.loads(stdout)
-    if response['operation'] is None or response['operationType'] != 'CREATE':
-      raise DBStatusQueryError('Invalid operation or unrecognized '
-                               'operationType in DB creation response. '
-                               ' stdout is %s' % stdout)
+    logging.info('Create SQL instance completed. Stdout:\n%s', stdout)
 
     status_query_cmd = [FLAGS.gcloud_path,
                         'sql',
@@ -750,6 +787,18 @@ class GoogleCloudSQLBenchmark(object):
     stdout, stderr, _ = vm_util.IssueCommand(set_password_cmd)
     logging.info('Set root password completed. Stdout:\n%s\nStderr:\n%s',
                  stdout, stderr)
+
+  def _ValidateSize(self, size):
+    """Validate flag for storage size and throw exception if invalid.
+
+    GCP supports storage sizes from 1GB to 64TB currently.
+
+    Args:
+      size: (GB).
+    """
+    if size < 1 or size > 64000:
+      raise StorageSizeFlagError('Storage size flag is not valid. Must'
+                                 ' be between 1 and 64000 GB for GCP.')
 
   def Cleanup(self, vm):
     if hasattr(vm, 'db_instance_name'):
