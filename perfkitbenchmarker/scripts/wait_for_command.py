@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 #
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -74,6 +74,7 @@ def main():
           with open(options.status, 'r') as status:
             fcntl.lockf(status, fcntl.LOCK_SH)
             return_code_str = status.read()
+            break
     except IOError:
       print >> sys.stderr, 'WARNING: file doesn\'t exist, retrying'
       time.sleep(WAIT_SLEEP_IN_SEC)
