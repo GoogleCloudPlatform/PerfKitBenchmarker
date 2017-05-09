@@ -214,13 +214,17 @@ class AzureStorageAccount(resource.BaseResource):
 
   def _Exists(self):
     """Returns true if the storage account exists."""
-    _, _, retcode = vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'storage', 'account', 'show',
          '--output', 'json',
          '--name', self.name] + self.resource_group.args,
         suppress_warning=True)
 
-    return retcode == 0
+    try:
+      json.loads(stdout)
+      return True
+    except:
+      return False
 
 
 class AzureVirtualNetwork(resource.BaseResource):

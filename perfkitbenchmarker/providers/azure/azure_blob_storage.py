@@ -83,7 +83,6 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   def DeleteBucket(self, bucket):
     vm_util.IssueCommand([
         azure.AZURE_PATH, 'storage', 'container', 'delete',
-        '--yes',
         '--name', bucket] + self.storage_account.connection_args)
 
   def EmptyBucket(self, bucket):
