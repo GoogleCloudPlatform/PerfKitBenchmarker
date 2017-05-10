@@ -341,6 +341,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.host_type = vm_spec.host_type
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.min_cpu_platform = vm_spec.min_cpu_platform
+    self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
 
   @property
   def host_list(self):
@@ -445,7 +446,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
-    # GCE firewall rules are created for all instances in a network.
     # Create necessary VM access rules *prior* to creating the VM, such that it
     # doesn't affect boot time.
     self.AllowRemoteAccessPorts()
@@ -542,6 +542,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['metadata'] = ','.join('{0}={1}'.format(key, value)
                                      for key, value in kwargs.iteritems())
     cmd.Issue()
+
+  def AllowRemoteAccessPorts(self):
+    """Creates firewall rules for remote access if required. """
+
+    # If gce_remote_access_firewall_rule is specified, access is already
+    # granted by that rule.
+    # If not, GCE firewall rules are created for all instances in a
+    # network.
+    if not self.gce_remote_access_firewall_rule:
+      super.AllowRemoteAccessPorts()
 
   def GetMachineTypeDict(self):
     """Returns a dict containing properties that specify the machine type.
