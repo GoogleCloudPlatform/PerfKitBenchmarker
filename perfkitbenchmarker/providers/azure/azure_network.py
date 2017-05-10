@@ -39,7 +39,7 @@ SSH_PORT = 22
 DEFAULT_LOCATION = 'eastus2'
 
 
-def GetResourceGroup():
+def GetResourceGroup(zone=None):
   """Get the resource group for the current benchmark."""
   spec = context.GetThreadBenchmarkSpec()
   # This is protected by spec.networks_lock, so there's no race
@@ -48,7 +48,8 @@ def GetResourceGroup():
   try:
     return spec.azure_resource_group
   except AttributeError:
-    group = AzureResourceGroup('pkb%s-%s' % (FLAGS.run_uri, spec.uid))
+    group = AzureResourceGroup(
+        'pkb%s-%s' % (FLAGS.run_uri, spec.uid), zone=zone)
     spec.azure_resource_group = group
     return group
 
@@ -56,14 +57,15 @@ def GetResourceGroup():
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
 
-  def __init__(self, name, use_existing=False):
+  def __init__(self, name, zone=None, use_existing=False):
     super(AzureResourceGroup, self).__init__()
     self.name = name
     self.use_existing = use_existing
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
-    self.location = FLAGS.zones[0] if FLAGS.zones else DEFAULT_LOCATION
+    self.location = (FLAGS.zones[0] if FLAGS.zones else
+                     zone or DEFAULT_LOCATION)
     # Whenever an Azure CLI command needs a resource group, it's
     # always specified the same way.
     self.args = ['--resource-group', self.name]
