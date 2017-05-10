@@ -25,11 +25,11 @@ flags.DEFINE_enum(
 # Azure Storage Account types. See
 # http://azure.microsoft.com/en-us/pricing/details/storage/ for more information
 # about the different types.
-LRS = 'LRS'
-PLRS = 'PLRS'
-ZRS = 'ZRS'
-GRS = 'GRS'
-RAGRS = 'RAGRS'
+LRS = 'Standard_LRS'
+PLRS = 'Premium_LRS'
+ZRS = 'Standard_ZRS'
+GRS = 'Standard_GRS'
+RAGRS = 'Standard_RAGRS'
 
 STORAGE = 'Storage'
 BLOB_STORAGE = 'BlobStorage'

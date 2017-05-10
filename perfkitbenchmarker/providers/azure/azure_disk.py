@@ -36,8 +36,8 @@ FLAGS = flags.FLAGS
 
 DRIVE_START_LETTER = 'c'
 
-PREMIUM_STORAGE = 'premium-storage'
-STANDARD_DISK = 'standard-disk'
+PREMIUM_STORAGE = 'Premium_LRS'
+STANDARD_DISK = 'Standard_LRS'
 
 DISK_TYPE = {disk.STANDARD: STANDARD_DISK,
              disk.REMOTE_SSD: PREMIUM_STORAGE}
@@ -81,7 +81,7 @@ class AzureDisk(disk.BaseDisk):
                storage_account, lun, is_image=False):
     super(AzureDisk, self).__init__(disk_spec)
     self.host_caching = FLAGS.azure_host_caching
-    self.name = None
+    self.name = vm_name + str(lun)
     self.vm_name = vm_name
     self.resource_group = azure_network.GetResourceGroup()
     self.storage_account = storage_account
@@ -111,66 +111,38 @@ class AzureDisk(disk.BaseDisk):
     """Creates the disk."""
     assert not self.is_image
 
-    if self.disk_type == PREMIUM_STORAGE:
-      assert FLAGS.azure_storage_type == azure_flags.PLRS
-    else:
-      assert FLAGS.azure_storage_type != azure_flags.PLRS
-
     with self._lock:
       _, _, retcode = vm_util.IssueCommand(
-          [azure.AZURE_PATH, 'vm', 'disk', 'attach-new',
-           '--host-caching', self.host_caching,
-           '--lun', str(self.lun),
-           self.vm_name, str(self.disk_size)] +
+          [azure.AZURE_PATH, 'vm', 'disk', 'attach', '--new',
+           '--caching', self.host_caching, '--disk', self.name,
+           '--lun', str(self.lun), '--sku', self.disk_type,
+           '--vm-name', self.vm_name, '--size-gb', str(self.disk_size)] +
           self.resource_group.args)
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
             'Error creating Azure disk.')
 
-      disk = self._GetDiskJSON()
-      self.name = disk['name']
-
   def _Delete(self):
     """Deletes the disk."""
     assert not self.is_image
     self._deleted = True
 
-  def _GetDiskJSON(self):
-    """Get Azure's JSON representation of the disk."""
-    stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'vm', 'disk', 'list',
-         '--json',
-         self.vm_name] + self.resource_group.args)
-    response = json.loads(stdout)
-
-    # data disks are ordered *alphabetically* by lun, so once we hit
-    # lun 10 the ordering doesn't match numerical order. We could
-    # compute the right offset for the alphabetical ordering, but it's
-    # simpler and more resilient to just search the array, and the
-    # size is limited to 15 so it will never take too long.
-    data_disk = (disk for disk in response
-                 if int(disk.get('lun', 0)) == self.lun).next()
-
-    return data_disk
-
   def _Exists(self):
     """Returns true if the disk exists."""
+    assert not self.is_image
     if self._deleted:
       return False
 
-    # Since we don't do .Create() or .Delete() on disks with
-    # is_image=True, we never call _Exists() on them either. The code
-    # below is not correct for image disks, but that's okay.
-    assert not self.is_image
-
-    _, _, retcode = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'storage', 'blob', 'show',
-         '--container', 'vhds',
-         '--json',
-         '%s.vhd' % self.name] + self.storage_account.connection_args)
-
-    return retcode == 0
+    stdout, _, _ = vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'disk', 'show',
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args)
+    try:
+      json.loads(stdout)
+      return True
+    except:
+      return False
 
   def Attach(self, vm):
     """Attaches the disk to a VM.
@@ -183,11 +155,9 @@ class AzureDisk(disk.BaseDisk):
 
   def Detach(self):
     """Detaches the disk from a VM."""
-
-    vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'vm', 'disk', 'detach',
-         '--vm-name', self.vm_name,
-         '--lun', self.lun] + self.resource_group.args)
+    # Not needed since the resource group can be deleted
+    # without detaching disks.
+    pass
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
