@@ -50,75 +50,90 @@ class AzurePublicIPAddress(resource.BaseResource):
     super(AzurePublicIPAddress, self).__init__()
     self.location = location
     self.name = name
+    self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
 
   def _Create(self):
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'public-ip', 'create',
          '--location', self.location,
-         self.name] + self.resource_group.args)
+         '--name', self.name] + self.resource_group.args)
 
   def _Exists(self):
-    stdout, _, retcode = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'public-ip', 'show',
-         '--json',
-         self.name] + self.resource_group.args)
+    if self._deleted:
+      return False
 
-    return retcode == 0 and stdout != '{}\n'
+    stdout, _, _ = vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'network', 'public-ip', 'show',
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args)
+    try:
+      json.loads(stdout)
+      return True
+    except:
+      return False
 
   def GetIPAddress(self):
     stdout, _ = vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'network', 'public-ip', 'show',
-         '--json',
-         self.name] + self.resource_group.args)
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args)
 
     response = json.loads(stdout)
     return response['ipAddress']
 
   def _Delete(self):
-    pass
+    self._deleted = True
 
 
 class AzureNIC(resource.BaseResource):
-  def __init__(self, subnet, name):
+  def __init__(self, subnet, name, public_ip):
     super(AzureNIC, self).__init__()
     self.subnet = subnet
     self.name = name
+    self.public_ip = public_ip
+    self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
     self.location = self.subnet.vnet.location
-    self.args = ['--nic-name', self.name]
+    self.args = ['--nics', self.name]
 
   def _Create(self):
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'nic', 'create',
          '--location', self.location,
-         '--subnet-vnet-name', self.subnet.vnet.name,
-         '--subnet-name', self.subnet.name,
-         self.name] + self.resource_group.args)
+         '--vnet-name', self.subnet.vnet.name,
+         '--subnet', self.subnet.name,
+         '--public-ip-address', self.public_ip,
+         '--name', self.name] + self.resource_group.args)
 
   def _Exists(self):
+    if self._deleted:
+      return False
     # Same deal as AzurePublicIPAddress. 'show' doesn't error out if
     # the resource doesn't exist, but no-op 'set' does.
-    stdout, _, retcode = vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'nic', 'show',
-         '--json',
-         self.name] + self.resource_group.args)
-
-    return retcode == 0 and stdout != '{}\n'
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args)
+    try:
+      json.loads(stdout)
+      return True
+    except:
+      return False
 
   def GetInternalIP(self):
     """Grab some data."""
 
     stdout, _ = vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'network', 'nic', 'show',
-         '--json',
-         self.name] + self.resource_group.args)
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args)
 
     response = json.loads(stdout)
-    return response['ipConfigurations'][0]['privateIPAddress']
+    return response['ipConfigurations'][0]['privateIpAddress']
 
   def _Delete(self):
-    pass
+    self._deleted = True
 
 
 class AzureVirtualMachineMetaClass(virtual_machine.AutoRegisterVmMeta):
@@ -159,7 +174,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.resource_group = azure_network.GetResourceGroup()
     self.public_ip = AzurePublicIPAddress(self.zone, self.name + '-public-ip')
     self.nic = AzureNIC(self.network.subnet,
-                        self.name + '-nic')
+                        self.name + '-nic', self.public_ip.name)
     self.storage_account = self.network.storage_account
     self.image = vm_spec.image or self.IMAGE_URN
 
@@ -180,50 +195,47 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_cmd = (
         [azure.AZURE_PATH, 'vm', 'create',
          '--location', self.zone,
-         '--image-urn', self.image,
-         '--os-type', 'Linux',
-         '--ssh-publickey-file', self.ssh_public_key,
-         '--vm-size', self.machine_type,
-         '--public-ip-name', self.public_ip.name,
-         '--storage-account-name', self.storage_account.name,
+         '--image', self.image,
+         '--size', self.machine_type,
          '--admin-username', self.user_name,
-         '--availset-name', self.network.avail_set.name,
-         self.name] +
+         '--availability-set', self.network.avail_set.name,
+         '--storage-sku', 'Standard_LRS',
+         '--name', self.name] +
         self.resource_group.args +
-        self.network.vnet.args +
-        self.network.subnet.args +
         self.nic.args)
 
     if self.password:
       create_cmd.extend(['--admin-password', self.password])
     else:
-      create_cmd.extend(['--ssh-publickey-file', self.ssh_public_key])
+      create_cmd.extend(['--ssh-key-value', self.ssh_public_key])
     vm_util.IssueCommand(create_cmd)
+
+  def _Exists(self):
+    """Returns True if the VM exists."""
+    if self._deleted:
+      return False
+    show_cmd = [
+        azure.AZURE_PATH, 'vm', 'show', '--output', 'json',
+        '--name', self.name
+    ] + self.resource_group.args
+    stdout, _, _ = vm_util.IssueCommand(show_cmd)
+    try:
+      json.loads(stdout)
+      return True
+    except:
+      return False
 
   def _Delete(self):
     # The VM will be deleted when the resource group is.
     self._deleted = True
 
   @vm_util.Retry()
-  def _Exists(self):
-    """Returns true if the VM exists and attempts to get some data."""
-    if self._deleted:
-      return False
-
-    stdout, _, _ = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'vm', 'show',
-         '--json',
-         self.name] + self.resource_group.args)
-
-    return bool(json.loads(stdout))
-
-  @vm_util.Retry()
   def _PostCreate(self):
     """Get VM data."""
     stdout, _ = vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'vm', 'show',
-         '--json',
-         self.name] + self.resource_group.args)
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args)
     response = json.loads(stdout)
     self.os_disk.name = response['storageProfile']['osDisk']['name']
     self.os_disk.created = True
@@ -231,14 +243,11 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.ip_address = self.public_ip.GetIPAddress()
 
   def AddMetadata(self, **tags):
-    tag_string = ';'.join(
-        ['%s=%s' % (key, value)
-         for key, value in tags.iteritems()])
+    tag_list = ['tags.%s=%s' % (k, v) for k, v in tags.iteritems()]
     vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'vm', 'set',
-         self.name,
-         '--tags', tag_string] +
-        self.resource_group.args)
+        [azure.AZURE_PATH, 'vm', 'update',
+         '--name', self.name] + self.resource_group.args +
+        ['--set'] + tag_list)
 
   def CreateScratchDisk(self, disk_spec):
     """Create a VM's scratch disk.

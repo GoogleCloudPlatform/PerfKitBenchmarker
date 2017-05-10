@@ -13,4 +13,4 @@
 # limitations under the License.
 
 
-AZURE_PATH = 'azure'
+AZURE_PATH = 'az'
