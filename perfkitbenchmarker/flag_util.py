@@ -483,7 +483,7 @@ def ParseKeyValuePairs(strings):
   return pairs
 
 
-def GetPresentFlags():
+def GetProvidedCommandLineFlags():
   """Return flag names and values that were specified on the command line.
 
   Returns:

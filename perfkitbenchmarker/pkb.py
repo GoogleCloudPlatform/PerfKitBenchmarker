@@ -597,7 +597,7 @@ def MakeFailedRunSample(error_message, run_stage_that_failed):
     metadata = {
         'error_message': error_message,
         'run_stage': run_stage_that_failed,
-        'flags': str(flag_util.GetPresentFlags())
+        'flags': str(flag_util.GetProvidedCommandLineFlags())
     }
     return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
 
