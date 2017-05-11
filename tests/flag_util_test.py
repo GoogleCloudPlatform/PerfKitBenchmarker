@@ -301,6 +301,7 @@ class MockFlag():
 
 
 class TestGetProvidedCommandLineFlags(unittest.TestCase):
+
   def setUp(self):
     flag_dict = {
         'flag1': MockFlag('flag1', '1', True),

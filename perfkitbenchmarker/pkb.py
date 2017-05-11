@@ -594,12 +594,33 @@ def RunBenchmark(spec, collector):
 
 
 def MakeFailedRunSample(error_message, run_stage_that_failed):
-    metadata = {
-        'error_message': error_message,
-        'run_stage': run_stage_that_failed,
-        'flags': str(flag_util.GetProvidedCommandLineFlags())
-    }
-    return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
+  """Create a sample.Sample representing a failed run stage.
+
+  The sample metric will have the name 'Run Failed';
+  the value will be 1 (has to be convertable to a float),
+  and the unit will be 'Run Failed' (for lack of a better idea).
+
+  The sample metadata will include the error message from the
+  Exception, the run stage that failed, as well as all PKB
+  command line flags that were passed in.
+
+  Args:
+    error_message: error message that was caught, resulting in the
+      run stage failure.
+    run_stage_that_failed: run stage that failed by raising an Exception
+
+  Returns:
+    a sample.Sample representing the run stage failure.
+  """
+  # Note: currently all provided PKB command line flags are included in the
+  # metadata. We may want to only include flags specific to the benchmark that
+  # failed. This can be acomplished using gflag's FlagsByModuleDict().
+  metadata = {
+      'error_message': error_message,
+      'run_stage': run_stage_that_failed,
+      'flags': str(flag_util.GetProvidedCommandLineFlags())
+  }
+  return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
 
 
 def RunBenchmarkTask(spec):
