@@ -20,7 +20,7 @@ import unittest
 import mock
 
 
-class TestCreateFailedRunSamplesFlag(unittest.TestCase):
+class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
   def patchPkbFunction(self, function_name):
     patcher = mock.patch(pkb.__name__ + '.' + function_name)
@@ -43,68 +43,59 @@ class TestCreateFailedRunSamplesFlag(unittest.TestCase):
         stages.TEARDOWN
     ]
 
-  def testCreateProvisionFailedSamples(self):
-    spec = mock.MagicMock()
-    collector = mock.Mock()
+    self.spec = mock.MagicMock()
+    self.collector = mock.Mock()
+
+  def testCreateProvisionFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
     error_msg = 'error'
     self.provision_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, spec, collector)
+    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
         error_msg, stages.PROVISION)
 
-  def testCreatePrepareFailedSamples(self):
-    spec = mock.MagicMock()
-    collector = mock.Mock()
+  def testCreatePrepareFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
     error_msg = 'error'
     self.prepare_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, spec, collector)
+    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
         error_msg, stages.PREPARE)
 
-  def testCreateRunFailedSamples(self):
-    spec = mock.MagicMock()
-    collector = mock.Mock()
+  def testCreateRunFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
     error_msg = 'error'
     self.run_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, spec, collector)
+    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
         error_msg, stages.RUN)
 
-  def testCreateCleanupFailedSamples(self):
-    spec = mock.MagicMock()
-    collector = mock.Mock()
+  def testCreateCleanupFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
     error_msg = 'error'
     self.cleanup_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, spec, collector)
+    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
         error_msg, stages.CLEANUP)
 
-  def testCreateTeardownFailedSamples(self):
-    spec = mock.MagicMock()
-    collector = mock.Mock()
+  def testCreateTeardownFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
     error_msg = 'error'
     self.teardown_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, spec, collector)
+    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
         error_msg, stages.TEARDOWN)
 
-  def testDontCreateFailedRunSamples(self):
-    spec = mock.MagicMock()
-    collector = mock.Mock()
+  def testDontCreateFailedRunSample(self):
     self.flags_mock.create_failed_run_samples = False
     self.run_mock.side_effect = Exception('error')
 
-    self.assertRaises(Exception, pkb.RunBenchmark, spec, collector)
+    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_not_called()
 
 
