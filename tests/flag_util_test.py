@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 import copy
 import sys
 import unittest
+import mock
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
@@ -290,6 +291,33 @@ class TestYAMLParser(unittest.TestCase):
   def testBadYAML(self):
     with self.assertRaises(ValueError):
       self.parser.parse('{a')
+
+
+class MockFlag():
+  def __init__(self, name, value, present):
+    self.name = name
+    self.value = value
+    self.present = present
+
+
+class TestGetProvidedCommandLineFlags(unittest.TestCase):
+
+  def setUp(self):
+    flag_dict = {
+        'flag1': MockFlag('flag1', '1', True),
+        'flag2': MockFlag('flag2', '2', True),
+        'flag3': MockFlag('flag3', '3', False)
+    }
+    patcher = mock.patch(flag_util.__name__ + '.FLAGS')
+    flags_mock = patcher.start()
+    flags_mock.FlagDict.return_value = flag_dict
+    self.addCleanup(patcher.stop)
+
+  def testGetProvidedCommandLineFlags(self):
+    self.assertDictEqual({
+        'flag1': '1',
+        'flag2': '2',
+    }, flag_util.GetProvidedCommandLineFlags())
 
 
 if __name__ == '__main__':
