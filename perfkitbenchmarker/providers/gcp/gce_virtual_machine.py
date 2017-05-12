@@ -551,7 +551,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # If not, GCE firewall rules are created for all instances in a
     # network.
     if not self.gce_remote_access_firewall_rule:
-      super.AllowRemoteAccessPorts()
+      super(GceVirtualMachine, self).AllowRemoteAccessPorts()
 
   def GetMachineTypeDict(self):
     """Returns a dict containing properties that specify the machine type.
