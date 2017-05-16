@@ -19,11 +19,11 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
-BENCHMARK_NAME = 'managed_sql_db_test'
+BENCHMARK_NAME = 'managed_relational_db_test'
 BENCHMARK_CONFIG = """
-managed_sql_db_test:
-  description: test managed sql database provisioning
-  managed_database:
+managed_relational_db_test:
+  description: test managed relational database provisioning
+  managed_relational_db:
     flavor: mysql
     version: '5.6'
     cloud: GCP
