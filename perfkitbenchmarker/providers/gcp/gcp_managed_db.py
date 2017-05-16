@@ -1,11 +1,11 @@
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import managed_db
+from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-class GCPManagedDb(managed_db.BaseManagedDb):
+class GCPManagedDb(managed_relational_db.BaseManagedDb):
   """An object representing a GCP managed database.
 
   Attributes:
@@ -14,10 +14,10 @@ class GCPManagedDb(managed_db.BaseManagedDb):
   """
 
   CLOUD = providers.GCP
-  SERVICE_NAME = 'managed_database'
+  SERVICE_NAME = 'managed_relational_db'
 
-  def __init__(self, managed_db_spec):
-    super(GCPManagedDb, self).__init__(managed_db_spec)
+  def __init__(self, managed_relational_db_spec):
+    super(GCPManagedDb, self).__init__(managed_relational_db_spec)
     self.instance_id = None
     self.project = None
 

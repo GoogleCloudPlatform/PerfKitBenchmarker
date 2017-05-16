@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
-from perfkitbenchmarker import managed_db
+from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
@@ -113,7 +113,7 @@ class BenchmarkSpec(object):
     self.spark_service = None
     self.dpb_service = None
     self.container_cluster = None
-    self.managed_db = None
+    self.managed_relational_db = None
 
     self._zone_index = 0
 
@@ -156,15 +156,15 @@ class BenchmarkSpec(object):
         self.config.dpb_service.service_type)
     self.dpb_service = dpb_service_class(self.config.dpb_service)
 
-  def ConstructManagedDatabase(self):
-    """Create the managed database object and create groups for its vms."""
-    if self.config.managed_database is None:
+  def ConstructManagedRelationalDb(self):
+    """Create the managed relational db and create groups for its vms."""
+    if self.config.managed_relational_db is None:
       return
-    cloud = self.config.managed_database.cloud
+    cloud = self.config.managed_relational_db.cloud
     providers.LoadProvider(cloud)
-    managed_db_class = managed_db.GetManagedDbClass(cloud)
-    self.managed_db = managed_db_class(self.config.managed_database)
-  
+    managed_relational_db_class = managed_relational_db.GetManagedDbClass(cloud)
+    self.managed_relational_db = managed_relational_db_class(self.config.managed_relational_db)
+
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
     vms = []
@@ -348,8 +348,8 @@ class BenchmarkSpec(object):
       self.spark_service.Create()
     if self.dpb_service:
       self.dpb_service.Create()
-    if self.managed_db:
-      self.managed_db.Create()
+    if self.managed_relational_db:
+      self.managed_relational_db.Create()
 
   def Delete(self):
     if self.deleted:
@@ -361,8 +361,8 @@ class BenchmarkSpec(object):
     if self.dpb_service:
       self.dpb_service.Delete()
 
-    if self.managed_db:
-      self.managed_db.Delete()
+    if self.managed_relational_db:
+      self.managed_relational_db.Delete()
 
     if self.vms:
       try:
