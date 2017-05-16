@@ -10,38 +10,39 @@ flags.DEFINE_string('managed_db_version', None,
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
 
-_MANAGED_DB_REGISTRY = {}
+_MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
 
-def GetManagedDbClass(cloud):
-  """Get the ManagedDb class corresponding to 'cloud'."""
-  if cloud in _MANAGED_DB_REGISTRY:
-    return _MANAGED_DB_REGISTRY.get(cloud)
+def GetManagedRelationalDbClass(cloud):
+  """Get the ManagedRelationalDb class corresponding to 'cloud'."""
+  if cloud in _MANAGED_RELATIONAL_DB_REGISTRY:
+    return _MANAGED_RELATIONAL_DB_REGISTRY.get(cloud)
   raise Exception('No ManagedDb found for {0}'.format(cloud))
 
 
-class AutoRegisterManagedDbMeta(abc.ABCMeta):
-  """Metaclass which allows ManagedDb to register."""
+class AutoRegisterManagedRelationalDbMeta(abc.ABCMeta):
+  """Metaclass which allows ManagedRelationalDb to register."""
 
   def __init__(cls, name, bases, dct):
     if hasattr(cls, 'CLOUD'):
       if cls.CLOUD is None:
-        raise Exception('ManagedDb subclasses must have a CLOUD' 'attribute.')
+        raise Exception('ManagedRelationalDb subclasses must '
+                        'have a CLOUD' 'attribute.')
       else:
-        _MANAGED_DB_REGISTRY[cls.CLOUD] = cls
-    super(AutoRegisterManagedDbMeta, cls).__init__(name, bases, dct)
+        _MANAGED_RELATIONAL_DB_REGISTRY[cls.CLOUD] = cls
+    super(AutoRegisterManagedRelationalDbMeta, cls).__init__(name, bases, dct)
 
 
-class BaseManagedDb(resource.BaseResource):
-  """Object representing a managed database Service."""
+class BaseManagedRelationalDb(resource.BaseResource):
+  """Object representing a managed relational database Service."""
 
-  __metaclass__ = AutoRegisterManagedDbMeta
+  __metaclass__ = AutoRegisterManagedRelationalDbMeta
 
-  def __init__(self, managed_db_spec):
-    """Initialize the managed database object 
+  def __init__(self, managed_relational_db_spec):
+    """Initialize the managed relational database object
 
     Args:
-      managed_db_spec: spec of the managed database 
+      managed_relational_db_spec: spec of the managed database
     """
-    super(BaseManagedDb, self).__init__()
-    self.spec = managed_db_spec
+    super(BaseManagedRelationalDb, self).__init__()
+    self.spec = managed_relational_db_spec

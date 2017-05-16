@@ -5,8 +5,8 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-class GCPManagedDb(managed_relational_db.BaseManagedDb):
-  """An object representing a GCP managed database.
+class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
+  """An object representing a GCP managed relational database.
 
   Attributes:
     created: True if the resource has been created.
@@ -17,7 +17,7 @@ class GCPManagedDb(managed_relational_db.BaseManagedDb):
   SERVICE_NAME = 'managed_relational_db'
 
   def __init__(self, managed_relational_db_spec):
-    super(GCPManagedDb, self).__init__(managed_relational_db_spec)
+    super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
     self.instance_id = None
     self.project = None
 
