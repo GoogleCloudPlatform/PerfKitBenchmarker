@@ -26,7 +26,7 @@ FLAGS = flags.FLAGS
 @functools32.lru_cache()
 def GetDefaultProject():
   """Get the default project."""
-  cmd = ['gcloud', 'config', 'list', '--format=json']
+  cmd = [FLAGS.gcloud_path, 'config', 'list', '--format=json']
   stdout, _, _ = vm_util.IssueCommand(cmd)
   result = json.loads(stdout)
   return result['core']['project']
