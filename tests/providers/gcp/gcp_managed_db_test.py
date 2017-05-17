@@ -152,6 +152,9 @@ def _mergeDicts(dict1, dict2):
 class GcpManagedRelationalDbSpecTestCase(unittest.TestCase):
 
   def setUp(self):
+    self.flags = mock_flags.MockFlags()
+    self.flags['run_uri'].parse('123')
+
     self.minimal_spec = {
       'cloud': 'GCP',
       'database': 'mysql',
@@ -165,18 +168,16 @@ class GcpManagedRelationalDbSpecTestCase(unittest.TestCase):
   def testMinimalConfig(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT,
+        flag_values = self.flags,
         **self.minimal_spec)
     self.assertEqual(result.database, 'mysql')
     self.assertEqual(result.cloud, 'GCP')
     self.assertIsInstance(result.vm_spec, gce_virtual_machine.GceVmSpec)
 
-
   def testDefaultDatabaseName(self):
-    flags = mock_flags.MockFlags()
-    flags['run_uri'].parse('123')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT,
-        flag_values = flags,
+        flag_values = self.flags,
         **self.minimal_spec)
     self.assertEqual(result.database_name, 'pkb-db-123')
 
@@ -186,8 +187,17 @@ class GcpManagedRelationalDbSpecTestCase(unittest.TestCase):
     })
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT,
+        flag_values = self.flags,
         **spec)
     self.assertEqual(result.database_name, 'fakename')
+
+  def testDefaultDatabaseVersion(self):
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        flag_values = self.flags,
+        **self.minimal_spec)
+    self.assertEqual(result.database_version, '5.6')
+
 
 
 class GceManagedRelationalDbTestCase(unittest.TestCase):

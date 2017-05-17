@@ -16,6 +16,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   CLOUD = providers.GCP
   SERVICE_NAME = 'managed_relational_db'
 
+  @staticmethod
+  def GetLatestDatabaseVersion(database):
+    return '5.6'
+
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
     self.instance_id = None

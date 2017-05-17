@@ -1,10 +1,12 @@
-import abc
+from abc import ABCMeta
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
+# TODO: change to enum
 flags.DEFINE_string('database', None,
-                    'Flavor (mysql, postgres) of the database')
+                    'Managed atabase to use (mysql, postgres)')
+# TODO: write a validator
 flags.DEFINE_string('database_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
 MYSQL = 'mysql'
@@ -13,6 +15,7 @@ POSTGRES = 'postgres'
 _MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
 
+
 def GetManagedRelationalDbClass(cloud):
   """Get the ManagedRelationalDb class corresponding to 'cloud'."""
   if cloud in _MANAGED_RELATIONAL_DB_REGISTRY:
@@ -20,7 +23,7 @@ def GetManagedRelationalDbClass(cloud):
   raise Exception('No ManagedDb found for {0}'.format(cloud))
 
 
-class AutoRegisterManagedRelationalDbMeta(abc.ABCMeta):
+class AutoRegisterManagedRelationalDbMeta(ABCMeta):
   """Metaclass which allows ManagedRelationalDb to register."""
 
   def __init__(cls, name, bases, dct):
