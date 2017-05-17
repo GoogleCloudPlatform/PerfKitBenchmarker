@@ -27,6 +27,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from tests import mock_flags
 
@@ -146,9 +147,20 @@ _FLAGS = None
 
 class GceManagedRelationalDbSpecTestCase(unittest.TestCase):
 
+  def setUp(self):
+    self.fake_vm_spec = {
+        'GCP': {
+            'machine_type': 'n1-standard-1'
+        }
+    }
+
   def testCreateBaseSpec(self):
-    result = benchmark_config_spec._ManagedRelationalDbSpec(_COMPONENT,
-                                                            replicated=False)
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        replicated=False,
+        cloud='GCP',
+        database='mysql',
+        vm_spec=self.fake_vm_spec)
     self.assertEqual(result.replicated, False)
 
 
