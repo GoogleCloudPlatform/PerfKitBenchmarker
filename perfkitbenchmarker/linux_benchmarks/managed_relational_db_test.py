@@ -24,9 +24,13 @@ BENCHMARK_CONFIG = """
 managed_relational_db_test:
   description: test managed relational database provisioning
   managed_relational_db:
-    flavor: mysql
+    database: mysql
     version: '5.6'
-    cloud: GCP
+    vm_spec:
+      GCP:
+        machine_type: n1-standard-1
+      AWS:
+        machine_type: db.t2.small
 """
 
 def GetConfig(user_config):
