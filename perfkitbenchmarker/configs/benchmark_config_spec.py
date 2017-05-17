@@ -308,6 +308,16 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
         '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
         flag_values=flag_values, **vm_config)
 
+    # Set defaults that were not able to be set in
+    # GetOptionDecoderConstructions()
+    if not self.database_version:
+      managed_db_class = managed_relational_db.GetManagedRelationalDbClass(
+          self.cloud)
+      self.database_version = managed_db_class.GetLatestDatabaseVersion(
+          self.database)
+    if not self.database_name:
+      self.database_name = 'pkb-db-%s' % flag_values.run_uri
+
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     """Gets decoder classes and constructor args for each configurable option.
@@ -324,14 +334,12 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
         'database': (option_decoders.EnumDecoder, {
             'valid_values': [managed_relational_db.MYSQL,
                              managed_relational_db.POSTGRES]}),
-        # Note: database_name is set to a valid value in ApplyFlags,
-        # because we need the run_uri from flag_values.
         'database_name': (option_decoders.StringDecoder, {
-            'default': '_'}),
+            'default': None}),
+        'database_version': (option_decoders.StringDecoder, {
+            'default': None}),
         'replicated': (option_decoders.BooleanDecoder, {
           'default': True}),
-        'version': (option_decoders.StringDecoder, {
-            'default': '5.7'}),
         'vm_spec': (_PerCloudConfigDecoder, {})})
     return result
 
@@ -351,13 +359,11 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
     if flag_values['database'].present:
-      config_values['database'] = (
-          flag_values.database)
-    if not 'database_name' in config_values:
-      config_values['database_name'] = 'pkb-db-%s' % flag_values.run_uri
+      config_values['database'] = flag_values.database
+    if flag_values['database_name'].present:
+      config_values['database_name'] = flag_values.database_version
     if flag_values['database_version'].present:
-      config_values['version'] = (
-          flag_values.database_version)
+      config_values['database_version'] = flag_values.database_version
 
 
 class _SparkServiceSpec(spec.BaseSpec):
