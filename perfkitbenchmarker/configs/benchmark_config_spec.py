@@ -292,6 +292,8 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     super(_ManagedRelationalDbSpec, self).__init__(component_full_name,
                                          flag_values=flag_values,
                                          **kwargs)
+    # TODO(ferneyhough): This is a lot of boilerplate (kinda), and is repeated
+    # below in VmGroupSpec. See if some can be consolidated.
     ignore_package_requirements = (
         getattr(flag_values, 'ignore_package_requirements', True) if flag_values
         else True)
