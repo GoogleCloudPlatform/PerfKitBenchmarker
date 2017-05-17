@@ -31,6 +31,9 @@ managed_relational_db_test:
         machine_type: n1-standard-1
       AWS:
         machine_type: db.t2.small
+  vm_groups:
+    clients:
+      vm_spec: *default_single_core
 """
 
 def GetConfig(user_config):

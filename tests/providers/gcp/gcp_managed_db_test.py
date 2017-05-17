@@ -145,7 +145,12 @@ _FLAGS = None
 
 
 class GceManagedRelationalDbSpecTestCase(unittest.TestCase):
-  pass
+
+  def testCreateBaseSpec(self):
+    result = benchmark_config_spec._ManagedRelationalDbSpec(_COMPONENT,
+                                                            replicated=False)
+    self.assertEqual(result.replicated, False)
+
 
 class GceManagedRelationalDbTestCase(unittest.TestCase):
   pass
