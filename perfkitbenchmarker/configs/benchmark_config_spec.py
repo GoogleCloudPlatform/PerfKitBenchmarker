@@ -292,7 +292,6 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     super(_ManagedRelationalDbSpec, self).__init__(component_full_name,
                                          flag_values=flag_values,
                                          **kwargs)
-    print 'kwargs:', kwargs
     # TODO(ferneyhough): This is a lot of boilerplate (kinda), and is repeated
     # below in VmGroupSpec. See if some can be consolidated.
     ignore_package_requirements = (
@@ -322,11 +321,15 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS}),
-        'replicated': (option_decoders.BooleanDecoder, {
-          'default': True}),
         'database': (option_decoders.EnumDecoder, {
             'valid_values': [managed_relational_db.MYSQL,
                              managed_relational_db.POSTGRES]}),
+        # Note: database_name is set to a valid value in ApplyFlags,
+        # because we need the run_uri from flag_values.
+        'database_name': (option_decoders.StringDecoder, {
+            'default': '_'}),
+        'replicated': (option_decoders.BooleanDecoder, {
+          'default': True}),
         'version': (option_decoders.StringDecoder, {
             'default': '5.7'}),
         'vm_spec': (_PerCloudConfigDecoder, {})})
@@ -350,6 +353,8 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     if flag_values['database'].present:
       config_values['database'] = (
           flag_values.database)
+    if not 'database_name' in config_values:
+      config_values['database_name'] = 'pkb-db-%s' % flag_values.run_uri
     if flag_values['database_version'].present:
       config_values['version'] = (
           flag_values.database_version)

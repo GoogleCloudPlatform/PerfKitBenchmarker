@@ -144,24 +144,50 @@ _FLAGS = None
 #        'Invalid test_component.machine_type.cpus value: "0". Value must be at '
 #        'least 1.'))
 
+def _mergeDicts(dict1, dict2):
+  result = dict1.copy()
+  result.update(dict2)
+  return result
 
-class GceManagedRelationalDbSpecTestCase(unittest.TestCase):
+class GcpManagedRelationalDbSpecTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.fake_vm_spec = {
+    self.minimal_spec = {
+      'cloud': 'GCP',
+      'database': 'mysql',
+      'vm_spec': {
         'GCP': {
             'machine_type': 'n1-standard-1'
         }
+      }
     }
 
-  def testCreateBaseSpec(self):
+  def testMinimalConfig(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT,
-        replicated=False,
-        cloud='GCP',
-        database='mysql',
-        vm_spec=self.fake_vm_spec)
-    self.assertEqual(result.replicated, False)
+        **self.minimal_spec)
+    self.assertEqual(result.database, 'mysql')
+    self.assertEqual(result.cloud, 'GCP')
+    self.assertIsInstance(result.vm_spec, gce_virtual_machine.GceVmSpec)
+
+
+  def testDefaultDatabaseName(self):
+    flags = mock_flags.MockFlags()
+    flags['run_uri'].parse('123')
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        flag_values = flags,
+        **self.minimal_spec)
+    self.assertEqual(result.database_name, 'pkb-db-123')
+
+  def testCustomDatabaseName(self):
+    spec = _mergeDicts(self.minimal_spec, {
+        'database_name': 'fakename'
+    })
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        **spec)
+    self.assertEqual(result.database_name, 'fakename')
 
 
 class GceManagedRelationalDbTestCase(unittest.TestCase):
