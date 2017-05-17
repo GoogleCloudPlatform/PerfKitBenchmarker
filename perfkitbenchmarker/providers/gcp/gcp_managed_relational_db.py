@@ -23,7 +23,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _Create(self):
     """Creates the GCP Cloud SQL instance"""
-    database_version = self._GetDatabaseVersionNameFromFlavor(self.spec.flavor,
+    database_version = self._GetDatabaseVersionNameFromFlavor(self.spec.database,
                                                               self.spec.version)
     if self.instance_id is None:
       self.instance_id = 'pkb-' + FLAGS.run_uri

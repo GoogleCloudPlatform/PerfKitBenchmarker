@@ -3,9 +3,9 @@ import abc
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
-flags.DEFINE_string('managed_db_flavor', None,
+flags.DEFINE_string('database', None,
                     'Flavor (mysql, postgres) of the database')
-flags.DEFINE_string('managed_db_version', None,
+flags.DEFINE_string('database_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
 MYSQL = 'mysql'
 POSTGRES = 'postgres'

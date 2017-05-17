@@ -286,23 +286,25 @@ class _StaticVmListDecoder(option_decoders.ListDecoder):
 
 
 class _ManagedRelationalDbSpec(spec.BaseSpec):
-  """Configurable options of a managed database service.
-
-  We may add more options here, such as disk specs, as necessary.
-  When there are flags for these attributes, the convention is that
-  the flag is prefixed with spark.  For example, the static_cluster_id
-  is overriden by the flag spark_static_cluster_id
-
-  Attributes:
-    flavor
-    replicated
-    database_name
-  """
+  """Configurable options of a managed database service."""
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_ManagedRelationalDbSpec, self).__init__(component_full_name,
                                          flag_values=flag_values,
                                          **kwargs)
+    ignore_package_requirements = (
+        getattr(flag_values, 'ignore_package_requirements', True) if flag_values
+        else True)
+    providers.LoadProvider(self.cloud, ignore_package_requirements)
+    vm_config = getattr(self.vm_spec, self.cloud, None)
+    if vm_config is None:
+      raise errors.Config.MissingOption(
+          '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
+          'configuration for "{1}".'.format(component_full_name, self.cloud))
+    vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
+    self.vm_spec = vm_spec_class(
+        '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
+        flag_values=flag_values, **vm_config)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -319,11 +321,12 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
             'valid_values': providers.VALID_CLOUDS}),
         'replicated': (option_decoders.BooleanDecoder, {
           'default': True}),
-        'flavor': (option_decoders.EnumDecoder, {
+        'database': (option_decoders.EnumDecoder, {
             'valid_values': [managed_relational_db.MYSQL,
                              managed_relational_db.POSTGRES]}),
         'version': (option_decoders.StringDecoder, {
-            'default': '5.7'})})
+            'default': '5.7'}),
+        'vm_spec': (_PerCloudConfigDecoder, {})})
     return result
 
   @classmethod
@@ -339,12 +342,14 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
           provided config values.
     """
     super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['managed_db_flavor'].present:
-      config_values['flavor'] = (
-          flag_values.managed_relational_db_flavor)
-    if flag_values['managed_db_version'].present:
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
+    if flag_values['database'].present:
+      config_values['database'] = (
+          flag_values.database)
+    if flag_values['database_version'].present:
       config_values['version'] = (
-          flag_values.managed_relational_db_version)
+          flag_values.database_version)
 
 
 class _SparkServiceSpec(spec.BaseSpec):
