@@ -296,7 +296,7 @@ def _IssueSysbenchCommand(vm, duration, metadata):
   stderr = ''
   num_threads = metadata['sysbench_thread_count']
   tables_count = metadata['mysql_svc_oltp_tables_count']
-  table_size = metadata['mysql_svc_oltp_tables_size']
+  table_size = metadata['mysql_svc_oltp_table_size']
   oltp_script_path = sysbench05plus.OLTP_SCRIPT_PATH
   if duration > 0:
     run_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
@@ -340,7 +340,7 @@ def _RunSysbench(vm, metadata):
   Returns:
     Results: A list of results of this run.
   """
-  results = DATA_LOAD_RESULTS
+  results = DATA_LOADING_RESULTS
 
   if not hasattr(vm, 'db_instance_address'):
     logging.error(
@@ -399,9 +399,9 @@ def _PrepareSysbench(vm, metadata):
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
-  num_threads = metadata['msql_svc_oltp_tables_count']
+  num_threads = metadata['mysql_svc_oltp_tables_count']
   tables_count = metadata['mysql_svc_oltp_tables_count']
-  table_size = metadata['mysql_svc_oltp_tables_size']
+  table_size = metadata['mysql_svc_oltp_table_size']
   prepare_script_path = sysbench05plus.PREPARE_SCRIPT_PATH
   data_load_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
                           '--test=%s' % prepare_script_path,
@@ -433,26 +433,6 @@ def _PrepareSysbench(vm, metadata):
       load_duration,
       SECONDS_UNIT,
       metadata))
-
-  # Now run the sysbench OLTP test and parse the results.
-  for phase in ['warm-up', 'run']:
-    # First step is to run the test long enough to cover the warmup period
-    # as requested by the caller. Then we do the "real" run, parse and report
-    # the results.
-    duration = 0
-    if phase == 'warm-up' and FLAGS.sysbench_warmup_seconds > 0:
-      duration = FLAGS.sysbench_warmup_seconds
-      logging.info('Sysbench warm-up run, duration is %d', duration)
-    elif phase == 'run':
-      duration = FLAGS.sysbench_run_seconds
-      logging.info('Sysbench real run, duration is %d', duration)
-
-    stdout, stderr = _IssueSysbenchCommand(vm, duration)
-
-    if phase == 'run':
-      # We only need to parse the results for the "real" run.
-      logging.info('\n Parsing Sysbench Results...\n')
-      ParseSysbenchOutput(stdout, results, metadata)
 
   return results
 
@@ -864,7 +844,9 @@ MYSQL_SERVICE_BENCHMARK_DICTIONARY = {
     providers.GCP: GoogleCloudSQLBenchmark(),
     providers.AWS: RDSMySQLBenchmark()}
 
-DATA_LOAD_RESULTS = []
+# Needs to be a global variable so the data loading results will persist
+# from Prepare to Run stage when called together.
+DATA_LOADING_RESULTS = []
 
 
 def Prepare(benchmark_spec):
@@ -903,8 +885,8 @@ def Prepare(benchmark_spec):
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval
   }
-  DATA_LOAD_RESULTS.append(_PrepareSysbench(vms[0], metadata))
-  logging.info('Data Load Results: \n%s', DATA_LOAD_RESULTS)
+  DATA_LOADING_RESULTS = _PrepareSysbench(vms[0], metadata)
+  print DATA_LOADING_RESULTS
 
 
 def Run(benchmark_spec):
