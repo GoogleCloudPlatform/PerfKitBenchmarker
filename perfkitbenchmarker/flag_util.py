@@ -481,3 +481,12 @@ def ParseKeyValuePairs(strings):
       continue
 
   return pairs
+
+
+def GetProvidedCommandLineFlags():
+  """Return flag names and values that were specified on the command line.
+
+  Returns:
+    A dictionary of provided flags in the form: {flag_name: flag_value}.
+  """
+  return {k: v.value for k, v in FLAGS.FlagDict().iteritems() if v.present}

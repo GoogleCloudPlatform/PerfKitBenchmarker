@@ -1351,6 +1351,14 @@ def Run(benchmark_spec):
                              benchmark_spec.service, bucket_name,
                              benchmark_spec.read_objects['objects_written'])
 
+  # Clear the bucket if we're not saving the objects for later
+  # This is needed for long running tests, or else the objects would just pile
+  # up after each run.
+  keep_bucket = (FLAGS.object_storage_objects_written_file is not None or
+                 FLAGS.object_storage_dont_delete_bucket)
+  if not keep_bucket:
+    service.EmptyBucket(bucket_name)
+
   return results
 
 

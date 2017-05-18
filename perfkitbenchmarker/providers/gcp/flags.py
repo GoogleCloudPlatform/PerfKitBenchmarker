@@ -40,6 +40,9 @@ flags.DEFINE_string('gce_subnet_region', None, 'Region to create subnet in '
 flags.DEFINE_string('gce_subnet_addr', '10.128.0.0/20', 'Address range to the '
                     'subnet, given in CDR notation. Not used unless '
                     '--gce_subnet_region is given.')
+flags.DEFINE_string('gce_remote_access_firewall_rule', None, 'The name of an '
+                    'already created firewall rule which allows remote access '
+                    'instead of creating a new one.')
 flags.DEFINE_multistring(
     'gcp_instance_metadata_from_file',
     [],

@@ -228,23 +228,23 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
             "volumes": volumes,
             "containers": [container],
             "dnsPolicy": "ClusterFirst",
-            "affinity": {
-                "podAntiAffinity": {
-                    "requiredDuringSchedulingIgnoredDuringExecution": [{
-                        "labelSelector": {
-                            "matchExpressions": [{
-                                "key": "pkb_anti_affinity",
-                                "operator": "In",
-                                "values": [""],
-                            }],
-                        },
-                        "topologyKey": "kubernetes.io/hostname",
-                    }],
-                },
-            },
         }
     }
     if FLAGS.kubernetes_anti_affinity:
+      template["spec"]["affinity"] = {
+          "podAntiAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": [{
+                  "labelSelector": {
+                      "matchExpressions": [{
+                          "key": "pkb_anti_affinity",
+                          "operator": "In",
+                          "values": [""],
+                      }],
+                  },
+                  "topologyKey": "kubernetes.io/hostname",
+              }],
+          },
+      }
       template["metadata"]["labels"]["pkb_anti_affinity"] = ""
 
     return json.dumps(template)

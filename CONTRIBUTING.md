@@ -23,6 +23,20 @@ use GitHub pull requests for this purpose.
 Contributions made by corporations are covered by a different agreement than
 the one above, the Software Grant and Corporate Contributor License Agreement.
 
+### Change log
+After creating a pull request, update the appropriate sections in CHANGES.next.md with a summary of your changes, then commit and push to the branch you are trying to merge.
+
+For example, under "Bug fixes and maintenance updates" you might put something like:
+```
+- Fix crazy bug X (GH-<insert PR number here> from @<insert your username here>)
+```
+
+Then:
+```
+git commit -m "Updated CHANGES.next.md"
+git push origin fix_crazy_bug_x
+```
+
 ### Configuring a local development environment
 This can optionally done within a [`virtualenv`](https://virtualenv.pypa.io/en/latest/).
 

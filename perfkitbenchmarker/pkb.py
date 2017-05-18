@@ -82,6 +82,7 @@ from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import requirements
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine
@@ -226,6 +227,12 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'helpmatch', '',
     'Shows only flags defined in a module whose name matches the given regex.')
+flags.DEFINE_boolean(
+    'create_failed_run_samples', False,
+    'If true, PKB will create a sample specifying that a run stage failed. '
+    'This sample will include metadata specifying the run stage that '
+    'failed, the exception that occured, as well as all the flags that '
+    'were provided to PKB on the command line.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -474,8 +481,8 @@ def DoRunPhase(spec, collector, timer):
     events.samples_created.send(
         events.RUN_PHASE, benchmark_spec=spec, samples=samples)
     if FLAGS.run_stage_time:
-      for sample in samples:
-        sample.metadata['run_number'] = run_number
+      for s in samples:
+        s.metadata['run_number'] = run_number
     collector.AddSamples(samples, spec.name, spec)
     if FLAGS.publish_after_run:
       collector.PublishSamples()
@@ -523,6 +530,7 @@ def RunBenchmark(spec, collector):
     collector: The SampleCollector object to add samples to.
   """
   spec.status = benchmark_status.FAILED
+  current_run_stage = stages.PROVISION
   # Modify the logger prompt for messages logged within this function.
   label_extension = '{}({}/{})'.format(
       spec.name, spec.sequence_number, spec.total_benchmarks)
@@ -538,15 +546,19 @@ def RunBenchmark(spec, collector):
             DoProvisionPhase(spec, detailed_timer)
 
           if stages.PREPARE in FLAGS.run_stage:
+            current_run_stage = stages.PREPARE
             DoPreparePhase(spec, detailed_timer)
 
           if stages.RUN in FLAGS.run_stage:
+            current_run_stage = stages.RUN
             DoRunPhase(spec, collector, detailed_timer)
 
           if stages.CLEANUP in FLAGS.run_stage:
+            current_run_stage = stages.CLEANUP
             DoCleanupPhase(spec, detailed_timer)
 
           if stages.TEARDOWN in FLAGS.run_stage:
+            current_run_stage = stages.TEARDOWN
             DoTeardownPhase(spec, detailed_timer)
 
         # Add timing samples.
@@ -558,10 +570,15 @@ def RunBenchmark(spec, collector):
           collector.AddSamples(
               detailed_timer.GenerateSamples(), spec.name, spec)
 
-      except:
+      except Exception as e:
         # Resource cleanup (below) can take a long time. Log the error to give
         # immediate feedback, then re-throw.
         logging.exception('Error during benchmark %s', spec.name)
+        if FLAGS.create_failed_run_samples:
+          collector.AddSamples(MakeFailedRunSample(str(e),
+                                                   current_run_stage),
+                               spec.name,
+                               spec)
         # If the particular benchmark requests us to always call cleanup, do it
         # here.
         if stages.CLEANUP in FLAGS.run_stage and spec.always_call_cleanup:
@@ -574,6 +591,36 @@ def RunBenchmark(spec, collector):
         # Pickle spec to save final resource state.
         spec.Pickle()
   spec.status = benchmark_status.SUCCEEDED
+
+
+def MakeFailedRunSample(error_message, run_stage_that_failed):
+  """Create a sample.Sample representing a failed run stage.
+
+  The sample metric will have the name 'Run Failed';
+  the value will be 1 (has to be convertable to a float),
+  and the unit will be 'Run Failed' (for lack of a better idea).
+
+  The sample metadata will include the error message from the
+  Exception, the run stage that failed, as well as all PKB
+  command line flags that were passed in.
+
+  Args:
+    error_message: error message that was caught, resulting in the
+      run stage failure.
+    run_stage_that_failed: run stage that failed by raising an Exception
+
+  Returns:
+    a sample.Sample representing the run stage failure.
+  """
+  # Note: currently all provided PKB command line flags are included in the
+  # metadata. We may want to only include flags specific to the benchmark that
+  # failed. This can be acomplished using gflag's FlagsByModuleDict().
+  metadata = {
+      'error_message': error_message,
+      'run_stage': run_stage_that_failed,
+      'flags': str(flag_util.GetProvidedCommandLineFlags())
+  }
+  return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
 
 
 def RunBenchmarkTask(spec):

@@ -39,7 +39,7 @@ SSH_PORT = 22
 DEFAULT_LOCATION = 'eastus2'
 
 
-def GetResourceGroup():
+def GetResourceGroup(zone=None):
   """Get the resource group for the current benchmark."""
   spec = context.GetThreadBenchmarkSpec()
   # This is protected by spec.networks_lock, so there's no race
@@ -48,7 +48,8 @@ def GetResourceGroup():
   try:
     return spec.azure_resource_group
   except AttributeError:
-    group = AzureResourceGroup('pkb%s-%s' % (FLAGS.run_uri, spec.uid))
+    group = AzureResourceGroup(
+        'pkb%s-%s' % (FLAGS.run_uri, spec.uid), zone=zone)
     spec.azure_resource_group = group
     return group
 
@@ -56,14 +57,15 @@ def GetResourceGroup():
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
 
-  def __init__(self, name, use_existing=False):
+  def __init__(self, name, zone=None, use_existing=False):
     super(AzureResourceGroup, self).__init__()
     self.name = name
     self.use_existing = use_existing
     # A resource group's location doesn't affect the location of
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
-    self.location = FLAGS.zones[0] if FLAGS.zones else DEFAULT_LOCATION
+    self.location = (FLAGS.zones[0] if FLAGS.zones else
+                     zone or DEFAULT_LOCATION)
     # Whenever an Azure CLI command needs a resource group, it's
     # always specified the same way.
     self.args = ['--resource-group', self.name]
@@ -75,24 +77,26 @@ class AzureResourceGroup(resource.BaseResource):
       # FLAGS.zones[0].
       _, _, retcode = vm_util.IssueCommand(
           [azure.AZURE_PATH, 'group', 'create',
-           self.name, self.location])
+           '--name', self.name, '--location', self.location])
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
             'Error creating Azure resource group')
 
   def _Exists(self):
-    _, _, retcode = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'resource', 'list', self.name],
+    stdout, _, _ = vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'group', 'show', '--name', self.name],
         suppress_warning=True)
-
-    return retcode == 0
+    try:
+      json.loads(stdout)
+      return True
+    except:
+      return False
 
   def _Delete(self):
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'delete',
-         '--quiet',
-         self.name])
+         '--yes', '--name', self.name])
 
 
 class AzureAvailSet(resource.BaseResource):
@@ -107,12 +111,13 @@ class AzureAvailSet(resource.BaseResource):
   def _Create(self):
     """Create the availability set."""
     create_cmd = [azure.AZURE_PATH,
-                  'availset',
+                  'vm',
+                  'availability-set',
                   'create',
-                  self.resource_group.name,
-                  self.name]
+                  '--resource-group', self.resource_group.name,
+                  '--name', self.name]
     if self.location:
-      create_cmd.append(self.location)
+      create_cmd.extend(['--location', self.location])
     vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
@@ -122,11 +127,12 @@ class AzureAvailSet(resource.BaseResource):
   def _Exists(self):
     """Returns True if the availability set exists."""
     show_cmd = [azure.AZURE_PATH,
-                'availset',
+                'vm',
+                'availability-set',
                 'show',
-                '--json',
-                self.resource_group.name,
-                self.name]
+                '--output', 'json',
+                '--resource-group', self.resource_group.name,
+                '--name', self.name]
     stdout, _, _ = vm_util.IssueCommand(show_cmd)
     return bool(json.loads(stdout))
 
@@ -164,8 +170,8 @@ class AzureStorageAccount(resource.BaseResource):
                     'account',
                     'create',
                     '--kind', self.kind,
-                    '--sku-name', self.storage_type,
-                    self.name] + self.resource_group.args
+                    '--sku', self.storage_type,
+                    '--name', self.name] + self.resource_group.args
       if self.location:
         create_cmd.extend(
             ['--location', self.location])
@@ -178,20 +184,20 @@ class AzureStorageAccount(resource.BaseResource):
     """Get our connection string and our keys."""
 
     stdout, _ = vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'storage', 'account', 'connectionstring', 'show',
-         '--json',
-         self.name] + self.resource_group.args)
+        [azure.AZURE_PATH, 'storage', 'account', 'show-connection-string',
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args)
 
     response = json.loads(stdout)
-    self.connection_string = response['string']
+    self.connection_string = response['connectionString']
     # Connection strings are always represented the same way on the
     # command line.
     self.connection_args = ['--connection-string', self.connection_string]
 
     stdout, _ = vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'storage', 'account', 'keys', 'list',
-         '--json',
-         self.name] + self.resource_group.args)
+         '--output', 'json',
+         '--account-name', self.name] + self.resource_group.args)
 
     response = json.loads(stdout)
     # A new storage account comes with two keys, but we only need one.
@@ -204,19 +210,23 @@ class AzureStorageAccount(resource.BaseResource):
                   'storage',
                   'account',
                   'delete',
-                  self.name,
-                  '--quiet'] + self.resource_group.args
+                  '--name', self.name,
+                  '--yes'] + self.resource_group.args
     vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
     """Returns true if the storage account exists."""
-    _, _, retcode = vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'storage', 'account', 'show',
-         '--json',
-         self.name] + self.resource_group.args,
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args,
         suppress_warning=True)
 
-    return retcode == 0
+    try:
+      json.loads(stdout)
+      return True
+    except:
+      return False
 
 
 class AzureVirtualNetwork(resource.BaseResource):
@@ -248,7 +258,7 @@ class AzureVirtualNetwork(resource.BaseResource):
         [azure.AZURE_PATH, 'network', 'vnet', 'create',
          '--location', self.location,
          '--address-prefixes', self.address_space,
-         self.name] + self.resource_group.args)
+         '--name', self.name] + self.resource_group.args)
 
   def _Delete(self):
     """Deletes the virtual network."""
@@ -259,8 +269,8 @@ class AzureVirtualNetwork(resource.BaseResource):
     """Returns true if the virtual network exists."""
     stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'vnet', 'show',
-         '--json',
-         self.name] + self.resource_group.args,
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args,
         suppress_warning=True)
 
     return bool(json.loads(stdout))
@@ -272,22 +282,22 @@ class AzureSubnet(resource.BaseResource):
     self.resource_group = GetResourceGroup()
     self.vnet = vnet
     self.name = name
-    self.args = ['--vnet-subnet-name', self.name]
+    self.args = ['--subnet', self.name]
 
   def _Create(self):
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'create',
          '--vnet-name', self.vnet.name,
          '--address-prefix', self.vnet.address_space,
-         self.name] + self.resource_group.args)
+         '--name', self.name] + self.resource_group.args)
 
   @vm_util.Retry()
   def _Exists(self):
     stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'show',
          '--vnet-name', self.vnet.name,
-         '--json',
-         self.name] + self.resource_group.args)
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args)
 
     return bool(json.loads(stdout))
 
@@ -303,7 +313,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     self.subnet = subnet
     self.name = name
     self.resource_group = GetResourceGroup()
-    self.args = ['--nsg-name', self.name]
+    self.args = ['--nsg', self.name]
 
     self.rules_lock = threading.Lock()
     # Mapping of (start_port, end_port) -> rule name, used to
@@ -318,14 +328,14 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'nsg', 'create',
          '--location', self.location,
-         self.name] + self.resource_group.args)
+         '--name', self.name] + self.resource_group.args)
 
   @vm_util.Retry()
   def _Exists(self):
     stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'network', 'nsg', 'show',
-         '--json',
-         self.name] + self.resource_group.args)
+         '--output', 'json',
+         '--name', self.name] + self.resource_group.args)
 
     return bool(json.loads(stdout))
 
@@ -334,9 +344,9 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
 
   def AttachToSubnet(self):
     vm_util.IssueRetryableCommand(
-        [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'set',
+        [azure.AZURE_PATH, 'network', 'vnet', 'subnet', 'update',
          '--name', self.subnet.name,
-         '--network-security-group-name', self.name] +
+         '--network-security-group', self.name] +
         self.resource_group.args +
         self.subnet.vnet.args)
 
@@ -366,7 +376,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
 
     vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create',
-         rule_name,
+         '--name', rule_name,
          '--destination-port-range', port_range,
          '--access', 'Allow',
          '--priority', str(rule_priority)]
