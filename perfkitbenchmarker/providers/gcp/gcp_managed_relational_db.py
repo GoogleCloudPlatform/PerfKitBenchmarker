@@ -17,25 +17,25 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   SERVICE_NAME = 'managed_relational_db'
 
   @staticmethod
+  # TODO: implement for real
   def GetLatestDatabaseVersion(database):
     return '5.6'
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
-    self.instance_id = None
-    self.project = None
+    self.spec = managed_relational_db_spec
+    self.project = FLAGS.project or util.GetDefaultProject()
+    self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
 
   def _Create(self):
     """Creates the GCP Cloud SQL instance"""
-    database_version = self._GetDatabaseVersionNameFromFlavor(self.spec.database,
-                                                              self.spec.version)
-    if self.instance_id is None:
-      self.instance_id = 'pkb-' + FLAGS.run_uri
+    cloudsql_specific_database_version = self._GetDatabaseVersionNameFromFlavor(
+        self.spec.database,
+        self.spec.database_version)
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'create',
                              self.instance_id)
-    if self.project is not None:
-      cmd.flags['project'] = self.project
-    cmd.flags['database-version'] = database_version
+    cmd.flags['project'] = self.project
+    cmd.flags['database-version'] = cloudsql_specific_database_version
 
     cmd.Issue()
 
