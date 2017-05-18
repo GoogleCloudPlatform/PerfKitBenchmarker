@@ -131,6 +131,15 @@ NA_UNIT = 'NA'
 SECONDS_UNIT = 'seconds'
 MS_UNIT = 'milliseconds'
 
+MYSQL_SVC_OLTP_TABLES_COUNT = 'mysql_svc_oltp_tables_count'
+MYSQL_SVC_OLTP_TABLE_SIZE = 'mysql_svc_oltp_table_size'
+MYSQL_SVC_DB_INSTANCE_CORES = 'mysql_svc_db_instance_cores'
+SYSBENCH_WARM_UP_SECONDS = 'sysbench_warm_up_seconds'
+SYSBENCH_RUN_SECONDS = 'sysbench_run_seconds'
+SYSBENCH_THREAD_COUNT = 'sysbench_thread_count'
+SYSBENCH_LATENCY_PERCENTILE = 'sysbench_latency_percentile'
+SYSBENCH_REPORT_INTERVAL = 'sysbench_report_interval'
+
 # These are the constants that should be specified in GCP's cloud SQL command.
 DEFAULT_BACKUP_START_TIME = '07:00'
 GCP_MY_SQL_VERSION = 'MYSQL_5_6'
@@ -294,9 +303,9 @@ def _IssueSysbenchCommand(vm, duration, metadata):
   """
   stdout = ''
   stderr = ''
-  num_threads = metadata['sysbench_thread_count']
-  tables_count = metadata['mysql_svc_oltp_tables_count']
-  table_size = metadata['mysql_svc_oltp_table_size']
+  num_threads = metadata[SYSBENCH_THREAD_COUNT]
+  tables_count = metadata[MYSQL_SVC_OLTP_TABLES_COUNT]
+  table_size = metadata[MYSQL_SVC_OLTP_TABLE_SIZE]
   oltp_script_path = sysbench05plus.OLTP_SCRIPT_PATH
   if duration > 0:
     run_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
@@ -399,9 +408,9 @@ def _PrepareSysbench(vm, metadata):
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
-  num_threads = metadata['mysql_svc_oltp_tables_count']
-  tables_count = metadata['mysql_svc_oltp_tables_count']
-  table_size = metadata['mysql_svc_oltp_table_size']
+  num_threads = metadata[MYSQL_SVC_OLTP_TABLES_COUNT]
+  tables_count = metadata[MYSQL_SVC_OLTP_TABLES_COUNT]
+  table_size = metadata[MYSQL_SVC_OLTP_TABLE_SIZE]
   prepare_script_path = sysbench05plus.PREPARE_SCRIPT_PATH
   data_load_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
                           '--test=%s' % prepare_script_path,
@@ -876,14 +885,14 @@ def Prepare(benchmark_spec):
   MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Prepare(vms[0])
 
   metadata = {
-      'mysql_svc_oltp_tables_count': benchmark_spec.mysql_svc_oltp_tables_count,
-      'mysql_svc_oltp_table_size': benchmark_spec.mysql_svc_oltp_table_size,
-      'mysql_svc_db_instance_cores': FLAGS.mysql_svc_db_instance_cores,
-      'sysbench_warm_up_seconds': FLAGS.sysbench_warmup_seconds,
-      'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
-      'sysbench_thread_count': FLAGS.sysbench_thread_count,
-      'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
-      'sysbench_report_interval': FLAGS.sysbench_report_interval
+      MYSQL_SVC_OLTP_TABLES_COUNT: benchmark_spec.mysql_svc_oltp_tables_count,
+      MYSQL_SVC_OLTP_TABLE_SIZE: benchmark_spec.mysql_svc_oltp_table_size,
+      MYSQL_SVC_DB_INSTANCE_CORES: FLAGS.mysql_svc_db_instance_cores,
+      SYSBENCH_WARM_UP_SECONDS: FLAGS.sysbench_warmup_seconds,
+      SYSBENCH_RUN_SECONDS: FLAGS.sysbench_run_seconds,
+      SYSBENCH_THREAD_COUNT: FLAGS.sysbench_thread_count,
+      SYSBENCH_LATENCY_PERCENTILE: FLAGS.sysbench_latency_percentile,
+      SYSBENCH_REPORT_INTERVAL: FLAGS.sysbench_report_interval
   }
   DATA_LOADING_RESULTS = _PrepareSysbench(vms[0], metadata)
   print DATA_LOADING_RESULTS
@@ -903,14 +912,14 @@ def Run(benchmark_spec):
                'Cloud Provider is %s.', FLAGS.cloud)
   vms = benchmark_spec.vms
   metadata = {
-      'mysql_svc_oltp_tables_count': benchmark_spec.mysql_svc_oltp_tables_count,
-      'mysql_svc_oltp_table_size': benchmark_spec.mysql_svc_oltp_table_size,
-      'mysql_svc_db_instance_cores': FLAGS.mysql_svc_db_instance_cores,
-      'sysbench_warm_up_seconds': FLAGS.sysbench_warmup_seconds,
-      'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
-      'sysbench_thread_count': FLAGS.sysbench_thread_count,
-      'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
-      'sysbench_report_interval': FLAGS.sysbench_report_interval
+      MYSQL_SVC_OLTP_TABLES_COUNT: benchmark_spec.mysql_svc_oltp_tables_count,
+      MYSQL_SVC_OLTP_TABLE_SIZE: benchmark_spec.mysql_svc_oltp_table_size,
+      MYSQL_SVC_DB_INSTANCE_CORES: FLAGS.mysql_svc_db_instance_cores,
+      SYSBENCH_WARM_UP_SECONDS: FLAGS.sysbench_warmup_seconds,
+      SYSBENCH_RUN_SECONDS: FLAGS.sysbench_run_seconds,
+      SYSBENCH_THREAD_COUNT: FLAGS.sysbench_thread_count,
+      SYSBENCH_LATENCY_PERCENTILE: FLAGS.sysbench_latency_percentile,
+      SYSBENCH_REPORT_INTERVAL: FLAGS.sysbench_report_interval
   }
 
   # The run phase is common across providers. The VMs[0] object contains all
