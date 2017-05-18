@@ -1,3 +1,60 @@
+# v1.12.0
+
+Breaking changes:
+- Azure CLI updated to 2.0 (GH-1359)
+- Update gflags to version 3.1.1 (GH-1322)
+
+New features:
+- Azure container service (GH-1361)
+- Add Reboot() method to BaseOsMixin (GH-1356)
+- Add container cluster classes (GH-1355)
+- Optional `--completion_status_file` flag to write the completion status of every config to a json file (GH-1349)
+- Add `--gcp_min_cpu_platform` flag (GH-1336)
+- Add GCP sole tenancy support (GH-1333)
+- Add SHOC package (GH-1332)
+- Add Stencil2D benchmark (GH-1332)
+- Managed memcache service abstraction and a backend for AWS ElastiCache (GH-1235)
+- Add Apache Beam benchmark (GH-1324)
+- Add `image_project` to GCP YAML config options (GH-1319)
+- Add support for AWS i3 (GH-1308)
+- Optionally create failed run samples with --create_failed_run_samples (GH-1363)
+- Add --storage_size flag for mysql_service benchmark (GH-1360 from @sspano)
+
+Enhancements:
+- Add optional step parameter to IntegerList (GH-1330)
+- Upgrade to NVIDIA's latest version of CUDA Toolkit 8 (GH-1304)
+- Add ID attribute to GCE VMs (GH-1318)
+- Add ability to install netperf from local tar file (GH-1364)
+
+Bug fixes and maintenance updates:
+- Fix up README.md - incorrect command line example and added note on Amazon ES publisher (GH-1350 from @Lirt)
+- Fix up README.md - remove outdated comments about GCP requirements (GH-1354 from @sspano)
+- Fix creating instance with local SSD using NVMe interface (GH-1287)
+- Make flag values consistent with gcloud CLI "SCSI" and "NVME" (GH-1287)
+- Store os types in list instead of tuple so that it can be extended by third parties (GH-1348)
+- Don't create host during VM Create if `num_vms_per_host` is specified (GH-1352)
+- Fix up kubernetes provider (GH-1351)
+- Add `--region` to describe/cancel spot-instance-request commands (GH-1347)
+- Install sysbench05plus package in a separate path from sysbench (GH-1338)
+- Change `--openstack_additional_flags` to be a list flag (GH-1340)
+- Move gflags installation from netperf benchmark to a package (GH-1341)
+- Move package installation of netperf from benchmark to a package (GH-1341)
+- Use snake_case gflags APIs (GH-1328)
+- Check if apt-update has been called in InstallPackages, and call it if it has not been (GH-1334)
+- Fix broken regular expression in blazemark benchmark (GH-1311)
+- Fix CloudSuite license page link (GH-1323)
+- Update hadoop version (GH-1327)
+- Use regional storage class for GCS buckets instead of DRA (GH-1326)
+- Fix gflags FLAGS object initialization in tests (GH-1313)
+- Fix bug with exception name in `azure_network.py` (GH-1314)
+- Always set GPU clock speed in cuda toolkit installation (GH-1321)
+- Specify `image_project` in `gpu_pcie_bandwidth` benchmark config (GH-1321)
+- Move gpu clock speed logic to `cuda_toolkit_8` module (GH-1279)
+- Add timeout to netperf remote script (GH-1306)
+- Don't assume that gcloud is in PATH in providers.gcp.util.GetDefaultProject (GH-1366)
+- Make AWS S3 bucket deletion retryable (GH-1343)
+- Empty bucket at the end of the Run stage of the object_storage_service benchmark (GH-1343)
+
 # v1.11.0
 
 External contributions:
