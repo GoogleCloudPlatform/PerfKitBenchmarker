@@ -5,7 +5,13 @@ from perfkitbenchmarker import resource
 
 # TODO: change to enum
 flags.DEFINE_string('database', None,
-                    'Managed atabase to use (mysql, postgres)')
+                    'Managed database flavor to use (mysql, postgres)')
+flags.DEFINE_string('database_name', None,
+                    'Name of the database to create. Defaults to '
+                    'pkb-db-[run-uri]')
+flags.DEFINE_string('database_password', None,
+                    'Database password. Defaults to '
+                    'a random 10-character alpha-numeric string')
 # TODO: write a validator
 flags.DEFINE_string('database_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
