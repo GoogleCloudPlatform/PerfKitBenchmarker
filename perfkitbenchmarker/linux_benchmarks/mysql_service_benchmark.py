@@ -279,7 +279,7 @@ def ParseSysbenchOutput(sysbench_output, results, metadata):
         metadata))
 
 
-def _IssueSysbenchCommand(vm, duration):
+def _IssueSysbenchCommand(vm, duration, metadata):
   """Issues a sysbench run command given a vm and a duration.
 
       Does nothing if duration is <= 0
@@ -287,25 +287,29 @@ def _IssueSysbenchCommand(vm, duration):
   Args:
     vm: The test VM to issue command to.
     duration: the duration of the sysbench run.
+    metadata: The PKB metadata to be passed along to the final results.
 
   Returns:
     stdout, stderr: the result of the command.
   """
   stdout = ''
   stderr = ''
+  num_threads = metadata['sysbench_thread_count']
+  tables_count = metadata['mysql_svc_oltp_tables_count']
+  table_size = metadata['mysql_svc_oltp_table_size']
   oltp_script_path = sysbench05plus.OLTP_SCRIPT_PATH
   if duration > 0:
     run_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
                       '--test=%s' % oltp_script_path,
                       '--mysql_svc_oltp_tables_count=%d' %
-                      FLAGS.mysql_svc_oltp_tables_count,
+                      tables_count,
                       '--oltp-table-size=%d' %
-                      FLAGS.mysql_svc_oltp_table_size,
+                      table_size,
                       '--rand-init=%s' % RAND_INIT_ON,
                       '--db-ps-mode=%s' % DISABLE,
                       '--oltp-dist-type=%s' % UNIFORM,
                       '--oltp-read-only=%s' % OFF,
-                      '--num-threads=%d' % FLAGS.sysbench_thread_count,
+                      '--num-threads=%d' % num_threads,
                       '--percentile=%d' % FLAGS.sysbench_latency_percentile,
                       '--report-interval=%d' %
                       FLAGS.sysbench_report_interval,
@@ -336,6 +340,44 @@ def _RunSysbench(vm, metadata):
   Returns:
     Results: A list of results of this run.
   """
+  results = DATA_LOADING_RESULTS
+
+  if not hasattr(vm, 'db_instance_address'):
+    logging.error(
+        'Prepare has likely failed, db_instance_address is not found.')
+    raise DBStatusQueryError('RunSysbench: DB instance address not found.')
+
+  # Now run the sysbench OLTP test and parse the results.
+  # First step is to run the test long enough to cover the warmup period
+  # as requested by the caller. Second step is the 'real' run where the results
+  # are parsed and reported.
+
+  warmup_seconds = FLAGS.sysbench_warmup_seconds
+  if warmup_seconds > 0:
+    logging.info('Sysbench warm-up run, duration is %d', warmup_seconds)
+    _IssueSysbenchCommand(vm, warmup_seconds, metadata)
+
+  run_seconds = FLAGS.sysbench_run_seconds
+  logging.info('Sysbench real run, duration is %d', run_seconds)
+  stdout, _ = _IssueSysbenchCommand(vm, run_seconds, metadata)
+  logging.info('\n Parsing Sysbench Results...\n')
+  ParseSysbenchOutput(stdout, results, metadata)
+
+  return results
+
+
+def _PrepareSysbench(vm, metadata):
+  """Prepare the Sysbench OLTP test with data loading stage.
+
+  Data loaded on the DB instance indicated by the vm.db_instance_address.
+
+  Args:
+    vm: The client VM that will issue the sysbench test.
+    metadata: The PKB metadata to be passed along to the final results.
+
+  Returns:
+    results: A list of results of the data loading step.
+  """
   results = []
 
   if not hasattr(vm, 'db_instance_address'):
@@ -357,16 +399,19 @@ def _RunSysbench(vm, metadata):
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
+  num_threads = metadata['mysql_svc_oltp_tables_count']
+  tables_count = metadata['mysql_svc_oltp_tables_count']
+  table_size = metadata['mysql_svc_oltp_table_size']
   prepare_script_path = sysbench05plus.PREPARE_SCRIPT_PATH
   data_load_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
                           '--test=%s' % prepare_script_path,
                           '--mysql_svc_oltp_tables_count=%d' %
-                          FLAGS.mysql_svc_oltp_tables_count,
+                          tables_count,
                           '--oltp-table-size=%d' %
-                          FLAGS.mysql_svc_oltp_table_size,
+                          table_size,
                           '--rand-init=%s' % RAND_INIT_ON,
                           '--num-threads=%d' %
-                          FLAGS.mysql_svc_oltp_tables_count,
+                          num_threads,
                           '--mysql-user=%s' % vm.db_instance_master_user,
                           '--mysql-password="%s"' %
                           vm.db_instance_master_password,
@@ -388,26 +433,6 @@ def _RunSysbench(vm, metadata):
       load_duration,
       SECONDS_UNIT,
       metadata))
-
-  # Now run the sysbench OLTP test and parse the results.
-  for phase in ['warm-up', 'run']:
-    # First step is to run the test long enough to cover the warmup period
-    # as requested by the caller. Then we do the "real" run, parse and report
-    # the results.
-    duration = 0
-    if phase == 'warm-up' and FLAGS.sysbench_warmup_seconds > 0:
-      duration = FLAGS.sysbench_warmup_seconds
-      logging.info('Sysbench warm-up run, duration is %d', duration)
-    elif phase == 'run':
-      duration = FLAGS.sysbench_run_seconds
-      logging.info('Sysbench real run, duration is %d', duration)
-
-    stdout, stderr = _IssueSysbenchCommand(vm, duration)
-
-    if phase == 'run':
-      # We only need to parse the results for the "real" run.
-      logging.info('\n Parsing Sysbench Results...\n')
-      ParseSysbenchOutput(stdout, results, metadata)
 
   return results
 
@@ -819,6 +844,10 @@ MYSQL_SERVICE_BENCHMARK_DICTIONARY = {
     providers.GCP: GoogleCloudSQLBenchmark(),
     providers.AWS: RDSMySQLBenchmark()}
 
+# Needs to be a global variable so the data loading results will persist
+# from Prepare to Run stage when called together.
+DATA_LOADING_RESULTS = []
+
 
 def Prepare(benchmark_spec):
   """Prepare the MySQL DB Instances, configures it.
@@ -840,8 +869,24 @@ def Prepare(benchmark_spec):
   # Setup common test tools required on the client VM
   vms[0].Install('sysbench05plus')
 
+  benchmark_spec.mysql_svc_oltp_tables_count = FLAGS.mysql_svc_oltp_tables_count
+  benchmark_spec.mysql_svc_oltp_table_size = FLAGS.mysql_svc_oltp_table_size
+
   # Prepare service specific states (create DB instance, configure it, etc)
   MYSQL_SERVICE_BENCHMARK_DICTIONARY[FLAGS.cloud].Prepare(vms[0])
+
+  metadata = {
+      'mysql_svc_oltp_tables_count': benchmark_spec.mysql_svc_oltp_tables_count,
+      'mysql_svc_oltp_table_size': benchmark_spec.mysql_svc_oltp_table_size,
+      'mysql_svc_db_instance_cores': FLAGS.mysql_svc_db_instance_cores,
+      'sysbench_warm_up_seconds': FLAGS.sysbench_warmup_seconds,
+      'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
+      'sysbench_thread_count': FLAGS.sysbench_thread_count,
+      'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
+      'sysbench_report_interval': FLAGS.sysbench_report_interval
+  }
+  DATA_LOADING_RESULTS = _PrepareSysbench(vms[0], metadata)
+  print DATA_LOADING_RESULTS
 
 
 def Run(benchmark_spec):
@@ -858,8 +903,8 @@ def Run(benchmark_spec):
                'Cloud Provider is %s.', FLAGS.cloud)
   vms = benchmark_spec.vms
   metadata = {
-      'mysql_svc_oltp_tables_count': FLAGS.mysql_svc_oltp_tables_count,
-      'mysql_svc_oltp_table_size': FLAGS.mysql_svc_oltp_table_size,
+      'mysql_svc_oltp_tables_count': benchmark_spec.mysql_svc_oltp_tables_count,
+      'mysql_svc_oltp_table_size': benchmark_spec.mysql_svc_oltp_table_size,
       'mysql_svc_db_instance_cores': FLAGS.mysql_svc_db_instance_cores,
       'sysbench_warm_up_seconds': FLAGS.sysbench_warmup_seconds,
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
