@@ -35,7 +35,7 @@ flags.DEFINE_string('beam_it_module', None,
                     'Module containing integration test.')
 flags.DEFINE_string('beam_it_profile', None,
                     'Profile to activate integration test.')
-flags.DEFINE_string('beam_it_timeout', 600, 'Integration Test Timeout.')
+flags.DEFINE_integer('beam_it_timeout', 600, 'Integration Test Timeout.')
 flags.DEFINE_string('git_binary', 'git', 'Path to git binary.')
 flags.DEFINE_string('beam_version', None, 'Version of Beam to download. Use'
                                           ' tag from Github as value. If not'
