@@ -400,8 +400,8 @@ def _PrepareSysbench(vm, metadata):
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
   # Data loading is write only so need num_threads less than or equal to the
-  # amount of tables. 
-  num_threads = min(metadata['mysql_svc_oltp_tables_count'], 
+  # amount of tables.
+  num_threads = min(metadata['mysql_svc_oltp_tables_count'],
                     metadata['sysbench_thread_count'])
   tables_count = metadata['mysql_svc_oltp_tables_count']
   table_size = metadata['mysql_svc_oltp_table_size']
