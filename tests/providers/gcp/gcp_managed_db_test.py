@@ -198,13 +198,85 @@ class GcpManagedRelationalDbSpecTestCase(unittest.TestCase):
         **self.minimal_spec)
     self.assertEqual(result.database_version, '5.6')
 
+  def testCustomDatabaseVersion(self):
+    spec = _mergeDicts(self.minimal_spec, {
+        'database_version': '6.6'
+    })
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        flag_values = self.flags,
+        **spec)
+    self.assertEqual(result.database_version, '6.6')
 
+  def testDefaultDatabasePassword(self):
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        flag_values = self.flags,
+        **self.minimal_spec)
+    self.assertIsInstance(result.database_password, str)
+    self.assertTrue(len(result.database_password) == 10)
 
-class GceManagedRelationalDbTestCase(unittest.TestCase):
-  pass
+  def testRandomDatabasePassword(self):
+    spec = _mergeDicts(self.minimal_spec, {
+        'database_password': 'fakepassword'
+    })
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        flag_values = self.flags,
+        **spec)
+    self.assertEqual(result.database_password, 'fakepassword')
+
 
 class GceManagedRelationalDbFlagsTestCase(unittest.TestCase):
-  pass
+
+  def setUp(self):
+    self.flags = mock_flags.MockFlags()
+    self.flags['run_uri'].parse('123')
+
+    self.full_spec = {
+      'cloud': 'GCP',
+      'database': 'mysql',
+      'database_name': 'fake_name',
+      'database_password': 'fake_password',
+      'vm_spec': {
+        'GCP': {
+            'machine_type': 'n1-standard-1'
+        }
+      }
+    }
+
+  # Not testing this yet, because it requires the implementation
+  # of a managed_relational_db provider for the specified
+  # cloud. We could mock it perhaps.
+  # Also, this test file is supposed to be specific to GCP.
+  # We may want to move the bulk of these tests to a base
+  # test file.
+  def testCloudFlag(self):
+    pass
+
+  def testDatabaseFlag(self):
+    self.flags['database'].parse('postgres')
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        flag_values = self.flags,
+        **self.full_spec)
+    self.assertEqual(result.database, 'postgres')
+
+  def testDatabaseNameFlag(self):
+    self.flags['database_name'].parse('fakedbname')
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        flag_values = self.flags,
+        **self.full_spec)
+    self.assertEqual(result.database_name, 'fakedbname')
+
+  def testDatabasePasswordFlag(self):
+    self.flags['database_password'].parse('fakepassword')
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT,
+        flag_values = self.flags,
+        **self.full_spec)
+    self.assertEqual(result.database_password, 'fakepassword')
 
 #class GceVmSpecTestCase(unittest.TestCase):
 #
