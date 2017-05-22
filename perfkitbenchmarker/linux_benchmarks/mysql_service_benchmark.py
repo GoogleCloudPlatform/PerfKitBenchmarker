@@ -58,26 +58,36 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 from perfkitbenchmarker.linux_packages import sysbench05plus
 
+
+MYSQL_SVC_OLTP_TABLES_COUNT = 'mysql_svc_oltp_tables_count'
+MYSQL_SVC_OLTP_TABLE_SIZE = 'mysql_svc_oltp_table_size'
+MYSQL_SVC_DB_INSTANCE_CORES = 'mysql_svc_db_instance_cores'
+SYSBENCH_WARMUP_SECONDS = 'sysbench_warmup_seconds'
+SYSBENCH_RUN_SECONDS = 'sysbench_run_seconds'
+SYSBENCH_THREAD_COUNT = 'sysbench_thread_count'
+SYSBENCH_LATENCY_PERCENTILE = 'sysbench_latency_percentile'
+SYSBENCH_REPORT_INTERVAL = 'sysbench_report_interval'
+
 FLAGS = flags.FLAGS
 flags.DEFINE_enum(
     'mysql_svc_db_instance_cores', '4', ['1', '4', '8', '16'],
     'The number of cores to be provisioned for the DB instance.')
 
-flags.DEFINE_integer('mysql_svc_oltp_tables_count', 4,
+flags.DEFINE_integer(MYSQL_SVC_OLTP_TABLES_COUNT, 4,
                      'The number of tables used in sysbench oltp.lua tests')
-flags.DEFINE_integer('mysql_svc_oltp_table_size', 100000,
+flags.DEFINE_integer(MYSQL_SVC_OLTP_TABLE_SIZE, 100000,
                      'The number of rows of each table used in the oltp tests')
-flags.DEFINE_integer('sysbench_warmup_seconds', 120,
+flags.DEFINE_integer(SYSBENCH_WARMUP_SECONDS, 120,
                      'The duration of the warmup run in which results are '
                      'discarded, in seconds.')
-flags.DEFINE_integer('sysbench_run_seconds', 480,
+flags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
                      'The duration of the actual run in which results are '
                      'collected, in seconds.')
-flags.DEFINE_integer('sysbench_thread_count', 16,
+flags.DEFINE_integer(SYSBENCH_THREAD_COUNT, 16,
                      'The number of test threads on the client side.')
-flags.DEFINE_integer('sysbench_latency_percentile', 99,
+flags.DEFINE_integer(SYSBENCH_LATENCY_PERCENTILE, 99,
                      'The latency percentile we ask sysbench to compute.')
-flags.DEFINE_integer('sysbench_report_interval', 2,
+flags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 2,
                      'The interval, in seconds, we ask sysbench to report '
                      'results.')
 flags.DEFINE_integer('storage_size', 100,
@@ -130,15 +140,6 @@ SYSBENCH_RESULT_NAME_LATENCY = 'sysbench latency'
 NA_UNIT = 'NA'
 SECONDS_UNIT = 'seconds'
 MS_UNIT = 'milliseconds'
-
-MYSQL_SVC_OLTP_TABLES_COUNT = 'mysql_svc_oltp_tables_count'
-MYSQL_SVC_OLTP_TABLE_SIZE = 'mysql_svc_oltp_table_size'
-MYSQL_SVC_DB_INSTANCE_CORES = 'mysql_svc_db_instance_cores'
-SYSBENCH_WARM_UP_SECONDS = 'sysbench_warm_up_seconds'
-SYSBENCH_RUN_SECONDS = 'sysbench_run_seconds'
-SYSBENCH_THREAD_COUNT = 'sysbench_thread_count'
-SYSBENCH_LATENCY_PERCENTILE = 'sysbench_latency_percentile'
-SYSBENCH_REPORT_INTERVAL = 'sysbench_report_interval'
 
 # These are the constants that should be specified in GCP's cloud SQL command.
 DEFAULT_BACKUP_START_TIME = '07:00'
@@ -891,7 +892,7 @@ def Prepare(benchmark_spec):
       MYSQL_SVC_OLTP_TABLES_COUNT: benchmark_spec.mysql_svc_oltp_tables_count,
       MYSQL_SVC_OLTP_TABLE_SIZE: benchmark_spec.mysql_svc_oltp_table_size,
       MYSQL_SVC_DB_INSTANCE_CORES: FLAGS.mysql_svc_db_instance_cores,
-      SYSBENCH_WARM_UP_SECONDS: FLAGS.sysbench_warmup_seconds,
+      SYSBENCH_WARMUP_SECONDS: FLAGS.sysbench_warmup_seconds,
       SYSBENCH_RUN_SECONDS: FLAGS.sysbench_run_seconds,
       SYSBENCH_THREAD_COUNT: FLAGS.sysbench_thread_count,
       SYSBENCH_LATENCY_PERCENTILE: FLAGS.sysbench_latency_percentile,
@@ -918,7 +919,7 @@ def Run(benchmark_spec):
       MYSQL_SVC_OLTP_TABLES_COUNT: benchmark_spec.mysql_svc_oltp_tables_count,
       MYSQL_SVC_OLTP_TABLE_SIZE: benchmark_spec.mysql_svc_oltp_table_size,
       MYSQL_SVC_DB_INSTANCE_CORES: FLAGS.mysql_svc_db_instance_cores,
-      SYSBENCH_WARM_UP_SECONDS: FLAGS.sysbench_warmup_seconds,
+      SYSBENCH_WARMUP_SECONDS: FLAGS.sysbench_warmup_seconds,
       SYSBENCH_RUN_SECONDS: FLAGS.sysbench_run_seconds,
       SYSBENCH_THREAD_COUNT: FLAGS.sysbench_thread_count,
       SYSBENCH_LATENCY_PERCENTILE: FLAGS.sysbench_latency_percentile,
