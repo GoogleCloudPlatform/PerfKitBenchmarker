@@ -479,7 +479,6 @@ class RDSMySQLBenchmark(object):
 
     Args:
       vm: The VM to be used as the test client.
-
     """
     logging.info('Preparing MySQL Service benchmarks for RDS.')
 
@@ -727,7 +726,6 @@ class GoogleCloudSQLBenchmark(object):
 
     Args:
       vm: The VM to be used as the test client
-
     """
     # TODO: Refactor the GCP Cloud SQL instance creation and deletion logic out
     # to a new class called GCPCloudSQLInstance that Inherits from
@@ -864,6 +862,7 @@ DATA_LOADING_RESULTS = []
 
 def Prepare(benchmark_spec):
   """Prepare the MySQL DB Instances, configures it.
+
      Prepare the client test VM, installs SysBench, configures it.
 
   Args:
