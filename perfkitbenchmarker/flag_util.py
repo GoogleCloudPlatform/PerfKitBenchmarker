@@ -489,4 +489,4 @@ def GetProvidedCommandLineFlags():
   Returns:
     A dictionary of provided flags in the form: {flag_name: flag_value}.
   """
-  return {k: v.value for k, v in FLAGS.FlagDict().iteritems() if v.present}
+  return {k: FLAGS[k].value for k in FLAGS if FLAGS[k].present}
