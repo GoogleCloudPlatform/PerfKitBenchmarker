@@ -137,7 +137,7 @@ class TestIntegerListSerializer(unittest.TestCase):
     ser = flag_util.IntegerListSerializer()
     il = flag_util.IntegerList([1, (2, 5, 2), 9])
 
-    self.assertEqual(ser.Serialize(il),
+    self.assertEqual(ser.serialize(il),
                      '1,2-5-2,9')
 
 
