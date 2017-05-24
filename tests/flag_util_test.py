@@ -80,14 +80,14 @@ class TestParseIntegerList(unittest.TestCase):
     self.assertEqual(list(self.ilp.parse('3-5')), [3, 4, 5])
 
   def testIntegerRangeWithStep(self):
-    self.assertEqual(list(self.ilp.Parse('2-7-2')), [2, 4, 6])
+    self.assertEqual(list(self.ilp.parse('2-7-2')), [2, 4, 6])
 
   def testIntegerList(self):
     self.assertEqual(list(self.ilp.parse('3-5,8,10-12')),
                      [3, 4, 5, 8, 10, 11, 12])
 
   def testIntegerListWithRangeAndStep(self):
-    self.assertEqual(list(self.ilp.Parse('3-5,8,10-15-2')),
+    self.assertEqual(list(self.ilp.parse('3-5,8,10-15-2')),
                      [3, 4, 5, 8, 10, 12, 14])
 
   def testNoInteger(self):
@@ -122,7 +122,7 @@ class TestParseIntegerList(unittest.TestCase):
     ilp = flag_util.IntegerListParser(
         on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
     with self.assertRaises(ValueError):
-      ilp.Parse('3-1-2')
+      ilp.parse('3-1-2')
 
 
 class TestIntegerListSerializer(unittest.TestCase):
