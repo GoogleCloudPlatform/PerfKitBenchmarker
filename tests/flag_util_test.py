@@ -17,7 +17,6 @@
 import copy
 import sys
 import unittest
-import mock
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
@@ -308,10 +307,10 @@ class TestGetProvidedCommandLineFlags(unittest.TestCase):
         'flag2': MockFlag('flag2', '2', True),
         'flag3': MockFlag('flag3', '3', False)
     }
-    patcher = mock.patch(flag_util.__name__ + '.FLAGS')
-    flags_mock = patcher.start()
-    flags_mock.FlagDict.return_value = flag_dict
-    self.addCleanup(patcher.stop)
+    flag_util.FLAGS = flag_dict
+
+  def tearDown(self):
+    flag_util.FLAGS = {}
 
   def testGetProvidedCommandLineFlags(self):
     self.assertDictEqual({
