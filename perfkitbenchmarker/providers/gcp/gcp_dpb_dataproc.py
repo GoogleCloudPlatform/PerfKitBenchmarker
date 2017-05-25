@@ -156,3 +156,36 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def _AddToCmd(self, cmd, cmd_property, cmd_value):
     flag_name = cmd_property
     cmd.flags[flag_name] = cmd_value
+
+  def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
+    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    cmd.flags['cluster'] = self.cluster_id
+    cmd.flags['jar'] = ('file:///usr/lib/hadoop-mapreduce/'
+                        'hadoop-mapreduce-client-jobclient.jar')
+    job_arguments = ['TestDFSIO']
+    if udpate_default_fs:
+      job_arguments.append('-Dfs.default.name={}'.format(source_dir))
+    job_arguments.append('-Dtest.build.data={}'.format(source_dir))
+    job_arguments.extend(['-write', '-nrFiles', str(num_files), '-fileSize', str(size_file)])
+    cmd.additional_flags = ['--'] + job_arguments
+    stdout, stderr, retcode = cmd.Issue(timeout=None)
+    if retcode != 0:
+      return {dpb_service.SUCCESS: False}
+
+
+  def distributed_copy(self, source_location, destination_location):
+    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    cmd.flags['cluster'] = self.cluster_id
+    cmd.flags['class'] = 'org.apache.hadoop.tools.DistCp'
+
+    job_arguments = [source_location, destination_location]
+    cmd.additional_flags = ['--'] + job_arguments
+    print cmd
+    stdout, stderr, retcode = cmd.Issue(timeout=None)
+    if retcode != 0:
+      return {dpb_service.SUCCESS: False}
+
+
+  def cleanup_data(self, source_location, destination_location):
+    # TODO(saksena): Implement cleanup of directories
+    pass
