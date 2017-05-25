@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -84,17 +82,17 @@ CLOUD_PROVIDERS_INFO = {
     AWS: {
         MAX_IOPS: 75000,
         DEFAULT_STORAGE_TYPE: 'ebs-gp2',
-        VALID_STORAGE_TYPES: ['ebs-gp2', 'ebs-piops']
+        VALID_STORAGE_TYPES: ['ebs-gp2']
     },
     GCP: {
         MAX_IOPS: 30000,
         DEFAULT_STORAGE_TYPE: 'pd-ssd',
-        VALID_STORAGE_TYPES: ['pd-ssd', 'pd-hhd'],
+        VALID_STORAGE_TYPES: ['pd-ssd'],
     }
 }
 
 
-class DiskIopsToCapacity(object):
+class DiskIOPSToCapacity(object):
   """Given iops and service provider requirements, return disk configurations.
 
   This class is used to translate an {IOPS, Cloud Provider} requirement
@@ -123,12 +121,12 @@ class DiskIopsToCapacity(object):
     self._iops = iops
     self._provider = provider.upper()
     self._storage_type = storage_type
-    self.ValidateProvider()
-    self.ValidateIOPS()
-    self.ValidateStorageType()
-    self.PopulateConfigs()
+    self._ValidateProvider()
+    self._ValidateIOPS()
+    self._ValidateStorageType()
+    self._PopulateConfigs()
 
-  def ValidateStorageType(self):
+  def _ValidateStorageType(self):
     """Validate storage type for given _provider, set to default if not given.
 
        Raises:
@@ -148,7 +146,7 @@ class DiskIopsToCapacity(object):
       self._storage_type = CLOUD_PROVIDERS_INFO[self._provider][
           DEFAULT_STORAGE_TYPE]
 
-  def ValidateProvider(self):
+  def _ValidateProvider(self):
     """Validate provider to be GCP or AWS, throw exception if invalid.
 
     Raises:
@@ -158,7 +156,7 @@ class DiskIopsToCapacity(object):
       raise InvalidProviderError('Provider given is not supported by '
                                  'storage_utility.')
 
-  def ValidateIOPS(self):
+  def _ValidateIOPS(self):
     """Validate IOPS to be within valid limits, throw exception if invalid.
 
     If IOPS parameter is less than 1 or greater than provider maximum IOPS
@@ -171,11 +169,11 @@ class DiskIopsToCapacity(object):
         self._iops > CLOUD_PROVIDERS_INFO[self._provider][MAX_IOPS]):
       raise InvalidIOPSError()
 
-  def PopulateConfigs(self):
+  def _PopulateConfigs(self):
     """Populate Storage Configurations."""
-    self.SetSize()
-    self.SetCPUCount()
-    self.SetNumberDisks()
+    self._SetSize()
+    self._SetCPUCount()
+    self._SetNumberDisks()
 
   def PrintConfigs(self):
     """Print out necessary configs."""
@@ -186,7 +184,7 @@ class DiskIopsToCapacity(object):
                                      self._cpu_count, self._number_disks)
     print vm_config
 
-  def SetSize(self):
+  def _SetSize(self):
     """Set minimum size (GB) necessary to achieve _iops level.
     Rating performance levels as of May 2017, sources found below.
     GCP: ratings from https://cloud.google.com/compute/docs/disks/. Storage can
@@ -217,7 +215,7 @@ class DiskIopsToCapacity(object):
     """
     return self._size
 
-  def SetCPUCount(self):
+  def _SetCPUCount(self):
     """Set cpu count.
 
     GCP: ratings from
@@ -241,7 +239,7 @@ class DiskIopsToCapacity(object):
     """
     return self._cpu_count
 
-  def SetNumberDisks(self):
+  def _SetNumberDisks(self):
     """Set number of disks.
 
     GCP: Adding disks does not increase IOPS for GCP.

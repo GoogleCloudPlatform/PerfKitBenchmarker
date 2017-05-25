@@ -18,59 +18,59 @@ import unittest
 import disk_iops_to_capacity
 
 
-class StorageUtilityTest(unittest.TestCase):
+class DiskIOPSToCapacityTest(unittest.TestCase):
 
   def testSetCPUCountAWS(self):
-    AWSconfig = disk_iops_to_capacity.DiskIopsToCapacity(300, 'AWS')
+    AWSconfig = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'AWS')
     self.assertEquals(AWSconfig.GetCPUCount(), 1)
 
   def testSetCPUCountGCP(self):
-    GCPconfig = disk_iops_to_capacity.DiskIopsToCapacity(300, 'GCP')
+    GCPconfig = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'GCP')
     self.assertEquals(GCPconfig.GetCPUCount(), 1)
 
   def testSetNumberDisksAWS(self):
-    AWSconfig1 = disk_iops_to_capacity.DiskIopsToCapacity(300, 'AWS')
+    AWSconfig1 = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'AWS')
     self.assertEqual(AWSconfig1.GetNumberDisks(), 1)
 
   def testSetNumberDisksGCP(self):
-    GCPconfig1 = disk_iops_to_capacity.DiskIopsToCapacity(50, 'GCP')
+    GCPconfig1 = disk_iops_to_capacity.DiskIOPSToCapacity(50, 'GCP')
     self.assertEqual(GCPconfig1.GetNumberDisks(), 1)
 
   def testSetStorageSizeAWS(self):
-    AWSconfig1 = disk_iops_to_capacity.DiskIopsToCapacity(50, 'AWS')
+    AWSconfig1 = disk_iops_to_capacity.DiskIOPSToCapacity(50, 'AWS')
     self.assertEqual(AWSconfig1.GetSize(), 2)
-    AWSconfig2 = disk_iops_to_capacity.DiskIopsToCapacity(100, 'AWS')
+    AWSconfig2 = disk_iops_to_capacity.DiskIOPSToCapacity(100, 'AWS')
     self.assertEqual(AWSconfig2.GetSize(), 2)
-    AWSconfig3 = disk_iops_to_capacity.DiskIopsToCapacity(300, 'AWS')
+    AWSconfig3 = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'AWS')
     self.assertEqual(AWSconfig3.GetSize(), 300 * 3)
-    AWSconfig4 = disk_iops_to_capacity.DiskIopsToCapacity(9999, 'AWS')
+    AWSconfig4 = disk_iops_to_capacity.DiskIOPSToCapacity(9999, 'AWS')
     self.assertEqual(AWSconfig4.GetSize(), 9999 * 3)
-    AWSconfig4 = disk_iops_to_capacity.DiskIopsToCapacity(10000, 'AWS')
+    AWSconfig4 = disk_iops_to_capacity.DiskIOPSToCapacity(10000, 'AWS')
     self.assertEqual(AWSconfig4.GetSize(), 3580)
 
   def testSetStorageSizeGCP(self):
-    GCPconfig1 = disk_iops_to_capacity.DiskIopsToCapacity(1, 'GCP')
+    GCPconfig1 = disk_iops_to_capacity.DiskIOPSToCapacity(1, 'GCP')
     self.assertEqual(GCPconfig1.GetSize(), 1)
-    GCPconfig1 = disk_iops_to_capacity.DiskIopsToCapacity(300, 'GCP')
+    GCPconfig1 = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'GCP')
     self.assertEqual(GCPconfig1.GetSize(), 10)
-    GCPconfig2 = disk_iops_to_capacity.DiskIopsToCapacity(30000, 'GCP')
+    GCPconfig2 = disk_iops_to_capacity.DiskIOPSToCapacity(30000, 'GCP')
     self.assertEqual(GCPconfig2.GetSize(), 1000)
 
   def testValidateProvider(self):
     self.assertRaises(disk_iops_to_capacity.InvalidProviderError,
-                      disk_iops_to_capacity.DiskIopsToCapacity, 300,
+                      disk_iops_to_capacity.DiskIOPSToCapacity, 300,
                       'NONPROVIDER')
 
   def testValidateIOPS(self):
     self.assertRaises(disk_iops_to_capacity.InvalidIOPSError,
-                      disk_iops_to_capacity.DiskIopsToCapacity, 0, 'AWS')
+                      disk_iops_to_capacity.DiskIOPSToCapacity, 0, 'AWS')
 
   def testValidateStorageType(self):
     self.assertRaises(disk_iops_to_capacity.InvalidStorageTypeError,
-                      disk_iops_to_capacity.DiskIopsToCapacity, 100, 'AWS',
+                      disk_iops_to_capacity.DiskIOPSToCapacity, 100, 'AWS',
                       'ebs-piops')
     self.assertRaises(disk_iops_to_capacity.InvalidStorageTypeError,
-                      disk_iops_to_capacity.DiskIopsToCapacity, 100, 'GCP',
+                      disk_iops_to_capacity.DiskIOPSToCapacity, 100, 'GCP',
                       'pd-hhd')
 
 
