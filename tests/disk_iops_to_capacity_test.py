@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for perfkitbenchmarker.disk_iops_to_capacity."""
+
 import unittest
-import disk_iops_to_capacity
+from perfkitbenchmarker import disk_iops_to_capacity
 
 
 class DiskIOPSToCapacityTest(unittest.TestCase):
 
   def testSetCPUCountAWS(self):
     AWSconfig = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'AWS')
-    self.assertEquals(AWSconfig.GetCPUCount(), 1)
+    self.assertEquals(AWSconfig.GetCPUCount(), 2)
 
   def testSetCPUCountGCP(self):
     GCPconfig = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'GCP')
@@ -31,6 +31,10 @@ class DiskIOPSToCapacityTest(unittest.TestCase):
   def testSetNumberDisksAWS(self):
     AWSconfig1 = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'AWS')
     self.assertEqual(AWSconfig1.GetNumberDisks(), 1)
+    AWSconfig2 = disk_iops_to_capacity.DiskIOPSToCapacity(25000, 'AWS')
+    self.assertEqual(AWSconfig2.GetNumberDisks(), 3)
+    AWSconfig3 = disk_iops_to_capacity.DiskIOPSToCapacity(20000, 'AWS')
+    self.assertEqual(AWSconfig3.GetNumberDisks(), 2)
 
   def testSetNumberDisksGCP(self):
     GCPconfig1 = disk_iops_to_capacity.DiskIOPSToCapacity(50, 'GCP')
@@ -64,6 +68,10 @@ class DiskIOPSToCapacityTest(unittest.TestCase):
   def testValidateIOPS(self):
     self.assertRaises(disk_iops_to_capacity.InvalidIOPSError,
                       disk_iops_to_capacity.DiskIOPSToCapacity, 0, 'AWS')
+    self.assertRaises(disk_iops_to_capacity.InvalidIOPSError,
+                      disk_iops_to_capacity.DiskIOPSToCapacity, 50000, 'GCP')
+    self.assertRaises(disk_iops_to_capacity.InvalidIOPSError,
+                      disk_iops_to_capacity.DiskIOPSToCapacity, 90000, 'AWS')
 
   def testValidateStorageType(self):
     self.assertRaises(disk_iops_to_capacity.InvalidStorageTypeError,

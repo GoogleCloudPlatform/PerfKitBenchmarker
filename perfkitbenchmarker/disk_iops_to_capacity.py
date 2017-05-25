@@ -15,10 +15,10 @@
 
 This class is used to translate an {IOPS, Cloud Provider} requirement
 to {core, number of disks, storage size} machine requirements necessary
-to meet the IOPS level using the Cloud MySQL Provider declared.
+to meet the IOPS level using the Cloud Provider declared.
 
- - On AWS, we will use EBS performance levels.
- - On GCP, we will use Persistent Disk performance levels.
+ - On AWS, we will use "ebs-gp2" storage type.
+ - On GCP, we will use PD-SSD storage type.
 
 In future versions, we will support Azure as well.
 
@@ -42,8 +42,8 @@ AWS Disk Number Ratings: https://aws.amazon.com/ebs/details/
 Note: These conversions will require updating as performance and resources
 change.
 
-To utilize this class, initialize an instance of the Storage Config class with
-the IOPS level desired and the provider you wish to use. The machine
+To utilize this class, initialize an instance of the DiskIOPSToCapacity class
+with the IOPS level desired and the provider you wish to use. The machine
 requirement attributes will be immediately populated.
 """
 import math
@@ -102,7 +102,7 @@ class DiskIOPSToCapacity(object):
   Currently assumes SSD persistent disks.
   TODO:
     - Implement Azure calculations. Add other cloud providers as applicable.
-    - Support HDD Disk.
+    - Support other storage types such as HDD and/or EBS-piops.
       Add a further parameter of Disk Type (default SSD PD) and update
       calculations to include HDD disk iops levels.
 
@@ -167,7 +167,11 @@ class DiskIOPSToCapacity(object):
     """
     if (self._iops < 1 or
         self._iops > CLOUD_PROVIDERS_INFO[self._provider][MAX_IOPS]):
-      raise InvalidIOPSError()
+      raise InvalidIOPSError(
+          'Invalid IOPS parameter, must be positive number less than '
+          'the maximum achievable for given cloud provider. '
+          'The maximum for {} is {}.'.format(
+              self._provider, CLOUD_PROVIDERS_INFO[self._provider][MAX_IOPS]))
 
   def _PopulateConfigs(self):
     """Populate Storage Configurations."""
@@ -220,7 +224,12 @@ class DiskIOPSToCapacity(object):
 
     GCP: ratings from
     https://cloud.google.com/compute/docs/disks/performance#ssd-pd-performance
-    AWS: ratings from https://aws.amazon.com/ebs/details/
+    AWS: to achieve good performance on EBS, one needs to use an
+    EBS-optimized VM instance, and the smallest VM instance that can be EBS
+    optimized is *.large VM types (e.g., c4.large), those comes with 2 cores.
+    ratings from
+    http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSOptimized.html
+
     """
     if self._provider == GCP:
       value = self._iops
@@ -229,7 +238,7 @@ class DiskIOPSToCapacity(object):
               (value > 15000) & (value <= 25000)
           ], [value > 25000]], [lambda x: 1, lambda x: 16, lambda x: 32]))
     elif self._provider == AWS:
-      self._cpu_count = 1
+      self._cpu_count = 2
 
   def GetCPUCount(self):
     """Return CPU count.
@@ -248,7 +257,7 @@ class DiskIOPSToCapacity(object):
     if self._provider == GCP:
       self._number_disks = 1
     elif self._provider == AWS:
-      self._number_disks = max(int(self._iops / 10000), 1)
+      self._number_disks = max(int(math.ceil(self._iops / 10000.0)), 1)
 
   def GetNumberDisks(self):
     """Return Number of Disks.
