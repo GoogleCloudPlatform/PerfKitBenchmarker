@@ -171,6 +171,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     stdout, stderr, retcode = cmd.Issue(timeout=None)
     if retcode != 0:
       return {dpb_service.SUCCESS: False}
+    else:
+      return {dpb_service.SUCCESS: True}
 
 
   def distributed_copy(self, source_location, destination_location):
@@ -184,6 +186,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     stdout, stderr, retcode = cmd.Issue(timeout=None)
     if retcode != 0:
       return {dpb_service.SUCCESS: False}
+    else:
+      return {dpb_service.SUCCESS: True}
 
 
   def cleanup_data(self, source_location, destination_location):

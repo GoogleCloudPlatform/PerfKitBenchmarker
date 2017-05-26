@@ -49,7 +49,7 @@ distcp_benchmark:
           machine_type: n1-standard-1
           boot_disk_size: 500
         AWS:
-          machine_type: m3.medium
+          machine_type: m3.xlarge
       disk_spec:
         GCP:
           disk_type: nodisk
@@ -76,6 +76,7 @@ flags.DEFINE_integer('num_files', 10, 'Number of distcp source files')
 
 FLAGS = flags.FLAGS
 
+SUPPORTED_DPB_BACKENDS = [dpb_service.DATAPROC, dpb_service.EMR]
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -89,9 +90,9 @@ def CheckPrerequisites(benchmark_config):
     configuration.
   """
   dpb_service_type = benchmark_config.dpb_service.service_type
-  if(dpb_service_type != dpb_service.DATAPROC or
-     dpb_service_type != dpb_service.DATAPROC):
-    raise errors.Config.InvalidValue('Invalid backend for distcp benchmark.')
+  if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
+    raise errors.Config.InvalidValue('Invalid backend for distcp. Not in:{}'.
+                                     format(str(SUPPORTED_DPB_BACKENDS)))
 
 
 def Prepare(benchmark_spec):
