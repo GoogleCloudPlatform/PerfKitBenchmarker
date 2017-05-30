@@ -13,18 +13,17 @@
 # limitations under the License.
 
 """Perform distributed copy of data on data processing backends.
-Apache Hadoop MapReduce distcp is an open-source tool used to copy large 
-amounts of data. DistCp is very efficient because it uses MapReduce to copy the 
-files or datasets and this means the copy operation is distributed across 
-multiple nodes in a cluster. 
-Benchmark to compare the performance of of the same distcp workload on clusters 
+Apache Hadoop MapReduce distcp is an open-source tool used to copy large
+amounts of data. DistCp is very efficient because it uses MapReduce to copy the
+files or datasets and this means the copy operation is distributed across
+multiple nodes in a cluster.
+Benchmark to compare the performance of of the same distcp workload on clusters
 of various cloud providers.
 """
 
 import copy
 import datetime
-import os
-import tempfile
+
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
@@ -32,9 +31,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.dpb_service import BaseDpbService
-from perfkitbenchmarker.providers.aws import aws_dpb_emr
-from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc
-from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
 
 BENCHMARK_NAME = 'distcp_benchmark'
 
@@ -78,6 +74,7 @@ FLAGS = flags.FLAGS
 
 SUPPORTED_DPB_BACKENDS = [dpb_service.DATAPROC, dpb_service.EMR]
 
+
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
@@ -86,7 +83,7 @@ def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
 
   Raises:
-    perfkitbenchmarker.errors.Config.InvalidValue: On encountering invalid 
+    perfkitbenchmarker.errors.Config.InvalidValue: On encountering invalid
     configuration.
   """
   dpb_service_type = benchmark_config.dpb_service.service_type
@@ -110,8 +107,7 @@ def Run(benchmark_spec):
   dpb_service_instance = benchmark_spec.dpb_service
   run_uri = benchmark_spec.uuid.split('-')[0]
 
-  source_dir, _ = dynamic_configuration(FLAGS.distcp_source_fs,
-                                                        run_uri)
+  source_dir, _ = dynamic_configuration(FLAGS.distcp_source_fs, run_uri)
   destination_dir, _ = dynamic_configuration(FLAGS.distcp_dest_fs, run_uri,
                                              suffix='/dfsio_destination')
 
@@ -144,5 +140,3 @@ def dynamic_configuration(fs, run_uri, suffix=''):
     return '/{}{}'.format(run_uri, suffix), False
   else:
     return '{}://{}{}'.format(fs, run_uri, suffix), True
-
-

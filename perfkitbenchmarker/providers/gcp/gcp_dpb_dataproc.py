@@ -35,7 +35,7 @@ SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                          'spark-examples.jar')
 
 TESTDFSIO_JAR_LOCATION = ('file:///usr/lib/hadoop-mapreduce/'
-                    'hadoop-mapreduce-client-jobclient.jar')
+                          'hadoop-mapreduce-client-jobclient.jar')
 
 TESTDFSIO_PROGRAM = 'TestDFSIO'
 
@@ -171,7 +171,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if udpate_default_fs:
       job_arguments.append('-Dfs.default.name={}'.format(source_dir))
     job_arguments.append('-Dtest.build.data={}'.format(source_dir))
-    job_arguments.extend(['-write', '-nrFiles', str(num_files), '-fileSize', str(size_file)])
+    job_arguments.extend(['-write', '-nrFiles', str(num_files), '-fileSize',
+                          str(size_file)])
     cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None)
     if retcode != 0:

@@ -235,7 +235,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def SetClusterProperty(self):
         pass
 
-    def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
+    def generate_data(self, source_dir, udpate_default_fs, num_files,
+                      size_file):
 
         @vm_util.Retry(timeout=600,
                        poll_interval=5, fuzz=0)
@@ -329,6 +330,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         return metrics
 
 
-    def cleanup_data(self, source_location, destination_location):
+    def cleanup_data(self, base_dir):
         # TODO(saksena): Implement cleanup of directories
         pass
