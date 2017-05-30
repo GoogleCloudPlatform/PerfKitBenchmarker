@@ -32,10 +32,10 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.dpb_service import BaseDpbService
 
-BENCHMARK_NAME = 'distcp_benchmark'
+BENCHMARK_NAME = 'dpb_distcp_benchmark'
 
 BENCHMARK_CONFIG = """
-distcp_benchmark:
+dpb_distcp_benchmark:
   description: Run distcp on dataproc and emr
   dpb_service:
     service_type: dataproc
@@ -43,14 +43,14 @@ distcp_benchmark:
       vm_spec:
         GCP:
           machine_type: n1-standard-4
-          boot_disk_size: 500
+          boot_disk_size: 1500
         AWS:
           machine_type: m3.xlarge
       disk_spec:
         GCP:
           disk_type: nodisk
         AWS:
-          disk_size: 500
+          disk_size: 1500
           disk_type: gp2
     worker_count: 2
 """
@@ -107,7 +107,8 @@ def Run(benchmark_spec):
   dpb_service_instance = benchmark_spec.dpb_service
   run_uri = benchmark_spec.uuid.split('-')[0]
 
-  source_dir, _ = dynamic_configuration(FLAGS.distcp_source_fs, run_uri)
+  source_dir, _ = dynamic_configuration(FLAGS.distcp_source_fs, run_uri,
+                                        suffix='/dfsio')
   destination_dir, _ = dynamic_configuration(FLAGS.distcp_dest_fs, run_uri,
                                              suffix='/dfsio_destination')
 
