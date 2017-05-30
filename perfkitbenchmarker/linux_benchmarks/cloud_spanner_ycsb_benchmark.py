@@ -14,12 +14,8 @@
 
 """Run YCSB benchmark against Google Cloud Spanner
 
-Before running this benchmark, you have to download your JSON
-service account credential file to local machine, and pass the path
-via 'cloud_spanner_credential_file' parameters to PKB.
-
 By default, this benchmark provision 1 single-CPU VM and spawn 1 thread
-to test Spanner.
+to test Spanner. Configure the number of VMs via --ycsb_client_vms.
 """
 
 import getpass
@@ -36,7 +32,7 @@ BENCHMARK_CONFIG = """
 cloud_spanner_ycsb:
   description: >
       Run YCSB against Google Cloud Spanner.
-      Configure the number of VMs via --num-vms.
+      Configure the number of VMs via --ycsb_client_vms.
   vm_groups:
     default:
       vm_spec: *default_single_core
@@ -52,6 +48,8 @@ cloud_spanner_ycsb:
 # binary located at
 # https://storage.googleapis.com/cloud-spanner-ycsb-custom-release/
 # ycsb-cloudspanner-binding-0.13.0.tar.gz
+#
+# TODO: Remove this once cloud spanner is included in YCSB release.
 YCSB_BINDING_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases'
                         '/download/0.13.0/'
                         'ycsb-cloudspanner-binding-0.13.0.tar.gz')
@@ -60,10 +58,10 @@ REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/spanner.data')
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('table',
+flags.DEFINE_string('cloud_spanner_table',
                     'usertable',
                     'The table name used in the YCSB benchmark.')
-flags.DEFINE_integer('zeropadding',
+flags.DEFINE_integer('cloud_spanner_zeropadding',
                      12,
                      'The zero padding used in the YCSB benchmark.')
 flags.DEFINE_string('cloud_spanner_host',
@@ -75,9 +73,9 @@ flags.DEFINE_string('cloud_spanner_instance',
 flags.DEFINE_string('cloud_spanner_database',
                     'ycsb',
                     'The Cloud Spanner database used in the YCSB benchmark.')
-flags.DEFINE_string('cloud_spanner_readmode',
-                    'query',
-                    'The Cloud Spanner read mode used in the YCSB benchmark.')
+flags.DEFINE_enum('cloud_spanner_readmode',
+                  'query', ['query', 'read'],
+                  'The Cloud Spanner read mode used in the YCSB benchmark.')
 flags.DEFINE_integer('cloud_spanner_boundedstaleness',
                      0,
                      'The Cloud Spanner bounded staleness used in the YCSB '
@@ -122,6 +120,12 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
+  """Prepare the virtual machines to run cloud spanner benchmarks.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+  """
   benchmark_spec.always_call_cleanup = True
 
   benchmark_spec.spanner_instance = gcp_spanner.GcpSpannerInstance(
@@ -156,10 +160,19 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
+  """Spawn YCSB and gather the results.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+
+  Returns:
+    A list of sample.Sample instances.
+  """
   vms = benchmark_spec.vms
   run_kwargs = {
-      'table': FLAGS.table,
-      'zeropadding': FLAGS.zeropadding,
+      'table': FLAGS.cloud_spanner_table,
+      'zeropadding': FLAGS.cloud_spanner_zeropadding,
       'cloudspanner.instance': FLAGS.cloud_spanner_instance,
       'cloudspanner.database': FLAGS.cloud_spanner_database,
       'cloudspanner.readmode': FLAGS.cloud_spanner_readmode,
@@ -170,14 +183,20 @@ def Run(benchmark_spec):
     run_kwargs['cloudspanner.host'] = FLAGS.cloud_spanner_host
 
   load_kwargs = run_kwargs.copy()
-  if FLAGS['ycsb_preload_threads'].present:
-    load_kwargs['threads'] = FLAGS.ycsb_preload_threads
+  if not FLAGS['ycsb_preload_threads'].present:
+    load_kwargs['threads'] = 1
   samples = list(benchmark_spec.executor.LoadAndRun(
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
   return samples
 
 
 def Cleanup(benchmark_spec):
+  """Cleanup.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+  """
   benchmark_spec.spanner_instance.Delete()
 
 

@@ -45,8 +45,8 @@ class GcpSpannerInstance(resource.BaseResource):
     self._database = database
     self._ddl = ddl
 
-    # Cloud Spanner is not using the following common flags.
-    self.project = None
+    # Cloud Spanner does not explicitly set the following common flags.
+    self.project = util.GetDefaultProject()
     self.zone = None
 
   def _Create(self):
@@ -55,50 +55,51 @@ class GcpSpannerInstance(resource.BaseResource):
     cmd.flags['description'] = self._desp
     cmd.flags['nodes'] = self._nodes
     cmd.flags['config'] = self._config
-    stdout, stderr, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue()
     if retcode != 0:
-      logging.error('Create GCP Spanner instance failed. Return code %s '
-                    'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
+      logging.error('Create GCP Spanner instance failed.')
       return
 
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
                              self._database)
     cmd.flags['instance'] = self._name
-    stdout, stderr, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue()
     if retcode != 0:
-      logging.error('Create GCP Spanner database failed. Return code %s '
-                    'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
+      logging.error('Create GCP Spanner database failed.')
       return
 
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'ddl', 'update',
                              self._database)
     cmd.flags['instance'] = self._name
     cmd.flags['ddl'] = self._ddl
-    stdout, stderr, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue()
     if retcode != 0:
-      logging.error('Update GCP Spanner database schema failed. Return code %s '
-                    'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
+      logging.error('Update GCP Spanner database schema failed.')
+    else:
+      logging.info('Created GCP Spanner instance and database.')
 
   def _Delete(self):
     """Deletes the instance."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'delete',
                              self._name)
-    stdout, stderr, retcode = cmd.Issue()
+    _, _, retcode = cmd.Issue()
     if retcode != 0:
-      logging.error('Delete GCP Spanner instances failed. Return code %s '
-                    'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
+      logging.error('Delete GCP Spanner instance failed.')
+    else:
+      logging.info('Deleted GCP Spanner instance.')
 
   def _Exists(self):
     """Returns true if the instance and the database exists."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'list')
     cmd.flags['filter'] = self._name
+    # Suppress warning to prevent it from pollute stdout.
     stdout, stderr, retcode = cmd.Issue(suppress_warning=True)
     if retcode != 0:
       # This is not ideal, as we're returning false not because we know
       # the instance isn't there, but because we can't figure out whether
       # it is there.  This behavior is consistent without other
       # _Exists methods.
-      logging.error('Unable to list GCP Spanner instances. Return code %s '
+      logging.error('List GCP Spanner instances failed. Return code %s '
                     'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
       return False
     result = json.loads(stdout)
@@ -109,13 +110,14 @@ class GcpSpannerInstance(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'list')
     cmd.flags['filter'] = self._database
     cmd.flags['instance'] = self._name
+    # Suppress warning to prevent it from pollute stdout.
     stdout, stderr, retcode = cmd.Issue(suppress_warning=True)
     if retcode != 0:
       # This is not ideal, as we're returning false not because we know
       # the database isn't there, but because we can't figure out whether
       # it is there.  This behavior is consistent without other
       # _Exists methods.
-      logging.error('Unable to list GCP Spanner databases. Return code %s '
+      logging.error('List GCP Spanner databases failed. Return code %s '
                     'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
       return False
     result = json.loads(stdout)
