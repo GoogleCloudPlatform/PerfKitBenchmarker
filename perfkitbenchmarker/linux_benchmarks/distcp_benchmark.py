@@ -46,7 +46,7 @@ distcp_benchmark:
     worker_group:
       vm_spec:
         GCP:
-          machine_type: n1-standard-1
+          machine_type: n1-standard-4
           boot_disk_size: 500
         AWS:
           machine_type: m3.xlarge
@@ -98,7 +98,7 @@ def CheckPrerequisites(benchmark_config):
 def Prepare(benchmark_spec):
   run_uri = benchmark_spec.uuid.split('-')[0]
   source_dir, update_default_fs = dynamic_configuration(FLAGS.distcp_source_fs,
-                                                        run_uri)
+                                                        run_uri, '/dfsio')
   # TODO(saksena): Respond to data generation failure
   benchmark_spec.dpb_service.generate_data(source_dir, update_default_fs,
                                            FLAGS.num_files,
@@ -113,7 +113,7 @@ def Run(benchmark_spec):
   source_dir, _ = dynamic_configuration(FLAGS.distcp_source_fs,
                                                         run_uri)
   destination_dir, _ = dynamic_configuration(FLAGS.distcp_dest_fs, run_uri,
-                                             suffix='_destination')
+                                             suffix='/dfsio_destination')
 
   results = []
   metadata = copy.copy(dpb_service_instance.GetMetadata())
@@ -133,20 +133,16 @@ def Run(benchmark_spec):
 def Cleanup(benchmark_spec):
   dpb_service_instance = benchmark_spec.dpb_service
   run_uri = benchmark_spec.uuid.split('-')[0]
+  source_dir, update_default_fs = dynamic_configuration(FLAGS.distcp_source_fs,
+                                                        run_uri)
 
-  if FLAGS.distcp_source_fs == BaseDpbService.HDFS_FS:
-    source_dir = '/{}/dfsio'.format(run_uri)
-  else:
-    source_dir = '{}://{}/dfsio'.format(FLAGS.distcp_source_fs, run_uri)
-
-  destination_dir = '{}_destination'.format(source_dir)
-  dpb_service_instance.cleanup_data(source_dir, destination_dir)
+  dpb_service_instance.cleanup_data(source_dir, update_default_fs)
 
 
 def dynamic_configuration(fs, run_uri, suffix=''):
   if fs == BaseDpbService.HDFS_FS:
-    return '/{}/dfsio{}'.format(run_uri, suffix), False
+    return '/{}{}'.format(run_uri, suffix), False
   else:
-    return '{}://{}/dfsio{}'.format(fs, run_uri, suffix), True
+    return '{}://{}{}'.format(fs, run_uri, suffix), True
 
 

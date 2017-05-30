@@ -24,8 +24,8 @@ import logging
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
-
 
 FLAGS = flags.FLAGS
 
@@ -190,6 +190,20 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       return {dpb_service.SUCCESS: True}
 
 
-  def cleanup_data(self, source_location, destination_location):
-    # TODO(saksena): Implement cleanup of directories
-    pass
+  def cleanup_data(self, base_dir, udpate_default_fs):
+    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    cmd.flags['cluster'] = self.cluster_id
+    cmd.flags['jar'] = ('file:///usr/lib/hadoop-mapreduce/'
+                        'hadoop-mapreduce-client-jobclient.jar')
+    job_arguments = ['TestDFSIO']
+    if udpate_default_fs:
+      job_arguments.append('-Dfs.default.name={}'.format(base_dir))
+    job_arguments.append('-Dtest.build.data={}'.format(base_dir))
+    job_arguments.append('-clean')
+    cmd.additional_flags = ['--'] + job_arguments
+    stdout, stderr, retcode = cmd.Issue(timeout=None)
+    if retcode != 0:
+      return {dpb_service.SUCCESS: False}
+    if udpate_default_fs:
+      vm_util.IssueCommand(['gsutil', '-m', 'rm', '-r', '%s' % base_dir])
+    return {dpb_service.SUCCESS: True}
