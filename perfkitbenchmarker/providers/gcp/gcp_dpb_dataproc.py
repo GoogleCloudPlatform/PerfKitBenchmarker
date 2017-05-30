@@ -34,6 +34,12 @@ GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                          'spark-examples.jar')
 
+TESTDFSIO_JAR_LOCATION = ('file:///usr/lib/hadoop-mapreduce/'
+                    'hadoop-mapreduce-client-jobclient.jar')
+
+TESTDFSIO_PROGRAM = 'TestDFSIO'
+
+
 
 class GcpDpbDataproc(dpb_service.BaseDpbService):
   """Object representing a GCP Dataproc cluster.
@@ -160,9 +166,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['jar'] = ('file:///usr/lib/hadoop-mapreduce/'
-                        'hadoop-mapreduce-client-jobclient.jar')
-    job_arguments = ['TestDFSIO']
+    cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
+    job_arguments = [TESTDFSIO_PROGRAM]
     if udpate_default_fs:
       job_arguments.append('-Dfs.default.name={}'.format(source_dir))
     job_arguments.append('-Dtest.build.data={}'.format(source_dir))
@@ -193,9 +198,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def cleanup_data(self, base_dir, udpate_default_fs):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
-    cmd.flags['jar'] = ('file:///usr/lib/hadoop-mapreduce/'
-                        'hadoop-mapreduce-client-jobclient.jar')
-    job_arguments = ['TestDFSIO']
+    cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
+    job_arguments = [TESTDFSIO_PROGRAM]
     if udpate_default_fs:
       job_arguments.append('-Dfs.default.name={}'.format(base_dir))
     job_arguments.append('-Dtest.build.data={}'.format(base_dir))
