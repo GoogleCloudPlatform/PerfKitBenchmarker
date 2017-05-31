@@ -25,6 +25,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import disk
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.managed_relational_db import MYSQL, POSTGRES
 from perfkitbenchmarker.providers.aws import aws_managed_relational_db
@@ -49,25 +50,19 @@ class AwsManagedRelationalDbFlagsTestCase(unittest.TestCase):
 
 class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
-  def setUp(self):
-    flag_values = {'run_uri': '123', 'project': None}
-
-    p = mock.patch(aws_managed_relational_db.__name__ + '.FLAGS')
-    flags_mock = p.start()
-    flags_mock.configure_mock(**flag_values)
-    self.addCleanup(p.stop)
+  def createSpecDict(self):
+    disk_spec = aws_disk.AwsDiskSpec(
+        _COMPONENT,
+        disk_size=5,
+        disk_type=aws_disk.IO1,
+        iops=1000)
 
     vm_spec = virtual_machine.BaseVmSpec(
         'NAME',
         **{'machine_type': 'db.t1.micro'}
     )
-    disk_spec = aws_disk.AwsDiskSpec(
-        _COMPONENT,
-        disk_size=5,
-        disk_type='test_disk_type',
-        iops=1000)
 
-    mock_db_spec_attrs = {
+    return {
         'database': MYSQL,
         'database_version': '5.6',
         'run_uri': '123',
@@ -77,9 +72,20 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
         'vm_spec': vm_spec,
         'disk_spec': disk_spec
     }
-    self.mock_db_spec = mock.Mock(
+
+  def createManagedDbFromSpec(self, spec_dict):
+    mock_db_spec = mock.Mock(
         spec=benchmark_config_spec._ManagedRelationalDbSpec)
-    self.mock_db_spec.configure_mock(**mock_db_spec_attrs)
+    mock_db_spec.configure_mock(**spec_dict)
+    return aws_managed_relational_db.AwsManagedRelationalDb(mock_db_spec)
+
+  def setUp(self):
+    flag_values = {'run_uri': '123', 'project': None}
+
+    p = mock.patch(aws_managed_relational_db.__name__ + '.FLAGS')
+    flags_mock = p.start()
+    flags_mock.configure_mock(**flag_values)
+    self.addCleanup(p.stop)
 
   @contextlib.contextmanager
   def _PatchCriticalObjects(self):
@@ -93,8 +99,8 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
   def testCreate(self):
     with self._PatchCriticalObjects() as issue_command:
-      vm = aws_managed_relational_db.AwsManagedRelationalDb(self.mock_db_spec)
-      vm._Create()
+      db = self.createManagedDbFromSpec(self.createSpecDict())
+      db._Create()
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
@@ -104,14 +110,39 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--db-instance-class db.t1.micro', command_string)
       self.assertIn('--engine mysql', command_string)
       self.assertIn('--master-user-password fakepassword', command_string)
-      self.assertIn('--allocated-storage 5', command_string)
 
+  def testDiskWithIops(self):
+    with self._PatchCriticalObjects() as issue_command:
+      db = self.createManagedDbFromSpec(self.createSpecDict())
+      db._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertIn('--allocated-storage 5', command_string)
+      self.assertIn('--storage-type %s' % aws_disk.IO1, command_string)
+      self.assertIn('--iops 1000', command_string)
+
+  def testDiskWithoutIops(self):
+    with self._PatchCriticalObjects() as issue_command:
+      spec = self.createSpecDict()
+      spec['disk_spec'] = aws_disk.AwsDiskSpec(
+        _COMPONENT,
+        disk_size=5,
+        disk_type=aws_disk.GP2)
+      db = self.createManagedDbFromSpec(spec)
+      db._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertIn('--allocated-storage 5', command_string)
+      self.assertIn('--storage-type %s' % aws_disk.GP2, command_string)
+      self.assertNotIn('--iops', command_string)
 
   @unittest.skip('TODO')
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
-      vm = aws_managed_relational_db.AwsManagedRelationalDb(self.mock_db_spec)
-      vm._Delete()
+      db = self.createManagedDbFromSpec(self.createSpecDict())
+      db._Delete()
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 

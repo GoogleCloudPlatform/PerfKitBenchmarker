@@ -1,9 +1,9 @@
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker.providers.aws import aws_disk
 
 FLAGS = flags.FLAGS
 
@@ -46,8 +46,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--db-instance-class %s' % self.spec.vm_spec.machine_type
     ]
 
-    if self.spec.disk_spec.disk_type == disk.PIOPS:
-      cmd.append('iops %s' % self.spec.disk_spec.iops)
+    if self.spec.disk_spec.disk_type == aws_disk.IO1:
+      cmd.append('--iops %s' % self.spec.disk_spec.iops)
 
     vm_util.IssueCommand(cmd)
 
