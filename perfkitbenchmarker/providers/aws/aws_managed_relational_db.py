@@ -39,8 +39,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         'create-db-instance',
         '--db-instance-identifier %s' % self.instance_id,
         '--engine %s' % self.spec.database,
-        '--master-username %s' % self.spec.db_username,
-        '--master-user-password %s' % self.spec.db_password,
+        '--master-username %s' % self.spec.database_username,
+        '--master-user-password %s' % self.spec.database_password,
         '--allocated-storage %s' % self.spec.disk_spec.disk_size,
         '--storage-type %s' % self.spec.disk_spec.disk_type,
         '--db-instance-class %s' % self.spec.vm_spec.machine_type

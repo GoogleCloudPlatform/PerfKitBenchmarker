@@ -67,8 +67,8 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
         'database_version': '5.6',
         'run_uri': '123',
         'database_name': 'fakedbname',
-        'db_password': 'fakepassword',
-        'db_username': 'fakeusername',
+        'database_password': 'fakepassword',
+        'database_username': 'fakeusername',
         'vm_spec': vm_spec,
         'disk_spec': disk_spec
     }

@@ -1,4 +1,5 @@
 from abc import ABCMeta
+import uuid
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
@@ -20,6 +21,10 @@ POSTGRES = 'postgres'
 
 _MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
+
+
+def generateRandomDbPassword():
+  return str(uuid.uuid4())[:10]
 
 
 def GetManagedRelationalDbClass(cloud):

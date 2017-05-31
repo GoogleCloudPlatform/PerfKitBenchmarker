@@ -286,10 +286,6 @@ class _StaticVmListDecoder(option_decoders.ListDecoder):
         default=list, item_decoder=_StaticVmDecoder(), **kwargs)
 
 
-def _generateRandomDbPassword():
-  return str(uuid.uuid4())[:10]
-
-
 class _ManagedRelationalDbSpec(spec.BaseSpec):
   """Configurable options of a managed database service."""
 
@@ -322,8 +318,10 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
           self.database)
     if not self.database_name:
       self.database_name = 'pkb-db-%s' % flag_values.run_uri
+    if not self.database_username:
+      self.database_username = 'pkb-db-user-%s' % flag_values.run_uri
     if not self.database_password:
-      self.database_password = _generateRandomDbPassword()
+      self.database_password = managed_relational_db.generateRandomDbPassword()
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -343,13 +341,16 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
                              managed_relational_db.POSTGRES]}),
         'database_name': (option_decoders.StringDecoder, {
             'default': None}),
+        'database_version': (option_decoders.StringDecoder, {
+            'default': None}),
         'database_password': (option_decoders.StringDecoder, {
             'default': None}),
-        'database_version': (option_decoders.StringDecoder, {
+        'database_username': (option_decoders.StringDecoder, {
             'default': None}),
         'replicated': (option_decoders.BooleanDecoder, {
           'default': True}),
-        'vm_spec': (_PerCloudConfigDecoder, {})})
+        'vm_spec': (_PerCloudConfigDecoder, {}),
+        'disk_spec': (_PerCloudConfigDecoder, {})})
     return result
 
   @classmethod
@@ -371,10 +372,12 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       config_values['database'] = flag_values.database
     if flag_values['database_name'].present:
       config_values['database_name'] = flag_values.database_name
-    if flag_values['database_password'].present:
-      config_values['database_password'] = flag_values.database_password
     if flag_values['database_version'].present:
       config_values['database_version'] = flag_values.database_version
+    if flag_values['database_username'].present:
+      config_values['database_username'] = flag_values.database_username
+    if flag_values['database_password'].present:
+      config_values['database_password'] = flag_values.database_password
 
 
 class _SparkServiceSpec(spec.BaseSpec):
