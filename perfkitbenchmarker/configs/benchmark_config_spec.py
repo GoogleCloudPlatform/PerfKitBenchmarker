@@ -294,11 +294,25 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
                                          flag_values=flag_values,
                                          **kwargs)
     # TODO(ferneyhough): This is a lot of boilerplate (kinda), and is repeated
-    # below in VmGroupSpec. See if some can be consolidated.
+    # below in VmGroupSpec. See if some can be consolidated. Maybe we can
+    # specify a VmGroupSpec instead of both vm_spec and disk_spec.
     ignore_package_requirements = (
         getattr(flag_values, 'ignore_package_requirements', True) if flag_values
         else True)
     providers.LoadProvider(self.cloud, ignore_package_requirements)
+
+    # TODO(ferneyhough): How can we have a default disk_spec?
+    if self.disk_spec:
+      disk_config = getattr(self.disk_spec, self.cloud, None)
+      if disk_config is None:
+        raise errors.Config.MissingOption(
+            '{0}.cloud is "{1}", but {0}.disk_spec does not contain a '
+            'configuration for "{1}".'.format(component_full_name, self.cloud))
+      disk_spec_class = disk.GetDiskSpecClass(self.cloud)
+      self.disk_spec = disk_spec_class(
+          '{0}.disk_spec.{1}'.format(component_full_name, self.cloud),
+          flag_values=flag_values, **disk_config)
+
     vm_config = getattr(self.vm_spec, self.cloud, None)
     if vm_config is None:
       raise errors.Config.MissingOption(
@@ -319,7 +333,7 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     if not self.database_name:
       self.database_name = 'pkb-db-%s' % flag_values.run_uri
     if not self.database_username:
-      self.database_username = 'pkb-db-user-%s' % flag_values.run_uri
+      self.database_username = 'pkb%s' % flag_values.run_uri
     if not self.database_password:
       self.database_password = managed_relational_db.generateRandomDbPassword()
 

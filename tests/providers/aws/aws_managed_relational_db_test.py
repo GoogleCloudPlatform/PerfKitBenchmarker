@@ -16,6 +16,7 @@
 import contextlib
 import mock
 import re
+import os
 import unittest
 
 from perfkitbenchmarker import benchmark_spec
@@ -59,7 +60,8 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
     vm_spec = virtual_machine.BaseVmSpec(
         'NAME',
-        **{'machine_type': 'db.t1.micro'}
+        **{'machine_type': 'db.t1.micro',
+           'zone': 'us-west-2b'}
     )
 
     return {
@@ -88,9 +90,9 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
 
   @contextlib.contextmanager
-  def _PatchCriticalObjects(self):
+  def _PatchCriticalObjects(self, stdout='', stderr='', return_code=0):
     """A context manager that patches a few critical objects with mocks."""
-    retval = ('', '', 0)
+    retval = (stdout, stderr, return_code)
     with mock.patch(vm_util.__name__ + '.IssueCommand',
                     return_value=retval) as issue_command, \
             mock.patch('__builtin__.open'), \
@@ -106,10 +108,10 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
       self.assertTrue(command_string.startswith('%s rds create-db-instance' %
                                                 _AWS_PREFIX))
-      self.assertIn('--db-instance-identifier pkb-db-instance-123', command_string)
-      self.assertIn('--db-instance-class db.t1.micro', command_string)
-      self.assertIn('--engine mysql', command_string)
-      self.assertIn('--master-user-password fakepassword', command_string)
+      self.assertIn('--db-instance-identifier=pkb-db-instance-123', command_string)
+      self.assertIn('--db-instance-class=db.t1.micro', command_string)
+      self.assertIn('--engine=mysql', command_string)
+      self.assertIn('--master-user-password=fakepassword', command_string)
 
   def testDiskWithIops(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -118,9 +120,9 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      self.assertIn('--allocated-storage 5', command_string)
-      self.assertIn('--storage-type %s' % aws_disk.IO1, command_string)
-      self.assertIn('--iops 1000', command_string)
+      self.assertIn('--allocated-storage=5', command_string)
+      self.assertIn('--storage-type=%s' % aws_disk.IO1, command_string)
+      self.assertIn('--iops=1000', command_string)
 
   def testDiskWithoutIops(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -134,11 +136,22 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      self.assertIn('--allocated-storage 5', command_string)
-      self.assertIn('--storage-type %s' % aws_disk.GP2, command_string)
+      self.assertIn('--allocated-storage=5', command_string)
+      self.assertIn('--storage-type=%s' % aws_disk.GP2, command_string)
       self.assertNotIn('--iops', command_string)
 
-  @unittest.skip('TODO')
+  def testIsReady(self):
+    path = os.path.join(os.path.dirname(__file__), '../../data',
+                        'aws-describe-db-instances.json')
+    with open(path) as fp:
+      test_output = fp.read()
+
+    with self._PatchCriticalObjects(stdout=test_output):
+      db = self.createManagedDbFromSpec(self.createSpecDict())
+
+      self.assertEqual(False, db._IsReady())
+
+
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
       db = self.createManagedDbFromSpec(self.createSpecDict())
@@ -146,8 +159,8 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      self.assertTrue(command_string.startswith('aws rds delete-db-instance'))
-      self.assertIn('--db-instance-identifier pkb-db-instance-123', command_string)
+      self.assertIn('aws --output json rds delete-db-instances', command_string)
+      self.assertIn('--db-instance-identifier=pkb-db-instance-123', command_string)
       self.assertIn('--skip-final-snapshot', command_string)
 
   # testUsername

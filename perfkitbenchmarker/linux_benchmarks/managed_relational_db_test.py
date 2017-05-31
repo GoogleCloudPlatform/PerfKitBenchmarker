@@ -29,13 +29,19 @@ managed_relational_db_test:
     vm_spec:
       GCP:
         machine_type: n1-standard-1
+        zone: us-central1-c
       AWS:
-        machine_type: db.t2.small
+        machine_type: db.t1.micro
+        zone: us-west-2a
+    disk_spec:
+      GCP:
+        disk_size: 50
+        disk_type: standard
+      AWS:
+        disk_size: 5
+        disk_type: gp2
 """
 
-#  vm_groups:
-#    clients:
-#      vm_spec: *default_single_core
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)

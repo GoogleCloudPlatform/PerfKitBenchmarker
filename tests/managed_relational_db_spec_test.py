@@ -56,7 +56,7 @@ class ManagedRelationalDbSpecTestCase(unittest.TestCase):
         },
         'disk_spec': {
             'GCP': {
-                'disk_size': '500'
+                'disk_size': 500
             }
         }
     }
@@ -119,7 +119,7 @@ class ManagedRelationalDbMinimalSpecTestCase(unittest.TestCase):
         },
         'disk_spec': {
             'GCP': {
-                'disk_size': '500'
+                'disk_size': 500
             }
         }
     }
@@ -161,7 +161,7 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
         },
         'disk_spec': {
             'GCP': {
-                'disk_size': '500'
+                'disk_size': 500
             }
         }
     }

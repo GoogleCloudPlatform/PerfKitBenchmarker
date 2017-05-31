@@ -1,3 +1,4 @@
+import json
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
@@ -27,6 +28,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     super(AwsManagedRelationalDb, self).__init__(managed_relational_db_spec)
     self.spec = managed_relational_db_spec
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
+    self.zone = self.spec.vm_spec.zone
+    self.region = util.GetRegionFromZone(self.zone)
 
   def _Create(self):
     """Creates the AWS RDS instance"""
@@ -37,17 +40,18 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     cmd = util.AWS_PREFIX + [
         'rds',
         'create-db-instance',
-        '--db-instance-identifier %s' % self.instance_id,
-        '--engine %s' % self.spec.database,
-        '--master-username %s' % self.spec.database_username,
-        '--master-user-password %s' % self.spec.database_password,
-        '--allocated-storage %s' % self.spec.disk_spec.disk_size,
-        '--storage-type %s' % self.spec.disk_spec.disk_type,
-        '--db-instance-class %s' % self.spec.vm_spec.machine_type
+        '--db-instance-identifier=%s' % self.instance_id,
+        '--engine=%s' % self.spec.database,
+        '--master-username=%s' % self.spec.database_username,
+        '--master-user-password=%s' % self.spec.database_password,
+        '--allocated-storage=%s' % self.spec.disk_spec.disk_size,
+        '--storage-type=%s' % self.spec.disk_spec.disk_type,
+        '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
+        '--region=%s' % self.region
     ]
 
     if self.spec.disk_spec.disk_type == aws_disk.IO1:
-      cmd.append('--iops %s' % self.spec.disk_spec.iops)
+      cmd.append('--iops=%s' % self.spec.disk_spec.iops)
 
     vm_util.IssueCommand(cmd)
 
@@ -61,7 +65,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     cmd = util.AWS_PREFIX + [
         'rds',
         'delete-db-instance',
-        'db-instance-identifier%s ' % self.instance_id
+        '--db-instance-identifier=%s' % self.instance_id,
+        '--skip-final-snapshot'
     ]
     vm_util.IssueCommand(cmd)
 
@@ -74,11 +79,11 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     cmd = util.AWS_PREFIX + [
         'rds',
-        'describe-db-instances'
-        '--db-instance-identifier %s' % self.instance_id,
-        '--region %s' % self.region
+        'describe-db-instances',
+        '--db-instance-identifier=%s' % self.instance_id,
+        '--region=%s' % self.region
     ]
-    _, _, retcode = vm_util.IssueCommand()
+    _, _, retcode = vm_util.IssueCommand(cmd)
     return retcode == 0
 
   def _IsReady(self):
@@ -93,12 +98,13 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     cmd = util.AWS_PREFIX + [
         'rds',
-        'describe-db-instances'
-        '--db-instance-identifier %s' % self.instance_id,
-        '--region %s' % self.region
+        'describe-db-instances',
+        '--db-instance-identifier=%s' % self.instance_id,
+        '--region=%s' % self.region
     ]
-    stdout, _ = vm_util.IssueCommand()
-    return json.loads(stdout).DBInstances[0].DBInstanceStatus == 'available'
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    return (json.loads(stdout)['DBInstances'][0]['DBInstanceStatus']
+            == 'available')
 
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.

@@ -10,6 +10,9 @@ flags.DEFINE_string('database', None,
 flags.DEFINE_string('database_name', None,
                     'Name of the database to create. Defaults to '
                     'pkb-db-[run-uri]')
+flags.DEFINE_string('database_username', None,
+                    'Database username. Defaults to '
+                    'pkb-db-user-[run-uri]')
 flags.DEFINE_string('database_password', None,
                     'Database password. Defaults to '
                     'a random 10-character alpha-numeric string')
