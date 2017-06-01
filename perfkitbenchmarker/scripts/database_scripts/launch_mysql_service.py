@@ -60,7 +60,7 @@ DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
 URI_REGEX = r'run_uri=([a-z0-9]{8})'
 ADDITIONAL_FLAGS = 'additional_flags'
 SLEEP_TIME_BETWEEN_RUNS = 20  # seconds
-TAIL_LINE_NUM = 20
+TAIL_LINE_NUM = '20'
 
 MAX_SLEEP_ITER = 24  # max wait time for a run is max_sleep_iter x sleep_time
 SLEEP_TIME = 1800  # seconds
