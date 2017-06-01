@@ -16,7 +16,6 @@
 Instances can be created and deleted.
 """
 
-import json
 import logging
 
 from perfkitbenchmarker import flags
@@ -36,7 +35,7 @@ class GcpSpannerInstance(resource.BaseResource):
     config: config the instance.
   """
 
-  def __init__(self, name, desp, nodes, config, database, ddl):
+  def __init__(self, project, name, desp, nodes, config, database, ddl):
     super(GcpSpannerInstance, self).__init__()
     self._nodes = nodes
     self._name = name
@@ -45,8 +44,8 @@ class GcpSpannerInstance(resource.BaseResource):
     self._database = database
     self._ddl = ddl
 
-    # Cloud Spanner does not explicitly set the following common flags.
-    self.project = util.GetDefaultProject()
+    # Cloud Spanner may not explicitly set the following common flags.
+    self.project = project if project is not None else util.GetDefaultProject()
     self.zone = None
 
   def _Create(self):
@@ -90,39 +89,19 @@ class GcpSpannerInstance(resource.BaseResource):
 
   def _Exists(self):
     """Returns true if the instance and the database exists."""
-    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'list')
-    cmd.flags['filter'] = self._name
-    # Suppress warning to prevent it from pollute stdout.
-    stdout, stderr, retcode = cmd.Issue(suppress_warning=True)
+    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'describe',
+                             self._name)
+    _, _, retcode = cmd.Issue()
     if retcode != 0:
-      # This is not ideal, as we're returning false not because we know
-      # the instance isn't there, but because we can't figure out whether
-      # it is there.  This behavior is consistent without other
-      # _Exists methods.
-      logging.error('List GCP Spanner instances failed. Return code %s '
-                    'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
-      return False
-    result = json.loads(stdout)
-    instances = {instance['name'].split('/')[-1] for instance in result}
-    if self._name not in instances:
+      logging.error('Could not found GCP Spanner instances %s.' % self._name)
       return False
 
-    cmd = util.GcloudCommand(self, 'spanner', 'databases', 'list')
-    cmd.flags['filter'] = self._database
+    cmd = util.GcloudCommand(self, 'spanner', 'databases', 'describe',
+                             self._database)
     cmd.flags['instance'] = self._name
-    # Suppress warning to prevent it from pollute stdout.
-    stdout, stderr, retcode = cmd.Issue(suppress_warning=True)
+    _, _, retcode = cmd.Issue()
     if retcode != 0:
-      # This is not ideal, as we're returning false not because we know
-      # the database isn't there, but because we can't figure out whether
-      # it is there.  This behavior is consistent without other
-      # _Exists methods.
-      logging.error('List GCP Spanner databases failed. Return code %s '
-                    'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
-      return False
-    result = json.loads(stdout)
-    databases = {database['name'].split('/')[-1] for database in result}
-    if self._database not in databases:
+      logging.error('Could not found GCP Spanner database %s.' % self._database)
       return False
 
     return True

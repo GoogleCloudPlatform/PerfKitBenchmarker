@@ -42,16 +42,13 @@ cloud_spanner_ycsb:
       https://www.googleapis.com/auth/spanner.admin
       https://www.googleapis.com/auth/spanner.data"""
 
-# As of May 2017, cloud spanner is not included in the latest YCSB release
-# 0.12.0. You can build your own release binary and feed it in with
-# --cloud_spanner_custom_ycsb_release=<url>. You are welcome to use a pre-build
-# binary located at
-# https://storage.googleapis.com/cloud-spanner-ycsb-custom-release/
-# ycsb-cloudspanner-binding-0.13.0.tar.gz
+# As of May 2017, cloud Spanner is not included in the latest YCSB release
+# 0.12.0. The URL below points to a custom YCSB build for Cloud Spanner.
+# You can override it by flag --cloud_spanner_custom_ycsb_release.
 #
 # TODO: Remove this once cloud spanner is included in YCSB release.
-YCSB_BINDING_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases'
-                        '/download/0.13.0/'
+YCSB_BINDING_TAR_URL = ('https://storage.googleapis.com/'
+                        'cloud-spanner-ycsb-custom-release/'
                         'ycsb-cloudspanner-binding-0.13.0.tar.gz')
 REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/spanner.admin',
@@ -67,9 +64,15 @@ flags.DEFINE_integer('cloud_spanner_zeropadding',
 flags.DEFINE_string('cloud_spanner_host',
                     None,
                     'The Cloud Spanner host used in the YCSB benchmark.')
+flags.DEFINE_string('cloud_spanner_project',
+                    None,
+                    'The gcloud project to use in the YCSB benchmark. Leave '
+                    'it unset to use the default gcloud project.')
 flags.DEFINE_string('cloud_spanner_instance',
                     'ycsb-' + getpass.getuser(),
-                    'The Cloud Spanner instance used in the YCSB benchmark.')
+                    'The Cloud Spanner instance used in the YCSB benchmark. '
+                    'Use distinct instances if you want to run multiple '
+                    'benchmarks in parallel.')
 flags.DEFINE_string('cloud_spanner_database',
                     'ycsb',
                     'The Cloud Spanner database used in the YCSB benchmark.')
@@ -87,7 +90,7 @@ flags.DEFINE_integer('cloud_spanner_batchinserts',
 flags.DEFINE_string('cloud_spanner_custom_ycsb_release',
                     None,
                     'If provided, the URL of a custom YCSB release')
-flags.DEFINE_string('cloud_spanner_desp',
+flags.DEFINE_string('cloud_spanner_description',
                     'YCSB',
                     'The description of the Cloud Spanner instance.')
 flags.DEFINE_integer('cloud_spanner_nodes',
@@ -129,10 +132,14 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
 
   benchmark_spec.spanner_instance = gcp_spanner.GcpSpannerInstance(
-      FLAGS.cloud_spanner_instance, FLAGS.cloud_spanner_desp,
-      FLAGS.cloud_spanner_nodes, FLAGS.cloud_spanner_config,
-      FLAGS.cloud_spanner_database, FLAGS.cloud_spanner_ddl)
-  benchmark_spec.spanner_instance.Delete()
+      FLAGS.cloud_spanner_project, FLAGS.cloud_spanner_instance,
+      FLAGS.cloud_spanner_description, FLAGS.cloud_spanner_nodes,
+      FLAGS.cloud_spanner_config, FLAGS.cloud_spanner_database,
+      FLAGS.cloud_spanner_ddl)
+  if benchmark_spec.spanner_instance._Exists():
+    logging.warning('Cloud Spanner instance %s exists, delete it first.' %
+                    FLAGS.cloud_spanner_instance)
+    benchmark_spec.spanner_instance.Delete()
   benchmark_spec.spanner_instance.Create()
   if not benchmark_spec.spanner_instance._Exists():
     logging.warning('Failed to create Cloud Spanner instance and database.')
@@ -147,7 +154,7 @@ def Prepare(benchmark_spec):
   else:
     ycsb.YCSB_TAR_URL = YCSB_BINDING_TAR_URL
 
-  logging.warning('YCSB tar url: ' + ycsb.YCSB_TAR_URL)
+  logging.info('YCSB tar url: ' + ycsb.YCSB_TAR_URL)
 
   vms = benchmark_spec.vms
 
@@ -187,6 +194,8 @@ def Run(benchmark_spec):
     load_kwargs['threads'] = 1
   samples = list(benchmark_spec.executor.LoadAndRun(
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  # TODO: Figure out a common set of properties and update the benchmark
+  # meta data here.
   return samples
 
 
