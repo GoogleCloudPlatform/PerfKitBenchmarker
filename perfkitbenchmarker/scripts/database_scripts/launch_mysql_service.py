@@ -31,8 +31,9 @@ All requirements for mysql_service_benchmark still apply. See
 perkfitbenchmarker.linuxbenchmarks.mysql_service_benchmark for more details.
 
 Any additional flags not specifically outlined in the flags below can be added
-as a list of strings under the 'additional_flags' flag. For example, a possible
-call with additional flags could be:
+as a list of strings under the 'additional_flags' flag. These flags will be
+passed through as is to the underlying benchmarking code. For example,
+a possible call with additional flags could be:
 ./launch_mysql_service --run_uri=2u2u2u3i
   --additional_flags=['--storage_size=100', '--cloud=GCP'].
 """
@@ -50,7 +51,6 @@ import gflags
 SYSBENCH_RUN_SECONDS = 'sysbench_run_seconds'
 SYSBENCH_THREAD_COUNT = 'sysbench_thread_count'
 SYSBENCH_REPORT_INTERVAL = 'sysbench_report_interval'
-STORAGE_BUCKET = 'storage_bucket'
 THREAD_COUNT_LIST = 'thread_count_list'
 RUN_URI = 'run_uri'
 DEFAULT_RUN_TIME = 60
@@ -59,6 +59,8 @@ STDERR = 'STDERR'
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
 URI_REGEX = r'run_uri=([a-z0-9]{8})'
 ADDITIONAL_FLAGS = 'additional_flags'
+SLEEP_TIME_BETWEEN_RUNS = 20  # seconds
+TAIL_LINE_NUM = 20
 
 MAX_SLEEP_ITER = 24  # max wait time for a run is max_sleep_iter x sleep_time
 SLEEP_TIME = 1800  # seconds
@@ -69,7 +71,6 @@ STAGE_FLAG = ' --run_stage='
 URI_FLAG = ' --run_uri='
 THREAD_FLAG = ' --sysbench_thread_count='
 RUN_TIME = ' --sysbench_run_seconds='
-STORAGE = ' --cloud_storage_bucket='
 PROVISION = 'provision'
 PREPARE = 'prepare'
 RUN = 'run'
@@ -78,8 +79,8 @@ TEARDOWN = 'teardown'
 
 FLAGS = gflags.FLAGS
 gflags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
-                      'The duration of the actual run in which results are '
-                      'collected, in seconds.')
+                      'The duration, in seconds, of each run phase with varying'
+                      'thread count.')
 gflags.DEFINE_list(THREAD_COUNT_LIST, [1, 2, 5, 8],
                    'The number of test threads on the client side.')
 gflags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 2,
@@ -88,14 +89,12 @@ gflags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 2,
 gflags.DEFINE_string(RUN_URI, None,
                      'Run identifier, if provided, only run phase '
                      'will be completed.')
-gflags.DEFINE_string(STORAGE_BUCKET, None,
-                     'GCS bucket to upload records to. Bucket must exist.')
 gflags.DEFINE_list(ADDITIONAL_FLAGS, None,
                    'List of additional PKB mysql_service valid flags (strings).'
                    'For example: ["--storage_size=100"].')
 
 
-class TimeOutError(Exception):
+class UnexpectedFileOutputError(Exception):
   pass
 
 
@@ -112,7 +111,8 @@ def driver(argv):
     sys.exit(1)
   run_uri = FLAGS.run_uri
   if not run_uri:
-    logging.info('No run_uri given. Will run full sysbench test.')
+    logging.info('No run_uri given. Will run full mysql_service_benchmark '
+                 'test.')
     run_uri = _provision_prepare_pkb()
     logging.info('Provision and prepare completed. Run uri assigned: %s',
                  run_uri)
@@ -122,7 +122,7 @@ def driver(argv):
 
 
 def _provision_prepare_pkb():
-  """Run cleanup stage of PKB benchmark.
+  """Run provision and prepare stage of PKB benchmark.
 
   Returns:
     run_uri: (string)
@@ -135,7 +135,7 @@ def _provision_prepare_pkb():
                pkb_cmd)
   [stdout_filename, stderr_filename] = _generate_filenames(PROVISION, None)
   _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
-  return _wait_for_run(stderr_filename)
+  return _get_run_uri(stderr_filename)
 
 
 def _run(run_uri):
@@ -155,10 +155,11 @@ def _run(run_uri):
     if FLAGS.additional_flags:
       pkb_cmd = _append_additional_flags(pkb_cmd)
     stdout_filename, stderr_filename = _generate_filenames(RUN, t)
-    logging.info('Executing PKB run with thread count: ' + str(t))
+    logging.info('Executing PKB run with thread count: %i', t)
     _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
-    _wait_for_run(stderr_filename)
-    logging.info('Finished executing PKB with thread count: ' + str(t))
+#     _wait_for_run(stderr_filename)
+    logging.info('Finished executing PKB with thread count: %i', t)
+    time.sleep(SLEEP_TIME_BETWEEN_RUNS)
 
 
 def _cleanup_teardown_pkb(run_uri):
@@ -171,6 +172,8 @@ def _cleanup_teardown_pkb(run_uri):
   pkb_cmd = (PKB + STAGE_FLAG + CLEANUP + ',' + TEARDOWN + URI_FLAG + run_uri)
   [stdout_filename, stderr_filename] = _generate_filenames(CLEANUP, None)
   _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
+#   _wait_for_run(stderr_filename)
+  logging.info('Finished executing PKB cleanup and teardown.')
 
 
 def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
@@ -184,12 +187,15 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   stdout_file = open(stdout_filename, 'w+')
   stderr_file = open(stderr_filename, 'w+')
   pkb_cmd_list = shlex.split(pkb_cmd)
-  logging.info('pkb command list:' + str(pkb_cmd_list))
-  subprocess.Popen(pkb_cmd_list, stdout=stdout_file, stderr=stderr_file)
+  logging.info('pkb command list: %s', str(pkb_cmd_list))
+  p = subprocess.Popen(pkb_cmd_list, stdout=stdout_file, stderr=stderr_file)
+  logging.info('Waiting for PKB call to finish.')
+  p.wait()  # add timeout time
+  logging.info('PKB call finished.')
 
 
-def _wait_for_run(filename):
-  """Given a filename, wait for it to be populated, return run_uri.
+def _get_run_uri(filename):
+  """Grab the last lines of file and return the first match with URI_REGEX.
 
   Args:
     filename: (string)
@@ -198,19 +204,18 @@ def _wait_for_run(filename):
     run_uri: (string) Run identifier from file.
 
   Raises:
-    TimeOutError: Filename not populated after considerable sleep iterations.
+    Exception: No match with regular expression. Unexpected output to filename.
   """
-  for _ in range(MAX_SLEEP_ITER):
-    logging.info('Checking %s for run completion.', filename)
-    r = re.compile(URI_REGEX)
-    for line in open(filename):
-      matches = r.search(line)
-      if matches:
-        logging.info('%s populated. Phase complete.', filename)
-        return matches.group(matches.lastindex)
-    time.sleep(SLEEP_TIME)
-  raise TimeOutError('%s never populated after %d seconds.' % filename,
-                     MAX_SLEEP_ITER * SLEEP_TIME)
+  grab_file_tail_cmd = ['tail', '-n', TAIL_LINE_NUM, filename]
+  p = subprocess.Popen(
+      grab_file_tail_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  lines = p.stdout.readlines()
+  r = re.compile(URI_REGEX)
+  for line in lines:
+    matches = r.search(line)
+    if matches:
+      return matches.group(matches.lastindex)
+  raise UnexpectedFileOutputError('No regex match with %s.' % filename)
 
 
 def _append_additional_flags(pkb_cmd):
@@ -224,8 +229,6 @@ def _append_additional_flags(pkb_cmd):
   """
   for flag in FLAGS.additional_flags:
     pkb_cmd += ' ' + flag
-  if FLAGS.storage_bucket:
-    pkb_cmd += ' ' + STORAGE + FLAGS.storage_bucket
   return pkb_cmd
 
 
@@ -248,8 +251,8 @@ def _generate_filenames(run_stage, thread_number):
   else:
     stdout_filename = date_string + str(run_stage) + '_PKB_STDOUT.txt'
     stderr_filename = date_string + str(run_stage) + '_PKB_STDERR.txt'
-  logging.info('STDOUT will be copied to: ' + stdout_filename)
-  logging.info('STDERR will be copied to: ' + stderr_filename)
+  logging.info('STDOUT will be copied to: %s', stdout_filename)
+  logging.info('STDERR will be copied to: %s', stderr_filename)
   return [stdout_filename, stderr_filename]
 
 
