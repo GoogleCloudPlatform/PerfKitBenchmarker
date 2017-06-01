@@ -28,3 +28,6 @@ flags.DEFINE_float('docker_cpus', 1,
 
 flags.DEFINE_string('marathon_address', 'localhost:8080',
                     'Marathon IP address and port.')
+
+flags.DEFINE_string('marathon_auth', 'root:password',
+                    'Marathon server basic authentication.')
