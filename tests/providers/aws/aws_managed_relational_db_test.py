@@ -67,7 +67,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
     return {
         'database': MYSQL,
-        'database_version': '5.6',
+        'database_version': '5.7.11',
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
@@ -163,6 +163,26 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--allocated-storage=5', command_string)
       self.assertIn('--storage-type=%s' % aws_disk.GP2, command_string)
       self.assertNotIn('--iops', command_string)
+
+  def testUnspecifiedDatabaseVersion(self):
+    with self._PatchCriticalObjects() as issue_command:
+      db = self.createManagedDbFromSpec(self.createSpecDict())
+      db._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertIn('--engine-version=5.7.11', command_string)
+
+  def testSpecifiedDatabaseVersion(self):
+    with self._PatchCriticalObjects() as issue_command:
+      spec = self.createSpecDict()
+      spec['database_version'] = '5.6.29'
+      db = self.createManagedDbFromSpec(spec)
+      db._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertIn('--engine-version=5.6.29', command_string)
 
   def testIsNotReady(self):
     path = os.path.join(os.path.dirname(__file__), '../../data',

@@ -19,23 +19,24 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   CLOUD = providers.AWS
   SERVICE_NAME = 'managed_relational_db'
 
-  @staticmethod
-  # TODO: implement for real
-  def GetLatestDatabaseVersion(database):
-    return '5.6'
-
-  def GetEndpoint(self):
-    return self.endpoint
-
-  def GetPort(self):
-    return self.port
-
   def __init__(self, managed_relational_db_spec):
     super(AwsManagedRelationalDb, self).__init__(managed_relational_db_spec)
     self.spec = managed_relational_db_spec
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.zone = self.spec.vm_spec.zone
     self.region = util.GetRegionFromZone(self.zone)
+
+  @staticmethod
+  # TODO: implement for real
+  def GetLatestDatabaseVersion(database):
+    if database == managed_relational_db.MYSQL:
+      return '5.7.11'
+
+  def GetEndpoint(self):
+    return self.endpoint
+
+  def GetPort(self):
+    return self.port
 
   def _AuthorizeDbSecurityGroup(self):
     cidr_to_authorize = '0.0.0.0/0'
@@ -73,10 +74,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _Create(self):
     """Creates the AWS RDS instance"""
-    database_version = (
-        self._GetDatabaseVersionNameFromFlavor(
-          self.spec.database,
-          self.spec.database_version))
     cmd = util.AWS_PREFIX + [
         'rds',
         'create-db-instance',
@@ -89,7 +86,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
         '--no-auto-minor-version-upgrade',
         '--db-security-groups=%s' % self.security_group_name,
-        '--region=%s' % self.region
+        '--region=%s' % self.region,
+        '--engine-version=%s' % self.spec.database_version
     ]
 
     if self.spec.disk_spec.disk_type == aws_disk.IO1:
@@ -187,9 +185,3 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     self._TeardownNetworking()
 
-  @staticmethod
-  def _GetDatabaseVersionNameFromFlavor(flavor, version):
-    if flavor == 'mysql':
-      if version == '5.6':
-        return 'MYSQL_5_6'
-    raise NotImplementedError('GCP managed databases only support MySQL 5.6')

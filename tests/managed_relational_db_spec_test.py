@@ -79,11 +79,6 @@ class ManagedRelationalDbSpecTestCase(unittest.TestCase):
         _COMPONENT, flag_values=self.flags, **spec)
     self.assertEqual(result.database_name, 'fakename')
 
-  def testDefaultDatabaseVersion(self):
-    result = benchmark_config_spec._ManagedRelationalDbSpec(
-        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
-    self.assertEqual(result.database_version, '5.6')
-
   def testCustomDatabaseVersion(self):
     spec = _mergeDicts(self.minimal_spec, {'database_version': '6.6'})
     result = benchmark_config_spec._ManagedRelationalDbSpec(
@@ -206,6 +201,12 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
     self.assertEqual(result.high_availability, True)
+
+  def testDatabaseVersionFlag(self):
+    self.flags['database_version'].parse('5.6')
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **self.full_spec)
+    self.assertEqual(result.database_version, '5.6')
 
 
 if __name__ == '__main__':
