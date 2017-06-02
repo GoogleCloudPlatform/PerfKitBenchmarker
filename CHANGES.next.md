@@ -2,7 +2,7 @@ Breaking changes:
 -
 
 New features:
--
+- Add YCSB benchmark for Cloud Spanner (GH-1387 from @haih-g)
 
 Enhancements:
 -
