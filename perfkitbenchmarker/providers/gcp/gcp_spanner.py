@@ -25,33 +25,66 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 
 
+DEFAULT_CLOUD_SPANNER_HOST = 'https://spanner.googleapis.com/'
+
+
 class GcpSpannerInstance(resource.BaseResource):
   """Object representing a GCP Spanner Instance.
 
   Attributes:
+    project: The gcloud project. If None, use default project.
     name: Instance name.
-    desp: Description of the instance.
+    description: Description of the instance.
     nodes: Number of nodes in the instance.
-    config: config the instance.
+    config: Config of the instance.
+    database: The name of the database.
+    ddl: The schema of the database.
+    host: The host of the database. If None, use default host.
   """
 
-  def __init__(self, project, name, desp, nodes, config, database, ddl):
+  def __init__(self, project, name, description, nodes, config, database, ddl,
+               host):
     super(GcpSpannerInstance, self).__init__()
     self._nodes = nodes
     self._name = name
-    self._desp = desp
+    self._description = description
     self._config = config
     self._database = database
     self._ddl = ddl
+    self._host = host
 
     # Cloud Spanner may not explicitly set the following common flags.
     self.project = project if project is not None else util.GetDefaultProject()
     self.zone = None
 
+    self._OverrideEndPoint()
+
+  def __del__(self):
+    self._ResetEndPoint()
+
+  def _OverrideEndPoint(self):
+    """Override Cloud Spanner end point if self._host is not None."""
+    if self._host is not None:
+      cmd = util.GcloudCommand(self, 'config', 'set',
+                               'api_endpoint_overrides/spanner', self._host)
+      _, _, retcode = cmd.Issue()
+      if retcode != 0:
+        logging.error('Override Cloud Spanner end point failed.')
+
+  def _ResetEndPoint(self):
+    """Reset Cloud Spanner end point."""
+    if self._host is not None and self._host != DEFAULT_CLOUD_SPANNER_HOST:
+      cmd = util.GcloudCommand(self, 'config', 'set',
+                               'api_endpoint_overrides/spanner',
+                               DEFAULT_CLOUD_SPANNER_HOST)
+      _, _, retcode = cmd.Issue()
+      if retcode != 0:
+        logging.error('Reset Cloud Spanner end point failed.')
+
   def _Create(self):
     """Creates the instance, the database, and update the schema."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create', self._name)
-    cmd.flags['description'] = self._desp
+    cmd.flags['description'] = self._description
     cmd.flags['nodes'] = self._nodes
     cmd.flags['config'] = self._config
     _, _, retcode = cmd.Issue()

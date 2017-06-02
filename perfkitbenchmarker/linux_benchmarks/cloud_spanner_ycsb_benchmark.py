@@ -135,7 +135,7 @@ def Prepare(benchmark_spec):
       FLAGS.cloud_spanner_project, FLAGS.cloud_spanner_instance,
       FLAGS.cloud_spanner_description, FLAGS.cloud_spanner_nodes,
       FLAGS.cloud_spanner_config, FLAGS.cloud_spanner_database,
-      FLAGS.cloud_spanner_ddl)
+      FLAGS.cloud_spanner_ddl, FLAGS.cloud_spanner_host)
   if benchmark_spec.spanner_instance._Exists():
     logging.warning('Cloud Spanner instance %s exists, delete it first.' %
                     FLAGS.cloud_spanner_instance)
@@ -211,3 +211,8 @@ def Cleanup(benchmark_spec):
 
 def _Install(vm):
   vm.Install('ycsb')
+
+  if FLAGS.cloud_spanner_host is not None:
+    _, _ = vm.RemoteCommand(
+        'gcloud config set api_endpoint_overrides/spanner %s' %
+        FLAGS.cloud_spanner_host)
