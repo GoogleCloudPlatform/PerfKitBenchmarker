@@ -361,8 +361,8 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
             'default': None}),
         'database_username': (option_decoders.StringDecoder, {
             'default': None}),
-        'replicated': (option_decoders.BooleanDecoder, {
-          'default': True}),
+        'high_availability': (option_decoders.BooleanDecoder, {
+          'default': False}),
         'vm_spec': (_PerCloudConfigDecoder, {}),
         'disk_spec': (_PerCloudConfigDecoder, {})})
     return result
@@ -392,6 +392,8 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       config_values['database_username'] = flag_values.database_username
     if flag_values['database_password'].present:
       config_values['database_password'] = flag_values.database_password
+    if flag_values['high_availability'].present:
+      config_values['high_availability'] = flag_values.high_availability
 
 
 class _SparkServiceSpec(spec.BaseSpec):

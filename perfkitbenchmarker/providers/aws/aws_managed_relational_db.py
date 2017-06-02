@@ -58,10 +58,10 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     vm_util.IssueCommand(cmd)
 
   def _SetupNetworking(self):
-  #  vpc = self.spec.vm_spec.network.regional_network.vpc
-  #  next_cidr_block = self.vpc.NextCidrBlock()
     self._CreateDbSecurityGroup()
     self._AuthorizeDbSecurityGroup()
+    # vpc = self.spec.vm_spec.network.regional_network.vpc
+    # next_cidr_block = self.vpc.NextCidrBlock()
 
   def _TeardownNetworking(self):
     cmd = util.AWS_PREFIX + [
@@ -94,6 +94,9 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     if self.spec.disk_spec.disk_type == aws_disk.IO1:
       cmd.append('--iops=%s' % self.spec.disk_spec.iops)
+
+    if self.spec.high_availability:
+      cmd.append('--multi-az')
 
     vm_util.IssueCommand(cmd)
 

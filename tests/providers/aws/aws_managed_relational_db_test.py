@@ -73,7 +73,8 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
         'database_password': 'fakepassword',
         'database_username': 'fakeusername',
         'vm_spec': vm_spec,
-        'disk_spec': disk_spec
+        'disk_spec': disk_spec,
+        'high_availability': False
     }
 
   def createManagedDbFromSpec(self, spec_dict):
@@ -115,6 +116,26 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--db-instance-class=db.t1.micro', command_string)
       self.assertIn('--engine=mysql', command_string)
       self.assertIn('--master-user-password=fakepassword', command_string)
+
+  def testNoHighAvailability(self):
+    with self._PatchCriticalObjects() as issue_command:
+      db = self.createManagedDbFromSpec(self.createSpecDict())
+      db._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertNotIn('--multi-az', command_string)
+
+  def testHighAvailability(self):
+    with self._PatchCriticalObjects() as issue_command:
+      spec = self.createSpecDict()
+      spec['high_availability'] = True
+      db = self.createManagedDbFromSpec(spec)
+      db._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertIn('--multi-az', command_string)
 
   def testDiskWithIops(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -200,22 +221,6 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('aws --output json rds delete-db-instance', command_string)
       self.assertIn('--db-instance-identifier=pkb-db-instance-123', command_string)
       self.assertIn('--skip-final-snapshot', command_string)
-
-  # testUsername
-  # testDatabseName
-  # testMysql
-  # testPostgres
-  # class StorageTest:
-  #   testStandard
-  #   testGp2
-  #   testIops
-  # testReboot
-  # testRegion
-  # testMulti-az
-
-
-
-
 
 if __name__ == '__main__':
   unittest.main()

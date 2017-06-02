@@ -102,6 +102,17 @@ class ManagedRelationalDbSpecTestCase(unittest.TestCase):
         _COMPONENT, flag_values=self.flags, **spec)
     self.assertEqual(result.database_password, 'fakepassword')
 
+  def testDefaultHighAvailability(self):
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
+    self.assertEqual(result.high_availability, False)
+
+  def testCustomHighAvailability(self):
+    spec = _mergeDicts(self.minimal_spec, {'high_availability': True})
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **spec)
+    self.assertEqual(result.high_availability, True)
+
 
 class ManagedRelationalDbMinimalSpecTestCase(unittest.TestCase):
 
@@ -189,6 +200,12 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
     self.assertEqual(result.database_password, 'fakepassword')
+
+  def testHighAvailabilityFlag(self):
+    self.flags['high_availability'].parse(True)
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **self.full_spec)
+    self.assertEqual(result.high_availability, True)
 
 
 if __name__ == '__main__':

@@ -19,6 +19,8 @@ flags.DEFINE_string('database_password', None,
 # TODO: write a validator
 flags.DEFINE_string('database_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
+flags.DEFINE_boolean('high_availability', False,
+                     'Specifies if the database should be high availability')
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
 
