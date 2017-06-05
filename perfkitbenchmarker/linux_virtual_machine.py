@@ -118,6 +118,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """
     with self._remote_command_script_upload_lock:
       if not self._has_remote_command_script:
+        self._CreateVmTmpDir()
         for f in (EXECUTE_COMMAND, WAIT_FOR_COMMAND):
           self.PushDataFile(f, os.path.join(vm_util.VM_TMP_DIR,
                                             os.path.basename(f)))
