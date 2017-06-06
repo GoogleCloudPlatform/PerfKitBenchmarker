@@ -179,6 +179,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image = vm_spec.image or self.IMAGE_URN
 
     disk_spec = disk.BaseDiskSpec('azure_os_disk')
+    disk_spec.disk_type = self.storage_account.storage_type
     self.os_disk = azure_disk.AzureDisk(disk_spec,
                                         self.name,
                                         self.machine_type,
@@ -199,7 +200,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
          '--size', self.machine_type,
          '--admin-username', self.user_name,
          '--availability-set', self.network.avail_set.name,
-         '--storage-sku', 'Standard_LRS',
+         '--storage-sku', self.os_disk.disk_type,
          '--name', self.name] +
         self.resource_group.args +
         self.nic.args)
