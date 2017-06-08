@@ -162,6 +162,18 @@ class PerCloudConfigDecoderTestCase(unittest.TestCase):
     self.assertEqual(result.__dict__, expected_attributes)
 
 
+class ManagedRelationalDbDecoderTestCase(unittest.TestCase):
+
+  def todo(self):
+    self.fail('Implement this class')
+
+
+class ManagedRelationalDbTestCase(unittest.TestCase):
+
+  def todo(self):
+    self.fail('Implement this class')
+
+
 class StaticVmDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
