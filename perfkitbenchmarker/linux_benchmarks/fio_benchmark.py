@@ -152,6 +152,11 @@ flags.DEFINE_integer('fio_log_avg_msec', 1000,
                      lower_bound=0)
 flags.DEFINE_boolean('fio_hist_log', False,
                      'Whether to collect clat histogram.')
+flags.DEFINE_integer('fio_hist_coarseness', 0,
+                     'Coarseness of fio latency histogram. Valid values range '
+                     'from 0 to 6. At 0, fio will output 1216 buckets. Each '
+                     'consecutive value will halve the number of buckets.',
+                     lower_bound=0, upper_bound=6)
 flags.DEFINE_integer('fio_log_hist_msec', 1000,
                      'Same as fio_log_avg_msec, but logs entries for '
                      'completion latency histograms. If set to 0, histogram '
@@ -400,6 +405,8 @@ def GetLogFlags(log_file_base):
                    (FLAGS.fio_bw_log, '--write_bw_log=%(filename)s',),
                    (FLAGS.fio_iops_log, '--write_iops_log=%(filename)s',),
                    (FLAGS.fio_hist_log, '--write_hist_log=%(filename)s',),
+                   (FLAGS.fio_hist_coarseness,
+                    '--log_hist_coarseness=%(hist_coarseness)d',),
                    (collect_logs, '--log_avg_msec=%(interval)d',)]
   fio_command_flags = ' '.join([flag for given, flag in fio_log_flags if given])
   if FLAGS.fio_hist_log:
@@ -408,7 +415,8 @@ def GetLogFlags(log_file_base):
 
   return fio_command_flags % {'filename': log_file_base,
                               'interval': FLAGS.fio_log_avg_msec,
-                              'hist_interval': FLAGS.fio_log_hist_msec}
+                              'hist_interval': FLAGS.fio_log_hist_msec,
+                              'hist_coarseness': FLAGS.fio_hist_coarseness}
 
 
 def CheckPrerequisites(benchmark_config):
