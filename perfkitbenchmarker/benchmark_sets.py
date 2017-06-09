@@ -83,8 +83,8 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: [
             'aerospike_ycsb', 'block_storage_workload', 'cassandra_stress',
             'cassandra_ycsb', 'cluster_boot', 'copy_throughput',
-            'fio', 'gpu_pcie_bandwidth', 'hadoop_terasort', 'hpcc', 'iperf',
-            'multichase', 'mesh_network', 'mongodb_ycsb', 'netperf',
+            'fio', 'gpu_pcie_bandwidth', 'hadoop_terasort', 'hpcc', 'hpcg',
+            'iperf', 'multichase', 'mesh_network', 'mongodb_ycsb', 'netperf',
             'object_storage_service', 'oldisim', 'ping', 'redis_ycsb',
             'stencil2d', 'speccpu2006', 'sysbench_oltp', 'tomcat_wrk',
             'unixbench']
