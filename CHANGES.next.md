@@ -9,4 +9,4 @@ Enhancements:
 - Add --failed_run_samples_error_length flag to limit failed run error length (GH-1391)
 
 Bug fixes and maintenance updates:
--
+- Fix provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
