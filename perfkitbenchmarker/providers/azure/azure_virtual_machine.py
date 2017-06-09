@@ -199,7 +199,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
          '--size', self.machine_type,
          '--admin-username', self.user_name,
          '--availability-set', self.network.avail_set.name,
-         '--storage-sku', 'Standard_LRS',
+         '--storage-sku', self.storage_account.storage_type,
          '--name', self.name] +
         self.resource_group.args +
         self.nic.args)

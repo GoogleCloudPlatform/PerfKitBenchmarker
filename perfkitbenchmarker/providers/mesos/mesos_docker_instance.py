@@ -14,6 +14,7 @@
 
 import json
 import logging
+from requests.auth import HTTPBasicAuth
 import requests
 import urlparse
 
@@ -79,6 +80,11 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     self.privileged = vm_spec.mesos_privileged_docker
     self.api_url = urlparse.urljoin(FLAGS.marathon_address, MARATHON_API_PREFIX)
     self.app_url = urlparse.urljoin(self.api_url, self.name)
+    auth = FLAGS.marathon_auth.split(":")
+    if len(auth) == 2:
+      self.auth = HTTPBasicAuth(auth[0], auth[1])
+    else:
+      self.auth = None
 
   def _CreateDependencies(self):
     self._CheckPrerequisites()
@@ -126,7 +132,8 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     logging.info("Attempting to create App: %s" % self.name)
     body = self._BuildAppBody()
     headers = {'content-type': 'application/json'}
-    output = requests.post(self.api_url, data=body, headers=headers)
+    output = requests.post(self.api_url, data=body, headers=headers,
+                           auth=self.auth)
     if output.status_code != requests.codes.CREATED:
       raise Exception("Unable to create App: %s" % output.text)
     logging.info("App %s created successfully." % self.name)
@@ -139,7 +146,7 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     logging.info("Waiting for App %s to get up and running. It may take a while"
                  " if a Docker image is being downloaded for the first time."
                  % self.name)
-    output = requests.get(self.app_url)
+    output = requests.get(self.app_url, auth=self.auth)
     output = json.loads(output.text)
     tasks_running = output['app']['tasksRunning']
     if not tasks_running:
@@ -153,7 +160,7 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     is running on,
     - SSH port is drawn by Marathon and is unique for each instance.
     """
-    output = requests.get(self.app_url)
+    output = requests.get(self.app_url, auth=self.auth)
     output = json.loads(output.text)
     tasks = output['app']['tasks']
     if not tasks or not tasks[0]['ports']:
@@ -190,7 +197,7 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     Deletes an App.
     """
     logging.info('Attempting to delete App: %s' % self.name)
-    output = requests.delete(self.app_url)
+    output = requests.delete(self.app_url, auth=self.auth)
     if output.status_code == requests.codes.NOT_FOUND:
       logging.info('App %s has been already deleted.' % self.name)
       return

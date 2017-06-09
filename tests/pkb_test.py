@@ -112,3 +112,17 @@ class TestMakeFailedRunSample(unittest.TestCase):
         'run_stage': stages.PROVISION,
         'flags': '{}'
     })
+
+  @mock.patch('perfkitbenchmarker.sample.Sample')
+  def testMakeFailedRunSampleWithTruncation(self, sample_mock):
+    error_msg = 'This is a long error message that should be truncated.'
+    pkb.FLAGS.failed_run_samples_error_length = 7
+
+    pkb.MakeFailedRunSample(error_msg, stages.PROVISION)
+
+    sample_mock.assert_called_once()
+    sample_mock.assert_called_with('Run Failed', 1, 'Run Failed', {
+        'error_message': "This is",
+        'run_stage': stages.PROVISION,
+        'flags': '{}'
+    })
