@@ -60,7 +60,7 @@ class GcpSpannerInstance(resource.BaseResource):
     self._end_point = end_point
 
     # Cloud Spanner may not explicitly set the following common flags.
-    self.project = project if project is not None else util.GetDefaultProject()
+    self.project = project or util.GetDefaultProject()
     self.zone = None
 
     self._OverrideEndPoint()
@@ -76,7 +76,7 @@ class GcpSpannerInstance(resource.BaseResource):
                                'api_endpoint_overrides/spanner',
                                self._end_point)
       _, _, retcode = cmd.Issue()
-      if retcode != 0:
+      if retcode:
         logging.error('Override Cloud Spanner end point failed.')
 
   def _ResetEndPoint(self):
@@ -87,7 +87,7 @@ class GcpSpannerInstance(resource.BaseResource):
                                'api_endpoint_overrides/spanner',
                                DEFAULT_CLOUD_SPANNER_END_POINT)
       _, _, retcode = cmd.Issue()
-      if retcode != 0:
+      if retcode:
         logging.error('Reset Cloud Spanner end point failed.')
 
   def _Create(self):

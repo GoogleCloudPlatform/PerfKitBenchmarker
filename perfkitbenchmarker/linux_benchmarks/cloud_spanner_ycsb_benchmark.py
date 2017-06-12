@@ -205,8 +205,6 @@ def Run(benchmark_spec):
     run_kwargs['cloudspanner.host'] = FLAGS.cloud_spanner_ycsb_end_point
 
   load_kwargs = run_kwargs.copy()
-  if not FLAGS['ycsb_preload_threads'].present:
-    load_kwargs['threads'] = 1
   samples = list(benchmark_spec.executor.LoadAndRun(
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
   # TODO: Figure out a common set of properties and update the benchmark
