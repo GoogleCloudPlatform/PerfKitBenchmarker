@@ -81,7 +81,7 @@ FLAGS = gflags.FLAGS
 gflags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
                       'The duration, in seconds, of each run phase with varying'
                       'thread count.')
-gflags.DEFINE_list(THREAD_COUNT_LIST, [1, 2, 5, 8],
+gflags.DEFINE_list(THREAD_COUNT_LIST, [1, 2, 4, 8],
                    'The number of test threads on the client side.')
 gflags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 2,
                       'The interval, in seconds, we ask sysbench to report '
@@ -157,7 +157,6 @@ def _run(run_uri):
     stdout_filename, stderr_filename = _generate_filenames(RUN, t)
     logging.info('Executing PKB run with thread count: %i', t)
     _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
-#     _wait_for_run(stderr_filename)
     logging.info('Finished executing PKB with thread count: %i', t)
     time.sleep(SLEEP_TIME_BETWEEN_RUNS)
 
@@ -172,7 +171,6 @@ def _cleanup_teardown_pkb(run_uri):
   pkb_cmd = (PKB + STAGE_FLAG + CLEANUP + ',' + TEARDOWN + URI_FLAG + run_uri)
   [stdout_filename, stderr_filename] = _generate_filenames(CLEANUP, None)
   _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
-#   _wait_for_run(stderr_filename)
   logging.info('Finished executing PKB cleanup and teardown.')
 
 
@@ -190,7 +188,7 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   logging.info('pkb command list: %s', str(pkb_cmd_list))
   p = subprocess.Popen(pkb_cmd_list, stdout=stdout_file, stderr=stderr_file)
   logging.info('Waiting for PKB call to finish.')
-  p.wait()  # add timeout time
+  p.wait()
   logging.info('PKB call finished.')
 
 
