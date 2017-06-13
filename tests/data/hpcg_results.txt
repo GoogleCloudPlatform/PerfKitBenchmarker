@@ -8,7 +8,7 @@ Setup time: 3.502772 sec
 GPU: 'Tesla K80' 
 Memory use: 8123 MB / 11439 MB
 2x2x2 process grid
-256x256x256 local domain
+64x128x256 local domain
 
 Reference SpMV+MG...
 
@@ -150,7 +150,7 @@ Optimization Overhead: 1.24%
 Convergence  Overhead: 7.41%
 
 2x2x2 process grid
-256x256x256 local domain
+64x128x256 local domain
 SpMV  =  178.3 GF (1123.1 GB/s Effective)   22.3 GF_per ( 140.4 GB/s Effective)
 SymGS =  246.8 GF (1904.5 GB/s Effective)   30.8 GF_per ( 238.1 GB/s Effective)
 total =  228.0 GF (1729.0 GB/s Effective)   28.5 GF_per ( 216.1 GB/s Effective)

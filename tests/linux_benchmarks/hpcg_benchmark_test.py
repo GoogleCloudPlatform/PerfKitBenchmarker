@@ -46,6 +46,10 @@ class HpcgBenchmarkTestCase(unittest.TestCase):
     throughput = hpcg_benchmark._ExtractThroughput(self.test_output2)
     self.assertEqual(62.3, throughput)
 
+  def testExtractProblemSize(self):
+    self.assertEqual([64, 128, 256],
+                     hpcg_benchmark._ExtractProblemSize(self.test_output))
+
 
 if __name__ == '__main__':
   unittest.main()

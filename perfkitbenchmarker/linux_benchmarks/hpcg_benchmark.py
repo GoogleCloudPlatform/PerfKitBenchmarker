@@ -15,7 +15,7 @@
 """Run HPCG.
 
 Requires:
-* openmpi 1.10.2 or openmpi 1.6.5
+* openmpi 1.10.2
 
 Binaries are provided which are statically linked to CUDA 8.0.44 and
 OpenMPI 1.10.2 and 1.6.5. If different versions of these libs are to be used,
@@ -36,7 +36,7 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 from perfkitbenchmarker.linux_packages import hpcg
 
 FLAGS = flags.FLAGS
-RUN_SCRIPT = 'run_hpcg'
+RUN_SCRIPT = 'run_hpcg.sh'
 CONFIG_FILE = 'hpcg.dat'
 MACHINEFILE = 'HOSTFILE'
 
@@ -82,6 +82,10 @@ flag_util.DEFINE_integerlist(
 
 
 class HpcgParseOutputException(Exception):
+  pass
+
+
+class HpcgIncorrectProblemSizeException(Exception):
   pass
 
 
@@ -157,15 +161,6 @@ def _CreateMachineFile(vms, gpus_per_node):
                        os.path.join(hpcg.HPCG_DIR, MACHINEFILE))
 
 
-def _PushFile(vm, filename, sed_cmds=[]):
-  local_file_path = _LocalDataPath(filename)
-  remote_file_path = os.path.join(hpcg.HPCG_DIR, filename)
-  vm.PushFile(local_file_path, remote_file_path)
-  for sed_cmd in sed_cmds:
-    cmd = sed_cmd + ' ' + remote_file_path
-    vm.RemoteCommand(cmd)
-
-
 def _CopyAndUpdateRunScripts(vm, benchmark_spec):
   """Copy and update all necessary run scripts on the given vm.
 
@@ -173,14 +168,16 @@ def _CopyAndUpdateRunScripts(vm, benchmark_spec):
     vm: vm to place and update run scripts on
     benchmark_spec: benchmark specification
   """
-  update_config_file_sed_cmds = [
-      'sed -i -e "3s/.*/%s %s %s/"' %
-      (benchmark_spec.hpcg_problem_size[0], benchmark_spec.hpcg_problem_size[1],
-       benchmark_spec.hpcg_problem_size[2]),
-      'sed -i -e "4s/.*/%s/"' % benchmark_spec.hpcg_runtime
-  ]
-  _PushFile(vm, RUN_SCRIPT)
-  _PushFile(vm, CONFIG_FILE, update_config_file_sed_cmds)
+  src_path = _LocalDataPath(CONFIG_FILE)
+  dest_path = os.path.join(hpcg.HPCG_DIR, CONFIG_FILE)
+  context = {
+      'PROBLEM_SIZE': '%s %s %s' % (benchmark_spec.hpcg_problem_size[0],
+                                    benchmark_spec.hpcg_problem_size[1],
+                                    benchmark_spec.hpcg_problem_size[2]),
+      'RUNTIME': benchmark_spec.hpcg_runtime
+  }
+  vm.RenderTemplate(src_path, dest_path, context)
+  vm.PushDataFile(RUN_SCRIPT, os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT))
 
 
 def _PrepareHpcg(vm):
@@ -233,27 +230,49 @@ def _CreateMetadataDict(benchmark_spec):
   return metadata
 
 
-def _UpdateNvidiaSmiPermissions(vm):
-  """Update nvidia-smi permissions to UNRESTRICTED.
-
-  This allows regular (non-root) users to change GPU power and
-  clock frequency settings.
+def _GetEnvironmentVars(benchmark_spec):
+  """Return a string containing HPCG-related environment variables.
 
   Args:
-    vm: vm to operate on
+    benchmark_spec: benchmark spec
+
+  Returns:
+    string of environment variables
   """
-  change_gpu_permissions_command = 'sudo nvidia-smi -acp UNRESTRICTED'
-  vm.RemoteCommand(change_gpu_permissions_command)
-
-
-def _GetEnvironmentVars(benchmark_spec):
   return ' '.join([
       'NUM_GPUS=%s' % benchmark_spec.total_gpus,
       'OMP_NUM_THREADS=%s' % benchmark_spec.cpus_per_rank
   ])
 
 
+def _ExtractProblemSize(output):
+  """Extract problem size from HPCG output.
+
+  Args:
+    output: HPCG output
+
+  Returns:
+    problem size in list format
+  """
+  regex = r'(\d+)x(\d+)x(\d+)\s+local domain'
+  match = re.search(regex, output)
+  try:
+    return [int(match.group(1)),
+            int(match.group(2)),
+            int(match.group(3))]
+  except:
+    raise HpcgParseOutputException('Unable to parse HPCG output')
+
+
 def _ExtractThroughput(output):
+  """Extract throughput from HPCG output.
+
+  Args:
+    output: HPCG output
+
+  Returns:
+    throuput (float)
+  """
   regex = r'final\s+=\s+(\S+)\s+GF'
   match = re.search(regex, output)
   try:
@@ -263,6 +282,22 @@ def _ExtractThroughput(output):
 
 
 def _MakeSamplesFromOutput(benchmark_spec, output):
+  """Create a sample continaing the measured HPCG throughput.
+
+  Args:
+    benchmark_spec: benchmark spec
+    output: HPCG output
+
+  Returns:
+    a Sample containing the HPCG throughput in Gflops
+  """
+  actual_hpcg_problem_size = _ExtractProblemSize(output)
+  if actual_hpcg_problem_size != benchmark_spec.hpcg_problem_size:
+    raise HpcgIncorrectProblemSizeException(
+        'Actual problem size of %s does not match expected problem '
+        'size of %s' % (actual_hpcg_problem_size,
+                        benchmark_spec.hpcg_problem_size))
+
   metadata = _CreateMetadataDict(benchmark_spec)
   hpcg_throughput = _ExtractThroughput(output)
   return [sample.Sample('HPCG Throughput', hpcg_throughput, 'Gflops', metadata)]
