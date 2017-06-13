@@ -31,6 +31,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 from perfkitbenchmarker.linux_packages import hpcg
@@ -143,24 +144,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.hpcg_runtime = FLAGS.hpcg_runtime
 
 
-# TODO(ferneyhough): This is duplicated in the HPCC benchmark. Refactor both.
-def _CreateMachineFile(vms, gpus_per_node):
-  """Create a file with the IP of each machine in the cluster on its own line.
-
-  Args:
-    vms: The list of vms which will be in the cluster
-    gpus_per_node: number of GPUs per node
-  """
-  with vm_util.NamedTemporaryFile() as machine_file:
-    master_vm = vms[0]
-    machine_file.write('localhost slots=%d\n' % gpus_per_node)
-    for vm in vms[1:]:
-      machine_file.write('%s slots=%d\n' % (vm.internal_ip, gpus_per_node))
-    machine_file.close()
-    master_vm.PushFile(machine_file.name,
-                       os.path.join(hpcg.HPCG_DIR, MACHINEFILE))
-
-
 def _CopyAndUpdateRunScripts(vm, benchmark_spec):
   """Copy and update all necessary run scripts on the given vm.
 
@@ -203,7 +186,9 @@ def Prepare(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   for vm in vms:
     _CopyAndUpdateRunScripts(vm, benchmark_spec)
-  _CreateMachineFile(vms, benchmark_spec.gpus_per_node)
+  hpc_util.CreateMachineFile(vms,
+                             lambda _: benchmark_spec.gpus_per_node,
+                             os.path.join(hpcg.HPCG_DIR, MACHINEFILE))
 
 
 def _CreateMetadataDict(benchmark_spec):
