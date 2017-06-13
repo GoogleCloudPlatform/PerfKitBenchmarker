@@ -63,6 +63,7 @@ BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
 INSTALL_COMMAND_ARGS = ["clean", "install", "-DskipTests",
                         "-Dcheckstyle.skip=true"]
 
+
 def InitializeBeamRepo(benchmark_spec):
   """Ensures environment is prepared for running Beam benchmarks.
 
@@ -127,6 +128,7 @@ def BuildBeamCommand(benchmark_spec, classname, job_arguments):
 
   return cmd, base_dir
 
+
 def _BuildMavenCommand(benchmark_spec, classname, job_arguments):
   """ Constructs a maven command for the benchmark.
 
@@ -189,7 +191,7 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
   python_executable = FLAGS.python_binary
   if not vm_util.ExecutableOnPath(python_executable):
     raise errors.Setup.MissingExecutableError(
-      'Could not find required executable "%s"' % python_executable)
+        'Could not find required executable "%s"' % python_executable)
   cmd.append(python_executable)
 
   cmd.append('setup.py')
@@ -218,7 +220,7 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
 def _GetBeamDir():
   # TODO: This is temporary, find a better way.
   return FLAGS.beam_location if FLAGS.beam_location else os.path.join(
-    vm_util.GetTempDir(), 'beam')
+      vm_util.GetTempDir(), 'beam')
 
 
 def _FindFiles(base_path, pattern):
