@@ -26,7 +26,7 @@ def CreateMachineFile(vms, num_slots=lambda vm: vm.num_cpus,
   Args:
     vms: The list of vms which will be in the cluster.
     num_slots: The function to use to calculate the number of slots
-      for each vm. Deafaults to vm.num_cpus
+      for each vm. Defaults to vm.num_cpus
     remote_path: remote path of the machine file. Defaults to MACHINEFILE
   """
   with vm_util.NamedTemporaryFile() as machine_file:
