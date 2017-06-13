@@ -68,6 +68,22 @@ class TestIntegerList(unittest.TestCase):
     il = flag_util.IntegerList([1, (2, 6, 2), 9])
     self.assertEqual(list(il), [1, 2, 4, 6, 9])
 
+  def testEqTrue(self):
+    il = flag_util.IntegerList([1, 2, 3])
+    self.assertEqual([1, 2, 3], il)
+
+  def testEqFalse(self):
+    il = flag_util.IntegerList([1, 2, 3])
+    self.assertFalse([1] == il)
+
+  def testNotEqTrue(self):
+    il = flag_util.IntegerList([1, 2, 3])
+    self.assertNotEqual([1], il)
+
+  def testNotEqFalse(self):
+    il = flag_util.IntegerList([1, 2, 3])
+    self.assertTrue([1] != il)
+
 
 class TestParseIntegerList(unittest.TestCase):
   def setUp(self):
