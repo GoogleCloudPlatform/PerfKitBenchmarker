@@ -575,6 +575,15 @@ class BaseOsMixin(object):
     raise NotImplementedError()
 
   @property
+  def total_free_memory_kb(self):
+    """Gets the amount of free memory on the VM.
+
+    Returns:
+      The number of kilobytes of memory on the VM.
+    """
+    return self._GetTotalFreeMemoryKb()
+
+  @property
   def total_memory_kb(self):
     """Gets the amount of memory on the VM.
 
@@ -584,6 +593,11 @@ class BaseOsMixin(object):
     if not self._total_memory_kb:
       self._total_memory_kb = self._GetTotalMemoryKb()
     return self._total_memory_kb
+
+  @abc.abstractmethod
+  def _GetTotalFreeMemoryKb(self):
+    """Returns the amount of free physical memory on the VM in Kilobytes."""
+    raise NotImplementedError()
 
   @abc.abstractmethod
   def _GetTotalMemoryKb(self):

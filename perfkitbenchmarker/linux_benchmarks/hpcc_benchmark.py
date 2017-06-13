@@ -46,7 +46,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker.linux_packages import hpcc
 
 FLAGS = flags.FLAGS
@@ -94,40 +94,13 @@ def CheckPrerequisites(benchmark_config):
     data.ResourcePath(FLAGS.hpcc_binary)
 
 
-def CreateMachineFile(vms):
-  """Create a file with the IP of each machine in the cluster on its own line.
-
-  Args:
-    vms: The list of vms which will be in the cluster.
-  """
-  with vm_util.NamedTemporaryFile() as machine_file:
-    master_vm = vms[0]
-    machine_file.write('localhost slots=%d\n' % master_vm.num_cpus)
-    for vm in vms[1:]:
-      machine_file.write('%s slots=%d\n' % (vm.internal_ip,
-                                            vm.num_cpus))
-    machine_file.close()
-    master_vm.PushFile(machine_file.name, MACHINEFILE)
-
-
 def CreateHpccinf(vm, benchmark_spec):
   """Creates the HPCC input file."""
   num_vms = len(benchmark_spec.vms)
   if FLAGS.memory_size_mb:
     total_memory = FLAGS.memory_size_mb * 1024 * 1024 * num_vms
   else:
-    # Sum of Free, Cached, Buffers in kb
-    stdout, _ = vm.RemoteCommand("""
-      awk '
-        BEGIN      {total =0}
-        /MemFree:/ {total += $2}
-        /Cached:/  {total += $2}
-        /Buffers:/ {total += $2}
-        END        {print total}
-        ' /proc/meminfo
-        """)
-    available_memory = int(stdout)
-    total_memory = available_memory * 1024 * num_vms
+    total_memory = vm.total_free_memory_kb * 1024 * num_vms
   total_cpus = vm.num_cpus * num_vms
   block_size = BLOCK_SIZE
 
@@ -190,7 +163,7 @@ def Prepare(benchmark_spec):
 
   PrepareHpcc(master_vm)
   CreateHpccinf(master_vm, benchmark_spec)
-  CreateMachineFile(vms)
+  hpc_util.CreateMachineFile(vms, remote_path=MACHINEFILE)
   PrepareBinaries(vms)
 
 

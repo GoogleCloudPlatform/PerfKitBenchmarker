@@ -521,6 +521,29 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         'cat /proc/cpuinfo | grep processor | wc -l')
     return int(stdout)
 
+  def _GetTotalFreeMemoryKb(self):
+    """Calculate amount of free memory in KB of the given vm.
+
+    Free memory is calculated as sum of free, cached, and buffers
+    as output from /proc/meminfo.
+
+    Args:
+      vm: vm to check
+
+    Returns:
+      free memory on the vm in KB
+    """
+    stdout, _ = self.RemoteCommand("""
+      awk '
+        BEGIN      {total =0}
+        /MemFree:/ {total += $2}
+        /Cached:/  {total += $2}
+        /Buffers:/ {total += $2}
+        END        {print total}
+        ' /proc/meminfo
+        """)
+    return int(stdout)
+
   def _GetTotalMemoryKb(self):
     """Returns the amount of physical memory on the VM in Kilobytes.
 
