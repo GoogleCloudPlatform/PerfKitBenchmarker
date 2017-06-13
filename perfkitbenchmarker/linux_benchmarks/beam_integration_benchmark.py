@@ -54,10 +54,10 @@ beam_integration_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_string(
-    'beam_it_class',
-    'org.apache.beam.examples.WordCountIT',
-    'Path to IT class')
+DEFAULT_JAVA_IT_CLASS = 'org.apache.beam.examples.WordCountIT'
+DEFAULT_PYTHON_IT_MODULE = 'apache_beam.examples.wordcount_it_test'
+
+flags.DEFINE_string('beam_it_class', None, 'Path to IT class')
 flags.DEFINE_string('beam_it_args', None, 'Args to provide to the IT')
 
 FLAGS = flags.FLAGS
@@ -78,6 +78,11 @@ def CheckPrerequisites(benchmark_spec):
     raise errors.Config.InvalidValue(
         'No args provided. To run with default class (WordCountIT), must'
         'provide --beam_it_args=--tempRoot=<temp dir, e.g. gs://my-dir/temp>.')
+  if FLAGS.beam_sdk is None:
+    raise errors.Config.InvalidValue(
+        'No sdk provided. To run Beam integration benchmark, the test must'
+        'specify which sdk is used in the pipeline. For example, java/python.'
+    )
   if benchmark_spec.dpb_service.service_type != dpb_service.DATAFLOW:
     raise NotImplementedError('Currently only works against Dataflow.')
 
@@ -100,7 +105,16 @@ def Run(benchmark_spec):
 
   # Switch the parameters for submit job function of specific dpb service
   job_arguments = ['"{}"'.format(arg) for arg in FLAGS.beam_it_args.split(',')]
-  classname = FLAGS.beam_it_class
+
+  if FLAGS.beam_it_class is None:
+    if FLAGS.beam_sdk == beam_benchmark_helper.BEAM_JAVA_SDK:
+      classname = DEFAULT_JAVA_IT_CLASS
+    elif FLAGS.beam_sdk == beam_benchmark_helper.BEAM_PYTHON_SDK:
+      classname = DEFAULT_PYTHON_IT_MODULE
+    else:
+      raise NotImplementedError('Unsupported Beam SDK: %s.' % FLAGS.beam_sdk)
+  else:
+    classname = FLAGS.beam_it_class
 
   job_type = BaseDpbService.BEAM_JOB_TYPE
 
