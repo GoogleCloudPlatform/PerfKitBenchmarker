@@ -62,8 +62,7 @@ ADDITIONAL_FLAGS = 'additional_flags'
 SLEEP_TIME_BETWEEN_RUNS = 20  # seconds
 TAIL_LINE_NUM = '20'
 
-MAX_SLEEP_ITER = 24  # max wait time for a run is max_sleep_iter x sleep_time
-SLEEP_TIME = 1800  # seconds
+MAX_SLEEP_ITER = 43200  # max wait time for a run in seconds
 
 # FLAG STRINGS
 PKB = './pkb.py --benchmarks=mysql_service'
@@ -92,9 +91,14 @@ gflags.DEFINE_string(RUN_URI, None,
 gflags.DEFINE_list(ADDITIONAL_FLAGS, None,
                    'List of additional PKB mysql_service valid flags (strings).'
                    'For example: ["--storage_size=100"].')
+# TODO: Implement flag for STDOUT/STDERR file paths.
 
 
 class UnexpectedFileOutputError(Exception):
+  pass
+
+
+class OperationTimeoutError(Exception):
   pass
 
 
@@ -186,9 +190,18 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   stderr_file = open(stderr_filename, 'w+')
   pkb_cmd_list = shlex.split(pkb_cmd)
   logging.info('pkb command list: %s', str(pkb_cmd_list))
+  start_time = time.time()
   p = subprocess.Popen(pkb_cmd_list, stdout=stdout_file, stderr=stderr_file)
   logging.info('Waiting for PKB call to finish.')
-  p.wait()
+  # TODO: implement better timeout. Currently this call will continue executing.
+  # In other words, unsure that p.terminate() is the best way to execute the
+  # timeout.
+  while p.returncode is None:
+    elapsed_time = time.time() - start_time
+    if elapsed_time > MAX_SLEEP_ITER:
+      p.terminate()
+      raise OperationTimeoutError(
+          'PKB execution timed out at %s seconds.' % str(int(elapsed_time)))
   logging.info('PKB call finished.')
 
 
