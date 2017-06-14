@@ -361,9 +361,6 @@ class BenchmarkSpec(object):
     if self.managed_relational_db:
       self.managed_relational_db.Delete()
 
-    if self.managed_relational_db:
-      self.managed_relational_db.Delete()
-
     if self.vms:
       try:
         vm_util.RunThreaded(self.DeleteVm, self.vms)
