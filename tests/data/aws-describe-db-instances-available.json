@@ -1,0 +1,58 @@
+{
+    "DBInstances": [
+        {
+            "PubliclyAccessible": true, 
+            "MasterUsername": "pkba4499926", 
+            "MonitoringInterval": 0, 
+            "LicenseModel": "general-public-license", 
+            "VpcSecurityGroups": [], 
+            "InstanceCreateTime": "2017-06-01T22:08:48.561Z", 
+            "CopyTagsToSnapshot": false, 
+            "OptionGroupMemberships": [
+                {
+                    "Status": "in-sync", 
+                    "OptionGroupName": "default:mysql-5-6"
+                }
+            ], 
+            "PendingModifiedValues": {}, 
+            "Engine": "mysql", 
+            "MultiAZ": false, 
+            "LatestRestorableTime": "2017-06-01T22:10:04.504Z", 
+            "DBSecurityGroups": [
+                {
+                    "Status": "active", 
+                    "DBSecurityGroupName": "pkb-db-security-group-a4499926"
+                }
+            ], 
+            "DBParameterGroups": [
+                {
+                    "DBParameterGroupName": "default.mysql5.6", 
+                    "ParameterApplyStatus": "in-sync"
+                }
+            ], 
+            "AutoMinorVersionUpgrade": false, 
+            "PreferredBackupWindow": "10:36-11:06", 
+            "ReadReplicaDBInstanceIdentifiers": [], 
+            "AllocatedStorage": 5, 
+            "DBInstanceArn": "arn:aws:rds:us-west-2:835761027970:db:pkb-db-instance-a4499926", 
+            "BackupRetentionPeriod": 1, 
+            "PreferredMaintenanceWindow": "fri:10:06-fri:10:36", 
+            "Endpoint": {
+                "HostedZoneId": "Z1PVIF0B656C1W", 
+                "Port": 3306, 
+                "Address": "pkb-db-instance-a4499926.cqxeajwjbqne.us-west-2.rds.amazonaws.com"
+            }, 
+            "DBInstanceStatus": "available", 
+            "EngineVersion": "5.6.27", 
+            "AvailabilityZone": "us-west-2c", 
+            "DomainMemberships": [], 
+            "StorageType": "gp2", 
+            "DbiResourceId": "db-BCHWPG4EB4LUCOUFFEGWLCZBZY", 
+            "CACertificateIdentifier": "rds-ca-2015", 
+            "StorageEncrypted": false, 
+            "DBInstanceClass": "db.t1.micro", 
+            "DbInstancePort": 0, 
+            "DBInstanceIdentifier": "pkb-db-instance-a4499926"
+        }
+    ]
+}

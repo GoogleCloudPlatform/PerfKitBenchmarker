@@ -1,9 +1,24 @@
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
+
 
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """An object representing a GCP managed relational database.
@@ -15,6 +30,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   CLOUD = providers.GCP
   SERVICE_NAME = 'managed_relational_db'
+
+  def GetEndpoint(self):
+    pass
+
+  def GetPort(self):
+    pass
 
   @staticmethod
   # TODO: implement for real

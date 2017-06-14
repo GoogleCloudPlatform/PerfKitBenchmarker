@@ -1,4 +1,5 @@
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
+import uuid
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
@@ -9,17 +10,26 @@ flags.DEFINE_string('database', None,
 flags.DEFINE_string('database_name', None,
                     'Name of the database to create. Defaults to '
                     'pkb-db-[run-uri]')
+flags.DEFINE_string('database_username', None,
+                    'Database username. Defaults to '
+                    'pkb-db-user-[run-uri]')
 flags.DEFINE_string('database_password', None,
                     'Database password. Defaults to '
                     'a random 10-character alpha-numeric string')
 # TODO: write a validator
 flags.DEFINE_string('database_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
+flags.DEFINE_boolean('high_availability', False,
+                     'Specifies if the database should be high availability')
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
 
 _MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
+
+
+def generateRandomDbPassword():
+  return str(uuid.uuid4())[:10]
 
 
 def GetManagedRelationalDbClass(cloud):
@@ -55,3 +65,17 @@ class BaseManagedRelationalDb(resource.BaseResource):
     """
     super(BaseManagedRelationalDb, self).__init__()
     self.spec = managed_relational_db_spec
+
+  @abstractmethod
+  def GetEndpoint(self):
+    pass
+
+  @abstractmethod
+  def GetPort(self):
+    pass
+
+  def GetUsername(self):
+    return self.spec.database_username
+
+  def GetPassword(self):
+    return self.spec.database_password

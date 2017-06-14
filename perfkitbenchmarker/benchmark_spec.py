@@ -30,6 +30,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
@@ -356,9 +357,10 @@ class BenchmarkSpec(object):
 
     if self.spark_service:
       self.spark_service.Delete()
-
     if self.dpb_service:
       self.dpb_service.Delete()
+    if self.managed_relational_db:
+      self.managed_relational_db.Delete()
 
     if self.managed_relational_db:
       self.managed_relational_db.Delete()
