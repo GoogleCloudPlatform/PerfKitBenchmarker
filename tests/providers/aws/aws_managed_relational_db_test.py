@@ -14,26 +14,17 @@
 """Tests for perfkitbenchmarker.providers.aws.aws_managed_relational_db"""
 
 import contextlib
-import mock
-import re
-import os
 import unittest
+import mock
+import os
 import json
 
-from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import context
-from perfkitbenchmarker import errors
-from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import disk
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.managed_relational_db import MYSQL, POSTGRES
+from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.providers.aws import aws_managed_relational_db
 from perfkitbenchmarker.providers.aws import aws_disk
-from perfkitbenchmarker.providers.aws import util
-from tests import mock_flags
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -54,16 +45,11 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
   def createSpecDict(self):
     disk_spec = aws_disk.AwsDiskSpec(
-        _COMPONENT,
-        disk_size=5,
-        disk_type=aws_disk.IO1,
-        iops=1000)
+        _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, iops=1000)
 
     vm_spec = virtual_machine.BaseVmSpec(
-        'NAME',
-        **{'machine_type': 'db.t1.micro',
-           'zone': 'us-west-2b'}
-    )
+        'NAME', **{'machine_type': 'db.t1.micro',
+                   'zone': 'us-west-2b'})
 
     return {
         'database': MYSQL,
@@ -110,9 +96,10 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      self.assertTrue(command_string.startswith('%s rds create-db-instance' %
-                                                _AWS_PREFIX))
-      self.assertIn('--db-instance-identifier=pkb-db-instance-123', command_string)
+      self.assertTrue(
+          command_string.startswith('%s rds create-db-instance' % _AWS_PREFIX))
+      self.assertIn('--db-instance-identifier=pkb-db-instance-123',
+                    command_string)
       self.assertIn('--db-instance-class=db.t1.micro', command_string)
       self.assertIn('--engine=mysql', command_string)
       self.assertIn('--master-user-password=fakepassword', command_string)
@@ -152,9 +139,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     with self._PatchCriticalObjects() as issue_command:
       spec = self.createSpecDict()
       spec['disk_spec'] = aws_disk.AwsDiskSpec(
-        _COMPONENT,
-        disk_size=5,
-        disk_type=aws_disk.GP2)
+          _COMPONENT, disk_size=5, disk_type=aws_disk.GP2)
       db = self.createManagedDbFromSpec(spec)
       db._Create()
       self.assertEquals(issue_command.call_count, 1)
@@ -185,8 +170,9 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--engine-version=5.6.29', command_string)
 
   def testIsNotReady(self):
-    path = os.path.join(os.path.dirname(__file__), '../../data',
-                        'aws-describe-db-instances-creating.json')
+    path = os.path.join(
+        os.path.dirname(__file__), '../../data',
+        'aws-describe-db-instances-creating.json')
     with open(path) as fp:
       test_output = fp.read()
 
@@ -196,8 +182,9 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertEqual(False, db._IsReady())
 
   def testIsReady(self):
-    path = os.path.join(os.path.dirname(__file__), '../../data',
-                        'aws-describe-db-instances-available.json')
+    path = os.path.join(
+        os.path.dirname(__file__), '../../data',
+        'aws-describe-db-instances-available.json')
     with open(path) as fp:
       test_output = fp.read()
 
@@ -207,29 +194,30 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       self.assertEqual(True, db._IsReady())
 
   def testParseEndpoint(self):
-    path = os.path.join(os.path.dirname(__file__), '../../data',
-                        'aws-describe-db-instances-available.json')
+    path = os.path.join(
+        os.path.dirname(__file__), '../../data',
+        'aws-describe-db-instances-available.json')
     with open(path) as fp:
       test_output = fp.read()
 
     with self._PatchCriticalObjects():
       db = self.createManagedDbFromSpec(self.createSpecDict())
 
-      self.assertEqual('pkb-db-instance-a4499926.cqxeajwjbqne.us-west-2.rds.amazonaws.com',
-                       db._ParseEndpoint(json.loads(test_output)))
+      self.assertEqual(
+          'pkb-db-instance-a4499926.cqxeajwjbqne.us-west-2.rds.amazonaws.com',
+          db._ParseEndpoint(json.loads(test_output)))
 
   def testParsePort(self):
-    path = os.path.join(os.path.dirname(__file__), '../../data',
-                        'aws-describe-db-instances-available.json')
+    path = os.path.join(
+        os.path.dirname(__file__), '../../data',
+        'aws-describe-db-instances-available.json')
     with open(path) as fp:
       test_output = fp.read()
 
     with self._PatchCriticalObjects():
       db = self.createManagedDbFromSpec(self.createSpecDict())
 
-      self.assertEqual(3306, db._ParsePort(
-          json.loads(test_output)))
-
+      self.assertEqual(3306, db._ParsePort(json.loads(test_output)))
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -239,8 +227,10 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertIn('aws --output json rds delete-db-instance', command_string)
-      self.assertIn('--db-instance-identifier=pkb-db-instance-123', command_string)
+      self.assertIn('--db-instance-identifier=pkb-db-instance-123',
+                    command_string)
       self.assertIn('--skip-final-snapshot', command_string)
+
 
 if __name__ == '__main__':
   unittest.main()

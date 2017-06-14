@@ -35,7 +35,6 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import spark_service
-from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
@@ -68,9 +67,9 @@ flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM. '
                     'Upon creation, these directories will have numbers '
                     'appended to them (for example /scratch0, /scratch1, etc).')
-flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED, [
-    SUPPORTED, NOT_EXCLUDED, SKIP_CHECK
-], 'Method used to check compatibility between the benchmark '
+flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
+                  [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
+                  'Method used to check compatibility between the benchmark '
                   ' and the cloud.  ' + SUPPORTED + ' runs the benchmark only'
                   ' if the cloud provider has declared it supported. ' +
                   NOT_EXCLUDED + ' runs the benchmark unless it has been'
