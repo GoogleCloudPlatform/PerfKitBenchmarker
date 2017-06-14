@@ -15,7 +15,7 @@
 
 import contextlib
 import unittest
-from unittest import mock
+import mock
 
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
