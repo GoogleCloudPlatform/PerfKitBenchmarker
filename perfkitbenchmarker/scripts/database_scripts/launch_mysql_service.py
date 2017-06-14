@@ -62,7 +62,7 @@ ADDITIONAL_FLAGS = 'additional_flags'
 SLEEP_TIME_BETWEEN_RUNS = 20  # seconds
 TAIL_LINE_NUM = '20'
 
-MAX_SLEEP_ITER = 43200  # max wait time for a run in seconds
+PKB_TIMEOUT = 43200  # max wait time for a run in seconds
 
 # FLAG STRINGS
 PKB = './pkb.py --benchmarks=mysql_service'
@@ -198,7 +198,7 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   # timeout.
   while p.returncode is None:
     elapsed_time = time.time() - start_time
-    if elapsed_time > MAX_SLEEP_ITER:
+    if elapsed_time > PKB_TIMEOUT:
       p.terminate()
       raise OperationTimeoutError(
           'PKB execution timed out at %s seconds.' % str(int(elapsed_time)))
