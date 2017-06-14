@@ -91,6 +91,7 @@ gflags.DEFINE_string(RUN_URI, None,
 gflags.DEFINE_list(ADDITIONAL_FLAGS, None,
                    'List of additional PKB mysql_service valid flags (strings).'
                    'For example: ["--storage_size=100"].')
+
 # TODO: Implement flag for STDOUT/STDERR file paths.
 
 
@@ -193,16 +194,11 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   start_time = time.time()
   p = subprocess.Popen(pkb_cmd_list, stdout=stdout_file, stderr=stderr_file)
   logging.info('Waiting for PKB call to finish.')
-  # TODO: implement better timeout. Currently this call will continue executing.
-  # In other words, unsure that p.terminate() is the best way to execute the
-  # timeout.
-  while p.returncode is None:
-    elapsed_time = time.time() - start_time
-    if elapsed_time > PKB_TIMEOUT:
-      p.terminate()
-      raise OperationTimeoutError(
-          'PKB execution timed out at %s seconds.' % str(int(elapsed_time)))
-  logging.info('PKB call finished.')
+  # TODO: implement timeout. Currently this call will wait unbounded.
+  # Will probably have to implement with threading.
+  p.wait()
+  elapsed_time = time.time() - start_time
+  logging.info('PKB call finished in %d seconds.', elapsed_time)
 
 
 def _get_run_uri(filename):
