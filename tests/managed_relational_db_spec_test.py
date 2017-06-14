@@ -13,17 +13,9 @@
 # limitations under the License.
 """Tests for _ManagedRelationalDbSpec"""
 
-import contextlib
-import mock
-import re
 import unittest
 
-from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import mock_flags
@@ -133,19 +125,13 @@ class ManagedRelationalDbMinimalSpecTestCase(unittest.TestCase):
   def testDiskSpecRequired(self):
     del self.spec['disk_spec']
     with self.assertRaisesRegexp(errors.Config.MissingOption, 'disk_spec'):
-      result = benchmark_config_spec._ManagedRelationalDbSpec(
-          _COMPONENT, flag_values=self.flags, **self.spec)
-
-  def testDiskSpecRequired(self):
-    del self.spec['disk_spec']
-    with self.assertRaisesRegexp(errors.Config.MissingOption, 'disk_spec'):
-      result = benchmark_config_spec._ManagedRelationalDbSpec(
+      benchmark_config_spec._ManagedRelationalDbSpec(
           _COMPONENT, flag_values=self.flags, **self.spec)
 
   def testVmSpecRequired(self):
     del self.spec['vm_spec']
     with self.assertRaisesRegexp(errors.Config.MissingOption, 'vm_spec'):
-      result = benchmark_config_spec._ManagedRelationalDbSpec(
+      benchmark_config_spec._ManagedRelationalDbSpec(
           _COMPONENT, flag_values=self.flags, **self.spec)
 
 

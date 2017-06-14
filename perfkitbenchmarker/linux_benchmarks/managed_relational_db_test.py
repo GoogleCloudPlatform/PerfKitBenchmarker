@@ -13,11 +13,7 @@
 # limitations under the License.
 """Test for managed relational database provisioning"""
 
-import os
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 
 BENCHMARK_NAME = 'managed_relational_db_test'
 BENCHMARK_CONFIG = """
@@ -84,6 +80,7 @@ def Run(benchmark_spec):
 
 
   return []
+
 
 def Cleanup(benchmark_spec):
   pass

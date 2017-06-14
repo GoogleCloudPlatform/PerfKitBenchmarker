@@ -14,22 +14,15 @@
 """Tests for perfkitbenchmarker.providers.gcp.gcp_managed_relational_db"""
 
 import contextlib
-import mock
-import re
 import unittest
+import mock
 
-from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import context
-from perfkitbenchmarker import errors
-from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.managed_relational_db import MYSQL, POSTGRES
+from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import util
-from tests import mock_flags
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
