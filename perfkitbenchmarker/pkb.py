@@ -233,6 +233,10 @@ flags.DEFINE_boolean(
     'This sample will include metadata specifying the run stage that '
     'failed, the exception that occured, as well as all the flags that '
     'were provided to PKB on the command line.')
+flags.DEFINE_integer(
+    'failed_run_samples_error_length', 10240,
+    'If create_failed_run_samples is true, PKB will truncate any error '
+    'messages at failed_run_samples_error_length.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -616,7 +620,7 @@ def MakeFailedRunSample(error_message, run_stage_that_failed):
   # metadata. We may want to only include flags specific to the benchmark that
   # failed. This can be acomplished using gflag's FlagsByModuleDict().
   metadata = {
-      'error_message': error_message,
+      'error_message': error_message[0:FLAGS.failed_run_samples_error_length],
       'run_stage': run_stage_that_failed,
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
