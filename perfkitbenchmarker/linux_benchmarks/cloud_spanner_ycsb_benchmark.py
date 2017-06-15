@@ -18,7 +18,6 @@ By default, this benchmark provision 1 single-CPU VM and spawn 1 thread
 to test Spanner. Configure the number of VMs via --ycsb_client_vms.
 """
 
-import getpass
 import logging
 
 from perfkitbenchmarker import configs
@@ -41,8 +40,13 @@ cloud_spanner_ycsb:
     gcloud_scopes: >
       https://www.googleapis.com/auth/spanner.admin
       https://www.googleapis.com/auth/spanner.data"""
+BENCHMARK_INSTANCE_PREFIX = 'ycsb-'
+BENCHMARK_DESCRIPTION = 'YCSB'
+BENCHMARK_DATABASE = 'ycsb'
+BENCHMARK_TABLE = 'usertable'
+BENCHMARK_ZERO_PADDING = 12
 BENCHMARK_SCHEMA = """
-CREATE TABLE usertable (
+CREATE TABLE %s (
   id     STRING(MAX),
   field0 STRING(MAX),
   field1 STRING(MAX),
@@ -55,7 +59,7 @@ CREATE TABLE usertable (
   field8 STRING(MAX),
   field9 STRING(MAX),
 ) PRIMARY KEY(id)
-"""
+""" % BENCHMARK_TABLE
 # As of May 2017, cloud Spanner is not included in the latest YCSB release
 # 0.12.0. The URL below points to a custom YCSB build for Cloud Spanner.
 # You can override it by flag --cloud_spanner_custom_ycsb_release.
@@ -77,46 +81,15 @@ flags.DEFINE_integer('cloud_spanner_ycsb_boundedstaleness',
                      0,
                      'The Cloud Spanner bounded staleness used in the YCSB '
                      'benchmark.')
-flags.DEFINE_string('cloud_spanner_ycsb_config',
-                    'regional-us-central1',
-                    'The config for the Cloud Spanner instance.')
 flags.DEFINE_string('cloud_spanner_ycsb_custom_release',
                     None,
                     'If provided, the URL of a custom YCSB release')
-flags.DEFINE_string('cloud_spanner_ycsb_database',
-                    'ycsb',
-                    'The Cloud Spanner database used in the YCSB benchmark.')
-flags.DEFINE_string('cloud_spanner_ycsb_ddl',
-                    BENCHMARK_SCHEMA,
-                    'The schema DDL for the Cloud Spanner database.')
-flags.DEFINE_string('cloud_spanner_ycsb_description',
-                    'YCSB',
-                    'The description of the Cloud Spanner instance.')
-flags.DEFINE_string('cloud_spanner_ycsb_end_point',
-                    None,
-                    'The Cloud Spanner end point used in the YCSB benchmark. '
-                    'Leave it unset to use the default end point.')
-flags.DEFINE_string('cloud_spanner_ycsb_instance',
-                    'ycsb-' + getpass.getuser(),
-                    'The Cloud Spanner instance used in the YCSB benchmark. '
-                    'Use distinct instances if you want to run multiple '
-                    'benchmarks in parallel.')
-flags.DEFINE_integer('cloud_spanner_ycsb_nodes',
-                     1,
-                     'The number of nodes for the Cloud Spanner instance.')
-flags.DEFINE_string('cloud_spanner_ycsb_project',
-                    None,
-                    'The gcloud project to use in the YCSB benchmark. Leave '
-                    'it unset to use the default gcloud project.')
 flags.DEFINE_enum('cloud_spanner_ycsb_readmode',
                   'query', ['query', 'read'],
                   'The Cloud Spanner read mode used in the YCSB benchmark.')
-flags.DEFINE_string('cloud_spanner_ycsb_table',
-                    'usertable',
-                    'The table name used in the YCSB benchmark.')
-flags.DEFINE_integer('cloud_spanner_ycsb_zeropadding',
-                     12,
-                     'The zero padding used in the YCSB benchmark.')
+flags.DEFINE_list('cloud_spanner_ycsb_custom_vm_install_commands', [],
+                  'A list of strings. If specified, execute them on every '
+                  'VM during the installation phase.')
 
 
 def GetConfig(user_config):
@@ -142,14 +115,10 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
 
   benchmark_spec.spanner_instance = gcp_spanner.GcpSpannerInstance(
-      name=FLAGS.cloud_spanner_ycsb_instance,
-      description=FLAGS.cloud_spanner_ycsb_description,
-      nodes=FLAGS.cloud_spanner_ycsb_nodes,
-      database=FLAGS.cloud_spanner_ycsb_database,
-      ddl=FLAGS.cloud_spanner_ycsb_ddl,
-      project=FLAGS.cloud_spanner_ycsb_project,
-      config=FLAGS.cloud_spanner_ycsb_config,
-      end_point=FLAGS.cloud_spanner_ycsb_end_point)
+      name=BENCHMARK_INSTANCE_PREFIX + FLAGS.run_uri,
+      description=BENCHMARK_DESCRIPTION,
+      database=BENCHMARK_DATABASE,
+      ddl=BENCHMARK_SCHEMA)
   if benchmark_spec.spanner_instance._Exists(instance_only=True):
     logging.warning('Cloud Spanner instance %s exists, delete it first.' %
                     FLAGS.cloud_spanner_ycsb_instance)
@@ -192,17 +161,16 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vms
   run_kwargs = {
-      'table': FLAGS.cloud_spanner_ycsb_table,
-      'zeropadding': FLAGS.cloud_spanner_ycsb_zeropadding,
-      'cloudspanner.instance': FLAGS.cloud_spanner_ycsb_instance,
-      'cloudspanner.database': FLAGS.cloud_spanner_ycsb_database,
+      'table': BENCHMARK_TABLE,
+      'zeropadding': BENCHMARK_ZERO_PADDING,
+      'cloudspanner.instance': BENCHMARK_INSTANCE_PREFIX + FLAGS.run_uri,
+      'cloudspanner.database': BENCHMARK_DATABASE,
       'cloudspanner.readmode': FLAGS.cloud_spanner_ycsb_readmode,
       'cloudspanner.boundedstaleness':
           FLAGS.cloud_spanner_ycsb_boundedstaleness,
       'cloudspanner.batchinserts': FLAGS.cloud_spanner_ycsb_batchinserts,
+      'cloudspanner.host': benchmark_spec.spanner_instance.GetEndPoint(),
   }
-  if FLAGS.cloud_spanner_ycsb_end_point:
-    run_kwargs['cloudspanner.host'] = FLAGS.cloud_spanner_ycsb_end_point
 
   load_kwargs = run_kwargs.copy()
   samples = list(benchmark_spec.executor.LoadAndRun(
@@ -225,7 +193,6 @@ def Cleanup(benchmark_spec):
 def _Install(vm):
   vm.Install('ycsb')
 
-  if FLAGS.cloud_spanner_ycsb_end_point is not None:
-    _, _ = vm.RemoteCommand(
-        'gcloud config set api_endpoint_overrides/spanner %s' %
-        FLAGS.cloud_spanner_ycsb_end_point)
+  # Run custom VM installation commands.
+  for command in FLAGS.cloud_spanner_ycsb_custom_vm_install_commands:
+    _, _ = vm.RemoteCommand(command)

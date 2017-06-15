@@ -16,17 +16,26 @@
 Instances can be created and deleted.
 """
 
+import json
 import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.gcp import util
 
-FLAGS = flags.FLAGS
-
-
-DEFAULT_CLOUD_SPANNER_END_POINT = 'https://spanner.googleapis.com/'
 DEFAULT_CLOUD_SPANNER_CONFIG = 'regional-us-central1'
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string('cloud_spanner_config',
+                    DEFAULT_CLOUD_SPANNER_CONFIG,
+                    'The config for the Cloud Spanner instance.')
+flags.DEFINE_integer('cloud_spanner_nodes',
+                     1,
+                     'The number of nodes for the Cloud Spanner instance.')
+flags.DEFINE_string('cloud_spanner_project',
+                    None,
+                    'The project for the Cloud Spanner instance. Use default '
+                    'project if unset.')
 
 
 class GcpSpannerInstance(resource.BaseResource):
@@ -35,60 +44,33 @@ class GcpSpannerInstance(resource.BaseResource):
   The project and Cloud Spanner config must already exist. Instance and database
   will be created and torn down before and after the test.
 
+  The following parameters are set by corresponding FLAGs.
+    project:     FLAGS.cloud_spanner_project
+    config:      FLAGS.cloud_spanner_config
+    nodes:       FLAGS.cloud_spanner_nodes
+
   Attributes:
     name:        Name of the instance to create.
     description: Description of the instance.
-    nodes:       Number of nodes in the instance.
     database:    Name of the database to create
     ddl:         The schema of the database.
-    project:     The gcloud project to use. If None, use the default project.
-    config:      The Cloud Spanner config to use.
-    end_point:   The end point of the Cloud Spanner. If None, use the default
-                 end point.
   """
 
-  def __init__(self, name, description, nodes, database, ddl,
-               project=None, config=DEFAULT_CLOUD_SPANNER_CONFIG,
-               end_point=DEFAULT_CLOUD_SPANNER_END_POINT):
+  def __init__(self, name, description, database, ddl):
     super(GcpSpannerInstance, self).__init__()
-    self._nodes = nodes
     self._name = name
     self._description = description
-    self._config = config
     self._database = database
     self._ddl = ddl
-    self._end_point = end_point
+
+    self._config = FLAGS.cloud_spanner_config
+    self._nodes = FLAGS.cloud_spanner_nodes
+
+    self._end_point = None
 
     # Cloud Spanner may not explicitly set the following common flags.
-    self.project = project or util.GetDefaultProject()
+    self.project = FLAGS.cloud_spanner_project or util.GetDefaultProject()
     self.zone = None
-
-    self._OverrideEndPoint()
-
-  def __del__(self):
-    self._ResetEndPoint()
-
-  def _OverrideEndPoint(self):
-    """Override Cloud Spanner end point."""
-    if (self._end_point is not None and
-        self._end_point != DEFAULT_CLOUD_SPANNER_END_POINT):
-      cmd = util.GcloudCommand(self, 'config', 'set',
-                               'api_endpoint_overrides/spanner',
-                               self._end_point)
-      _, _, retcode = cmd.Issue()
-      if retcode:
-        logging.error('Override Cloud Spanner end point failed.')
-
-  def _ResetEndPoint(self):
-    """Reset Cloud Spanner end point."""
-    if (self._end_point is not None and
-        self._end_point != DEFAULT_CLOUD_SPANNER_END_POINT):
-      cmd = util.GcloudCommand(self, 'config', 'set',
-                               'api_endpoint_overrides/spanner',
-                               DEFAULT_CLOUD_SPANNER_END_POINT)
-      _, _, retcode = cmd.Issue()
-      if retcode:
-        logging.error('Reset Cloud Spanner end point failed.')
 
   def _Create(self):
     """Creates the instance, the database, and update the schema."""
@@ -154,3 +136,17 @@ class GcpSpannerInstance(resource.BaseResource):
       return False
 
     return True
+
+  def GetEndPoint(self):
+    """Returns the end point for Cloud Spanner."""
+    if self._end_point:
+      return self._end_point
+
+    cmd = util.GcloudCommand(self, 'config', 'get-value',
+                             'api_endpoint_overrides/spanner')
+    stdout, _, retcode = cmd.Issue()
+    if retcode != 0:
+      logging.warning('Fail to retrieve cloud spanner end point.')
+      return None
+    self._end_point = json.loads(stdout)
+    return self._end_point
