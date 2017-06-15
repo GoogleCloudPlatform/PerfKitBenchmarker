@@ -25,7 +25,8 @@ flag_util.DEFINE_integerlist('gpu_clock_speeds',
                              flag_util.IntegerList(TESLA_K80_MAX_CLOCK_SPEEDS),
                              'desired gpu clock speeds in the form '
                              '[memory clock, graphics clock]')
-
+flags.DEFINE_boolean('gpu_autoboost_enabled', True,
+                     'whether gpu autoboost is enabled')
 
 FLAGS = flags.FLAGS
 
@@ -42,6 +43,21 @@ EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
 class UnsupportedClockSpeedException(Exception):
   pass
+
+
+def GetMetadataFromFlags():
+  """Returns gpu-specific flags as a metadata dict.
+
+  Returns:
+    A dict of gpu-specific metadata, as determined from
+    flag values.
+  """
+
+  metadata = {}
+  metadata['gpu_memory_clock'] = FLAGS.gpu_clock_speeds[0]
+  metadata['gpu_graphics_clock'] = FLAGS.gpu_clock_speeds[1]
+  metadata['gpu_autoboost_enabled'] = FLAGS.gpu_autoboost_enabled
+  return metadata
 
 
 def QueryNumberOfGpus(vm):
@@ -65,9 +81,11 @@ def SetAndConfirmGpuClocks(vm):
     UnsupportedClockSpeedException if a GPU did not accept the
     provided clock speeds.
   """
+  autoboost_enabled = FLAGS.gpu_autoboost_enabled
   desired_memory_clock = FLAGS.gpu_clock_speeds[0]
   desired_graphics_clock = FLAGS.gpu_clock_speeds[1]
-  SetGpuClockSpeed(vm, desired_memory_clock, desired_graphics_clock)
+  SetGpuClockSpeedAndAutoboost(vm, autoboost_enabled, desired_memory_clock,
+                               desired_graphics_clock)
   num_gpus = QueryNumberOfGpus(vm)
   for i in range(num_gpus):
     if QueryGpuClockSpeed(vm, i) != (desired_memory_clock,
@@ -78,8 +96,11 @@ def SetAndConfirmGpuClocks(vm):
                                                    desired_graphics_clock))
 
 
-def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
-  """Sets the memory and graphics clocks to the specified frequency.
+def SetGpuClockSpeedAndAutoboost(vm,
+                                 autoboost_enabled,
+                                 memory_clock_speed,
+                                 graphics_clock_speed):
+  """Sets autoboost and memory and graphics clocks to the specified frequency.
 
   Persistence mode is enabled as well. Note that these settings are
   lost after reboot.
@@ -90,6 +111,8 @@ def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
     graphics_clock_speed: desired speed of the graphics clock, in MHz
   """
   vm.RemoteCommand('sudo nvidia-smi -pm 1')
+  vm.RemoteCommand('sudo nvidia-smi --auto-boost-default=%s' % (
+      1 if autoboost_enabled else 0))
   vm.RemoteCommand('sudo nvidia-smi -ac {},{}'.format(memory_clock_speed,
                                                       graphics_clock_speed))
 

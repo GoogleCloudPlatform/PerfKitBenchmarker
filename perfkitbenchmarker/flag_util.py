@@ -90,6 +90,12 @@ class IntegerList(object):
     else:
       return self.groups[group_idx]
 
+  def __eq__(self, other):
+    return tuple(self) == tuple(other)
+
+  def __ne__(self, other):
+    return tuple(self) != tuple(other)
+
   def __iter__(self):
     for group in self.groups:
       if isinstance(group, int) or isinstance(group, long):
