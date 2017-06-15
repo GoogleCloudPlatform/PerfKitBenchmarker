@@ -222,6 +222,59 @@ EXPECTED_RESULT_BAD2 = [
                   metadata=EXPECTED_BAD2_METADATA),
 ]
 
+TEST_OUTPUT_EST = """
+==============================================================================
+400.perlbench       1        359       27.3 *
+401.bzip2           1        597       16.2 *
+403.gcc             1        368       21.9 *
+429.mcf             1        374       24.4 *
+445.gobmk           1        541       19.4 *
+456.hmmer           1        425       22.0 *
+458.sjeng           1        571       21.2 *
+462.libquantum      1        517       40.1 *
+464.h264ref         1        607       36.4 *
+471.omnetpp         1        513       12.2 *
+473.astar           1        491       14.3 *
+483.xalancbmk       1        318       21.7 *
+ Est. SPECint(R)_rate_base2006           --
+ """
+
+EXPECTED_EST_METADATA = GOOD_METADATA.copy()
+EXPECTED_EST_METADATA.update({
+    'partial': 'true',
+    'missing_results': 'SPECint(R)_rate_base2006',
+    'num_cpus': 256})
+
+EXPECTED_RESULT_EST = [
+    sample.Sample(metric='400.perlbench', value=27.3, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='401.bzip2', value=16.2, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='403.gcc', value=21.9, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='429.mcf', value=24.4, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='445.gobmk', value=19.4, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='456.hmmer', value=22.0, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='458.sjeng', value=21.2, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='462.libquantum', value=40.1, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='464.h264ref', value=36.4, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='471.omnetpp', value=12.2, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='473.astar', value=14.3, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='483.xalancbmk', value=21.7, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(metric='estimated_SPECint(R)_rate_base2006',
+                  value=21.846042257681507, unit='',
+                  metadata=EXPECTED_EST_METADATA),
+]
+
 
 class DummyVM(object):
 
@@ -241,22 +294,32 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     vm = DummyVM()
 
     samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_SPECINT, vm,
-                                                  False)
+                                                  False, False)
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_SPECINT)
 
-    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_SPECFP, vm, False)
+    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_SPECFP, vm,
+                                                  False, False)
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_SPECFP)
 
     # By default, incomplete results result in error.
     with self.assertRaises(errors.Benchmarks.RunError):
-      samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD1, vm, False)
+      samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD1, vm,
+                                                    False, False)
 
     with self.assertRaises(errors.Benchmarks.RunError):
-      samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD2, vm, False)
+      samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD2, vm,
+                                                    False, False)
 
     # Now use keep_partial_results
-    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD1, vm, True)
+    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD1, vm,
+                                                  True, False)
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_BAD1)
 
-    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD2, vm, True)
+    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD2, vm,
+                                                  True, False)
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_BAD2)
+
+    # Estimate scores
+    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_EST, vm,
+                                                  True, True)
+    self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_EST)
