@@ -11,6 +11,7 @@ Enhancements:
 - Added total_free_memory_kb to VirtualMachine class and implemented it for
   Linux vms (GH-1397)
 - Created hpc_util for a place to share common HPC functions
+- Added --runspec_estimate_spec flag to calculate an estimated spec score (GH-1401)
 
 Bug fixes and maintenance updates:
 - Fix provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
