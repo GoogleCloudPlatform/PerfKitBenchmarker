@@ -217,6 +217,10 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     # of this command can be a string like '4  4  '.
     return sum(int(i) for i in stdout.split())
 
+  def _GetTotalFreeMemoryKb(self):
+    """Returns the amount of free physical memory on the VM in Kilobytes."""
+    raise NotImplementedError()
+
   def _GetTotalMemoryKb(self):
     """Returns the amount of physical memory on the VM in Kilobytes.
 

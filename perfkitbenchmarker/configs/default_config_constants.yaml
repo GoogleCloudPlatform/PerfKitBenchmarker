@@ -52,7 +52,7 @@ default_500_gb: &default_500_gb
     disk_size: 500
     mount_point: /scratch
   Azure:
-    disk_type: standard-disk
+    disk_type: Standard_LRS
     disk_size: 500
     mount_point: /scratch
   AWS:

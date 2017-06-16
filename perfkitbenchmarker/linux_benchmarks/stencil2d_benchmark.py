@@ -17,6 +17,7 @@ import os
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker.linux_packages import shoc_benchmark_suite
@@ -124,22 +125,9 @@ def Prepare(benchmark_spec):
 
   master_vm = benchmark_spec.vms[0]
   benchmark_spec.num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
-  _CreateAndPushMachineFile(benchmark_spec.vms, benchmark_spec.num_gpus)
-
-
-def _CreateAndPushMachineFile(vms, num_gpus):
-  """Create a file with the IP of each machine in the cluster on its own line.
-
-  Args:
-    vms: The list of vms which will be in the cluster.
-  """
-  with vm_util.NamedTemporaryFile() as machine_file:
-    master_vm = vms[0]
-    machine_file.write('localhost slots=%d\n' % num_gpus)
-    for vm in vms[1:]:
-      machine_file.write('%s slots=%d\n' % (vm.internal_ip, num_gpus))
-    machine_file.close()
-    master_vm.PushFile(machine_file.name, MACHINEFILE)
+  hpc_util.CreateMachineFile(benchmark_spec.vms,
+                             lambda _: benchmark_spec.num_gpus,
+                             MACHINEFILE)
 
 
 def _CreateMedianStencilOutputSample(stencil2d_output, sample_name, pretty_name,
@@ -234,11 +222,10 @@ def Run(benchmark_spec):
   num_processes = len(vms) * num_gpus
 
   metadata = {}
+  metadata.update(cuda_toolkit_8.GetMetadataFromFlags())
   metadata['benchmark_version'] = BENCHMARK_VERSION
   metadata['num_iterations'] = num_iterations
   metadata['gpus_per_node'] = num_gpus
-  metadata['memory_clock_MHz'] = FLAGS.gpu_clock_speeds[0]
-  metadata['graphics_clock_MHz'] = FLAGS.gpu_clock_speeds[1]
   metadata['num_nodes'] = len(vms)
   metadata['num_processes'] = num_processes
 

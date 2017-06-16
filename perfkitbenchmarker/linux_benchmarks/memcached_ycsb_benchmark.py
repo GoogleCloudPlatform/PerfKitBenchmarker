@@ -69,6 +69,9 @@ memcached_ycsb:
     installation. Specify the number of YCSB client VMs with
     --ycsb_client_vms and the number of YCSB server VMS with
     --num_vms.
+  flags:
+    ycsb_client_vms: 1
+    num_vms: 1
   vm_groups:
     servers:
       vm_spec: *default_single_core
@@ -139,8 +142,7 @@ def Prepare(benchmark_spec):
     hosts = ['%s:%s' % (vm.internal_ip, memcached_server.MEMCACHED_PORT)
              for vm in servers]
     benchmark_spec.metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
-                               'ycsb_server_vms': FLAGS.ycsb_server_vms,
-                               'num_vms': len(servers),
+                               'ycsb_server_vms': len(servers),
                                'cache_size': FLAGS.memcached_size_mb}
 
   assert len(hosts) > 0

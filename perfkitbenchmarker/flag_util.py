@@ -90,6 +90,12 @@ class IntegerList(object):
     else:
       return self.groups[group_idx]
 
+  def __eq__(self, other):
+    return tuple(self) == tuple(other)
+
+  def __ne__(self, other):
+    return tuple(self) != tuple(other)
+
   def __iter__(self):
     for group in self.groups:
       if isinstance(group, int) or isinstance(group, long):
@@ -489,4 +495,4 @@ def GetProvidedCommandLineFlags():
   Returns:
     A dictionary of provided flags in the form: {flag_name: flag_value}.
   """
-  return {k: v.value for k, v in FLAGS.FlagDict().iteritems() if v.present}
+  return {k: FLAGS[k].value for k in FLAGS if FLAGS[k].present}
