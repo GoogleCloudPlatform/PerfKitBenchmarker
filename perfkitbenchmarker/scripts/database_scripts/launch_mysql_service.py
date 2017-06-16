@@ -53,7 +53,6 @@ SYSBENCH_THREAD_COUNT = 'sysbench_thread_count'
 SYSBENCH_REPORT_INTERVAL = 'sysbench_report_interval'
 THREAD_COUNT_LIST = 'thread_count_list'
 RUN_URI = 'run_uri'
-DEFAULT_RUN_TIME = 60
 STDOUT = 'STDOUT'
 STDERR = 'STDERR'
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
@@ -90,7 +89,8 @@ gflags.DEFINE_string(RUN_URI, None,
                      'will be completed.')
 gflags.DEFINE_list(ADDITIONAL_FLAGS, None,
                    'List of additional PKB mysql_service valid flags (strings).'
-                   'For example: ["--storage_size=100"].')
+                   'For example: "--storage_size=100","--cloud_storage_bucket='
+                   'bucket_name".')
 
 # TODO: Implement flag for STDOUT/STDERR file paths.
 
@@ -156,13 +156,13 @@ def _run(run_uri):
       run_iterations)
   for t in FLAGS.thread_count_list:
     pkb_cmd = (PKB + STAGE_FLAG + RUN + URI_FLAG + run_uri + THREAD_FLAG +
-               str(t) + RUN_TIME + str(FLAGS.sysbench_run_seconds) + ' &')
+               str(t) + RUN_TIME + str(FLAGS.sysbench_run_seconds))
     if FLAGS.additional_flags:
       pkb_cmd = _append_additional_flags(pkb_cmd)
     stdout_filename, stderr_filename = _generate_filenames(RUN, t)
-    logging.info('Executing PKB run with thread count: %i', t)
+    logging.info('Executing PKB run with thread count: %s', t)
     _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
-    logging.info('Finished executing PKB with thread count: %i', t)
+    logging.info('Finished executing PKB run.')
     time.sleep(SLEEP_TIME_BETWEEN_RUNS)
 
 
@@ -198,7 +198,7 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   # Will probably have to implement with threading.
   p.wait()
   elapsed_time = time.time() - start_time
-  logging.info('PKB call finished in %d seconds.', elapsed_time)
+  logging.info('PKB call finished in %i seconds.', int(elapsed_time))
 
 
 def _get_run_uri(filename):
@@ -222,7 +222,7 @@ def _get_run_uri(filename):
     matches = r.search(line)
     if matches:
       return matches.group(matches.lastindex)
-  raise UnexpectedFileOutputError('No regex match with %s.' % filename)
+  raise UnexpectedFileOutputError('No regex match with %s.', filename)
 
 
 def _append_additional_flags(pkb_cmd):
