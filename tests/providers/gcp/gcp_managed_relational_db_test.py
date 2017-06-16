@@ -23,6 +23,7 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker import disk
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -34,11 +35,26 @@ class GcpManagedRelationalDbSpecTestCase(unittest.TestCase):
   pass
 
 
-class GceManagedRelationalDbFlagsTestCase(unittest.TestCase):
+class GcpManagedRelationalDbFlagsTestCase(unittest.TestCase):
   pass
 
 
-class GceManagedRelationalDbTestCase(unittest.TestCase):
+class GcpManagedRelationalDbTestCase(unittest.TestCase):
+
+  def createSpecDict(self):
+    vm_spec = virtual_machine.BaseVmSpec('NAME',
+                                         **{'machine_type': 'db-n1-standard-1'})
+    disk_spec = disk.BaseDiskSpec('NAME',
+                                  **{'disk_size': 50})
+    return {
+        'database': MYSQL,
+        'database_version': '5.6',
+        'run_uri': '123',
+        'database_name': 'fakedbname',
+        'database_password': 'fakepassword',
+        'vm_spec': vm_spec,
+        'disk_spec': disk_spec
+    }
 
   def setUp(self):
     flag_values = {'run_uri': '123', 'project': None}
@@ -48,18 +64,7 @@ class GceManagedRelationalDbTestCase(unittest.TestCase):
     flags_mock.configure_mock(**flag_values)
     self.addCleanup(p.stop)
 
-    vm_spec = virtual_machine.BaseVmSpec(
-        'NAME',
-        **{'machine_type': 'n1-standard-1'}
-    )
-    mock_db_spec_attrs = {
-        'database': MYSQL,
-        'database_version': '5.6',
-        'run_uri': '123',
-        'database_name': 'fakedbname',
-        'database_password': 'fakepassword',
-        'vm_spec': vm_spec
-    }
+    mock_db_spec_attrs = self.createSpecDict()
     self.mock_db_spec = mock.Mock(
         spec=benchmark_config_spec._ManagedRelationalDbSpec)
     self.mock_db_spec.configure_mock(**mock_db_spec_attrs)
@@ -83,9 +88,13 @@ class GceManagedRelationalDbTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      self.assertTrue(command_string.startswith(
-          'gcloud sql instances create pkb-db-instance-123'), command_string)
-      self.assertTrue(command_string.find('--project fakeproject') != -1)
+      self.assertTrue(
+          command_string.startswith(
+              'gcloud beta sql instances create pkb-db-instance-123'),
+          command_string)
+      self.assertIn('--project fakeproject', command_string)
+      self.assertIn('--tier=db-n1-standard-1', command_string)
+      self.assertIn('--storage-size=50', command_string)
 
 
 if __name__ == '__main__':

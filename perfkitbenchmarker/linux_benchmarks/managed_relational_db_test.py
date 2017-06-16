@@ -11,7 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Test for managed relational database provisioning"""
+"""Test for managed relational database provisioning.
+
+As of June 2017 to make this benchmark run for GCP you must install the
+gcloud beta component. This is necessary because creating a Cloud SQL instance
+with a non-default storage size is in beta right now. This can be removed when
+this feature is part of the default components.
+See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
+for more information.
+To run this benchmark for GCP it is required to install a non-default gcloud
+component. Otherwise this benchmark will fail.
+To ensure that gcloud beta is installed, type
+        'gcloud components list'
+into the terminal. This will output all components and status of each.
+Make sure that
+  name: gcloud Beta Commands
+  id:  beta
+has status: Installed.
+If not, run
+        'gcloud components install beta'
+to install it. This will allow this benchmark to properly create an instance.
+"""
 
 from perfkitbenchmarker import configs
 
@@ -24,7 +44,7 @@ managed_relational_db_test:
     database_version: '5.6'
     vm_spec:
       GCP:
-        machine_type: n1-standard-1
+        machine_type: db-n1-standard-1
         zone: us-central1-c
       AWS:
         machine_type: db.t1.micro

@@ -12,6 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+"""
+As of June 2017 to make this benchmark run for GCP you must install the
+gcloud beta component. This is necessary because creating a Cloud SQL instance
+with a non-default storage size is in beta right now. This can be removed when
+this feature is part of the default components.
+See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
+for more information.
+To run this benchmark for GCP it is required to install a non-default gcloud
+component. Otherwise this benchmark will fail.
+To ensure that gcloud beta is installed, type
+        'gcloud components list'
+into the terminal. This will output all components and status of each.
+Make sure that
+  name: gcloud Beta Commands
+  id:  beta
+has status: Installed.
+If not, run
+        'gcloud components install beta'
+to install it. This will allow this benchmark to properly create an instance.
+"""
+
+
+
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
@@ -30,6 +54,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   CLOUD = providers.GCP
   SERVICE_NAME = 'managed_relational_db'
+  # These are the constants that should be specified in GCP's cloud SQL command.
+  DEFAULT_BACKUP_START_TIME = '07:00'
+  GCP_MY_SQL_VERSION = 'MYSQL_5_6'
+  GCP_PRICING_PLAN = 'PACKAGE'
 
   def GetEndpoint(self):
     pass
@@ -49,16 +77,45 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
 
   def _Create(self):
-    """Creates the GCP Cloud SQL instance"""
+    """Creates the GCP Cloud SQL instance."""
+    db_tier = self.spec.vm_spec.machine_type
+    storage_size = self.spec.disk_spec.disk_size
+    instance_zone = self.spec.vm_spec.zone
     cloudsql_specific_database_version = self._GetDatabaseVersionNameFromFlavor(
-        self.spec.database,
-        self.spec.database_version)
-    cmd = util.GcloudCommand(self, 'sql', 'instances', 'create',
-                             self.instance_id)
+        self.spec.database, self.spec.database_version)
+    # Please install gcloud component beta for this to work. See note in
+    # module level docstring.
+    # This is necessary only because creating a SQL instance with a non-default
+    # storage size is in beta right now in gcloud. This can be removed when
+    # this feature is part of the default components. See
+    # https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
+    # for more information. When this flag is allowed in the default gcloud
+    # components the create_db_cmd below can be updated.
+    cmd = util.GcloudCommand(
+        self,
+        'beta',
+        'sql',
+        'instances',
+        'create',
+        self.instance_id,
+        '--quiet',
+        '--format=json',
+        '--async',
+        '--activation-policy=ALWAYS',
+        '--assign-ip',
+        # TODO: Implement authorized networks
+        #         '--authorized-networks=%s' % authorized_network,
+        '--backup-start-time=%s' % self.DEFAULT_BACKUP_START_TIME,
+        '--enable-bin-log',
+        '--tier=%s' % db_tier,
+        '--gce-zone=%s' % instance_zone,
+        '--database-version=%s' % self.GCP_MY_SQL_VERSION,
+        '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
+        '--storage-size=%d' % storage_size)
     cmd.flags['project'] = self.project
     cmd.flags['database-version'] = cloudsql_specific_database_version
 
-    cmd.Issue()
+    _, _, _ = cmd.Issue()
 
   def _Delete(self):
     """Deletes the underlying resource.
