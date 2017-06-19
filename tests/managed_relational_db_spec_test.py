@@ -16,6 +16,7 @@
 import unittest
 
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import mock_flags
@@ -30,6 +31,24 @@ def _mergeDicts(dict1, dict2):
   result = dict1.copy()
   result.update(dict2)
   return result
+
+
+class FakeManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
+
+  def GetEndpoint(self):
+    pass
+
+  def GetPort(self):
+    pass
+
+  def _Create(self):
+    pass
+
+  def _Delete(self):
+    pass
+
+  def GetLatestDatabaseVersion(self, _):
+    pass
 
 
 class ManagedRelationalDbSpecTestCase(unittest.TestCase):
@@ -52,6 +71,13 @@ class ManagedRelationalDbSpecTestCase(unittest.TestCase):
             }
         }
     }
+
+    managed_relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {
+        'GCP': FakeManagedRelationalDb(None)
+    }
+
+  def tearDown(self):
+    managed_relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {}
 
   def testMinimalConfig(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
@@ -157,6 +183,13 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
             }
         }
     }
+
+    managed_relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {
+        'GCP': FakeManagedRelationalDb(None)
+    }
+
+  def tearDown(self):
+    managed_relational_db._MANAGED_RELATIONAL_DB_REGISTRY = {}
 
   # Not testing this yet, because it requires the implementation
   # of a managed_relational_db provider for the specified
