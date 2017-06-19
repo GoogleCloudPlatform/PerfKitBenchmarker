@@ -43,8 +43,8 @@ class FlagsDecoder(option_decoders.TypeVerifier):
   """Processes the flags override dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
-    super(FlagsDecoder, self).__init__(default=None, none_ok=True,
-                                       valid_types=(dict,), **kwargs)
+    super(FlagsDecoder, self).__init__(
+        default=None, none_ok=True, valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Processes the flags override dictionary of a benchmark config object.
@@ -84,14 +84,14 @@ class FlagsDecoder(option_decoders.TypeVerifier):
 
 
 class _DpbApplicationListDecoder(option_decoders.ListDecoder):
-    """Decodes the list of applications to be enabled on the dpb service."""
+  """Decodes the list of applications to be enabled on the dpb service."""
 
-    def __init__(self, **kwargs):
-        super(_DpbApplicationListDecoder, self).__init__(
-            default=None,
-            item_decoder=option_decoders.EnumDecoder([dpb_service.FLINK,
-                                                      dpb_service.HIVE]),
-            **kwargs)
+  def __init__(self, **kwargs):
+    super(_DpbApplicationListDecoder, self).__init__(
+        default=None,
+        item_decoder=option_decoders.EnumDecoder(
+            [dpb_service.FLINK, dpb_service.HIVE]),
+        **kwargs)
 
 
 class _DpbServiceDecoder(option_decoders.TypeVerifier):
@@ -99,7 +99,7 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
   benchmark config object."""
 
   def __init__(self, **kwargs):
-      super(_DpbServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
+    super(_DpbServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies dpb(data processing backend) service dictionary of a
@@ -119,15 +119,16 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
     dpb_service_config = super(_DpbServiceDecoder, self).Decode(
         value, component_full_name, flag_values)
     if dpb_service_config['service_type'] == dpb_service.EMR:
-        if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
-            raise errors.Config.InvalidValue('EMR service requires S3.')
-    result = _DpbServiceSpec(self._GetOptionFullName(component_full_name),
-                             flag_values, **dpb_service_config)
+      if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
+        raise errors.Config.InvalidValue('EMR service requires S3.')
+    result = _DpbServiceSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **dpb_service_config)
     return result
 
 
 class _DpbServiceSpec(spec.BaseSpec):
-    """Configurable options of an Distributed Processing Backend Service.
+  """Configurable options of an Distributed Processing Backend Service.
 
     We may add more options here, such as disk specs, as necessary.
     When there are flags for these attributes, the convention is that
@@ -142,40 +143,44 @@ class _DpbServiceSpec(spec.BaseSpec):
         to be enabled on the dpb service
     """
 
-    def __init__(self, component_full_name, flag_values=None, **kwargs):
-        super(_DpbServiceSpec, self).__init__(component_full_name,
-                                              flag_values=flag_values,
-                                              **kwargs)
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_DpbServiceSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
 
-    @classmethod
-    def _GetOptionDecoderConstructions(cls):
-        """Gets decoder classes and constructor args for each configurable option.
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
 
         Returns:
           dict. Maps option name string to a (ConfigOptionDecoder class, dict)
            pair. The pair specifies a decoder class and its __init__() keyword
            arguments to construct in order to decode the named option.
         """
-        result = super(_DpbServiceSpec, cls)._GetOptionDecoderConstructions()
-        result.update({
-            'static_dpb_service_instance': (option_decoders.StringDecoder,
-                                            {'default': None, 'none_ok': True}),
-            'service_type': (option_decoders.EnumDecoder, {
-                'default': dpb_service.DATAPROC,
-                'valid_values': [dpb_service.DATAPROC,
-                                 dpb_service.DATAFLOW,
-                                 dpb_service.EMR]}),
-            'worker_group': (_VmGroupSpecDecoder, {}),
-            'worker_count': (option_decoders.IntDecoder,
-                             {'default': dpb_service.DEFAULT_WORKER_COUNT,
-                              'min': 2}),
-            'applications': (_DpbApplicationListDecoder, {})
-        })
-        return result
+    result = super(_DpbServiceSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'static_dpb_service_instance': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'service_type': (option_decoders.EnumDecoder, {
+            'default':
+                dpb_service.DATAPROC,
+            'valid_values': [
+                dpb_service.DATAPROC, dpb_service.DATAFLOW, dpb_service.EMR
+            ]
+        }),
+        'worker_group': (_VmGroupSpecDecoder, {}),
+        'worker_count': (option_decoders.IntDecoder, {
+            'default': dpb_service.DEFAULT_WORKER_COUNT,
+            'min': 2
+        }),
+        'applications': (_DpbApplicationListDecoder, {})
+    })
+    return result
 
-    @classmethod
-    def _ApplyFlags(cls, config_values, flag_values):
-        """Modifies config options based on runtime flag values.
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
 
         Can be overridden by derived classes to add support for specific flags.
 
@@ -185,17 +190,17 @@ class _DpbServiceSpec(spec.BaseSpec):
           flag_values: flags.FlagValues. Runtime flags that may override the
               provided config values.
         """
-        super(_DpbServiceSpec, cls)._ApplyFlags(config_values, flag_values)
-        if flag_values['static_dpb_service_instance'].present:
-            config_values['static_dpb_service_instance'] = (
-                flag_values.static_dpb_service_instance)
-        # TODO(saksena): Update the documentation for zones assignment
-        if flag_values['zones'].present:
-            for group in ('worker_group'):
-                if group in config_values:
-                    for cloud in config_values[group]['vm_spec']:
-                        config_values[group]['vm_spec'][cloud]['zone'] = (
-                            flag_values.zones[0])
+    super(_DpbServiceSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['static_dpb_service_instance'].present:
+      config_values['static_dpb_service_instance'] = (
+          flag_values.static_dpb_service_instance)
+    # TODO(saksena): Update the documentation for zones assignment
+    if flag_values['zones'].present:
+      for group in ('worker_group'):
+        if group in config_values:
+          for cloud in config_values[group]['vm_spec']:
+            config_values[group]['vm_spec'][cloud]['zone'] = (
+                flag_values.zones[0])
 
 
 class _PerCloudConfigSpec(spec.BaseSpec):
@@ -215,8 +220,10 @@ class _PerCloudConfigSpec(spec.BaseSpec):
     """
     result = super(_PerCloudConfigSpec, cls)._GetOptionDecoderConstructions()
     for cloud in providers.VALID_CLOUDS:
-      result[cloud] = option_decoders.TypeVerifier, {'default': None,
-                                                     'valid_types': (dict,)}
+      result[cloud] = option_decoders.TypeVerifier, {
+          'default': None,
+          'valid_types': (dict,)
+      }
     return result
 
 
@@ -242,7 +249,8 @@ class _PerCloudConfigDecoder(option_decoders.TypeVerifier):
     input_dict = super(_PerCloudConfigDecoder, self).Decode(
         value, component_full_name, flag_values)
     return None if input_dict is None else _PerCloudConfigSpec(
-        self._GetOptionFullName(component_full_name), flag_values=flag_values,
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
         **input_dict)
 
 
@@ -269,10 +277,11 @@ class _StaticVmDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    input_dict = super(_StaticVmDecoder, self).Decode(
-        value, component_full_name, flag_values)
+    input_dict = super(_StaticVmDecoder,
+                       self).Decode(value, component_full_name, flag_values)
     return static_virtual_machine.StaticVmSpec(
-        self._GetOptionFullName(component_full_name), flag_values=flag_values,
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
         **input_dict)
 
 
@@ -301,9 +310,8 @@ class _SparkServiceSpec(spec.BaseSpec):
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(_SparkServiceSpec, self).__init__(component_full_name,
-                                            flag_values=flag_values,
-                                            **kwargs)
+    super(_SparkServiceSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -316,16 +324,23 @@ class _SparkServiceSpec(spec.BaseSpec):
     """
     result = super(_SparkServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'static_cluster_id': (option_decoders.StringDecoder,
-                              {'default': None, 'none_ok': True}),
+        'static_cluster_id': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
         'service_type': (option_decoders.EnumDecoder, {
-            'default': spark_service.PROVIDER_MANAGED,
-            'valid_values': [spark_service.PROVIDER_MANAGED,
-                             spark_service.PKB_MANAGED]}),
+            'default':
+                spark_service.PROVIDER_MANAGED,
+            'valid_values': [
+                spark_service.PROVIDER_MANAGED, spark_service.PKB_MANAGED
+            ]
+        }),
         'worker_group': (_VmGroupSpecDecoder, {}),
-        'master_group': (_VmGroupSpecDecoder,
-                         {'default': None,
-                          'none_ok': True})})
+        'master_group': (_VmGroupSpecDecoder, {
+            'default': None,
+            'none_ok': True
+        })
+    })
     return result
 
   @classmethod
@@ -342,8 +357,7 @@ class _SparkServiceSpec(spec.BaseSpec):
     """
     super(_SparkServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['spark_static_cluster_id'].present:
-      config_values['static_cluster_id'] = (
-          flag_values.spark_static_cluster_id)
+      config_values['static_cluster_id'] = (flag_values.spark_static_cluster_id)
     if flag_values['zones'].present:
       for group in ('master_group', 'worker_group'):
         if group in config_values:
@@ -369,11 +383,11 @@ class _VmGroupSpec(spec.BaseSpec):
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(_VmGroupSpec, self).__init__(component_full_name,
-                                       flag_values=flag_values, **kwargs)
-    ignore_package_requirements = (
-        getattr(flag_values, 'ignore_package_requirements', True) if flag_values
-        else True)
+    super(_VmGroupSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
+    ignore_package_requirements = (getattr(flag_values,
+                                           'ignore_package_requirements', True)
+                                   if flag_values else True)
     providers.LoadProvider(self.cloud, ignore_package_requirements)
     if self.disk_spec:
       disk_config = getattr(self.disk_spec, self.cloud, None)
@@ -384,7 +398,8 @@ class _VmGroupSpec(spec.BaseSpec):
       disk_spec_class = disk.GetDiskSpecClass(self.cloud)
       self.disk_spec = disk_spec_class(
           '{0}.disk_spec.{1}'.format(component_full_name, self.cloud),
-          flag_values=flag_values, **disk_config)
+          flag_values=flag_values,
+          **disk_config)
     vm_config = getattr(self.vm_spec, self.cloud, None)
     if vm_config is None:
       raise errors.Config.MissingOption(
@@ -393,7 +408,8 @@ class _VmGroupSpec(spec.BaseSpec):
     vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
     self.vm_spec = vm_spec_class(
         '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
-        flag_values=flag_values, **vm_config)
+        flag_values=flag_values,
+        **vm_config)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -407,18 +423,27 @@ class _VmGroupSpec(spec.BaseSpec):
     result = super(_VmGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS}),
+            'valid_values': providers.VALID_CLOUDS
+        }),
         'disk_count': (option_decoders.IntDecoder, {
             'default': _DEFAULT_DISK_COUNT,
-            'min': 0, 'none_ok': True}),
-        'disk_spec': (_PerCloudConfigDecoder, {'default': None,
-                                               'none_ok': True}),
+            'min': 0,
+            'none_ok': True
+        }),
+        'disk_spec': (_PerCloudConfigDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
         'os_type': (option_decoders.EnumDecoder, {
-            'valid_values': os_types.ALL}),
+            'valid_values': os_types.ALL
+        }),
         'static_vms': (_StaticVmListDecoder, {}),
         'vm_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_VM_COUNT, 'min': 0}),
-        'vm_spec': (_PerCloudConfigDecoder, {})})
+            'default': _DEFAULT_VM_COUNT,
+            'min': 0
+        }),
+        'vm_spec': (_PerCloudConfigDecoder, {})
+    })
     return result
 
   @classmethod
@@ -470,9 +495,10 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
     result = {}
     for vm_group_name, vm_group_config in vm_group_configs.iteritems():
       result[vm_group_name] = _VmGroupSpec(
-          '{0}.{1}'.format(self._GetOptionFullName(component_full_name),
-                           vm_group_name),
-          flag_values=flag_values, **vm_group_config)
+          '{0}.{1}'.format(
+              self._GetOptionFullName(component_full_name), vm_group_name),
+          flag_values=flag_values,
+          **vm_group_config)
     return result
 
 
@@ -500,13 +526,15 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
     """
     vm_group_config = super(_VmGroupSpecDecoder, self).Decode(
         value, component_full_name, flag_values)
-    return _VmGroupSpec(self._GetOptionFullName(component_full_name),
-                        flag_values=flag_values,
-                        **vm_group_config)
+    return _VmGroupSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **vm_group_config)
 
 
 class _SparkServiceDecoder(option_decoders.TypeVerifier):
   """Validates the spark_service dictionary of a benchmark config object."""
+
   def __init__(self, **kwargs):
     super(_SparkServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
@@ -526,8 +554,9 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
     """
     spark_service_config = super(_SparkServiceDecoder, self).Decode(
         value, component_full_name, flag_values)
-    result = _SparkServiceSpec(self._GetOptionFullName(component_full_name),
-                               flag_values, **spark_service_config)
+    result = _SparkServiceSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **spark_service_config)
     return result
 
 
@@ -562,15 +591,14 @@ class BenchmarkConfigSpec(spec.BaseSpec):
       for group_name, group_spec in sorted(self.vm_groups.iteritems()):
         if group_spec.os_type not in expected_os_types:
           mismatched_os_types.append('{0}.vm_groups[{1}].os_type: {2}'.format(
-              component_full_name, repr(group_name),
-              repr(group_spec.os_type)))
+              component_full_name, repr(group_name), repr(group_spec.os_type)))
       if mismatched_os_types:
         raise errors.Config.InvalidValue(
             'VM groups in {0} may only have the following OS types: {1}. The '
             'following VM group options are invalid:{2}{3}'.format(
-                component_full_name,
-                ', '.join(repr(os_type) for os_type in expected_os_types),
-                os.linesep, os.linesep.join(mismatched_os_types)))
+                component_full_name, ', '.join(
+                    repr(os_type) for os_type in expected_os_types), os.linesep,
+                os.linesep.join(mismatched_os_types)))
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -586,15 +614,30 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     """
     result = super(BenchmarkConfigSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'description': (option_decoders.StringDecoder, {'default': None}),
-        'name': (option_decoders.StringDecoder, {'default': None}),
-        'flags': (option_decoders.TypeVerifier, {'default': None,
-                                                 'none_ok': True,
-                                                 'valid_types': (dict,)}),
-        'vm_groups': (_VmGroupsDecoder, {'default': {}}),
-        'spark_service': (_SparkServiceDecoder, {'default': None}),
-        'container_cluster': (_VmGroupSpecDecoder, {'default': None}),
-        'dpb_service': (_DpbServiceDecoder, {'default': None})})
+        'description': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'name': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'flags': (option_decoders.TypeVerifier, {
+            'default': None,
+            'none_ok': True,
+            'valid_types': (dict,)
+        }),
+        'vm_groups': (_VmGroupsDecoder, {
+            'default': {}
+        }),
+        'spark_service': (_SparkServiceDecoder, {
+            'default': None
+        }),
+        'container_cluster': (_VmGroupSpecDecoder, {
+            'default': None
+        }),
+        'dpb_service': (_DpbServiceDecoder, {
+            'default': None
+        })
+    })
     return result
 
   def _DecodeAndInit(self, component_full_name, config, decoders, flag_values):
