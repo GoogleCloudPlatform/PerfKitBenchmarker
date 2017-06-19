@@ -3,6 +3,7 @@ Breaking changes:
 
 New features:
 - Added CUDA-enabled HPCG benchmark (GH-1395)
+- Added ManagedRelationalDatabase base classes and tests (GH-1405)
 
 Enhancements:
 - Added basic auth support for Mesos provider. (GH-1390)
