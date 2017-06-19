@@ -322,6 +322,9 @@ class _SparkServiceSpec(spec.BaseSpec):
             'default': spark_service.PROVIDER_MANAGED,
             'valid_values': [spark_service.PROVIDER_MANAGED,
                              spark_service.PKB_MANAGED]}),
+        'version': (option_decoders.EnumDecoder, {
+            'default': spark_service.SPARK_1_6_2,
+            'valid_values': spark_service.SPARK_VERSIONS}),
         'worker_group': (_VmGroupSpecDecoder, {}),
         'master_group': (_VmGroupSpecDecoder,
                          {'default': None,

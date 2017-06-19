@@ -30,6 +30,12 @@ FLAGS = flags.FLAGS
 
 GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
+DATAPROC_VERSION_MAP = {
+    spark_service.SPARK_1_6_1: None,
+    spark_service.SPARK_1_6_2: '1.0',
+    spark_service.SPARK_2_0_2: '1.1',
+}
+
 
 class GcpDataproc(spark_service.BaseSparkService):
   """Object representing a GCP Dataproc cluster.
@@ -93,6 +99,11 @@ class GcpDataproc(spark_service.BaseSparkService):
       if group_spec.vm_spec.boot_disk_size:
         disk_flag = group_type + '-boot-disk-size'
         cmd.flags[disk_flag] = group_spec.vm_spec.boot_disk_size
+
+    if self.spec.version is not None:
+      if DATAPROC_VERSION_MAP[self.spec.version] is None:
+        raise Exception('Spark version specified not supported on Dataproc.')
+      cmd.flags['image-version'] = DATAPROC_VERSION_MAP[self.spec.version]
 
     cmd.Issue()
 

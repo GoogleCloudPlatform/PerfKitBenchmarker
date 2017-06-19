@@ -64,6 +64,7 @@ spark:
   description: Run a jar on a spark cluster.
   spark_service:
     service_type: managed
+    version: 1.6.2
     worker_group:
       vm_spec:
         GCP:

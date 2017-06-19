@@ -44,6 +44,12 @@ flags.DEFINE_string('spark_static_cluster_id', None,
 PKB_MANAGED = 'pkb_managed'
 PROVIDER_MANAGED = 'managed'
 
+# Spark version options.
+SPARK_1_6_1 = '1.6.1'
+SPARK_1_6_2 = '1.6.2'
+SPARK_2_0_2 = '2.0.2'
+SPARK_VERSIONS = [SPARK_1_6_1, SPARK_1_6_2, SPARK_2_0_2]
+
 SUCCESS = 'success'
 RUNTIME = 'running_time'
 WAITING = 'pending_time'
