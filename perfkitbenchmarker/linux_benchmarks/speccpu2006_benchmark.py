@@ -85,7 +85,6 @@ flags.DEFINE_boolean(
     'failed with status "NR". Available results will be saved, and PKB samples '
     'will be marked with a metadata value of partial=true. If unset, partial '
     'failures are treated as errors.')
-
 flags.DEFINE_boolean(
     'runspec_estimate_spec', False,
     'Used by the PKB speccpu2006 benchmark. If set, the benchmark will report '
@@ -96,7 +95,7 @@ flags.DEFINE_boolean(
     'estimated_SPECfp(R)_rate_base2006.  Available results will be saved, '
     'and PKB samples will be marked with a metadata value of partial=true. If '
     'unset, SPECint(R)_rate_base2006 and SPECfp(R)_rate_base2006 are listed '
-    'in the metadata under missing_results')
+    'in the metadata under missing_results.')
 
 BENCHMARK_NAME = 'speccpu2006'
 BENCHMARK_CONFIG = """
