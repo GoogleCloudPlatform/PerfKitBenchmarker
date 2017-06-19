@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Container for all data required for a benchmark to run."""
 
 import contextlib
@@ -61,22 +60,23 @@ SKIP_CHECK = 'none'
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('cloud', providers.GCP,
-                  providers.VALID_CLOUDS,
+flags.DEFINE_enum('cloud', providers.GCP, providers.VALID_CLOUDS,
                   'Name of the cloud to use.')
 flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM. '
                     'Upon creation, these directories will have numbers '
                     'appended to them (for example /scratch0, /scratch1, etc).')
+# pyformat: disable
 flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
                   [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
                   'Method used to check compatibility between the benchmark '
                   ' and the cloud.  ' + SUPPORTED + ' runs the benchmark only'
                   ' if the cloud provider has declared it supported. ' +
                   NOT_EXCLUDED + ' runs the benchmark unless it has been'
-                  ' declared not supported by the cloud provider. ' +
-                  SKIP_CHECK + ' does not do the compatibility'
+                  ' declared not supported by the cloud provider. ' + SKIP_CHECK
+                  + ' does not do the compatibility'
                   ' check.')
+# pyformat: enable
 
 
 class BenchmarkSpec(object):
@@ -163,9 +163,10 @@ class BenchmarkSpec(object):
 
     # First create the Static VM objects.
     if group_spec.static_vms:
-      specs = [spec for spec in group_spec.static_vms
-               if (FLAGS.static_vm_tags is None or
-                   spec.tag in FLAGS.static_vm_tags)][:vm_count]
+      specs = [
+          spec for spec in group_spec.static_vms
+          if (FLAGS.static_vm_tags is None or spec.tag in FLAGS.static_vm_tags)
+      ][:vm_count]
       for vm_spec in specs:
         static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
         vms.append(static_vm_class(vm_spec))
@@ -198,8 +199,7 @@ class BenchmarkSpec(object):
         zone_list = FLAGS.zones + FLAGS.extra_zones
         group_spec.vm_spec.zone = zone_list[self._zone_index]
         self._zone_index = (self._zone_index + 1
-                            if self._zone_index < len(zone_list) - 1
-                            else 0)
+                            if self._zone_index < len(zone_list) - 1 else 0)
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       if disk_spec and not vm.is_static:
         if disk_spec.disk_type == disk.LOCAL and disk_count is None:
@@ -230,8 +230,7 @@ class BenchmarkSpec(object):
       raise ValueError('Provider {0} does not support {1}.  Use '
                        '--benchmark_compatibility_checking=none '
                        'to override this check.'.format(
-                           provider_info_class.CLOUD,
-                           self.name))
+                           provider_info_class.CLOUD, self.name))
 
   def _ConstructJujuController(self, group_spec):
     """Construct a VirtualMachine object for a Juju controller."""
@@ -253,22 +252,22 @@ class BenchmarkSpec(object):
       vms = self.ConstructVirtualMachineGroup(group_name, group_spec)
 
       if group_spec.os_type == os_types.JUJU:
-          # The Juju VM needs to be created first, so that subsequent units can
-          # be properly added under its control.
-          if group_spec.cloud in clouds:
-            jujuvm = clouds[group_spec.cloud]
-          else:
-            jujuvm = self._ConstructJujuController(group_spec)
-            clouds[group_spec.cloud] = jujuvm
+        # The Juju VM needs to be created first, so that subsequent units can
+        # be properly added under its control.
+        if group_spec.cloud in clouds:
+          jujuvm = clouds[group_spec.cloud]
+        else:
+          jujuvm = self._ConstructJujuController(group_spec)
+          clouds[group_spec.cloud] = jujuvm
 
-          for vm in vms:
-            vm.controller = clouds[group_spec.cloud]
-            vm.vm_group = group_name
+        for vm in vms:
+          vm.controller = clouds[group_spec.cloud]
+          vm.vm_group = group_name
 
-          jujuvm.units.extend(vms)
-          if jujuvm and jujuvm not in self.vms:
-            self.vms.extend([jujuvm])
-            self.vm_groups['%s_juju_controller' % group_spec.cloud] = [jujuvm]
+        jujuvm.units.extend(vms)
+        if jujuvm and jujuvm not in self.vms:
+          self.vms.extend([jujuvm])
+          self.vm_groups['%s_juju_controller' % group_spec.cloud] = [jujuvm]
 
       self.vm_groups[group_name] = vms
       self.vms.extend(vms)
@@ -278,7 +277,6 @@ class BenchmarkSpec(object):
         self.config.spark_service.service_type == spark_service.PKB_MANAGED):
       for group_name in 'master_group', 'worker_group':
         self.spark_service.vms[group_name] = self.vm_groups[group_name]
-
 
   def ConstructSparkService(self):
     """Create the spark_service object and create groups for its vms."""
@@ -330,8 +328,9 @@ class BenchmarkSpec(object):
       sshable_vms = [vm for vm in self.vms if vm.OS_TYPE != os_types.WINDOWS]
       sshable_vm_groups = {}
       for group_name, group_vms in self.vm_groups.iteritems():
-        sshable_vm_groups[group_name] = [vm for vm in group_vms
-                                         if vm.OS_TYPE != os_types.WINDOWS]
+        sshable_vm_groups[group_name] = [
+            vm for vm in group_vms if vm.OS_TYPE != os_types.WINDOWS
+        ]
       vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
     if self.spark_service:
       self.spark_service.Create()
@@ -411,9 +410,11 @@ class BenchmarkSpec(object):
     Args:
         vm: The BaseVirtualMachine object representing the VM.
     """
-    vm_metadata = {'benchmark': self.name,
-                   'perfkit_uuid': self.uuid,
-                   'benchmark_uid': self.uid}
+    vm_metadata = {
+        'benchmark': self.name,
+        'perfkit_uuid': self.uuid,
+        'benchmark_uid': self.uid
+    }
     for item in FLAGS.vm_metadata:
       if ':' not in item:
         raise Exception('"%s" not in expected key:value format' % item)
