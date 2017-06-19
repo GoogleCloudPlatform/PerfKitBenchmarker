@@ -30,6 +30,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import spark_service
+from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -291,6 +292,125 @@ class _StaticVmListDecoder(option_decoders.ListDecoder):
   def __init__(self, **kwargs):
     super(_StaticVmListDecoder, self).__init__(
         default=list, item_decoder=_StaticVmDecoder(), **kwargs)
+
+
+class _ManagedRelationalDbSpec(spec.BaseSpec):
+  """Configurable options of a managed database service."""
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_ManagedRelationalDbSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
+    # TODO(ferneyhough): This is a lot of boilerplate, and is repeated
+    # below in VmGroupSpec. See if some can be consolidated. Maybe we can
+    # specify a VmGroupSpec instead of both vm_spec and disk_spec.
+    ignore_package_requirements = (getattr(flag_values,
+                                           'ignore_package_requirements', True)
+                                   if flag_values else True)
+    providers.LoadProvider(self.cloud, ignore_package_requirements)
+
+    if self.disk_spec:
+      disk_config = getattr(self.disk_spec, self.cloud, None)
+      if disk_config is None:
+        raise errors.Config.MissingOption(
+            '{0}.cloud is "{1}", but {0}.disk_spec does not contain a '
+            'configuration for "{1}".'.format(component_full_name, self.cloud))
+      disk_spec_class = disk.GetDiskSpecClass(self.cloud)
+      self.disk_spec = disk_spec_class(
+          '{0}.disk_spec.{1}'.format(component_full_name, self.cloud),
+          flag_values=flag_values,
+          **disk_config)
+
+    vm_config = getattr(self.vm_spec, self.cloud, None)
+    if vm_config is None:
+      raise errors.Config.MissingOption(
+          '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
+          'configuration for "{1}".'.format(component_full_name, self.cloud))
+    vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
+    self.vm_spec = vm_spec_class(
+        '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
+        flag_values=flag_values,
+        **vm_config)
+
+    # Set defaults that were not able to be set in
+    # GetOptionDecoderConstructions()
+    if not self.database_version:
+      managed_db_class = managed_relational_db.GetManagedRelationalDbClass(
+          self.cloud)
+      self.database_version = managed_db_class.GetLatestDatabaseVersion(
+          self.database)
+    if not self.database_name:
+      self.database_name = 'pkb-db-%s' % flag_values.run_uri
+    if not self.database_username:
+      self.database_username = 'pkb%s' % flag_values.run_uri
+    if not self.database_password:
+      self.database_password = managed_relational_db.generateRandomDbPassword()
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments
+      to construct in order to decode the named option.
+    """
+    result = super(_ManagedRelationalDbSpec,
+                   cls)._GetOptionDecoderConstructions()
+    result.update({
+        'cloud': (option_decoders.EnumDecoder, {
+            'valid_values': providers.VALID_CLOUDS
+        }),
+        'database': (option_decoders.EnumDecoder, {
+            'valid_values': [
+                managed_relational_db.MYSQL, managed_relational_db.POSTGRES
+            ]
+        }),
+        'database_name': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'database_version': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'database_password': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'database_username': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'high_availability': (option_decoders.BooleanDecoder, {
+            'default': False
+        }),
+        'vm_spec': (_PerCloudConfigDecoder, {}),
+        'disk_spec': (_PerCloudConfigDecoder, {})
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
+    if flag_values['database'].present:
+      config_values['database'] = flag_values.database
+    if flag_values['database_name'].present:
+      config_values['database_name'] = flag_values.database_name
+    if flag_values['database_version'].present:
+      config_values['database_version'] = flag_values.database_version
+    if flag_values['database_username'].present:
+      config_values['database_username'] = flag_values.database_username
+    if flag_values['database_password'].present:
+      config_values['database_password'] = flag_values.database_password
+    if flag_values['high_availability'].present:
+      config_values['high_availability'] = flag_values.high_availability
 
 
 class _SparkServiceSpec(spec.BaseSpec):
@@ -560,6 +680,39 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _ManagedRelationalDbDecoder(option_decoders.TypeVerifier):
+  """Validate the managed_relational_db dictionary of a benchmark config object.
+  """
+
+  def __init__(self, **kwargs):
+    super(_ManagedRelationalDbDecoder, self).__init__(
+        valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify managed_relational_db dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+      component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _ManagedRelationalDbService built from the config passed in in value.
+
+    Raises:
+      errors.Config.InvalidateValue upon invalid input value.
+    """
+    managed_relational_db_config = super(
+        _ManagedRelationalDbDecoder, self).Decode(value, component_full_name,
+                                                  flag_values)
+    result = _ManagedRelationalDbSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **managed_relational_db_config)
+    return result
+
+
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -635,6 +788,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'default': None
         }),
         'dpb_service': (_DpbServiceDecoder, {
+            'default': None
+        }),
+        'managed_relational_db': (_ManagedRelationalDbDecoder, {
             'default': None
         })
     })

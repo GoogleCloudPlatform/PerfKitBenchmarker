@@ -419,6 +419,7 @@ def DoProvisionPhase(spec, timer):
   # spark service needs to go first, because it adds some vms.
   spec.ConstructSparkService()
   spec.ConstructDpbService()
+  spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
