@@ -4,7 +4,7 @@ import uuid
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
-# TODO: change to enum
+# TODO (ferneyhough): change to enum
 flags.DEFINE_string('database', None,
                     'Managed database flavor to use (mysql, postgres)')
 flags.DEFINE_string('database_name', None,
@@ -16,7 +16,7 @@ flags.DEFINE_string('database_username', None,
 flags.DEFINE_string('database_password', None,
                     'Database password. Defaults to '
                     'a random 10-character alpha-numeric string')
-# TODO: write a validator
+# TODO (ferneyhough): write a validator
 flags.DEFINE_string('database_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
 flags.DEFINE_boolean('high_availability', False,
@@ -29,11 +29,17 @@ FLAGS = flags.FLAGS
 
 
 def generateRandomDbPassword():
+  """Generate a random password 10 characters in length."""
+
   return str(uuid.uuid4())[:10]
 
 
 def GetManagedRelationalDbClass(cloud):
-  """Get the ManagedRelationalDb class corresponding to 'cloud'."""
+  """Get the ManagedRelationalDb class corresponding to 'cloud'.
+
+  Args:
+    cloud: name of cloud to get the class for
+  """
   if cloud in _MANAGED_RELATIONAL_DB_REGISTRY:
     return _MANAGED_RELATIONAL_DB_REGISTRY.get(cloud)
   raise Exception('No ManagedDb found for {0}'.format(cloud))
@@ -68,14 +74,34 @@ class BaseManagedRelationalDb(resource.BaseResource):
 
   @abstractmethod
   def GetEndpoint(self):
+    """Return the endpoint of the managed database.
+
+    Returns:
+      database endpoint (IP or dns name)
+    """
     pass
 
   @abstractmethod
   def GetPort(self):
+    """Return the port of the managed database.
+
+    Returns:
+      database port number
+    """
     pass
 
   def GetUsername(self):
+    """Return the username associated with the managed database.
+
+    Returns:
+      database username
+    """
     return self.spec.database_username
 
   def GetPassword(self):
+    """Return the password associated with the managed database.
+
+    Returns:
+      database password
+    """
     return self.spec.database_password

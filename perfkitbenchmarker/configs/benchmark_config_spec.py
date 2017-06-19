@@ -112,10 +112,8 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
       component containing the config option.
       flag_values: flags.FlagValues.  Runtime flag values to be propagated
       to BaseSpec constructors.
-
     Returns:
       _DpbServiceSpec Build from the config passed in in value.
-
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
@@ -302,7 +300,7 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_ManagedRelationalDbSpec, self).__init__(
         component_full_name, flag_values=flag_values, **kwargs)
-    # TODO(ferneyhough): This is a lot of boilerplate (kinda), and is repeated
+    # TODO(ferneyhough): This is a lot of boilerplate, and is repeated
     # below in VmGroupSpec. See if some can be consolidated. Maybe we can
     # specify a VmGroupSpec instead of both vm_spec and disk_spec.
     ignore_package_requirements = (getattr(flag_values,
@@ -310,7 +308,6 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
                                    if flag_values else True)
     providers.LoadProvider(self.cloud, ignore_package_requirements)
 
-    # TODO(ferneyhough): How can we have a default disk_spec?
     if self.disk_spec:
       disk_config = getattr(self.disk_spec, self.cloud, None)
       if disk_config is None:
@@ -572,6 +569,7 @@ class _VmGroupSpec(spec.BaseSpec):
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     """Modifies config options based on runtime flag values.
+
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
@@ -691,7 +689,7 @@ class _ManagedRelationalDbDecoder(option_decoders.TypeVerifier):
         valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
-    """Verify managed_relational_db_service dict of a benchmark config object.
+    """Verify managed_relational_db dict of a benchmark config object.
 
     Args:
       value: dict. Config dictionary
@@ -701,7 +699,7 @@ class _ManagedRelationalDbDecoder(option_decoders.TypeVerifier):
         BaseSpec constructors.
 
     Returns:
-      _ManagedRelationalDbServiceSpec Build from the config passed in in value.
+      _ManagedRelationalDbService built from the config passed in in value.
 
     Raises:
       errors.Config.InvalidateValue upon invalid input value.
