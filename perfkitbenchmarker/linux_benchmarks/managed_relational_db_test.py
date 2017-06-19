@@ -41,7 +41,7 @@ managed_relational_db_test:
   description: test managed relational database provisioning
   managed_relational_db:
     database: mysql
-    database_version: '5.6'
+    database_version: '5.7'
     vm_spec:
       GCP:
         machine_type: db-n1-standard-1

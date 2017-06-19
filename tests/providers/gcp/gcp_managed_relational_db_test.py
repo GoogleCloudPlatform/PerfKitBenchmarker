@@ -48,7 +48,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
                                   **{'disk_size': 50})
     return {
         'database': MYSQL,
-        'database_version': '5.6',
+        'database_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',

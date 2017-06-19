@@ -56,7 +56,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   SERVICE_NAME = 'managed_relational_db'
   # These are the constants that should be specified in GCP's cloud SQL command.
   DEFAULT_BACKUP_START_TIME = '07:00'
-  GCP_MY_SQL_VERSION = 'MYSQL_5_6'
+  GCP_MY_SQL_VERSION = 'MYSQL_5_7'
   GCP_PRICING_PLAN = 'PACKAGE'
 
   def GetEndpoint(self):
@@ -68,7 +68,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   @staticmethod
   # TODO: implement for real
   def GetLatestDatabaseVersion(database):
-    return '5.6'
+    return '5.7'
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
@@ -180,6 +180,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   @staticmethod
   def _GetDatabaseVersionNameFromFlavor(flavor, version):
     if flavor == 'mysql':
-      if version == '5.6':
-        return 'MYSQL_5_6'
-    raise NotImplementedError('GCP managed databases only support MySQL 5.6')
+      if version == '5.7':
+        return 'MYSQL_5_7'
+    raise NotImplementedError('GCP managed databases only support MySQL 5.7')
