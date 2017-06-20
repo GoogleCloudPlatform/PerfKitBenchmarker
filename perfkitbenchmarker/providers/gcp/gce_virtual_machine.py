@@ -57,6 +57,10 @@ RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
+GPU_TYPE_K80 = 'k80'
+GPU_TYPE_TO_INTERAL_NAME_MAP = {
+    GPU_TYPE_K80: 'nvidia-tesla-k80'
+}
 
 
 class MemoryDecoder(option_decoders.StringDecoder):
@@ -109,6 +113,60 @@ class MemoryDecoder(option_decoders.StringDecoder):
           'number of MiB.'.format(self._GetOptionFullName(component_full_name),
                                   string))
     return memory_mib_int
+
+
+class GceGpuDecoder(option_decoders.TypeVerifier):
+  """Decodes a GPU spec."""
+
+  def __init__(self, **kwargs):
+    super(GceGpuDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Decodes a GPU spec.
+
+    Args:
+      value: dict mapping GPU config name to corresponding value.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+    Returns:
+      GceGpuSpec decoded from the input dict.
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    input_dict = super(GceGpuDecoder,
+                       self).Decode(value, component_full_name, flag_values)
+    return GceGpuSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **input_dict)
+
+
+class GceGpuSpec(spec.BaseSpec):
+  """Properties of a GCE GPU.
+
+  Attributes:
+    type: string. Type of GPU.
+    count: int. Number of GPUs
+  """
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(GceGpuSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'type': (option_decoders.EnumDecoder, {
+            'valid_values': GPU_TYPE_TO_INTERAL_NAME_MAP.keys()}),
+        'count': (option_decoders.IntDecoder, {'min': 1})
+    })
+    return result
 
 
 class CustomMachineTypeSpec(spec.BaseSpec):
@@ -175,6 +233,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     memory: None or string. For custom VMs, a string representation of the size
         of memory, expressed in MiB or GiB. Must be an integer number of MiB
         (e.g. "1280MiB", "7.5GiB").
+    gpus: None or GceGpuSpec.
     num_local_ssds: int. The number of local SSDs to attach to the instance.
     preemptible: boolean. True if the VM should be preemptible, False otherwise.
     project: string or None. The project to create the VM in.
@@ -242,6 +301,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'machine_type': (MachineTypeDecoder, {}),
+        'gpus': (GceGpuDecoder, {'default': None,
+                                 'none_ok': True}),
         'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
                                                         'min': 0}),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
@@ -326,6 +387,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.boot_metadata = {}
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
+    self.gpus = vm_spec.gpus
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
@@ -357,7 +419,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
-    args = ['alpha'] if (self.host or self.min_cpu_platform) else []
+    args = []
+    if self.host or self.min_cpu_platform:
+      args = ['alpha']
+    elif self.gpus:
+      args = ['beta']
     args.extend(['compute', 'instances', 'create', self.name])
 
     cmd = util.GcloudCommand(self, *args)
@@ -376,6 +442,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
     else:
       cmd.flags['machine-type'] = self.machine_type
+    if self.gpus is not None:
+      cmd.flags['accelerator'] = 'type={0},count={1}'.format(
+          GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpus.type],
+          self.gpus.count)
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
     if self.host:
@@ -408,7 +478,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['metadata'] = ','.join(
         ['%s=%s' % (k, v) for k, v in metadata.iteritems()])
 
-    if not FLAGS.gce_migrate_on_maintenance:
+    # TODO: If GCE one day supports live migration on GPUs this can be revised.
+    if not FLAGS.gce_migrate_on_maintenance or self.gpus:
       cmd.flags['maintenance-policy'] = 'TERMINATE'
     ssd_interface_option = FLAGS.gce_ssd_interface
     cmd.flags['local-ssd'] = (['interface={0}'.format(ssd_interface_option)] *
@@ -567,6 +638,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_dedicated_host:
       result['host_type'] = self.host_type
       result['num_vms_per_host'] = self.num_vms_per_host
+    if self.gpus:
+      result['gpu_type'] = self.gpus.type
+      result['gpu_count'] = self.gpus.count
     return result
 
 
