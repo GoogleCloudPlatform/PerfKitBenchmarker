@@ -176,7 +176,6 @@ class CustomMachineTypeSpec(spec.BaseSpec):
     cpus: int. Number of vCPUs.
     memory: string. Representation of the size of memory, expressed in MiB or
         GiB. Must be an integer number of MiB (e.g. "1280MiB", "7.5GiB").
-    gpus: GpuSpec. Representation of the gpu configuration, if any.
   """
 
   @classmethod
@@ -190,11 +189,7 @@ class CustomMachineTypeSpec(spec.BaseSpec):
     """
     result = super(CustomMachineTypeSpec, cls)._GetOptionDecoderConstructions()
     result.update({'cpus': (option_decoders.IntDecoder, {'min': 1}),
-                   'memory': (MemoryDecoder, {}),
-                   'gpus': (GceGpuDecoder, {
-                       'default': None,
-                       'none_ok': True
-                   })})
+                   'memory': (MemoryDecoder, {})})
     return result
 
 
@@ -250,18 +245,15 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = providers.GCP
 
-  # TODO (ferneyhoug): Add GPU support to named VM types in GCE.
   def __init__(self, *args, **kwargs):
     super(GceVmSpec, self).__init__(*args, **kwargs)
     if isinstance(self.machine_type, CustomMachineTypeSpec):
       self.cpus = self.machine_type.cpus
       self.memory = self.machine_type.memory
-      self.gpus = self.machine_type.gpus
       self.machine_type = None
     else:
       self.cpus = None
       self.memory = None
-      self.gpus = None
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):

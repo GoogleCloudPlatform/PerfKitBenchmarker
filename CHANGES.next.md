@@ -16,4 +16,5 @@ Enhancements:
 - Added --runspec_estimate_spec flag to calculate an estimated spec score (GH-1401)
 
 Bug fixes and maintenance updates:
-- Fix provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
+- Fixed provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
+- Fixed GPU benchmarks on GCE to work with new GPU API (GH-1407)

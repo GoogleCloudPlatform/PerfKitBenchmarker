@@ -39,15 +39,16 @@ BENCHMARK_NAME = 'gpu_pcie_bandwidth'
 BENCHMARK_CONFIG = """
 gpu_pcie_bandwidth:
   description: Runs NVIDIA's CUDA bandwidth test.
-  flags:
-    gce_migrate_on_maintenance: False
   vm_groups:
     default:
       vm_spec:
         GCP:
           image: ubuntu-1604-xenial-v20161115
           image_project: ubuntu-os-cloud
-          machine_type: n1-standard-4-k80x1
+          machine_type: n1-standard-4
+          gpus:
+            type: k80
+            count: 1
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
@@ -195,10 +196,9 @@ def Run(benchmark_spec):
   num_iterations = FLAGS.gpu_pcie_bandwidth_iterations
   raw_results = []
   metadata = {}
+  metadata.update(cuda_toolkit_8.GetMetadataFromFlags())
   metadata['num_iterations'] = num_iterations
   metadata['num_gpus'] = cuda_toolkit_8.QueryNumberOfGpus(vm)
-  metadata['memory_clock_MHz'] = FLAGS.gpu_clock_speeds[0]
-  metadata['graphics_clock_MHz'] = FLAGS.gpu_clock_speeds[1]
   run_command = ('%s/extras/demo_suite/bandwidthTest --device=all'
                  % cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR)
   for i in range(num_iterations):
