@@ -13,7 +13,8 @@
 # limitations under the License.
 
 
-"""
+"""Managed relational database provisioning for GCP.
+
 As of June 2017 to make this benchmark run for GCP you must install the
 gcloud beta component. This is necessary because creating a Cloud SQL instance
 with a non-default storage size is in beta right now. This can be removed when
@@ -35,7 +36,6 @@ to install it. This will allow this benchmark to properly create an instance.
 """
 
 
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
@@ -55,8 +55,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   CLOUD = providers.GCP
   SERVICE_NAME = 'managed_relational_db'
   # These are the constants that should be specified in GCP's cloud SQL command.
-  DEFAULT_BACKUP_START_TIME = '07:00'
-  GCP_MY_SQL_VERSION = 'MYSQL_5_7'
+  DEFAULT_GCP_MY_SQL_VERSION = 'MYSQL_5_7'
   GCP_PRICING_PLAN = 'PACKAGE'
 
   def GetEndpoint(self):
@@ -68,7 +67,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   @staticmethod
   # TODO: implement for real
   def GetLatestDatabaseVersion(database):
-    return '5.7'
+    if database == managed_relational_db.MYSQL:
+      return '5.7'
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
@@ -105,11 +105,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--assign-ip',
         # TODO: Implement authorized networks
         #         '--authorized-networks=%s' % authorized_network,
-        '--backup-start-time=%s' % self.DEFAULT_BACKUP_START_TIME,
         '--enable-bin-log',
         '--tier=%s' % db_tier,
         '--gce-zone=%s' % instance_zone,
-        '--database-version=%s' % self.GCP_MY_SQL_VERSION,
+        '--database-version=%s' % self.DEFAULT_GCP_MY_SQL_VERSION,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size)
     cmd.flags['project'] = self.project

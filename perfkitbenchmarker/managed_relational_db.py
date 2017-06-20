@@ -28,6 +28,8 @@ _MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
 
 
+# TODO: Implement DEFAULT BACKUP_START_TIME for instances.
+
 def generateRandomDbPassword():
   return str(uuid.uuid4())[:10]
 

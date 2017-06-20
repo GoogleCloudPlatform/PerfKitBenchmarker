@@ -23,10 +23,7 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import util
-<<<<<<< HEAD
 from perfkitbenchmarker import disk
-=======
->>>>>>> upstream/add_managed_relational_databases
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -49,6 +46,9 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
                                          **{'machine_type': 'db-n1-standard-1'})
     disk_spec = disk.BaseDiskSpec('NAME',
                                   **{'disk_size': 50})
+    # TODO: Database version has more than one supported value. Test should
+    # reflect that by not declaring a database version and letting the default
+    # version be returned.
     return {
         'database': MYSQL,
         'database_version': '5.7',
