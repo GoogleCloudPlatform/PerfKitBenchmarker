@@ -47,14 +47,18 @@ BENCHMARK_CONFIG = """
 hpcg:
   description: Runs HPCG. Specify the number of VMs with --num_vms
   flags:
-    gce_migrate_on_maintenance: False
     image_project: ubuntu-os-cloud
   vm_groups:
     default:
       vm_spec:
         GCP:
           image: ubuntu-1604-xenial-v20170307
-          machine_type: n1-standard-4-k80x1
+          machine_type:
+            cpus: 4
+            memory: 20GiB
+            gpus:
+              type: k80
+              count: 1
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
