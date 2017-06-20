@@ -132,20 +132,6 @@ class CustomMachineTypeSpecTestCase(unittest.TestCase):
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
 
-  def testValidWithGpus(self):
-    gpu_spec = {
-        'type': 'k80',
-        'count': 2
-    }
-    result = gce_virtual_machine.CustomMachineTypeSpec(_COMPONENT,
-                                                       cpus=1,
-                                                       memory='7.5GiB',
-                                                       gpus=gpu_spec)
-    self.assertEqual(result.cpus, 1)
-    self.assertEqual(result.memory, 7680)
-    self.assertEqual(result.gpus.type, 'k80')
-    self.assertEqual(result.gpus.count, 2)
-
   def testMissingCpus(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
       gce_virtual_machine.CustomMachineTypeSpec(_COMPONENT, memory='7.5GiB')
@@ -222,12 +208,40 @@ class GceVmSpecTestCase(unittest.TestCase):
     self.assertEqual(result.cpus, None)
     self.assertEqual(result.memory, None)
 
+  def testStringMachineTypeWithGpus(self):
+    gpu_spec = {
+        'type': 'k80',
+        'count': 2
+    }
+    result = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                           machine_type='n1-standard-8',
+                                           gpus=gpu_spec)
+    self.assertEqual(result.machine_type, 'n1-standard-8')
+    self.assertEqual(result.gpus.type, 'k80')
+    self.assertEqual(result.gpus.count, 2)
+
   def testCustomMachineType(self):
     result = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
         'cpus': 1, 'memory': '7.5GiB'})
     self.assertEqual(result.machine_type, None)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
+
+  def testCustomMachineTypeWithGpus(self):
+    gpu_spec = {
+        'type': 'k80',
+        'count': 2
+    }
+    result = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                           machine_type={
+                                               'cpus': 1,
+                                               'memory': '7.5GiB'
+                                           },
+                                           gpus=gpu_spec)
+    self.assertEqual(result.cpus, 1)
+    self.assertEqual(result.memory, 7680)
+    self.assertEqual(result.gpus.type, 'k80')
+    self.assertEqual(result.gpus.count, 2)
 
   def testStringMachineTypeFlagOverride(self):
     flags = mock_flags.MockFlags()
@@ -299,12 +313,8 @@ class GceVirtualMachineTestCase(unittest.TestCase):
   def testCustomVmWithGpus(self):
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT,
-        machine_type={'cpus': 1,
-                      'memory': '1.0GiB',
-                      'gpus': {
-                          'count': 2,
-                          'type': 'k80'
-                      }},
+        machine_type={'cpus': 1, 'memory': '1.0GiB'},
+        gpus={'count': 2, 'type': 'k80'},
         project='fakeproject')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertDictEqual(vm.GetMachineTypeDict(), {
@@ -404,7 +414,7 @@ class GCEVMCreateTestCase(unittest.TestCase):
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
 
-  def testCreateCustomVmWithoutGpu(self):
+  def testVmWithoutGpu(self):
     with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
           _COMPONENT, machine_type={
@@ -416,17 +426,14 @@ class GCEVMCreateTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       self.assertNotIn('--accelerator', issue_command.call_args[0][0])
 
-  def testCreateCustomVmWithGpu(self):
+  def testVmWithGpu(self):
     with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
-          _COMPONENT, machine_type={
-              'cpus': 1,
-              'memory': '1.0GiB',
-              'gpus': {
-                  'type': 'k80',
-                  'count': 2
-              }
-          })
+          _COMPONENT,
+          machine_type='n1-standard-8',
+          gpus={'type': 'k80',
+                'count': 2
+                })
       vm = gce_virtual_machine.GceVirtualMachine(spec)
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)
