@@ -305,13 +305,11 @@ class GceVirtualMachineTestCase(unittest.TestCase):
                           'count': 2,
                           'type': 'k80'
                       }},
-        preemptible=True,
         project='fakeproject')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertDictEqual(vm.GetMachineTypeDict(), {
         'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
-        'dedicated_host': False, 'preemptible': True,
-        'gpu_count': 2, 'gpu_type': 'k80'
+        'dedicated_host': False, 'gpu_count': 2, 'gpu_type': 'k80'
     })
 
 
