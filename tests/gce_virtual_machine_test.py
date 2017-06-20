@@ -37,6 +37,18 @@ _COMPONENT = 'test_component'
 _FLAGS = None
 
 
+@contextlib.contextmanager
+def PatchCriticalObjects():
+  """A context manager that patches a few critical objects with mocks."""
+  retval = ('', '', 0)
+  with mock.patch(vm_util.__name__ + '.IssueCommand',
+                  return_value=retval) as issue_command, \
+          mock.patch('__builtin__.open'), \
+          mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
+          mock.patch(util.__name__ + '.GetDefaultProject'):
+    yield issue_command
+
+
 class MemoryDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
@@ -321,19 +333,9 @@ class GCEVMFlagsTestCase(unittest.TestCase):
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
-  @contextlib.contextmanager
-  def _PatchCriticalObjects(self):
-    """A context manager that patches a few critical objects with mocks."""
-    retval = ('', '', 0)
-    with mock.patch(vm_util.__name__ + '.IssueCommand',
-                    return_value=retval) as issue_command, \
-            mock.patch('__builtin__.open'), \
-            mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
-            mock.patch(util.__name__ + '.GetDefaultProject'):
-      yield issue_command
 
   def testPreemptibleVMFlag(self):
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       self._mocked_flags['gce_preemptible_vms'].parse(True)
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
@@ -345,7 +347,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
 
   def testImageProjectFlag(self):
     """Tests that custom image_project flag is supported."""
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       self._mocked_flags['image_project'].parse('bar')
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
@@ -357,7 +359,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
                     ' '.join(issue_command.call_args[0][0]))
 
   def testGcpInstanceMetadataFlag(self):
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       self._mocked_flags.gcp_instance_metadata = ['k1:v1', 'k2:v2,k3:v3']
       self._mocked_flags.owner = 'test-owner'
       vm_spec = gce_virtual_machine.GceVmSpec(
@@ -375,7 +377,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
       self.assertIn('owner=test-owner', actual_metadata)
 
   def testGcpInstanceMetadataFromFileFlag(self):
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       self._mocked_flags.gcp_instance_metadata_from_file = [
           'k1:p1', 'k2:p2,k3:p3']
       vm_spec = gce_virtual_machine.GceVmSpec(
@@ -404,19 +406,8 @@ class GCEVMCreateTestCase(unittest.TestCase):
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
 
-  @contextlib.contextmanager
-  def _PatchCriticalObjects(self):
-    """A context manager that patches a few critical objects with mocks."""
-    retval = ('', '', 0)
-    with mock.patch(vm_util.__name__ + '.IssueCommand',
-                    return_value=retval) as issue_command, \
-            mock.patch('__builtin__.open'), \
-            mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
-            mock.patch(util.__name__ + '.GetDefaultProject'):
-      yield issue_command
-
   def testCreateCustomVmWithoutGpu(self):
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
           _COMPONENT, machine_type={
               'cpus': 1,
@@ -428,7 +419,7 @@ class GCEVMCreateTestCase(unittest.TestCase):
       self.assertNotIn('--accelerator', issue_command.call_args[0][0])
 
   def testCreateCustomVmWithGpu(self):
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
           _COMPONENT, machine_type={
               'cpus': 1,
