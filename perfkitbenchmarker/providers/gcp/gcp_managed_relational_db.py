@@ -35,6 +35,7 @@ If not, run
 to install it. This will allow this benchmark to properly create an instance.
 """
 
+import json
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -57,12 +58,13 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   # These are the constants that should be specified in GCP's cloud SQL command.
   DEFAULT_GCP_MY_SQL_VERSION = 'MYSQL_5_7'
   GCP_PRICING_PLAN = 'PACKAGE'
+  MYSQL_DEFAULT_PORT = 3306
 
   def GetEndpoint(self):
     pass
 
   def GetPort(self):
-    pass
+    return self.port
 
   @staticmethod
   # TODO: implement for real
@@ -81,6 +83,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     db_tier = self.spec.vm_spec.machine_type
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
+    # TODO: Close authorized networks to VM once spec is updated so client
+    # VM is child of managed_relational_db. Then client VM ip address will be
+    # available from managed_relational_db_spec.
+    authorized_network = '0.0.0.0/0'
     cloudsql_specific_database_version = self._GetDatabaseVersionNameFromFlavor(
         self.spec.database, self.spec.database_version)
     # Please install gcloud component beta for this to work. See note in
@@ -91,7 +97,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
     # for more information. When this flag is allowed in the default gcloud
     # components the create_db_cmd below can be updated.
-    cmd = util.GcloudCommand(
+    cmd_string = [
         self,
         'beta',
         'sql',
@@ -103,14 +109,17 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--async',
         '--activation-policy=ALWAYS',
         '--assign-ip',
-        # TODO: Implement authorized networks
-        #         '--authorized-networks=%s' % authorized_network,
+        '--authorized-networks=%s' % authorized_network,
         '--enable-bin-log',
         '--tier=%s' % db_tier,
         '--gce-zone=%s' % instance_zone,
         '--database-version=%s' % self.DEFAULT_GCP_MY_SQL_VERSION,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
-        '--storage-size=%d' % storage_size)
+        '--storage-size=%d' % storage_size]
+    if self.spec.high_availability:
+      ha_flag = '--failover-replica-name=replica-' + self.instance_id
+      cmd_string.append(ha_flag)
+    cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
     cmd.flags['database-version'] = cloudsql_specific_database_version
 
@@ -124,7 +133,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     deleted.
     """
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
-                             self.instance_id)
+                             self.instance_id, '--quiet')
     cmd.Issue()
 
   def _Exists(self):
@@ -149,7 +158,20 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
+    cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
+                             self.instance_id)
+    stdout, _, _ = cmd.Issue()
+    json_output = json.loads(stdout)
+    is_ready = (json_output[0]['state']
+                == 'RUNNABLE')
+    if not is_ready:
+      return False
+    self.endpoint = self._ParseEndpoint(json_output)
+    self.port = self.MYSQL_DEFAULT_PORT
     return True
+
+  def _ParseEndpoint(self, describe_instance_json):
+    return describe_instance_json[0]['selfLink']
 
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.

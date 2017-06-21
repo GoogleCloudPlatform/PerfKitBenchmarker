@@ -107,4 +107,3 @@ class BaseManagedRelationalDb(resource.BaseResource):
       database password
     """
     pass
-
