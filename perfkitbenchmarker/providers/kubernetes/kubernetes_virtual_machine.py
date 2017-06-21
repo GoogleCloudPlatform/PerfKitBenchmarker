@@ -18,9 +18,10 @@ import logging
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import kubernetes_helper
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
     OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
@@ -35,9 +36,7 @@ def CreateResource(resource_body):
   with vm_util.NamedTemporaryFile() as tf:
     tf.write(resource_body)
     tf.close()
-    create_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                  'create', '-f', tf.name]
-    return vm_util.IssueCommand(create_cmd)
+    return kubernetes_helper.CreateFromFile(tf.name)
 
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -167,13 +166,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetInternalIp(self):
     """
-    Get's the POD's internal ip address.
+    Gets the POD's internal ip address.
     """
-    get_pod_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                   'get', 'pod', self.name, '-o', 'json']
-    stdout, _, _ = vm_util.IssueCommand(get_pod_cmd, suppress_warning=True)
-    pod = json.loads(stdout)
-    pod_ip = pod.get('status', {}).get('podIP', None)
+    pod_ip = kubernetes_helper.Get(
+        'pods', self.name, '', '.items[0].status.podIP')
 
     if not pod_ip:
       raise Exception("Internal POD IP address not found. Retrying.")
