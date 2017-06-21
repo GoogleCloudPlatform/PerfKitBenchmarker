@@ -353,6 +353,30 @@ class GCEVMFlagsTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       self.assertIn('--preemptible', issue_command.call_args[0][0])
 
+  def testMigrateOnMaintenanceFlagTrueWithGpus(self):
+    with PatchCriticalObjects():
+      self._mocked_flags['gce_migrate_on_maintenance'].parse(True)
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', self._mocked_flags, image='image',
+          machine_type='test_machine_type', gpus={'type': 'k80', 'count': 1})
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+
+      with self.assertRaises(errors.Config.InvalidValue) as cm:
+        vm._Create()
+      self.assertEqual(str(cm.exception), (
+          'Cannot set flag gce_migrate_on_maintenance on '
+          'instances with GPUs, as it is not supported by GCP.'))
+
+  def testMigrateOnMaintenanceFlagFalseWithGpus(self):
+    with PatchCriticalObjects() as issue_command:
+      self._mocked_flags['gce_migrate_on_maintenance'].parse(False)
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', self._mocked_flags, image='image',
+          machine_type='test_machine_type', gpus={'type': 'k80', 'count': 1})
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+
   def testImageProjectFlag(self):
     """Tests that custom image_project flag is supported."""
     with PatchCriticalObjects() as issue_command:

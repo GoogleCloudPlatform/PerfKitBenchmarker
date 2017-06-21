@@ -479,6 +479,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         ['%s=%s' % (k, v) for k, v in metadata.iteritems()])
 
     # TODO: If GCE one day supports live migration on GPUs this can be revised.
+    if (FLAGS['gce_migrate_on_maintenance'].present and
+        FLAGS.gce_migrate_on_maintenance and self.gpus):
+      raise errors.Config.InvalidValue(
+          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs, '
+          'as it is not supported by GCP.')
     if not FLAGS.gce_migrate_on_maintenance or self.gpus:
       cmd.flags['maintenance-policy'] = 'TERMINATE'
     ssd_interface_option = FLAGS.gce_ssd_interface
