@@ -22,7 +22,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker.linux_packages import shoc_benchmark_suite
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
-from perfkitbenchmarker import num_gpus_map_util
 
 flags.DEFINE_integer(
     'stencil2d_iterations', 5, 'number of iterations to run', lower_bound=1)
@@ -39,22 +38,21 @@ FLAGS = flags.FLAGS
 
 MACHINEFILE = 'machinefile'
 BENCHMARK_NAME = 'stencil2d'
-BENCHMARK_VERSION = '0.24'
-# Note on the config: gce_migrate_on_maintenance must be false,
-# because GCE does not support migrating the user's GPU state.
+BENCHMARK_VERSION = '0.25'
 BENCHMARK_CONFIG = """
 stencil2d:
   description: Runs Stencil2D from SHOC Benchmark Suite.\
       Specify the number of VMs with --num_vms
-  flags:
-    gce_migrate_on_maintenance: False
   vm_groups:
     default:
       vm_spec:
         GCP:
           image: ubuntu-1604-xenial-v20170330
           image_project: ubuntu-os-cloud
-          machine_type: n1-standard-4-k80x1
+          machine_type: n1-standard-4
+          gpus:
+            type: k80
+            count: 1
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
@@ -84,24 +82,6 @@ def CheckPrerequisites(benchmark_config):
   pass
 
 
-def AssertCorrectNumberOfGpus(vm):
-  """Assert that the VM is reporting the correct number of GPUs.
-
-  Returns: number of GPUs on the VM
-
-  Raises:
-    Exception: if VM reports incorrect number of GPUs
-  """
-
-  expected_num_gpus = num_gpus_map_util.gpus_per_vm[vm.machine_type]
-  actual_num_gpus = cuda_toolkit_8.QueryNumberOfGpus(vm)
-  if actual_num_gpus != expected_num_gpus:
-    raise Exception('VM reported incorrect number of GPUs. ',
-                    'Expected %s, received %s' % (expected_num_gpus,
-                                                  actual_num_gpus))
-  return actual_num_gpus
-
-
 def _InstallAndAuthenticateVm(vm):
   """Install SHOC, ensure correct GPU state, and authenticate the VM for ssh.
 
@@ -109,7 +89,6 @@ def _InstallAndAuthenticateVm(vm):
     vm: vm to operate on.
   """
   vm.Install('shoc_benchmark_suite')
-  AssertCorrectNumberOfGpus(vm)
   cuda_toolkit_8.SetAndConfirmGpuClocks(vm)
   vm.AuthenticateVm()  # Configure ssh between vms for MPI
 
@@ -205,7 +184,7 @@ def _RunSingleIteration(master_vm, problem_size, num_processes, num_iterations,
 
 
 def Run(benchmark_spec):
-  """Sets the GPU clock speed and runs the Stencil2D benchmark.
+  """Runs the Stencil2D benchmark. GPU clock speeds must be set already.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
