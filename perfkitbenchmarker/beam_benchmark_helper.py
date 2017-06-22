@@ -19,7 +19,6 @@ executions.
 """
 
 import fnmatch
-import logging
 import os
 
 from perfkitbenchmarker import dpb_service
@@ -97,8 +96,7 @@ def InitializeBeamRepo(benchmark_spec):
     mvn_command = [FLAGS.maven_binary]
     mvn_command.extend(INSTALL_COMMAND_ARGS)
     mvn_command.append('-Pdataflow-runner')
-    logging.info("Running: %s", mvn_command)
-    vm_util.IssueCommand(mvn_command, cwd=_GetBeamDir())
+    vm_util.IssueCommand(mvn_command, timeout=1500, cwd=_GetBeamDir())
 
 
 def BuildBeamCommand(benchmark_spec, classname, job_arguments):
@@ -122,7 +120,7 @@ def BuildBeamCommand(benchmark_spec, classname, job_arguments):
     cmd = _BuildMavenCommand(benchmark_spec, classname, job_arguments)
   elif FLAGS.beam_sdk == BEAM_PYTHON_SDK:
     cmd = _BuildPythonCommand(benchmark_spec, classname, job_arguments)
-    base_dir = os.path.join(base_dir, 'sdks/python')
+    base_dir = _GetBeamPythonDir()
   else:
     raise NotImplementedError('Unsupported Beam SDK: %s.' % FLAGS.beam_sdk)
 
@@ -202,8 +200,7 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
   beam_args = job_arguments if job_arguments else []
 
   if benchmark_spec.service_type == dpb_service.DATAFLOW:
-    python_binary = _FindFiles(os.path.join(_GetBeamDir(),
-                                            'sdks/python/target'),
+    python_binary = _FindFiles(os.path.join(_GetBeamPythonDir(), 'target'),
                                'apache-beam*.tar.gz')
     if len(python_binary) == 0:
       raise RuntimeError('No python binary is found')
@@ -221,6 +218,10 @@ def _GetBeamDir():
   # TODO: This is temporary, find a better way.
   return FLAGS.beam_location if FLAGS.beam_location else os.path.join(
       vm_util.GetTempDir(), 'beam')
+
+
+def _GetBeamPythonDir():
+  return os.path.join(_GetBeamDir(), 'sdks/python')
 
 
 def _FindFiles(base_path, pattern):
