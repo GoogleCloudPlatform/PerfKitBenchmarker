@@ -34,8 +34,6 @@ flags.DEFINE_integer('gpu_pcie_bandwidth_iterations', 30,
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'gpu_pcie_bandwidth'
-# Note on the config: gce_migrate_on_maintenance must be false,
-# because GCE does not support migrating the user's GPU state.
 BENCHMARK_CONFIG = """
 gpu_pcie_bandwidth:
   description: Runs NVIDIA's CUDA bandwidth test.
