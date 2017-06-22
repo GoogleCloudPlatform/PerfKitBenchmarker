@@ -28,7 +28,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
-from tests import mock_flags
+import mock_flags
 
 
 _BENCHMARK_NAME = 'name'
