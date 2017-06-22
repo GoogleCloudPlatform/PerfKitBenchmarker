@@ -6,6 +6,8 @@ New features:
 - Added CUDA-enabled HPCG benchmark (GH-1395)
 - Added ManagedRelationalDatabase base classes and tests (GH-1405)
 - Added gpus to GceVmSpec. This is now the only way to create VMs with gpus on GCE due to a gcloud API change (GH-1406)
+- Added flag_zip_defs which functions like flag_matrix_defs, but performs a zip
+  operation on the axes instead of a cross-product (GH-1414)
 
 Enhancements:
 - Added basic auth support for Mesos provider. (GH-1390)
