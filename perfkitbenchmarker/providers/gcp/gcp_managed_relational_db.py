@@ -145,8 +145,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
-    _, _, retcode = cmd.Issue()
-    return retcode == 0
+    stdout, _, _ = cmd.Issue()
+    json_output = json.loads(stdout)
+    return (json_output[0]['kind'] ==
+            'sql#instance')
 
   def _IsReady(self):
     """Return true if the underlying resource is ready.
@@ -169,6 +171,9 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = self.MYSQL_DEFAULT_PORT
     return True
+
+  def _ParseType(self, describe_instance_json):
+    return describe_instance_json[0]['kind'] == 'sql#instance'
 
   def _ParseEndpoint(self, describe_instance_json):
     return describe_instance_json[0]['selfLink']
