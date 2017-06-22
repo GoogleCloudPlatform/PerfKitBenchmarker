@@ -41,6 +41,16 @@ flags.DEFINE_string('beam_it_module', None,
                     'comma-separated list to include multiple modules.')
 flags.DEFINE_string('beam_it_profile', None,
                     'Profile to activate integration test.')
+flags.DEFINE_string('beam_runner_profile', None,
+                    'Overrides the normal runner profile associated with'
+                    ' the dpb_service')
+flags.DEFINE_string('beam_runner_option', None,
+                    'Overrides any pipeline options by the dpb service to'
+                    ' specify the runner.')
+flags.DEFINE_boolean('beam_prebuilt', False, 'Set this to indicate that the'
+                                             ' repo in beam_location does not'
+                                             ' need to be rebuilt before'
+                                             ' being used')
 flags.DEFINE_integer('beam_it_timeout', 600, 'Integration Test Timeout.')
 flags.DEFINE_string('git_binary', 'git', 'Path to git binary.')
 flags.DEFINE_string('beam_version', None, 'Version of Beam to download. Use'
@@ -61,6 +71,33 @@ SUPPORTED_RUNNERS = [
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
 INSTALL_COMMAND_ARGS = ["clean", "install", "-DskipTests",
                         "-Dcheckstyle.skip=true"]
+
+
+def AddRunnerProfileMvnArgument(service_type, mvn_command,
+                                runner_profile_override):
+  runner_profile = ''
+
+  if service_type == dpb_service.DATAFLOW:
+    runner_profile = 'dataflow-runner'
+
+  if runner_profile_override is not None:
+    runner_profile = runner_profile_override
+
+  if len(runner_profile) > 0:
+    mvn_command.append('-P{}'.format(runner_profile))
+
+
+def AddRunnerOptionMvnArgument(service_type, beam_args, runner_option_override):
+  runner_pipeline_option = ''
+
+  if service_type == dpb_service.DATAFLOW:
+    runner_pipeline_option = ('"--runner=TestDataflowRunner"')
+
+  if runner_option_override is not None:
+    runner_pipeline_option = runner_option_override
+
+  if len(runner_pipeline_option) > 0:
+    beam_args.append(runner_pipeline_option)
 
 
 def InitializeBeamRepo(benchmark_spec):
@@ -92,10 +129,11 @@ def InitializeBeamRepo(benchmark_spec):
         'Directory indicated by beam_location does not exist: '
         '{}.'.format(FLAGS.beam_location))
 
-  if benchmark_spec.dpb_service.SERVICE_TYPE == dpb_service.DATAFLOW:
+  if not FLAGS.beam_prebuilt:
     mvn_command = [FLAGS.maven_binary]
     mvn_command.extend(INSTALL_COMMAND_ARGS)
-    mvn_command.append('-Pdataflow-runner')
+    AddRunnerProfileMvnArgument(benchmark_spec.dpb_service.SERVICE_TYPE,
+                                mvn_command)
     vm_util.IssueCommand(mvn_command, timeout=1500, cwd=_GetBeamDir())
 
 
@@ -160,11 +198,17 @@ def _BuildMavenCommand(benchmark_spec, classname, job_arguments):
 
   beam_args = job_arguments if job_arguments else []
 
-  if benchmark_spec.service_type == dpb_service.DATAFLOW:
-    cmd.append('-P{}'.format('dataflow-runner'))
-    beam_args.append('"--runner=org.apache.beam.runners.'
-                     'dataflow.testing.TestDataflowRunner"')
+  # Don't add any args when the user overrides beam_runner_profile since it is
+  # expected that they know what they are doing and we can't know what args
+  # to pass since it differs by runner.
+  if (benchmark_spec.service_type == dpb_service.DATAFLOW
+      and FLAGS.beam_runner_profile is not None):
     beam_args.append('"--defaultWorkerLogLevel={}"'.format(FLAGS.dpb_log_level))
+
+  AddRunnerProfileMvnArgument(benchmark_spec.service_type, cmd,
+                              FLAGS.beam_runner_profile)
+  AddRunnerOptionMvnArgument(benchmark_spec.service_type, beam_args,
+                             FLAGS.beam_runner_option)
 
   cmd.append("-DintegrationTestPipelineOptions="
              "[{}]".format(','.join(beam_args)))
