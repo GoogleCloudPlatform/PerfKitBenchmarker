@@ -149,10 +149,10 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
 
     with self._PatchCriticalObjects():
       db = self.createManagedDbFromSpec(self.createSpecDict())
-
-      self.assertIn(
-          'pkb-db-instance-123',
-          db._ParseEndpoint(json.loads(test_output)))
+      self.assertEquals('',
+                        db._ParseEndpoint(None))
+      self.assertIn('pkb-db-instance-123',
+                    db._ParseEndpoint(json.loads(test_output)))
 
 
 if __name__ == '__main__':

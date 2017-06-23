@@ -36,6 +36,7 @@ to install it. This will allow this benchmark to properly create an instance.
 """
 
 import json
+import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -67,10 +68,13 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return self.port
 
   @staticmethod
-  # TODO: implement for real
+  # TODO: Implement so values aren't hard-coded. Retrieve latest versions
+  # from outside resource.
   def GetLatestDatabaseVersion(database):
     if database == managed_relational_db.MYSQL:
       return '5.7'
+    elif database == managed_relational_db.POSTGRES:
+      return '9.6'
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
@@ -145,10 +149,13 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
-    stdout, _, _ = cmd.Issue()
-    json_output = json.loads(stdout)
-    return (json_output[0]['kind'] ==
-            'sql#instance')
+    stdout, _, _ = cmd.Issue
+    try:
+      json_output = json.loads(stdout)
+      exists = (json_output[0]['kind'] == 'sql#instance')
+    except:
+      exists = False
+    return exists
 
   def _IsReady(self):
     """Return true if the underlying resource is ready.
@@ -163,20 +170,31 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
     stdout, _, _ = cmd.Issue()
-    json_output = json.loads(stdout)
-    is_ready = (json_output[0]['state']
-                == 'RUNNABLE')
+    try:
+      json_output = json.loads(stdout)
+      is_ready = (json_output[0]['state'] == 'RUNNABLE')
+    except:
+      logging.exception('Error attempting to read stdout. Creation failure.')
+      is_ready = False
     if not is_ready:
       return False
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = self.MYSQL_DEFAULT_PORT
     return True
 
-  def _ParseType(self, describe_instance_json):
-    return describe_instance_json[0]['kind'] == 'sql#instance'
-
   def _ParseEndpoint(self, describe_instance_json):
-    return describe_instance_json[0]['selfLink']
+    """Return the URI of the resource given the metadata as JSON.
+
+    Args:
+      describe_instance_json: JSON output.
+    Returns:
+      resource URI (string)
+    """
+    try:
+      selflink = describe_instance_json[0]['selfLink']
+    except:
+      selflink = ""
+    return selflink
 
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.
