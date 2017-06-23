@@ -381,10 +381,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
     args = []
-    if self.host or self.min_cpu_platform:
+    if self.host or self.min_cpu_platform or self.gpu_count:
       args = ['alpha']
-    elif self.gpu_count:
-      args = ['beta']
     args.extend(['compute', 'instances', 'create', self.name])
 
     cmd = util.GcloudCommand(self, *args)
