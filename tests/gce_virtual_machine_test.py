@@ -81,49 +81,6 @@ class MemoryDecoderTestCase(unittest.TestCase):
         'must be an integer number of MiB.'))
 
 
-class GceGpuSpecTestCase(unittest.TestCase):
-
-  def testValid(self):
-    result = gce_virtual_machine.GceGpuSpec(
-        _COMPONENT,
-        type=gce_virtual_machine.GPU_TYPE_K80,
-        count=2)
-
-    self.assertEqual(result.type, 'k80')
-    self.assertEqual(result.count, 2)
-
-  def testMissingType(self):
-    with self.assertRaises(errors.Config.MissingOption) as cm:
-      gce_virtual_machine.GceGpuSpec(_COMPONENT, count=2)
-    self.assertEqual(str(cm.exception), (
-        'Required options were missing from test_component: type.'))
-
-  def testMissingCount(self):
-    with self.assertRaises(errors.Config.MissingOption) as cm:
-      gce_virtual_machine.GceGpuSpec(_COMPONENT, type='k80')
-    self.assertEqual(str(cm.exception), (
-        'Required options were missing from test_component: count.'))
-
-  def testInvalidCount(self):
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      gce_virtual_machine.GceGpuSpec(
-          _COMPONENT,
-          count=0,
-          type='k80')
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.count value: "0". Value must be at least 1.'))
-
-  def testInvalidType(self):
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      gce_virtual_machine.GceGpuSpec(
-          _COMPONENT,
-          count=1,
-          type='unknown')
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.type value: "unknown". '
-        'Value must be one of the following: k80.'))
-
-
 class CustomMachineTypeSpecTestCase(unittest.TestCase):
 
   def testValid(self):
@@ -209,16 +166,15 @@ class GceVmSpecTestCase(unittest.TestCase):
     self.assertEqual(result.memory, None)
 
   def testStringMachineTypeWithGpus(self):
-    gpu_spec = {
-        'type': 'k80',
-        'count': 2
-    }
+    gpu_count = 2
+    gpu_type = 'k80'
     result = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                            machine_type='n1-standard-8',
-                                           gpus=gpu_spec)
+                                           gpu_count=gpu_count,
+                                           gpu_type=gpu_type)
     self.assertEqual(result.machine_type, 'n1-standard-8')
-    self.assertEqual(result.gpus.type, 'k80')
-    self.assertEqual(result.gpus.count, 2)
+    self.assertEqual(result.gpu_type, 'k80')
+    self.assertEqual(result.gpu_count, 2)
 
   def testCustomMachineType(self):
     result = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
@@ -228,20 +184,19 @@ class GceVmSpecTestCase(unittest.TestCase):
     self.assertEqual(result.memory, 7680)
 
   def testCustomMachineTypeWithGpus(self):
-    gpu_spec = {
-        'type': 'k80',
-        'count': 2
-    }
+    gpu_count = 2
+    gpu_type = 'k80'
     result = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                            machine_type={
                                                'cpus': 1,
                                                'memory': '7.5GiB'
                                            },
-                                           gpus=gpu_spec)
+                                           gpu_count=gpu_count,
+                                           gpu_type=gpu_type)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
-    self.assertEqual(result.gpus.type, 'k80')
-    self.assertEqual(result.gpus.count, 2)
+    self.assertEqual(result.gpu_type, 'k80')
+    self.assertEqual(result.gpu_count, 2)
 
   def testStringMachineTypeFlagOverride(self):
     flags = mock_flags.MockFlags()
@@ -261,6 +216,48 @@ class GceVmSpecTestCase(unittest.TestCase):
     self.assertEqual(result.machine_type, None)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
+
+  def testMissingGpuCount(self):
+    flags = mock_flags.MockFlags()
+    with self.assertRaises(errors.Config.MissingOption) as cm:
+      gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', flags,
+          machine_type='test_machine_type', gpu_type='k80')
+
+    self.assertEqual(str(cm.exception), (
+        'gpu_count must be specified if gpu_type is set'))
+
+  def testMissingGpuType(self):
+    flags = mock_flags.MockFlags()
+    with self.assertRaises(errors.Config.MissingOption) as cm:
+      gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', flags,
+          machine_type='test_machine_type', gpu_count=1)
+
+    self.assertEqual(str(cm.exception), (
+        'gpu_type must be specified if gpu_count is set'))
+
+  def testInvalidGpuType(self):
+    flags = mock_flags.MockFlags()
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', flags,
+          machine_type='test_machine_type', gpu_count=1, gpu_type='bad_type')
+
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_vm_spec.GCP.gpu_type value: "bad_type". '
+        'Value must be one of the following: k80.'))
+
+  def testInvalidGpuCount(self):
+    flags = mock_flags.MockFlags()
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', flags,
+          machine_type='test_machine_type', gpu_count=0, gpu_type='k80')
+
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_vm_spec.GCP.gpu_count value: "0". '
+        'Value must be at least 1.'))
 
 
 class GceVirtualMachineTestCase(unittest.TestCase):
@@ -314,7 +311,8 @@ class GceVirtualMachineTestCase(unittest.TestCase):
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT,
         machine_type={'cpus': 1, 'memory': '1.0GiB'},
-        gpus={'count': 2, 'type': 'k80'},
+        gpu_count=2,
+        gpu_type='k80',
         project='fakeproject')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
     self.assertDictEqual(vm.GetMachineTypeDict(), {
@@ -358,7 +356,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
       self._mocked_flags['gce_migrate_on_maintenance'].parse(True)
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
-          machine_type='test_machine_type', gpus={'type': 'k80', 'count': 1})
+          machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
 
       with self.assertRaises(errors.Config.InvalidValue) as cm:
@@ -372,7 +370,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
       self._mocked_flags['gce_migrate_on_maintenance'].parse(False)
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
-          machine_type='test_machine_type', gpus={'type': 'k80', 'count': 1})
+          machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)
@@ -455,9 +453,8 @@ class GCEVMCreateTestCase(unittest.TestCase):
       spec = gce_virtual_machine.GceVmSpec(
           _COMPONENT,
           machine_type='n1-standard-8',
-          gpus={'type': 'k80',
-                'count': 2
-                })
+          gpu_count=2,
+          gpu_type='k80')
       vm = gce_virtual_machine.GceVirtualMachine(spec)
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)
