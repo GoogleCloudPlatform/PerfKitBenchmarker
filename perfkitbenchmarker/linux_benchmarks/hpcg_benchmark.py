@@ -53,9 +53,8 @@ hpcg:
           image: ubuntu-1604-xenial-v20170307
           image_project: ubuntu-os-cloud
           machine_type: n1-standard-4
-          gpus:
-            type: k80
-            count: 1
+          gpu_type: k80
+          gpu_count: 1
           zone: us-east1-d
           boot_disk_size: 200
         AWS:

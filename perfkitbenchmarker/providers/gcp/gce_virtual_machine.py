@@ -115,60 +115,6 @@ class MemoryDecoder(option_decoders.StringDecoder):
     return memory_mib_int
 
 
-class GceGpuDecoder(option_decoders.TypeVerifier):
-  """Decodes a GPU spec."""
-
-  def __init__(self, **kwargs):
-    super(GceGpuDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Decodes a GPU spec.
-
-    Args:
-      value: dict mapping GPU config name to corresponding value.
-      component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
-      flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
-    Returns:
-      GceGpuSpec decoded from the input dict.
-    Raises:
-      errors.Config.InvalidValue upon invalid input value.
-    """
-    input_dict = super(GceGpuDecoder,
-                       self).Decode(value, component_full_name, flag_values)
-    return GceGpuSpec(
-        self._GetOptionFullName(component_full_name),
-        flag_values=flag_values,
-        **input_dict)
-
-
-class GceGpuSpec(spec.BaseSpec):
-  """Properties of a GCE GPU.
-
-  Attributes:
-    type: string. Type of GPU.
-    count: int. Number of GPUs
-  """
-
-  @classmethod
-  def _GetOptionDecoderConstructions(cls):
-    """Gets decoder classes and constructor args for each configurable option.
-
-    Returns:
-      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
-          The pair specifies a decoder class and its __init__() keyword
-          arguments to construct in order to decode the named option.
-    """
-    result = super(GceGpuSpec, cls)._GetOptionDecoderConstructions()
-    result.update({
-        'type': (option_decoders.EnumDecoder, {
-            'valid_values': GPU_TYPE_TO_INTERAL_NAME_MAP.keys()}),
-        'count': (option_decoders.IntDecoder, {'min': 1})
-    })
-    return result
-
-
 class CustomMachineTypeSpec(spec.BaseSpec):
   """Properties of a GCE custom machine type.
 
@@ -233,7 +179,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     memory: None or string. For custom VMs, a string representation of the size
         of memory, expressed in MiB or GiB. Must be an integer number of MiB
         (e.g. "1280MiB", "7.5GiB").
-    gpus: None or GceGpuSpec.
+    gpu_count: None or int. Number of gpus to attach to the VM.
+    gpu_type: None or string. Type of gpus to attach to the VM.
     num_local_ssds: int. The number of local SSDs to attach to the instance.
     preemptible: boolean. True if the VM should be preemptible, False otherwise.
     project: string or None. The project to create the VM in.
@@ -288,6 +235,17 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['num_vms_per_host'] = flag_values.gcp_num_vms_per_host
     if flag_values['gcp_min_cpu_platform'].present:
       config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
+    if flag_values['gcp_gpu_type'].present:
+      config_values['gpu_type'] = flag_values.gcp_gpu_type
+    if flag_values['gcp_gpu_count'].present:
+      config_values['gpu_count'] = flag_values.gcp_gpu_count
+
+    if 'gpu_count' in config_values and 'gpu_type' not in config_values:
+        raise errors.Config.MissingOption(
+            'gpu_type must be specified if gpu_count is set')
+    if 'gpu_type' in config_values and 'gpu_count' not in config_values:
+        raise errors.Config.MissingOption(
+            'gpu_count must be specified if gpu_type is set')
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -301,8 +259,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'machine_type': (MachineTypeDecoder, {}),
-        'gpus': (GceGpuDecoder, {'default': None,
-                                 'none_ok': True}),
         'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
                                                         'min': 0}),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
@@ -313,7 +269,11 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'host_type': (option_decoders.StringDecoder,
                       {'default': 'n1-host-64-416'}),
         'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
-        'min_cpu_platform': (option_decoders.StringDecoder, {'default': None})
+        'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
+        'gpu_type': (option_decoders.EnumDecoder, {
+            'valid_values': GPU_TYPE_TO_INTERAL_NAME_MAP.keys(),
+            'default': None}),
+        'gpu_count': (option_decoders.IntDecoder, {'min': 1, 'default': None})
     })
     return result
 
@@ -387,7 +347,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.boot_metadata = {}
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
-    self.gpus = vm_spec.gpus
+    self.gpu_count = vm_spec.gpu_count
+    self.gpu_type = vm_spec.gpu_type
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
@@ -420,10 +381,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
     args = []
-    if self.host or self.min_cpu_platform:
+    if self.host or self.min_cpu_platform or self.gpu_count:
       args = ['alpha']
-    elif self.gpus:
-      args = ['beta']
     args.extend(['compute', 'instances', 'create', self.name])
 
     cmd = util.GcloudCommand(self, *args)
@@ -442,10 +401,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
     else:
       cmd.flags['machine-type'] = self.machine_type
-    if self.gpus is not None:
+    if self.gpu_count:
       cmd.flags['accelerator'] = 'type={0},count={1}'.format(
-          GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpus.type],
-          self.gpus.count)
+          GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpu_type],
+          self.gpu_count)
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
     if self.host:
@@ -480,11 +439,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     # TODO: If GCE one day supports live migration on GPUs this can be revised.
     if (FLAGS['gce_migrate_on_maintenance'].present and
-        FLAGS.gce_migrate_on_maintenance and self.gpus):
+        FLAGS.gce_migrate_on_maintenance and self.gpu_count):
       raise errors.Config.InvalidValue(
           'Cannot set flag gce_migrate_on_maintenance on instances with GPUs, '
           'as it is not supported by GCP.')
-    if not FLAGS.gce_migrate_on_maintenance or self.gpus:
+    if not FLAGS.gce_migrate_on_maintenance or self.gpu_count:
       cmd.flags['maintenance-policy'] = 'TERMINATE'
     ssd_interface_option = FLAGS.gce_ssd_interface
     cmd.flags['local-ssd'] = (['interface={0}'.format(ssd_interface_option)] *
@@ -643,9 +602,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_dedicated_host:
       result['host_type'] = self.host_type
       result['num_vms_per_host'] = self.num_vms_per_host
-    if self.gpus:
-      result['gpu_type'] = self.gpus.type
-      result['gpu_count'] = self.gpus.count
+    if self.gpu_count:
+      result['gpu_type'] = self.gpu_type
+      result['gpu_count'] = self.gpu_count
     return result
 
 
