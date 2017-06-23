@@ -20,9 +20,13 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 
 
-TESLA_K80_MAX_CLOCK_SPEEDS = [2505, 875]
+# K80s have a max speed of 2505,875,
+# but not all cloud providers support the max speed.
+# This default value is supported by all providers.
+TESLA_K80_DEFAULT_CLOCK_SPEEDS = [2505, 562]
 flag_util.DEFINE_integerlist('gpu_clock_speeds',
-                             flag_util.IntegerList(TESLA_K80_MAX_CLOCK_SPEEDS),
+                             flag_util.IntegerList(
+                                 TESLA_K80_DEFAULT_CLOCK_SPEEDS),
                              'desired gpu clock speeds in the form '
                              '[memory clock, graphics clock]')
 flags.DEFINE_boolean('gpu_autoboost_enabled', True,
