@@ -64,6 +64,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   # These are the constants that should be specified in GCP's cloud SQL command.
   GCP_PRICING_PLAN = 'PACKAGE'
   MYSQL_DEFAULT_PORT = 3306
+  VALID_POSTGRES_MACHINE_TYPES = ['db-f1-micro', 'db-g1-small']
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
@@ -73,10 +74,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _Create(self):
     """Creates the GCP Cloud SQL instance."""
-    db_tier = self.spec.vm_spec.machine_type
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
     database_version = FLAGS.database or DEFAULT_GCP_MYSQL_VERSION
+    db_tier = self._ValidateMachineType(self.spec.vm_spec.machine_type)
     # TODO: Close authorized networks to VM once spec is updated so client
     # VM is child of managed_relational_db. Then client VM ip address will be
     # available from managed_relational_db_spec.
@@ -170,6 +171,20 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       self.endpoint = self._ParseEndpoint(json_output)
       self.port = self.MYSQL_DEFAULT_PORT
     return is_ready
+
+  def _ValidateMachineType(self, machine_type):
+    """Validate that machine type is valid for database type.
+
+    Args:
+      machine_type: (string).
+
+    Returns:
+      (string): Validated machine type.
+    """
+    if FLAGS.database == managed_relational_db.POSTGRES:
+      if machine_type not in self.VALID_POSTGRES_MACHINE_TYPES:
+        machine_type = self.VALID_POSTGRES_MACHINE_TYPES[0]
+    return machine_type
 
   def _ParseEndpoint(self, describe_instance_json):
     """Return the URI of the resource given the metadata as JSON.
