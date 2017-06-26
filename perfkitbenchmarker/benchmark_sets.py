@@ -192,6 +192,13 @@ def _GetConfigForAxis(benchmark_config, flag_config):
   return config
 
 
+def _AssertZipAxesHaveSameLength(axes):
+  expected_length = len(axes[0])
+  for axis in axes[1:]:
+    if len(axis) != expected_length:
+      raise ValueError('flag_zip axes must all be the same length')
+
+
 def GetBenchmarksFromFlags():
   """Returns a list of benchmarks to run based on the benchmarks flag.
 
@@ -241,7 +248,7 @@ def GetBenchmarksFromFlags():
 
 
     # We need to remove the 'flag_matrix', 'flag_matrix_defs', 'flag_zip',
-    # 'flag_dif_defs', and 'flag_matrix_filters' keys from the config
+    # 'flag_zip_defs', and 'flag_matrix_filters' keys from the config
     # dictionary since they aren't actually part of the config spec and will
     # cause errors if they are left in.
     flag_matrix_name = benchmark_config.pop(
@@ -263,6 +270,8 @@ def GetBenchmarksFromFlags():
       flag_axes = []
       for flag, values in flag_zip.iteritems():
         flag_axes.append([{flag: v} for v in values])
+
+      _AssertZipAxesHaveSameLength(flag_axes)
 
       for flag_config in itertools.izip(*flag_axes):
         config = _GetConfigForAxis(benchmark_config, flag_config)

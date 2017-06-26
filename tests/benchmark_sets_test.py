@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,12 +38,22 @@ netperf:
       machine_type: [n1-standard-1, n1-standard-4]
       zones: [us-central1-a, us-central1-b]
 """
-EXPECTED_FLAGS = [
+EXPECTED_MATRIX_FLAGS = [
     {'machine_type': 'n1-standard-1', 'zones': 'us-central1-a'},
     {'machine_type': 'n1-standard-1', 'zones': 'us-central1-b'},
     {'machine_type': 'n1-standard-4', 'zones': 'us-central1-a'},
     {'machine_type': 'n1-standard-4', 'zones': 'us-central1-b'}
 ]
+ZIP_CONFIG_DIFFERENT_AXES_LENGTH = """
+netperf:
+  flags:
+    gpu_type: k80
+  flag_zip: GCP
+  flag_zip_defs:
+    GCP:
+      machine_type: [n1-standard-4, n1-standard-8]
+      gpu_count: [1, 2, 3]
+"""
 ZIP_CONFIG = """
 netperf:
   flags:
@@ -54,9 +64,22 @@ netperf:
       machine_type: [n1-standard-4, n1-standard-8]
       gpu_count: [1, 2]
 """
-EXPECTED_FLAGS2 = [
+EXPECTED_ZIP_FLAGS = [
     {'machine_type': 'n1-standard-4', 'gpu_count': 1, 'gpu_type': 'k80'},
     {'machine_type': 'n1-standard-8', 'gpu_count': 2, 'gpu_type': 'k80'}
+]
+SINGLE_ZIP_CONFIG = """
+netperf:
+  flags:
+    gpu_type: k80
+  flag_zip: GCP
+  flag_zip_defs:
+    GCP:
+      machine_type: [n1-standard-4, n1-standard-8]
+"""
+EXPECTED_SINGLE_ZIP_FLAGS = [
+    {'machine_type': 'n1-standard-4', 'gpu_type': 'k80'},
+    {'machine_type': 'n1-standard-8', 'gpu_type': 'k80'}
 ]
 ZIP_AND_MATRIX_CONFIG = """
 netperf:
@@ -72,7 +95,7 @@ netperf:
     GCP:
       zones: [us-central1-a, us-central1-b]
 """
-EXPECTED_FLAGS3 = [
+EXPECTED_ZIP_AND_MATRIX_FLAGS = [
     {'zones': 'us-central1-a', 'gpu_type': 'k80',
      'machine_type': 'n1-standard-4', 'gpu_count': 1},
     {'zones': 'us-central1-b', 'gpu_type': 'k80',
@@ -252,7 +275,15 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertEqual(len(benchmark_tuple_list), 4)
     flag_list = [benchmark_tuple[1]['flags']
                  for benchmark_tuple in benchmark_tuple_list]
-    self.assertItemsEqual(flag_list, EXPECTED_FLAGS)
+    self.assertItemsEqual(flag_list, EXPECTED_MATRIX_FLAGS)
+
+  def testZipWithDifferentAxesLengths(self):
+    self.mock_flags.benchmarks = ['netperf']
+    self.mock_flags.flag_matrix = None
+    self.mock_flags.flag_zip = None
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(ZIP_CONFIG_DIFFERENT_AXES_LENGTH)):
+      self.assertRaises(ValueError, benchmark_sets.GetBenchmarksFromFlags)
 
   def testZip(self):
     self.mock_flags.benchmarks = ['netperf']
@@ -264,7 +295,19 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertEqual(len(benchmark_tuple_list), 2)
     flag_list = [benchmark_tuple[1]['flags']
                  for benchmark_tuple in benchmark_tuple_list]
-    self.assertItemsEqual(flag_list, EXPECTED_FLAGS2)
+    self.assertItemsEqual(flag_list, EXPECTED_ZIP_FLAGS)
+
+  def testZipSingleAxis(self):
+    self.mock_flags.benchmarks = ['netperf']
+    self.mock_flags.flag_matrix = None
+    self.mock_flags.flag_zip = None
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(SINGLE_ZIP_CONFIG)):
+      benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
+    self.assertEqual(len(benchmark_tuple_list), 2)
+    flag_list = [benchmark_tuple[1]['flags']
+                 for benchmark_tuple in benchmark_tuple_list]
+    self.assertItemsEqual(flag_list, EXPECTED_SINGLE_ZIP_FLAGS)
 
   def testZipAndMatrix(self):
     self.mock_flags.benchmarks = ['netperf']
@@ -276,7 +319,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.assertEqual(len(benchmark_tuple_list), 4)
     flag_list = [benchmark_tuple[1]['flags']
                  for benchmark_tuple in benchmark_tuple_list]
-    self.assertItemsEqual(flag_list, EXPECTED_FLAGS3)
+    self.assertItemsEqual(flag_list, EXPECTED_ZIP_AND_MATRIX_FLAGS)
 
   def testFilters(self):
     self.mock_flags.benchmarks = ['netperf']
