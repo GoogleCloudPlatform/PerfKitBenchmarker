@@ -92,9 +92,9 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertNotIn('replica-pkb-db-instance-123', command_string)
 
   @contextlib.contextmanager
-  def _PatchCriticalObjects(self):
+  def _PatchCriticalObjects(self, stdout='', stderr='', return_code=0):
     """A context manager that patches a few critical objects with mocks."""
-    retval = ('', '', 0)
+    retval = (stdout, stderr, return_code)
     with mock.patch(vm_util.__name__ + '.IssueCommand',
                     return_value=retval) as issue_command, \
             mock.patch('__builtin__.open'), \
@@ -127,6 +127,29 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertTrue(
           command_string.startswith(
               'gcloud sql instances delete pkb-db-instance-123'))
+
+  def testIsReady(self):
+    path = os.path.join(
+        os.path.dirname(__file__), '../../data',
+        'gcloud-describe-db-instances-available.json')
+    with open(path) as fp:
+      test_output = fp.read()
+
+    with self._PatchCriticalObjects(stdout=test_output):
+      db = self.createManagedDbFromSpec(self.createSpecDict())
+
+      self.assertEqual(True, db._IsReady())
+
+  def testExists(self):
+    path = os.path.join(
+        os.path.dirname(__file__), '../../data',
+        'gcloud-describe-db-instances-available.json')
+    with open(path) as fp:
+      test_output = fp.read()
+
+    with self._PatchCriticalObjects(stdout=test_output):
+      db = self.createManagedDbFromSpec(self.createSpecDict())
+      self.assertEqual(True, db._Exists())
 
   def testHighAvailability(self):
     with self._PatchCriticalObjects() as issue_command:

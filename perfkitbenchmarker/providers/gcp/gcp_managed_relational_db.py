@@ -45,6 +45,11 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
+LATEST_MYSQL_VERSION = '5.7'
+LATEST_POSTGRES_VERSION = '9.6'
+DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
+DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
+
 
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """An object representing a GCP managed relational database.
@@ -57,24 +62,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   CLOUD = providers.GCP
   SERVICE_NAME = 'managed_relational_db'
   # These are the constants that should be specified in GCP's cloud SQL command.
-  DEFAULT_GCP_MY_SQL_VERSION = 'MYSQL_5_7'
   GCP_PRICING_PLAN = 'PACKAGE'
   MYSQL_DEFAULT_PORT = 3306
-
-  def GetEndpoint(self):
-    pass
-
-  def GetPort(self):
-    return self.port
-
-  @staticmethod
-  # TODO: Implement so values aren't hard-coded. Retrieve latest versions
-  # from outside resource.
-  def GetLatestDatabaseVersion(database):
-    if database == managed_relational_db.MYSQL:
-      return '5.7'
-    elif database == managed_relational_db.POSTGRES:
-      return '9.6'
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
@@ -87,6 +76,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     db_tier = self.spec.vm_spec.machine_type
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
+    database_version = FLAGS.database or DEFAULT_GCP_MYSQL_VERSION
     # TODO: Close authorized networks to VM once spec is updated so client
     # VM is child of managed_relational_db. Then client VM ip address will be
     # available from managed_relational_db_spec.
@@ -117,7 +107,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--enable-bin-log',
         '--tier=%s' % db_tier,
         '--gce-zone=%s' % instance_zone,
-        '--database-version=%s' % self.DEFAULT_GCP_MY_SQL_VERSION,
+        '--database-version=%s' % database_version,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size]
     if self.spec.high_availability:
@@ -149,7 +139,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
-    stdout, _, _ = cmd.Issue
+    stdout, _, _ = cmd.Issue()
     try:
       json_output = json.loads(stdout)
       exists = (json_output[0]['kind'] == 'sql#instance')
@@ -222,8 +212,50 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     pass
 
   @staticmethod
+  def GetLatestDatabaseVersion(database):
+    """Returns the latest version of a given database.
+
+    Args:
+      database (string): type of database (my_sql or postgres).
+    Returns:
+      (string): Latest database version.
+    """
+    if database == managed_relational_db.MYSQL:
+      return LATEST_MYSQL_VERSION
+    elif database == managed_relational_db.POSTGRES:
+      return LATEST_POSTGRES_VERSION
+
+  @staticmethod
   def _GetDatabaseVersionNameFromFlavor(flavor, version):
-    if flavor == 'mysql':
-      if version == '5.7':
-        return 'MYSQL_5_7'
-    raise NotImplementedError('GCP managed databases only support MySQL 5.7')
+    """Returns internal name for database type.
+
+    Args:
+      flavor:
+      version:
+    Returns:
+      (string): Internal name for database type.
+    """
+    if flavor == managed_relational_db.MYSQL:
+      if version == LATEST_MYSQL_VERSION:
+        return DEFAULT_GCP_MYSQL_VERSION
+    elif flavor == managed_relational_db.POSTGRES:
+      if version == LATEST_POSTGRES_VERSION:
+        return DEFAULT_GCP_POSTGRES_VERSION
+    raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'
+                              'POSTGRES 9.6')
+
+  def GetEndpoint(self):
+    """Return the endpoint of the managed database.
+
+    Returns:
+      database endpoint (IP or dns name)
+    """
+    return self.endpoint
+
+  def GetPort(self):
+    """Return the port of the managed database.
+
+    Returns:
+      database port number
+    """
+    return self.port
