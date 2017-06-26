@@ -1,0 +1,16 @@
+hpcg:
+  name: hpcg
+  flags:
+    hpcg_runtime: 30
+    gcp_gpu_type: k80
+  flag_zip: GCP
+  flag_matrix: GCP
+  flag_zip_defs:
+    GCP:
+      machine_type: [n1-standard-4, n1-standard-8]
+      gcp_gpu_count: [1, 2]
+  flag_matrix_defs:
+    GCP:
+      num_vms: [1, 2]
+
+
