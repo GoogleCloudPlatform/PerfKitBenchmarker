@@ -176,11 +176,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     except:
       logging.exception('Error attempting to read stdout. Creation failure.')
       is_ready = False
-    if not is_ready:
-      return False
-    self.endpoint = self._ParseEndpoint(json_output)
-    self.port = self.MYSQL_DEFAULT_PORT
-    return True
+    if is_ready:
+      self.endpoint = self._ParseEndpoint(json_output)
+      self.port = self.MYSQL_DEFAULT_PORT
+    return is_ready
 
   def _ParseEndpoint(self, describe_instance_json):
     """Return the URI of the resource given the metadata as JSON.
@@ -194,6 +193,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       selflink = describe_instance_json[0]['selfLink']
     except:
       selflink = ""
+      logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
 
   def _PostCreate(self):
