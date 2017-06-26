@@ -35,6 +35,8 @@ If not, run
 to install it. This will allow this benchmark to properly create an instance.
 """
 
+import json
+import logging
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -42,6 +44,11 @@ from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
+
+LATEST_MYSQL_VERSION = '5.7'
+LATEST_POSTGRES_VERSION = '9.6'
+DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
+DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
 
 
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
@@ -55,20 +62,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   CLOUD = providers.GCP
   SERVICE_NAME = 'managed_relational_db'
   # These are the constants that should be specified in GCP's cloud SQL command.
-  DEFAULT_GCP_MY_SQL_VERSION = 'MYSQL_5_7'
   GCP_PRICING_PLAN = 'PACKAGE'
-
-  def GetEndpoint(self):
-    pass
-
-  def GetPort(self):
-    pass
-
-  @staticmethod
-  # TODO: implement for real
-  def GetLatestDatabaseVersion(database):
-    if database == managed_relational_db.MYSQL:
-      return '5.7'
+  MYSQL_DEFAULT_PORT = 3306
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
@@ -81,6 +76,11 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     db_tier = self.spec.vm_spec.machine_type
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
+    database_version = FLAGS.database or DEFAULT_GCP_MYSQL_VERSION
+    # TODO: Close authorized networks to VM once spec is updated so client
+    # VM is child of managed_relational_db. Then client VM ip address will be
+    # available from managed_relational_db_spec.
+    authorized_network = '0.0.0.0/0'
     cloudsql_specific_database_version = self._GetDatabaseVersionNameFromFlavor(
         self.spec.database, self.spec.database_version)
     # Please install gcloud component beta for this to work. See note in
@@ -91,7 +91,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
     # for more information. When this flag is allowed in the default gcloud
     # components the create_db_cmd below can be updated.
-    cmd = util.GcloudCommand(
+    cmd_string = [
         self,
         'beta',
         'sql',
@@ -103,14 +103,17 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--async',
         '--activation-policy=ALWAYS',
         '--assign-ip',
-        # TODO: Implement authorized networks
-        #         '--authorized-networks=%s' % authorized_network,
+        '--authorized-networks=%s' % authorized_network,
         '--enable-bin-log',
         '--tier=%s' % db_tier,
         '--gce-zone=%s' % instance_zone,
-        '--database-version=%s' % self.DEFAULT_GCP_MY_SQL_VERSION,
+        '--database-version=%s' % database_version,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
-        '--storage-size=%d' % storage_size)
+        '--storage-size=%d' % storage_size]
+    if self.spec.high_availability:
+      ha_flag = '--failover-replica-name=replica-' + self.instance_id
+      cmd_string.append(ha_flag)
+    cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
     cmd.flags['database-version'] = cloudsql_specific_database_version
 
@@ -124,7 +127,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     deleted.
     """
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
-                             self.instance_id)
+                             self.instance_id, '--quiet')
     cmd.Issue()
 
   def _Exists(self):
@@ -136,8 +139,13 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
-    _, _, retcode = cmd.Issue()
-    return retcode == 0
+    stdout, _, _ = cmd.Issue()
+    try:
+      json_output = json.loads(stdout)
+      exists = (json_output[0]['kind'] == 'sql#instance')
+    except:
+      exists = False
+    return exists
 
   def _IsReady(self):
     """Return true if the underlying resource is ready.
@@ -149,7 +157,34 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    return True
+    cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
+                             self.instance_id)
+    stdout, _, _ = cmd.Issue()
+    try:
+      json_output = json.loads(stdout)
+      is_ready = (json_output[0]['state'] == 'RUNNABLE')
+    except:
+      logging.exception('Error attempting to read stdout. Creation failure.')
+      is_ready = False
+    if is_ready:
+      self.endpoint = self._ParseEndpoint(json_output)
+      self.port = self.MYSQL_DEFAULT_PORT
+    return is_ready
+
+  def _ParseEndpoint(self, describe_instance_json):
+    """Return the URI of the resource given the metadata as JSON.
+
+    Args:
+      describe_instance_json: JSON output.
+    Returns:
+      resource URI (string)
+    """
+    try:
+      selflink = describe_instance_json[0]['selfLink']
+    except:
+      selflink = ""
+      logging.exception('Error attempting to read stdout. Creation failure.')
+    return selflink
 
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.
@@ -177,8 +212,50 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     pass
 
   @staticmethod
+  def GetLatestDatabaseVersion(database):
+    """Returns the latest version of a given database.
+
+    Args:
+      database (string): type of database (my_sql or postgres).
+    Returns:
+      (string): Latest database version.
+    """
+    if database == managed_relational_db.MYSQL:
+      return LATEST_MYSQL_VERSION
+    elif database == managed_relational_db.POSTGRES:
+      return LATEST_POSTGRES_VERSION
+
+  @staticmethod
   def _GetDatabaseVersionNameFromFlavor(flavor, version):
-    if flavor == 'mysql':
-      if version == '5.7':
-        return 'MYSQL_5_7'
-    raise NotImplementedError('GCP managed databases only support MySQL 5.7')
+    """Returns internal name for database type.
+
+    Args:
+      flavor:
+      version:
+    Returns:
+      (string): Internal name for database type.
+    """
+    if flavor == managed_relational_db.MYSQL:
+      if version == LATEST_MYSQL_VERSION:
+        return DEFAULT_GCP_MYSQL_VERSION
+    elif flavor == managed_relational_db.POSTGRES:
+      if version == LATEST_POSTGRES_VERSION:
+        return DEFAULT_GCP_POSTGRES_VERSION
+    raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'
+                              'POSTGRES 9.6')
+
+  def GetEndpoint(self):
+    """Return the endpoint of the managed database.
+
+    Returns:
+      database endpoint (IP or dns name)
+    """
+    return self.endpoint
+
+  def GetPort(self):
+    """Return the port of the managed database.
+
+    Returns:
+      database port number
+    """
+    return self.port

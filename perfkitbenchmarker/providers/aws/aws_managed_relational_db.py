@@ -183,6 +183,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     once, after the resource is confirmed to exist. It is intended to allow
     data about the resource to be collected or for the resource to be tagged.
     """
+    pass
 
   def _CreateDependencies(self):
     """Method that will be called once before _CreateResource() is called.
