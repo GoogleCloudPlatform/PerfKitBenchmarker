@@ -20,7 +20,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 
 
-TESLA_K80_MAX_CLOCK_SPEEDS = [2505, 875]
+TESLA_K80_MAX_CLOCK_SPEEDS = [2505, 562]
 flag_util.DEFINE_integerlist('gpu_clock_speeds',
                              flag_util.IntegerList(TESLA_K80_MAX_CLOCK_SPEEDS),
                              'desired gpu clock speeds in the form '
@@ -167,6 +167,9 @@ def AptInstall(vm):
   vm.RemoteCommand('sudo apt-get install -y cuda')
   vm.Reboot()
   DoPostInstallActions(vm)
+  # NVIDIA CUDA Profile Tools Interface.
+  # This library provides advanced profiling support
+  vm.RemoteCommand('sudo apt-get install -y libcupti-dev')
 
 
 def YumInstall(vm):
