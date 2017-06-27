@@ -92,13 +92,13 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   Args:
     benchmark_spec: benchmark specification to update
   """
-  benchmark_spec.tf_model = FLAGS.tf_model
-  benchmark_spec.tf_data_name = FLAGS.tf_data_name
-  benchmark_spec.tf_batch_size = FLAGS.tf_batch_size
-  benchmark_spec.tf_variable_update = FLAGS.tf_variable_update
-  benchmark_spec.tf_local_parameter_device = FLAGS.tf_local_parameter_device
-  benchmark_spec.tf_use_nccl = FLAGS.tf_use_nccl
-  benchmark_spec.tf_distortions = FLAGS.tf_distortions
+  benchmark_spec.model = FLAGS.tf_model
+  benchmark_spec.data_name = FLAGS.tf_data_name
+  benchmark_spec.batch_size = FLAGS.tf_batch_size
+  benchmark_spec.variable_update = FLAGS.tf_variable_update
+  benchmark_spec.local_parameter_device = FLAGS.tf_local_parameter_device
+  benchmark_spec.use_nccl = FLAGS.tf_use_nccl
+  benchmark_spec.distortions = FLAGS.tf_distortions
 
 
 def Prepare(benchmark_spec):
@@ -112,7 +112,7 @@ def Prepare(benchmark_spec):
   master_vm = vms[0]
   logging.info('Installing CUDA Toolkit 8.0 on %s', master_vm)
   master_vm.Install('cuda_toolkit_8')
-  benchmark_spec.tf_num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
+  benchmark_spec.num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
   master_vm.Install('cudnn')
   master_vm.Install('tensorflow')
 
@@ -128,15 +128,14 @@ def _CreateMetadataDict(benchmark_spec):
   """
   metadata = dict()
   metadata.update(cuda_toolkit_8.GetMetadataFromFlags())
-  metadata['tf_model'] = benchmark_spec.tf_model
-  metadata['tf_num_gpus'] = benchmark_spec.tf_num_gpus
-  metadata['tf_data_name'] = benchmark_spec.tf_data_name
-  metadata['tf_batch_size'] = benchmark_spec.tf_batch_size
-  metadata['tf_variable_update'] = benchmark_spec.tf_variable_update
-  metadata['tf_local_parameter_device'] = (
-      benchmark_spec.tf_local_parameter_device)
-  metadata['tf_use_nccl'] = benchmark_spec.tf_use_nccl
-  metadata['tf_distortions'] = benchmark_spec.tf_distortions
+  metadata['model'] = benchmark_spec.model
+  metadata['num_gpus'] = benchmark_spec.num_gpus
+  metadata['data_name'] = benchmark_spec.data_name
+  metadata['batch_size'] = benchmark_spec.batch_size
+  metadata['variable_update'] = benchmark_spec.variable_update
+  metadata['local_parameter_device'] = benchmark_spec.local_parameter_device
+  metadata['use_nccl'] = benchmark_spec.use_nccl
+  metadata['distortions'] = benchmark_spec.distortions
   return metadata
 
 
@@ -215,14 +214,14 @@ def Run(benchmark_spec):
       'python tf_cnn_benchmarks.py --local_parameter_device=%s --num_gpus=%s '
       '--batch_size=%s --model=%s --data_name=%s --variable_update=%s '
       '--nccl=%s --distortions=%s') % (
-          benchmark_spec.tf_local_parameter_device,
-          benchmark_spec.tf_num_gpus,
-          benchmark_spec.tf_batch_size,
-          benchmark_spec.tf_model,
-          benchmark_spec.tf_data_name,
-          benchmark_spec.tf_variable_update,
-          benchmark_spec.tf_use_nccl,
-          benchmark_spec.tf_distortions)
+          benchmark_spec.local_parameter_device,
+          benchmark_spec.num_gpus,
+          benchmark_spec.batch_size,
+          benchmark_spec.model,
+          benchmark_spec.data_name,
+          benchmark_spec.variable_update,
+          benchmark_spec.use_nccl,
+          benchmark_spec.distortions)
   run_command = 'cd %s && %s %s' % (tf_cnn_benchmark_dir,
                                     _GetEnvironmentVars(master_vm),
                                     tf_cnn_benchmark_cmd)

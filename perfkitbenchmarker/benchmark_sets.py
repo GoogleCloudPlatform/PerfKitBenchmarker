@@ -27,6 +27,8 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('flag_matrix', None,
                     'The name of the flag matrix to run.')
+flags.DEFINE_string('flag_zip', None,
+                    'The name of the flag zip to run.')
 
 MESSAGE = 'message'
 BENCHMARK_LIST = 'benchmark_list'
@@ -180,6 +182,23 @@ def _GetBenchmarksFromUserConfig(user_config):
   return benchmark_config_list
 
 
+def _GetConfigForAxis(benchmark_config, flag_config):
+  config = copy.copy(benchmark_config)
+  config_local_flags = config.get('flags', {})
+  config['flags'] = copy.deepcopy(configs.GetConfigFlags())
+  config['flags'].update(config_local_flags)
+  for setting in flag_config:
+    config['flags'].update(setting)
+  return config
+
+
+def _AssertZipAxesHaveSameLength(axes):
+  expected_length = len(axes[0])
+  for axis in axes[1:]:
+    if len(axis) != expected_length:
+      raise ValueError('flag_zip axes must all be the same length')
+
+
 def GetBenchmarksFromFlags():
   """Returns a list of benchmarks to run based on the benchmarks flag.
 
@@ -227,10 +246,11 @@ def GetBenchmarksFromFlags():
       raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
                        (benchmark_name, FLAGS.os_type))
 
-    # We need to remove the 'flag_matrix', 'flag_matrix_defs', and
-    # 'flag_matrix_filters' keys from the config dictionary since
-    # they aren't actually part of the config spec and will cause
-    # errors if they are left in.
+
+    # We need to remove the 'flag_matrix', 'flag_matrix_defs', 'flag_zip',
+    # 'flag_zip_defs', and 'flag_matrix_filters' keys from the config
+    # dictionary since they aren't actually part of the config spec and will
+    # cause errors if they are left in.
     flag_matrix_name = benchmark_config.pop(
         'flag_matrix', None)
     flag_matrix_name = FLAGS.flag_matrix or flag_matrix_name
@@ -238,18 +258,33 @@ def GetBenchmarksFromFlags():
         'flag_matrix_defs', {}).get(flag_matrix_name, {})
     flag_matrix_filter = benchmark_config.pop(
         'flag_matrix_filters', {}).get(flag_matrix_name)
+    flag_zip_name = benchmark_config.pop(
+        'flag_zip', None)
+    flag_zip_name = FLAGS.flag_zip or flag_zip_name
+    flag_zip = benchmark_config.pop(
+        'flag_zip_defs', {}).get(flag_zip_name, {})
 
-    flag_axes = []
+    zipped_axes = []
+    crossed_axes = []
+    if flag_zip:
+      flag_axes = []
+      for flag, values in flag_zip.iteritems():
+        flag_axes.append([{flag: v} for v in values])
+
+      _AssertZipAxesHaveSameLength(flag_axes)
+
+      for flag_config in itertools.izip(*flag_axes):
+        config = _GetConfigForAxis(benchmark_config, flag_config)
+        zipped_axes.append((benchmark_module, config))
+
+      crossed_axes.append([benchmark_tuple[1]['flags'] for
+                           benchmark_tuple in zipped_axes])
+
     for flag, values in flag_matrix.iteritems():
-      flag_axes.append([{flag: v} for v in values])
+      crossed_axes.append([{flag: v} for v in values])
 
-    for flag_config in itertools.product(*flag_axes):
-      config = copy.copy(benchmark_config)
-      config_local_flags = config.get('flags', {})
-      config['flags'] = copy.deepcopy(configs.GetConfigFlags())
-      config['flags'].update(config_local_flags)
-      for setting in flag_config:
-        config['flags'].update(setting)
+    for flag_config in itertools.product(*crossed_axes):
+      config = _GetConfigForAxis(benchmark_config, flag_config)
       if (flag_matrix_filter and not eval(
           flag_matrix_filter, {}, config['flags'])):
           continue
