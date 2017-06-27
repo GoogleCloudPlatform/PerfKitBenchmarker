@@ -58,9 +58,11 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FLAGS = flags.FLAGS
 
-YCSB_VERSION = '0.9.0'
+YCSB_VERSION = '0.12.0'
 YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases/'
                 'download/{0}/ycsb-{0}.tar.gz').format(YCSB_VERSION)
+YCSB_TAR_URL_HDRHISTOGRAM = ('https://storage.googleapis.com/pkb-ycsb-jars/'
+                             'ycsb-0.13.0-SNAPSHOT.tar.gz')
 YCSB_DIR = posixpath.join(INSTALL_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 
@@ -122,6 +124,9 @@ flags.DEFINE_integer('ycsb_operation_count', 1000000, 'Number of operations '
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination. Set to 0 for '
                      'unlimited time.')
+flags.DEFINE_boolean('ycsb_use_hdrhistogram', False,
+                     'If true, PKB collects histograms from client VMs at '
+                     'microsecond granularity. Otherwise, it is millisecond.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -154,9 +159,14 @@ def _Install(vm):
   """Installs the YCSB package on the VM."""
   vm.Install('openjdk')
   vm.Install('curl')
+
+  # TODO: Once PR https://github.com/brianfrankcooper/YCSB/pull/983 gets in,
+  # remove the conditional statement.
+  ycsb_tar_url = (YCSB_TAR_URL_HDRHISTOGRAM if FLAGS.ycsb_use_hdrhistogram
+                  else YCSB_TAR_URL)
   vm.RemoteCommand(('mkdir -p {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
-                        YCSB_DIR, YCSB_TAR_URL))
+                        YCSB_DIR, ycsb_tar_url))
 
 
 def YumInstall(vm):
@@ -201,14 +211,12 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
       groups: list of operation group descriptions, each with schema:
         group: group name (e.g., update, insert, overall)
         statistics: dict mapping from statistic name to value
-        histogram: list of (ms_lower_bound, count) tuples, e.g.:
+        histogram: list of (latency_lower_bound, count) tuples, e.g.:
           [(0, 530), (19, 1)]
         indicates that 530 ops took between 0ms and 1ms, and 1 took between
         19ms and 20ms. Empty bins are not reported.
   """
 
-  # TODO: YCSB 0.9.0 output client and command line string to stderr, so
-  # we need to support it in the future.
   lines = []
   client_string = 'YCSB'
   command_line = 'unknown'
@@ -321,11 +329,24 @@ def _WeightedQuantile(x, weights, p):
     return x[i]
 
 
+def _LatencyInMilliSecond(ycsb_histogram_latency):
+  """Adjusts the unit of ycsb histogram latency to use millisecond.
+
+  Args:
+    ycsb_histogram_latency: value of histogram latency exported from ycsb.
+
+  Returns:
+    Adjusted value of ycsb histogram latency.
+  """
+  return (ycsb_histogram_latency / 1000.0 if FLAGS.ycsb_use_hdrhistogram
+          else ycsb_histogram_latency)
+
+
 def _PercentilesFromHistogram(ycsb_histogram, percentiles=_DEFAULT_PERCENTILES):
   """Calculate percentiles for from a YCSB histogram.
 
   Args:
-    ycsb_histogram: List of (time_ms, frequency) tuples.
+    ycsb_histogram: List of (latency, frequency) tuples.
     percentiles: iterable of floats, in the interval [0, 100].
 
   Returns:
@@ -340,8 +361,8 @@ def _PercentilesFromHistogram(ycsb_histogram, percentiles=_DEFAULT_PERCENTILES):
       percentile = int(percentile)
     label = 'p{0}'.format(percentile)
     latencies, freqs = zip(*histogram)
-    time_ms = _WeightedQuantile(latencies, freqs, percentile * 0.01)
-    result[label] = time_ms
+    result[label] = _LatencyInMilliSecond(
+        _WeightedQuantile(latencies, freqs, percentile * 0.01))
   return result
 
 
@@ -485,9 +506,10 @@ def _CreateSamples(ycsb_result, include_histogram=True, **kwargs):
                             value, 'ms', meta)
 
     if include_histogram:
-      for time_ms, count in group['histogram']:
+      for latency, count in group['histogram']:
         yield sample.Sample(
-            '{0}_latency_histogram_{1}_ms'.format(group_name, time_ms),
+            '{0}_latency_histogram_{1}_ms'.format(
+                group_name, _LatencyInMilliSecond(latency)),
             count, 'count', meta)
 
 
@@ -530,6 +552,13 @@ class YCSBExecutor(object):
     self.loaded = False
     self.parameter_files = parameter_files or []
     self.parameters = kwargs.copy()
+
+    if FLAGS.ycsb_use_hdrhistogram:
+      self.parameters['measurementtype'] = 'hdrhistogram'
+      self.parameters['measurement.interval'] = 'intended'
+    else:
+      self.parameters['measurementtype'] = 'histogram'
+
     # Self-defined parameters, pop them out of self.parameters, so they
     # are not passed to ycsb commands
     self.perclientparam = self.parameters.pop('perclientparam', None)
@@ -554,7 +583,6 @@ class YCSBExecutor(object):
     for parameter, value in parameters.iteritems():
       command.extend(('-p', '{0}={1}'.format(parameter, value)))
 
-    command.append('-p measurementtype=histogram')
     return 'cd %s; %s' % (YCSB_DIR, ' '.join(command))
 
   @property
