@@ -112,7 +112,7 @@ def Prepare(benchmark_spec):
   master_vm = vms[0]
   logging.info('Installing CUDA Toolkit 8.0 on %s', master_vm)
   master_vm.Install('cuda_toolkit_8')
-  benchmark_spec.num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
+  benchmark_spec.tf_num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
   master_vm.Install('cudnn')
   master_vm.Install('tensorflow')
 
@@ -129,7 +129,7 @@ def _CreateMetadataDict(benchmark_spec):
   metadata = dict()
   metadata.update(cuda_toolkit_8.GetMetadataFromFlags())
   metadata['tf_model'] = benchmark_spec.tf_model
-  metadata['num_gpus'] = benchmark_spec.num_gpus
+  metadata['tf_num_gpus'] = benchmark_spec.tf_num_gpus
   metadata['tf_data_name'] = benchmark_spec.tf_data_name
   metadata['tf_batch_size'] = benchmark_spec.tf_batch_size
   metadata['tf_variable_update'] = benchmark_spec.tf_variable_update
@@ -216,7 +216,7 @@ def Run(benchmark_spec):
       '--batch_size=%s --model=%s --data_name=%s --variable_update=%s '
       '--nccl=%s --distortions=%s') % (
           benchmark_spec.tf_local_parameter_device,
-          benchmark_spec.num_gpus,
+          benchmark_spec.tf_num_gpus,
           benchmark_spec.tf_batch_size,
           benchmark_spec.tf_model,
           benchmark_spec.tf_data_name,
