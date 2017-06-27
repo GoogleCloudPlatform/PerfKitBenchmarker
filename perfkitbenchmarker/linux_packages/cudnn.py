@@ -18,12 +18,13 @@
 import os
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 
 flags.DEFINE_string('cudnn', 'cudnn-8.0-linux-x64-v5.1.tgz',
                     '''The NVIDIA CUDA Deep Neural Network library.
                     Please put in data directory and specify the name''')
 FLAGS = flags.FLAGS
-CUDA_TOOLKIT_INSTALL_DIR = '/usr/local/cuda'
+CUDA_TOOLKIT_INSTALL_DIR = cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
 
 
 def Install(vm):

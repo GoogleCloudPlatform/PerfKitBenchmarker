@@ -18,14 +18,13 @@ import logging
 import os
 import re
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 
 FLAGS = flags.FLAGS
 
-CUDA_TOOLKIT_INSTALL_DIR = '/usr/local/cuda'
+CUDA_TOOLKIT_INSTALL_DIR = cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
 
 BENCHMARK_NAME = 'tensorflow'
 BENCHMARK_CONFIG = """
@@ -51,23 +50,22 @@ tensorflow:
           image: Canonical:UbuntuServer:16.04.0-LTS:latest
           machine_type: Standard_NC6
           zone: eastus
-      vm_count: null
 """
 
-flags.DEFINE_string('model', 'vgg16', 'name of the model to run')
-flags.DEFINE_string('data_name', 'imagenet',
+flags.DEFINE_string('tf_model', 'vgg16', 'name of the model to run')
+flags.DEFINE_string('tf_data_name', 'imagenet',
                     'Name of dataset: imagenet or flowers.')
-flags.DEFINE_integer('batch_size', 64, 'batch size per compute device')
-flags.DEFINE_string('variable_update', 'parameter_server',
+flags.DEFINE_integer('tf_batch_size', 64, 'batch size per compute device')
+flags.DEFINE_string('tf_variable_update', 'parameter_server',
                     '''The method for managing variables: parameter_server,
                     replicated, distributed_replicated, independent''')
-flags.DEFINE_string('local_parameter_device', 'gpu',
+flags.DEFINE_string('tf_local_parameter_device', 'gpu',
                     '''Device to use as parameter server: cpu or gpu. For
                     distributed training, it can affect where caching of
                     variables happens.''')
-flags.DEFINE_boolean('use_nccl', True,
+flags.DEFINE_boolean('tf_use_nccl', True,
                      'Whether to use nccl all-reduce primitives where possible')
-flags.DEFINE_boolean('distortions', True,
+flags.DEFINE_boolean('tf_distortions', True,
                      '''Enable/disable distortions during image preprocessing.
                      These include bbox and color distortions.''')
 
@@ -88,40 +86,19 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(_):
-  """Verify that the required resources are present.
-
-  Raises:
-    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
-  """
-  cuda_toolkit_8.CheckPrerequisites()
-
-
-def _LocalDataPath(local_file):
-  """Return local data path for given file.
-
-  Args:
-    local_file: name of local file to create full data path for
-
-  Returns:
-    path of local_file, in the data directory
-  """
-  return data.ResourcePath(local_file)
-
-
 def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """Update the benchmark_spec with supplied command line flags.
 
   Args:
     benchmark_spec: benchmark specification to update
   """
-  benchmark_spec.model = FLAGS.model
-  benchmark_spec.data_name = FLAGS.data_name
-  benchmark_spec.batch_size = FLAGS.batch_size
-  benchmark_spec.variable_update = FLAGS.variable_update
-  benchmark_spec.local_parameter_device = FLAGS.local_parameter_device
-  benchmark_spec.use_nccl = FLAGS.use_nccl
-  benchmark_spec.distortions = FLAGS.distortions
+  benchmark_spec.tf_model = FLAGS.tf_model
+  benchmark_spec.tf_data_name = FLAGS.tf_data_name
+  benchmark_spec.tf_batch_size = FLAGS.tf_batch_size
+  benchmark_spec.tf_variable_update = FLAGS.tf_variable_update
+  benchmark_spec.tf_local_parameter_device = FLAGS.tf_local_parameter_device
+  benchmark_spec.tf_use_nccl = FLAGS.tf_use_nccl
+  benchmark_spec.tf_distortions = FLAGS.tf_distortions
 
 
 def Prepare(benchmark_spec):
@@ -150,14 +127,16 @@ def _CreateMetadataDict(benchmark_spec):
     metadata dict
   """
   metadata = dict()
-  metadata['model'] = benchmark_spec.model
+  metadata.update(cuda_toolkit_8.GetMetadataFromFlags())
+  metadata['tf_model'] = benchmark_spec.tf_model
   metadata['num_gpus'] = benchmark_spec.num_gpus
-  metadata['data_name'] = benchmark_spec.data_name
-  metadata['batch_size'] = benchmark_spec.batch_size
-  metadata['variable_update'] = benchmark_spec.variable_update
-  metadata['local_parameter_device'] = benchmark_spec.local_parameter_device
-  metadata['use_nccl'] = benchmark_spec.use_nccl
-  metadata['distortions'] = benchmark_spec.distortions
+  metadata['tf_data_name'] = benchmark_spec.tf_data_name
+  metadata['tf_batch_size'] = benchmark_spec.tf_batch_size
+  metadata['tf_variable_update'] = benchmark_spec.tf_variable_update
+  metadata['tf_local_parameter_device'] = (
+      benchmark_spec.tf_local_parameter_device)
+  metadata['tf_use_nccl'] = benchmark_spec.tf_use_nccl
+  metadata['tf_distortions'] = benchmark_spec.tf_distortions
   return metadata
 
 
@@ -235,20 +214,19 @@ def Run(benchmark_spec):
   tf_cnn_benchmark_cmd = (
       'python tf_cnn_benchmarks.py --local_parameter_device=%s --num_gpus=%s '
       '--batch_size=%s --model=%s --data_name=%s --variable_update=%s '
-      '--distortions=%s --distortions=%s') % (
-          benchmark_spec.local_parameter_device,
+      '--nccl=%s --distortions=%s') % (
+          benchmark_spec.tf_local_parameter_device,
           benchmark_spec.num_gpus,
-          benchmark_spec.batch_size,
-          benchmark_spec.model,
-          benchmark_spec.data_name,
-          benchmark_spec.variable_update,
-          benchmark_spec.use_nccl,
-          benchmark_spec.distortions)
+          benchmark_spec.tf_batch_size,
+          benchmark_spec.tf_model,
+          benchmark_spec.tf_data_name,
+          benchmark_spec.tf_variable_update,
+          benchmark_spec.tf_use_nccl,
+          benchmark_spec.tf_distortions)
   run_command = 'cd %s && %s %s' % (tf_cnn_benchmark_dir,
                                     _GetEnvironmentVars(master_vm),
                                     tf_cnn_benchmark_cmd)
   output, _ = master_vm.RobustRemoteCommand(run_command, should_log=True)
-  print output
   return _MakeSamplesFromOutput(benchmark_spec, output)
 
 

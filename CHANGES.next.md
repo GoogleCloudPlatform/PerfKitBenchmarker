@@ -6,6 +6,7 @@ New features:
 - Added CUDA-enabled HPCG benchmark (GH-1395)
 - Added ManagedRelationalDatabase base classes and tests (GH-1405)
 - Added gpus to GceVmSpec. This is now the only way to create VMs with gpus on GCE due to a gcloud API change (GH-1406)
+- Added TensorFlow Benchmarks. (GH-1420)
 
 Enhancements:
 - Added basic auth support for Mesos provider. (GH-1390)
