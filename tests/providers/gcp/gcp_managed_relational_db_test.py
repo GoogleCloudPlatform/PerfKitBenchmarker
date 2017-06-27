@@ -118,6 +118,17 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--tier=db-n1-standard-1', command_string)
       self.assertIn('--storage-size=50', command_string)
 
+  def testCreatepostgres(self):
+    with self._PatchCriticalObjects() as issue_command:
+      spec = self.createSpecDict()
+      spec['database'] = 'postgres'
+      spec['database_version'] = '9.6'
+      db = self.createManagedDbFromSpec(spec)
+      db._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+      self.assertIn('POSTGRES_9_6', command_string)
+
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
       vm = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
@@ -172,11 +183,31 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
 
     with self._PatchCriticalObjects():
       db = self.createManagedDbFromSpec(self.createSpecDict())
-      self.assertEquals('',
-                        db._ParseEndpoint(None))
+      self.assertEquals('', db._ParseEndpoint(None))
       self.assertIn('pkb-db-instance-123',
                     db._ParseEndpoint(json.loads(test_output)))
 
+  def testValidateMachineTypePostgres(self):
+    spec = self.createSpecDict()
+    spec['database'] = 'postgres'
+    db = self.createManagedDbFromSpec(spec)
+    for machine in db.VALID_POSTGRES_MACHINE_TYPES:
+      self.assertEquals(db._ValidateMachineType(machine), machine)
+      self.assertEquals(db._ValidateMachineType(machine), machine)
+    self.assertEquals(
+        db._ValidateMachineType('db-n1-standard-1'),
+        db.VALID_POSTGRES_MACHINE_TYPES[0])
+
+  def testValidateMachineTypeMYSQL(self):
+    spec = self.createSpecDict()
+    spec['database'] = 'mysql'
+    db = self.createManagedDbFromSpec(spec)
+    for machine in db.VALID_POSTGRES_MACHINE_TYPES:
+      self.assertEquals(db._ValidateMachineType(machine), machine)
+      self.assertEquals(db._ValidateMachineType(machine), machine)
+    self.assertEquals(
+        db._ValidateMachineType('db-n1-standard-1'),
+        'db-n1-standard-1')
 
 if __name__ == '__main__':
   unittest.main()

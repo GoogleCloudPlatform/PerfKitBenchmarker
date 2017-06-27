@@ -181,7 +181,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       (string): Validated machine type.
     """
-    if FLAGS.database == managed_relational_db.POSTGRES:
+    if self.spec.database == managed_relational_db.POSTGRES:
       if machine_type not in self.VALID_POSTGRES_MACHINE_TYPES:
         machine_type = self.VALID_POSTGRES_MACHINE_TYPES[0]
     return machine_type
