@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """Managed relational database provisioning for GCP.
 
 As of June 2017 to make this benchmark run for GCP you must install the
@@ -64,7 +62,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   # These are the constants that should be specified in GCP's cloud SQL command.
   GCP_PRICING_PLAN = 'PACKAGE'
   MYSQL_DEFAULT_PORT = 3306
-  VALID_POSTGRES_MACHINE_TYPES = ['db-f1-micro', 'db-g1-small']
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
@@ -76,8 +73,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """Creates the GCP Cloud SQL instance."""
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
-    database_version = FLAGS.database or DEFAULT_GCP_MYSQL_VERSION
-    db_tier = self._ValidateMachineType(self.spec.vm_spec.machine_type)
+
     # TODO: Close authorized networks to VM once spec is updated so client
     # VM is child of managed_relational_db. Then client VM ip address will be
     # available from managed_relational_db_spec.
@@ -93,30 +89,25 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # for more information. When this flag is allowed in the default gcloud
     # components the create_db_cmd below can be updated.
     cmd_string = [
-        self,
-        'beta',
-        'sql',
-        'instances',
-        'create',
-        self.instance_id,
-        '--quiet',
-        '--format=json',
-        '--async',
-        '--activation-policy=ALWAYS',
-        '--assign-ip',
-        '--authorized-networks=%s' % authorized_network,
-        '--enable-bin-log',
-        '--tier=%s' % db_tier,
+        self, 'beta', 'sql', 'instances', 'create', self.instance_id, '--quiet',
+        '--format=json', '--async', '--activation-policy=ALWAYS', '--assign-ip',
+        '--authorized-networks=%s' % authorized_network, '--enable-bin-log',
         '--gce-zone=%s' % instance_zone,
-        '--database-version=%s' % database_version,
+        '--database-version=%s' % cloudsql_specific_database_version,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
-        '--storage-size=%d' % storage_size]
+        '--storage-size=%d' % storage_size
+    ]
+    if self.spec.database == managed_relational_db.MYSQL:
+      machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
+    else:
+      machine_type_flag = ('--cpu={} --ram={}'.format(self.spec.vm_spec.memory,
+                                                      self.spec.vm_spec.cpus))
+    cmd_string.append(machine_type_flag)
     if self.spec.high_availability:
       ha_flag = '--failover-replica-name=replica-' + self.instance_id
       cmd_string.append(ha_flag)
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
-    cmd.flags['database-version'] = cloudsql_specific_database_version
 
     _, _, _ = cmd.Issue()
 
@@ -172,20 +163,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       self.port = self.MYSQL_DEFAULT_PORT
     return is_ready
 
-  def _ValidateMachineType(self, machine_type):
-    """Validate that machine type is valid for database type.
-
-    Args:
-      machine_type: (string).
-
-    Returns:
-      (string): Validated machine type.
-    """
-    if self.spec.database == managed_relational_db.POSTGRES:
-      if machine_type not in self.VALID_POSTGRES_MACHINE_TYPES:
-        machine_type = self.VALID_POSTGRES_MACHINE_TYPES[0]
-    return machine_type
-
   def _ParseEndpoint(self, describe_instance_json):
     """Return the URI of the resource given the metadata as JSON.
 
@@ -197,7 +174,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     try:
       selflink = describe_instance_json[0]['selfLink']
     except:
-      selflink = ""
+      selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
 

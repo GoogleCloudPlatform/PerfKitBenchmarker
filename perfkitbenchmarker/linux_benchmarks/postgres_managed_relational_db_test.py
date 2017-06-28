@@ -54,16 +54,18 @@ to install it. This will allow this benchmark to properly create an instance.
 
 from perfkitbenchmarker import configs
 
-BENCHMARK_NAME = 'managed_relational_db_test'
+BENCHMARK_NAME = 'postgres_managed_relational_db_test'
 BENCHMARK_CONFIG = """
-managed_relational_db_test:
+postgres_managed_relational_db_test:
   description: test managed relational database provisioning
   managed_relational_db:
-    database: mysql
-    database_version: '5.7'
+    database: postgres
+    database_version: '9.6'
     vm_spec:
       GCP:
-        machine_type: db-n1-standard-1
+        machine_type:
+          cpus: 1
+          memory: 3840MiB
         zone: us-central1-c
       AWS:
         machine_type: db.t1.micro

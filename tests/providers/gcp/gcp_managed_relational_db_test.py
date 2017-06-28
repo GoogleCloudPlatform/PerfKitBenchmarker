@@ -24,6 +24,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker import disk
 
@@ -43,9 +44,27 @@ class GcpManagedRelationalDbFlagsTestCase(unittest.TestCase):
 
 class GcpManagedRelationalDbTestCase(unittest.TestCase):
 
-  def createSpecDict(self):
+  def createSQLSpecDict(self):
     vm_spec = virtual_machine.BaseVmSpec('NAME',
                                          **{'machine_type': 'db-n1-standard-1'})
+    disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
+    # TODO: Database version has more than one supported value. Test should
+    # reflect that by not declaring a database version and letting the default
+    # version be returned.
+    return {
+        'database': MYSQL,
+        'database_version': '5.7',
+        'run_uri': '123',
+        'database_name': 'fakedbname',
+        'database_password': 'fakepassword',
+        'vm_spec': vm_spec,
+        'disk_spec': disk_spec,
+        'high_availability': False
+    }
+
+  def createPostgresSpecDict(self):
+    machine_type = {'machine_type': {'cpus': 1, 'memory': '3840MiB'}}
+    vm_spec = gce_virtual_machine.GceVmSpec('NAME', **machine_type)
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     # TODO: Database version has more than one supported value. Test should
     # reflect that by not declaring a database version and letting the default
@@ -76,14 +95,14 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     flags_mock.configure_mock(**flag_values)
     self.addCleanup(p.stop)
 
-    mock_db_spec_attrs = self.createSpecDict()
+    mock_db_spec_attrs = self.createSQLSpecDict()
     self.mock_db_spec = mock.Mock(
         spec=benchmark_config_spec._ManagedRelationalDbSpec)
     self.mock_db_spec.configure_mock(**mock_db_spec_attrs)
 
   def testNoHighAvailability(self):
     with self._PatchCriticalObjects() as issue_command:
-      db = self.createManagedDbFromSpec(self.createSpecDict())
+      db = self.createManagedDbFromSpec(self.createSQLSpecDict())
       db._Create()
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -120,14 +139,14 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
 
   def testCreatepostgres(self):
     with self._PatchCriticalObjects() as issue_command:
-      spec = self.createSpecDict()
+      spec = self.createPostgresSpecDict()
       spec['database'] = 'postgres'
       spec['database_version'] = '9.6'
       db = self.createManagedDbFromSpec(spec)
       db._Create()
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
-      self.assertIn('POSTGRES_9_6', command_string)
+      self.assertIn('database-version=POSTGRES_9_6', command_string)
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -147,7 +166,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       test_output = fp.read()
 
     with self._PatchCriticalObjects(stdout=test_output):
-      db = self.createManagedDbFromSpec(self.createSpecDict())
+      db = self.createManagedDbFromSpec(self.createSQLSpecDict())
 
       self.assertEqual(True, db._IsReady())
 
@@ -159,12 +178,12 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       test_output = fp.read()
 
     with self._PatchCriticalObjects(stdout=test_output):
-      db = self.createManagedDbFromSpec(self.createSpecDict())
+      db = self.createManagedDbFromSpec(self.createSQLSpecDict())
       self.assertEqual(True, db._Exists())
 
   def testHighAvailability(self):
     with self._PatchCriticalObjects() as issue_command:
-      spec = self.createSpecDict()
+      spec = self.createSQLSpecDict()
       spec['high_availability'] = True
       db = self.createManagedDbFromSpec(spec)
       db._Create()
@@ -182,32 +201,11 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       test_output = fp.read()
 
     with self._PatchCriticalObjects():
-      db = self.createManagedDbFromSpec(self.createSpecDict())
+      db = self.createManagedDbFromSpec(self.createSQLSpecDict())
       self.assertEquals('', db._ParseEndpoint(None))
       self.assertIn('pkb-db-instance-123',
                     db._ParseEndpoint(json.loads(test_output)))
 
-  def testValidateMachineTypePostgres(self):
-    spec = self.createSpecDict()
-    spec['database'] = 'postgres'
-    db = self.createManagedDbFromSpec(spec)
-    for machine in db.VALID_POSTGRES_MACHINE_TYPES:
-      self.assertEquals(db._ValidateMachineType(machine), machine)
-      self.assertEquals(db._ValidateMachineType(machine), machine)
-    self.assertEquals(
-        db._ValidateMachineType('db-n1-standard-1'),
-        db.VALID_POSTGRES_MACHINE_TYPES[0])
-
-  def testValidateMachineTypeMYSQL(self):
-    spec = self.createSpecDict()
-    spec['database'] = 'mysql'
-    db = self.createManagedDbFromSpec(spec)
-    for machine in db.VALID_POSTGRES_MACHINE_TYPES:
-      self.assertEquals(db._ValidateMachineType(machine), machine)
-      self.assertEquals(db._ValidateMachineType(machine), machine)
-    self.assertEquals(
-        db._ValidateMachineType('db-n1-standard-1'),
-        'db-n1-standard-1')
 
 if __name__ == '__main__':
   unittest.main()
