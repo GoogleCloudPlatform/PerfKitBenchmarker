@@ -36,13 +36,6 @@ flags.DEFINE_string('database_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
 flags.DEFINE_boolean('high_availability', False,
                      'Specifies if the database should be high availability')
-flags.DEFINE_string('cpu', None,
-                    'For postgres only: Number of vCPUs for custom machine. '
-                    'Must be or an even number up to (and including) 32.')
-flags.DEFINE_string('ram', None,
-                    'For postgres & GCP only: Amount of RAM for custom machine.'
-                    ' Must be a multiple of 256MB and memory per CPU must '
-                    'be between 0.9 and 6.5 inclusive.')
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
 

@@ -27,9 +27,7 @@ To run this benchmark the following flags may be used:
 - database_password: Defaults to random 10-character alpha-numeric string.
 - database_version: {5.7, 9.6} Defaulted to latest for type.
 - high_availability: Boolean.
-- data_disk_size:
-- cpu:
-- ram:
+- data_disk_size: integer. Storage size.
 
 
 As of June 2017 to make this benchmark run for GCP you must install the
@@ -81,6 +79,9 @@ postgres_managed_relational_db_test:
     client:
       vm_spec: *default_single_core
 """
+# Machine type in benchmark config broken into cpu & memory instead of
+# converting from tiered machines to cpu & memory to be consistent with UI and
+# gcloud experience when creating postgres instances.
 
 
 def GetConfig(user_config):

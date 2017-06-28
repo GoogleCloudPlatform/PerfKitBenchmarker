@@ -206,6 +206,14 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('pkb-db-instance-123',
                     db._ParseEndpoint(json.loads(test_output)))
 
+  def testValidateMachineType(self):
+    with self._PatchCriticalObjects():
+      db = self.createManagedDbFromSpec(self.createPostgresSpecDict())
+      self.assertRaises(ValueError, db._ValidateMachineType, 0, 0)
+      db._ValidateMachineType('3840MiB', 1)
+      db._ValidateMachineType('5376MB', 4)
+#       db._ValidateMachineType(db.spec.vm_spec.machine_type.memory,
+#                               db.spec.vm_spec.machine_type.cpus)
 
 if __name__ == '__main__':
   unittest.main()

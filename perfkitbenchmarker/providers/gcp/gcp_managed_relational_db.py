@@ -39,6 +39,7 @@ import logging
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -47,6 +48,9 @@ LATEST_MYSQL_VERSION = '5.7'
 LATEST_POSTGRES_VERSION = '9.6'
 DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
 DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
+CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND = 0.9
+CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND = 6.5
+MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
 
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
@@ -89,9 +93,19 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # for more information. When this flag is allowed in the default gcloud
     # components the create_db_cmd below can be updated.
     cmd_string = [
-        self, 'beta', 'sql', 'instances', 'create', self.instance_id, '--quiet',
-        '--format=json', '--async', '--activation-policy=ALWAYS', '--assign-ip',
-        '--authorized-networks=%s' % authorized_network, '--enable-bin-log',
+        self,
+        'beta',
+        'sql',
+        'instances',
+        'create',
+        self.instance_id,
+        '--quiet',
+        '--format=json',
+        '--async',
+        '--activation-policy=ALWAYS',
+        '--assign-ip',
+        '--authorized-networks=%s' % authorized_network,
+        '--enable-bin-log',
         '--gce-zone=%s' % instance_zone,
         '--database-version=%s' % cloudsql_specific_database_version,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
@@ -100,8 +114,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if self.spec.database == managed_relational_db.MYSQL:
       machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
     else:
-      machine_type_flag = ('--cpu={} --ram={}'.format(self.spec.vm_spec.memory,
-                                                      self.spec.vm_spec.cpus))
+      memory = self.spec.vm_spec.memory
+      cpus = self.spec.vm_spec.cpus
+      self._ValidateMachineType(memory, cpus)
+      machine_type_flag = ('--cpu={} --ram={}'.format(memory, cpus))
     cmd_string.append(machine_type_flag)
     if self.spec.high_availability:
       ha_flag = '--failover-replica-name=replica-' + self.instance_id
@@ -110,6 +126,50 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     cmd.flags['project'] = self.project
 
     _, _, _ = cmd.Issue()
+
+  def _ParseMemory(self, memory):
+    """
+    Args:
+      memory:
+
+    Returns"""
+
+  def _ValidateMachineType(self, memory, cpus):
+    """ validated machine configurations.
+
+    Args:
+      memory: (string).
+      cpus: (int).
+
+    Raises:
+      ValueError.
+    """
+    decoder = gce_virtual_machine.MemoryDecoder(option='memory')
+
+    memory = decoder.Decode(memory, '', None)
+    if cpus not in [1] + range(2, 32, 2):
+      raise ValueError(
+          'CPUs and memory values are invalid. See '
+          'https://cloud.google.com/sql/docs/postgres/create-instance'
+          'for restrictions.')
+
+    if memory % 256 != 0:
+      raise ValueError(
+          'Total memory (%dMiB) for a custom machine must be a multiple'
+          'of 256MiB.', memory)
+    ratio = memory / 1024.0 / cpus
+    if (ratio < CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND or
+        ratio > CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND):
+      raise ValueError(
+          'The memory (%.2fGiB) per vCPU (%d) of a custom machine type must be '
+          'between %.2f GiB and %.2f GiB per vCPU, inclusive', memory / 1024.0,
+          cpus, CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND,
+          CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND)
+    if memory < MIN_CUSTOM_MACHINE_MEM_MB:
+      raise ValueError('The total memory (%dMiB) for a custom machine type'
+                       'must be at least %dMiB',
+                       memory,
+                       MIN_CUSTOM_MACHINE_MEM_MB)
 
   def _Delete(self):
     """Deletes the underlying resource.
