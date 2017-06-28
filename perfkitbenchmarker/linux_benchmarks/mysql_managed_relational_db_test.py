@@ -14,13 +14,13 @@
 """Test for managed relational database provisioning.
 
 This is a set of benchmarks that measures performance of SQL Databases on
-managed SQL services.
+managed MySQL services.
 
 - On AWS, we will use RDS+MySQL and RDS PostgreSQL.
 - On GCP, we will use Cloud SQL v2 (Performance Edition).
 As other cloud providers deliver a managed SQL service, we will add it here.
 
-To run this benchmark the following flags may be used:
+To run this benchmark the following flags can be used to overwrite config:
 - database: {mysql, postgres} Declares type of database.
 - database_name: Defaults to 'pkb-db-{run_uri}'.
 - database_username: Defaults to 'pkb-db-user-{run_uri}'.

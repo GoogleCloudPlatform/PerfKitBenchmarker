@@ -147,6 +147,8 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertIn('database-version=POSTGRES_9_6', command_string)
+      self.assertIn('--cpu=1', command_string)
+      self.assertIn('--ram=3840', command_string)
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -210,10 +212,12 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     with self._PatchCriticalObjects():
       db = self.createManagedDbFromSpec(self.createPostgresSpecDict())
       self.assertRaises(ValueError, db._ValidateMachineType, 0, 0)
-      db._ValidateMachineType('3840MiB', 1)
-      db._ValidateMachineType('5376MB', 4)
-#       db._ValidateMachineType(db.spec.vm_spec.machine_type.memory,
-#                               db.spec.vm_spec.machine_type.cpus)
+      self.assertRaises(ValueError, db._ValidateMachineType, 3840, 0)
+      self.assertRaises(ValueError, db._ValidateMachineType, 255, 1)
+      self.assertRaises(ValueError, db._ValidateMachineType, 256000000000, 1)
+      self.assertRaises(ValueError, db._ValidateMachineType, 2560, 1)
+      db._ValidateMachineType(db.spec.vm_spec.memory,
+                              db.spec.vm_spec.cpus)
 
 if __name__ == '__main__':
   unittest.main()
