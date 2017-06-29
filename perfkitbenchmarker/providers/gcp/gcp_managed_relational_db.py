@@ -75,6 +75,9 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.spec = managed_relational_db_spec
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
+#     if not hasattr(managed_relational_db_spec.vm_spec, 'cpus'):
+#       raise KeyError('machine_type: {%s}' %
+#                      managed_relational_db_spec.vm_spec.machine_type)
 
   def _Create(self):
     """Creates the GCP Cloud SQL instance."""

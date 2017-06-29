@@ -97,7 +97,6 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     flags_mock = p.start()
     flags_mock.configure_mock(**flag_values)
     self.addCleanup(p.stop)
-
     mock_db_spec_attrs = self.createMySQLSpecDict()
     self.mock_db_spec = mock.Mock(
         spec=benchmark_config_spec._ManagedRelationalDbSpec)
@@ -172,7 +171,6 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
 
     with self._PatchCriticalObjects(stdout=test_output):
       db = self.createManagedDbFromSpec(self.createMySQLSpecDict())
-
       self.assertEqual(True, db._IsReady())
 
   def testExists(self):
