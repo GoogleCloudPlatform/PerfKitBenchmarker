@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """Tests for perfkitbenchmarker.providers.gcp.gcp_managed_relational_db"""
 
 import contextlib
@@ -27,6 +28,7 @@ from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import data
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -207,6 +209,13 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertEquals('', db._ParseEndpoint(None))
       self.assertIn('pkb-db-instance-123',
                     db._ParseEndpoint(json.loads(test_output)))
+
+  def testValidateSpec(self):
+    with self._PatchCriticalObjects():
+      db_sql = self.createManagedDbFromSpec(self.createSQLSpecDict())
+      self.assertRaises(data.ResourceNotFound, db_sql._ValidateSpec)
+      db_postgres = self.createManagedDbFromSpec(self.createPostgresSpecDict())
+      db_postgres._ValidateSpec()
 
   def testValidateMachineType(self):
     with self._PatchCriticalObjects():

@@ -39,6 +39,7 @@ import logging
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker import data
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -47,6 +48,9 @@ LATEST_MYSQL_VERSION = '5.7'
 LATEST_POSTGRES_VERSION = '9.6'
 DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
 DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
+
+# PostgreSQL restrictions on memory.
+# Source: https://cloud.google.com/sql/docs/postgres/instance-settings.
 CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND = 0.9
 CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND = 6.5
 MIN_CUSTOM_MACHINE_MEM_MB = 3840
@@ -71,6 +75,9 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.spec = managed_relational_db_spec
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
+#     if not hasattr(managed_relational_db_spec.vm_spec, 'cpus'):
+#       raise KeyError('machine_type: {%s}' %
+#                      managed_relational_db_spec.vm_spec.machine_type)
 
   def _Create(self):
     """Creates the GCP Cloud SQL instance."""
@@ -113,6 +120,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if self.spec.database == managed_relational_db.MYSQL:
       machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
     else:
+      self._ValidateSpec()
       memory = self.spec.vm_spec.memory
       cpus = self.spec.vm_spec.cpus
       self._ValidateMachineType(memory, cpus)
@@ -125,6 +133,24 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     cmd.flags['project'] = self.project
 
     _, _, _ = cmd.Issue()
+
+  def _ValidateSpec(self):
+    """Validate postgreSQL spec for CPU and memory.
+
+    Raises:
+      data.ResourceNotFound: On missing memory or cpus in postgres benchmark
+                              config.
+    """
+    if not hasattr(self.spec.vm_spec, 'cpus'):
+      raise data.ResourceNotFound(
+          'Must initialize a memory amount in benchmark config. See https://'
+          'cloud.google.com/sql/docs/postgres/instance-settings for more '
+          'details about size restrictions.')
+    if not hasattr(self.spec.vm_spec, 'memory'):
+      raise data.ResourceNotFound(
+          'Must initialize a memory amount in benchmark config. See https://'
+          'cloud.google.com/sql/docs/postgres/instance-settings for more '
+          'details about size restrictions.')
 
   def _ValidateMachineType(self, memory, cpus):
     """ validated machine configurations.
