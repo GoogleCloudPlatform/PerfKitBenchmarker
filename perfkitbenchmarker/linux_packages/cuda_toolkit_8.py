@@ -167,6 +167,9 @@ def AptInstall(vm):
   vm.RemoteCommand('sudo apt-get install -y cuda')
   vm.Reboot()
   DoPostInstallActions(vm)
+  # NVIDIA CUDA Profile Tools Interface.
+  # This library provides advanced profiling support
+  vm.RemoteCommand('sudo apt-get install -y libcupti-dev')
 
 
 def YumInstall(vm):
