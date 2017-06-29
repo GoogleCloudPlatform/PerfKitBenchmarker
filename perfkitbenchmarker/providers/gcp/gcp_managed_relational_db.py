@@ -143,12 +143,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     if not hasattr(self.spec.vm_spec, 'cpus'):
       raise data.ResourceNotFound(
-          'Must initialize a memory amount in benchmark config. See https://'
+          'Must specify cpu count in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
           'details about size restrictions.')
     if not hasattr(self.spec.vm_spec, 'memory'):
       raise data.ResourceNotFound(
-          'Must initialize a memory amount in benchmark config. See https://'
+          'Must specify a memory amount in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
           'details about size restrictions.')
 
