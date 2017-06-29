@@ -24,6 +24,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.managed_relational_db import MYSQL
+from perfkitbenchmarker.managed_relational_db import POSTGRES
 from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
@@ -46,7 +47,7 @@ class GcpManagedRelationalDbFlagsTestCase(unittest.TestCase):
 
 class GcpManagedRelationalDbTestCase(unittest.TestCase):
 
-  def createSQLSpecDict(self):
+  def createMySQLSpecDict(self):
     vm_spec = virtual_machine.BaseVmSpec('NAME',
                                          **{'machine_type': 'db-n1-standard-1'})
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
@@ -72,7 +73,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     # reflect that by not declaring a database version and letting the default
     # version be returned.
     return {
-        'database': MYSQL,
+        'database': POSTGRES,
         'database_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',
@@ -97,14 +98,14 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     flags_mock.configure_mock(**flag_values)
     self.addCleanup(p.stop)
 
-    mock_db_spec_attrs = self.createSQLSpecDict()
+    mock_db_spec_attrs = self.createMySQLSpecDict()
     self.mock_db_spec = mock.Mock(
         spec=benchmark_config_spec._ManagedRelationalDbSpec)
     self.mock_db_spec.configure_mock(**mock_db_spec_attrs)
 
   def testNoHighAvailability(self):
     with self._PatchCriticalObjects() as issue_command:
-      db = self.createManagedDbFromSpec(self.createSQLSpecDict())
+      db = self.createManagedDbFromSpec(self.createMySQLSpecDict())
       db._Create()
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -139,7 +140,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--tier=db-n1-standard-1', command_string)
       self.assertIn('--storage-size=50', command_string)
 
-  def testCreatepostgres(self):
+  def testCreatePostgres(self):
     with self._PatchCriticalObjects() as issue_command:
       spec = self.createPostgresSpecDict()
       spec['database'] = 'postgres'
@@ -170,7 +171,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       test_output = fp.read()
 
     with self._PatchCriticalObjects(stdout=test_output):
-      db = self.createManagedDbFromSpec(self.createSQLSpecDict())
+      db = self.createManagedDbFromSpec(self.createMySQLSpecDict())
 
       self.assertEqual(True, db._IsReady())
 
@@ -182,12 +183,12 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       test_output = fp.read()
 
     with self._PatchCriticalObjects(stdout=test_output):
-      db = self.createManagedDbFromSpec(self.createSQLSpecDict())
+      db = self.createManagedDbFromSpec(self.createMySQLSpecDict())
       self.assertEqual(True, db._Exists())
 
   def testHighAvailability(self):
     with self._PatchCriticalObjects() as issue_command:
-      spec = self.createSQLSpecDict()
+      spec = self.createMySQLSpecDict()
       spec['high_availability'] = True
       db = self.createManagedDbFromSpec(spec)
       db._Create()
@@ -205,14 +206,14 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       test_output = fp.read()
 
     with self._PatchCriticalObjects():
-      db = self.createManagedDbFromSpec(self.createSQLSpecDict())
+      db = self.createManagedDbFromSpec(self.createMySQLSpecDict())
       self.assertEquals('', db._ParseEndpoint(None))
       self.assertIn('pkb-db-instance-123',
                     db._ParseEndpoint(json.loads(test_output)))
 
   def testValidateSpec(self):
     with self._PatchCriticalObjects():
-      db_sql = self.createManagedDbFromSpec(self.createSQLSpecDict())
+      db_sql = self.createManagedDbFromSpec(self.createMySQLSpecDict())
       self.assertRaises(data.ResourceNotFound, db_sql._ValidateSpec)
       db_postgres = self.createManagedDbFromSpec(self.createPostgresSpecDict())
       db_postgres._ValidateSpec()

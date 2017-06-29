@@ -75,9 +75,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.spec = managed_relational_db_spec
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
-#     if not hasattr(managed_relational_db_spec.vm_spec, 'cpus'):
-#       raise KeyError('machine_type: {%s}' %
-#                      managed_relational_db_spec.vm_spec.machine_type)
 
   def _Create(self):
     """Creates the GCP Cloud SQL instance."""
@@ -143,12 +140,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     if not hasattr(self.spec.vm_spec, 'cpus'):
       raise data.ResourceNotFound(
-          'Must initialize a memory amount in benchmark config. See https://'
+          'Must specify cpu count in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
           'details about size restrictions.')
     if not hasattr(self.spec.vm_spec, 'memory'):
       raise data.ResourceNotFound(
-          'Must initialize a memory amount in benchmark config. See https://'
+          'Must specify a memory amount in benchmark config. See https://'
           'cloud.google.com/sql/docs/postgres/instance-settings for more '
           'details about size restrictions.')
 
