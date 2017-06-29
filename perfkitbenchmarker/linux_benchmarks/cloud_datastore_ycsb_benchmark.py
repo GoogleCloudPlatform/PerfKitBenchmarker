@@ -14,24 +14,17 @@
 
 """Run YCSB benchmark against Google Cloud Datastore
 
-Before running this benchmark, you have to download your P12
-service account private key file to local machine, and pass the path
-via 'google_datastore_keyfile' parameters to PKB.
-
-Service Account email associated with the key file is also needed to
-pass to PKB.
-
 By default, this benchmark provision 1 single-CPU VM and spawn 1 thread
 to test Datastore.
 """
 
-import posixpath
 import logging
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
+from perfkitbenchmarker.providers.gcp import util
 
 
 BENCHMARK_NAME = 'cloud_datastore_ycsb'
@@ -43,90 +36,73 @@ cloud_datastore_ycsb:
   vm_groups:
     default:
       vm_spec: *default_single_core
-      vm_count: 1"""
-
-YCSB_BINDING_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases'
-                        '/download/0.9.0/'
-                        'ycsb-googledatastore-binding-0.9.0.tar.gz')
-YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'lib')
-PRIVATE_KEYFILE_DIR = '/tmp/key.p12'
+      vm_count: 1
+  flags:
+    gcloud_scopes: >
+      https://www.googleapis.com/auth/datastore"""
+YCSB_BINDING_TAR_URL = ('https://storage.googleapis.com/datastore-ycsb/'
+                        'ycsb-googledatastore-binding-0.13.0-SNAPSHOT.tar.gz')
+REQUIRED_SCOPES = ('https://www.googleapis.com/auth/datastore')
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('google_datastore_keyfile',
-                    None,
-                    'The path to Google API P12 private key file')
-flags.DEFINE_string('google_datastore_serviceAccount',
-                    None,
-                    'The service account email associated with'
-                    'datastore private key file')
 flags.DEFINE_string('google_datastore_datasetId',
                     None,
-                    'The project ID that has Cloud Datastore service')
+                    'The project ID that has Cloud Datastore service.')
 flags.DEFINE_string('google_datastore_debug',
                     'false',
-                    'The logging level when running YCSB')
+                    'The logging level when running YCSB.')
 
 
 def GetConfig(user_config):
-    config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-    if FLAGS['ycsb_client_vms'].present:
-        config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
-    return config
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
+  return config
 
 
 def CheckPrerequisites(benchmark_config):
-    # Before YCSB Cloud Datastore supports Application Default Credential,
-    # we should always make sure valid credential flags are set.
-    if not FLAGS.google_datastore_keyfile:
-        raise ValueError('"google_datastore_keyfile" must be set')
-    if not FLAGS.google_datastore_serviceAccount:
-        raise ValueError('"google_datastore_serviceAccount" must be set')
-    if not FLAGS.google_datastore_datasetId:
-        raise ValueError('"google_datastore_datasetId" must be set ')
+  for scope in REQUIRED_SCOPES:
+    if scope not in FLAGS.gcloud_scopes:
+      raise ValueError('Scope {0} required.'.format(scope))
 
 
 def Prepare(benchmark_spec):
-    benchmark_spec.always_call_cleanup = True
-    default_ycsb_tar_url = ycsb.YCSB_TAR_URL
-    vms = benchmark_spec.vms
+  benchmark_spec.always_call_cleanup = True
+  default_ycsb_tar_url = ycsb.YCSB_TAR_URL
+  vms = benchmark_spec.vms
 
-    # TODO: figure out a less hacky way to override.
-    # Override so that we only need to download the required binding.
-    ycsb.YCSB_TAR_URL = YCSB_BINDING_TAR_URL
+  # TODO: figure out a less hacky way to override.
+  # Override so that we only need to download the required binding.
+  ycsb.YCSB_TAR_URL = YCSB_BINDING_TAR_URL
 
-    # Install required packages and copy credential files
-    vm_util.RunThreaded(_Install, vms)
+  # Install required packages and copy credential files
+  vm_util.RunThreaded(_Install, vms)
 
-    # Restore YCSB_TAR_URL
-    ycsb.YCSB_TAR_URL = default_ycsb_tar_url
-    benchmark_spec.executor = ycsb.YCSBExecutor('googledatastore')
+  # Restore YCSB_TAR_URL
+  ycsb.YCSB_TAR_URL = default_ycsb_tar_url
+
+  benchmark_spec.executor = ycsb.YCSBExecutor('googledatastore')
 
 
 def Run(benchmark_spec):
-    vms = benchmark_spec.vms
-    run_kwargs = {
-        'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
-        'googledatastore.privateKeyFile': PRIVATE_KEYFILE_DIR,
-        'googledatastore.serviceAccountEmail':
-            FLAGS.google_datastore_serviceAccount,
-        'googledatastore.debug': FLAGS.google_datastore_debug,
-    }
-    load_kwargs = run_kwargs.copy()
-    if FLAGS['ycsb_preload_threads'].present:
-        load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
-    samples = list(benchmark_spec.executor.LoadAndRun(
-        vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
-    return samples
+  vms = benchmark_spec.vms
+  run_kwargs = {
+      'googledatastore.datasetId': (FLAGS.google_datastore_datasetId
+                                    if FLAGS.google_datastore_datasetId
+                                    else util.GetDefaultProject()),
+      'googledatastore.debug': FLAGS.google_datastore_debug,
+  }
+  load_kwargs = run_kwargs.copy()
+  samples = list(benchmark_spec.executor.LoadAndRun(
+      vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  return samples
 
 
 def Cleanup(benchmark_spec):
-    # TODO: support automatic cleanup.
-    logging.warning(
-        "For now, we can only manually delete all the entries via GCP portal.")
+  # TODO: support automatic cleanup.
+  logging.warning(
+      "For now, we can only manually delete all the entries via GCP portal.")
 
 
 def _Install(vm):
-    vm.Install('ycsb')
-
-    # Copy private key file to VM
-    vm.RemoteCopy(FLAGS.google_datastore_keyfile, PRIVATE_KEYFILE_DIR)
+  vm.Install('ycsb')
