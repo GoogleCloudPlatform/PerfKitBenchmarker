@@ -13,6 +13,23 @@
 # limitations under the License.
 """Test for managed relational database provisioning.
 
+This is a set of benchmarks that measures performance of SQL Databases on
+managed MySQL services.
+
+- On AWS, we will use RDS+MySQL and RDS PostgreSQL.
+- On GCP, we will use Cloud SQL v2 (Performance Edition).
+As other cloud providers deliver a managed SQL service, we will add it here.
+
+To run this benchmark the following flags can be used to overwrite config:
+- database: {mysql, postgres} Declares type of database.
+- database_name: Defaults to 'pkb-db-{run_uri}'.
+- database_username: Defaults to 'pkb-db-user-{run_uri}'.
+- database_password: Defaults to random 10-character alpha-numeric string.
+- database_version: {5.7, 9.6} Defaulted to latest for type.
+- high_availability: Boolean.
+- data_disk_size: integer. Storage size.
+
+
 As of June 2017 to make this benchmark run for GCP you must install the
 gcloud beta component. This is necessary because creating a Cloud SQL instance
 with a non-default storage size is in beta right now. This can be removed when

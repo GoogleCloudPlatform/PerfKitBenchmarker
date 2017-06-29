@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """Managed relational database provisioning for GCP.
 
 As of June 2017 to make this benchmark run for GCP you must install the
@@ -41,6 +39,7 @@ import logging
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker import data
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -49,6 +48,12 @@ LATEST_MYSQL_VERSION = '5.7'
 LATEST_POSTGRES_VERSION = '9.6'
 DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
 DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
+
+# PostgreSQL restrictions on memory.
+# Source: https://cloud.google.com/sql/docs/postgres/instance-settings.
+CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND = 0.9
+CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND = 6.5
+MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
 
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
@@ -70,13 +75,15 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.spec = managed_relational_db_spec
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
+#     if not hasattr(managed_relational_db_spec.vm_spec, 'cpus'):
+#       raise KeyError('machine_type: {%s}' %
+#                      managed_relational_db_spec.vm_spec.machine_type)
 
   def _Create(self):
     """Creates the GCP Cloud SQL instance."""
-    db_tier = self.spec.vm_spec.machine_type
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
-    database_version = FLAGS.database or DEFAULT_GCP_MYSQL_VERSION
+
     # TODO: Close authorized networks to VM once spec is updated so client
     # VM is child of managed_relational_db. Then client VM ip address will be
     # available from managed_relational_db_spec.
@@ -105,19 +112,81 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--assign-ip',
         '--authorized-networks=%s' % authorized_network,
         '--enable-bin-log',
-        '--tier=%s' % db_tier,
         '--gce-zone=%s' % instance_zone,
-        '--database-version=%s' % database_version,
+        '--database-version=%s' % cloudsql_specific_database_version,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
-        '--storage-size=%d' % storage_size]
+        '--storage-size=%d' % storage_size
+    ]
+    if self.spec.database == managed_relational_db.MYSQL:
+      machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
+    else:
+      self._ValidateSpec()
+      memory = self.spec.vm_spec.memory
+      cpus = self.spec.vm_spec.cpus
+      self._ValidateMachineType(memory, cpus)
+      machine_type_flag = ('--cpu={} --ram={}'.format(cpus, memory))
+    cmd_string.append(machine_type_flag)
     if self.spec.high_availability:
       ha_flag = '--failover-replica-name=replica-' + self.instance_id
       cmd_string.append(ha_flag)
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
-    cmd.flags['database-version'] = cloudsql_specific_database_version
 
     _, _, _ = cmd.Issue()
+
+  def _ValidateSpec(self):
+    """Validate postgreSQL spec for CPU and memory.
+
+    Raises:
+      data.ResourceNotFound: On missing memory or cpus in postgres benchmark
+                              config.
+    """
+    if not hasattr(self.spec.vm_spec, 'cpus'):
+      raise data.ResourceNotFound(
+          'Must initialize a memory amount in benchmark config. See https://'
+          'cloud.google.com/sql/docs/postgres/instance-settings for more '
+          'details about size restrictions.')
+    if not hasattr(self.spec.vm_spec, 'memory'):
+      raise data.ResourceNotFound(
+          'Must initialize a memory amount in benchmark config. See https://'
+          'cloud.google.com/sql/docs/postgres/instance-settings for more '
+          'details about size restrictions.')
+
+  def _ValidateMachineType(self, memory, cpus):
+    """ validated machine configurations.
+
+    Args:
+      memory: (int) in MiB.
+      cpus: (int).
+
+    Raises:
+      ValueError.
+    """
+    if cpus not in [1] + range(2, 32, 2):
+      raise ValueError(
+          'CPUs (%i) much be 1 or an even number in-between 2 and 32, '
+          'inclusive.' % cpus)
+
+    if memory % 256 != 0:
+      raise ValueError(
+          'Total memory (%dMiB) for a custom machine must be a multiple'
+          'of 256MiB.' % memory)
+    ratio = memory / 1024.0 / cpus
+    if (ratio < CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND or
+        ratio > CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND):
+      raise ValueError('The memory (%.2fGiB) per vCPU (%d) of a custom machine '
+                       'type must be between %.2f GiB and %.2f GiB per vCPU, '
+                       'inclusive.' %
+                       (memory / 1024.0,
+                        cpus,
+                        CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND,
+                        CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND)
+                       )
+    if memory < MIN_CUSTOM_MACHINE_MEM_MB:
+      raise ValueError('The total memory (%dMiB) for a custom machine type'
+                       'must be at least %dMiB.' %
+                       (memory,
+                        MIN_CUSTOM_MACHINE_MEM_MB))
 
   def _Delete(self):
     """Deletes the underlying resource.
@@ -182,7 +251,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     try:
       selflink = describe_instance_json[0]['selfLink']
     except:
-      selflink = ""
+      selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
 
