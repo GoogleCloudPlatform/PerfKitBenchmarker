@@ -52,17 +52,22 @@ tensorflow:
           zone: eastus
 """
 
-flags.DEFINE_string('tf_model', 'vgg16', 'name of the model to run')
-flags.DEFINE_string('tf_data_name', 'imagenet',
-                    'Name of dataset: imagenet or flowers.')
+flags.DEFINE_enum('tf_model', 'vgg16',
+                  ['vgg11', 'vgg16', 'vgg19', 'lenet', 'googlenet', 'overfeat',
+                   'alexnet', 'trivial', 'inception3', 'inception4', 'resnet50',
+                   'resnet101', 'resnet152'], 'name of the model to run')
+flags.DEFINE_enum('tf_data_name', 'imagenet', ['imagenet', 'flowers'],
+                  'Name of dataset: imagenet or flowers.')
 flags.DEFINE_integer('tf_batch_size', 64, 'batch size per compute device')
-flags.DEFINE_string('tf_variable_update', 'parameter_server',
-                    '''The method for managing variables: parameter_server,
-                    replicated, distributed_replicated, independent''')
-flags.DEFINE_string('tf_local_parameter_device', 'gpu',
-                    '''Device to use as parameter server: cpu or gpu. For
-                    distributed training, it can affect where caching of
-                    variables happens.''')
+flags.DEFINE_enum('tf_variable_update', 'parameter_server',
+                  ['parameter_server', 'replicated',
+                   'distributed_replicated', 'independent'],
+                  '''The method for managing variables: parameter_server,
+                  replicated, distributed_replicated, independent''')
+flags.DEFINE_enum('tf_local_parameter_device', 'gpu', ['cpu', 'gpu'],
+                  '''Device to use as parameter server: cpu or gpu. For
+                  distributed training, it can affect where caching of
+                  variables happens.''')
 flags.DEFINE_boolean('tf_use_nccl', True,
                      'Whether to use nccl all-reduce primitives where possible')
 flags.DEFINE_boolean('tf_distortions', True,
@@ -153,12 +158,11 @@ def _GetEnvironmentVars(vm):
   long_bit = output.strip()
   lib_name = 'lib' if long_bit == '32' else 'lib64'
   return ' '.join([
-      'PATH=%s' % os.path.join(CUDA_TOOLKIT_INSTALL_DIR,
-                               'bin${PATH:+:${PATH}}'),
+      'PATH=%s${PATH:+:${PATH}}' %
+      os.path.join(CUDA_TOOLKIT_INSTALL_DIR, 'bin'),
       'CUDA_HOME=%s' % CUDA_TOOLKIT_INSTALL_DIR,
-      'LD_LIBRARY_PATH=%s' % os.path.join(
-          CUDA_TOOLKIT_INSTALL_DIR,
-          '%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' % lib_name)
+      'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
+      os.path.join(CUDA_TOOLKIT_INSTALL_DIR, lib_name),
   ])
 
 
