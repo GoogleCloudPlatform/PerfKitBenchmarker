@@ -133,7 +133,7 @@ def InitializeBeamRepo(benchmark_spec):
     mvn_command = [FLAGS.maven_binary]
     mvn_command.extend(INSTALL_COMMAND_ARGS)
     AddRunnerProfileMvnArgument(benchmark_spec.dpb_service.SERVICE_TYPE,
-                                mvn_command)
+                                mvn_command, FLAGS.beam_runner_profile)
     vm_util.IssueCommand(mvn_command, timeout=1500, cwd=_GetBeamDir())
 
 
