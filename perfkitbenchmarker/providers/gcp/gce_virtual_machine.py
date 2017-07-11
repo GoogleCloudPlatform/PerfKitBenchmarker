@@ -187,7 +187,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     image_project: string or None. The image project used to locate the
         specifed image.
     boot_disk_size: None or int. The size of the boot disk in GB.
-    boot_disk_type: string or None. The tyoe of the boot disk.
+    boot_disk_type: string or None. The type of the boot disk.
   """
 
   CLOUD = providers.GCP
