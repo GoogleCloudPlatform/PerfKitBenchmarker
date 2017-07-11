@@ -131,8 +131,9 @@ def _CreateMetadataDict(benchmark_spec):
   Returns:
     metadata dict
   """
+  vm = benchmark_spec.vms[0]
   metadata = dict()
-  metadata.update(cuda_toolkit_8.GetMetadataFromFlags())
+  metadata.update(cuda_toolkit_8.GetMetadata(vm))
   metadata['model'] = benchmark_spec.model
   metadata['num_gpus'] = benchmark_spec.num_gpus
   metadata['data_name'] = benchmark_spec.data_name

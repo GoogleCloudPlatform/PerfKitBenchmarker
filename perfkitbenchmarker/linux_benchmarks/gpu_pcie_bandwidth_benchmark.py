@@ -193,7 +193,7 @@ def Run(benchmark_spec):
   num_iterations = FLAGS.gpu_pcie_bandwidth_iterations
   raw_results = []
   metadata = {}
-  metadata.update(cuda_toolkit_8.GetMetadataFromFlags())
+  metadata.update(cuda_toolkit_8.GetMetadata(vm))
   metadata['num_iterations'] = num_iterations
   metadata['num_gpus'] = cuda_toolkit_8.QueryNumberOfGpus(vm)
   run_command = ('%s/extras/demo_suite/bandwidthTest --device=all'

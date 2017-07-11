@@ -15,6 +15,8 @@
 
 """Module containing CUDA toolkit 8 installation and cleanup functions."""
 
+import re
+
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
@@ -45,19 +47,34 @@ class UnsupportedClockSpeedException(Exception):
   pass
 
 
-def GetMetadataFromFlags():
-  """Returns gpu-specific flags as a metadata dict.
+class NvidiaSmiParseOutputException(Exception):
+  pass
+
+
+def GetMetadata(vm):
+  """Returns gpu-specific metadata as a dict.
 
   Returns:
-    A dict of gpu-specific metadata, as determined from
-    flag values.
+    A dict of gpu-specific metadata.
   """
 
   metadata = {}
   metadata['gpu_memory_clock'] = FLAGS.gpu_clock_speeds[0]
   metadata['gpu_graphics_clock'] = FLAGS.gpu_clock_speeds[1]
   metadata['gpu_autoboost_enabled'] = FLAGS.gpu_autoboost_enabled
+  metadata['nvidia_driver_version'] = GetDriverVersion(vm)
   return metadata
+
+
+def GetDriverVersion(vm):
+  """Returns the NVIDIA driver version as a string"""
+  stdout, _ = vm.RemoteCommand('nvidia-smi', should_log=True)
+  regex = 'Driver Version\:\s+(\S+)'
+  match = re.search(regex, stdout)
+  try:
+    return str(match.group(1))
+  except:
+    raise NvidiaSmiParseOutputException('Unable to parse driver version')
 
 
 def QueryNumberOfGpus(vm):
