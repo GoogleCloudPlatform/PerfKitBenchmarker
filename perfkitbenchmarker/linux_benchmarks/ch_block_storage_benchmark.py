@@ -108,9 +108,10 @@ def Run(benchmark_spec):
     fns = _LocateFioJson(vm, outdir, test)
     fio_json_list = [
         vm.RemoteCommand('cat %s' % fn)[0] for fn in fns]
-    results += ch_block_storage.ParseOutput(result_json, fio_json_list)
-    for r in results:
+    tmp_results = ch_block_storage.ParseOutput(result_json, fio_json_list)
+    for r in tmp_results:
       r.metadata.update(metadata)
+    results += tmp_results
   return results
 
 
