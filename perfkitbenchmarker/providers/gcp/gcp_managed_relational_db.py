@@ -227,14 +227,14 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     stdout, _, _ = cmd.Issue()
     try:
       json_output = json.loads(stdout)
-      json_output['state'] == 'RUNNABLE')
+      if not json_output['state'] == 'RUNNABLE':
+        return False
     except:
       logging.exception('Error attempting to read stdout. Creation failure.')
-      is_ready = False
-    if is_ready:
-      self.endpoint = self._ParseEndpoint(json_output)
-      self.port = self.MYSQL_DEFAULT_PORT
-    return is_ready
+      return False
+    self.endpoint = self._ParseEndpoint(json_output)
+    self.port = self.MYSQL_DEFAULT_PORT
+    return True
 
   def _ParseEndpoint(self, describe_instance_json):
     """Return the URI of the resource given the metadata as JSON.
