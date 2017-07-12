@@ -245,7 +245,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       resource URI (string)
     """
     try:
-      selflink = describe_instance_json[0]['selfLink']
+      selflink = describe_instance_json['selfLink']
     except:
       selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')
