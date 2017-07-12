@@ -14,6 +14,7 @@
 
 
 from abc import ABCMeta, abstractmethod
+import re
 import uuid
 
 from perfkitbenchmarker import flags
@@ -36,6 +37,20 @@ flags.DEFINE_string('database_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
 flags.DEFINE_boolean('high_availability', False,
                      'Specifies if the database should be high availability')
+flags.DEFINE_boolean('database_backup_enabled', True,
+                     'Whether or not to enable automated backups')
+flags.DEFINE_string('database_backup_start_time', '07:00',
+                    'Time in UTC that automated backups (if enabled) '
+                    'will be scheduled. In the form HH:MM UTC. '
+                    'Defaults to 07:00 UTC')
+
+BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
+flags.RegisterValidator('database_backup_start_time',
+                        lambda value: re.search(BACKUP_TIME_REGULAR_EXPRESSION,
+                                                value) is not None,
+                        message=('--database_backup_start_time must be in the '
+                                 'form HH:MM'))
+
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
 
