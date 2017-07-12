@@ -208,10 +208,9 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     stdout, _, _ = cmd.Issue()
     try:
       json_output = json.loads(stdout)
-      exists = (json_output[0]['kind'] == 'sql#instance')
+      return json_output['kind'] == 'sql#instance'
     except:
-      exists = False
-    return exists
+      return False
 
   def _IsReady(self):
     """Return true if the underlying resource is ready.
@@ -228,7 +227,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     stdout, _, _ = cmd.Issue()
     try:
       json_output = json.loads(stdout)
-      is_ready = (json_output[0]['state'] == 'RUNNABLE')
+      json_output['state'] == 'RUNNABLE')
     except:
       logging.exception('Error attempting to read stdout. Creation failure.')
       is_ready = False
