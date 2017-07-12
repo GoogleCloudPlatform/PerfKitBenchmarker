@@ -107,6 +107,16 @@ class BaseManagedRelationalDb(resource.BaseResource):
     """
     pass
 
+  @abstractmethod
+  def GetDefaultDatabaseVersion(self, database):
+    """Return the default version (for PKB) for the given database.
+
+    Args:
+      database: name of the database
+
+    Returns: default database version as a string for the given database.
+  """
+
   def GetUsername(self):
     """Return the username associated with the managed database.
 
