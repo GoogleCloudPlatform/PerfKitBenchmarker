@@ -44,8 +44,8 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-LATEST_MYSQL_VERSION = '5.7'
-LATEST_POSTGRES_VERSION = '9.6'
+DEFAULT_MYSQL_VERSION = '5.7'
+DEFAULT_POSTGRES_VERSION = '9.6'
 DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
 DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
 
@@ -278,18 +278,18 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     pass
 
   @staticmethod
-  def GetLatestDatabaseVersion(database):
-    """Returns the latest version of a given database.
+  def GetDefaultDatabaseVersion(database):
+    """Returns the default version of a given database.
 
     Args:
       database (string): type of database (my_sql or postgres).
     Returns:
-      (string): Latest database version.
+      (string): Default database version.
     """
     if database == managed_relational_db.MYSQL:
-      return LATEST_MYSQL_VERSION
+      return DEFAULT_MYSQL_VERSION
     elif database == managed_relational_db.POSTGRES:
-      return LATEST_POSTGRES_VERSION
+      return DEFAULT_POSTGRES_VERSION
 
   @staticmethod
   def _GetDatabaseVersionNameFromFlavor(flavor, version):
@@ -302,10 +302,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       (string): Internal name for database type.
     """
     if flavor == managed_relational_db.MYSQL:
-      if version == LATEST_MYSQL_VERSION:
+      if version == DEFAULT_MYSQL_VERSION:
         return DEFAULT_GCP_MYSQL_VERSION
     elif flavor == managed_relational_db.POSTGRES:
-      if version == LATEST_POSTGRES_VERSION:
+      if version == DEFAULT_POSTGRES_VERSION:
         return DEFAULT_GCP_POSTGRES_VERSION
     raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'
                               'POSTGRES 9.6')

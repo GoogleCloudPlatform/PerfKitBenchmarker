@@ -47,7 +47,7 @@ class FakeManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _Delete(self):
     pass
 
-  def GetLatestDatabaseVersion(self, _):
+  def GetDefaultDatabaseVersion(self, _):
     pass
 
 
