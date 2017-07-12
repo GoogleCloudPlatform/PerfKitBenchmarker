@@ -1,0 +1,53 @@
+{
+    "DBInstances": [
+        {
+            "PubliclyAccessible": true, 
+            "MasterUsername": "pkbc78b81a5", 
+            "MonitoringInterval": 0, 
+            "LicenseModel": "general-public-license", 
+            "VpcSecurityGroups": [], 
+            "CopyTagsToSnapshot": false, 
+            "OptionGroupMemberships": [
+                {
+                    "Status": "in-sync", 
+                    "OptionGroupName": "default:mysql-5-6"
+                }
+            ], 
+            "PendingModifiedValues": {
+                "MasterUserPassword": "****"
+            }, 
+            "Engine": "mysql", 
+            "MultiAZ": false, 
+            "DBSecurityGroups": [
+                {
+                    "Status": "active", 
+                    "DBSecurityGroupName": "default"
+                }
+            ], 
+            "DBParameterGroups": [
+                {
+                    "DBParameterGroupName": "default.mysql5.6", 
+                    "ParameterApplyStatus": "in-sync"
+                }
+            ], 
+            "AutoMinorVersionUpgrade": true, 
+            "PreferredBackupWindow": "12:57-13:27", 
+            "ReadReplicaDBInstanceIdentifiers": [], 
+            "AllocatedStorage": 5, 
+            "DBInstanceArn": "arn:aws:rds:us-west-2:835761027970:db:pkb-db-instance-c78b81a5", 
+            "BackupRetentionPeriod": 1, 
+            "PreferredMaintenanceWindow": "wed:07:36-wed:08:06", 
+            "DBInstanceStatus": "creating", 
+            "EngineVersion": "5.6.27", 
+            "AvailabilityZone": "us-west-2c", 
+            "DomainMemberships": [], 
+            "StorageType": "gp2", 
+            "DbiResourceId": "db-DPT27PABDZYMKYR4NI7PTKQXXQ", 
+            "CACertificateIdentifier": "rds-ca-2015", 
+            "StorageEncrypted": false, 
+            "DBInstanceClass": "db.t1.micro", 
+            "DbInstancePort": 0, 
+            "DBInstanceIdentifier": "pkb-db-instance-c78b81a5"
+        }
+    ]
+}
