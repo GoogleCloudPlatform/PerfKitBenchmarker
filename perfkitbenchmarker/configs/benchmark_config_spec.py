@@ -380,6 +380,12 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
         'high_availability': (option_decoders.BooleanDecoder, {
             'default': False
         }),
+        'backup_enabled': (option_decoders.BooleanDecoder, {
+            'default': True
+        }),
+        'backup_start_time': (option_decoders.StringDecoder, {
+            'default': '07:00'
+        }),
         'vm_spec': (_PerCloudConfigDecoder, {}),
         'disk_spec': (_PerCloudConfigDecoder, {})
     })
@@ -411,6 +417,11 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       config_values['database_password'] = flag_values.database_password
     if flag_values['high_availability'].present:
       config_values['high_availability'] = flag_values.high_availability
+    if flag_values['database_backup_enabled'].present:
+      config_values['backup_enabled'] = flag_values.database_backup_enabled
+    if flag_values['database_backup_start_time'].present:
+      config_values['backup_start_time'] = (
+          flag_values.database_backup_start_time)
 
 
 class _SparkServiceSpec(spec.BaseSpec):

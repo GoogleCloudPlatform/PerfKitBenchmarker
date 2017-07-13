@@ -126,6 +126,28 @@ class ManagedRelationalDbSpecTestCase(unittest.TestCase):
         _COMPONENT, flag_values=self.flags, **spec)
     self.assertEqual(result.high_availability, True)
 
+  def testDefaultBackupEnabled(self):
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
+    self.assertEqual(result.backup_enabled, True)
+
+  def testCustomBackupEnabled(self):
+    spec = _mergeDicts(self.minimal_spec, {'backup_enabled': False})
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **spec)
+    self.assertEqual(result.backup_enabled, False)
+
+  def testDefaultBackupTime(self):
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **self.minimal_spec)
+    self.assertEqual(result.backup_start_time, '07:00')
+
+  def testCustomBackupTime(self):
+    spec = _mergeDicts(self.minimal_spec, {'backup_start_time': '08:00'})
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **spec)
+    self.assertEqual(result.backup_start_time, '08:00')
+
 
 class ManagedRelationalDbMinimalSpecTestCase(unittest.TestCase):
 
@@ -172,6 +194,8 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
         'database': 'mysql',
         'database_name': 'fake_name',
         'database_password': 'fake_password',
+        'backup_enabled': True,
+        'backup_start_time': '07:00',
         'vm_spec': {
             'GCP': {
                 'machine_type': 'n1-standard-1'
@@ -226,6 +250,18 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
     self.assertEqual(result.database_version, '5.6')
+
+  def testBackupEnabledFlag(self):
+    self.flags['database_backup_enabled'].parse(False)
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **self.full_spec)
+    self.assertEqual(result.backup_enabled, False)
+
+  def testBackupStartTimeFlag(self):
+    self.flags['database_backup_start_time'].parse('12:23')
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **self.full_spec)
+    self.assertEqual(result.backup_start_time, '12:23')
 
 
 if __name__ == '__main__':
