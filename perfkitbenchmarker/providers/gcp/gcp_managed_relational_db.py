@@ -130,6 +130,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       cmd_string.append('--backup')
       cmd_string.append('--backup-start-time={}'.format(
           self.spec.backup_start_time))
+    else:
+      cmd_string.append('--no-backup')
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
 

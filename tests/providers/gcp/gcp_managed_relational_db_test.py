@@ -56,8 +56,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
         'disk_spec': disk_spec,
         'high_availability': False,
         'backup_enabled': True,
-        'backup_start_time': '07:00'
-
+        'backup_start_time': '07:00',
     }
 
   def createPostgresSpecDict(self):
@@ -166,7 +165,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
           command_string)
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--tier=db-n1-standard-1', command_string)
-      self.assertNotIn('--backup', command_string)
+      self.assertIn('--no-backup', command_string)
       self.assertNotIn('--backup-start-time=07:00', command_string)
 
   def testDelete(self):
