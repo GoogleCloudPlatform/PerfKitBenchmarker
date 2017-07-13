@@ -54,7 +54,9 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
         'database_password': 'fakepassword',
         'vm_spec': vm_spec,
         'disk_spec': disk_spec,
-        'high_availability': False
+        'high_availability': False,
+        'backup_enabled': True,
+        'backup_start_time': '07:00',
     }
 
   def createPostgresSpecDict(self):
@@ -72,7 +74,9 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
         'database_password': 'fakepassword',
         'vm_spec': vm_spec,
         'disk_spec': disk_spec,
-        'high_availability': False
+        'high_availability': False,
+        'backup_enabled': True,
+        'backup_start_time': '07:00'
     }
 
   def createManagedDbFromSpec(self, spec_dict):
@@ -130,6 +134,8 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--tier=db-n1-standard-1', command_string)
       self.assertIn('--storage-size=50', command_string)
+      self.assertIn('--backup', command_string)
+      self.assertIn('--backup-start-time=07:00', command_string)
 
   def testCreatePostgres(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -143,6 +149,24 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('database-version=POSTGRES_9_6', command_string)
       self.assertIn('--cpu=1', command_string)
       self.assertIn('--ram=3840', command_string)
+
+  def testCreateWithBackupDisabled(self):
+    with self._PatchCriticalObjects() as issue_command:
+      spec = self.mock_db_spec
+      spec.backup_enabled = False
+      vm = gcp_managed_relational_db.GCPManagedRelationalDb(self.mock_db_spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertTrue(
+          command_string.startswith(
+              'gcloud beta sql instances create pkb-db-instance-123'),
+          command_string)
+      self.assertIn('--project fakeproject', command_string)
+      self.assertIn('--tier=db-n1-standard-1', command_string)
+      self.assertIn('--no-backup', command_string)
+      self.assertNotIn('--backup-start-time=07:00', command_string)
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:

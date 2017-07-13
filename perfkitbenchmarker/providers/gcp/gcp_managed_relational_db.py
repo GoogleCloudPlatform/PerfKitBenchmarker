@@ -126,6 +126,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if self.spec.high_availability:
       ha_flag = '--failover-replica-name=replica-' + self.instance_id
       cmd_string.append(ha_flag)
+    if self.spec.backup_enabled:
+      cmd_string.append('--backup')
+      cmd_string.append('--backup-start-time={}'.format(
+          self.spec.backup_start_time))
+    else:
+      cmd_string.append('--no-backup')
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
 
