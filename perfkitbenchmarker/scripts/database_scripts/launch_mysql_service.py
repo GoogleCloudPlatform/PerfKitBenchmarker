@@ -123,7 +123,7 @@ gflags.DEFINE_string(GCE_BOOT_DISK_SIZE, '300',
                      'The boot disk size in GB for GCP VMs..')
 gflags.DEFINE_string(GCE_BOOT_DISK_TYPE, 'pd-ssd',
                      'The boot disk type for GCP VMs.')
-gflags.DEFINE_string(MACHINE_TYPE, 'n1-standard-16',
+gflags.DEFINE_string(MACHINE_TYPE, 'n1-standard-4',
                      'Machine type for GCE Virtual machines.')
 gflags.DEFINE_enum(
     MYSQL_SVC_DB_INSTANCE_CORES, '4', ['1', '4', '8', '16'],
