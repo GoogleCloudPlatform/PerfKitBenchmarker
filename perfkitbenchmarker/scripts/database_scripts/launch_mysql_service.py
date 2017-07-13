@@ -151,6 +151,11 @@ class OperationTimeoutError(Exception):
 def driver(argv):
   """Driver initiates sysbench run with different thread counts.
 
+  If running this wrapper module with a bash script the print statement
+  can be used to capture the run_uri. This allows user to provision and prepare
+  the database and client VM less frequently which is advantageous when the
+  specifications contain larger values.
+
   Args:
     argv: system arguments (command line flags).
   """
