@@ -330,6 +330,46 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         return metrics
 
 
-    def cleanup_data(self, base_dir):
-        # TODO(saksena): Implement cleanup of directories
-        pass
+    def cleanup_data(self, base_dir, udpate_default_fs):
+        @vm_util.Retry(timeout=600,
+                       poll_interval=5, fuzz=0)
+        def WaitForStep(step_id):
+            result = self._IsStepDone(step_id)
+            if result is None:
+                raise Exception('Step {0} not complete.'.format(step_id))
+            return result
+
+        job_arguments = ['TestDFSIO']
+        if udpate_default_fs:
+            job_arguments.append('-Dfs.default.name={}'.format(base_dir))
+        job_arguments.append('-Dtest.build.data={}'.format(base_dir))
+        job_arguments.append('-clean')
+        arg_spec = '[' + ','.join(job_arguments) + ']'
+
+        step_type_spec = 'Type=CUSTOM_JAR'
+        step_name = "Name=\"TestDFSIO\""
+        step_action_on_failure = "ActionOnFailure=CONTINUE"
+        jar_spec = GENERATE_HADOOP_JAR
+
+        # How will we handle a class name ????
+        step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec
+                     ]
+        step_list.append('Args=' + arg_spec)
+        step_string = ','.join(step_list)
+
+        step_cmd = self.cmd_prefix + ['emr',
+                                      'add-steps',
+                                      '--cluster-id',
+                                      self.cluster_id,
+                                      '--steps',
+                                      step_string]
+        stdout, _, _ = vm_util.IssueCommand(step_cmd)
+        result = json.loads(stdout)
+        step_id = result['StepIds'][0]
+
+        result = WaitForStep(step_id)
+        step_state = result['Step']['Status']['State']
+        if step_state != "COMPLETED":
+            return {dpb_service.SUCCESS: False}
+        else:
+            return {dpb_service.SUCCESS: True}
