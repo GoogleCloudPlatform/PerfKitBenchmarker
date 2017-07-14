@@ -65,7 +65,7 @@ flags.DEFINE_enum('distcp_dest_fs', BaseDpbService.GCS_FS,
                    BaseDpbService.HDFS_FS],
                   'File System to use as destination of the distcp operation')
 
-flags.DEFINE_integer('individual _file_size_in_megabytes', 10,
+flags.DEFINE_integer('individual_file_size_in_megabytes', 10,
                      'File size to use for the distcp source files')
 
 flags.DEFINE_integer('num_files', 10, 'Number of distcp source files')
@@ -93,51 +93,48 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
-  run_uri = benchmark_spec.uuid.split('-')[0]
-  source_dir, update_default_fs = dynamic_configuration(FLAGS.distcp_source_fs,
-                                                        run_uri, '/dfsio')
-  # TODO(saksena): Respond to data generation failure
-  benchmark_spec.dpb_service.generate_data(source_dir, update_default_fs,
-                                           FLAGS.num_files,
-                                           10)
+  pass
 
 
 def Run(benchmark_spec):
-  # Get handle to the dpb service
-  dpb_service_instance = benchmark_spec.dpb_service
+
   run_uri = benchmark_spec.uuid.split('-')[0]
+  source = '/{}'.format(run_uri)
+  update_source_default_fs = False
 
-  source_dir, _ = dynamic_configuration(FLAGS.distcp_source_fs, run_uri,
-                                        suffix='/dfsio')
-  destination_dir, _ = dynamic_configuration(FLAGS.distcp_dest_fs, run_uri,
-                                             suffix='/dfsio_destination')
+  if FLAGS.distcp_source_fs != BaseDpbService.HDFS_FS:
+    source = '{}:/{}'.format(FLAGS.distcp_source_fs, source)
+    update_source_default_fs = True
 
-  results = []
-  metadata = copy.copy(dpb_service_instance.GetMetadata())
-  metadata.update({'source_location': source_dir})
-  metadata.update({'destination_location': destination_dir})
+  source_dir = '{}{}'.format(source, '/dfsio')
+  source_data_dir = '{}{}'.format(source_dir, '/io_data')
+
+  # TODO(saksena): Respond to data generation failure
+  benchmark_spec.dpb_service.generate_data(source_dir, update_source_default_fs,
+                                           FLAGS.num_files,
+                                           FLAGS.individual_file_size_in_megabytes)
+
+  destination_dir = '/{}{}'.format(run_uri, '/dfsio_destination')
+  if FLAGS.distcp_dest_fs != BaseDpbService.HDFS_FS:
+    destination_dir = '{}:/{}'.format(FLAGS.distcp_source_fs, destination_dir)
 
   start = datetime.datetime.now()
-  dpb_service_instance.distributed_copy(source_location=source_dir,
-                                        destination_location=destination_dir)
+  benchmark_spec.dpb_service.distributed_copy(source_location=source_data_dir,
+                                              destination_location=destination_dir)
   end_time = datetime.datetime.now()
-
   run_time = (end_time - start).total_seconds()
+
+  results = []
+  metadata = copy.copy(benchmark_spec.dpb_service.GetMetadata())
+  metadata.update({'source_location': source_dir})
+  metadata.update({'destination_location': destination_dir})
+  metadata.update({'num_files': FLAGS.num_files})
+  metadata.update({'individual_file_size_in_megabytes': FLAGS.individual_file_size_in_megabytes})
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
+
+  benchmark_spec.dpb_service.cleanup_data(source, update_source_default_fs)
+
   return results
 
-
 def Cleanup(benchmark_spec):
-  dpb_service_instance = benchmark_spec.dpb_service
-  run_uri = benchmark_spec.uuid.split('-')[0]
-  source_dir, update_default_fs = dynamic_configuration(FLAGS.distcp_source_fs,
-                                                        run_uri)
-
-  dpb_service_instance.cleanup_data(source_dir, update_default_fs)
-
-
-def dynamic_configuration(fs, run_uri, suffix=''):
-  if fs == BaseDpbService.HDFS_FS:
-    return '/{}{}'.format(run_uri, suffix), False
-  else:
-    return '{}://{}{}'.format(fs, run_uri, suffix), True
+  pass

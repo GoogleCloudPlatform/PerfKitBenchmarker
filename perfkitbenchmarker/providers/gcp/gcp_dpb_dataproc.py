@@ -188,7 +188,6 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
     job_arguments = [source_location, destination_location]
     cmd.additional_flags = ['--'] + job_arguments
-    print cmd
     stdout, stderr, retcode = cmd.Issue(timeout=None)
     if retcode != 0:
       return {dpb_service.SUCCESS: False}
