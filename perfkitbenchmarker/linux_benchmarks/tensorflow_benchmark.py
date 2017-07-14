@@ -104,10 +104,7 @@ def GetConfig(user_config):
 
 
 def _GetDefaultBatchSizeByModel(model):
-  try:
-    return DEFAULT_BATCH_SIZES_BY_MODEL[model]
-  except KeyError:
-    return DEFAULT_BATCH_SIZE
+  return DEFAULT_BATCH_SIZES_BY_MODEL.get(model, DEFAULT_BATCH_SIZE)
 
 
 def _GetBatchSize(model):
