@@ -238,7 +238,7 @@ def Run(benchmark_spec):
   tf_cnn_benchmark_cmd = (
       'python tf_cnn_benchmarks.py --local_parameter_device=%s --num_gpus=%s '
       '--batch_size=%s --model=%s --data_name=%s --variable_update=%s '
-      '--nccl=%s --distortions=%s') % (
+      '--use_nccl=%s --distortions=%s') % (
           benchmark_spec.local_parameter_device,
           benchmark_spec.num_gpus,
           benchmark_spec.batch_size,
