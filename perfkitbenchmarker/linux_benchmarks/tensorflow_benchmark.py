@@ -58,7 +58,9 @@ flags.DEFINE_enum('tf_model', 'vgg16',
                    'resnet101', 'resnet152'], 'name of the model to run')
 flags.DEFINE_enum('tf_data_name', 'imagenet', ['imagenet', 'flowers'],
                   'Name of dataset: imagenet or flowers.')
-flags.DEFINE_integer('tf_batch_size', 64, 'batch size per compute device')
+flags.DEFINE_integer('tf_batch_size', None, 'batch size per compute device. '
+                     'If not provided, the suggested batch size is used for '
+                     'the given model')
 flags.DEFINE_enum('tf_variable_update', 'parameter_server',
                   ['parameter_server', 'replicated',
                    'distributed_replicated', 'independent'],
@@ -73,6 +75,16 @@ flags.DEFINE_boolean('tf_use_nccl', True,
 flags.DEFINE_boolean('tf_distortions', True,
                      '''Enable/disable distortions during image preprocessing.
                      These include bbox and color distortions.''')
+
+
+DEFAULT_BATCH_SIZE = 64
+DEFAULT_BATCH_SIZES_BY_MODEL = {
+    'inception4': 64,
+    'vgg16': 32,
+    'alexnet': 512,
+    'resnet50': 64,
+    'restnet152': 32,
+}
 
 
 class TFParseOutputException(Exception):
@@ -91,6 +103,14 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
+def _GetDefaultBatchSizeByModel(model):
+  return DEFAULT_BATCH_SIZES_BY_MODEL.get(model, DEFAULT_BATCH_SIZE)
+
+
+def _GetBatchSize(model):
+ return FLAGS.tf_batch_size or _GetDefaultBatchSizeByModel(model)
+
+
 def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """Update the benchmark_spec with supplied command line flags.
 
@@ -99,7 +119,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """
   benchmark_spec.model = FLAGS.tf_model
   benchmark_spec.data_name = FLAGS.tf_data_name
-  benchmark_spec.batch_size = FLAGS.tf_batch_size
+  benchmark_spec.batch_size = _GetBatchSize(benchmark_spec.model)
   benchmark_spec.variable_update = FLAGS.tf_variable_update
   benchmark_spec.local_parameter_device = FLAGS.tf_local_parameter_device
   benchmark_spec.use_nccl = FLAGS.tf_use_nccl
