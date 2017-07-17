@@ -24,10 +24,12 @@ import datetime
 import tempfile
 
 from perfkitbenchmarker import beam_benchmark_helper
+from perfkitbenchmarker import beam_pipeline_options
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.dpb_service import BaseDpbService
 
@@ -58,7 +60,16 @@ DEFAULT_JAVA_IT_CLASS = 'org.apache.beam.examples.WordCountIT'
 DEFAULT_PYTHON_IT_MODULE = 'apache_beam.examples.wordcount_it_test'
 
 flags.DEFINE_string('beam_it_class', None, 'Path to IT class')
-flags.DEFINE_string('beam_it_args', None, 'Args to provide to the IT')
+flags.DEFINE_string('beam_it_args', None, 'Args to provide to the IT.'
+                    ' Deprecated & replaced by beam_it_options')
+flags.DEFINE_string('beam_it_options', None, 'Pipeline Options sent to the'
+                    ' integration test.')
+flags.DEFINE_string('beam_kubernetes_scripts', None, 'A local path to the'
+                    ' Kubernetes scripts to run which will instantiate a'
+                    ' datastore.')
+flags.DEFINE_string('beam_options_config_file', None, 'A local path to the'
+                    ' yaml file defining static and dynamic pipeline options to'
+                    ' use for this benchmark run.')
 
 FLAGS = flags.FLAGS
 
@@ -67,29 +78,44 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(benchmark_spec):
+def CheckPrerequisites(benchmark_config_spec):
   """Verifies that the required resources are present.
 
   Raises:
     perfkitbenchmarker.errors.Config.InvalidValue: If no Beam args are provided.
     NotImplementedError: If an invalid runner is specified.
   """
-  if FLAGS.beam_it_args is None:
+  if FLAGS.beam_it_options is None and FLAGS.beam_it_args is None:
     raise errors.Config.InvalidValue(
-        'No args provided. To run with default class (WordCountIT), must'
-        'provide --beam_it_args=--tempRoot=<temp dir, e.g. gs://my-dir/temp>.')
+        'No options provided. To run with default class (WordCountIT), must'
+        ' provide --beam_it_options=--tempRoot=<temp dir,'
+        ' e.g. gs://my-dir/temp>.')
   if FLAGS.beam_sdk is None:
     raise errors.Config.InvalidValue(
         'No sdk provided. To run Beam integration benchmark, the test must'
-        'specify which sdk is used in the pipeline. For example, java/python.'
-    )
-  if benchmark_spec.dpb_service.service_type != dpb_service.DATAFLOW:
+        'specify which sdk is used in the pipeline. For example, java/python.')
+  if benchmark_config_spec.dpb_service.service_type != dpb_service.DATAFLOW:
     raise NotImplementedError('Currently only works against Dataflow.')
+  if (len(FLAGS.beam_it_options) > 0 and
+      (not FLAGS.beam_it_options.endswith(']') or
+       not FLAGS.beam_it_options.startswith('['))):
+    raise Exception("beam_it_options must be of form"
+                    " [\"--option=value\",\"--option2=val2\"]")
 
 
 def Prepare(benchmark_spec):
   beam_benchmark_helper.InitializeBeamRepo(benchmark_spec)
+  benchmark_spec.always_call_cleanup = True
+  kubernetes_helper.CreateAllFiles(getKubernetesScripts())
   pass
+
+
+def getKubernetesScripts():
+  if FLAGS.beam_kubernetes_scripts:
+    scripts = FLAGS.beam_kubernetes_scripts.split(',')
+    return scripts
+  else:
+    return []
 
 
 def Run(benchmark_spec):
@@ -103,9 +129,6 @@ def Run(benchmark_spec):
                                             delete=False)
   stdout_file.close()
 
-  # Switch the parameters for submit job function of specific dpb service
-  job_arguments = ['"{}"'.format(arg) for arg in FLAGS.beam_it_args.split(',')]
-
   if FLAGS.beam_it_class is None:
     if FLAGS.beam_sdk == beam_benchmark_helper.BEAM_JAVA_SDK:
       classname = DEFAULT_JAVA_IT_CLASS
@@ -115,6 +138,14 @@ def Run(benchmark_spec):
       raise NotImplementedError('Unsupported Beam SDK: %s.' % FLAGS.beam_sdk)
   else:
     classname = FLAGS.beam_it_class
+
+  static_pipeline_options, dynamic_pipeline_options = \
+      beam_pipeline_options.ReadPipelineOptionConfigFile()
+
+  job_arguments = beam_pipeline_options.GenerateAllPipelineOptions(
+      FLAGS.beam_it_args, FLAGS.beam_it_options,
+      static_pipeline_options,
+      dynamic_pipeline_options)
 
   job_type = BaseDpbService.BEAM_JOB_TYPE
 
@@ -133,4 +164,5 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
+  kubernetes_helper.DeleteAllFiles(getKubernetesScripts())
   pass
