@@ -23,13 +23,22 @@ FLAGS = flags.FLAGS
 
 
 def GetStaticPipelineOptions(options_list):
+  """
+  Takes the dictionary loaded from the yaml configuration file and returns it
+  in a form consistent with the others in GenerateAllPipelineOptions: a list of
+  (pipeline_option_name, pipline_option_value) tuples.
+
+  The options in the options_list are a dict:
+    Key is the name of the pipeline option to pass to beam
+    Value is the value of the pipeline option to pass to beam
+  """
   options = []
   for option in options_list:
     if not len(option.keys()) == 1:
-      raise Exception('static_pipeline_options should only have 1 key/value')
+      raise Exception('Each item in static_pipeline_options should only have'
+                      ' 1 key/value')
     option_kv = option.items()[0]
     options.append((option_kv[0], option_kv[1]))
-
   return options
 
 
@@ -69,10 +78,8 @@ def GenerateAllPipelineOptions(it_args, it_options, static_pipeline_options,
   """
   :param it_args: options list passed in via FLAGS.beam_it_args
   :param it_options: options list passed in via FLAGS.beam_it_options
-  :param static_pipeline_options: options list passed in via
-      benchmark_spec.dpb_service.static_pipeline_options
-  :param dynamic_pipeline_options: options list passed in via
-      benchmark_spec.dpb_service.dynamic_pipeline_options
+  :param static_pipeline_options: options list loaded from the yaml config file
+  :param dynamic_pipeline_options: options list loaded from the yaml config file
   :return: a list of values of the form "\"--option_name=value\""
   """
   # beam_it_options are in [--option=value,--option2=val2] form
@@ -101,6 +108,10 @@ def GenerateAllPipelineOptions(it_args, it_options, static_pipeline_options,
 
 
 def ReadPipelineOptionConfigFile():
+  """
+  Reads the path to the config file from FLAGS, then loads the static and
+  dynamic pipeline options from it.
+  """
   dynamic_pipeline_options = []
   static_pipeline_options = []
   if FLAGS.beam_options_config_file:

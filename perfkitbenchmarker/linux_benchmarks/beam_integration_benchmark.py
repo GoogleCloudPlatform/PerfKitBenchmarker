@@ -64,11 +64,12 @@ flags.DEFINE_string('beam_it_args', None, 'Args to provide to the IT.'
                     ' Deprecated & replaced by beam_it_options')
 flags.DEFINE_string('beam_it_options', None, 'Pipeline Options sent to the'
                     ' integration test.')
-flags.DEFINE_string('beam_kubernetes_scripts', None, 'Kubernetes scripts to run'
-                    ' which will instantiate a datastore.')
-flags.DEFINE_string('beam_options_config_file', None, 'Yaml file defining'
-                    ' static and dynamic pipeline options to use for this'
-                    ' benchmark run.')
+flags.DEFINE_string('beam_kubernetes_scripts', None, 'A local path to the'
+                    ' Kubernetes scripts to run which will instantiate a'
+                    ' datastore.')
+flags.DEFINE_string('beam_options_config_file', None, 'A local path to the'
+                    ' yaml file defining static and dynamic pipeline options to'
+                    ' use for this benchmark run.')
 
 FLAGS = flags.FLAGS
 
