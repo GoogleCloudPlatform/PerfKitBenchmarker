@@ -202,7 +202,8 @@ def _BuildMavenCommand(benchmark_spec, classname, job_arguments):
   # expected that they know what they are doing and we can't know what args
   # to pass since it differs by runner.
   if (benchmark_spec.service_type == dpb_service.DATAFLOW
-      and FLAGS.beam_runner_profile is not None):
+      and (FLAGS.beam_runner_profile is not None and
+           len(FLAGS.beam_runner_profile) > 0)):
     beam_args.append('"--defaultWorkerLogLevel={}"'.format(FLAGS.dpb_log_level))
 
   AddRunnerProfileMvnArgument(benchmark_spec.service_type, cmd,
