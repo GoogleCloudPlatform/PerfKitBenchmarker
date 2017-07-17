@@ -79,10 +79,8 @@ flags.DEFINE_boolean('tf_distortions', True,
 
 DEFAULT_BATCH_SIZE = 64
 DEFAULT_BATCH_SIZES_BY_MODEL = {
-    'inception4': 64,
     'vgg16': 32,
     'alexnet': 512,
-    'resnet50': 64,
     'restnet152': 32,
 }
 
