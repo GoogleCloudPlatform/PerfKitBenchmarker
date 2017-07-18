@@ -224,6 +224,10 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vms
   master_vm = vms[0]
+  # backup existing HPCC output, if any
+  master_vm.RemoteCommand(('if [ -f hpccoutf.txt ]; then '
+                           'mv hpccoutf.txt hpccoutf-$(date +%s).txt; '
+                           'fi'))
   num_processes = len(vms) * master_vm.num_cpus
   mpi_env = ' '.join(['-x %s' % v for v in FLAGS.hpcc_mpi_env])
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '
