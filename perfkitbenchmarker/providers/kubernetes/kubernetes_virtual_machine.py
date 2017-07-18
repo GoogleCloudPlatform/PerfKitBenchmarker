@@ -169,7 +169,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Gets the POD's internal ip address.
     """
     pod_ip = kubernetes_helper.Get(
-        'pods', self.name, '', '.items[0].status.podIP')
+        'pods', self.name, '', '.status.podIP')
 
     if not pod_ip:
       raise Exception("Internal POD IP address not found. Retrying.")

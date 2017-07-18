@@ -64,7 +64,7 @@ def _CopyTar(vm):
   """
 
   try:
-    vm.PushDataFile(NETPERF_TAR, remote_path=INSTALL_DIR)
+    vm.PushDataFile(NETPERF_TAR, remote_path=(INSTALL_DIR + '/'))
   except ResourceNotFound:
     vm.Install('curl')
     vm.RemoteCommand('curl %s -o %s/%s' % (

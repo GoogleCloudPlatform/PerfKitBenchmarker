@@ -56,9 +56,19 @@ class BaseContainerCluster(resource.BaseResource):
 
   def __init__(self, spec):
     super(BaseContainerCluster, self).__init__()
+    self.name = 'pkb-%s' % FLAGS.run_uri
     self.machine_type = spec.vm_spec.machine_type
     self.zone = spec.vm_spec.zone
     self.num_nodes = spec.vm_count
+
+  def GetMetadata(self):
+    """Returns a dictionary of cluster metadata."""
+    metadata = {
+        'container_cluster_machine_type': self.machine_type,
+        'container_cluster_zone': self.zone,
+        'container_cluster_size': self.num_nodes,
+    }
+    return metadata
 
 
 class KubernetesCluster(BaseContainerCluster):
