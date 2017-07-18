@@ -177,6 +177,9 @@ class DefaultMetadataProvider(MetadataProvider):
     if FLAGS.hostname_metadata:
       metadata['hostnames'] = ','.join([vm.hostname
                                         for vm in benchmark_spec.vms])
+    if benchmark_spec.container_cluster:
+      metadata.update(benchmark_spec.container_cluster.GetMetadata())
+
     for name, vms in benchmark_spec.vm_groups.iteritems():
       if len(vms) == 0:
         continue
