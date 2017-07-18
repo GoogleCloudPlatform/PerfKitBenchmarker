@@ -249,7 +249,8 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
             raise e
           else:
             if log_errors:
-              logging.error('Got exception running %s: %s', f.__name__, e)
+              logging.error('Got exception running %s: %s', f.__name__, e,
+                            exc_info=1)
             time.sleep(sleep_time)
     return WrappedFunction
   return Wrap
