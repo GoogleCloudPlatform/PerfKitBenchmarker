@@ -56,7 +56,10 @@ import sys
 import time
 import gflags
 
+import file_to_plot
+
 # GLOBAL STRINGS
+PER_SECOND_GRAPH_CLOUD_BUCKET = 'per_second_graph_cloud_bucket'
 MYSQL_SVC_DB_INSTANCE_CORES = 'mysql_svc_db_instance_cores'
 MYSQL_SVC_OLTP_TABLES_COUNT = 'mysql_svc_oltp_tables_count'
 MYSQL_SVC_OLTP_TABLE_SIZE = 'mysql_svc_oltp_table_size'
@@ -79,6 +82,7 @@ SLEEP_TIME_BETWEEN_RUNS = 20  # seconds
 TAIL_LINE_NUM = '20'
 
 PKB_TIMEOUT = 43200  # max wait time for a run in seconds
+TIME_MIN = 1
 
 # FLAG STRINGS
 PKB = './pkb.py --benchmarks=mysql_service'
@@ -101,6 +105,10 @@ CLEANUP = 'cleanup'
 TEARDOWN = 'teardown'
 
 FLAGS = gflags.FLAGS
+gflags.DEFINE_string(PER_SECOND_GRAPH_CLOUD_BUCKET, None,
+                     'Indicator for using per second data collection.'
+                     'To enable set the google cloud storage bucket for the '
+                     'graph.')
 gflags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
                       'The duration, in seconds, of each run phase with varying'
                       'thread count.')
@@ -125,9 +133,8 @@ gflags.DEFINE_string(GCE_BOOT_DISK_TYPE, 'pd-ssd',
                      'The boot disk type for GCP VMs.')
 gflags.DEFINE_string(MACHINE_TYPE, 'n1-standard-4',
                      'Machine type for GCE Virtual machines.')
-gflags.DEFINE_enum(
-    MYSQL_SVC_DB_INSTANCE_CORES, '4', ['1', '4', '8', '16'],
-    'The number of cores to be provisioned for the DB instance.')
+gflags.DEFINE_enum(MYSQL_SVC_DB_INSTANCE_CORES, '4', ['1', '4', '8', '16'],
+                   'The number of cores to be provisioned for the DB instance.')
 gflags.DEFINE_integer(MYSQL_SVC_OLTP_TABLES_COUNT, 4,
                       'The number of tables used in sysbench oltp.lua tests')
 gflags.DEFINE_integer(MYSQL_SVC_OLTP_TABLE_SIZE, 100000,
@@ -145,6 +152,10 @@ class UnexpectedFileOutputError(Exception):
 
 
 class OperationTimeoutError(Exception):
+  pass
+
+
+class CallFailureError(Exception):
   pass
 
 
@@ -213,23 +224,30 @@ def _run(run_uri):
   Args:
     run_uri: (string).
   """
-
+  if FLAGS.per_second_graph_cloud_bucket:
+    plotter = file_to_plot.Plotter(FLAGS.sysbench_run_seconds,
+                                   FLAGS.report_interval,
+                                   FLAGS.per_second_graph_cloud_bucket)
   run_iterations = len(FLAGS.thread_count_list)
   logging.info(
       'Beginning run phase. Will execute runs with %d different thread counts.',
       run_iterations)
   for t in FLAGS.thread_count_list:
     pkb_cmd = (PKB + STAGE_FLAG + RUN + URI_FLAG + run_uri + THREAD_FLAG +
-               str(t) + RUN_TIME + str(FLAGS.sysbench_run_seconds) +
-               WARMUP_FLAG + str(FLAGS.sysbench_warmup_seconds))
+               str(t) + RUN_TIME + str(FLAGS.sysbench_run_seconds) + WARMUP_FLAG
+               + str(FLAGS.sysbench_warmup_seconds))
     if FLAGS.additional_flags:
       pkb_cmd = _append_additional_flags(pkb_cmd)
     stdout_filename, stderr_filename = _generate_filenames(RUN, t)
     logging.info('Executing PKB run with thread count: %s', t)
     logging.info('Run sysbench with the following command:\n%s', pkb_cmd)
     _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
+    if FLAGS.per_second_data:
+      plotter.add_file(stderr_filename)
     logging.info('Finished executing PKB run.')
     time.sleep(SLEEP_TIME_BETWEEN_RUNS)
+  if FLAGS.per_second_graph_cloud_bucket:
+    plotter.plot()
 
 
 def _cleanup_teardown_pkb(run_uri):
@@ -266,6 +284,9 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   # Will probably have to implement with threading.
   p.wait()
   elapsed_time = time.time() - start_time
+  if elapsed_time == 1:
+    raise CallFailureError('The call failed before execution (duration 1s). '
+                           'Check stderr for traceback.')
   logging.info('PKB call finished in %i seconds.', int(elapsed_time))
 
 
