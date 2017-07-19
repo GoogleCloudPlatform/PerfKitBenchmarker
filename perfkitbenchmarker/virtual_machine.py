@@ -325,6 +325,10 @@ class BaseVirtualMachine(resource.BaseResource):
       result['dedicated_host'] = self.use_dedicated_host
     return result
 
+  def SimulateMaintenanceEvent(self):
+    """Simulates a maintenance event on the VM."""
+    raise NotImplementedError()
+
 
 class BaseOsMixin(object):
   """The base class for OS Mixin classes.
