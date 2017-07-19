@@ -342,8 +342,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def TcpCongestionControl(self):
     """Return the congestion control used for tcp."""
-    # TODO(b/68257366): This was failing on default docker image used by
-    # kubernetes_virtual_machine, hence the addition of the try block.
     try:
       resp, _ = self.RemoteCommand(
           'cat /proc/sys/net/ipv4/tcp_congestion_control')
