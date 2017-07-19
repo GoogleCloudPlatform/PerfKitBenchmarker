@@ -610,6 +610,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['gpu_count'] = self.gpu_count
     return result
 
+  def SimulateMaintenanceEvent(self):
+    """Simulates a maintenance event on the VM."""
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'instances',
+                             'simulate-maintenance-event', self.name)
+    _, _, retcode = cmd.Issue()
+    if retcode:
+      raise errors.VirtualMachine.VirtualMachineError(
+          'Unable to simulate maintenance event.')
+
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
                                      linux_vm.ContainerizedDebianMixin):
