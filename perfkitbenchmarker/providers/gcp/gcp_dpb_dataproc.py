@@ -116,7 +116,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
 
-  def append_region(self, cmd, append_zone = False):
+  def append_region(self, cmd, append_zone=False):
     if FLAGS.zones:
       zone = FLAGS.zones[0]
       region = zone.rsplit('-', 1)[0]
@@ -144,6 +144,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def SubmitJob(self, jarfile, classname, job_poll_interval=None,
                 job_arguments=None, job_stdout_file=None,
                 job_type=None):
+    """See base class."""
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
 
@@ -183,13 +184,14 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if FLAGS.zones:
       zone = FLAGS.zones[0]
       region = zone.rsplit('-', 1)[0]
-      mb_command.extend(['-c', 'regional', '-l',  region])
+      mb_command.extend(['-c', 'regional', '-l', region])
 
     mb_command.append(source_bucket)
     vm_util.IssueCommand(mb_command)
 
 
   def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
+    """Method to generate data using a distributed job on the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
@@ -211,6 +213,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
 
   def distributed_copy(self, source_location, destination_location):
+    """Method to copy data using a distributed job on the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['class'] = 'org.apache.hadoop.tools.DistCp'
@@ -227,6 +230,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
 
   def cleanup_data(self, base_dir, udpate_default_fs):
+    """Method to cleanup data using a distributed job on the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION

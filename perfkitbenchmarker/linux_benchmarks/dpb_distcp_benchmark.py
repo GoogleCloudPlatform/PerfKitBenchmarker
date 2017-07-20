@@ -93,11 +93,20 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
+  del benchmark_spec  # Unused.
   pass
 
 
 def Run(benchmark_spec):
+  """Runs distributed_copy benchmark and reports the results.
 
+  Args:
+    benchmark_spec: Spec needed to run the distributed synth benchmark
+
+
+  Returns:
+    A list of samples
+  """
   run_uri = benchmark_spec.uuid.split('-')[0]
   source = '/{}'.format(run_uri)
   update_source_default_fs = False
@@ -120,8 +129,7 @@ def Run(benchmark_spec):
     destination_dir = '{}:/{}'.format(FLAGS.distcp_source_fs, destination_dir)
 
   start = datetime.datetime.now()
-  benchmark_spec.dpb_service.distributed_copy(source_location=source_data_dir,
-                                              destination_location=destination_dir)
+  benchmark_spec.dpb_service.distributed_copy(source_data_dir, destination_dir)
   end_time = datetime.datetime.now()
   run_time = (end_time - start).total_seconds()
 
@@ -144,5 +152,8 @@ def Run(benchmark_spec):
   benchmark_spec.dpb_service.cleanup_data(source, update_source_default_fs)
   return results
 
+
 def Cleanup(benchmark_spec):
+  """Cleans up the distcp benchmark"""
+  del benchmark_spec  # Unused.
   pass

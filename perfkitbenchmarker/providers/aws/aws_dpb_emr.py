@@ -239,10 +239,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     mb_cmd = self.cmd_prefix + ['s3', 'mb', source_bucket]
     stdout, _, _ = vm_util.IssueCommand(mb_cmd)
 
-
   def generate_data(self, source_dir, udpate_default_fs, num_files,
                     size_file):
-
+    """Method to generate data using a distributed job on the cluster."""
     @vm_util.Retry(timeout=600,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
@@ -264,9 +263,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     step_action_on_failure = "ActionOnFailure=CONTINUE"
     jar_spec = GENERATE_HADOOP_JAR
 
-    # How will we handle a class name ????
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec
-                 ]
+    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
     step_list.append('Args=' + arg_spec)
     step_string = ','.join(step_list)
 
@@ -287,9 +284,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     else:
       return {dpb_service.SUCCESS: True}
 
-
   def distributed_copy(self, source_location, destination_location):
-
+    """Method to copy data using a distributed job on the cluster."""
     @vm_util.Retry(timeout=600,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
@@ -308,8 +304,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     step_action_on_failure = "ActionOnFailure=CONTINUE"
     jar_spec = 'Jar=command-runner.jar'
 
-    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec
-                 ]
+    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
     step_list.append('Args=' + arg_spec)
     step_string = ','.join(step_list)
 
@@ -334,8 +329,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     metrics[dpb_service.SUCCESS] = step_state == "COMPLETED"
     return metrics
 
-
   def cleanup_data(self, base_dir, udpate_default_fs):
+    """Method to cleanup data using a distributed job on the cluster."""
     @vm_util.Retry(timeout=600,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
@@ -377,9 +372,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     if step_state != "COMPLETED":
       return {dpb_service.SUCCESS: False}
     else:
-      rb_step_cmd = self.cmd_prefix + ['s3',
-                                    'rb',
-                                    base_dir,
-                                    '--force']
+      rb_step_cmd = self.cmd_prefix + ['s3', 'rb', base_dir, '--force']
       stdout, _, _ = vm_util.IssueCommand(rb_step_cmd)
       return {dpb_service.SUCCESS: True}
