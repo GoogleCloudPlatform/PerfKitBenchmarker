@@ -246,10 +246,10 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
           sleep_time = poll_interval * fuzz_multiplier
           if ((time.time() + sleep_time) >= deadline or
               (max_retries >= 0 and tries > max_retries)):
-            raise e
+            raise
           else:
             if log_errors:
-              logging.error('Got exception running %s: %s', f.__name__, e)
+              logging.error('Retrying exception running %s: %s', f.__name__, e)
             time.sleep(sleep_time)
     return WrappedFunction
   return Wrap
