@@ -112,15 +112,17 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
         self._AddToCmd(cmd, 'num-{0}-local-ssds'.format(role),
                        self.spec.worker_group.vm_spec.num_local_ssds)
 
-    self.append_region(cmd)
+    self.append_region(cmd, True)
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
 
-  def append_region(self, cmd):
+  def append_region(self, cmd, append_zone = False):
     if FLAGS.zones:
       zone = FLAGS.zones[0]
       region = zone.rsplit('-', 1)[0]
       cmd.flags['region'] = region
+      if append_zone:
+        cmd.flags['zone'] = zone
 
   def _Delete(self):
     """Deletes the cluster."""
