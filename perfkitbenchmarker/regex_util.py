@@ -18,6 +18,9 @@ import re
 
 _IPV4_REGEX = r'[0-9]+(?:\.[0-9]+){3}'
 
+# From https://docs.python.org/2/library/re.html#simulating-scanf.
+FLOAT_REGEX = r'[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?'
+
 
 class NoMatchError(ValueError):
   """Raised when no matches for a regex are found within a string."""
@@ -58,6 +61,31 @@ def ExtractGroup(regex, text, group=1, flags=0):
 def ExtractFloat(regex, text, group=1):
   """Extracts a float from a regular expression matched to 'text'."""
   return float(ExtractGroup(regex, text, group=group))
+
+
+def ExtractAllFloatMetrics(text,
+                           metric_regex=r'\w+',
+                           value_regex=FLOAT_REGEX,
+                           delimiter_regex='='):
+  """Extracts metrics and their values into a dict.
+
+  Args:
+    text: The text to parse to find metric and values.
+    metric_regex: A regular expression to find metric names. The metric regex
+        should not contain any parenthesized groups.
+    value_regex: A regular expression to find float values. By default, this
+        works well for floating-point numbers found via scanf.
+    delimiter_regex: A regular expression between the metric name and value.
+
+  Returns:
+    A dict mapping metrics to values.
+  """
+  if '(' in metric_regex:
+    raise NotImplementedError('ExtractAllFloatMetrics does not support a '
+                              'metric regex with groups.')
+  matches = re.findall('(%s)%s(%s)' % (metric_regex, delimiter_regex,
+                                       value_regex), text)
+  return {match[0]: float(match[1]) for match in matches}
 
 
 def ExtractIpv4Addresses(text):

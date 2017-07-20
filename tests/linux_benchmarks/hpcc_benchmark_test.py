@@ -35,9 +35,8 @@ class HPCCTestCase(unittest.TestCase):
   def testParseHpcc(self):
     benchmark_spec = mock.MagicMock()
     result = hpcc_benchmark.ParseOutput(self.contents, benchmark_spec)
-    self.assertEqual(7, len(result))
+    self.assertEqual(150, len(result))
     results = {i[0]: i[1] for i in result}
-
     self.assertAlmostEqual(0.0331844, results['HPL Throughput'])
     self.assertAlmostEqual(0.0151415, results['Random Access Throughput'])
     self.assertAlmostEqual(11.5032, results['STREAM Copy Throughput'])
@@ -45,6 +44,11 @@ class HPCCTestCase(unittest.TestCase):
     self.assertAlmostEqual(12.7265, results['STREAM Add Throughput'])
     self.assertAlmostEqual(12.2433, results['STREAM Triad Throughput'])
     self.assertAlmostEqual(0.338561, results['PTRANS Throughput'])
+
+    # Spot check a few of the metrics without units.
+    self.assertAlmostEqual(4, results['sizeof_float'])
+    self.assertAlmostEqual(5.80539, results['StarSTREAM_Add'])
+
 
 if __name__ == '__main__':
   unittest.main()
