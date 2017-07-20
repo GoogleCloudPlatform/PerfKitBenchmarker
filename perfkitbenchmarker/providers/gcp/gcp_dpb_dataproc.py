@@ -111,19 +111,31 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
       if self.spec.worker_group.vm_spec.num_local_ssds:
         self._AddToCmd(cmd, 'num-{0}-local-ssds'.format(role),
                        self.spec.worker_group.vm_spec.num_local_ssds)
+
+    self.append_region(cmd)
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
+
+  def append_region(self, cmd):
+    if FLAGS.zones:
+      zone = FLAGS.zones[0]
+      region = zone.rsplit('-', 1)[0]
+      cmd.flags['region'] = region
 
   def _Delete(self):
     """Deletes the cluster."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'delete',
                              self.cluster_id)
+    self.append_region(cmd)
+
     cmd.Issue()
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
     cmd = util.GcloudCommand(self, 'dataproc', 'clusters', 'describe',
                              self.cluster_id)
+    self.append_region(cmd)
+
     _, _, retcode = cmd.Issue()
     return retcode == 0
 
@@ -163,10 +175,25 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     flag_name = cmd_property
     cmd.flags[flag_name] = cmd_value
 
+  def CreateBucket(self, source_bucket):
+    mb_command = ['gsutil', 'mb']
+
+    if FLAGS.zones:
+      zone = FLAGS.zones[0]
+      region = zone.rsplit('-', 1)[0]
+      mb_command.extend(['-c', 'regional', '-l',  region])
+
+    mb_command.append(source_bucket)
+    vm_util.IssueCommand(mb_command)
+
+
   def generate_data(self, source_dir, udpate_default_fs, num_files, size_file):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
+
+    self.append_region(cmd)
+
     job_arguments = [TESTDFSIO_PROGRAM]
     if udpate_default_fs:
       job_arguments.append('-Dfs.default.name={}'.format(source_dir))
@@ -186,6 +213,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['class'] = 'org.apache.hadoop.tools.DistCp'
 
+    self.append_region(cmd)
+
     job_arguments = [source_location, destination_location]
     cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None)
@@ -199,6 +228,9 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
+
+    self.append_region(cmd)
+
     job_arguments = [TESTDFSIO_PROGRAM]
     if udpate_default_fs:
       job_arguments.append('-Dfs.default.name={}'.format(base_dir))

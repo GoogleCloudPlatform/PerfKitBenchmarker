@@ -65,7 +65,7 @@ flags.DEFINE_enum('distcp_dest_fs', BaseDpbService.GCS_FS,
                    BaseDpbService.HDFS_FS],
                   'File System to use as destination of the distcp operation')
 
-flags.DEFINE_integer('individual_file_size_in_megabytes', 10,
+flags.DEFINE_integer('file_size_mbs', 10,
                      'File size to use for the distcp source files')
 
 flags.DEFINE_integer('num_files', 10, 'Number of distcp source files')
@@ -104,6 +104,7 @@ def Run(benchmark_spec):
 
   if FLAGS.distcp_source_fs != BaseDpbService.HDFS_FS:
     source = '{}:/{}'.format(FLAGS.distcp_source_fs, source)
+    benchmark_spec.dpb_service.CreateBucket(source)
     update_source_default_fs = True
 
   source_dir = '{}{}'.format(source, '/dfsio')
@@ -112,7 +113,7 @@ def Run(benchmark_spec):
   # TODO(saksena): Respond to data generation failure
   benchmark_spec.dpb_service.generate_data(source_dir, update_source_default_fs,
                                            FLAGS.num_files,
-                                           FLAGS.individual_file_size_in_megabytes)
+                                           FLAGS.file_size_mbs)
 
   destination_dir = '/{}{}'.format(run_uri, '/dfsio_destination')
   if FLAGS.distcp_dest_fs != BaseDpbService.HDFS_FS:
@@ -126,14 +127,21 @@ def Run(benchmark_spec):
 
   results = []
   metadata = copy.copy(benchmark_spec.dpb_service.GetMetadata())
-  metadata.update({'source_location': source_dir})
-  metadata.update({'destination_location': destination_dir})
+  metadata.update({'source_fs': FLAGS.distcp_source_fs})
+  metadata.update({'destination_fs': FLAGS.distcp_dest_fs})
   metadata.update({'num_files': FLAGS.num_files})
-  metadata.update({'individual_file_size_in_megabytes': FLAGS.individual_file_size_in_megabytes})
+  metadata.update({'file_size_mbs': FLAGS.file_size_mbs})
+  if FLAGS.zones:
+    zone = FLAGS.zones[0]
+    region = zone.rsplit('-', 1)[0]
+    metadata.update({'regional': True})
+    metadata.update({'region': region})
+  elif FLAGS.cloud == 'AWS':
+    metadata.update({'regional': True})
+    metadata.update({'region': 'aws_default'})
+
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
-
   benchmark_spec.dpb_service.cleanup_data(source, update_source_default_fs)
-
   return results
 
 def Cleanup(benchmark_spec):

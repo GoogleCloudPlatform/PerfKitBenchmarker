@@ -235,6 +235,11 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def SetClusterProperty(self):
     pass
 
+  def CreateBucket(self, source_bucket):
+    mb_cmd = self.cmd_prefix + ['s3', 'mb', source_bucket]
+    stdout, _, _ = vm_util.IssueCommand(mb_cmd)
+
+
   def generate_data(self, source_dir, udpate_default_fs, num_files,
                     size_file):
 
