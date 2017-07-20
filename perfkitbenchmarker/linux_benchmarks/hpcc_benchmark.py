@@ -195,8 +195,9 @@ def ParseOutput(hpcc_output, benchmark_spec):
   UpdateMetadata(metadata)
 
   # Parse all metrics from metric=value lines in the HPCC output.
-  for metric, value in regex_util.ExtractAllFloatMetrics(
-      hpcc_output).iteritems():
+  metric_values = regex_util.ExtractAllFloatMetrics(
+      hpcc_output)
+  for metric, value in metric_values.iteritems():
     results.append(sample.Sample(metric, value, '', metadata))
 
   # Parse some metrics separately and add units. Although these metrics are
@@ -234,6 +235,10 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vms
   master_vm = vms[0]
+  # backup existing HPCC output, if any
+  master_vm.RemoteCommand(('if [ -f hpccoutf.txt ]; then '
+                           'mv hpccoutf.txt hpccoutf-$(date +%s).txt; '
+                           'fi'))
   num_processes = len(vms) * master_vm.num_cpus
   mpi_env = ' '.join(['-x %s' % v for v in FLAGS.hpcc_mpi_env])
   mpi_cmd = ('mpirun -np %s -machinefile %s --mca orte_rsh_agent '
