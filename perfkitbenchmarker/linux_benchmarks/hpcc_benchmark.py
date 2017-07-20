@@ -193,19 +193,30 @@ def ParseOutput(hpcc_output, benchmark_spec):
   metadata['num_cpus'] = match.group(1)
   metadata['num_machines'] = len(benchmark_spec.vms)
   UpdateMetadata(metadata)
+
+  # Parse all metrics from metric=value lines in the HPCC output.
+  metric_values = regex_util.ExtractAllFloatMetrics(
+      hpcc_output)
+  for metric, value in metric_values.iteritems():
+    results.append(sample.Sample(metric, value, '', metadata))
+
+  # Parse some metrics separately and add units. Although these metrics are
+  # parsed above and added to results, this handling is left so that existing
+  # uses of these metric names will continue to work.
   value = regex_util.ExtractFloat('HPL_Tflops=([0-9]*\\.[0-9]*)', hpcc_output)
   results.append(sample.Sample('HPL Throughput', value, 'Tflops', metadata))
 
   value = regex_util.ExtractFloat('SingleRandomAccess_GUPs=([0-9]*\\.[0-9]*)',
                                   hpcc_output)
-  results.append(sample.Sample('Random Access Throughput', value,
-                               'GigaUpdates/sec'))
+  results.append(
+      sample.Sample('Random Access Throughput', value, 'GigaUpdates/sec',
+                    metadata))
 
   for metric in STREAM_METRICS:
     regex = 'SingleSTREAM_%s=([0-9]*\\.[0-9]*)' % metric
     value = regex_util.ExtractFloat(regex, hpcc_output)
-    results.append(sample.Sample('STREAM %s Throughput' % metric, value,
-                                 'GB/s'))
+    results.append(
+        sample.Sample('STREAM %s Throughput' % metric, value, 'GB/s', metadata))
 
   value = regex_util.ExtractFloat(r'PTRANS_GBs=([0-9]*\.[0-9]*)', hpcc_output)
   results.append(sample.Sample('PTRANS Throughput', value, 'GB/s', metadata))
