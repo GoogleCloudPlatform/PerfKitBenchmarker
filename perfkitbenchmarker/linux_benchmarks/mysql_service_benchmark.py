@@ -311,7 +311,7 @@ def _IssueSysbenchCommand(vm, duration, metadata):
   if duration > 0:
     run_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
                       '--test=%s' % oltp_script_path,
-                      '--mysql_svc_oltp_tables_count=%d' %
+                      '--oltp_tables_count=%d' %
                       tables_count,
                       '--oltp-table-size=%d' %
                       table_size,
@@ -418,7 +418,7 @@ def _PrepareSysbench(vm, metadata):
   prepare_script_path = sysbench05plus.PREPARE_SCRIPT_PATH
   data_load_cmd_tokens = ['%s' % sysbench05plus.SYSBENCH05PLUS_PATH,
                           '--test=%s' % prepare_script_path,
-                          '--mysql_svc_oltp_tables_count=%d' %
+                          '--oltp_tables_count=%d' %
                           tables_count,
                           '--oltp-table-size=%d' %
                           table_size,
