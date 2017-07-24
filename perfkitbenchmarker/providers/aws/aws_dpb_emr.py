@@ -16,6 +16,7 @@ Clusters can be created and deleted.
 """
 
 import json
+import logging
 
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import flags
@@ -24,8 +25,8 @@ from perfkitbenchmarker import vm_util
 
 import util
 
-GENERATE_HADOOP_JAR = \
-    'Jar=file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-client-jobclient.jar'
+GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
+                       'hadoop-mapreduce-client-jobclient.jar')
 
 FLAGS = flags.FLAGS
 
@@ -37,6 +38,10 @@ READY_CHECK_SLEEP = 30
 READY_CHECK_TRIES = 60
 READY_STATE = 'WAITING'
 JOB_WAIT_SLEEP = 30
+
+
+class EMRRetryableException(Exception):
+  pass
 
 
 class AwsDpbEmr(dpb_service.BaseDpbService):
@@ -120,7 +125,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     stdout, stderr, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     self.cluster_id = result['ClusterId']
-    print 'Cluster created with id %s', self.cluster_id
+    logging.info('Cluster created with id %s', self.cluster_id)
 
 
   def _Delete(self):
@@ -148,7 +153,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def _IsReady(self):
     """Check to see if the cluster is ready."""
-    print 'Checking _Ready cluster:', self.cluster_id
+    logging.info('Checking _Ready cluster:', self.cluster_id)
     cmd = self.cmd_prefix + ['emr',
                              'describe-cluster', '--cluster-id',
                              self.cluster_id]
@@ -173,7 +178,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
-    if state == "COMPLETED" or state == "FAILED":
+    if state == 'COMPLETED' or state == 'FAILED':
       return result
     else:
       return None
@@ -187,7 +192,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
-        raise Exception('Step {0} not complete.'.format(step_id))
+        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
     if job_type == 'hadoop':
@@ -229,7 +234,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     metrics[dpb_service.WAITING] = start_time - pending_time
     metrics[dpb_service.RUNTIME] = end_time - start_time
     step_state = result['Step']['Status']['State']
-    metrics[dpb_service.SUCCESS] = step_state == "COMPLETED"
+    metrics[dpb_service.SUCCESS] = step_state == 'COMPLETED'
     return metrics
 
   def SetClusterProperty(self):
@@ -247,7 +252,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
-          raise Exception('Step {0} not complete.'.format(step_id))
+          raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
     job_arguments = ['TestDFSIO']
@@ -259,8 +264,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     arg_spec = '[' + ','.join(job_arguments) + ']'
 
     step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = "Name=\"TestDFSIO\""
-    step_action_on_failure = "ActionOnFailure=CONTINUE"
+    step_name = 'Name="TestDFSIO"'
+    step_action_on_failure = 'ActionOnFailure=CONTINUE'
     jar_spec = GENERATE_HADOOP_JAR
 
     step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
@@ -279,7 +284,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     result = WaitForStep(step_id)
     step_state = result['Step']['Status']['State']
-    if step_state != "COMPLETED":
+    if step_state != 'COMPLETED':
       return {dpb_service.SUCCESS: False}
     else:
       return {dpb_service.SUCCESS: True}
@@ -291,7 +296,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
-        raise Exception('Step {0} not complete.'.format(step_id))
+        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
     job_arguments = ['s3-dist-cp', '--s3Endpoint=s3.amazonaws.com']
@@ -300,8 +305,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     arg_spec = '[' + ','.join(job_arguments) + ']'
 
     step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = "Name=\"S3DistCp\""
-    step_action_on_failure = "ActionOnFailure=CONTINUE"
+    step_name = 'Name="S3DistCp"'
+    step_action_on_failure = 'ActionOnFailure=CONTINUE'
     jar_spec = 'Jar=command-runner.jar'
 
     step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
@@ -326,7 +331,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     metrics[dpb_service.WAITING] = start_time - pending_time
     metrics[dpb_service.RUNTIME] = end_time - start_time
     step_state = result['Step']['Status']['State']
-    metrics[dpb_service.SUCCESS] = step_state == "COMPLETED"
+    metrics[dpb_service.SUCCESS] = step_state == 'COMPLETED'
     return metrics
 
   def cleanup_data(self, base_dir, udpate_default_fs):
@@ -336,7 +341,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
-          raise Exception('Step {0} not complete.'.format(step_id))
+          raise EMRRetryableException('Step {0} not complete.'.format(step_id))
       return result
 
     job_arguments = ['TestDFSIO']
@@ -347,8 +352,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     arg_spec = '[' + ','.join(job_arguments) + ']'
 
     step_type_spec = 'Type=CUSTOM_JAR'
-    step_name = "Name=\"TestDFSIO\""
-    step_action_on_failure = "ActionOnFailure=CONTINUE"
+    step_name = 'Name="TestDFSIO"'
+    step_action_on_failure = 'ActionOnFailure=CONTINUE'
     jar_spec = GENERATE_HADOOP_JAR
 
     # How will we handle a class name ????
@@ -369,7 +374,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     result = WaitForStep(step_id)
     step_state = result['Step']['Status']['State']
-    if step_state != "COMPLETED":
+    if step_state != 'COMPLETED':
       return {dpb_service.SUCCESS: False}
     else:
       rb_step_cmd = self.cmd_prefix + ['s3', 'rb', base_dir, '--force']
