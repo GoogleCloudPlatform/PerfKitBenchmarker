@@ -223,10 +223,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     job_arguments = [source_location, destination_location]
     cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None)
-    if retcode != 0:
-      return {dpb_service.SUCCESS: False}
-    else:
-      return {dpb_service.SUCCESS: True}
+    return {dpb_service.SUCCESS: retcode == 0}
 
 
   def cleanup_data(self, base_dir, udpate_default_fs):
@@ -247,5 +244,5 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if retcode != 0:
       return {dpb_service.SUCCESS: False}
     if udpate_default_fs:
-      vm_util.IssueCommand(['gsutil', '-m', 'rm', '-r', '%s' % base_dir])
+      vm_util.IssueCommand(['gsutil', '-m', 'rm', '-r', base_dir])
     return {dpb_service.SUCCESS: True}

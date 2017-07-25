@@ -65,10 +65,10 @@ flags.DEFINE_enum('distcp_dest_fs', BaseDpbService.GCS_FS,
                    BaseDpbService.HDFS_FS],
                   'File System to use as destination of the distcp operation')
 
-flags.DEFINE_integer('file_size_mbs', 10,
-                     'File size to use for the distcp source files')
+flags.DEFINE_integer('distcp_file_size_mbs', 10,
+                     'File size to use for each of the distcp source files')
 
-flags.DEFINE_integer('num_files', 10, 'Number of distcp source files')
+flags.DEFINE_integer('distcp_num_files', 10, 'Number of distcp source files')
 
 FLAGS = flags.FLAGS
 
@@ -94,7 +94,6 @@ def CheckPrerequisites(benchmark_config):
 
 def Prepare(benchmark_spec):
   del benchmark_spec  # Unused.
-  pass
 
 
 def Run(benchmark_spec):
@@ -102,7 +101,6 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: Spec needed to run the distributed synth benchmark
-
 
   Returns:
     A list of samples
@@ -121,12 +119,13 @@ def Run(benchmark_spec):
 
   # TODO(saksena): Respond to data generation failure
   benchmark_spec.dpb_service.generate_data(source_dir, update_source_default_fs,
-                                           FLAGS.num_files,
-                                           FLAGS.file_size_mbs)
+                                           FLAGS.distcp_num_files,
+                                           FLAGS.distcp_file_size_mbs)
 
-  destination_dir = '/{}{}'.format(run_uri, '/dfsio_destination')
-  if FLAGS.distcp_dest_fs != BaseDpbService.HDFS_FS:
-    destination_dir = '{}:/{}'.format(FLAGS.distcp_source_fs, destination_dir)
+  destination_dir = ('{}://{}{}'.format(FLAGS.distcp_source_fs, run_uri,
+                                        '/dfsio_destination')
+                     if (FLAGS.distcp_dest_fs != BaseDpbService.HDFS_FS) else
+                     '/{}{}'.format(run_uri, '/dfsio_destination'))
 
   start = datetime.datetime.now()
   benchmark_spec.dpb_service.distributed_copy(source_data_dir, destination_dir)
@@ -137,8 +136,8 @@ def Run(benchmark_spec):
   metadata = copy.copy(benchmark_spec.dpb_service.GetMetadata())
   metadata.update({'source_fs': FLAGS.distcp_source_fs})
   metadata.update({'destination_fs': FLAGS.distcp_dest_fs})
-  metadata.update({'num_files': FLAGS.num_files})
-  metadata.update({'file_size_mbs': FLAGS.file_size_mbs})
+  metadata.update({'distcp_num_files': FLAGS.distcp_num_files})
+  metadata.update({'distcp_file_size_mbs': FLAGS.distcp_file_size_mbs})
   if FLAGS.zones:
     zone = FLAGS.zones[0]
     region = zone.rsplit('-', 1)[0]
@@ -156,4 +155,3 @@ def Run(benchmark_spec):
 def Cleanup(benchmark_spec):
   """Cleans up the distcp benchmark"""
   del benchmark_spec  # Unused.
-  pass
