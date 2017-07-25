@@ -18,8 +18,10 @@ Enhancements:
   Linux vms (GH-1397)
 - Created hpc_util for a place to share common HPC functions
 - Added --runspec_estimate_spec flag to calculate an estimated spec score (GH-1401)
-- Added support for p100 gpus on Google Cloud Platform (GH-1450)
+- Added support for P100 gpus on Google Cloud Platform (GH-1450)
+- Added gpu type to cuda_toolkit_8 metadata (GH-1453)
 
 Bug fixes and maintenance updates:
 - Fixed provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
 - Fixed GPU benchmarks on GCE to work with new GPU API (GH-1407)
+- Changed cuda_toolkit_8 to use the gpu-specific base clock speed as the default (GH-1453)
