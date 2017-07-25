@@ -505,8 +505,8 @@ def DoCleanupPhase(spec, timer):
       benchmark module's Cleanup function.
   """
   logging.info('Cleaning up benchmark %s', spec.name)
-
-  if spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]):
+  if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
+          spec.dpb_service is not None):
     spec.StopBackgroundWorkload()
     with timer.Measure('Benchmark Cleanup'):
       spec.BenchmarkCleanup(spec)

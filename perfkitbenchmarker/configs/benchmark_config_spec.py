@@ -119,12 +119,13 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
     """
     dpb_service_config = super(_DpbServiceDecoder, self).Decode(
         value, component_full_name, flag_values)
-    if dpb_service_config['service_type'] == dpb_service.EMR:
-      if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
-        raise errors.Config.InvalidValue('EMR service requires S3.')
-    result = _DpbServiceSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **dpb_service_config)
+    
+    if (dpb_service_config['service_type'] == dpb_service.EMR and
+            component_full_name == 'dpb_wordcount_benchmark'):
+        if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
+            raise errors.Config.InvalidValue('EMR service requires S3.')
+    result = _DpbServiceSpec(self._GetOptionFullName(component_full_name),
+                             flag_values, **dpb_service_config)
     return result
 
 
