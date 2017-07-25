@@ -57,6 +57,10 @@ RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
+GPU_TYPE_K80 = 'k80'
+GPU_TYPE_TO_INTERAL_NAME_MAP = {
+    GPU_TYPE_K80: 'nvidia-tesla-k80'
+}
 
 
 class MemoryDecoder(option_decoders.StringDecoder):
@@ -175,13 +179,15 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     memory: None or string. For custom VMs, a string representation of the size
         of memory, expressed in MiB or GiB. Must be an integer number of MiB
         (e.g. "1280MiB", "7.5GiB").
+    gpu_count: None or int. Number of gpus to attach to the VM.
+    gpu_type: None or string. Type of gpus to attach to the VM.
     num_local_ssds: int. The number of local SSDs to attach to the instance.
     preemptible: boolean. True if the VM should be preemptible, False otherwise.
     project: string or None. The project to create the VM in.
     image_project: string or None. The image project used to locate the
         specifed image.
     boot_disk_size: None or int. The size of the boot disk in GB.
-    boot_disk_type: string or None. The tyoe of the boot disk.
+    boot_disk_type: string or None. The type of the boot disk.
   """
 
   CLOUD = providers.GCP
@@ -229,6 +235,17 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['num_vms_per_host'] = flag_values.gcp_num_vms_per_host
     if flag_values['gcp_min_cpu_platform'].present:
       config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
+    if flag_values['gcp_gpu_type'].present:
+      config_values['gpu_type'] = flag_values.gcp_gpu_type
+    if flag_values['gcp_gpu_count'].present:
+      config_values['gpu_count'] = flag_values.gcp_gpu_count
+
+    if 'gpu_count' in config_values and 'gpu_type' not in config_values:
+        raise errors.Config.MissingOption(
+            'gpu_type must be specified if gpu_count is set')
+    if 'gpu_type' in config_values and 'gpu_count' not in config_values:
+        raise errors.Config.MissingOption(
+            'gpu_count must be specified if gpu_type is set')
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -252,7 +269,11 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'host_type': (option_decoders.StringDecoder,
                       {'default': 'n1-host-64-416'}),
         'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
-        'min_cpu_platform': (option_decoders.StringDecoder, {'default': None})
+        'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
+        'gpu_type': (option_decoders.EnumDecoder, {
+            'valid_values': GPU_TYPE_TO_INTERAL_NAME_MAP.keys(),
+            'default': None}),
+        'gpu_count': (option_decoders.IntDecoder, {'min': 1, 'default': None})
     })
     return result
 
@@ -326,6 +347,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.boot_metadata = {}
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
+    self.gpu_count = vm_spec.gpu_count
+    self.gpu_type = vm_spec.gpu_type
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
@@ -357,7 +380,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
-    args = ['alpha'] if (self.host or self.min_cpu_platform) else []
+    args = []
+    # TODO: gcloud supports GPUs in the beta version, but we are using alpha
+    # here so that we can specify min_cpu_platform in addition to attaching
+    # gpus.
+    if self.host or self.min_cpu_platform or self.gpu_count:
+      args = ['alpha']
     args.extend(['compute', 'instances', 'create', self.name])
 
     cmd = util.GcloudCommand(self, *args)
@@ -376,6 +404,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
     else:
       cmd.flags['machine-type'] = self.machine_type
+    if self.gpu_count:
+      cmd.flags['accelerator'] = 'type={0},count={1}'.format(
+          GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpu_type],
+          self.gpu_count)
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
     if self.host:
@@ -408,7 +440,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['metadata'] = ','.join(
         ['%s=%s' % (k, v) for k, v in metadata.iteritems()])
 
-    if not FLAGS.gce_migrate_on_maintenance:
+    # TODO: If GCE one day supports live migration on GPUs this can be revised.
+    if (FLAGS['gce_migrate_on_maintenance'].present and
+        FLAGS.gce_migrate_on_maintenance and self.gpu_count):
+      raise errors.Config.InvalidValue(
+          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs, '
+          'as it is not supported by GCP.')
+    if not FLAGS.gce_migrate_on_maintenance or self.gpu_count:
       cmd.flags['maintenance-policy'] = 'TERMINATE'
     ssd_interface_option = FLAGS.gce_ssd_interface
     cmd.flags['local-ssd'] = (['interface={0}'.format(ssd_interface_option)] *
@@ -567,7 +605,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_dedicated_host:
       result['host_type'] = self.host_type
       result['num_vms_per_host'] = self.num_vms_per_host
+    if self.gpu_count:
+      result['gpu_type'] = self.gpu_type
+      result['gpu_count'] = self.gpu_count
     return result
+
+  def SimulateMaintenanceEvent(self):
+    """Simulates a maintenance event on the VM."""
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'instances',
+                             'simulate-maintenance-event', self.name)
+    _, _, retcode = cmd.Issue()
+    if retcode:
+      raise errors.VirtualMachine.VirtualMachineError(
+          'Unable to simulate maintenance event.')
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,

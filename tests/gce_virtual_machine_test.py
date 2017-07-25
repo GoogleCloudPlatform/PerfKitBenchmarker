@@ -28,13 +28,25 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
-from tests import mock_flags
+import mock_flags
 
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
 _COMPONENT = 'test_component'
 _FLAGS = None
+
+
+@contextlib.contextmanager
+def PatchCriticalObjects():
+  """A context manager that patches a few critical objects with mocks."""
+  retval = ('', '', 0)
+  with mock.patch(vm_util.__name__ + '.IssueCommand',
+                  return_value=retval) as issue_command, \
+          mock.patch('__builtin__.open'), \
+          mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
+          mock.patch(util.__name__ + '.GetDefaultProject'):
+    yield issue_command
 
 
 class MemoryDecoderTestCase(unittest.TestCase):
@@ -153,12 +165,38 @@ class GceVmSpecTestCase(unittest.TestCase):
     self.assertEqual(result.cpus, None)
     self.assertEqual(result.memory, None)
 
+  def testStringMachineTypeWithGpus(self):
+    gpu_count = 2
+    gpu_type = 'k80'
+    result = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                           machine_type='n1-standard-8',
+                                           gpu_count=gpu_count,
+                                           gpu_type=gpu_type)
+    self.assertEqual(result.machine_type, 'n1-standard-8')
+    self.assertEqual(result.gpu_type, 'k80')
+    self.assertEqual(result.gpu_count, 2)
+
   def testCustomMachineType(self):
     result = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
         'cpus': 1, 'memory': '7.5GiB'})
     self.assertEqual(result.machine_type, None)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
+
+  def testCustomMachineTypeWithGpus(self):
+    gpu_count = 2
+    gpu_type = 'k80'
+    result = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                           machine_type={
+                                               'cpus': 1,
+                                               'memory': '7.5GiB'
+                                           },
+                                           gpu_count=gpu_count,
+                                           gpu_type=gpu_type)
+    self.assertEqual(result.cpus, 1)
+    self.assertEqual(result.memory, 7680)
+    self.assertEqual(result.gpu_type, 'k80')
+    self.assertEqual(result.gpu_count, 2)
 
   def testStringMachineTypeFlagOverride(self):
     flags = mock_flags.MockFlags()
@@ -178,6 +216,48 @@ class GceVmSpecTestCase(unittest.TestCase):
     self.assertEqual(result.machine_type, None)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
+
+  def testMissingGpuCount(self):
+    flags = mock_flags.MockFlags()
+    with self.assertRaises(errors.Config.MissingOption) as cm:
+      gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', flags,
+          machine_type='test_machine_type', gpu_type='k80')
+
+    self.assertEqual(str(cm.exception), (
+        'gpu_count must be specified if gpu_type is set'))
+
+  def testMissingGpuType(self):
+    flags = mock_flags.MockFlags()
+    with self.assertRaises(errors.Config.MissingOption) as cm:
+      gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', flags,
+          machine_type='test_machine_type', gpu_count=1)
+
+    self.assertEqual(str(cm.exception), (
+        'gpu_type must be specified if gpu_count is set'))
+
+  def testInvalidGpuType(self):
+    flags = mock_flags.MockFlags()
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', flags,
+          machine_type='test_machine_type', gpu_count=1, gpu_type='bad_type')
+
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_vm_spec.GCP.gpu_type value: "bad_type". '
+        'Value must be one of the following: k80.'))
+
+  def testInvalidGpuCount(self):
+    flags = mock_flags.MockFlags()
+    with self.assertRaises(errors.Config.InvalidValue) as cm:
+      gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', flags,
+          machine_type='test_machine_type', gpu_count=0, gpu_type='k80')
+
+    self.assertEqual(str(cm.exception), (
+        'Invalid test_vm_spec.GCP.gpu_count value: "0". '
+        'Value must be at least 1.'))
 
 
 class GceVirtualMachineTestCase(unittest.TestCase):
@@ -227,6 +307,19 @@ class GceVirtualMachineTestCase(unittest.TestCase):
                      {'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
                       'dedicated_host': False, 'preemptible': True})
 
+  def testCustomVmWithGpus(self):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type={'cpus': 1, 'memory': '1.0GiB'},
+        gpu_count=2,
+        gpu_type='k80',
+        project='fakeproject')
+    vm = gce_virtual_machine.GceVirtualMachine(spec)
+    self.assertDictEqual(vm.GetMachineTypeDict(), {
+        'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
+        'dedicated_host': False, 'gpu_count': 2, 'gpu_type': 'k80'
+    })
+
 
 class GCEVMFlagsTestCase(unittest.TestCase):
 
@@ -246,19 +339,9 @@ class GCEVMFlagsTestCase(unittest.TestCase):
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
-  @contextlib.contextmanager
-  def _PatchCriticalObjects(self):
-    """A context manager that patches a few critical objects with mocks."""
-    retval = ('', '', 0)
-    with mock.patch(vm_util.__name__ + '.IssueCommand',
-                    return_value=retval) as issue_command, \
-            mock.patch('__builtin__.open'), \
-            mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
-            mock.patch(util.__name__ + '.GetDefaultProject'):
-      yield issue_command
 
   def testPreemptibleVMFlag(self):
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       self._mocked_flags['gce_preemptible_vms'].parse(True)
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
@@ -268,9 +351,33 @@ class GCEVMFlagsTestCase(unittest.TestCase):
       self.assertEquals(issue_command.call_count, 1)
       self.assertIn('--preemptible', issue_command.call_args[0][0])
 
+  def testMigrateOnMaintenanceFlagTrueWithGpus(self):
+    with PatchCriticalObjects():
+      self._mocked_flags['gce_migrate_on_maintenance'].parse(True)
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', self._mocked_flags, image='image',
+          machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+
+      with self.assertRaises(errors.Config.InvalidValue) as cm:
+        vm._Create()
+      self.assertEqual(str(cm.exception), (
+          'Cannot set flag gce_migrate_on_maintenance on '
+          'instances with GPUs, as it is not supported by GCP.'))
+
+  def testMigrateOnMaintenanceFlagFalseWithGpus(self):
+    with PatchCriticalObjects() as issue_command:
+      self._mocked_flags['gce_migrate_on_maintenance'].parse(False)
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', self._mocked_flags, image='image',
+          machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+
   def testImageProjectFlag(self):
     """Tests that custom image_project flag is supported."""
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       self._mocked_flags['image_project'].parse('bar')
       vm_spec = gce_virtual_machine.GceVmSpec(
           'test_vm_spec.GCP', self._mocked_flags, image='image',
@@ -282,7 +389,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
                     ' '.join(issue_command.call_args[0][0]))
 
   def testGcpInstanceMetadataFlag(self):
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       self._mocked_flags.gcp_instance_metadata = ['k1:v1', 'k2:v2,k3:v3']
       self._mocked_flags.owner = 'test-owner'
       vm_spec = gce_virtual_machine.GceVmSpec(
@@ -300,7 +407,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
       self.assertIn('owner=test-owner', actual_metadata)
 
   def testGcpInstanceMetadataFromFileFlag(self):
-    with self._PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects() as issue_command:
       self._mocked_flags.gcp_instance_metadata_from_file = [
           'k1:p1', 'k2:p2,k3:p3']
       vm_spec = gce_virtual_machine.GceVmSpec(
@@ -315,6 +422,47 @@ class GCEVMFlagsTestCase(unittest.TestCase):
       self.assertIn('k1=p1', actual_metadata_from_file)
       self.assertIn('k2=p2', actual_metadata_from_file)
       self.assertIn('k3=p3', actual_metadata_from_file)
+
+
+class GCEVMCreateTestCase(unittest.TestCase):
+
+  def setUp(self):
+    p = mock.patch(gce_virtual_machine.__name__ +
+                   '.gce_network.GceNetwork.GetNetwork')
+    self.mock_get_network = p.start()
+    self.addCleanup(p.stop)
+    p = mock.patch(gce_virtual_machine.__name__ +
+                   '.gce_network.GceFirewall.GetFirewall')
+    self.mock_get_firewall = p.start()
+    self.addCleanup(p.stop)
+
+  def testVmWithoutGpu(self):
+    with PatchCriticalObjects() as issue_command:
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT, machine_type={
+              'cpus': 1,
+              'memory': '1.0GiB',
+          })
+      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      self.assertNotIn('--accelerator', issue_command.call_args[0][0])
+
+  def testVmWithGpu(self):
+    with PatchCriticalObjects() as issue_command:
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT,
+          machine_type='n1-standard-8',
+          gpu_count=2,
+          gpu_type='k80')
+      vm = gce_virtual_machine.GceVirtualMachine(spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      self.assertIn('--accelerator', issue_command.call_args[0][0])
+      self.assertIn('type=nvidia-tesla-k80,count=2',
+                    issue_command.call_args[0][0])
+      self.assertIn('--maintenance-policy', issue_command.call_args[0][0])
+      self.assertIn('TERMINATE', issue_command.call_args[0][0])
 
 
 if __name__ == '__main__':

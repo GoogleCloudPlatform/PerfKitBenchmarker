@@ -17,7 +17,6 @@
 import copy
 import sys
 import unittest
-import mock
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
@@ -69,6 +68,22 @@ class TestIntegerList(unittest.TestCase):
     il = flag_util.IntegerList([1, (2, 6, 2), 9])
     self.assertEqual(list(il), [1, 2, 4, 6, 9])
 
+  def testEqTrue(self):
+    il = flag_util.IntegerList([1, 2, 3])
+    self.assertEqual([1, 2, 3], il)
+
+  def testEqFalse(self):
+    il = flag_util.IntegerList([1, 2, 3])
+    self.assertFalse([1] == il)
+
+  def testNotEqTrue(self):
+    il = flag_util.IntegerList([1, 2, 3])
+    self.assertNotEqual([1], il)
+
+  def testNotEqFalse(self):
+    il = flag_util.IntegerList([1, 2, 3])
+    self.assertTrue([1] != il)
+
 
 class TestParseIntegerList(unittest.TestCase):
   def setUp(self):
@@ -81,14 +96,14 @@ class TestParseIntegerList(unittest.TestCase):
     self.assertEqual(list(self.ilp.parse('3-5')), [3, 4, 5])
 
   def testIntegerRangeWithStep(self):
-    self.assertEqual(list(self.ilp.Parse('2-7-2')), [2, 4, 6])
+    self.assertEqual(list(self.ilp.parse('2-7-2')), [2, 4, 6])
 
   def testIntegerList(self):
     self.assertEqual(list(self.ilp.parse('3-5,8,10-12')),
                      [3, 4, 5, 8, 10, 11, 12])
 
   def testIntegerListWithRangeAndStep(self):
-    self.assertEqual(list(self.ilp.Parse('3-5,8,10-15-2')),
+    self.assertEqual(list(self.ilp.parse('3-5,8,10-15-2')),
                      [3, 4, 5, 8, 10, 12, 14])
 
   def testNoInteger(self):
@@ -123,7 +138,7 @@ class TestParseIntegerList(unittest.TestCase):
     ilp = flag_util.IntegerListParser(
         on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
     with self.assertRaises(ValueError):
-      ilp.Parse('3-1-2')
+      ilp.parse('3-1-2')
 
 
 class TestIntegerListSerializer(unittest.TestCase):
@@ -138,7 +153,7 @@ class TestIntegerListSerializer(unittest.TestCase):
     ser = flag_util.IntegerListSerializer()
     il = flag_util.IntegerList([1, (2, 5, 2), 9])
 
-    self.assertEqual(ser.Serialize(il),
+    self.assertEqual(ser.serialize(il),
                      '1,2-5-2,9')
 
 
@@ -308,10 +323,10 @@ class TestGetProvidedCommandLineFlags(unittest.TestCase):
         'flag2': MockFlag('flag2', '2', True),
         'flag3': MockFlag('flag3', '3', False)
     }
-    patcher = mock.patch(flag_util.__name__ + '.FLAGS')
-    flags_mock = patcher.start()
-    flags_mock.FlagDict.return_value = flag_dict
-    self.addCleanup(patcher.stop)
+    flag_util.FLAGS = flag_dict
+
+  def tearDown(self):
+    flag_util.FLAGS = {}
 
   def testGetProvidedCommandLineFlags(self):
     self.assertDictEqual({

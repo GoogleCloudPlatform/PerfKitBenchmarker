@@ -23,7 +23,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-_KUBERNETES_MASTER_VERSION = '1.6.2'
+
 
 
 class GkeCluster(container_service.KubernetesCluster):
@@ -32,7 +32,6 @@ class GkeCluster(container_service.KubernetesCluster):
 
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)
-    self.name = 'pkb-%s' % FLAGS.run_uri
     self.project = spec.vm_spec.project
 
   def _Create(self):
@@ -40,7 +39,7 @@ class GkeCluster(container_service.KubernetesCluster):
     cmd = util.GcloudCommand(self, 'container', 'clusters', 'create', self.name)
     cmd.flags['num-nodes'] = self.num_nodes
     cmd.flags['machine-type'] = self.machine_type
-    cmd.flags['cluster-version'] = _KUBERNETES_MASTER_VERSION
+
     cmd.Issue()
 
   def _PostCreate(self):
@@ -51,7 +50,7 @@ class GkeCluster(container_service.KubernetesCluster):
       FLAGS.kubeconfig = vm_util.PrependTempDir('kubeconfig')
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
-    cmd.Issue(env=env)
+    cmd.IssueRetryable(env=env)
 
   def _Delete(self):
     """Deletes the cluster."""

@@ -13,9 +13,9 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.packages.cuda_toolkit_8."""
 
-import unittest
-
 import mock
+import os
+import unittest
 
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
@@ -24,10 +24,10 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
-    pass
-
-  def tearDown(self):
-    pass
+    path = os.path.join(os.path.dirname(__file__), '../data',
+                        'nvidia_smi_output.txt')
+    with open(path) as fp:
+      self.nvidia_smi_output = fp.read()
 
   def testQueryNumberOfGpus(self):
     vm = mock.MagicMock()
@@ -45,6 +45,12 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
         "sudo nvidia-smi "
         "--query-gpu=clocks.applications.memory,"
         "clocks.applications.graphics --format=csv --id=3", should_log=True)
+
+  def testGetDriverVersion(self):
+    vm = mock.MagicMock()
+    vm.RemoteCommand = mock.MagicMock(
+        return_value=(self.nvidia_smi_output, ''))
+    self.assertEqual('375.66', cuda_toolkit_8.GetDriverVersion(vm))
 
 
 if __name__ == '__main__':

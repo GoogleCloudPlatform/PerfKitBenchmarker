@@ -29,6 +29,7 @@ import posixpath
 import re
 import tarfile
 
+from operator import mul
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -84,6 +85,17 @@ flags.DEFINE_boolean(
     'failed with status "NR". Available results will be saved, and PKB samples '
     'will be marked with a metadata value of partial=true. If unset, partial '
     'failures are treated as errors.')
+flags.DEFINE_boolean(
+    'runspec_estimate_spec', False,
+    'Used by the PKB speccpu2006 benchmark. If set, the benchmark will report '
+    'an estimated aggregate score even if SPEC CPU2006 did not compute one. '
+    'This usually occurs when --runspec_iterations is less than 3.  '
+    '--runspec_keep_partial_results is also required to be set. Samples will be'
+    'created as estimated_SPECint(R)_rate_base2006 and '
+    'estimated_SPECfp(R)_rate_base2006.  Available results will be saved, '
+    'and PKB samples will be marked with a metadata value of partial=true. If '
+    'unset, SPECint(R)_rate_base2006 and SPECfp(R)_rate_base2006 are listed '
+    'in the metadata under missing_results.')
 
 BENCHMARK_NAME = 'speccpu2006'
 BENCHMARK_CONFIG = """
@@ -308,7 +320,7 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
   vm.RobustRemoteCommand('yes | {0}'.format(install_script_path))
 
 
-def _ExtractScore(stdout, vm, keep_partial_results):
+def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
   """Extracts the SPEC(int|fp) score from stdout.
 
   Args:
@@ -401,6 +413,7 @@ def _ExtractScore(stdout, vm, keep_partial_results):
   metadata.update(vm.GetMachineTypeDict())
 
   missing_results = []
+  scores = []
 
   for benchmark in result_section:
     # Skip over failed runs, but count them since they make the overall
@@ -410,8 +423,10 @@ def _ExtractScore(stdout, vm, keep_partial_results):
       missing_results.append(str(benchmark.split()[0]))
       continue
     # name, ref_time, time, score, misc
-    name, _, _, score, _ = benchmark.split()
-    results.append(sample.Sample(str(name), float(score), '', metadata))
+    name, _, _, score_str, _ = benchmark.split()
+    score_float = float(score_str)
+    scores.append(score_float)
+    results.append(sample.Sample(str(name), score_float, '', metadata))
 
   if spec_score is None:
     missing_results.append(spec_name)
@@ -426,8 +441,17 @@ def _ExtractScore(stdout, vm, keep_partial_results):
 
   if spec_score is not None:
     results.append(sample.Sample(spec_name, spec_score, '', metadata))
+  elif estimate_spec:
+    estimated_spec_score = _GeometricMean(scores)
+    results.append(sample.Sample('estimated_' + spec_name,
+                                 estimated_spec_score, '', metadata))
 
   return results
+
+
+def _GeometricMean(arr):
+  "Calculates the geometric mean of the array."
+  return reduce(mul, arr) ** (1.0 / len(arr))
 
 
 def _ParseOutput(vm, spec_dir):
@@ -458,7 +482,8 @@ def _ParseOutput(vm, spec_dir):
                                  should_log=True)
     results.extend(_ExtractScore(
         stdout, vm, FLAGS.runspec_keep_partial_results or (
-            FLAGS.benchmark_subset not in _SPECCPU_SUBSETS)))
+            FLAGS.benchmark_subset not in _SPECCPU_SUBSETS),
+        FLAGS.runspec_estimate_spec))
 
   return results
 

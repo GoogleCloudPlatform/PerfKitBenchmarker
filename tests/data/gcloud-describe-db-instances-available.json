@@ -1,0 +1,50 @@
+{
+  "backendType": "SECOND_GEN",
+  "connectionName": "sql-benchmarking:us-central1:pkb-db-instance-123",
+  "databaseVersion": "MYSQL_5_6",
+  "etag": "\"7nzH-h2yIa30F8s0g/MQ\"",
+  "instanceType": "CLOUD_SQL_INSTANCE",
+  "ipAddresses": [
+    {
+      "ipAddress": "000.000.000.35",
+      "type": "PRIMARY"
+    }
+  ],
+  "kind": "sql#instance",
+  "name": "pkb-db-instance-123",
+  "project": "sql-benchmarking",
+  "region": "us-central1",
+  "selfLink": "https://www.googleapis.com/sql/pkb-db-instance-123",
+  "serverCaCert": {
+    "cert": "-----BEGIN CERTIFICATE-----\n9n\nbJ\nBG\ns\nC\ng\nCeA==\n-----END CERTIFICATE-----",
+    "certSerialNumber": "0",
+    "commonName": "C=US,O=Google\\, Inc,CN=Google Cloud SQL Server CA",
+    "createTime": "2017-06-21T17:54:45.430000+00:00",
+    "expirationTime": "2019-06-21T17:55:45.430000+00:00",
+    "instance": "pkb-db-instance-123",
+    "kind": "sql#sslCert",
+    "sha1Fingerprint": "58ca6"
+  },
+  "serviceAccountEmailAddress": "wsi@speckle-ella-5.iam.gserviceaccount.com",
+  "settings": {
+    "activationPolicy": "ALWAYS",
+    "backupConfiguration": {
+      "enabled": false,
+      "kind": "sql#backupConfiguration",
+      "startTime": "05:00"
+    },
+    "dataDiskSizeGb": "10",
+    "dataDiskType": "PD_SSD",
+    "ipConfiguration": {
+      "ipv4Enabled": true
+    },
+    "kind": "sql#settings",
+    "pricingPlan": "PER_USE",
+    "replicationType": "SYNCHRONOUS",
+    "settingsVersion": "1",
+    "storageAutoResize": true,
+    "storageAutoResizeLimit": "0",
+    "tier": "db-n1-standard-1"
+  },
+  "state": "RUNNABLE"
+}

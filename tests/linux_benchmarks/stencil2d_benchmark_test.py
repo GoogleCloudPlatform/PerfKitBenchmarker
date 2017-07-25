@@ -67,10 +67,14 @@ class Stencil2DBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(testMetadata, stencil_sp_stddev_results.metadata)
 
   @mock.patch(('perfkitbenchmarker.linux_packages.'
+               'cuda_toolkit_8.GetDriverVersion'))
+  @mock.patch(('perfkitbenchmarker.linux_packages.'
                'cuda_toolkit_8.QueryNumberOfGpus'))
   @mock.patch(('perfkitbenchmarker.linux_benchmarks.'
                'stencil2d_benchmark._RunSingleIteration'))
-  def testRun(self, run_single_iteration_mock, cuda_toolkit_mock):
+  def testRun(self, run_single_iteration_mock, cuda_toolkit_mock,
+              get_driver_version_mock):
+    get_driver_version_mock.return_value = '123.45'
     cuda_toolkit_mock.return_value = 8
     benchmark_spec = mock.MagicMock()
     problem_sizes = [2, 3, 4]
