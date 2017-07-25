@@ -96,7 +96,7 @@ def CheckPrerequisites(benchmark_config_spec):
         'specify which sdk is used in the pipeline. For example, java/python.')
   if benchmark_config_spec.dpb_service.service_type != dpb_service.DATAFLOW:
     raise NotImplementedError('Currently only works against Dataflow.')
-  if (len(FLAGS.beam_it_options) > 0 and
+  if (FLAGS.beam_it_options and
       (not FLAGS.beam_it_options.endswith(']') or
        not FLAGS.beam_it_options.startswith('['))):
     raise Exception("beam_it_options must be of form"
