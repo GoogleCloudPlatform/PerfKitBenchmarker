@@ -58,8 +58,10 @@ WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 GPU_TYPE_K80 = 'k80'
+GPU_TYPE_P100 = 'p100'
 GPU_TYPE_TO_INTERAL_NAME_MAP = {
-    GPU_TYPE_K80: 'nvidia-tesla-k80'
+    GPU_TYPE_K80: 'nvidia-tesla-k80',
+    GPU_TYPE_P100: 'nvidia-tesla-p100',
 }
 
 
