@@ -86,6 +86,6 @@ flags.DEFINE_integer(
     'specified.')
 flags.DEFINE_enum(
     'gcp_gpu_type', None,
-    ['k80'],
+    ['k80', 'p100'],
     'Type of gpus to attach to the VM. Requires gce_gpu_count to be '
     'specified.')

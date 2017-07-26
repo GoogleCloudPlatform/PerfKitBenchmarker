@@ -244,9 +244,12 @@ class GceVmSpecTestCase(unittest.TestCase):
           'test_vm_spec.GCP', flags,
           machine_type='test_machine_type', gpu_count=1, gpu_type='bad_type')
 
-    self.assertEqual(str(cm.exception), (
+    self.assertIn((
         'Invalid test_vm_spec.GCP.gpu_type value: "bad_type". '
-        'Value must be one of the following: k80.'))
+        'Value must be one of the following:'), str(cm.exception))
+
+    self.assertIn('k80', str(cm.exception))
+    self.assertIn('p100', str(cm.exception))
 
   def testInvalidGpuCount(self):
     flags = mock_flags.MockFlags()
