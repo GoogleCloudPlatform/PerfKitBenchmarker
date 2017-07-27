@@ -13,10 +13,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Plots per second output from STDERR files.
-How to use:
+"""Plots per second output from mysql_service_benchmark STDERR files.
+Prerequisites/assumptions:
+Gnuplot must be installed on the machine to use this module.
+  To check if gnuplot is installed on the machine enter:
+    'dpkg -l gnuplot'
+  To install gnuplot:
+    sudo apt-get install gnuplot-x11
+mysql_service_benchmark Stderr file
+  Can be generated with launch_mysql_service. If enabled, per_second_graphs flag
+  will automatically call this module and generate the per second graphs.
+no sysbench_warmup time
+  Parsing of file assumes sysbench_warmup_seconds is set to 0.
+Sysbench version
+  Assumes Sysbench GPL v2 (https://github.com/akopytov/sysbench) stderr output.
+  If TPS value printout changes, _parse_file method will throw a PatternNotFound
+  exception and need to be updated.
+How to use plot_sysbench_results:
   Initialize a plotter instance.
-  Add relevant STDERR files using add_file() method.
+  Add relevant STDERR files from mysql_service using add_file() method.
   When finished adding files, utilize plot() method to generate a chart.
   If using launch_mysql_service enabling 'per_second_graphs' feature flag will
   automatically add files as runs complete and plot after last thread count call
@@ -26,6 +41,8 @@ import datetime
 import plot_scatter_points
 import subprocess
 
+
+# Assumes Sysbench GPL v2 stderr output.
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
 DATA_INDICATOR_LINE = 'Threads started!'
 TPS = 'tps:'
@@ -88,6 +105,8 @@ class Plotter():
   def _parse_file(self, f):
     """Parses stderr file, f, extracts list of TPS values.
     Assumes no warmup phase and only one report per file.
+    Method will need to be updated if Sysbench output format changes. Assumes
+    Sysbench GPL v2.
     Args:
       f: (file object) file to be parsed.
     Returns:
@@ -110,7 +129,7 @@ class Plotter():
                                        '. Assume run failed.')
           tps = float(line[start_id:end_id].strip())
           tps_values.append(tps)
-          if float(tps) > self.max_tps:
+          if tps > self.max_tps:
             self.max_tps = tps
         break
       line = f.readline()
