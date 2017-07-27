@@ -23,3 +23,4 @@ Enhancements:
 Bug fixes and maintenance updates:
 - Fixed provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
 - Fixed GPU benchmarks on GCE to work with new GPU API (GH-1407)
+- Changed default AWS P2 region for gpu benchmarks (GH-1454)
