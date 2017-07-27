@@ -19,7 +19,6 @@ This module installs cuda toolkit 8 from NVIDIA, configures gpu clock speeds
 and autoboost settings, and exposes a method to collect gpu metadata. Currently
 Tesla K80 and P100 gpus are supported, provided that there is only a single
 type of gpu per system.
-
 """
 
 import re
@@ -114,13 +113,13 @@ def GetGpuType(vm):
     gpu_types = [line.split(' ')[3] for line in stdout.splitlines() if line]
   except:
     raise NvidiaSmiParseOutputException('Unable to parse gpu type')
-  if gpu_types[1:] != gpu_types[:-1]:
+  if any(gpu_type != gpu_types[0] for gpu_type in gpu_types):
     raise HeterogeneousGpuTypesException(
         'PKB only supports one type of gpu per VM')
 
-  if gpu_types[0].find('P100') != -1:
+  if 'P100' in gpu_types[0]:
     return NVIDIA_TESLA_P100
-  if gpu_types[0].find('K80') != -1:
+  if 'K80' in gpu_types[0]:
     return NVIDIA_TESLA_K80
   raise UnsupportedClockSpeedException(
       'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
