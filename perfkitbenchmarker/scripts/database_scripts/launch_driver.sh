@@ -20,8 +20,7 @@
 # The run phase is completed several times daily with results uploaded to
 # a designated Google Cloud Storage Bucket.
 
-# If desired, per second data graphs can be created and uploaded to a designated
-# Google Cloud Storage Bucket.
+# If desired, per second data graphs can be created and wil be stored locally.
 
 # The values below are provisioned for realistic benchmarking.
 
@@ -31,9 +30,9 @@
 # Example call:
 #    ./perfkitbenchmarker/scripts/database_scripts/launch_driver.sh bucket_name
 
-# To utilize per second data graphs, include a storage bucket as a second input.
+# To utilize per second data graphs, indicate that with a second input.
 # Example:
-#     ./perfkitbenchmarker/scripts/database_scripts/launch_driver.sh log_bucket_name graph_bucket_name
+#     ./perfkitbenchmarker/scripts/database_scripts/launch_driver.sh log_bucket_name per_second_graphs
 
 
 if [ -z $1 ]; then
@@ -41,10 +40,14 @@ if [ -z $1 ]; then
   exit 1;
 fi
 
+cloud_storage_bucket=$1
+per_second_graph=$2
+
+
 while true
   do
   # provision, prepare phase of mysql_service
-  run_uri=$(python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds="1200" --run_stage=provision,prepare --mysql_svc_db_instance_cores="16" --mysql_svc_oltp_table_size="12000000" --mysql_svc_oltp_tables_count="100" --mysql_instance_storage_size=1000 --additional_flags='"'"--cloud_storage_bucket=${1}"'"')
+  run_uri=$(python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --run_stage=provision,prepare --mysql_svc_db_instance_cores="16" --mysql_svc_oltp_table_size="12000000" --mysql_svc_oltp_tables_count="100" --mysql_instance_storage_size=1000 --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"')
   # for 3 days
   for day in day1 day2 day3
   do
@@ -53,10 +56,10 @@ while true
     do
       # run only
       echo "BASH: In for loop. Executing run."
-      if [ -z $2 ]; then
-        python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds="1200" --run_stage=run --run_uri=${run_uri} --thread_count_list=1,2,4,8,16,32,64,128,256,512 --additional_flags='"'"--cloud_storage_bucket=${1}"'"'
+      if [ -z $per_second_graph ]; then
+        python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds="1200" --run_stage=run --run_uri=${run_uri} --thread_count_list=1,2,4,8,16,32,64,128,256,512 --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"'
       else
-        python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds="1200" --run_stage=run --run_uri=${run_uri} --thread_count_list=1,2,4,8,16,32,64,128,256,512 --additional_flags='"'"--cloud_storage_bucket=${1}"'"' --per_second_graphs=${2}
+        python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds="1200" --run_stage=run --run_uri=${run_uri} --thread_count_list=1,2,4,8,16,32,64,128,256,512 --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"' --per_second_graphs=True
       fi  
       # recalculate or use different method
       sleep 21600
@@ -64,6 +67,6 @@ while true
   done
   echo "BASH: Left for loop. Executing Cleanup."
   # cleanup, teardown
-  python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --run_uri=${run_uri} --run_stage=cleanup,teardown --additional_flags='"'"--cloud_storage_bucket=${1}"'"'
+  python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --run_uri=${run_uri} --run_stage=cleanup,teardown --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"'
   echo "BASH: Finished teardown."
 done

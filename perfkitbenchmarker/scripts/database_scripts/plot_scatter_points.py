@@ -18,7 +18,7 @@ returns a gnuplot info file. This file can create a per second chart by
 calling:
   'gnuplot {filename}'.
 
-Designed to be used with file_to_plot.py.
+Designed to be used with plot_sysbench_results.py.
 """
 
 import os
@@ -110,6 +110,9 @@ class GnuplotInfo():
           '\tset label (sprintf(\"%d\", thread)) at x+20, 0  offset -2\n')
       output_file.write(
           '\tset arrow from x,0 to x,y nohead ls 0 lc rgb \"blue\"\n')
+      # TODO: This code assumes thread count increases by 2 times the previous
+      # number. Future implementation should take a list of thread counts and
+      # properly handle that here.
       output_file.write('\tthread=thread*2\n')
       output_file.write('\tx=x+' + self.X_INTERVAL + '\n')
       output_file.write('}\n')

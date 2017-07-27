@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.scripts.database_scripts.file_to_plot.
+"""Tests for perfkitbenchmarker.scripts.database_scripts.plot_sysbench_results.
 """
 import unittest
 import os
-from perfkitbenchmarker.scripts.database_scripts import file_to_plot
+from perfkitbenchmarker.scripts.database_scripts import plot_sysbench_results
 
 TEST_FILE_1 = '../tests/data/sysbench_stderr_output_sample.txt'
 TEST_FILE_1_RUN_SECONDS = 480
@@ -27,12 +27,11 @@ TEST_RUN_URI = 'abcdefgh'
 class PlotterTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.plotter = file_to_plot.Plotter(TEST_FILE_1_RUN_SECONDS,
-                                        TEST_FILE_1_REPORT_INTERVAL,
-                                        TEST_RUN_URI)
+    self.plotter = plot_sysbench_results.Plotter(
+        TEST_FILE_1_RUN_SECONDS, TEST_FILE_1_REPORT_INTERVAL, TEST_RUN_URI)
 
   def testadd_file(self):
-    self.assertRaises(file_to_plot.STDERRFileDoesNotExistError,
+    self.assertRaises(plot_sysbench_results.STDERRFileDoesNotExistError,
                       self.plotter.add_file, '')
 
   def testparse_file(self):

@@ -51,7 +51,7 @@ import sys
 import time
 import gflags
 
-import file_to_plot
+import plot_sysbench_results
 
 # GLOBAL STRINGS
 PER_SECOND_GRAPHS = 'per_second_graphs'
@@ -102,10 +102,10 @@ CLEANUP = 'cleanup'
 TEARDOWN = 'teardown'
 
 FLAGS = gflags.FLAGS
-gflags.DEFINE_string(PER_SECOND_GRAPHS, None,
-                     'Indicator for using per second data collection.'
-                     'To enable set the google cloud storage bucket for the '
-                     'graph.')
+gflags.DEFINE_bool(PER_SECOND_GRAPHS, False,
+                   'Indicator for using per second data collection.'
+                   'To enable set the google cloud storage bucket for the '
+                   'graph.')
 gflags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
                       'The duration, in seconds, of each run phase with varying'
                       'thread count.')
@@ -221,9 +221,9 @@ def _run(run_uri):
   """
   if FLAGS.per_second_graphs:
     print('Will generate per second logs for this run.')
-    plotter = file_to_plot.Plotter(FLAGS.sysbench_run_seconds,
-                                   FLAGS.sysbench_report_interval,
-                                   run_uri)
+    plotter = plot_sysbench_results.Plotter(FLAGS.sysbench_run_seconds,
+                                            FLAGS.sysbench_report_interval,
+                                            run_uri)
   run_iterations = len(FLAGS.thread_count_list)
   logging.info(
       'Beginning run phase. Will execute runs with %d different thread counts.',
