@@ -57,7 +57,7 @@ while true
         python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds="1200" --run_stage=run --run_uri=${run_uri} --thread_count_list=1,2,4,8,16,32,64,128,256,512 --additional_flags='"'"--cloud_storage_bucket=${1}"'"'
       else
         python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds="1200" --run_stage=run --run_uri=${run_uri} --thread_count_list=1,2,4,8,16,32,64,128,256,512 --additional_flags='"'"--cloud_storage_bucket=${1}"'"' --per_second_graphs=${2}
-      if  
+      fi  
       # recalculate or use different method
       sleep 21600
     done
