@@ -195,7 +195,6 @@ def Run(benchmark_spec):
   metadata = {}
   metadata.update(cuda_toolkit_8.GetMetadata(vm))
   metadata['num_iterations'] = num_iterations
-  metadata['num_gpus'] = cuda_toolkit_8.QueryNumberOfGpus(vm)
   run_command = ('%s/extras/demo_suite/bandwidthTest --device=all'
                  % cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR)
   for i in range(num_iterations):

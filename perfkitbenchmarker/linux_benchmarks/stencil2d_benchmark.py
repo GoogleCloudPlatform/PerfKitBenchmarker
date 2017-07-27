@@ -203,7 +203,6 @@ def Run(benchmark_spec):
   metadata.update(cuda_toolkit_8.GetMetadata(master_vm))
   metadata['benchmark_version'] = BENCHMARK_VERSION
   metadata['num_iterations'] = num_iterations
-  metadata['gpus_per_node'] = num_gpus
   metadata['num_nodes'] = len(vms)
   metadata['num_processes'] = num_processes
 
