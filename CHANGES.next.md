@@ -25,3 +25,4 @@ Bug fixes and maintenance updates:
 - Fixed provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
 - Fixed GPU benchmarks on GCE to work with new GPU API (GH-1407)
 - Changed cuda_toolkit_8 to use the gpu-specific base clock speed as the default (GH-1453)
+- Changed default AWS P2 region for gpu benchmarks (GH-1454)
