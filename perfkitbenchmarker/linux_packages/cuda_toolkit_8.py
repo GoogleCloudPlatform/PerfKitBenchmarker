@@ -13,7 +13,13 @@
 # limitations under the License.
 
 
-"""Module containing CUDA toolkit 8 installation and cleanup functions."""
+"""Module containing CUDA toolkit 8 installation and cleanup functions.
+
+This module installs cuda toolkit 8 from NVIDIA, configures gpu clock speeds
+and autoboost settings, and exposes a method to collect gpu metadata. Currently
+Tesla K80 and P100 gpus are supported, provided that there is only a single
+type of gpu per system.
+"""
 
 import re
 
@@ -22,12 +28,24 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 
 
-TESLA_K80_MAX_CLOCK_SPEEDS = [2505, 875]
+NVIDIA_TESLA_K80 = 'k80'
+NVIDIA_TESLA_P100 = 'p100'
+GPU_DEFAULTS = {
+    NVIDIA_TESLA_K80: {
+        'base_clock': [2505, 562],
+        'autoboost_enabled': True,
+    },
+    NVIDIA_TESLA_P100: {
+        'base_clock': [715, 1189],
+        'autoboost_enabled': None,
+    },
+}
+
 flag_util.DEFINE_integerlist('gpu_clock_speeds',
-                             flag_util.IntegerList(TESLA_K80_MAX_CLOCK_SPEEDS),
+                             None,
                              'desired gpu clock speeds in the form '
                              '[memory clock, graphics clock]')
-flags.DEFINE_boolean('gpu_autoboost_enabled', True,
+flags.DEFINE_boolean('gpu_autoboost_enabled', None,
                      'whether gpu autoboost is enabled')
 
 FLAGS = flags.FLAGS
@@ -51,19 +69,60 @@ class NvidiaSmiParseOutputException(Exception):
   pass
 
 
+class HeterogeneousGpuTypesException(Exception):
+  pass
+
+
+class UnsupportedGpuTypeException(Exception):
+  pass
+
+
 def GetMetadata(vm):
   """Returns gpu-specific metadata as a dict.
 
   Returns:
     A dict of gpu-specific metadata.
   """
-
   metadata = {}
-  metadata['gpu_memory_clock'] = FLAGS.gpu_clock_speeds[0]
-  metadata['gpu_graphics_clock'] = FLAGS.gpu_clock_speeds[1]
-  metadata['gpu_autoboost_enabled'] = FLAGS.gpu_autoboost_enabled
+  clock_speeds = QueryGpuClockSpeed(vm, 0)
+  autoboost_policy = QueryAutoboostPolicy(vm, 0)
+  metadata['gpu_memory_clock'] = clock_speeds[0]
+  metadata['gpu_graphics_clock'] = clock_speeds[1]
+  metadata['gpu_autoboost'] = autoboost_policy['autoboost']
+  metadata['gpu_autoboost_default'] = autoboost_policy['autoboost_default']
   metadata['nvidia_driver_version'] = GetDriverVersion(vm)
+  metadata['gpu_type'] = GetGpuType(vm)
   return metadata
+
+
+def GetGpuType(vm):
+  """Return the type of NVIDIA gpu(s) installed on the vm.
+
+  Args:
+    vm: virtual machine to query
+
+  Returns:
+    type of gpus installed on the vm as a string
+
+  Raises:
+    NvidiaSmiParseOutputException: if nvidia-smi output cannot be parsed
+    HeterogeneousGpuTypesException: if more than one gpu type is detected
+  """
+  stdout, _ = vm.RemoteCommand('nvidia-smi -L', should_log=True)
+  try:
+    gpu_types = [line.split(' ')[3] for line in stdout.splitlines() if line]
+  except:
+    raise NvidiaSmiParseOutputException('Unable to parse gpu type')
+  if any(gpu_type != gpu_types[0] for gpu_type in gpu_types):
+    raise HeterogeneousGpuTypesException(
+        'PKB only supports one type of gpu per VM')
+
+  if 'P100' in gpu_types[0]:
+    return NVIDIA_TESLA_P100
+  if 'K80' in gpu_types[0]:
+    return NVIDIA_TESLA_K80
+  raise UnsupportedClockSpeedException(
+      'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
 
 
 def GetDriverVersion(vm):
@@ -85,11 +144,12 @@ def QueryNumberOfGpus(vm):
 
 
 def SetAndConfirmGpuClocks(vm):
-  """Sets and confirms the GPU clock speed.
+  """Sets and confirms the GPU clock speed and autoboost policy.
 
-  The clock values are provided in the gpu_pcie_bandwidth_clock_speeds
-  flag. If a device is queried and its clock speed does not allign with
-  what it was just set to, an expection will be raised.
+  The clock values are provided either by the gpu_pcie_bandwidth_clock_speeds
+  flags, or from gpu-specific defaults. If a device is queried and its
+  clock speed does not align with what it was just set to, an exception will
+  be raised.
 
   Args:
     vm: the virtual machine to operate on.
@@ -98,9 +158,17 @@ def SetAndConfirmGpuClocks(vm):
     UnsupportedClockSpeedException if a GPU did not accept the
     provided clock speeds.
   """
-  autoboost_enabled = FLAGS.gpu_autoboost_enabled
-  desired_memory_clock = FLAGS.gpu_clock_speeds[0]
-  desired_graphics_clock = FLAGS.gpu_clock_speeds[1]
+  gpu_type = GetGpuType(vm)
+  gpu_clock_speeds = GPU_DEFAULTS[gpu_type]['base_clock']
+  autoboost_enabled = GPU_DEFAULTS[gpu_type]['autoboost_enabled']
+
+  if FLAGS.gpu_clock_speeds is not None:
+    gpu_clock_speeds = FLAGS.gpu_clock_speeds
+  if FLAGS.gpu_autoboost_enabled is not None:
+    autoboost_enabled = FLAGS.gpu_autoboost_enabled
+
+  desired_memory_clock = gpu_clock_speeds[0]
+  desired_graphics_clock = gpu_clock_speeds[1]
   SetGpuClockSpeedAndAutoboost(vm, autoboost_enabled, desired_memory_clock,
                                desired_graphics_clock)
   num_gpus = QueryNumberOfGpus(vm)
@@ -124,18 +192,57 @@ def SetGpuClockSpeedAndAutoboost(vm,
 
   Args:
     vm: virtual machine to operate on
+    autoboost_enabled: bool or None. Value (if any) to set autoboost policy to
     memory_clock_speed: desired speed of the memory clock, in MHz
     graphics_clock_speed: desired speed of the graphics clock, in MHz
   """
   vm.RemoteCommand('sudo nvidia-smi -pm 1')
-  vm.RemoteCommand('sudo nvidia-smi --auto-boost-default=%s' % (
-      1 if autoboost_enabled else 0))
+  if autoboost_enabled is not None:
+    vm.RemoteCommand('sudo nvidia-smi --auto-boost-default=%s' % (
+        1 if autoboost_enabled else 0))
   vm.RemoteCommand('sudo nvidia-smi -ac {},{}'.format(memory_clock_speed,
                                                       graphics_clock_speed))
 
 
+def QueryAutoboostPolicy(vm, device_id):
+  """Returns the state of autoboost and autoboost_default.
+
+  Args:
+    vm: virtual machine to operate on
+    device_id: id of GPU device to query
+
+  Returns:
+    dict containing values for autoboost and autoboost_default.
+    Values can be True (autoboost on), False (autoboost off),
+    and None (autoboost not supported).
+
+  """
+  autoboost_regex = r'Auto Boost\s*:\s*(\S+)'
+  autoboost_default_regex = r'Auto Boost Default\s*:\s*(\S+)'
+  query = ('sudo nvidia-smi -q -d CLOCK --id={0}'.format(device_id))
+  stdout, _ = vm.RemoteCommand(query, should_log=True)
+  autoboost_match = re.search(autoboost_regex, stdout)
+  autoboost_default_match = re.search(autoboost_default_regex, stdout)
+
+  nvidia_smi_output_string_to_value = {
+      'On': True,
+      'Off': False,
+      'N/A': None,
+  }
+
+  try:
+    return {
+        'autoboost': nvidia_smi_output_string_to_value[
+            autoboost_match.group(1)],
+        'autoboost_default': nvidia_smi_output_string_to_value[
+            autoboost_default_match.group(1)]
+    }
+  except:
+    raise NvidiaSmiParseOutputException('Unable to parse Auto Boost policy')
+
+
 def QueryGpuClockSpeed(vm, device_id):
-  """Returns the user-specified values of the memory and graphics clock.
+  """Returns the value of the memory and graphics clock.
 
   All clock values are in MHz.
 
@@ -167,7 +274,7 @@ def _CheckNvidiaSmiExists(vm):
 
 
 def DoPostInstallActions(vm):
-    SetAndConfirmGpuClocks(vm)
+  SetAndConfirmGpuClocks(vm)
 
 
 def AptInstall(vm):

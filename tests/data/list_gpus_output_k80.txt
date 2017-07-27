@@ -1,0 +1,2 @@
+GPU 0: Tesla K80 (UUID: GPU-5c6dd8d9-b3bd-4e11-5d86-e33307f46ea5)
+
