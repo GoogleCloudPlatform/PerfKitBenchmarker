@@ -58,9 +58,9 @@ hpcg:
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
-          image: ami-a9d276c9
+          image: ami-d15a75c7
           machine_type: p2.xlarge
-          zone: us-west-2b
+          zone: us-east-1
           boot_disk_size: 200
         Azure:
           image: Canonical:UbuntuServer:16.04.0-LTS:latest
