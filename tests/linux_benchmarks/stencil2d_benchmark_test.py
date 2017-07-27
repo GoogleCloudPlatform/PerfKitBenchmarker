@@ -67,15 +67,32 @@ class Stencil2DBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(testMetadata, stencil_sp_stddev_results.metadata)
 
   @mock.patch(('perfkitbenchmarker.linux_packages.'
+               'cuda_toolkit_8.GetGpuType'))
+  @mock.patch(('perfkitbenchmarker.linux_packages.'
                'cuda_toolkit_8.GetDriverVersion'))
   @mock.patch(('perfkitbenchmarker.linux_packages.'
                'cuda_toolkit_8.QueryNumberOfGpus'))
+  @mock.patch(('perfkitbenchmarker.linux_packages.'
+               'cuda_toolkit_8.QueryGpuClockSpeed'))
+  @mock.patch(('perfkitbenchmarker.linux_packages.'
+               'cuda_toolkit_8.QueryAutoboostPolicy'))
   @mock.patch(('perfkitbenchmarker.linux_benchmarks.'
                'stencil2d_benchmark._RunSingleIteration'))
-  def testRun(self, run_single_iteration_mock, cuda_toolkit_mock,
-              get_driver_version_mock):
+  def testRun(self,
+              run_single_iteration_mock,
+              query_autoboost_policy_mock,
+              query_gpu_clock_speed_mock,
+              query_number_of_gpus_mock,
+              get_driver_version_mock,
+              get_gpu_type):
+    get_gpu_type.return_value = 'k80'
     get_driver_version_mock.return_value = '123.45'
-    cuda_toolkit_mock.return_value = 8
+    query_number_of_gpus_mock.return_value = 8
+    query_gpu_clock_speed_mock.return_value = [100, 200]
+    query_autoboost_policy_mock.return_value = {
+        'autoboost': True,
+        'autoboost_default': True,
+    }
     benchmark_spec = mock.MagicMock()
     problem_sizes = [2, 3, 4]
     stencil2d_benchmark.FLAGS.stencil2d_problem_sizes = (

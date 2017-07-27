@@ -1,0 +1,40 @@
+
+==============NVSMI LOG==============
+
+Timestamp                           : Wed Jul 26 21:12:35 2017
+Driver Version                      : 375.66
+
+Attached GPUs                       : 4
+GPU 0000:00:04.0
+    Clocks
+        Graphics                    : 405 MHz
+        SM                          : 405 MHz
+        Memory                      : 715 MHz
+        Video                       : 835 MHz
+    Applications Clocks
+        Graphics                    : 1189 MHz
+        Memory                      : 715 MHz
+    Default Applications Clocks
+        Graphics                    : 1189 MHz
+        Memory                      : 715 MHz
+    Max Clocks
+        Graphics                    : 1328 MHz
+        SM                          : 1328 MHz
+        Memory                      : 715 MHz
+        Video                       : 1328 MHz
+    SM Clock Samples
+        Duration                    : 1719.57 sec
+        Number of Samples           : 20
+        Max                         : 1316 MHz
+        Min                         : 405 MHz
+        Avg                         : 427 MHz
+    Memory Clock Samples
+        Duration                    : 1719.57 sec
+        Number of Samples           : 20
+        Max                         : 715 MHz
+        Min                         : 715 MHz
+        Avg                         : 715 MHz
+    Clock Policy
+        Auto Boost                  : N/A
+        Auto Boost Default          : N/A
+
