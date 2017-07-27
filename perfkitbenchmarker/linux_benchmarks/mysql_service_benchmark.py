@@ -62,6 +62,7 @@ from perfkitbenchmarker.linux_packages import sysbench05plus
 MYSQL_SVC_OLTP_TABLES_COUNT = 'mysql_svc_oltp_tables_count'
 MYSQL_SVC_OLTP_TABLE_SIZE = 'mysql_svc_oltp_table_size'
 MYSQL_SVC_DB_INSTANCE_CORES = 'mysql_svc_db_instance_cores'
+MYSQL_INSTANCE_STORAGE_SIZE = 'mysql_instance_storage_size'
 SYSBENCH_WARMUP_SECONDS = 'sysbench_warmup_seconds'
 SYSBENCH_RUN_SECONDS = 'sysbench_run_seconds'
 SYSBENCH_THREAD_COUNT = 'sysbench_thread_count'
@@ -90,7 +91,7 @@ flags.DEFINE_integer(SYSBENCH_LATENCY_PERCENTILE, 99,
 flags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 2,
                      'The interval, in seconds, we ask sysbench to report '
                      'results.')
-flags.DEFINE_integer('storage_size', 100,
+flags.DEFINE_integer(MYSQL_INSTANCE_STORAGE_SIZE, 100,
                      'Storage size for SQL instance in GB.')
 
 BENCHMARK_NAME = 'mysql_service'
@@ -143,7 +144,7 @@ MS_UNIT = 'milliseconds'
 
 # These are the constants that should be specified in GCP's cloud SQL command.
 DEFAULT_BACKUP_START_TIME = '07:00'
-GCP_MY_SQL_VERSION = 'MYSQL_5_6'
+GCP_MY_SQL_VERSION = 'MYSQL_5_7'
 GCP_PRICING_PLAN = 'PACKAGE'
 
 RESPONSE_TIME_TOKENS = ['min', 'avg', 'max', 'percentile']
@@ -494,7 +495,7 @@ class RDSMySQLBenchmark(object):
 
     # Get a list of zones and pick one that's different from the zone VM is in.
     new_subnet_zone = None
-    self._ValidateSize(FLAGS.storage_size)
+    self._ValidateSize(FLAGS.mysql_instance_storage_size)
     get_zones_cmd = util.AWS_PREFIX + ['ec2', 'describe-availability-zones']
     stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
     response = json.loads(stdout)
@@ -559,7 +560,7 @@ class RDSMySQLBenchmark(object):
         '--engine', RDS_DB_ENGINE,
         '--engine-version', RDS_DB_ENGINE_VERSION,
         '--storage-type', RDS_DB_STORAGE_TYPE_GP2,
-        '--allocated-storage', FLAGS.storage_size,
+        '--allocated-storage', FLAGS.mysql_instance_storage_size,
         '--vpc-security-group-ids', vm.group_id,
         '--master-username', vm.db_instance_master_user,
         '--master-user-password', vm.db_instance_master_password,
@@ -734,7 +735,7 @@ class GoogleCloudSQLBenchmark(object):
     logging.info('Preparing MySQL Service benchmarks for Google Cloud SQL.')
 
     vm.db_instance_name = 'pkb%s' % FLAGS.run_uri
-    self._ValidateSize(FLAGS.storage_size)
+    self._ValidateSize(FLAGS.mysql_instance_storage_size)
     db_tier = 'db-n1-standard-%s' % FLAGS.mysql_svc_db_instance_cores
     # Currently, we create DB instance in the same zone as the test VM.
     db_instance_zone = vm.zone
@@ -766,7 +767,7 @@ class GoogleCloudSQLBenchmark(object):
                      '--gce-zone=%s' % db_instance_zone,
                      '--database-version=%s' % GCP_MY_SQL_VERSION,
                      '--pricing-plan=%s' % GCP_PRICING_PLAN,
-                     '--storage-size=%d' % FLAGS.storage_size]
+                     '--storage-size=%d' % FLAGS.mysql_instance_storage_size]
 
     stdout, _, _ = vm_util.IssueCommand(create_db_cmd)
     logging.info('Create SQL instance completed. Stdout:\n%s', stdout)
