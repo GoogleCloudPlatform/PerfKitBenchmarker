@@ -92,6 +92,7 @@ def GetMetadata(vm):
   metadata['gpu_autoboost_default'] = autoboost_policy['autoboost_default']
   metadata['nvidia_driver_version'] = GetDriverVersion(vm)
   metadata['gpu_type'] = GetGpuType(vm)
+  metadata['num_gpus'] = QueryNumberOfGpus(vm)
   return metadata
 
 
