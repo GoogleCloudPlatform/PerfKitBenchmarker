@@ -1,5 +1,5 @@
 Breaking changes:
--
+- Removed gpus_per_node metadata from stencil2d and hpcg benchmarks (GH-1455)
 
 New features:
 - Added YCSB benchmark for Cloud Spanner (GH-1387 from @haih-g)
@@ -20,6 +20,7 @@ Enhancements:
 - Added --runspec_estimate_spec flag to calculate an estimated spec score (GH-1401)
 - Added support for P100 gpus on Google Cloud Platform (GH-1450)
 - Added gpu type to cuda_toolkit_8 metadata (GH-1453)
+- Added num_gpus to cuda_toolkit_8 metadata (GH-1455)
 
 Bug fixes and maintenance updates:
 - Fixed provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)

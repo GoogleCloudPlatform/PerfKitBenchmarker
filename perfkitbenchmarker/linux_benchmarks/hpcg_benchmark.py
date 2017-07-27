@@ -204,7 +204,6 @@ def _CreateMetadataDict(benchmark_spec):
   metadata = dict()
   metadata.update(cuda_toolkit_8.GetMetadata(vm))
   metadata['num_nodes'] = len(benchmark_spec.vms)
-  metadata['gpus_per_node'] = int(benchmark_spec.gpus_per_node)
   metadata['cpus_per_rank'] = int(benchmark_spec.cpus_per_rank)
   metadata['total_gpus'] = int(benchmark_spec.total_gpus)
   metadata['benchmark_version'] = BENCHMARK_VERSION
