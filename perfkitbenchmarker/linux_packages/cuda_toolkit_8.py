@@ -148,7 +148,7 @@ def SetAndConfirmGpuClocks(vm):
 
   The clock values are provided either by the gpu_pcie_bandwidth_clock_speeds
   flags, or from gpu-specific defaults. If a device is queried and its
-  clock speed does not allign with what it was just set to, an expection will
+  clock speed does not align with what it was just set to, an exception will
   be raised.
 
   Args:
