@@ -26,7 +26,7 @@ mysql_service_benchmark Stderr file
 no sysbench_warmup time
   Parsing of file assumes sysbench_warmup_seconds is set to 0.
 Sysbench version
-  Assumes Sysbench GPL v2 (https://github.com/akopytov/sysbench) stderr output.
+  Assumes Sysbench 0.5 (https://github.com/akopytov/sysbench) stderr output.
   If TPS value printout changes, _parse_file method will throw a PatternNotFound
   exception and need to be updated.
 How to use plot_sysbench_results:
@@ -42,7 +42,7 @@ import plot_scatter_points
 import subprocess
 
 
-# Assumes Sysbench GPL v2 stderr output.
+# Assumes Sysbench 0.5 stderr output.
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
 DATA_INDICATOR_LINE = 'Threads started!'
 TPS = 'tps:'
@@ -106,7 +106,7 @@ class Plotter():
     """Parses stderr file, f, extracts list of TPS values.
     Assumes no warmup phase and only one report per file.
     Method will need to be updated if Sysbench output format changes. Assumes
-    Sysbench GPL v2.
+    Sysbench 0.5.
     Args:
       f: (file object) file to be parsed.
     Returns:
