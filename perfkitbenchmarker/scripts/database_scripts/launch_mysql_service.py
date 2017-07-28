@@ -278,8 +278,8 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   # Will probably have to implement with threading.
   p.wait()
   elapsed_time = time.time() - start_time
-  if elapsed_time == 1:
-    raise CallFailureError('The call failed before execution (duration 1s). '
+  if p.returncode != 0:
+    raise CallFailureError('The call failed (return code is not 0). '
                            'Check stderr for traceback.')
   logging.info('PKB call finished in %i seconds.', int(elapsed_time))
 
