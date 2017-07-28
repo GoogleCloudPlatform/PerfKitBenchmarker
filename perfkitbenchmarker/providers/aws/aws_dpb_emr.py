@@ -41,8 +41,6 @@ READY_CHECK_TRIES = 60
 READY_STATE = 'WAITING'
 JOB_WAIT_SLEEP = 30
 
-# Certain machine types require a subnet.
-NEEDS_SUBNET = ['m4', 'c4']
 MANAGER_SG = 'EmrManagedMasterSecurityGroup'
 WORKER_SG = 'EmrManagedSlaveSecurityGroup'
 
@@ -106,12 +104,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       region = util.GetRegionFromZone(self.zone)
       self.cmd_prefix += ['--region', region]
 
-    if self.spec.worker_group.vm_spec.machine_type[0:2] in NEEDS_SUBNET:
-      # GetNetwork is supposed to take a VM, but all it uses
-      # from the VM is the zone attribute, which self has.
-      self.network = aws_network.AwsNetwork.GetNetwork(self)
-    else:
-      self.network = None
+    self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.bucket_to_delete = None
 
 
