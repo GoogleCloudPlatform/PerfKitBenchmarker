@@ -45,7 +45,7 @@ dpb_distcp_benchmark:
           machine_type: n1-standard-4
           boot_disk_size: 1500
         AWS:
-          machine_type: m3.xlarge
+          machine_type: m4.xlarge
       disk_spec:
         GCP:
           disk_type: nodisk
