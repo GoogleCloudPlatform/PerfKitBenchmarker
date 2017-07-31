@@ -104,8 +104,7 @@ TEARDOWN = 'teardown'
 FLAGS = gflags.FLAGS
 gflags.DEFINE_bool(PER_SECOND_GRAPHS, False,
                    'Indicator for using per second data collection.'
-                   'To enable set the google cloud storage bucket for the '
-                   'graph.')
+                   'To enable set True.')
 gflags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
                       'The duration, in seconds, of each run phase with varying'
                       'thread count.')
@@ -132,12 +131,12 @@ gflags.DEFINE_string(MACHINE_TYPE, 'n1-standard-4',
                      'Machine type for GCE Virtual machines.')
 gflags.DEFINE_enum(MYSQL_SVC_DB_INSTANCE_CORES, '4', ['1', '4', '8', '16'],
                    'The number of cores to be provisioned for the DB instance.')
-gflags.DEFINE_integer(MYSQL_SVC_OLTP_TABLES_COUNT, 4,
-                      'The number of tables used in sysbench oltp.lua tests')
-gflags.DEFINE_integer(MYSQL_SVC_OLTP_TABLE_SIZE, 100000,
-                      'The number of rows of each table used in the oltp tests')
-gflags.DEFINE_integer(MYSQL_INSTANCE_STORAGE_SIZE, 300,
-                      'Storage size (in GB) for SQL instance.')
+gflags.DEFINE_string(MYSQL_SVC_OLTP_TABLES_COUNT, '4',
+                     'The number of tables used in sysbench oltp.lua tests')
+gflags.DEFINE_string(MYSQL_SVC_OLTP_TABLE_SIZE, '100000',
+                     'The number of rows of each table used in the oltp tests')
+gflags.DEFINE_string(MYSQL_INSTANCE_STORAGE_SIZE, '300',
+                     'Storage size (in GB) for SQL instance.')
 gflags.DEFINE_list(ADDITIONAL_FLAGS, None,
                    'List of additional PKB mysql_service valid flags (strings).'
                    'For example: "--cloud_storage_bucket=bucket_name".')
@@ -201,9 +200,9 @@ def _provision_prepare_pkb():
       BOOT_DISK_SIZE_FLAG + FLAGS.gce_boot_disk_size + BOOT_DISK_TYPE_FLAG +
       FLAGS.gce_boot_disk_type + MACHINE_TYPE_FLAG + FLAGS.machine_type +
       MYSQL_SVC_DB_CORES_FLAG + FLAGS.mysql_svc_db_instance_cores +
-      MYSQL_SVC_DB_TABLES_COUNT_FLAG + str(FLAGS.mysql_svc_oltp_tables_count) +
-      MYSQL_SVC_OLTP_TABLE_SIZE_FLAG + str(FLAGS.mysql_svc_oltp_table_size) +
-      MYSQL_INSTANCE_STORAGE_SIZE_FLAG + str(FLAGS.mysql_instance_storage_size))
+      MYSQL_SVC_OLTP_TABLE_SIZE_FLAG + FLAGS.mysql_svc_oltp_table_size +
+      MYSQL_SVC_DB_TABLES_COUNT_FLAG + FLAGS.mysql_svc_oltp_tables_count +
+      MYSQL_INSTANCE_STORAGE_SIZE_FLAG + FLAGS.mysql_instance_storage_size)
   if FLAGS.additional_flags:
     pkb_cmd = _append_additional_flags(pkb_cmd)
   # PKB run with prepare,provision, wait
@@ -220,7 +219,7 @@ def _run(run_uri):
     run_uri: (string).
   """
   if FLAGS.per_second_graphs:
-    print('Will generate per second logs for this run.')
+    logging.info('Will generate per second logs for this run.')
     plotter = plot_sysbench_results.Plotter(FLAGS.sysbench_run_seconds,
                                             FLAGS.sysbench_report_interval,
                                             run_uri)
@@ -239,10 +238,12 @@ def _run(run_uri):
     logging.info('Run sysbench with the following command:\n%s', pkb_cmd)
     _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
     if FLAGS.per_second_graphs:
+      logging.info('Adding Sysbench STDERR to per second graph.s')
       plotter.add_file(stderr_filename)
     logging.info('Finished executing PKB run.')
     time.sleep(SLEEP_TIME_BETWEEN_RUNS)
   if FLAGS.per_second_graphs:
+    logging.info('Plotting per second graph for this series of runs.')
     plotter.plot()
 
 
@@ -278,7 +279,9 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   # Will probably have to implement with threading.
   p.wait()
   elapsed_time = time.time() - start_time
-  if p.returncode != 0:
+  retcode = p.returncode
+  print retcode
+  if retcode != 0:
     raise CallFailureError('The call failed (return code is not 0). '
                            'Check stderr for traceback.')
   logging.info('PKB call finished in %i seconds.', int(elapsed_time))
