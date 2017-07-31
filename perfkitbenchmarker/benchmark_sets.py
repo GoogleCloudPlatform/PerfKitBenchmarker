@@ -111,6 +111,7 @@ BENCHMARK_SETS = {
                   'Performance Team.'),
         BENCHMARK_LIST: [
             'aerospike_ycsb',
+            'bidirectional_network',
             'block_storage_workload',
             'cassandra_stress',
             'cassandra_ycsb',
