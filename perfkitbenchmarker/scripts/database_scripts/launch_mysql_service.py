@@ -111,7 +111,7 @@ gflags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
 gflags.DEFINE_integer(SYSBENCH_WARMUP_SECONDS, 0,
                       'The duration, in seconds, of the warmup run in which '
                       'results are discarded.')
-gflags.DEFINE_list(THREAD_COUNT_LIST, [1, 2, 4, 8],
+gflags.DEFINE_list(THREAD_COUNT_LIST, [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
                    'The number of test threads on the client side.')
 gflags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 2,
                       'The interval, in seconds, we ask sysbench to report '
@@ -267,6 +267,8 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
     pkb_cmd: (str)
     stdout_filename: (str) filename string.
     stderr_filename: (str) filename_str
+  Raises:
+    Exception (CallFailureError): Popen call failed.
   """
   stdout_file = open(stdout_filename, 'w+')
   stderr_file = open(stderr_filename, 'w+')
@@ -281,8 +283,8 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   elapsed_time = time.time() - start_time
   retcode = p.returncode
   if retcode != 0:
-    raise CallFailureError('The call failed (return code is not 0). '
-                           'Check stderr for traceback.')
+    raise CallFailureError('The call failed (return code is {}). '
+                           'Check stderr for traceback.'.format(retcode))
   logging.info('PKB call finished in %i seconds.', int(elapsed_time))
 
 
@@ -304,7 +306,7 @@ def _get_run_uri(filename):
     matches = r.search(line)
     if matches:
       return matches.group(matches.lastindex)
-  raise UnexpectedFileOutputError('No regex match with ' + filename)
+  raise UnexpectedFileOutputError('No regex match with {}.'.format(filename))
 
 
 def _append_additional_flags(pkb_cmd):
@@ -329,13 +331,13 @@ def _generate_filenames(run_stage, thread_number):
   """
   date_string = DATETIME_FORMAT.format(datetime.datetime.now())
   if run_stage == RUN:
-    stdout_filename = date_string + str(
-        thread_number) + '_THREAD_RUN' + '_PKB_STDOUT.txt'
-    stderr_filename = date_string + str(
-        thread_number) + '_THREAD_RUN' + '_PKB_STDERR.txt'
+    stdout_filename = '{}{}_THREAD_RUN_PKB_STDOUT.txt'.format(
+        date_string, thread_number)
+    stderr_filename = '{}{}_THREAD_RUN_PKB_STDERR.txt'.format(
+        date_string, thread_number)
   else:
-    stdout_filename = date_string + str(run_stage) + '_PKB_STDOUT.txt'
-    stderr_filename = date_string + str(run_stage) + '_PKB_STDERR.txt'
+    stdout_filename = '{}{}_PKB_STDOUT.txt'.format(date_string, run_stage)
+    stderr_filename = '{}{}_PKB_STDERR.txt'.format(date_string, run_stage)
   logging.info('STDOUT will be copied to: %s', stdout_filename)
   logging.info('STDERR will be copied to: %s', stderr_filename)
   return [stdout_filename, stderr_filename]
