@@ -280,7 +280,6 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   p.wait()
   elapsed_time = time.time() - start_time
   retcode = p.returncode
-  print retcode
   if retcode != 0:
     raise CallFailureError('The call failed (return code is not 0). '
                            'Check stderr for traceback.')
