@@ -20,7 +20,7 @@
 # The run phase is completed several times daily with results uploaded to
 # a designated Google Cloud Storage Bucket.
 
-# If desired, per second data graphs can be created and wil be stored locally.
+# If desired, per second data graphs can be created and will be stored locally.
 
 # The values below are provisioned for realistic benchmarking.
 
@@ -44,9 +44,9 @@ cloud_storage_bucket=$1
 per_second_graph=$2
 sysbench_run_seconds=1200
 thread_count_list=1,2,4,8,16,32,64,128,256,512
-mysql_svc_db_instance_cores="16"
-mysql_svc_oltp_table_size="12000000"
-mysql_svc_oltp_tables_count="100"
+mysql_svc_db_instance_cores=16
+mysql_svc_oltp_table_size=12000000
+mysql_svc_oltp_tables_count=100
 mysql_instance_storage_size=1000
 prepare_provision=provision,prepare
 run=run
@@ -55,7 +55,7 @@ cleanup_teardown=cleanup,teardown
 while true
   do
   # provision, prepare phase of mysql_service
-  run_uri=$(python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --run_stage=${prepare_provision} --mysql_svc_db_instance_cores=${mysql_svc_db_instance_cores} --mysql_svc_oltp_table_size="12000000" --mysql_svc_oltp_tables_count="100" --mysql_instance_storage_size=${mysql_instance_storage_size} --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"')
+  run_uri=$(python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --run_stage=${prepare_provision} --mysql_svc_db_instance_cores=${mysql_svc_db_instance_cores} --mysql_svc_oltp_table_size=${mysql_svc_oltp_table_size} --mysql_svc_oltp_tables_count=${mysql_svc_oltp_tables_count} --mysql_instance_storage_size=${mysql_instance_storage_size} --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"')
   # for 3 days
   for day in day1 day2 day3
   do
@@ -65,9 +65,9 @@ while true
       # run only
       echo "BASH: In for loop. Executing run."
       if [ -z $per_second_graph ]; then
-        python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds="1200" --run_stage=${run} --run_uri=${run_uri} --thread_count_list=${thread_count_list} --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"'
+        python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds=${sysbench_run_seconds} --run_stage=${run} --run_uri=${run_uri} --thread_count_list=${thread_count_list} --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"'
       else
-        python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --run_stage=${run} --run_uri=${run_uri} --thread_count_list=${thread_count_list} --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"' --per_second_graphs=True
+        python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --sysbench_run_seconds=${sysbench_run_seconds} --run_stage=${run} --run_uri=${run_uri} --thread_count_list=${thread_count_list} --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"' --per_second_graphs=True
       fi  
       # recalculate or use different method
       sleep 21600
