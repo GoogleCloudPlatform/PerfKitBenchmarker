@@ -30,6 +30,8 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 flags.DEFINE_string('dpb_dataproc_image_version', None,
                     'The image version to use for the cluster.')
+flags.DEFINE_integer('dpb_dataproc_distcp_num_maps', None,
+                     'Number of maps to copy data.')
 
 GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
@@ -227,7 +229,11 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
 
     self.append_region(cmd)
 
-    job_arguments = [source_location, destination_location]
+    job_arguments = (['-m={}'.format(FLAGS.dpb_dataproc_distcp_num_maps)]
+                     if FLAGS.dpb_dataproc_distcp_num_maps is not None else [])
+
+    job_arguments.extend([source_location, destination_location])
+
     cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None)
     return {dpb_service.SUCCESS: retcode == 0}
