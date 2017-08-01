@@ -22,3 +22,5 @@ pint>=0.7
 numpy
 functools32
 contextlib2>=0.5.1
+six>=1.10.0
+
