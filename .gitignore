@@ -10,3 +10,4 @@
 *.iml
 /.idea
 /*git_ignore*
+dist/
