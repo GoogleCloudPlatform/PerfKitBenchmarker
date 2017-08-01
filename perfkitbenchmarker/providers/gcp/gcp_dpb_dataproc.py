@@ -28,6 +28,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
+flags.DEFINE_string('dpb_dataproc_image_version', None,
+                    'The image version to use for the cluster.')
 
 GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
@@ -55,6 +57,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataproc, self).__init__(dpb_service_spec)
     self.project = None
+    self.dpb_dataproc_image_version = FLAGS.dpb_dataproc_image_version
 
   @staticmethod
   def _GetStats(stdout):
@@ -113,6 +116,10 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
                        self.spec.worker_group.vm_spec.num_local_ssds)
 
     self.append_region(cmd, True)
+
+    if self.dpb_dataproc_image_version:
+      cmd.flags['image-version'] = self.dpb_dataproc_image_version
+
     # TODO(saksena): Retrieve the cluster create time and hold in a var
     cmd.Issue()
 
