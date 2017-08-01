@@ -138,6 +138,8 @@ def Prepare(benchmark_spec):
   benchmark_spec.num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
   master_vm.Install('cudnn')
   master_vm.Install('tensorflow')
+  master_vm.RemoteCommand(
+      'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -228,10 +230,9 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
+  _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vms = benchmark_spec.vms
   master_vm = vms[0]
-  master_vm.RemoteCommand(
-      'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
   tf_cnn_benchmark_dir = 'benchmarks/scripts/tf_cnn_benchmarks'
   tf_cnn_benchmark_cmd = (
       'python tf_cnn_benchmarks.py --local_parameter_device=%s --num_gpus=%s '
