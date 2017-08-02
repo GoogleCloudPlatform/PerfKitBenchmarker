@@ -27,7 +27,6 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 
 
-
 class AwsKopsCluster(container_service.KubernetesCluster):
 
   CLOUD = providers.AWS
