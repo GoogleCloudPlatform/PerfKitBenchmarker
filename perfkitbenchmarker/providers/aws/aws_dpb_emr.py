@@ -471,5 +471,5 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
     basic_data = super(AwsDpbEmr, self).GetMetadata()
-    basic_data['dpb_service'] = ('emr_{}'.format(self.emr_release_label))
+    basic_data['dpb_service'] = 'emr_{}'.format(self.emr_release_label)
     return basic_data
