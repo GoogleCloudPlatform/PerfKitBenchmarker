@@ -37,3 +37,5 @@ flags.DEFINE_float('aws_spot_price', 0.0,
                    'The spot price to bid for AWS spot instances.')
 flags.DEFINE_integer('aws_boot_disk_size', None,
                      'The boot disk size in GiB for AWS VMs.')
+flags.DEFINE_string('kops', 'kops',
+                    'The path to the kops binary.')
