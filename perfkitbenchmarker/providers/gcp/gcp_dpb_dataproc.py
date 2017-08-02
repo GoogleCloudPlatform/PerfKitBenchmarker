@@ -259,3 +259,11 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     if udpate_default_fs:
       vm_util.IssueCommand(['gsutil', '-m', 'rm', '-r', base_dir])
     return {dpb_service.SUCCESS: True}
+
+  def GetMetadata(self):
+    """Return a dictionary of the metadata for this cluster."""
+    basic_data = super(GcpDpbDataproc, self).GetMetadata()
+    if self.dpb_dataproc_image_version:
+      basic_data['dpb_service'] = ('dataproc_{}'.
+                                   format(self.dpb_dataproc_image_version))
+    return basic_data

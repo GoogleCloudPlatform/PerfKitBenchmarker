@@ -31,6 +31,8 @@ GENERATE_HADOOP_JAR = ('Jar=file:///usr/lib/hadoop-mapreduce/'
                        'hadoop-mapreduce-client-jobclient.jar')
 
 FLAGS = flags.FLAGS
+flags.DEFINE_string('dpb_emr_release_label', 'emr-5.2.0',
+                    'The emr version to use for the cluster.')
 
 SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
                          'spark-examples.jar')
@@ -106,6 +108,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.bucket_to_delete = None
+    self.emr_release_label = FLAGS.dpb_emr_release_label
 
 
   def _CreateLogBucket(self):
@@ -120,10 +123,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def _Create(self):
     """Creates the cluster."""
     name = 'pkb_' + FLAGS.run_uri
-
-    # TODO(saksena): Move this to a configuration value, potentially
-    # related to providers' cluster support details
-    RELEASE_LABEL = 'emr-5.2.0'
 
     # Set up ebs details if disk_spec is present int he config
     ebs_configuration = None
@@ -163,7 +162,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     logs_bucket = FLAGS.aws_emr_loguri or self._CreateLogBucket()
 
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
-                             '--release-label', RELEASE_LABEL,
+                             '--release-label', self.emr_release_label,
                              '--use-default-roles',
                              '--instance-groups',
                              json.dumps(instance_groups),
@@ -468,3 +467,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       rb_step_cmd = self.cmd_prefix + ['s3', 'rb', base_dir, '--force']
       stdout, _, _ = vm_util.IssueCommand(rb_step_cmd)
       return {dpb_service.SUCCESS: True}
+
+  def GetMetadata(self):
+    """Return a dictionary of the metadata for this cluster."""
+    basic_data = super(AwsDpbEmr, self).GetMetadata()
+    basic_data['dpb_service'] = 'emr_{}'.format(self.emr_release_label)
+    return basic_data
