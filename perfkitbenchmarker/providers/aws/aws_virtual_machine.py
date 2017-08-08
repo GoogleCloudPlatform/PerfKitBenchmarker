@@ -46,8 +46,7 @@ FLAGS = flags.FLAGS
 HVM = 'HVM'
 PV = 'PV'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
-PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['c3', 'c4', 'cc2', 'cg1', 'g2', 'cr1', 'r3', 'hi1', 'i2', 'i3'])
+NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3'])
 NUM_LOCAL_VOLUMES = {
     'c1.medium': 1, 'c1.xlarge': 4,
     'c3.large': 2, 'c3.xlarge': 2, 'c3.2xlarge': 2, 'c3.4xlarge': 2,
@@ -167,7 +166,7 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
 def IsPlacementGroupCompatible(machine_type):
   """Returns True if VMs of 'machine_type' can be put in a placement group."""
   prefix = machine_type.split('.')[0]
-  return prefix in PLACEMENT_GROUP_PREFIXES
+  return prefix not in NON_PLACEMENT_GROUP_PREFIXES
 
 
 class AwsDedicatedHost(resource.BaseResource):
