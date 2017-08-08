@@ -52,7 +52,7 @@ dpb_distcp_benchmark:
         AWS:
           disk_size: 1500
           disk_type: gp2
-    worker_count: 2
+    worker_count: 8
 """
 
 flags.DEFINE_enum('distcp_source_fs', BaseDpbService.GCS_FS,
