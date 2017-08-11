@@ -163,6 +163,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     else:
       cmd.flags['jar'] = jarfile
 
+    self.append_region(cmd)
+
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
     # stdout of the job.  We set the driver log level to FATAL
