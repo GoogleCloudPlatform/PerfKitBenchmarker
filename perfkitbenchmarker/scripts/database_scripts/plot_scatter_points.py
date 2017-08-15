@@ -34,7 +34,7 @@ Y_LABEL = 'TPS'
 # This variable controls the verticle lines inside the chart.
 #   0 means no vertical lines.
 Y_TICS = '100'
-ITERATIONS = '10'
+DEFAULT_ITERATIONS = '10'
 
 
 class GnuplotInfo():
@@ -44,6 +44,7 @@ class GnuplotInfo():
                entries_per_run,
                run_uri,
                y_max,
+               iterations=DEFAULT_ITERATIONS,
                title=None):
     """Initialize GnuplotInfo object.
     Args:
@@ -58,6 +59,7 @@ class GnuplotInfo():
     self.X_INTERVAL = str(entries_per_run)
     self.Y_HEIGHT = str(int(100 * round(float(y_max) / 100)))
     self.title = title
+    self.iterations = str(iterations)
 
   def _generate_filenames(self, run_uri):
     """Sets filename (with path) of gnuplot input and chart.
@@ -65,7 +67,7 @@ class GnuplotInfo():
       run_uri: (string) run identifier.
     """
     date_string = DATETIME_FORMAT.format(datetime.datetime.now())
-    identifier = date_string + run_uri + '_innodb_pages.png'
+    identifier = date_string + run_uri + '_sysbench_run.png'
     self.output_chart = os.path.join(
         os.path.dirname(__file__), '..', '..', '..', 'charts',
         identifier)
@@ -105,7 +107,7 @@ class GnuplotInfo():
 
       output_file.write('thread=1\n')
       output_file.write('x=0\n')
-      output_file.write('do for [t=1:' + ITERATIONS + ':+1] {\n')
+      output_file.write('do for [t=1:' + self.iterations + ':+1] {\n')
       output_file.write(
           '\tset label (sprintf(\"%d\", thread)) at x+20, 0  offset -2\n')
       output_file.write(

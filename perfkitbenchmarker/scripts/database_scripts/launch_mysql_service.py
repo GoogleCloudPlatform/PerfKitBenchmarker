@@ -236,9 +236,13 @@ def _run(run_uri):
     stdout_filename, stderr_filename = _generate_filenames(RUN, t)
     logging.info('Executing PKB run with thread count: %s', t)
     logging.info('Run sysbench with the following command:\n%s', pkb_cmd)
-    _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
+    try:
+      _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
+    except CallFailureError:
+      logging.info('Call Failed. Ending run phase ')
+      break
     if FLAGS.per_second_graphs:
-      logging.info('Adding Sysbench STDERR to per second graph.s')
+      logging.info('Adding Sysbench STDERR to per second graph.')
       plotter.add_file(stderr_filename)
     logging.info('Finished executing PKB run.')
     time.sleep(SLEEP_TIME_BETWEEN_RUNS)
