@@ -26,6 +26,7 @@ import re
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import vm_util
 
 
 NVIDIA_TESLA_K80 = 'k80'
@@ -278,6 +279,19 @@ def DoPostInstallActions(vm):
   SetAndConfirmGpuClocks(vm)
 
 
+@vm_util.Retry(timeout=900)
+def _InstallCuda(vm):
+  """Installs CUDA Toolkit from NVIDIA, with retry.
+
+  Steps taken from section 3.6 found here:
+  http://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html
+  """
+  vm.RemoteCommand('wget %s' % CUDA_TOOLKIT_UBUNTU_URL)
+  vm.RemoteCommand('sudo dpkg -i %s' % CUDA_TOOLKIT_UBUNTU)
+  vm.RemoteCommand('sudo apt-get update')
+  vm.RemoteCommand('sudo apt-get install -y cuda')
+
+
 def AptInstall(vm):
   """Installs CUDA toolkit 8 on the VM if not already installed"""
   if _CheckNvidiaSmiExists(vm):
@@ -286,10 +300,7 @@ def AptInstall(vm):
 
   vm.Install('build_tools')
   vm.Install('wget')
-  vm.RemoteCommand('wget %s' % CUDA_TOOLKIT_UBUNTU_URL)
-  vm.RemoteCommand('sudo dpkg -i %s' % CUDA_TOOLKIT_UBUNTU)
-  vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo apt-get install -y cuda')
+  _InstallCuda(vm)
   vm.Reboot()
   DoPostInstallActions(vm)
   # NVIDIA CUDA Profile Tools Interface.
