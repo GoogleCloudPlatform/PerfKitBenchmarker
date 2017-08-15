@@ -41,7 +41,6 @@ import datetime
 import plot_scatter_points
 import subprocess
 
-
 # Assumes Sysbench 0.5 stderr output.
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
 DATA_INDICATOR_LINE = 'Threads started!'
@@ -75,6 +74,7 @@ class Plotter():
     self.data_entries_per_file = run_seconds / report_interval
     self.filename = self._generate_filename()
     self.max_tps = 0
+    self.iterations = 0
 
   def _generate_filename(self):
     """Generates filename for parsed data.
@@ -101,6 +101,7 @@ class Plotter():
     data = self._parse_file(f)
     f.close()
     self._add_data(data)
+    self.iterations += 1
 
   def _parse_file(self, f):
     """Parses stderr file, f, extracts list of TPS values.
@@ -147,8 +148,11 @@ class Plotter():
   def plot(self):
     """Generates a graph using gnuplot and data from filename.
     """
-    p = plot_scatter_points.GnuplotInfo(
-        self.filename, self.data_entries_per_file, self.run_uri, self.max_tps)
+    p = plot_scatter_points.GnuplotInfo(self.filename,
+                                        self.data_entries_per_file,
+                                        self.run_uri,
+                                        self.max_tps,
+                                        self.iterations)
     output_gnuplot_file, output_chart = p.create_file()
     subprocess.Popen(['gnuplot', output_gnuplot_file])
     # TODO(samspano): Implement copy command to copy output_chart
