@@ -113,7 +113,7 @@ gflags.DEFINE_integer(SYSBENCH_WARMUP_SECONDS, 0,
                       'results are discarded.')
 gflags.DEFINE_list(THREAD_COUNT_LIST, [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
                    'The number of test threads on the client side.')
-gflags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 2,
+gflags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 1,
                       'The interval, in seconds, we ask sysbench to report '
                       'results.')
 gflags.DEFINE_string(RUN_URI, None,
@@ -123,11 +123,11 @@ gflags.DEFINE_string(RUN_STAGE, None,
                      'List of phases to be executed. For example:'
                      '"--run_uri=provision,prepare". Available phases:'
                      'prepare, provision, run, cleanup, teardown.')
-gflags.DEFINE_string(GCE_BOOT_DISK_SIZE, '300',
+gflags.DEFINE_string(GCE_BOOT_DISK_SIZE, '1000',
                      'The boot disk size in GB for GCP VMs..')
 gflags.DEFINE_string(GCE_BOOT_DISK_TYPE, 'pd-ssd',
                      'The boot disk type for GCP VMs.')
-gflags.DEFINE_string(MACHINE_TYPE, 'n1-standard-4',
+gflags.DEFINE_string(MACHINE_TYPE, 'n1-standard-16',
                      'Machine type for GCE Virtual machines.')
 gflags.DEFINE_enum(MYSQL_SVC_DB_INSTANCE_CORES, '4', ['1', '4', '8', '16'],
                    'The number of cores to be provisioned for the DB instance.')
@@ -239,7 +239,7 @@ def _run(run_uri):
     try:
       _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
     except CallFailureError:
-      logging.info('Call Failed. Ending run phase ')
+      logging.info('Call Failed. Ending run phase.')
       break
     if FLAGS.per_second_graphs:
       logging.info('Adding Sysbench STDERR to per second graph.')
