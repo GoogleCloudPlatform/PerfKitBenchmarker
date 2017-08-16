@@ -26,7 +26,8 @@ import datetime
 
 
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
-CHART_TITLE = 'Sysbench TPS'
+DATETIME_TITLE_FORMAT = '{: %m %d %Y %H %M}'
+CHART_TITLE_PREFIX = 'Sysbench TPS'
 
 X_LABEL = 'Thread Count'
 Y_LABEL = 'TPS'
@@ -67,6 +68,8 @@ class GnuplotInfo():
       run_uri: (string) run identifier.
     """
     date_string = DATETIME_FORMAT.format(datetime.datetime.now())
+    date_title_string = DATETIME_TITLE_FORMAT.format(datetime.datetime.now())
+    self.chart_title = CHART_TITLE_PREFIX + date_title_string
     identifier = date_string + run_uri + '_sysbench_run.png'
     self.output_chart = os.path.join(
         os.path.dirname(__file__), '..', '..', '..', 'charts',
@@ -82,7 +85,7 @@ class GnuplotInfo():
     color = '38761d'
 
     # Titles for the data series
-    title = self.title or '1TB DB Instance'
+    title = self.title or 'Cloud SQL Prod'
 
     output_file = open(self.output_gnuplot_file, 'w')
     output_file.write('set terminal pngcairo size 1500,800 '
@@ -91,8 +94,8 @@ class GnuplotInfo():
     output_file.write('set multiplot\n')
     output_file.write('set grid\n')
     output_file.write('set border 4095 ls 0 lc rgb \"black\"\n')
-    output_file.write('set title (\"' + CHART_TITLE +
-                      '") font \"aerial, 14\"\n')
+    output_file.write('set title (\"' + self.chart_title +
+                      '") font \"aerial, 14\" noenhanced\n')
     output_file.write('set xlabel "' + X_LABEL + '"\n')
     output_file.write('set ylabel "' + Y_LABEL + '"\n')
 
