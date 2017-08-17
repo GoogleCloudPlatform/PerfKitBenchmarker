@@ -29,14 +29,14 @@ import jinja2
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
 
 PKB_FIO_LOG_FILE_NAME = 'pkb_fio_avg'
-LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
+LOCAL_JOB_FILE_SUFFIX = '_fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
 MOUNT_POINT = '/scratch'
@@ -336,7 +336,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
       in GB.
     block_size: Quantity or None. If Quantity, the block size to use.
     runtime: int. The number of seconds to run each job.
-    paramters: list. Other fio parameters to apply to all jobs.
+    parameters: list. Other fio parameters to apply to all jobs.
 
   Returns:
     A string containing a fio job file.
@@ -476,7 +476,7 @@ def Run(benchmark_spec):
       FLAGS.fio_blocksize,
       FLAGS.fio_runtime,
       FLAGS.fio_parameters)
-  job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
+  job_file_path = vm_util.PrependTempDir(vm.name + LOCAL_JOB_FILE_SUFFIX)
   with open(job_file_path, 'w') as job_file:
     job_file.write(job_file_string)
     logging.info('Wrote fio job file at %s', job_file_path)
