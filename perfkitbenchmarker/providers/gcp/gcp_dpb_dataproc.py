@@ -217,11 +217,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
                           str(size_file)])
     cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None)
-    if retcode != 0:
-      return {dpb_service.SUCCESS: False}
-    else:
-      return {dpb_service.SUCCESS: True}
-
+    return {dpb_service.SUCCESS: retcode == 0}
 
   def read_data(self, source_dir, udpate_default_fs, num_files, size_file):
     """Method to read data using a distributed job on the cluster."""
@@ -239,10 +235,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
                           str(size_file)])
     cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None)
-    if retcode != 0:
-      return {dpb_service.SUCCESS: False}
-    else:
-      return {dpb_service.SUCCESS: True}
+    return {dpb_service.SUCCESS: retcode == 0}
 
 
   def distributed_copy(self, source_location, destination_location):
