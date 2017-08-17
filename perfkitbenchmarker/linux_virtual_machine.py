@@ -925,10 +925,17 @@ class ContainerizedDebianMixin(DebianMixin):
 
   def PrepareVMEnvironment(self):
     """Initializes docker before proceeding with preparation."""
-    self._CreateVmTmpDir()
     if not self._CheckDockerExists():
       self.Install('docker')
+    # We need to explicitly create VM_TMP_DIR in the host because
+    # otherwise it will be implicitly created by Docker in InitDocker()
+    # (because of the -v option) and owned by root instead of perfkit,
+    # causing permission problems.
+    self.RemoteHostCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
     self.InitDocker()
+    # This will create the VM_TMP_DIR in the container.
+    # Has to be done after InitDocker() because it needs docker_id.
+    self._CreateVmTmpDir()
 
     # Python is needed for RobustRemoteCommands
     self.Install('python')
