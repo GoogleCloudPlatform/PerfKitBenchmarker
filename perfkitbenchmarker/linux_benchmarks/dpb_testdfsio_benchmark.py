@@ -74,53 +74,49 @@ SUPPORTED_DPB_BACKENDS = [dpb_service.DATAPROC, dpb_service.EMR]
 
 
 def GetConfig(user_config):
-    return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def CheckPrerequisites(benchmark_config):
-    """Verifies that the required resources are present.
+  """Verifies that the required resources are present.
 
     Raises:
-      perfkitbenchmarker.errors.Config.InvalidValue: On encountering invalid
-      configuration.
-    """
-    dpb_service_type = benchmark_config.dpb_service.service_type
-    if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
-        raise errors.Config.InvalidValue('Invalid backend for dfsio. Not in:{}'.
-                                         format(str(SUPPORTED_DPB_BACKENDS)))
+    perfkitbenchmarker.errors.Config.InvalidValue: On encountering invalid
+    configuration.
+  """
+  dpb_service_type = benchmark_config.dpb_service.service_type
+  if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
+    raise errors.Config.InvalidValue('Invalid backend for dfsio. Not in:{}'.
+                                     format(str(SUPPORTED_DPB_BACKENDS)))
 
 
 def Prepare(benchmark_spec):
-    del benchmark_spec  # Unused.
+  del benchmark_spec  # Unused.
 
 
 def Run(benchmark_spec):
-    """Runs testdfsio benchmark and reports the results.
+  """Runs testdfsio benchmark and reports the results.
 
-    Args:
-      benchmark_spec: Spec needed to run the testdfsio benchmark
+  Args:
+    benchmark_spec: Spec needed to run the testdfsio benchmark
 
-    Returns:
-      A list of samples
-    """
-    run_uri = benchmark_spec.uuid.split('-')[0]
-    source = '/{}'.format(run_uri)
-    update_source_default_fs = False
+  Returns:
+    A list of samples
+  """
+  run_uri = benchmark_spec.uuid.split('-')[0]
+  source = '/{}'.format(run_uri)
+  update_source_default_fs = False
 
-    if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
-        source = '{}:/{}'.format(FLAGS.dfsio_fs, source)
-        benchmark_spec.dpb_service.CreateBucket(source)
-        update_source_default_fs = True
+  if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
+    source = '{}:/{}'.format(FLAGS.dfsio_fs, source)
+    benchmark_spec.dpb_service.CreateBucket(source)
+    update_source_default_fs = True
 
-    source_dir = '{}{}'.format(source, '/dfsio')
+  source_dir = '{}{}'.format(source, '/dfsio')
 
-    combos = ((file_size, num_files)
-              for file_size in FLAGS.dfsio_file_sizes_list
-              for num_files in FLAGS.dfsio_num_files_list)
-
-    results = []
-    for file_size, num_files in combos:
-
+  results = []
+  for file_size in FLAGS.dfsio_file_sizes_list:
+    for num_files in FLAGS.dfsio_num_files_list:
       # TODO(saksena): Respond to data generation failure
       start = datetime.datetime.now()
       benchmark_spec.dpb_service.generate_data(source_dir,
@@ -141,22 +137,22 @@ def Run(benchmark_spec):
       metadata.update({'dfsio_num_files': num_files})
       metadata.update({'dfsio_file_size_mbs': file_size})
       if FLAGS.zones:
-          zone = FLAGS.zones[0]
-          region = zone.rsplit('-', 1)[0]
-          metadata.update({'regional': True})
-          metadata.update({'region': region})
+        zone = FLAGS.zones[0]
+        region = zone.rsplit('-', 1)[0]
+        metadata.update({'regional': True})
+        metadata.update({'region': region})
       elif FLAGS.cloud == 'AWS':
-          metadata.update({'regional': True})
-          metadata.update({'region': 'aws_default'})
+        metadata.update({'regional': True})
+        metadata.update({'region': 'aws_default'})
 
       results.append(sample.Sample('write_run_time', write_run_time, 'seconds',
                                    metadata))
       results.append(sample.Sample('read_run_time', read_run_time, 'seconds',
                                    metadata))
       benchmark_spec.dpb_service.cleanup_data(source, update_source_default_fs)
-    return results
+  return results
 
 
 def Cleanup(benchmark_spec):
-    """Cleans up the testdfsio benchmark"""
-    del benchmark_spec  # Unused.
+  """Cleans up the testdfsio benchmark"""
+  del benchmark_spec  # Unused.
