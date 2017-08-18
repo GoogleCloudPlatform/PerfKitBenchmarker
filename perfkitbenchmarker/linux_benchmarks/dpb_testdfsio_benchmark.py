@@ -109,7 +109,6 @@ def Run(benchmark_spec):
 
   if FLAGS.dfsio_fs != BaseDpbService.HDFS_FS:
     source = '{}:/{}'.format(FLAGS.dfsio_fs, source)
-    benchmark_spec.dpb_service.CreateBucket(source)
     update_source_default_fs = True
 
   source_dir = '{}{}'.format(source, '/dfsio')
@@ -117,6 +116,7 @@ def Run(benchmark_spec):
   results = []
   for file_size in FLAGS.dfsio_file_sizes_list:
     for num_files in FLAGS.dfsio_num_files_list:
+      benchmark_spec.dpb_service.CreateBucket(source)
       # TODO(saksena): Respond to data generation failure
       start = datetime.datetime.now()
       benchmark_spec.dpb_service.generate_data(source_dir,
