@@ -40,7 +40,7 @@ class GkeCluster(container_service.KubernetesCluster):
     cmd.flags['num-nodes'] = self.num_nodes
     cmd.flags['machine-type'] = self.machine_type
 
-    cmd.Issue()
+    cmd.Issue(timeout=600)
 
   def _PostCreate(self):
     """Acquire cluster authentication."""

@@ -664,6 +664,34 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
         **vm_group_config)
 
 
+class _ContainerClusterSpec(_VmGroupSpec):
+  """Spec conntaining info needed to create a container cluster."""
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    super(_ContainerClusterSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['container_cluster_cloud'].present:
+      config_values['cloud'] = flag_values.container_cluster_cloud
+
+
+class _ContainerClusterSpecDecoder(option_decoders.TypeVerifier):
+  """Validates a ContainerClusterSpec dictionairy."""
+
+  def __init__(self, **kwargs):
+    super(_ContainerClusterSpecDecoder, self).__init__(
+        valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies container_cluster dictionairy of a benchmark config object."""
+    cluster_config = super(_ContainerClusterSpecDecoder, self).Decode(
+        value, component_full_name, flag_values)
+
+    return _ContainerClusterSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **cluster_config)
+
+
 class _SparkServiceDecoder(option_decoders.TypeVerifier):
   """Validates the spark_service dictionary of a benchmark config object."""
 
@@ -796,7 +824,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'spark_service': (_SparkServiceDecoder, {
             'default': None
         }),
-        'container_cluster': (_VmGroupSpecDecoder, {
+        'container_cluster': (_ContainerClusterSpecDecoder, {
             'default': None
         }),
         'dpb_service': (_DpbServiceDecoder, {
