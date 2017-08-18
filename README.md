@@ -544,7 +544,10 @@ Open the `.boto` file and edit the following fields:
 
 1. In the [Credentials] section:
 
-   `gs_oauth2_refresh_token`: set it to be the same as the `refresh_token` field in your gcloud credential file (~/.config/gcloud/credentials), which was setup as part of the `gcloud auth login` step.
+   `gs_oauth2_refresh_token`: set it to be the same as the `refresh_token` field in your gcloud credential file (~/.config/gcloud/credentials.db), which was setup as part of the `gcloud auth login` step. To see the refresh token, run
+   ```bash
+   $ strings ~/.config/gcloud/credentials.db.
+   ```
 
    `aws_access_key_id`, `aws_secret_access_key`: set these to be the AWS access keys you intend to use for these tests, or you can use the same keys as those in your existing AWS credentials file (`~/.aws/credentials`).
 
@@ -554,7 +557,7 @@ Open the `.boto` file and edit the following fields:
 
 3. In the `[OAuth2]` section:
 
-   `client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials`), which was setup as part of the `gcloud auth login` step.
+   `client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials.db`), which was setup as part of the `gcloud auth login` step.
 
 
 Running a Single Benchmark
