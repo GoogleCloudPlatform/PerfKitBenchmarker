@@ -48,7 +48,7 @@ class AcsKubernetesCluster(container_service.KubernetesCluster):
         '--orchestrator-type', 'Kubernetes',
         '--dns-prefix', 'pkb' + FLAGS.run_uri,
         '--ssh-key-value', vm_util.GetPublicKeyPath(),
-    ] + self.resource_group.args)
+    ] + self.resource_group.args, timeout=600)
 
   def _Exists(self):
     """Returns True if the cluster exists."""
