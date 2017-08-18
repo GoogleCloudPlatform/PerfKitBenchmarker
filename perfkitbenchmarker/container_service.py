@@ -35,6 +35,11 @@ flags.DEFINE_string('kubeconfig', None,
 flags.DEFINE_string('kubectl', 'kubectl',
                     'Path to kubectl tool')
 
+flags.DEFINE_string('container_cluster_cloud', None,
+                    'Sets the cloud to use for the container cluster. '
+                    'This will override both the value set in the config and '
+                    'the value set using the generic "cloud" flag.')
+
 
 def GetContainerClusterClass(cloud):
   return _CLUSTER_REGISTRY[cloud]

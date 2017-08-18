@@ -43,3 +43,12 @@ flags.DEFINE_boolean('docker_in_privileged_mode', True,
 flags.DEFINE_boolean('kubernetes_anti_affinity', True,
                      'If set to True, PKB pods will not be scheduled on the '
                      'same nodes as other PKB pods.')
+flags.DEFINE_multistring('k8s_volume_parameters', None,
+                         'A colon separated key-value pair that will be '
+                         'added to Kubernetes storage class parameters.')
+_K8S_PROVISIONERS = [
+    'kubernetes.io/azure-disk', 'kubernetes.io/gce-pd', 'kubernetes.io/aws-ebs'
+]
+flags.DEFINE_enum('k8s_volume_provisioner', None, _K8S_PROVISIONERS,
+                  'The name of the provisioner to use for K8s storage '
+                  'classes.')

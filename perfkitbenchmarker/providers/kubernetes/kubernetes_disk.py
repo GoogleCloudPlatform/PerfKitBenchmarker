@@ -13,19 +13,21 @@
 # limitations under the License.
 
 import abc
-import copy
+import json
 import logging
 import re
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import resource
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
     OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.providers.gcp import gce_disk
 
 FLAGS = flags.FLAGS
 _K8S_VOLUME_REGISTRY = {}
@@ -53,10 +55,36 @@ class KubernetesDiskSpec(disk.BaseDiskSpec):
   def _GetOptionDecoderConstructions(cls):
     result = super(KubernetesDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'backing_store_disk_type': (option_decoders.StringDecoder,
-                                    {'default': None, 'none_ok': True}),
+        'provisioner': (option_decoders.StringDecoder,
+                        {'default': None, 'none_ok': True}),
+        'parameters': (option_decoders.TypeVerifier,
+                       {'default': {}, 'valid_types': (dict,)})
     })
     return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Overrides config values with flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. Is
+          modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+
+    Returns:
+      dict mapping config option names to values derived from the config
+      values or flag values.
+    """
+    super(KubernetesDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['k8s_volume_provisioner'].present:
+      config_values['provisioner'] = flag_values.k8s_volume_provisioner
+    if flag_values['k8s_volume_parameters'].present:
+      config_values['parameters'] = config_values.get('parameters', {})
+      config_values['parameters'].update(
+          flag_util.ParseKeyValuePairs(flag_values.k8s_volume_parameters))
 
 
 def GetKubernetesDiskClass(volume_type):
@@ -217,42 +245,106 @@ class CephDisk(KubernetesDisk):
     return self.device_path
 
 
-class GcePersistentDisk(KubernetesDisk):
-  """GCE disk that can be used with K8s containers."""
+class PersistentVolumeClaim(resource.BaseResource):
+  """Object representing a K8s PVC."""
 
-  K8S_VOLUME_TYPE = 'gcePersistentDisk'
-
-  def __init__(self, disk_num, spec, name):
-    super(GcePersistentDisk, self).__init__(disk_num, spec, name)
-    spec = copy.deepcopy(spec)
-    spec.disk_type = spec.backing_store_disk_type or gce_disk.PD_STANDARD
-    stdout, _, _ = vm_util.IssueCommand([
-        FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-        'nodes', '-o=jsonpath={.items[].spec.providerID}'])
-    try:
-      m = re.match('gce://(?P<project>[^/]*)/(?P<zone>[^/]*)/.*', stdout)
-      self.project = m.group('project')
-      self.zone = m.group('zone')
-    except:
-      logging.exception(
-          'Node ProviderID (%s) does not match expected GCE format.', stdout)
-      raise
-
-    self.pd = gce_disk.GceDisk(
-        spec, self.name, self.zone, self.project)
+  def __init__(self, name, storage_class, size):
+    super(PersistentVolumeClaim, self).__init__()
+    self.name = name
+    self.storage_class = storage_class
+    self.size = size
 
   def _Create(self):
-    self.pd._Create()
-
-  def _Exists(self):
-    return self.pd._Exists()
+    """Creates the PVC."""
+    body = self._BuildBody()
+    kubernetes_helper.CreateResource(body)
 
   def _Delete(self):
-    self.pd._Delete()
+    """Deletes the PVC."""
+    body = self._BuildBody()
+    kubernetes_helper.DeleteResource(body)
+
+  def _BuildBody(self):
+    """Builds JSON representing the PVC."""
+    body = {
+        'kind': 'PersistentVolumeClaim',
+        'apiVersion': 'v1',
+        'metadata': {
+            'name': self.name
+        },
+        'spec': {
+            'accessModes': ['ReadWriteOnce'],
+            'resources': {
+                'requests': {
+                    'storage': '%sGi' % self.size
+                }
+            },
+            'storageClassName': self.storage_class,
+        }
+    }
+    return json.dumps(body)
+
+
+class StorageClass(resource.BaseResource):
+  """Object representing a K8s StorageClass (with dynamic provisioning)."""
+
+  def __init__(self, name, provisioner, parameters):
+    super(StorageClass, self).__init__()
+    self.name = name
+    self.provisioner = provisioner
+    self.parameters = parameters
+
+  def _Create(self):
+    """Creates the PVC."""
+    body = self._BuildBody()
+    kubernetes_helper.CreateResource(body)
+
+  def _Delete(self):
+    """Deletes the PVC."""
+    body = self._BuildBody()
+    kubernetes_helper.DeleteResource(body)
+
+  def _BuildBody(self):
+    """Builds JSOM representing the StorageClass."""
+    body = {
+        'kind': 'StorageClass',
+        'apiVersion': 'storage.k8s.io/v1',
+        'metadata': {
+            'name': self.name
+        },
+        'provisioner': self.provisioner,
+        'parameters': self.parameters
+    }
+    return json.dumps(body)
+
+
+class PvcVolume(KubernetesDisk):
+  """Volume representing a persistent volume claim."""
+
+  K8S_VOLUME_TYPE = 'persistentVolumeClaim'
+  PROVISIONER = None
+
+  def __init__(self, disk_num, spec, name):
+    super(PvcVolume, self).__init__(disk_num, spec, name)
+    self.storage_class = StorageClass(
+        name, self.PROVISIONER or spec.provisioner, spec.parameters)
+    self.pvc = PersistentVolumeClaim(
+        self.name, self.storage_class.name, spec.disk_size)
+    self.metadata = spec.parameters
+
+  def _Create(self):
+    self.storage_class.Create()
+    self.pvc.Create()
+
+  def _Delete(self):
+    self.pvc.Delete()
+    self.storage_class.Delete()
 
   def AttachVolumeInfo(self, volumes):
-    gce_volume = {
-        "name": self.name,
-        "pdName": self.pd.name
+    pvc_volume = {
+        'name': self.name,
+        'persistentVolumeClaim': {
+            'claimName': self.name
+        }
     }
-    volumes.append(gce_volume)
+    volumes.append(pvc_volume)

@@ -23,20 +23,12 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
-from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
-    OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
+from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
 FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu-upstart'
 SELECTOR_PREFIX = 'pkb'
-
-
-def CreateResource(resource_body):
-  with vm_util.NamedTemporaryFile() as tf:
-    tf.write(resource_body)
-    tf.close()
-    return kubernetes_helper.CreateFromFile(tf.name)
 
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -97,10 +89,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Creates a POD (Docker container with optional volumes).
     """
     create_rc_body = self._BuildPodBody()
-    output = CreateResource(create_rc_body)
-    if output[EXIT_CODE]:
-      raise Exception("Creating POD failed: %s" % output[STDERR])
-    logging.info(output[STDOUT].rstrip())
+    kubernetes_helper.CreateResource(create_rc_body)
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
   def _WaitForPodBootCompletion(self):
