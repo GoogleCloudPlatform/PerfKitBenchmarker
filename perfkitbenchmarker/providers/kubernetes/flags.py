@@ -46,6 +46,9 @@ flags.DEFINE_boolean('kubernetes_anti_affinity', True,
 flags.DEFINE_multistring('k8s_volume_parameters', None,
                          'A colon separated key-value pair that will be '
                          'added to Kubernetes storage class parameters.')
-flags.DEFINE_string('k8s_volume_provisioner', None,
-                    'The name of the provisioner to use for K8s storage '
-                    'classes.')
+_K8S_PROVISIONERS = [
+    'kubernetes.io/azure-disk', 'kubernetes.io/gce-pd', 'kubernetes.io/aws-ebs'
+]
+flags.DEFINE_enum('k8s_volume_provisioner', None, _K8S_PROVISIONERS,
+                  'The name of the provisioner to use for K8s storage '
+                  'classes.')
