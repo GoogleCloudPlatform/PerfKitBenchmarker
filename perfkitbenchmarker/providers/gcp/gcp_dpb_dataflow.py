@@ -28,14 +28,15 @@ flags.DEFINE_string('dpb_dataflow_staging_location', None,
                     'Google Cloud Storage bucket for Dataflow to stage the '
                     'binary and any temporary files. You must create this '
                     'bucket ahead of time, before running your pipeline.')
+flags.DEFINE_string('dpb_dataflow_runner', 'DataflowRunner',
+                    'Flag to specify the pipeline runner at runtime.')
+flags.DEFINE_string('dpb_dataflow_sdk', None,
+                    'SDK used to build the Dataflow executable.')
 
-flags.DEFINE_string('dpb_dataflow_jar', None, 'Executable jar for the job')
 
 FLAGS = flags.FLAGS
 
 GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
-
-DATAFLOW_BLOCKING_RUNNER = 'BlockingDataflowPipelineRunner'
 
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
 
@@ -116,3 +117,10 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def SetClusterProperty(self):
     pass
+
+  def GetMetadata(self):
+    """Return a dictionary of the metadata for this cluster."""
+    basic_data = super(GcpDpbDataflow, self).GetMetadata()
+    basic_data['dpb_dataflow_runner'] = FLAGS.dpb_dataflow_runner
+    basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
+    return basic_data
