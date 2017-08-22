@@ -103,9 +103,11 @@ def CheckPrerequisites(benchmark_config):
   if (FLAGS.dpb_wordcount_input is None and
           FLAGS.dpb_wordcount_fs != BaseDpbService.GCS_FS):
     raise errors.Config.InvalidValue('Invalid default input directory.')
-  # TODO (saksena): Make this conditional for Dataflow
-  if FLAGS.dpb_job_jarfile and not os.path.exists(FLAGS.dpb_job_jarfile):
-    raise errors.Config.InvalidValue('Job jar missing.')
+  # Get handle to the dpb service
+  dpb_service_class = dpb_service.GetDpbServiceClass(
+      benchmark_config.dpb_service.service_type)
+  dpb_service_class.CheckPrerequisites(benchmark_config)
+
 
 
 def Prepare(benchmark_spec):

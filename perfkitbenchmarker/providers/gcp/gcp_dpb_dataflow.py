@@ -17,6 +17,8 @@ No Clusters can be created or destroyed, since it is a managed solution
 See details at: https://cloud.google.com/dataflow/
 """
 
+import os
+
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -58,6 +60,14 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     metrics when available
     """
     pass
+
+  @staticmethod
+  def CheckPrerequisites(benchmark_config):
+    if not FLAGS.dpb_job_jarfile or not os.path.exists(FLAGS.dpb_job_jarfile):
+      raise errors.Config.InvalidValue('Job jar missing.')
+    if not FLAGS.dpb_dataflow_sdk:
+      raise errors.Config.InvalidValue('Dataflow SDK version missing.')
+
 
   def Create(self):
     """See base class."""
