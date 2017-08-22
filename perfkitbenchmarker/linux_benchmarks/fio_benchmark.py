@@ -68,6 +68,16 @@ SCENARIOS = {
         'name': 'random_read_write',
         'rwkind': 'randrw',
         'blocksize': '4k'
+    },
+    'sequential_trim': {
+        'name': 'sequential_trim',
+        'rwkind': 'trim',
+        'blocksize': '512k'
+    },
+    'rand_trim': {
+        'name': 'rand_trim',
+        'rwkind': 'randtrim',
+        'blocksize': '4k'
     }
 }
 
