@@ -30,7 +30,6 @@ https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
 
 import copy
 import datetime
-import os
 import tempfile
 
 from perfkitbenchmarker import configs
