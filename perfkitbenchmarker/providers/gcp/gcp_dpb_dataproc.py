@@ -84,6 +84,11 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
           (start_time - pending_time).total_seconds())
     return stats
 
+  @staticmethod
+  def CheckPrerequisites(benchmark_config):
+    del benchmark_config  # Unused
+    pass
+
   def _Create(self):
     """Creates the cluster."""
 

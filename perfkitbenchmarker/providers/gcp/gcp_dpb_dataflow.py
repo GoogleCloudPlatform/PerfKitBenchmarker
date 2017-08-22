@@ -63,11 +63,11 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
+    del benchmark_config  # Unused
     if not FLAGS.dpb_job_jarfile or not os.path.exists(FLAGS.dpb_job_jarfile):
       raise errors.Config.InvalidValue('Job jar missing.')
     if not FLAGS.dpb_dataflow_sdk:
       raise errors.Config.InvalidValue('Dataflow SDK version missing.')
-
 
   def Create(self):
     """See base class."""
