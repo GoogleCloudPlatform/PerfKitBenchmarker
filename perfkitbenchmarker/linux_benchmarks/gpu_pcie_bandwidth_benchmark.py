@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """Runs NVIDIA's CUDA PCI-E bandwidth test
       (https://developer.nvidia.com/cuda-code-samples)
 """
@@ -26,17 +24,17 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 
+DEFAULT_RANGE_START = 1 << 26  # 64 MB
+DEFAULT_RANGE_STEP = 1 << 26  # 64 MB
+DEFAULT_RANGE_END = 1 << 30  # 1 GB
 
-DEFAULT_RANGE_START=1<<26 # 64 MB
-DEFAULT_RANGE_STEP=1<<26 # 64 MB
-DEFAULT_RANGE_END=1<<30 # 1 GB
+flags.DEFINE_integer(
+    'gpu_pcie_bandwidth_iterations',
+    30,
+    'number of iterations to run',
+    lower_bound=1)
 
-flags.DEFINE_integer('gpu_pcie_bandwidth_iterations', 30,
-                     'number of iterations to run',
-                     lower_bound=1)
-
-flags.DEFINE_enum('gpu_pcie_bandwidth_mode', 'quick',
-                  ['quick', 'range'],
+flags.DEFINE_enum('gpu_pcie_bandwidth_mode', 'quick', ['quick', 'range'],
                   'bandwidth test mode to use. '
                   'If range is selected, provide desired range '
                   'in flag gpu_pcie_bandwidth_transfer_sizes. '
@@ -44,13 +42,12 @@ flags.DEFINE_enum('gpu_pcie_bandwidth_mode', 'quick',
                   'bandwidth will be averaged over all provided transfer '
                   'sizes.')
 
-flag_util.DEFINE_integerlist('gpu_pcie_bandwidth_transfer_sizes',
-    flag_util.IntegerList([DEFAULT_RANGE_START,
-                           DEFAULT_RANGE_END,
-                           DEFAULT_RANGE_STEP]),
-    'range of transfer sizes to use in bytes. '
+flag_util.DEFINE_integerlist(
+    'gpu_pcie_bandwidth_transfer_sizes',
+    flag_util.IntegerList(
+        [DEFAULT_RANGE_START, DEFAULT_RANGE_END,
+         DEFAULT_RANGE_STEP]), 'range of transfer sizes to use in bytes. '
     'Only used if gpu_pcie_bandwidth_mode is set to range')
-
 
 FLAGS = flags.FLAGS
 
@@ -79,15 +76,16 @@ gpu_pcie_bandwidth:
           machine_type: Standard_NC6
           zone: eastus
 """
-BENCHMARK_METRICS = ['Host to device bandwidth',
-                     'Device to host bandwidth',
-                     'Device to device bandwidth']
+BENCHMARK_METRICS = [
+    'Host to device bandwidth', 'Device to host bandwidth',
+    'Device to device bandwidth'
+]
 
 EXTRACT_BANDWIDTH_TEST_RESULTS_REGEX = r'\d+\s+(\d+\.?\d*)'
 EXTRACT_DEVICE_INFO_REGEX = r'Device\s*(\d):\s*(.*$)'
 
 
-class InvalidBandwithTestOutputFormat(Exception):
+class InvalidBandwidthTestOutputFormat(Exception):
   pass
 
 
@@ -127,8 +125,8 @@ def _ParseDeviceInfo(test_output):
     A dictionary mapping the device number to its name, for every
     device available on the system.
   """
-  matches = regex_util.ExtractAllMatches(EXTRACT_DEVICE_INFO_REGEX,
-                                         test_output, re.MULTILINE)
+  matches = regex_util.ExtractAllMatches(EXTRACT_DEVICE_INFO_REGEX, test_output,
+                                         re.MULTILINE)
   devices = {str(i[0]): str(i[1]) for i in matches}
   return devices
 
@@ -149,7 +147,7 @@ def _AverageResultsForSection(lines, results_section_header_index):
   results = []
   for line in lines[results_section_header_index + RESULTS_OFFSET_FROM_HEADER:]:
     if not line:
-      break # done with this section if line is empty
+      break  # done with this section if line is empty
     results.append(float(line.split()[1]))
   return numpy.mean(results)
 
@@ -165,12 +163,13 @@ def _FindIndexOfLineThatStarsWith(lines, str):
     first index of the element in lines that startswith str
 
   Raises:
-    InvalidBandwithTestOutputFormat if str is not found
+    InvalidBandwidthTestOutputFormat if str is not found
   """
   for idx, line in enumerate(lines):
     if line.startswith(str):
       return idx
-  return -1
+  raise InvalidBandwidthTestOutputFormat(
+      'Unable to find {0} in bandwidthTest output'.format(str))
 
 
 def _ParseOutputFromSingleIteration(test_output):
@@ -196,17 +195,17 @@ def _ParseOutputFromSingleIteration(test_output):
   device_to_device_results_start = _FindIndexOfLineThatStarsWith(
       lines, 'Device to Device Bandwidth')
 
-  host_to_device_mean = _AverageResultsForSection(
-      lines, host_to_device_results_start)
-  device_to_host_mean = _AverageResultsForSection(
-      lines, device_to_host_results_start)
+  host_to_device_mean = _AverageResultsForSection(lines,
+                                                  host_to_device_results_start)
+  device_to_host_mean = _AverageResultsForSection(lines,
+                                                  device_to_host_results_start)
   device_to_device_mean = _AverageResultsForSection(
       lines, device_to_device_results_start)
 
   results = {
-    'Host to device bandwidth': host_to_device_mean,
-    'Device to host bandwidth': device_to_host_mean,
-    'Device to device bandwidth': device_to_device_mean,
+      'Host to device bandwidth': host_to_device_mean,
+      'Device to host bandwidth': device_to_host_mean,
+      'Device to device bandwidth': device_to_device_mean,
   }
   return results
 
@@ -241,17 +240,18 @@ def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
     for idx, measurement in enumerate(sequence):
       metadata_copy = metadata.copy()
       metadata_copy['iteration'] = idx
-      samples.append(sample.Sample(
-          metric, measurement, 'MB/s', metadata_copy))
+      samples.append(sample.Sample(metric, measurement, 'MB/s', metadata_copy))
 
-    samples.append(sample.Sample(
-        metric + ', min', min(sequence), 'MB/s', metadata))
-    samples.append(sample.Sample(
-        metric + ', max', max(sequence), 'MB/s', metadata))
-    samples.append(sample.Sample(
-        metric + ', mean', numpy.mean(sequence), 'MB/s', metadata))
-    samples.append(sample.Sample(
-        metric + ', stddev', numpy.std(sequence), 'MB/s', metadata))
+    samples.append(
+        sample.Sample(metric + ', min', min(sequence), 'MB/s', metadata))
+    samples.append(
+        sample.Sample(metric + ', max', max(sequence), 'MB/s', metadata))
+    samples.append(
+        sample.Sample(metric + ', mean', numpy.mean(sequence), 'MB/s',
+                      metadata))
+    samples.append(
+        sample.Sample(metric + ', stddev', numpy.std(sequence), 'MB/s',
+                      metadata))
   return samples
 
 
@@ -283,12 +283,11 @@ def Run(benchmark_spec):
     metadata['range_stop'] = transfer_size_range[1]
     metadata['range_step'] = transfer_size_range[2]
 
-  run_command = ('%s/extras/demo_suite/bandwidthTest --device=all'
-                 % cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR)
+  run_command = ('%s/extras/demo_suite/bandwidthTest --device=all' %
+                 cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR)
   if mode == 'range':
     run_command += (' --mode=range --start={0} --end={1} --increment={2}'
-                    .format(transfer_size_range[0],
-                            transfer_size_range[1],
+                    .format(transfer_size_range[0], transfer_size_range[1],
                             transfer_size_range[2]))
 
   for i in range(num_iterations):

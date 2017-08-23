@@ -56,9 +56,12 @@ class GpuBandwidthTestCase(unittest.TestCase):
     results = gpu_pcie_bandwidth_benchmark.\
         _ParseOutputFromSingleIteration(self.range_test_output)
     self.assertEqual(3, len(results))
-    self.assertAlmostEqual(8063.3666667, results['Host to device bandwidth'])
-    self.assertAlmostEqual(10518.7666667, results['Device to host bandwidth'])
-    self.assertAlmostEqual(157524.4333333, results['Device to device bandwidth'])
+    self.assertAlmostEqual(8063.3666667,
+                           results['Host to device bandwidth'])
+    self.assertAlmostEqual(10518.7666667,
+                           results['Device to host bandwidth'])
+    self.assertAlmostEqual(157524.4333333,
+                           results['Device to device bandwidth'])
 
   def testCalculateMetrics(self):
     raw_results = [{
