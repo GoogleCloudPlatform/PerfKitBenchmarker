@@ -35,12 +35,12 @@ flags.DEFINE_integer('gpu_pcie_bandwidth_iterations', 30,
                      'number of iterations to run',
                      lower_bound=1)
 
-flags.DEFINE_enum('gpu_pcie_bandwidth_mode', 'QUICK',
-                  ['QUICK', 'RANGE'],
+flags.DEFINE_enum('gpu_pcie_bandwidth_mode', 'quick',
+                  ['quick', 'range'],
                   'bandwidth test mode to use. '
-                  'If RANGE is selected, provide desired range '
+                  'If range is selected, provide desired range '
                   'in flag gpu_pcie_bandwidth_transfer_sizes. '
-                  'Additionally, if RANGE is selected, the resulting '
+                  'Additionally, if range is selected, the resulting '
                   'bandwidth will be averaged over all provided transfer '
                   'sizes.')
 
@@ -49,7 +49,7 @@ flag_util.DEFINE_integerlist('gpu_pcie_bandwidth_transfer_sizes',
                            DEFAULT_RANGE_END,
                            DEFAULT_RANGE_STEP]),
     'range of transfer sizes to use in bytes. '
-    'Only used if gpu_pcie_bandwidth_mode is set to RANGE')
+    'Only used if gpu_pcie_bandwidth_mode is set to range')
 
 
 FLAGS = flags.FLAGS
@@ -278,14 +278,14 @@ def Run(benchmark_spec):
   metadata.update(cuda_toolkit_8.GetMetadata(vm))
   metadata['num_iterations'] = num_iterations
   metadata['mode'] = mode
-  if mode == 'RANGE':
+  if mode == 'range':
     metadata['range_start'] = transfer_size_range[0]
     metadata['range_stop'] = transfer_size_range[1]
     metadata['range_step'] = transfer_size_range[2]
 
   run_command = ('%s/extras/demo_suite/bandwidthTest --device=all'
                  % cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR)
-  if mode == 'RANGE':
+  if mode == 'range':
     run_command += (' --mode=range --start={0} --end={1} --increment={2}'
                     .format(transfer_size_range[0],
                             transfer_size_range[1],
