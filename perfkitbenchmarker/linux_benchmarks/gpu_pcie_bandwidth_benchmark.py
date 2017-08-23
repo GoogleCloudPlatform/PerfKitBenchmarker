@@ -152,7 +152,7 @@ def _AverageResultsForSection(lines, results_section_header_index):
   return numpy.mean(results)
 
 
-def _FindIndexOfLineThatStarsWith(lines, str):
+def _FindIndexOfLineThatStartsWith(lines, str):
   """Return the index of the line that startswith str.
 
   Args:
@@ -188,11 +188,11 @@ def _ParseOutputFromSingleIteration(test_output):
     by the test.
   """
   lines = [line.strip() for line in test_output.splitlines()]
-  host_to_device_results_start = _FindIndexOfLineThatStarsWith(
+  host_to_device_results_start = _FindIndexOfLineThatStartsWith(
       lines, 'Host to Device Bandwidth')
-  device_to_host_results_start = _FindIndexOfLineThatStarsWith(
+  device_to_host_results_start = _FindIndexOfLineThatStartsWith(
       lines, 'Device to Host Bandwidth')
-  device_to_device_results_start = _FindIndexOfLineThatStarsWith(
+  device_to_device_results_start = _FindIndexOfLineThatStartsWith(
       lines, 'Device to Device Bandwidth')
 
   host_to_device_mean = _AverageResultsForSection(lines,
