@@ -21,6 +21,8 @@ Enhancements:
 - Added support for P100 gpus on Google Cloud Platform (GH-1450)
 - Added gpu type to cuda_toolkit_8 metadata (GH-1453)
 - Added num_gpus to cuda_toolkit_8 metadata (GH-1455)
+- Added range mode to gpu_pcie_bandwidth which calculates average bandwidth over
+  a provided range of transfer sizes (GH-1482)
 
 Bug fixes and maintenance updates:
 - Fixed provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
