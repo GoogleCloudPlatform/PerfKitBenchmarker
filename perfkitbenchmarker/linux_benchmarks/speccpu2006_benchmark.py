@@ -104,7 +104,7 @@ speccpu2006:
   vm_groups:
     default:
       vm_spec: *default_single_core
-      disk_spec: *default_500_gb
+      disk_spec: *default_50_gb
 """
 
 _BENCHMARK_SPECIFIC_VM_STATE_ATTR = 'speccpu2006_vm_state'
