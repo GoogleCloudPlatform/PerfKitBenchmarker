@@ -30,3 +30,4 @@ Bug fixes and maintenance updates:
 - Changed cuda_toolkit_8 to use the gpu-specific base clock speed as the default (GH-1453)
 - Changed default AWS P2 region for gpu benchmarks (GH-1454)
 - Fix multi-threading issue in fio.job filename (GH-1474)
+- Decreased speccpu2006 default disk size to 50gb (GH-1484)
