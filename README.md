@@ -108,7 +108,7 @@ Before you can run the PerfKit Benchmarker, you need account(s) on the cloud pro
 * [Google Cloud Platform](https://cloud.google.com)
 * [AWS](http://aws.amazon.com)
 * [Azure](http://azure.microsoft.com)
-* [AliCloud](http://www.alicloud.com)
+* [AliCloud](http://www.aliyun.com)
 * [DigitalOcean](https://www.digitalocean.com)
 * [Rackspace Cloud](https://www.rackspace.com)
 * [ProfitBricks](https://www.profitbricks.com/)
@@ -414,6 +414,13 @@ Run the following command to install `aliyuncli` (omit the `sudo` on Windows)
 
    ```bash
    $ sudo pip install -r perfkitbenchmarker/providers/alicloud/requirements.txt
+   ```
+   In some CentOS version, you may need:
+   
+   ```bash
+   $ sudo yum install libffi-devel.x86_64
+   $ sudo yum install openssl-devel.x86_64
+   $ sudo pip install 'colorama<=0.3.3'
    ```
 
    To check if AliCloud is installed:

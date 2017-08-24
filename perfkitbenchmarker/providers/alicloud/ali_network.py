@@ -118,6 +118,7 @@ class AliVSwitch(resource.BaseResource):
         'CreateVSwitch',
         '--VSwitchName %s' % self.name,
         '--ZoneId %s' % self.zone,
+        '--RegionId %s' % self.region,
         '--CidrBlock 10.0.0.0/24',
         '--VpcId %s' % self.vpc_id,
     ]
