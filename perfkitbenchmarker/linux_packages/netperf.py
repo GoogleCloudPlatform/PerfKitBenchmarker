@@ -31,9 +31,11 @@ flags.DEFINE_integer(
     'increase the precision of the histogram samples that the netperf '
     'benchmark produces.')
 FLAGS = flags.FLAGS
-NETPERF_TAR = 'netperf-2.6.0.tar.gz'
-NETPERF_URL = 'ftp://ftp.netperf.org/netperf/archive/%s' % NETPERF_TAR
-NETPERF_DIR = '%s/netperf-2.6.0' % INSTALL_DIR
+NETPERF_TAR = 'netperf-2.7.0.tar.gz'
+NETPERF_URL = 'https://github.com/HewlettPackard/netperf/archive/%s' % (
+              NETPERF_TAR)
+NETPERF_DIR = '%s/netperf-netperf-2.7.0' % INSTALL_DIR
+
 NETPERF_SRC_DIR = NETPERF_DIR + '/src'
 NETSERVER_PATH = NETPERF_SRC_DIR + '/netserver'
 NETPERF_PATH = NETPERF_SRC_DIR + '/netperf'
@@ -67,7 +69,7 @@ def _CopyTar(vm):
     vm.PushDataFile(NETPERF_TAR, remote_path=(INSTALL_DIR + '/'))
   except ResourceNotFound:
     vm.Install('curl')
-    vm.RemoteCommand('curl %s -o %s/%s' % (
+    vm.RemoteCommand('curl %s -L -o %s/%s' % (
         NETPERF_URL, INSTALL_DIR, NETPERF_TAR))
 
 

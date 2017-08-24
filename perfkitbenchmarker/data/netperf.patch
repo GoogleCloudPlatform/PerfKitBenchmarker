@@ -139,8 +139,8 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
  
  {
  
--#define OMNI_ARGS "b:cCd:DG:hH:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:u:Vw:W:46"
-+#define OMNI_ARGS "b:cCd:DG:hH:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:U:u:Vw:W:46"
+-#define OMNI_ARGS "aBb:cCd:De:FgG:hH:i:Ij:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:u:UVw:W:46"
++#define OMNI_ARGS "aBb:cCd:De:FgG:hH:i:Ij:kK:l:L:m:M:nNoOp:P:r:R:s:S:t:T:u:UVw:W:X:46"
  
    extern char	*optarg;	  /* pointer to option string	*/
  
@@ -148,7 +148,7 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
        test_uuid[sizeof(test_uuid) - 1] = 0;
        have_uuid = 1;
        break;
-+    case 'U':
++    case 'X':
 +      break_args(optarg, arg1, arg2);
 +      break_args(optarg+strlen(arg1)+1, arg2, arg3);
 +      think_time = convert(arg1);
