@@ -17,6 +17,8 @@ No Clusters can be created or destroyed, since it is a managed solution
 See details at: https://cloud.google.com/dataflow/
 """
 
+import os
+
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -28,14 +30,15 @@ flags.DEFINE_string('dpb_dataflow_staging_location', None,
                     'Google Cloud Storage bucket for Dataflow to stage the '
                     'binary and any temporary files. You must create this '
                     'bucket ahead of time, before running your pipeline.')
+flags.DEFINE_string('dpb_dataflow_runner', 'DataflowRunner',
+                    'Flag to specify the pipeline runner at runtime.')
+flags.DEFINE_string('dpb_dataflow_sdk', None,
+                    'SDK used to build the Dataflow executable.')
 
-flags.DEFINE_string('dpb_dataflow_jar', None, 'Executable jar for the job')
 
 FLAGS = flags.FLAGS
 
 GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
-
-DATAFLOW_BLOCKING_RUNNER = 'BlockingDataflowPipelineRunner'
 
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
 
@@ -57,6 +60,14 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     metrics when available
     """
     pass
+
+  @staticmethod
+  def CheckPrerequisites(benchmark_config):
+    del benchmark_config  # Unused
+    if not FLAGS.dpb_job_jarfile or not os.path.exists(FLAGS.dpb_job_jarfile):
+      raise errors.Config.InvalidValue('Job jar missing.')
+    if not FLAGS.dpb_dataflow_sdk:
+      raise errors.Config.InvalidValue('Dataflow SDK version missing.')
 
   def Create(self):
     """See base class."""
@@ -116,3 +127,10 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def SetClusterProperty(self):
     pass
+
+  def GetMetadata(self):
+    """Return a dictionary of the metadata for this cluster."""
+    basic_data = super(GcpDpbDataflow, self).GetMetadata()
+    basic_data['dpb_dataflow_runner'] = FLAGS.dpb_dataflow_runner
+    basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
+    return basic_data
