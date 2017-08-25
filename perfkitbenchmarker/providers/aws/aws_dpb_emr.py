@@ -110,6 +110,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.bucket_to_delete = None
     self.emr_release_label = FLAGS.dpb_emr_release_label
 
+  @staticmethod
+  def CheckPrerequisites(benchmark_config):
+    del benchmark_config  # Unused
+    pass
 
   def _CreateLogBucket(self):
     bucket_name = 's3://pkb-{0}-emr'.format(FLAGS.run_uri)
