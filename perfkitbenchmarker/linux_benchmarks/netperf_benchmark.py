@@ -27,6 +27,7 @@ import csv
 import io
 import json
 import logging
+import re
 
 from collections import Counter
 
@@ -92,6 +93,12 @@ REMOTE_SCRIPT = 'netperf_test.py'
 
 PERCENTILES = [50, 90, 99]
 
+# By default, Container-Optimized OS (COS) host firewall allows only
+# outgoing connections and incoming SSH connections. To allow incoming
+# connections from VMs running netperf, we need to add iptables rules
+# on the VM running netserver.
+_COS_RE = re.compile(r'\b(cos|gci)-')
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -115,6 +122,10 @@ def Prepare(benchmark_spec):
 
   num_streams = max(FLAGS.netperf_num_streams)
 
+  # See comments where _COS_RE is defined.
+  if re.search(_COS_RE, vms[1].image):
+    _SetupHostFirewall(benchmark_spec)
+
   # Start the netserver processes
   if vm_util.ShouldRunOnExternalIpAddress():
     # Open all of the command and data ports
@@ -131,6 +142,29 @@ def Prepare(benchmark_spec):
   logging.info('Uploading %s to %s', path, vms[0])
   vms[0].PushFile(path)
   vms[0].RemoteCommand('sudo chmod 777 %s' % REMOTE_SCRIPT)
+
+
+def _SetupHostFirewall(benchmark_spec):
+  """Set up host firewall to allow incoming traffic.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+  """
+
+  client_vm = benchmark_spec.vms[0]
+  server_vm = benchmark_spec.vms[1]
+
+  ip_addrs = [client_vm.internal_ip]
+  if vm_util.ShouldRunOnExternalIpAddress():
+    ip_addrs.append(client_vm.ip_address)
+
+  logging.info('setting up host firewall on %s running %s for client at %s',
+               server_vm.name, server_vm.image, ip_addrs)
+  cmd = 'sudo iptables -A INPUT -p %s -s %s -j ACCEPT'
+  for protocol in 'tcp', 'udp':
+    for ip_addr in ip_addrs:
+      server_vm.RemoteHostCommand(cmd % (protocol, ip_addr))
 
 
 def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
