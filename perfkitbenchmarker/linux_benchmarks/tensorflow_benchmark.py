@@ -14,7 +14,6 @@
 
 """Run Tensorflow benchmarks (https://github.com/tensorflow/benchmarks)."""
 
-import logging
 import os
 import re
 from perfkitbenchmarker import configs
@@ -164,7 +163,7 @@ def _CreateMetadataDict(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   metadata = dict()
-  if FLAGS.tf_device == GPU:
+  if benchmark_spec.device == GPU:
     metadata.update(cuda_toolkit_8.GetMetadata(vm))
     metadata['num_gpus'] = benchmark_spec.num_gpus
   metadata['model'] = benchmark_spec.model
