@@ -42,6 +42,7 @@ READY_CHECK_SLEEP = 30
 READY_CHECK_TRIES = 60
 READY_STATE = 'WAITING'
 JOB_WAIT_SLEEP = 30
+EMR_TIMEOUT = 3600
 
 MANAGER_SG = 'EmrManagedMasterSecurityGroup'
 WORKER_SG = 'EmrManagedSlaveSecurityGroup'
@@ -278,7 +279,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                 job_arguments=None, job_stdout_file=None,
                 job_type=None):
     """See base class."""
-    @vm_util.Retry(timeout=600,
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=job_poll_interval, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
@@ -338,7 +339,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def generate_data(self, source_dir, udpate_default_fs, num_files,
                     size_file):
     """Method to generate data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=600,
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
@@ -382,7 +383,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def read_data(self, source_dir, udpate_default_fs, num_files, size_file):
     """Method to read data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=600,
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
@@ -427,7 +428,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def distributed_copy(self, source_location, destination_location):
     """Method to copy data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=600,
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
@@ -472,7 +473,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def cleanup_data(self, base_dir, udpate_default_fs):
     """Method to cleanup data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=600,
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
