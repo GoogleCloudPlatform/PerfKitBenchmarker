@@ -20,19 +20,35 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 
-flags.DEFINE_string('cudnn', 'cudnn-8.0-linux-x64-v5.1.tgz',
+flags.DEFINE_string('cudnn', 'libcudnn6_6.0.21-1+cuda8.0_amd64.deb',
                     '''The NVIDIA CUDA Deep Neural Network library.
                     Please put in data directory and specify the name''')
 FLAGS = flags.FLAGS
 CUDA_TOOLKIT_INSTALL_DIR = cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
 
 
-def Install(vm):
-  """Installs NVIDIA CUDA Deep Neural Network library."""
+def _Install(vm, dest_path):
+  vm.RemoteCommand('tar -zxf %s' % dest_path, should_log=True)
+  vm.RemoteCommand('sudo cp -P cuda/include/cudnn.h %s/include/' %
+                   CUDA_TOOLKIT_INSTALL_DIR)
+  vm.RemoteCommand('sudo cp -P cuda/lib64/libcudnn* %s/lib64/' %
+                   CUDA_TOOLKIT_INSTALL_DIR)
+
+
+def _CopyLib(vm):
   src_path = data.ResourcePath(FLAGS.cudnn)
   dest_path = os.path.join('/tmp', FLAGS.cudnn)
   vm.RemoteCopy(src_path, dest_path)
-  vm.RemoteCommand('tar -zxf %s' % dest_path, should_log=True)
-  vm.RemoteCommand('sudo cp cuda/lib64/* %s/lib64/' % CUDA_TOOLKIT_INSTALL_DIR)
-  vm.RemoteCommand('sudo cp cuda/include/cudnn.h %s/include/' %
-                   CUDA_TOOLKIT_INSTALL_DIR)
+  return dest_path
+
+
+def AptInstall(vm):
+  dest_path = _CopyLib(vm)
+  if dest_path.endswith('.deb'):
+    vm.RemoteCommand('sudo dpkg -i %s' % dest_path, should_log=True)
+  else:
+    _Install(vm, dest_path)
+
+
+def YumInstall(vm):
+  _Install(vm, _CopyLib(vm))
