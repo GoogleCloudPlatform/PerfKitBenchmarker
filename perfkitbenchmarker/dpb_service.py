@@ -32,7 +32,8 @@ flags.DEFINE_string('static_dpb_service_instance', None,
 flags.DEFINE_string('dpb_log_level', 'INFO', 'Manipulate service log level')
 flags.DEFINE_string('dpb_job_jarfile', None,
                     'Executable Jarfile containing workload implementation')
-flags.DEFINE_string('dpb_job_classname', None, 'Classname to be used')
+flags.DEFINE_string('dpb_job_classname', None, 'Classname of the job '
+                                               'implementation in the jar file')
 
 
 _DPB_SERVICE_REGISTRY = {}
