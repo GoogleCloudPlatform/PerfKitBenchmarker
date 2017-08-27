@@ -42,3 +42,5 @@ flags.DEFINE_string('kops', 'kops',
                     'The path to the kops binary.')
 flags.DEFINE_string('edw_redshift_cluster_version', 'redshift-1.0',
                     'The redshift version to use for the cluster.')
+flags.DEFINE_string('aws_image_name_filter', None,
+                    'The filter to use when searching for an image for a VM.')
