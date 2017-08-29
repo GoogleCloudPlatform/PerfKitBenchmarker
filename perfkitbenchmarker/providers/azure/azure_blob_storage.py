@@ -93,12 +93,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
 
   def PrepareVM(self, vm):
     vm.Install('azure_cli')
-
-    if FLAGS.azure_lib_version:
-      version_string = '==' + FLAGS.azure_lib_version
-    else:
-      version_string = ''
-    vm.RemoteCommand('sudo pip install azure%s' % version_string)
+    vm.Install('azure_sdk')
 
     vm.PushFile(
         object_storage_service.FindCredentialFile('~/' +
