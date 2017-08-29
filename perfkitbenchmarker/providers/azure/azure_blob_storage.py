@@ -95,15 +95,6 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     vm.Install('azure_cli')
     vm.Install('azure_sdk')
 
-    # This package is necessary for installing azure with pip below.
-    vm.InstallPackages('python-dev')
-
-    if FLAGS.azure_lib_version:
-      version_string = '==' + FLAGS.azure_lib_version
-    else:
-      version_string = ''
-    vm.RemoteCommand('sudo pip install azure%s' % version_string)
-
     vm.PushFile(
         object_storage_service.FindCredentialFile('~/' +
                                                   AZURE_CREDENTIAL_LOCATION),
