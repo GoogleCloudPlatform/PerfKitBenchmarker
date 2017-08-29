@@ -93,6 +93,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
 
   def PrepareVM(self, vm):
     vm.Install('azure_cli')
+    vm.Install('azure_sdk')
 
     # This package is necessary for installing azure with pip below.
     vm.InstallPackages('python-dev')
