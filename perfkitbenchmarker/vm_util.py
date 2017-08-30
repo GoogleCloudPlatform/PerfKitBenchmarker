@@ -61,6 +61,8 @@ OUTPUT_STDOUT = 0
 OUTPUT_STDERR = 1
 OUTPUT_EXIT_CODE = 2
 
+_SIMULATE_MAINTENANCE_SEMAPHORE = threading.Semaphore(0)
+
 flags.DEFINE_integer('default_timeout', TIMEOUT, 'The default timeout for '
                      'retryable commands in seconds.')
 flags.DEFINE_integer('burn_cpu_seconds', 0,
@@ -75,6 +77,12 @@ flags.DEFINE_integer('background_network_mbits_per_sec', None,
                      'Number of megabits per second of background '
                      'network traffic to generate during the run phase '
                      'of the benchmark')
+flags.DEFINE_boolean('simulate_maintenance', False,
+                     'Whether to simulate VM maintenance during the benchmark. '
+                     'This requires both benchmark and provider support.')
+flags.DEFINE_integer('simulate_maintenance_delay', 0,
+                     'The number of seconds to wait to start simulating '
+                     'maintenance.')
 
 
 class IpAddressSubset(object):
@@ -518,3 +526,21 @@ def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):
   password.append(random.choice(string.digits))
   password.append(random.choice(special_chars))
   return ''.join(password)
+
+
+def StartSimulatedMaintenance():
+  """Initiates the simulated maintenance event."""
+  if FLAGS.simulate_maintenance:
+    _SIMULATE_MAINTENANCE_SEMAPHORE.release()
+
+
+def SetupSimulatedMaintenance(vm):
+  """Called ready VM for simulated maintenance."""
+  if FLAGS.simulate_maintenance:
+    def _SimulateMaintenance():
+      _SIMULATE_MAINTENANCE_SEMAPHORE.acquire()
+      time.sleep(FLAGS.simulate_maintenance_delay)
+      vm.SimulateMaintenanceEvent()
+    t = threading.Thread(target=_SimulateMaintenance)
+    t.daemon = True
+    t.start()
