@@ -174,6 +174,8 @@ class DefaultMetadataProvider(MetadataProvider):
   def AddMetadata(self, metadata, benchmark_spec):
     metadata = metadata.copy()
     metadata['perfkitbenchmarker_version'] = version.VERSION
+    if FLAGS.simulate_maintenance:
+      metadata['simulate_maintenance'] = True
     if FLAGS.hostname_metadata:
       metadata['hostnames'] = ','.join([vm.hostname
                                         for vm in benchmark_spec.vms])
