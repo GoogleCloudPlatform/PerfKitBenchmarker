@@ -53,6 +53,7 @@ flags.RegisterValidator('database_backup_start_time',
 
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
+AURORA_POSTGRES = 'aurora-postgresql'
 
 _MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
@@ -103,6 +104,60 @@ class BaseManagedRelationalDb(resource.BaseResource):
     """
     super(BaseManagedRelationalDb, self).__init__()
     self.spec = managed_relational_db_spec
+
+  def AddClientVms(self, vms):
+    # TODO(ferneyhough): assert # of VMs, and that VM(s) are in same
+    # region as DB
+    self.client_vms = vms
+    if not self.client_vms:
+      return
+    self.network = vms[0].network
+
+  def MakePsqlConnectionString(self, database_name):
+    return '\'host={0} user={1} password={2} dbname={3}\''.format(
+        self.GetEndpoint(),
+        self.GetUsername(),
+        self.GetPassword(),
+        database_name)
+
+  def GetResourceMetadata(self):
+    """Returns a dictionary of metadata
+
+   Child classes can extend this if needed.
+   """
+    metadata = {
+        'zone': self.spec.vm_spec.zone,
+        'disk_type': self.spec.disk_spec.disk_type,
+        'disk_size': self.spec.disk_spec.disk_size,
+        'database': self.spec.database,
+        'high_availability': self.spec.high_availability,
+        'backup_enabled': self.spec.backup_enabled,
+        'backup_start_time': self.spec.backup_start_time,
+        'database_version': self.spec.database_version,
+    }
+    if self.spec.vm_spec.machine_type:
+      metadata.update({
+        'machine_type': self.spec.vm_spec.machine_type,
+      })
+    else:
+      # TOOD(ferneyhough): fix this. Azure has no vm_spec, hence the need for
+      # the try block
+      try:
+        metadata.update({
+          'cpus': self.spec.vm_spec.cpus,
+          'memory': self.spec.vm_spec.memory,
+        })
+      except:
+        pass
+
+    try:
+      metadata.update({
+          'disk_iops': self.spec.disk_spec.iops,
+      })
+    except:
+      pass
+
+    return metadata
 
   @abstractmethod
   def GetEndpoint(self):

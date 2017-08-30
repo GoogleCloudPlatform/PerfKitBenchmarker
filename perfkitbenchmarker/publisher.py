@@ -183,6 +183,11 @@ class DefaultMetadataProvider(MetadataProvider):
       for k, v in cluster.GetResourceMetadata().iteritems():
         metadata['container_cluster_' + k] = v
 
+    if benchmark_spec.managed_relational_db:
+      managed_db = benchmark_spec.managed_relational_db
+      for k, v in managed_db.GetResourceMetadata().iteritems():
+        metadata['managed_relational_db_' + k] = v
+
     for name, vms in benchmark_spec.vm_groups.iteritems():
       if len(vms) == 0:
         continue

@@ -19,22 +19,14 @@ with a non-default storage size is in beta right now. This can be removed when
 this feature is part of the default components.
 See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
 for more information.
-To run this benchmark for GCP it is required to install a non-default gcloud
-component. Otherwise this benchmark will fail.
-To ensure that gcloud beta is installed, type
-        'gcloud components list'
-into the terminal. This will output all components and status of each.
-Make sure that
-  name: gcloud Beta Commands
-  id:  beta
-has status: Installed.
-If not, run
-        'gcloud components install beta'
-to install it. This will allow this benchmark to properly create an instance.
 """
 
+import datetime
 import json
 import logging
+import time
+import os
+import subprocess
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -87,14 +79,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     authorized_network = '0.0.0.0/0'
     cloudsql_specific_database_version = self._GetDatabaseVersionNameFromFlavor(
         self.spec.database, self.spec.database_version)
-    # Please install gcloud component beta for this to work. See note in
-    # module level docstring.
-    # This is necessary only because creating a SQL instance with a non-default
-    # storage size is in beta right now in gcloud. This can be removed when
-    # this feature is part of the default components. See
-    # https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
-    # for more information. When this flag is allowed in the default gcloud
-    # components the create_db_cmd below can be updated.
+
     cmd_string = [
         self,
         'beta',
@@ -114,16 +99,23 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size
     ]
+    # TODO(ferneyhough): tier machine types are supported on Posgres too
     if self.spec.database == managed_relational_db.MYSQL:
       machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
+      cmd_string.append(machine_type_flag)
     else:
       self._ValidateSpec()
       memory = self.spec.vm_spec.memory
       cpus = self.spec.vm_spec.cpus
       self._ValidateMachineType(memory, cpus)
-      machine_type_flag = ('--cpu={} --ram={}'.format(cpus, memory))
-    cmd_string.append(machine_type_flag)
-    if self.spec.high_availability:
+      cmd_string.append('--cpu={}'.format(cpus))
+      cmd_string.append('--memory={}MiB'.format(memory))
+    # postgres HA requires a manual curl command to enable,
+    # so don't do anything special. the samples will still have
+    # high_availability in the metadata, so be sure to enable it
+    # if the flag is specified.
+    if (self.spec.high_availability and
+        self.spec.database == managed_relational_db.MYSQL):
       ha_flag = '--failover-replica-name=replica-' + self.instance_id
       cmd_string.append(ha_flag)
     if self.spec.backup_enabled:
@@ -228,34 +220,53 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
+    timeout = 600 # 10 minutes
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
-    stdout, _, _ = cmd.Issue()
-    try:
-      json_output = json.loads(stdout)
-      if not json_output['state'] == 'RUNNABLE':
+    start_time = datetime.datetime.now()
+
+    while True:
+      if (datetime.datetime.now() - start_time).seconds > timeout:
+        loggine.exception('Timeout waiting for sql instance to be ready')
         return False
-    except:
-      logging.exception('Error attempting to read stdout. Creation failure.')
-      return False
+      time.sleep(5)
+      stdout, _, retcode = cmd.Issue(suppress_warning=True)
+
+      try:
+        json_output = json.loads(stdout)
+        state = json_output['state']
+        logging.info('Instance state: {0}'.format(state))
+        if state == 'RUNNABLE':
+          break
+      except:
+        logging.exception('Error attempting to read stdout. Creation failure.')
+        return False
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = self.MYSQL_DEFAULT_PORT
     return True
 
   def _ParseEndpoint(self, describe_instance_json):
-    """Return the URI of the resource given the metadata as JSON.
+    """Return the IP of the resource given the metadata as JSON.
 
     Args:
       describe_instance_json: JSON output.
     Returns:
-      resource URI (string)
+      public IP address (string)
     """
     try:
-      selflink = describe_instance_json['selfLink']
+      selflink = describe_instance_json['ipAddresses'][0]['ipAddress']
     except:
       selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
+
+  def _EnableHighAvailability(self):
+    print 'Using CURL to enable high availability'
+    enable_ha_script_path = data.ResourcePath('enable_gcp_ha.sh')
+    subprocess.check_call([enable_ha_script_path], shell=True,
+                          env=dict(os.environ, INSTANCENAME=self.instance_id))
+    print 'Done. Waiting for 5 minutes for changes to take effect'
+    time.sleep(5*60)
 
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.
@@ -264,7 +275,16 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     once, after the resource is confirmed to exist. It is intended to allow
     data about the resource to be collected or for the resource to be tagged.
     """
-    pass
+    # TODO(ferneyhough): raise exception on failure
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'create', self.GetUsername(), 'dummy_host',
+        '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.GetPassword()))
+    stdout, _, _ = cmd.Issue()
+    print(stdout)
+
+    if self.spec.high_availability:
+      self._EnableHighAvailability()
 
   def _CreateDependencies(self):
     """Method that will be called once before _CreateResource() is called.
