@@ -243,7 +243,11 @@ stonewall
 rw={{scenario['rwkind']}}
 blocksize={{scenario['blocksize']}}
 iodepth={{iodepth}}
+{%- if scenario['size'] is defined %}
+size={{scenario['size']}}
+{%- else %}
 size={{size}}
+{%- endif%}
 numjobs={{numjob}}
 {%- endfor %}
 {%- endfor %}
@@ -423,6 +427,7 @@ def GetLogFlags(log_file_base):
 
 def CheckPrerequisites(benchmark_config):
   """Perform flag checks."""
+  del benchmark_config  # unused
   WarnOnBadFlags()
 
 
@@ -490,6 +495,7 @@ def Run(benchmark_spec):
   with open(job_file_path, 'w') as job_file:
     job_file.write(job_file_string)
     logging.info('Wrote fio job file at %s', job_file_path)
+    logging.info(job_file_string)
 
   vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
 
@@ -513,7 +519,7 @@ def Run(benchmark_spec):
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
 
-  stdout, stderr = vm.RobustRemoteCommand(fio_command, should_log=True)
+  stdout, _ = vm.RobustRemoteCommand(fio_command, should_log=True)
   bin_vals = []
   if collect_logs:
     vm.PullFile(vm_util.GetTempDir(), '%s*.log' % log_file_base)
