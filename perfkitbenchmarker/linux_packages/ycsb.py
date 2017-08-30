@@ -766,6 +766,27 @@ class YCSBExecutor(object):
 
     return all_results
 
+  def Load(self, vms, workloads=None, load_kwargs=None):
+    """Load data using YCSB."""
+    workloads = workloads or _GetWorkloadFileList()
+    load_samples = []
+    assert workloads, 'no workloads'
+    if FLAGS.ycsb_reload_database or not self.loaded:
+        load_samples += list(self._LoadThreaded(
+            vms, workloads[0], **(load_kwargs or {})))
+        self.loaded = True
+    if FLAGS.ycsb_load_samples:
+      return load_samples
+    else:
+      return []
+
+  def Run(self, vms, workloads=None, run_kwargs=None):
+    """Runs each workload/client count combination."""
+    workloads = workloads or _GetWorkloadFileList()
+    assert workloads, 'no workloads'
+    return list(self.RunStaircaseLoads(vms, workloads,
+                                       **(run_kwargs or {})))
+
   def LoadAndRun(self, vms, workloads=None, load_kwargs=None, run_kwargs=None):
     """Load data using YCSB, then run each workload/client count combination.
 
@@ -785,16 +806,6 @@ class YCSBExecutor(object):
     Returns:
       List of sample.Sample objects.
     """
-    workloads = workloads or _GetWorkloadFileList()
-    load_samples = []
-    assert workloads, 'no workloads'
-    if FLAGS.ycsb_reload_database or not self.loaded:
-        load_samples += list(self._LoadThreaded(
-            vms, workloads[0], **(load_kwargs or {})))
-        self.loaded = True
-    run_samples = list(self.RunStaircaseLoads(vms, workloads,
-                                              **(run_kwargs or {})))
-    if FLAGS.ycsb_load_samples:
-      return load_samples + run_samples
-    else:
-      return run_samples
+    load_samples = self.Load(vms, workloads=workloads, load_kwargs=load_kwargs)
+    run_samples = self.Run(vms, workloads=workloads, run_kwargs=run_kwargs)
+    return load_samples + run_samples

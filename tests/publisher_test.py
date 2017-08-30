@@ -243,7 +243,8 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     self.mock_flags.configure_mock(metadata=[],
                                    num_striped_disks=1,
                                    sysctl=[],
-                                   set_files=[])
+                                   set_files=[],
+                                   simulate_maintenance=False)
     self.addCleanup(p.stop)
 
     self.maxDiff = None
