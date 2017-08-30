@@ -54,7 +54,7 @@ EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
 UPDATE_RETRIES = 5
 SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
-REMOTE_KEY_PATH = '.ssh/id_rsa'
+REMOTE_KEY_PATH = '~/.ssh/id_rsa'
 CONTAINER_MOUNT_DIR = '/mnt'
 CONTAINER_WORK_DIR = '/root'
 
@@ -166,12 +166,19 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                                          wrapper_log)
     self.RemoteCommand(start_command)
 
-    wait_command = ['python', wait_path, '--stdout', stdout_file,
-                    '--stderr', stderr_file,
-                    '--status', status_file,
-                    '--delete']
-    try:
+    def _WaitForCommand():
+      wait_command = ['python', wait_path, '--stdout', stdout_file,
+                      '--stderr', stderr_file,
+                      '--status', status_file]
+      stdout, stderr = None, None
+      while not (stdout or stderr):
+        stdout, stderr = self.RemoteCommand(
+            ' '.join(wait_command), should_log=should_log)
+      wait_command.append('--delete')
       return self.RemoteCommand(' '.join(wait_command), should_log=should_log)
+
+    try:
+      return _WaitForCommand()
     except errors.VirtualMachine.RemoteCommandError:
       # In case the error was with the wrapper script itself, print the log.
       stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
@@ -453,12 +460,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if not self.is_static and not self.has_private_key:
       self.RemoteHostCopy(vm_util.GetPrivateKeyPath(),
                           REMOTE_KEY_PATH)
-      with vm_util.NamedTemporaryFile() as tf:
-        tf.write('Host *\n')
-        tf.write('  StrictHostKeyChecking no\n')
-        tf.close()
-        self.PushFile(tf.name, '~/.ssh/config')
-
+      self.RemoteCommand(
+          'echo "Host *\n  StrictHostKeyChecking no\n" > ~/.ssh/config')
       self.has_private_key = True
 
   def TestAuthentication(self, peer):
