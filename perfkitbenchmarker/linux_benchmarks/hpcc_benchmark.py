@@ -165,6 +165,7 @@ def Prepare(benchmark_spec):
   CreateHpccinf(master_vm, benchmark_spec)
   hpc_util.CreateMachineFile(vms, remote_path=MACHINEFILE)
   PrepareBinaries(vms)
+  master_vm.AuthenticateVm()
 
 
 def UpdateMetadata(metadata):
