@@ -328,6 +328,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       raise errors.VirtualMachine.RemoteCommandError(error_text)
     if copy_to:
       file_name = posixpath.basename(file_path)
+      remote_path = remote_path or file_name
       self.RemoteCommand('mv %s %s; chmod 777 %s' %
                          (file_name, remote_path, remote_path))
 
