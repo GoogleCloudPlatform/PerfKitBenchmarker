@@ -69,6 +69,7 @@ class BaseContainerCluster(resource.BaseResource):
   def GetMetadata(self):
     """Returns a dictionary of cluster metadata."""
     metadata = {
+        'container_cluster_cloud': self.CLOUD,
         'container_cluster_machine_type': self.machine_type,
         'container_cluster_zone': self.zone,
         'container_cluster_size': self.num_nodes,
