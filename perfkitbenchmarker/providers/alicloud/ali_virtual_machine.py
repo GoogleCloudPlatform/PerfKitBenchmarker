@@ -326,6 +326,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       release_eip_cmd = util.ALI_PREFIX + [
           'ecs',
           'ReleaseEipAddress',
+          '--RegionId %s' % self.region,
           '--AllocationId %s' % self.eip_id]
       release_eip_cmd = util.GetEncodedCmd(release_eip_cmd)
       vm_util.IssueRetryableCommand(release_eip_cmd)
