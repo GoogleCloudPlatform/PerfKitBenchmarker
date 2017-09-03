@@ -69,7 +69,7 @@ INSTANCE_EXISTS_STATUSES = frozenset(
 INSTANCE_DELETED_STATUSES = frozenset([])
 INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 
-DEFAULT_IMAGE = "ubuntu1404_64_20G_aliaegis_20150325.vhd",
+DEFAULT_IMAGE = "ubuntu_14_0405_64_40G_alibase_20170711.vhd",
 
 
 class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -78,7 +78,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.ALICLOUD
   DEFAULT_ZONE = 'cn-hangzhou-d'
   DEFAULT_MACHINE_TYPE = 'ecs.s3.large'
-  IMAGE_NAME_FILTER = 'ubuntu1404_64_20G_aliaegis*'
+  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64_40G_alibase*'
 
   _lock = threading.Lock()
   imported_keyfile_set = set()
@@ -376,7 +376,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedAliVirtualMachine(AliVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
-  IMAGE_NAME_FILTER = 'ubuntu1404_64*aliaegis*.vhd'
+  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64*alibase*.vhd'
 
 
 class RhelBasedAliVirtualMachine(AliVirtualMachine,
