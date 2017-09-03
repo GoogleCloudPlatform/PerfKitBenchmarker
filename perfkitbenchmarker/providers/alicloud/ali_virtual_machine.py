@@ -104,7 +104,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry(poll_interval=1, log_errors=False)
   def _WaitForInstanceStatus(self, status_list):
     """Waits until the instance's status is in status_list"""
-    logging.info('Waits until the instance\'s stastus is one of statuses: %s',
+    logging.info('Waits until the instance\'s status is one of statuses: %s',
                  status_list)
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
@@ -122,7 +122,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def _WaitForEipStatus(self, status_list):
     """Waits until the instance's status is in status_list"""
-    logging.info('Waits until the eip\'s stastus is one of statuses: %s',
+    logging.info('Waits until the eip\'s status is one of statuses: %s',
                  status_list)
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
