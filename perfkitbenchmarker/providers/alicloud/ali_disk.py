@@ -117,10 +117,7 @@ class AliDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    if FLAGS.ali_io_optimized is None:
-      return '/dev/xvd%s' % self.device_letter
-    else:
-      return '/dev/vd%s' % self.device_letter
+    return '/dev/vd%s' % self.device_letter
 
   def GetVirtualDevicePath(self):
     """Returns the path to the device visible to console users."""
