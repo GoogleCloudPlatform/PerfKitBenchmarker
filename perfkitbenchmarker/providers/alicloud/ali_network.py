@@ -190,12 +190,17 @@ class AliSecurityGroup(resource.BaseResource):
     """Returns true if the security group exists."""
     show_cmd = util.ALI_PREFIX + [
         'ecs',
-        'DescribeSecurityGroupAttribute',
+        'DescribeSecurityGroups',
         '--RegionId %s' % self.region,
         '--SecurityGroupId %s' % self.group_id]
     show_cmd = util.GetEncodedCmd(show_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(show_cmd)
-    return 'SecurityGroupId' in json.loads(stdout)
+    response = json.loads(stdout)
+    securityGroups = response['SecurityGroups']['SecurityGroup']
+    assert len(securityGroups) < 2, 'Too many securityGroups.'
+    if not securityGroups:
+      return False
+    return True
 
 
 
