@@ -14,12 +14,20 @@
 
 
 """Module containing TensorFlow installation and cleanup functions."""
+from perfkitbenchmarker import flags
+FLAGS = flags.FLAGS
 
 
 def Install(vm):
   """Installs TensorFlow on the VM."""
   vm.Install('pip')
-  vm.RemoteCommand('sudo pip install --upgrade tensorflow-gpu', should_log=True)
+  if FLAGS.tf_device == 'gpu':
+    vm.Install('cuda_toolkit_8')
+    vm.Install('cudnn')
+    vm.RemoteCommand('sudo pip install --upgrade tensorflow-gpu',
+                     should_log=True)
+  elif FLAGS.tf_device == 'cpu':
+    vm.RemoteCommand('sudo pip install --upgrade tensorflow', should_log=True)
 
 
 def Uninstall(vm):

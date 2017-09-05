@@ -14,7 +14,6 @@
 
 """Run Tensorflow benchmarks (https://github.com/tensorflow/benchmarks)."""
 
-import logging
 import os
 import re
 from perfkitbenchmarker import configs
@@ -37,8 +36,6 @@ tensorflow:
           image: ubuntu-1604-xenial-v20170307
           image_project: ubuntu-os-cloud
           machine_type: n1-standard-4
-          gpu_type: k80
-          gpu_count: 1
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
@@ -52,6 +49,8 @@ tensorflow:
           zone: eastus
 """
 
+GPU = 'gpu'
+CPU = 'cpu'
 flags.DEFINE_enum('tf_model', 'vgg16',
                   ['vgg11', 'vgg16', 'vgg19', 'lenet', 'googlenet', 'overfeat',
                    'alexnet', 'trivial', 'inception3', 'inception4', 'resnet50',
@@ -66,15 +65,28 @@ flags.DEFINE_enum('tf_variable_update', 'parameter_server',
                    'distributed_replicated', 'independent'],
                   '''The method for managing variables: parameter_server,
                   replicated, distributed_replicated, independent''')
-flags.DEFINE_enum('tf_local_parameter_device', 'gpu', ['cpu', 'gpu'],
+flags.DEFINE_enum('tf_local_parameter_device', GPU, [CPU, GPU],
                   '''Device to use as parameter server: cpu or gpu. For
                   distributed training, it can affect where caching of
                   variables happens.''')
+flags.DEFINE_enum('tf_device', GPU, [CPU, GPU],
+                  'Device to use for computation: cpu or gpu')
+flags.DEFINE_enum('tf_data_format', 'NCHW', ['NCHW', 'NHWC'], '''Data layout to
+                  use: NHWC (TF native) or NCHW (cuDNN native).''')
 flags.DEFINE_boolean('tf_use_nccl', True,
                      'Whether to use nccl all-reduce primitives where possible')
 flags.DEFINE_boolean('tf_distortions', True,
                      '''Enable/disable distortions during image preprocessing.
                      These include bbox and color distortions.''')
+
+
+def LocalParameterDeviceValidator(value):
+  if FLAGS.tf_device == CPU:
+    return value == CPU
+  return True
+
+flags.register_validator('tf_local_parameter_device',
+                         LocalParameterDeviceValidator)
 
 
 DEFAULT_BATCH_SIZE = 64
@@ -106,7 +118,7 @@ def _GetDefaultBatchSizeByModel(model):
 
 
 def _GetBatchSize(model):
- return FLAGS.tf_batch_size or _GetDefaultBatchSizeByModel(model)
+  return FLAGS.tf_batch_size or _GetDefaultBatchSizeByModel(model)
 
 
 def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
@@ -120,6 +132,8 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.batch_size = _GetBatchSize(benchmark_spec.model)
   benchmark_spec.variable_update = FLAGS.tf_variable_update
   benchmark_spec.local_parameter_device = FLAGS.tf_local_parameter_device
+  benchmark_spec.device = FLAGS.tf_device
+  benchmark_spec.data_format = FLAGS.tf_data_format
   benchmark_spec.use_nccl = FLAGS.tf_use_nccl
   benchmark_spec.distortions = FLAGS.tf_distortions
 
@@ -133,10 +147,6 @@ def Prepare(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vms = benchmark_spec.vms
   master_vm = vms[0]
-  logging.info('Installing CUDA Toolkit 8.0 on %s', master_vm)
-  master_vm.Install('cuda_toolkit_8')
-  benchmark_spec.num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
-  master_vm.Install('cudnn')
   master_vm.Install('tensorflow')
   master_vm.RemoteCommand(
       'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
@@ -153,13 +163,16 @@ def _CreateMetadataDict(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   metadata = dict()
-  metadata.update(cuda_toolkit_8.GetMetadata(vm))
+  if benchmark_spec.device == GPU:
+    metadata.update(cuda_toolkit_8.GetMetadata(vm))
+    metadata['num_gpus'] = benchmark_spec.num_gpus
   metadata['model'] = benchmark_spec.model
-  metadata['num_gpus'] = benchmark_spec.num_gpus
   metadata['data_name'] = benchmark_spec.data_name
   metadata['batch_size'] = benchmark_spec.batch_size
   metadata['variable_update'] = benchmark_spec.variable_update
   metadata['local_parameter_device'] = benchmark_spec.local_parameter_device
+  metadata['device'] = benchmark_spec.device
+  metadata['data_format'] = benchmark_spec.data_format
   metadata['use_nccl'] = benchmark_spec.use_nccl
   metadata['distortions'] = benchmark_spec.distortions
   return metadata
@@ -174,7 +187,6 @@ def _GetEnvironmentVars(vm):
   Returns:
     string of environment variables
   """
-
   output, _ = vm.RemoteCommand('getconf LONG_BIT', should_log=True)
   long_bit = output.strip()
   lib_name = 'lib' if long_bit == '32' else 'lib64'
@@ -235,20 +247,25 @@ def Run(benchmark_spec):
   master_vm = vms[0]
   tf_cnn_benchmark_dir = 'benchmarks/scripts/tf_cnn_benchmarks'
   tf_cnn_benchmark_cmd = (
-      'python tf_cnn_benchmarks.py --local_parameter_device=%s --num_gpus=%s '
+      'python tf_cnn_benchmarks.py --local_parameter_device=%s '
       '--batch_size=%s --model=%s --data_name=%s --variable_update=%s '
-      '--use_nccl=%s --distortions=%s') % (
+      '--use_nccl=%s --distortions=%s --device=%s --data_format=%s') % (
           benchmark_spec.local_parameter_device,
-          benchmark_spec.num_gpus,
           benchmark_spec.batch_size,
           benchmark_spec.model,
           benchmark_spec.data_name,
           benchmark_spec.variable_update,
           benchmark_spec.use_nccl,
-          benchmark_spec.distortions)
-  run_command = 'cd %s && %s %s' % (tf_cnn_benchmark_dir,
-                                    _GetEnvironmentVars(master_vm),
-                                    tf_cnn_benchmark_cmd)
+          benchmark_spec.distortions,
+          benchmark_spec.device,
+          benchmark_spec.data_format)
+  if benchmark_spec.device == GPU:
+    benchmark_spec.num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
+    tf_cnn_benchmark_cmd = '%s %s --num_gpus=%s' % (
+        _GetEnvironmentVars(master_vm), tf_cnn_benchmark_cmd,
+        benchmark_spec.num_gpus)
+  run_command = 'cd %s && %s' % (tf_cnn_benchmark_dir,
+                                 tf_cnn_benchmark_cmd)
   output, _ = master_vm.RobustRemoteCommand(run_command, should_log=True)
   return _MakeSamplesFromOutput(benchmark_spec, output)
 
