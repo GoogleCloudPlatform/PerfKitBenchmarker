@@ -98,6 +98,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.bandwidth_out = FLAGS.ali_bandwidth_out
     self.scratch_disk_size = FLAGS.scratch_disk_size or DEFAULT_DISK_SIZE
     self.system_disk_type = FLAGS.ali_system_disk_type
+    self.eip_address_bandwidth = FLAGS.ali_eip_address_bandwidth
     self.network = ali_network.AliNetwork.GetNetwork(self)
     self.firewall = ali_network.AliFirewall.GetFirewall()
 
@@ -144,7 +145,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
           'ecs',
           'AllocateEipAddress',
           '--RegionId %s' % region,
-          '--InternetChargeType PayByTraffic']
+          '--InternetChargeType PayByTraffic',
+          '--Bandwidth %s' % self.eip_address_bandwidth]
       allocatip_cmd = util.GetEncodedCmd(allocatip_cmd)
       stdout, _ = vm_util.IssueRetryableCommand(allocatip_cmd)
       response = json.loads(stdout)
