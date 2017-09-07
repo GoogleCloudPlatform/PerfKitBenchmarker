@@ -213,6 +213,28 @@ class AliFirewall(network.BaseFirewall):
     self.firewall_set = set()
     self._lock = threading.Lock()
 
+  def AllowIcmp(self, vm):
+    """Opens the ICMP protocol on the firewall.
+
+    Args:
+      vm: The BaseVirtualMachine object to open the ICMP protocol for.
+    """
+    if vm.is_static:
+      return
+    with self._lock:
+      authorize_cmd = util.ALI_PREFIX + [
+          'ecs',
+          'AuthorizeSecurityGroup',
+          '--IpProtocol ICMP',
+          '--PortRange -1/-1',
+          '--SourceCidrIp 0.0.0.0/0',
+          '--RegionId %s' % vm.region,
+          '--SecurityGroupId %s' % vm.group_id]
+      if FLAGS.ali_use_vpc:
+        authorize_cmd.append('--NicType intranet')
+      authorize_cmd = util.GetEncodedCmd(authorize_cmd)
+      vm_util.IssueRetryableCommand(authorize_cmd)
+
   def AllowPort(self, vm, port):
     """Opens a port on the firewall.
 
