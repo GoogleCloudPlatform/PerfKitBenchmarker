@@ -213,7 +213,8 @@ class DefaultMetadataProvider(MetadataProvider):
         # Modern metadata keys
         metadata[name_prefix + 'data_disk_0_type'] = disk_type
         if disk_type == disk.LOCAL and vm.CLOUD == providers.GCP:
-          metadata[name_prefix + 'data_disk_0_interface'] = FLAGS.gce_ssd_interface
+          metadata[
+              name_prefix + 'data_disk_0_interface'] = FLAGS.gce_ssd_interface
         metadata[name_prefix + 'data_disk_count'] = len(vm.scratch_disks)
         metadata[name_prefix + 'data_disk_0_size'] = (
             disk_size * num_stripes if disk_size else disk_size)
