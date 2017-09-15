@@ -14,7 +14,8 @@
 
 """Runs ping.
 
-This benchmark runs ping using the internal, and optionally external, ips of vms in the same zone.
+This benchmark runs ping using the internal, and optionally external, ips of
+vms in the same zone.
 """
 
 import logging
@@ -24,7 +25,8 @@ from perfkitbenchmarker import sample
 import re
 
 flags.DEFINE_boolean('ping_also_run_using_external_ip', False,
-                     'If set to True, the ping command will also be executed using the external ips of the vms.')
+                     'If set to True, the ping command will also be executed '
+                     'using the external ips of the vms.')
 
 FLAGS = flags.FLAGS
 

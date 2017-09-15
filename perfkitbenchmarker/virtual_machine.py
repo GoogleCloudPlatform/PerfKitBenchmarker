@@ -288,7 +288,9 @@ class BaseVirtualMachine(resource.BaseResource):
     return self.scratch_disks[disk_num].mount_point
 
   def AllowIcmp(self):
-    """Opens the ICMP protocol on the firewall corresponding to the VM if one exists."""
+    """Opens the ICMP protocol on the firewall corresponding to the VM if
+    one exists.
+    """
     if self.firewall:
       self.firewall.AllowIcmp(self)
 
