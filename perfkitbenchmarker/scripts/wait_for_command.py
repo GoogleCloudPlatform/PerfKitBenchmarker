@@ -29,6 +29,8 @@ this script will block until command completion, then print
 *Runs on the guest VM. Supports Python 2.6, 2.7, and 3.x.*
 """
 
+from __future__ import print_function
+
 import fcntl
 import optparse
 import os
@@ -78,11 +80,11 @@ def main():
         return_code_str = status.read()
         break
     except IOError:
-      print >> sys.stderr, 'WARNING: file doesn\'t exist, retrying'
+      print('WARNING: file doesn\'t exist, retrying', file=sys.stderr)
       time.sleep(WAIT_SLEEP_IN_SEC)
 
   if not (options.stdout and options.stderr):
-    print >> sys.stdout, 'Command finished.'
+    print('Command finished.')
     return 0
 
   with open(options.stdout, 'r') as stdout:
@@ -90,7 +92,7 @@ def main():
       if return_code_str:
         return_code = int(return_code_str)
       else:
-        print >> sys.stderr, 'WARNING: wrapper script interrupted.'
+        print('WARNING: wrapper script interrupted.', file=sys.stderr)
         return_code = 1
 
       stderr_copier = threading.Thread(target=shutil.copyfileobj,
