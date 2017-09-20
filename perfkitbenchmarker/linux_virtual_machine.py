@@ -167,14 +167,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand(start_command)
 
     def _WaitForCommand():
-      wait_command = ['python', wait_path, '--stdout', stdout_file,
-                      '--stderr', stderr_file,
-                      '--status', status_file]
-      stdout, stderr = None, None
-      while not (stdout or stderr):
-        stdout, stderr = self.RemoteCommand(
+      wait_command = ['python', wait_path, '--status', status_file]
+      stdout = ''
+      while 'Command finished.' not in stdout:
+        stdout, _ = self.RemoteCommand(
             ' '.join(wait_command), should_log=should_log)
-      wait_command.append('--delete')
+      wait_command.extend([
+          '--stdout', stdout_file,
+          '--stderr', stderr_file,
+          '--delete'])
       return self.RemoteCommand(' '.join(wait_command), should_log=should_log)
 
     try:
