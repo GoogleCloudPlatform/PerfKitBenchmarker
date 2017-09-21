@@ -42,21 +42,16 @@ STANDARD_DISK = 'Standard_LRS'
 DISK_TYPE = {disk.STANDARD: STANDARD_DISK,
              disk.REMOTE_SSD: PREMIUM_STORAGE}
 
+HOST_CACHING = 'host_caching'
+
 AZURE = 'Azure'
 disk.RegisterDiskTypeMap(AZURE, DISK_TYPE)
-
-PREMIUM_STORAGE_METADATA = {
-    disk.MEDIA: disk.SSD,
-    disk.REPLICATION: disk.ZONE,
-    disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD
-}
 
 AZURE_REPLICATION_MAP = {
     azure_flags.LRS: disk.ZONE,
     azure_flags.ZRS: disk.REGION,
-    # Deliberately omitting PLRS, because that is handled by
-    # PREMIUM_STORAGE_METADATA, and (RA)GRS, because those are
-    # asynchronously replicated.
+    # Deliberately omitting PLRS, because that is set explicty in __init__,
+    # and (RA)GRS, because those are asynchronously replicated.
 }
 
 LOCAL_SSD_PREFIXES = {
@@ -91,12 +86,18 @@ class AzureDisk(disk.BaseDisk):
     self._deleted = False
 
     if self.disk_type == PREMIUM_STORAGE:
-      self.metadata = PREMIUM_STORAGE_METADATA
+      self.metadata = {
+          disk.MEDIA: disk.SSD,
+          disk.REPLICATION: disk.ZONE,
+          disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD,
+          HOST_CACHING: self.host_caching,
+      }
     elif self.disk_type == STANDARD_DISK:
       self.metadata = {
           disk.MEDIA: disk.HDD,
           disk.REPLICATION: AZURE_REPLICATION_MAP[FLAGS.azure_storage_type],
-          disk.LEGACY_DISK_TYPE: disk.STANDARD
+          disk.LEGACY_DISK_TYPE: disk.STANDARD,
+          HOST_CACHING: self.host_caching,
       }
     elif self.disk_type == disk.LOCAL:
       media = disk.SSD if LocalDiskIsSSD(machine_type) else disk.HDD
