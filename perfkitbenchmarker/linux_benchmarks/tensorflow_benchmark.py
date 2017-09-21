@@ -51,6 +51,8 @@ tensorflow:
 
 GPU = 'gpu'
 CPU = 'cpu'
+flags.DEFINE_boolean('tf_forward_only', False, '''whether use forward-only or
+                     training for benchmarking''')
 flags.DEFINE_enum('tf_model', 'vgg16',
                   ['vgg11', 'vgg16', 'vgg19', 'lenet', 'googlenet', 'overfeat',
                    'alexnet', 'trivial', 'inception3', 'inception4', 'resnet50',
@@ -127,6 +129,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   Args:
     benchmark_spec: benchmark specification to update
   """
+  benchmark_spec.forward_only = FLAGS.tf_forward_only
   benchmark_spec.model = FLAGS.tf_model
   benchmark_spec.data_name = FLAGS.tf_data_name
   benchmark_spec.batch_size = _GetBatchSize(benchmark_spec.model)
@@ -166,6 +169,7 @@ def _CreateMetadataDict(benchmark_spec):
   if benchmark_spec.device == GPU:
     metadata.update(cuda_toolkit_8.GetMetadata(vm))
     metadata['num_gpus'] = benchmark_spec.num_gpus
+  metadata['forward_only'] = benchmark_spec.forward_only
   metadata['model'] = benchmark_spec.model
   metadata['data_name'] = benchmark_spec.data_name
   metadata['batch_size'] = benchmark_spec.batch_size
@@ -249,7 +253,8 @@ def Run(benchmark_spec):
   tf_cnn_benchmark_cmd = (
       'python tf_cnn_benchmarks.py --local_parameter_device=%s '
       '--batch_size=%s --model=%s --data_name=%s --variable_update=%s '
-      '--use_nccl=%s --distortions=%s --device=%s --data_format=%s') % (
+      '--use_nccl=%s --distortions=%s --device=%s --data_format=%s '
+      '--forward_only=%s') % (
           benchmark_spec.local_parameter_device,
           benchmark_spec.batch_size,
           benchmark_spec.model,
@@ -258,7 +263,8 @@ def Run(benchmark_spec):
           benchmark_spec.use_nccl,
           benchmark_spec.distortions,
           benchmark_spec.device,
-          benchmark_spec.data_format)
+          benchmark_spec.data_format,
+          benchmark_spec.forward_only)
   if benchmark_spec.device == GPU:
     benchmark_spec.num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
     tf_cnn_benchmark_cmd = '%s %s --num_gpus=%s' % (
