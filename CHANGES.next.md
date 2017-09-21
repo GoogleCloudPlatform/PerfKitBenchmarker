@@ -32,3 +32,4 @@ Bug fixes and maintenance updates:
 - Changed default AWS P2 region for gpu benchmarks (GH-1454)
 - Fix multi-threading issue in fio.job filename (GH-1474)
 - Decreased speccpu2006 default disk size to 50gb (GH-1484)
+- Added azure_host_caching to metadata (GH-1500)
