@@ -23,19 +23,33 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import fio
 
+BASE_METADATA = {'foo': 'bar'}
+
+
+def _ReadFileToString(filename):
+  """Helper function to read a file into a string."""
+  with open(filename) as f:
+    return f.read()
+
+
+def _ExtractHistogramFromMetric(results, sample_name):
+  """Search results for given metric and extract the embedded histogram."""
+  for r in results:
+    if r.metric == sample_name:
+      return json.loads(r.metadata['histogram'])
+  return None
+
 
 class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   maxDiff = None
 
   def setUp(self):
-    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
-    result_path = os.path.join(data_dir, 'fio-parser-sample-result.json')
-    with open(result_path) as result_file:
-      self.result_contents = json.loads(result_file.read())
-    job_file_path = os.path.join(data_dir, 'fio.job')
-    with open(job_file_path) as job_file:
-      self.job_contents = job_file.read()
+    self.data_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'fio')
+    result_path = os.path.join(self.data_dir, 'fio-parser-sample-result.json')
+    self.result_contents = json.loads(_ReadFileToString(result_path))
+    job_file_path = os.path.join(self.data_dir, 'fio.job')
+    self.job_contents = _ReadFileToString(job_file_path)
 
   def tearDown(self):
     pass
@@ -363,8 +377,6 @@ class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
       self.assertSampleListsEqualUpToTimestamp(result, expected_result)
 
   def testParseResultsBaseMetadata(self):
-    BASE_METADATA = {'foo': 'bar'}
-
     with mock.patch(
         fio.__name__ + '.ParseJobFile',
         return_value={
@@ -427,6 +439,43 @@ class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             fio.DeleteParameterFromJobFile(original_job_file, 'directory'),
             'filename'))
 
+  def testParseHistogramMultipleJobs(self):
+    hist_dir = os.path.join(self.data_dir, 'hist')
+    job_file = _ReadFileToString(
+        os.path.join(hist_dir, 'pkb-7fb0c9d8-0_fio.job'))
+    fio_json_result = json.loads(_ReadFileToString(
+        os.path.join(hist_dir, 'pkb-7fb0c9d8-0_fio.json')))
+    log_file_base = 'pkb_fio_avg_1506559526.49'
+
+    single_bin_vals = [float(f) for f in _ReadFileToString(
+        os.path.join(hist_dir, 'bin_vals')).split()]
+    # each hist file has its own bin_vals, but they're all the same
+    bin_vals = [single_bin_vals, single_bin_vals,
+                single_bin_vals, single_bin_vals]
+
+    # redirect open to the hist subdirectory
+    def OpenTestFile(filename):
+      return open(os.path.join(hist_dir, os.path.basename(filename)))
+
+    with mock.patch(fio.__name__ + '.open',
+                    new=mock.MagicMock(side_effect=OpenTestFile),
+                    create=True):
+      results = fio.ParseResults(job_file, fio_json_result, None,
+                                 log_file_base, bin_vals)
+
+    actual_read_hist = _ExtractHistogramFromMetric(
+        results,
+        'rand_16k_read_100%-io-depth-1-num-jobs-2:16384:read:histogram')
+    expected_read_hist = json.loads(
+        _ReadFileToString(os.path.join(hist_dir, 'expected_read.json')))
+    self.assertEqual(expected_read_hist, actual_read_hist)
+
+    actual_write_hist = _ExtractHistogramFromMetric(
+        results,
+        'rand_16k_write_100%-io-depth-1-num-jobs-2:16384:write:histogram')
+    expected_write_hist = json.loads(
+        _ReadFileToString(os.path.join(hist_dir, 'expected_write.json')))
+    self.assertEqual(expected_write_hist, actual_write_hist)
 
 if __name__ == '__main__':
   unittest.main()
