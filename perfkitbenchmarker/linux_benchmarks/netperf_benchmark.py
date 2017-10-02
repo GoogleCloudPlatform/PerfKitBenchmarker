@@ -123,7 +123,7 @@ def Prepare(benchmark_spec):
   num_streams = max(FLAGS.netperf_num_streams)
 
   # See comments where _COS_RE is defined.
-  if re.search(_COS_RE, vms[1].image):
+  if vms[1].image and re.search(_COS_RE, vms[1].image):
     _SetupHostFirewall(benchmark_spec)
 
   # Start the netserver processes
