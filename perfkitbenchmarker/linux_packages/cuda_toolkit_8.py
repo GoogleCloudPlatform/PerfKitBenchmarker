@@ -289,7 +289,7 @@ def _InstallCuda(vm):
   vm.RemoteCommand('wget %s' % CUDA_TOOLKIT_UBUNTU_URL)
   vm.RemoteCommand('sudo dpkg -i %s' % CUDA_TOOLKIT_UBUNTU)
   vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo apt-get install -y cuda')
+  vm.RemoteCommand('sudo apt-get install -y cuda-8-0')
 
 
 def AptInstall(vm):
