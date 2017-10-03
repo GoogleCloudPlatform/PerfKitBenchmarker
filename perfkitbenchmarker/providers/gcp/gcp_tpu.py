@@ -23,7 +23,6 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.gcp import util
 
-DEFAULT_CLOUD_SPANNER_CONFIG = 'regional-us-central1'
 TPU_TIMEOUT = 1200
 
 FLAGS = flags.FLAGS
@@ -55,18 +54,20 @@ class GcpCloudTpu(resource.BaseResource):
 
   def _Create(self):
     """Create Cloud TPU."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'list')
-    cmd.flags['project'] = self.project
-    cmd.flags['zone'] = self.zone
-    stdout, _, retcode = cmd.Issue()
-    if retcode != 0:
-      logging.error('List GCP cloud TPU failed.')
-      return
+    def List():
+      cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'list')
+      cmd.flags['project'] = self.project
+      cmd.flags['zone'] = self.zone
+      stdout, _, retcode = cmd.Issue()
+      if retcode != 0:
+        logging.error('List GCP cloud TPU failed.')
+        return
+      result = json.loads(stdout)
+      return [tpu['ipAddress'] for tpu in result]
 
-    result = json.loads(stdout)
-    tpu_ips_cidr = [tpu['ipAddress'] for tpu in result]
     cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'create',
                              self.name)
+    tpu_ips_cidr = List()
     for i in range(2 ** 8):
       self.tpu_ip = self.tpu_ip.format(i)
       if self.tpu_ip not in tpu_ips_cidr:
