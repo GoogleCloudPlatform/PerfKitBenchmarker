@@ -89,14 +89,12 @@ class AzureDisk(disk.BaseDisk):
       self.metadata = {
           disk.MEDIA: disk.SSD,
           disk.REPLICATION: disk.ZONE,
-          disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD,
           HOST_CACHING: self.host_caching,
       }
     elif self.disk_type == STANDARD_DISK:
       self.metadata = {
           disk.MEDIA: disk.HDD,
           disk.REPLICATION: AZURE_REPLICATION_MAP[FLAGS.azure_storage_type],
-          disk.LEGACY_DISK_TYPE: disk.STANDARD,
           HOST_CACHING: self.host_caching,
       }
     elif self.disk_type == disk.LOCAL:
@@ -105,7 +103,6 @@ class AzureDisk(disk.BaseDisk):
       self.metadata = {
           disk.MEDIA: media,
           disk.REPLICATION: disk.NONE,
-          disk.LEGACY_DISK_TYPE: disk.LOCAL
       }
 
   def _Create(self):

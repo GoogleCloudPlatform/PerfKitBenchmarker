@@ -52,16 +52,16 @@ class GcpDiskMetadataTest(_DiskMetadataTestCase):
     disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_size=2,
                                   disk_type=gce_disk.PD_STANDARD)
     disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
-    self.assertEqual(disk_obj.metadata,
-                     {disk.MEDIA: disk.HDD,
-                      disk.REPLICATION: disk.ZONE,
-                      disk.LEGACY_DISK_TYPE: disk.STANDARD})
+    self.assertDictContainsSubset(
+        {disk.MEDIA: disk.HDD, disk.REPLICATION: disk.ZONE},
+        disk_obj.metadata
+    )
 
 
 class AwsDiskMetadataTest(_DiskMetadataTestCase):
 
   def DoAwsDiskTest(self, disk_type, machine_type,
-                    goal_media, goal_replication, goal_legacy_disk_type):
+                    goal_media, goal_replication):
     disk_spec = aws_disk.AwsDiskSpec(_COMPONENT, disk_size=2,
                                      disk_type=disk_type)
 
@@ -72,32 +72,30 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
 
     vm.CreateScratchDisk(disk_spec)
 
-    self.assertEqual(vm.scratch_disks[0].metadata,
-                     {disk.MEDIA: goal_media,
-                      disk.REPLICATION: goal_replication,
-                      disk.LEGACY_DISK_TYPE: goal_legacy_disk_type})
+    self.assertDictContainsSubset(
+        {disk.MEDIA: goal_media, disk.REPLICATION: goal_replication},
+        vm.scratch_disks[0].metadata
+    )
 
   def testLocalSSD(self):
     self.DoAwsDiskTest(
         disk.LOCAL,
         'c3.2xlarge',
         disk.SSD,
-        disk.NONE,
-        disk.LOCAL)
+        disk.NONE)
 
   def testLocalHDD(self):
     self.DoAwsDiskTest(
         disk.LOCAL,
         'd2.2xlarge',
         disk.HDD,
-        disk.NONE,
-        disk.LOCAL)
+        disk.NONE)
 
 
 class AzureDiskMetadataTest(_DiskMetadataTestCase):
 
   def DoAzureDiskTest(self, storage_type, disk_type, machine_type,
-                      goal_media, goal_replication, goal_legacy_disk_type,
+                      goal_media, goal_replication,
                       goal_host_caching):
     with mock.patch(azure_disk.__name__ + '.FLAGS') as disk_flags:
       disk_flags.azure_storage_type = storage_type
@@ -115,8 +113,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
       vm.CreateScratchDisk(disk_spec)
 
       expected = {disk.MEDIA: goal_media,
-                  disk.REPLICATION: goal_replication,
-                  disk.LEGACY_DISK_TYPE: goal_legacy_disk_type}
+                  disk.REPLICATION: goal_replication}
       if goal_host_caching:
         expected[azure_disk.HOST_CACHING] = goal_host_caching
       self.assertEqual(vm.scratch_disks[0].metadata, expected)
@@ -127,7 +124,6 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                          'Standard_D1',
                          disk.SSD,
                          disk.ZONE,
-                         disk.REMOTE_SSD,
                          azure_flags.READ_ONLY)
 
   def testStandardDisk(self):
@@ -136,7 +132,6 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                          'Standard_D1',
                          disk.HDD,
                          disk.REGION,
-                         disk.STANDARD,
                          azure_flags.NONE)
 
   def testLocalHDD(self):
@@ -145,7 +140,6 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                          'Standard_A1',
                          disk.HDD,
                          disk.NONE,
-                         disk.LOCAL,
                          None)
 
   def testLocalSSD(self):
@@ -154,7 +148,6 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                          'Standard_DS2',
                          disk.SSD,
                          disk.NONE,
-                         disk.LOCAL,
                          None)
 
 

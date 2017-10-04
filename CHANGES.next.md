@@ -1,5 +1,6 @@
 Breaking changes:
 - Removed gpus_per_node metadata from stencil2d and hpcg benchmarks (GH-1455)
+- Removed legacy disk type metadata (use data_disk\* not scratch_disk\*)
 
 New features:
 - Added YCSB benchmark for Cloud Spanner (GH-1387 from @haih-g)

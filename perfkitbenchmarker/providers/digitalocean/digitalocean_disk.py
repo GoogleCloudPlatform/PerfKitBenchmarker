@@ -31,13 +31,11 @@ BLOCK_STORAGE = 'block-storage'
 LOCAL_DISK_METADATA = {
     disk.MEDIA: disk.SSD,
     disk.REPLICATION: disk.NONE,
-    disk.LEGACY_DISK_TYPE: disk.LOCAL
 }
 
 BLOCK_STORAGE_METADATA = {
     disk.MEDIA: disk.SSD,
     disk.REPLICATION: disk.ZONE,
-    disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD
 }
 
 # Map legacy disk types to DigitalOcean disk types.
