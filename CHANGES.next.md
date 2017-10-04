@@ -33,3 +33,4 @@ Bug fixes and maintenance updates:
 - Fix multi-threading issue in fio.job filename (GH-1474)
 - Decreased speccpu2006 default disk size to 50gb (GH-1484)
 - Added azure_host_caching to metadata (GH-1500)
+- Fixed fio histograms when generated with numjobs>1 (GH-1501)
