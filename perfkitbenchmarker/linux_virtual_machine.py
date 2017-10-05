@@ -378,7 +378,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
-    """Waits until VM is has booted."""
+    """Waits until VM has booted."""
     resp, _ = self.RemoteHostCommand('hostname', retries=1,
                                      suppress_warning=True)
     if self.bootable_time is None:

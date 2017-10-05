@@ -95,7 +95,7 @@ flags.DEFINE_boolean('ycsb_include_individual_results', False,
                      'Include results from each client VM, rather than just '
                      'combined results.')
 flags.DEFINE_boolean('ycsb_reload_database', True,
-                     'Reload database, othewise skip load stage. '
+                     'Reload database, otherwise skip load stage. '
                      'Note, this flag is only used if the database '
                      'is already loaded.')
 flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.',
@@ -107,7 +107,7 @@ flags.DEFINE_list('ycsb_load_parameters', [],
                   'Passed to YCSB during the load stage. Comma-separated list '
                   'of "key=value" pairs.')
 flags.DEFINE_list('ycsb_run_parameters', [],
-                  'Passed to YCSB during the load stage. Comma-separated list '
+                  'Passed to YCSB during the run stage. Comma-separated list '
                   'of "key=value" pairs.')
 flags.DEFINE_list('ycsb_threads_per_client', ['32'], 'Number of threads per '
                   'loader during the benchmark run. Specify a list to vary the '
@@ -499,7 +499,6 @@ class YCSBExecutor(object):
 
   Attributes:
     database: str.
-    loaded: boolean. If the database is already loaded.
     parameters: dict. May contain the following, plus database-specific fields
       (e.g., columnfamily for HBase).
 
@@ -527,7 +526,6 @@ class YCSBExecutor(object):
 
   def __init__(self, database, parameter_files=None, **kwargs):
     self.database = database
-    self.loaded = False
     self.parameter_files = parameter_files or []
     self.parameters = kwargs.copy()
     # Self-defined parameters, pop them out of self.parameters, so they
@@ -771,10 +769,9 @@ class YCSBExecutor(object):
     workloads = workloads or _GetWorkloadFileList()
     load_samples = []
     assert workloads, 'no workloads'
-    if FLAGS.ycsb_reload_database or not self.loaded:
+    if FLAGS.ycsb_reload_database:
         load_samples += list(self._LoadThreaded(
             vms, workloads[0], **(load_kwargs or {})))
-        self.loaded = True
     if FLAGS.ycsb_load_samples:
       return load_samples
     else:
