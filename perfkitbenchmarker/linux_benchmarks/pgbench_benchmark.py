@@ -13,9 +13,6 @@
 # limitations under the License.
 """Pgbench"""
 
-# TODO(ferneyhough):
-# - save raw pgbench output and push to gcs bucket
-
 import time
 
 from perfkitbenchmarker import configs
@@ -84,9 +81,10 @@ pgbench:
           zone: us-central1-c
 """
 
+
 TEST_DB_NAME = 'perftest'
 DEFAULT_DB_NAME = 'postgres'
-MAX_JOBS = 16 # TODO(ferneyhough): use test VM num_cpus
+MAX_JOBS = 16  # TODO(ferneyhough): use test VM num_cpus
 
 
 def GetConfig(user_config):
@@ -111,6 +109,7 @@ def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
   benchmark_spec.seconds_per_test = FLAGS.pgbench_seconds_per_test
   benchmark_spec.seconds_to_pause = FLAGS.pgbench_seconds_to_pause_before_steps
   benchmark_spec.client_counts = FLAGS.pgbench_client_counts
+
 
 def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]

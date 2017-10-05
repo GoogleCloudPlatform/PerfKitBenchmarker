@@ -26,9 +26,11 @@ from perfkitbenchmarker.providers.aws import aws_network
 
 FLAGS = flags.FLAGS
 
+
 DEFAULT_MYSQL_VERSION = '5.7.11'
 DEFAULT_POSTGRES_VERSION = '9.6.2'
 DEFAULT_POSTGRES_PORT = 5432
+
 
 class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """An object representing an AWS managed relational database.
@@ -53,11 +55,21 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     metadata.update({
       'zone': self.primary_zone,
     })
+
     if self.spec.high_availability:
       metadata.update({
           'secondary_zone': self.secondary_zone,
       })
+
     return metadata
+
+  def _GetNetwork(self):
+    if not hasattr(self.spec, 'network'):
+      raise Exception('Cannot create AwsManagedRelationalDb: '
+                      'no network available. Call AddNetwork() '
+                      'before calling Create()')
+
+    return self.network
 
   @staticmethod
   def GetDefaultDatabaseVersion(database):
@@ -83,7 +95,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _GetNewZones(self):
     # Get a list of zones, excluding the one that the VM is in.
-    zone =  self.spec.vm_spec.zone
+    zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     get_zones_cmd = util.AWS_PREFIX + [
         'ec2',
@@ -105,9 +117,10 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         new_subnet_zone = new_subnet_zones.pop()
         logging.info('Attempting to create a second subnet in zone %s',
                      new_subnet_zone)
-        new_subnet = aws_network.AwsSubnet(new_subnet_zone,
-                                           self.network.regional_network.vpc.id,
-                                           '10.0.1.0/24')
+        new_subnet = (
+            aws_network.AwsSubnet(new_subnet_zone,
+                                  self._GetNetwork().regional_network.vpc.id,
+                                  '10.0.1.0/24'))
         new_subnet.Create()
         logging.info('Successfully created a new subnet, subnet id is: %s',
                      new_subnet.id)
@@ -121,7 +134,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _CreateDbSubnetGroup(self, new_subnet):
     # Now we can create a new DB subnet group that has two subnets in it.
-    zone =  self.spec.vm_spec.zone
+    zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     db_subnet_group_name = 'pkb-db-subnet-group-{0}'.format(FLAGS.run_uri)
     create_db_subnet_group_cmd = util.AWS_PREFIX + [
@@ -129,18 +142,19 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         'create-db-subnet-group',
         '--db-subnet-group-name', db_subnet_group_name,
         '--db-subnet-group-description', 'pkb_subnet_group_for_db',
-        '--subnet-ids', self.network.subnet.id, new_subnet.id,
+        '--subnet-ids', self._GetNetwork().subnet.id, new_subnet.id,
         '--region', region]
     stdout, stderr, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
     # save for cleanup
     self.spec.db_subnet_group_name = db_subnet_group_name
 
   def _SetupNetworking(self):
-    zone =  self.spec.vm_spec.zone
+    zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     new_subnet = self._CreateSubnetInAdditionalZone()
     self._CreateDbSubnetGroup(new_subnet)
-    group_id = self.network.regional_network.vpc.default_security_group_id
+    group_id = (self._GetNetwork().regional_network.
+                vpc.default_security_group_id)
 
     open_port_cmd = util.AWS_PREFIX + [
         'ec2',
@@ -155,7 +169,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
                  stdout, stderr)
 
   def _TeardownNetworking(self):
-    zone =  self.spec.vm_spec.zone
+    zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     if hasattr(self.spec, 'db_subnet_group_name'):
       delete_db_subnet_group_cmd = util.AWS_PREFIX + [
@@ -170,7 +184,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _Create(self):
     """Creates the AWS RDS instance"""
-    group_id = self.network.regional_network.vpc.default_security_group_id
+    group_id = self._GetNetwork().regional_network.vpc.default_security_group_id
     cmd = util.AWS_PREFIX + [
         'rds',
         'create-db-instance',
@@ -252,7 +266,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    timeout = 60 * 60 * 3 # 3 hours. (RDS HA takes a long time to prepare)
+    timeout = 60 * 60 * 3  # 3 hours. (RDS HA takes a long time to prepare)
     cmd = util.AWS_PREFIX + [
         'rds',
         'describe-db-instances',
@@ -263,7 +277,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     while True:
       if (datetime.datetime.now() - start_time).seconds > timeout:
-        loggine.exception('Timeout waiting for sql instance to be ready')
+        logging.exception('Timeout waiting for sql instance to be ready')
         return False
       time.sleep(5)
       stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)

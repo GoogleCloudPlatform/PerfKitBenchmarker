@@ -15,12 +15,8 @@
 """Tests for pgbench benchmark."""
 import os
 import unittest
-
 import mock
-from mock import ANY
-from mock import call
 
-from perfkitbenchmarker import flag_util
 from perfkitbenchmarker.linux_benchmarks import pgbench_benchmark
 
 

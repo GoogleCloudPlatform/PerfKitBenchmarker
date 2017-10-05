@@ -105,13 +105,10 @@ class BaseManagedRelationalDb(resource.BaseResource):
     super(BaseManagedRelationalDb, self).__init__()
     self.spec = managed_relational_db_spec
 
-  def AddClientVms(self, vms):
+  def SetNetwork(self, network):
     # TODO(ferneyhough): assert # of VMs, and that VM(s) are in same
     # region as DB
-    self.client_vms = vms
-    if not self.client_vms:
-      return
-    self.network = vms[0].network
+    self.network = network
 
   def MakePsqlConnectionString(self, database_name):
     return '\'host={0} user={1} password={2} dbname={3}\''.format(

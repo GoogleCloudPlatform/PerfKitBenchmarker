@@ -220,16 +220,15 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    timeout = 600 # 10 minutes
+    timeout = 600  # 10 minutes
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
     start_time = datetime.datetime.now()
 
     while True:
       if (datetime.datetime.now() - start_time).seconds > timeout:
-        loggine.exception('Timeout waiting for sql instance to be ready')
+        logging.exception('Timeout waiting for sql instance to be ready')
         return False
-      time.sleep(5)
       stdout, _, retcode = cmd.Issue(suppress_warning=True)
 
       try:
@@ -241,6 +240,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       except:
         logging.exception('Error attempting to read stdout. Creation failure.')
         return False
+      time.sleep(5)
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = self.MYSQL_DEFAULT_PORT
     return True
@@ -266,7 +266,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     subprocess.check_call([enable_ha_script_path], shell=True,
                           env=dict(os.environ, INSTANCENAME=self.instance_id))
     print 'Done. Waiting for 5 minutes for changes to take effect'
-    time.sleep(5*60)
+    time.sleep(5 * 60)
 
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.

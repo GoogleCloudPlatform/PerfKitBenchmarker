@@ -148,7 +148,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertIn('database-version=POSTGRES_9_6', command_string)
       self.assertIn('--cpu=1', command_string)
-      self.assertIn('--ram=3840', command_string)
+      self.assertIn('--memory=3840MiB', command_string)
 
   def testCreateWithBackupDisabled(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -222,7 +222,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     with self._PatchCriticalObjects():
       db = self.createManagedDbFromSpec(self.createMySQLSpecDict())
       self.assertEquals('', db._ParseEndpoint(None))
-      self.assertIn('pkb-db-instance-123',
+      self.assertIn('10.10.0.35',
                     db._ParseEndpoint(json.loads(test_output)))
 
   def testValidateSpec(self):
