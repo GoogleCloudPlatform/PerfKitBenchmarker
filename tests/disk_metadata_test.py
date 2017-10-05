@@ -96,12 +96,14 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
 
   def DoAzureDiskTest(self, storage_type, disk_type, machine_type,
                       goal_media, goal_replication,
-                      goal_host_caching):
+                      goal_host_caching, disk_size=2,
+                      goal_size=2, goal_stripes=1):
     with mock.patch(azure_disk.__name__ + '.FLAGS') as disk_flags:
       disk_flags.azure_storage_type = storage_type
       disk_flags.azure_host_caching = goal_host_caching
-      disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_size=2,
-                                    disk_type=disk_type)
+      disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_size=disk_size,
+                                    disk_type=disk_type,
+                                    num_striped_disks=goal_stripes)
 
       vm_spec = virtual_machine.BaseVmSpec(
           'test_vm_spec.AZURE', zone='East US 2', machine_type=machine_type)
@@ -110,10 +112,13 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
 
       azure_disk.AzureDisk.Create = mock.Mock()
       azure_disk.AzureDisk.Attach = mock.Mock()
+      vm.StripeDisks = mock.Mock()
       vm.CreateScratchDisk(disk_spec)
 
       expected = {disk.MEDIA: goal_media,
-                  disk.REPLICATION: goal_replication}
+                  disk.REPLICATION: goal_replication,
+                  'num_stripes': goal_stripes,
+                  'size': goal_size}
       if goal_host_caching:
         expected[azure_disk.HOST_CACHING] = goal_host_caching
       self.assertDictContainsSubset(expected, vm.scratch_disks[0].metadata)
@@ -149,6 +154,17 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                          disk.SSD,
                          disk.NONE,
                          None)
+
+  def testStripedDisk(self):
+    self.DoAzureDiskTest(azure_flags.LRS,
+                         azure_disk.STANDARD_DISK,
+                         'Standard_D1',
+                         disk.HDD,
+                         disk.ZONE,
+                         azure_flags.READ_ONLY,
+                         disk_size=5,
+                         goal_size=10,
+                         goal_stripes=2)
 
 
 if __name__ == '__main__':

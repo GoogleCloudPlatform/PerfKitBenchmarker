@@ -51,7 +51,7 @@ class BaseResource(object):
     self.metadata = dict()
 
   def GetResourceMetadata(self):
-    """Returns a dictionairy of metadata about the resource."""
+    """Returns a dictionary of metadata about the resource."""
     return self.metadata.copy()
 
   @abc.abstractmethod
