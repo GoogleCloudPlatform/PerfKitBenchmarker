@@ -593,13 +593,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not self.gce_remote_access_firewall_rule:
       super(GceVirtualMachine, self).AllowRemoteAccessPorts()
 
-  def GetMachineTypeDict(self):
-    """Returns a dict containing properties that specify the machine type.
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
 
     Returns:
       dict mapping string property key to value.
     """
-    result = super(GceVirtualMachine, self).GetMachineTypeDict()
+    result = super(GceVirtualMachine, self).GetResourceMetadata()
     for attr_name in 'cpus', 'memory_mib', 'preemptible', 'project':
       attr_value = getattr(self, attr_name)
       if attr_value:

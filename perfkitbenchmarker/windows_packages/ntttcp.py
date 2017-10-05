@@ -91,8 +91,7 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type):
 
   metadata = {'ip_type': ip_type}
   for vm_specifier, vm in ('receiving', receiving_vm), ('sending', sending_vm):
-    metadata['{0}_zone'.format(vm_specifier)] = vm.zone
-    for k, v in vm.GetMachineTypeDict().iteritems():
+    for k, v in vm.GetResourceMetadata().iteritems():
       metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
   return ParseNtttcpResults(stdout, metadata)
