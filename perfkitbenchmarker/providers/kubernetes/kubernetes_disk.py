@@ -330,7 +330,6 @@ class PvcVolume(KubernetesDisk):
         name, self.PROVISIONER or spec.provisioner, spec.parameters)
     self.pvc = PersistentVolumeClaim(
         self.name, self.storage_class.name, spec.disk_size)
-    self.metadata = spec.parameters
 
   def _Create(self):
     self.storage_class.Create()

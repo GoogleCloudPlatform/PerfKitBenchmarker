@@ -86,24 +86,24 @@ class AzureDisk(disk.BaseDisk):
     self._deleted = False
 
     if self.disk_type == PREMIUM_STORAGE:
-      self.metadata = {
+      self.metadata.update({
           disk.MEDIA: disk.SSD,
           disk.REPLICATION: disk.ZONE,
           HOST_CACHING: self.host_caching,
-      }
+      })
     elif self.disk_type == STANDARD_DISK:
-      self.metadata = {
+      self.metadata.update({
           disk.MEDIA: disk.HDD,
           disk.REPLICATION: AZURE_REPLICATION_MAP[FLAGS.azure_storage_type],
           HOST_CACHING: self.host_caching,
-      }
+      })
     elif self.disk_type == disk.LOCAL:
       media = disk.SSD if LocalDiskIsSSD(machine_type) else disk.HDD
 
-      self.metadata = {
+      self.metadata.update({
           disk.MEDIA: media,
           disk.REPLICATION: disk.NONE,
-      }
+      })
 
   def _Create(self):
     """Creates the disk."""

@@ -116,7 +116,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                   disk.REPLICATION: goal_replication}
       if goal_host_caching:
         expected[azure_disk.HOST_CACHING] = goal_host_caching
-      self.assertEqual(vm.scratch_disks[0].metadata, expected)
+      self.assertDictContainsSubset(expected, vm.scratch_disks[0].metadata)
 
   def testPremiumStorage(self):
     self.DoAzureDiskTest(azure_flags.PLRS,

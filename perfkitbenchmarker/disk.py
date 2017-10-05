@@ -305,7 +305,7 @@ class StripedDisk(BaseDisk):
     self.disks = disks
     self.metadata = disks[0].metadata.copy()
     if self.disk_size:
-      self.metdata['size'] = self.disk_size * self.num_striped_disks
+      self.metadata['size'] = self.disk_size * self.num_striped_disks
 
   def _Create(self):
     for disk in self.disks:

@@ -50,7 +50,7 @@ class DigitalOceanLocalDisk(disk.BaseDisk):
 
   def __init__(self, disk_spec):
     super(DigitalOceanLocalDisk, self).__init__(disk_spec)
-    self.metadata = LOCAL_DISK_METADATA
+    self.metadata.update(LOCAL_DISK_METADATA)
 
   def Attach(self, vm):
     pass
@@ -79,7 +79,7 @@ class DigitalOceanBlockStorageDisk(disk.BaseDisk):
     self.zone = zone
     if self.disk_type != BLOCK_STORAGE:
       raise ValueError('DigitalOcean data disks must have type block-storage.')
-    self.metadata = BLOCK_STORAGE_METADATA
+    self.metadata.update(BLOCK_STORAGE_METADATA)
 
   def _Create(self):
     self.volume_name = 'pkb-%s-%s' % (FLAGS.run_uri, self.disk_number)
