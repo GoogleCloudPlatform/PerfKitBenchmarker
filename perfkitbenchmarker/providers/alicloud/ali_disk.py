@@ -117,10 +117,7 @@ class AliDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    if FLAGS.ali_io_optimized is None:
-      return '/dev/xvd%s' % self.device_letter
-    else:
-      return '/dev/vd%s' % self.device_letter
+    return '/dev/vd%s' % self.device_letter
 
   def GetVirtualDevicePath(self):
     """Returns the path to the device visible to console users."""
@@ -129,7 +126,7 @@ class AliDisk(disk.BaseDisk):
   @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def WaitForDiskStatus(self, status_list):
     """Waits until disk is attach to the instance"""
-    logging.info('Waits until the disk\'s stastus is one of statuses: %s',
+    logging.info('Waits until the disk\'s status is one of statuses: %s',
                  status_list)
     describe_cmd = util.ALI_PREFIX + [
         'ecs',

@@ -51,6 +51,14 @@ class BaseFirewall(object):
         benchmark_spec.firewalls[key] = cls()
       return benchmark_spec.firewalls[key]
 
+  def AllowIcmp(self, vm):
+    """Opens the ICMP protocol on the firewall.
+
+    Args:
+      vm: The BaseVirtualMachine object to open the ICMP protocol for.
+    """
+    pass
+
   def AllowPort(self, vm, start_port, end_port=None):
     """Opens a port on the firewall.
 
