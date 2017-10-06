@@ -30,6 +30,7 @@ FLAGS = flags.FLAGS
 DEFAULT_MYSQL_VERSION = '5.7.11'
 DEFAULT_POSTGRES_VERSION = '9.6.2'
 DEFAULT_POSTGRES_PORT = 5432
+IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
 
 
 class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
@@ -126,7 +127,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
                      new_subnet.id)
 
         # save for cleanup
-        self.spec.extra_subnet_for_db = new_subnet
+        self.extra_subnet_for_db = new_subnet
         return new_subnet
       except:
         logging.info('Unable to create subnet in zone %s', new_subnet_zone)
@@ -146,21 +147,21 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--region', region]
     stdout, stderr, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
     # save for cleanup
-    self.spec.db_subnet_group_name = db_subnet_group_name
+    self.db_subnet_group_name = db_subnet_group_name
+    self.security_group_id = (self._GetNetwork().regional_network.
+                              vpc.default_security_group_id)
 
   def _SetupNetworking(self):
     zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     new_subnet = self._CreateSubnetInAdditionalZone()
     self._CreateDbSubnetGroup(new_subnet)
-    group_id = (self._GetNetwork().regional_network.
-                vpc.default_security_group_id)
 
     open_port_cmd = util.AWS_PREFIX + [
         'ec2',
         'authorize-security-group-ingress',
-        '--group-id', group_id,
-        '--source-group', group_id,
+        '--group-id', self.security_group_id,
+        '--source-group', self.security_group_id,
         '--protocol', 'tcp',
         '--port={0}'.format(DEFAULT_POSTGRES_PORT),
         '--region', region]
@@ -171,20 +172,19 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _TeardownNetworking(self):
     zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
-    if hasattr(self.spec, 'db_subnet_group_name'):
+    if hasattr(self, 'db_subnet_group_name'):
       delete_db_subnet_group_cmd = util.AWS_PREFIX + [
           'rds',
           'delete-db-subnet-group',
-          '--db-subnet-group-name', self.spec.db_subnet_group_name,
+          '--db-subnet-group-name', self.db_subnet_group_name,
           '--region', region]
       stdout, stderr, _ = vm_util.IssueCommand(delete_db_subnet_group_cmd)
 
-    if hasattr(self.spec, 'extra_subnet_for_db'):
-      self.spec.extra_subnet_for_db.Delete()
+    if hasattr(self, 'extra_subnet_for_db'):
+      self.extra_subnet_for_db.Delete()
 
   def _Create(self):
     """Creates the AWS RDS instance"""
-    group_id = self._GetNetwork().regional_network.vpc.default_security_group_id
     cmd = util.AWS_PREFIX + [
         'rds',
         'create-db-instance',
@@ -198,8 +198,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--no-auto-minor-version-upgrade',
         '--region=%s' % self.region,
         '--engine-version=%s' % self.spec.database_version,
-        '--db-subnet-group-name=%s' % self.spec.db_subnet_group_name,
-        '--vpc-security-group-ids=%s' % group_id,
+        '--db-subnet-group-name=%s' % self.db_subnet_group_name,
+        '--vpc-security-group-ids=%s' % self.security_group_id,
     ]
 
     if self.spec.disk_spec.disk_type == aws_disk.IO1:
@@ -256,7 +256,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         self.secondary_zone = (
             json_output['DBInstances'][0]['SecondaryAvailabilityZone'])
 
-  def _IsReady(self):
+  def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
 
     Supplying this method is optional.  Use it when a resource can exist
@@ -266,7 +266,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    timeout = 60 * 60 * 3  # 3 hours. (RDS HA takes a long time to prepare)
     cmd = util.AWS_PREFIX + [
         'rds',
         'describe-db-instances',
@@ -276,10 +275,9 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     start_time = datetime.datetime.now()
 
     while True:
-      if (datetime.datetime.now() - start_time).seconds > timeout:
+      if (datetime.datetime.now() - start_time).seconds >= timeout:
         logging.exception('Timeout waiting for sql instance to be ready')
         return False
-      time.sleep(5)
       stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
 
       try:
@@ -292,6 +290,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       except:
         logging.exception('Error attempting to read stdout. Creation failure.')
         return False
+      time.sleep(5)
+
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = self._ParsePort(json_output)
     return True
