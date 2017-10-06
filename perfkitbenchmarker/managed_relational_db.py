@@ -134,15 +134,15 @@ class BaseManagedRelationalDb(resource.BaseResource):
     }
     if self.spec.vm_spec.machine_type:
       metadata.update({
-        'machine_type': self.spec.vm_spec.machine_type,
+          'machine_type': self.spec.vm_spec.machine_type,
       })
     else:
       # TOOD(ferneyhough): fix this. Azure has no vm_spec, hence the need for
       # the try block
       try:
         metadata.update({
-          'cpus': self.spec.vm_spec.cpus,
-          'memory': self.spec.vm_spec.memory,
+            'cpus': self.spec.vm_spec.cpus,
+            'memory': self.spec.vm_spec.memory,
         })
       except:
         pass

@@ -54,7 +54,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def GetResourceMetadata(self):
     metadata = super(AwsManagedRelationalDb, self).GetMetadata()
     metadata.update({
-      'zone': self.primary_zone,
+        'zone': self.primary_zone,
     })
 
     if self.spec.high_availability:
