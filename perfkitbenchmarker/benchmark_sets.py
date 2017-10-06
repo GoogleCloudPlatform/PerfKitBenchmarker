@@ -39,11 +39,26 @@ BENCHMARK_SETS = {
         MESSAGE: ('The standard_set is a community agreed upon set of '
                   'benchmarks to measure Cloud performance.'),
         BENCHMARK_LIST: [
-            'aerospike', 'block_storage_workload', 'cassandra_stress',
-            'cluster_boot', 'copy_throughput', 'coremark', 'fio',
-            'hadoop_terasort', 'hpcc', 'iperf', 'mesh_network',
-            'mongodb_ycsb', 'netperf', 'object_storage_service', 'ping',
-            'redis', 'speccpu2006', 'sysbench_oltp', 'unixbench']
+            'aerospike',
+            'block_storage_workload',
+            'cassandra_stress',
+            'cluster_boot',
+            'copy_throughput',
+            'coremark',
+            'fio',
+            'hadoop_terasort',
+            'hpcc',
+            'iperf',
+            'mesh_network',
+            'mongodb_ycsb',
+            'netperf',
+            'object_storage_service',
+            'ping',
+            'redis',
+            'speccpu2006',
+            'sysbench_oltp',
+            'unixbench',
+        ]
     },
     'arm_set': {
         MESSAGE: 'ARM benchmark set.',
@@ -63,9 +78,18 @@ BENCHMARK_SETS = {
     },
     'centurylinkcloud_set': {
         MESSAGE: 'This benchmark set is supported on CenturyLink Cloud.',
-        BENCHMARK_LIST: ['hpcc', 'unixbench', 'sysbench_oltp', 'mongodb_ycsb',
-                         'mesh_network', 'ping', 'iperf', 'redis',
-                         'cassandra_stress', 'copy_throughput']
+        BENCHMARK_LIST: [
+            'hpcc',
+            'unixbench',
+            'sysbench_oltp',
+            'mongodb_ycsb',
+            'mesh_network',
+            'ping',
+            'iperf',
+            'redis',
+            'cassandra_stress',
+            'copy_throughput',
+        ]
     },
     'cisco_set': {
         MESSAGE: 'Cisco benchmark set.',
@@ -73,7 +97,10 @@ BENCHMARK_SETS = {
     },
     'cloudharmony_set': {
         MESSAGE: 'CloudHarmony benchmark set.',
-        BENCHMARK_LIST: ['speccpu2006', 'unixbench']
+        BENCHMARK_LIST: [
+            'speccpu2006',
+            'unixbench',
+        ]
     },
     'cloudspectator_set': {
         MESSAGE: 'CloudSpectator benchmark set.',
@@ -83,26 +110,63 @@ BENCHMARK_SETS = {
         MESSAGE: ('This benchmark set is maintained by Google Cloud Platform '
                   'Performance Team.'),
         BENCHMARK_LIST: [
-            'aerospike_ycsb', 'block_storage_workload', 'cassandra_stress',
-            'cassandra_ycsb', 'cluster_boot', 'copy_throughput',
-            'fio', 'gpu_pcie_bandwidth', 'hadoop_terasort', 'hpcc', 'hpcg',
-            'iperf', 'multichase', 'mesh_network', 'mongodb_ycsb', 'netperf',
-            'object_storage_service', 'oldisim', 'ping', 'redis_ycsb',
-            'stencil2d', 'speccpu2006', 'sysbench_oltp', 'tomcat_wrk',
-            'tensorflow', 'unixbench']
+            'aerospike_ycsb',
+            'block_storage_workload',
+            'cassandra_stress',
+            'cassandra_ycsb',
+            'cluster_boot',
+            'copy_throughput',
+            'fio',
+            'gpu_pcie_bandwidth',
+            'hadoop_terasort',
+            'hpcc',
+            'hpcg',
+            'iperf',
+            'multichase',
+            'mesh_network',
+            'mongodb_ycsb',
+            'netperf',
+            'object_storage_service',
+            'oldisim',
+            'ping',
+            'redis_ycsb',
+            'stencil2d',
+            'speccpu2006',
+            'sysbench_oltp',
+            'tomcat_wrk',
+            'tensorflow',
+            'unixbench',
+        ]
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',
-        BENCHMARK_LIST: ['fio', 'iperf', 'unixbench', 'hpcc',
-                         'cluster_boot', 'redis', 'cassandra_stress',
-                         'object_storage_service', 'sysbench_oltp']
+        BENCHMARK_LIST: [
+            'fio',
+            'iperf',
+            'unixbench',
+            'hpcc',
+            'cluster_boot',
+            'redis',
+            'cassandra_stress',
+            'object_storage_service',
+            'sysbench_oltp',
+        ]
     },
     'kubernetes_set': {
         MESSAGE: 'Kubernetes benchmark set.',
-        BENCHMARK_LIST: ['block_storage_workload', 'cassandra_ycsb',
-                         'cassandra_stress', 'cluster_boot', 'fio', 'iperf',
-                         'mesh_network', 'mongodb_ycsb', 'netperf', 'redis',
-                         'sysbench_oltp']
+        BENCHMARK_LIST: [
+            'block_storage_workload',
+            'cassandra_ycsb',
+            'cassandra_stress',
+            'cluster_boot',
+            'fio',
+            'iperf',
+            'mesh_network',
+            'mongodb_ycsb',
+            'netperf',
+            'redis',
+            'sysbench_oltp',
+        ]
     },
     'mellanox_set': {
         MESSAGE: 'Mellanox benchmark set.',
@@ -118,11 +182,25 @@ BENCHMARK_SETS = {
     },
     'rackspace_set': {
         MESSAGE: 'Rackspace benchmark set.',
-        BENCHMARK_LIST: ['aerospike', 'cassandra_stress', 'cluster_boot',
-                         'copy_throughput', 'fio', 'hpcc', 'iperf',
-                         'mesh_network', 'mongodb_ycsb', 'netperf', 'ping',
-                         'redis', 'block_storage_workload', 'sysbench_oltp',
-                         'unixbench', 'oldisim', 'silo']
+        BENCHMARK_LIST: [
+            'aerospike',
+            'cassandra_stress',
+            'cluster_boot',
+            'copy_throughput',
+            'fio',
+            'hpcc',
+            'iperf',
+            'mesh_network',
+            'mongodb_ycsb',
+            'netperf',
+            'ping',
+            'redis',
+            'block_storage_workload',
+            'sysbench_oltp',
+            'unixbench',
+            'oldisim',
+            'silo',
+        ]
     },
     'red_hat_set': {
         MESSAGE: 'Red Hat benchmark set.',
@@ -146,13 +224,15 @@ BENCHMARK_SETS = {
     },
     'cloudsuite_set': {
         MESSAGE: 'CloudSuite benchmark set.',
-        BENCHMARK_LIST: ['cloudsuite_data_analytics',
-                         'cloudsuite_data_caching',
-                         'cloudsuite_graph_analytics',
-                         'cloudsuite_in_memory_analytics',
-                         'cloudsuite_media_streaming',
-                         'cloudsuite_web_search',
-                         'cloudsuite_web_serving']
+        BENCHMARK_LIST: [
+            'cloudsuite_data_analytics',
+            'cloudsuite_data_caching',
+            'cloudsuite_graph_analytics',
+            'cloudsuite_in_memory_analytics',
+            'cloudsuite_media_streaming',
+            'cloudsuite_web_search',
+            'cloudsuite_web_serving',
+        ]
     }
 }
 
