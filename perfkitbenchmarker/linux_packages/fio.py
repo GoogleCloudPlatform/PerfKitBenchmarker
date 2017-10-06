@@ -55,6 +55,7 @@ def _Install(vm):
   """Installs the fio package on the VM."""
   for p in ['build_tools', 'python', 'pip']:
     vm.Install(p)
+  vm.InstallPackages('python-dev')
   vm.RemoteCommand('sudo pip install pandas numpy')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, FIO_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(FIO_DIR, GIT_TAG))
