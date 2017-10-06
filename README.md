@@ -7,14 +7,14 @@ tuned for any particular platform or instance type. These settings are recommend
 Only in the rare case where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
-This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [wiki] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contains more detailed information:
+This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [wiki](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contains more detailed information:
 
-* [FAQ] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
-* [Tech Talks] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
-* [Governing rules] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
-* [Community meeting decks and notes] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
-* [Design documents] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
-* You are always welcome to [open an issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues), or to join us on #PerfKitBenchmarker on freenode to discuss issues you're having, pull requests, or anything else related to PerfKitBenchmarker
+* [FAQ](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
+* [Tech Talks](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
+* [Governing rules](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
+* [Community meeting decks and notes](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
+* [Design documents](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
+* You are always welcome to [open an issue](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues), or to join us on #PerfKitBenchmarker on freenode to discuss issues you're having, pull requests, or anything else related to PerfKitBenchmarker
 
 
 Known Issues
