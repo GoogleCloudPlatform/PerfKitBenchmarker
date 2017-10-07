@@ -287,6 +287,13 @@ class BaseVirtualMachine(resource.BaseResource):
               disk_num, len(self.scratch_disks)))
     return self.scratch_disks[disk_num].mount_point
 
+  def AllowIcmp(self):
+    """Opens the ICMP protocol on the firewall corresponding to the VM if
+    one exists.
+    """
+    if self.firewall:
+      self.firewall.AllowIcmp(self)
+
   def AllowPort(self, start_port, end_port=None):
     """Opens the port on the firewall corresponding to the VM if one exists."""
     if self.firewall:
@@ -316,13 +323,18 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     pass
 
-  def GetMachineTypeDict(self):
-    """Returns a dict containing properties that specify the machine type.
+  def GetResourceMetadata(self):
+    """Returns a dict containing VM metadata.
 
     Returns:
       dict mapping string property key to value.
     """
-    result = {}
+    result = self.metadata.copy()
+    result.update({
+        'image': self.image,
+        'zone': self.zone,
+        'cloud': self.CLOUD,
+    })
     if self.machine_type is not None:
       result['machine_type'] = self.machine_type
     if self.use_dedicated_host is not None:

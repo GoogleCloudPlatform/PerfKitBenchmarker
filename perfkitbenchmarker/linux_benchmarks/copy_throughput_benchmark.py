@@ -199,8 +199,7 @@ def RunScpSingleDirection(sending_vm, receiving_vm, cipher):
   results = []
   metadata = {}
   for vm_specifier, vm in ('receiving', receiving_vm), ('sending', sending_vm):
-    metadata['{0}_zone'.format(vm_specifier)] = vm.zone
-    for k, v in vm.GetMachineTypeDict().iteritems():
+    for k, v in vm.GetResourceMetadata().iteritems():
       metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
   cmd_template = ('sudo sync; sudo sysctl vm.drop_caches=3; '

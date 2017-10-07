@@ -229,7 +229,6 @@ def Run(benchmark_spec):
       fanout_list.add(fanout)
 
   metadata = {'num_cpus': vm.num_cpus}
-  metadata.update(vm.GetMachineTypeDict())
   for fanout in sorted(fanout_list):
     qps = RunLoadTest(benchmark_spec, fanout)[2]
     qps_dict[fanout] = qps

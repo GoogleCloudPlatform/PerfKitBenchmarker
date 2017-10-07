@@ -34,11 +34,9 @@ import time
 import urllib
 import uuid
 
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import log_util
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 
@@ -181,7 +179,9 @@ class DefaultMetadataProvider(MetadataProvider):
       metadata['hostnames'] = ','.join([vm.hostname
                                         for vm in benchmark_spec.vms])
     if benchmark_spec.container_cluster:
-      metadata.update(benchmark_spec.container_cluster.GetMetadata())
+      cluster = benchmark_spec.container_cluster
+      for k, v in cluster.GetResourceMetadata().iteritems():
+        metadata['container_cluster_' + k] = v
 
     for name, vms in benchmark_spec.vm_groups.iteritems():
       if len(vms) == 0:
@@ -190,41 +190,15 @@ class DefaultMetadataProvider(MetadataProvider):
       # machine type, and image.
       vm = vms[-1]
       name_prefix = '' if name == 'default' else name + '_'
-      metadata[name_prefix + 'cloud'] = vm.CLOUD
-      metadata[name_prefix + 'zone'] = vm.zone
-      metadata[name_prefix + 'image'] = vm.image
-      for k, v in vm.GetMachineTypeDict().iteritems():
+      for k, v in vm.GetResourceMetadata().iteritems():
         metadata[name_prefix + k] = v
       metadata[name_prefix + 'vm_count'] = len(vms)
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
-        disk_type = data_disk.disk_type
-        disk_size = data_disk.disk_size
-        num_stripes = data_disk.num_striped_disks
-        # Legacy metadata keys
-        metadata[name_prefix + 'scratch_disk_type'] = disk_type
-        metadata[name_prefix + 'scratch_disk_size'] = disk_size
-        metadata[name_prefix + 'num_striped_disks'] = (
-            data_disk.num_striped_disks)
-        if getattr(data_disk, 'iops', None) is not None:
-          metadata[name_prefix + 'scratch_disk_iops'] = data_disk.iops
-          metadata[name_prefix + 'aws_provisioned_iops'] = data_disk.iops
-        # Modern metadata keys
-        metadata[name_prefix + 'data_disk_0_type'] = disk_type
-        if disk_type == disk.LOCAL and vm.CLOUD == providers.GCP:
-          metadata[
-              name_prefix + 'data_disk_0_interface'] = FLAGS.gce_ssd_interface
         metadata[name_prefix + 'data_disk_count'] = len(vm.scratch_disks)
-        metadata[name_prefix + 'data_disk_0_size'] = (
-            disk_size * num_stripes if disk_size else disk_size)
-        metadata[name_prefix + 'data_disk_0_num_stripes'] = num_stripes
-        if getattr(data_disk, 'metadata', None) is not None:
-          if disk.LEGACY_DISK_TYPE in data_disk.metadata:
-            metadata[name_prefix + 'scratch_disk_type'] = (
-                data_disk.metadata[disk.LEGACY_DISK_TYPE])
-          for key, value in data_disk.metadata.iteritems():
-            metadata[name_prefix + 'data_disk_0_%s' % (key, )] = value
+        for key, value in data_disk.GetResourceMetadata().iteritems():
+          metadata[name_prefix + 'data_disk_0_%s' % (key, )] = value
 
     if FLAGS.set_files:
       metadata['set_files'] = ','.join(FLAGS.set_files)
