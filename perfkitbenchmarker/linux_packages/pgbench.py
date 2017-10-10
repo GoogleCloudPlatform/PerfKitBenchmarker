@@ -16,12 +16,27 @@
 """Module containing pgbench installation and cleanup functions."""
 
 
-def Install(vm):
-  """Installs pgbench on the VM."""
-  vm.InstallPackages('postgresql-client-common')
-  vm.InstallPackages('postgresql-client')
-  vm.InstallPackages('postgresql-contrib')
+APT_PACKAGES = (
+    'postgresql-client-common',
+    'postgresql-client',
+    'postgresql-contrib',
+)
+
+def AptInstall(vm):
+  """Installs pgbench on the Debian VM."""
+  for package in APT_PACKAGES:
+    vm.InstallPackages(packge)
 
 
-def Uninstall(vm):
-  pass
+def YumInstall(vm):
+  """Raises exception when trying to install on yum-based VMs"""
+  raise NotImplementedError(
+	'PKB currently only supports the installation of pgbench on '
+	'Debian-based VMs')
+
+
+def AptUninstall(vm):
+  """Removes pgbench from the Debian VM."""
+  remove_str = 'sudo apt-get --purge autoremove -y '
+  for package in APT_PACKAGES:
+    vm.RemoteCommand(remove_str + package)

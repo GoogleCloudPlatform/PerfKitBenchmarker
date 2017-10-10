@@ -197,4 +197,4 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
-  pass
+  vm.Uninstall('pgbench')
