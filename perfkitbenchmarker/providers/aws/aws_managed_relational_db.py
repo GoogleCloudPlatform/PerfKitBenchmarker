@@ -66,14 +66,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     return metadata
 
-  def _GetNetwork(self):
-    if not hasattr(self.spec, 'network'):
-      raise Exception('Cannot create AwsManagedRelationalDb: '
-                      'no network available. Call AddNetwork() '
-                      'before calling Create()')
-
-    return self.network
-
   @staticmethod
   def GetDefaultEngineVersion(engine):
     """Returns the default version of a given database engine.
@@ -121,9 +113,10 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         logging.info('Attempting to create a second subnet in zone %s',
                      new_subnet_zone)
         new_subnet = (
-            aws_network.AwsSubnet(new_subnet_zone,
-                                  self._GetNetwork().regional_network.vpc.id,
-                                  '10.0.1.0/24'))
+            aws_network.AwsSubnet(
+                new_subnet_zone,
+                self._GetClientVm().network.regional_network.vpc.id,
+                '10.0.1.0/24'))
         new_subnet.Create()
         logging.info('Successfully created a new subnet, subnet id is: %s',
                      new_subnet.id)
@@ -145,12 +138,12 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         'create-db-subnet-group',
         '--db-subnet-group-name', db_subnet_group_name,
         '--db-subnet-group-description', 'pkb_subnet_group_for_db',
-        '--subnet-ids', self._GetNetwork().subnet.id, new_subnet.id,
+        '--subnet-ids', self._GetClientVm().network.subnet.id, new_subnet.id,
         '--region', region]
     stdout, stderr, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
     # save for cleanup
     self.db_subnet_group_name = db_subnet_group_name
-    self.security_group_id = (self._GetNetwork().regional_network.
+    self.security_group_id = (self._GetClientVm().network.regional_network.
                               vpc.default_security_group_id)
 
   def _SetupNetworking(self):

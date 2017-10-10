@@ -42,6 +42,9 @@ flags.DEFINE_string('managed_db_backup_start_time', '07:00',
                     'Time in UTC that automated backups (if enabled) '
                     'will be scheduled. In the form HH:MM UTC. '
                     'Defaults to 07:00 UTC')
+flags.DEFINE_string('managed_db_zone', None,
+                    'zone or region to launch the database in. '
+                    'Defaults to the client vm\'s zone.')
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
 flags.RegisterValidator('managed_db_backup_start_time',
@@ -54,10 +57,8 @@ MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
 
-
 _MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
-
 
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
 
@@ -105,10 +106,21 @@ class BaseManagedRelationalDb(resource.BaseResource):
     super(BaseManagedRelationalDb, self).__init__()
     self.spec = managed_relational_db_spec
 
-  def SetNetwork(self, network):
-    # TODO(ferneyhough): assert # of VMs, and that VM(s) are in same
-    # region as DB
-    self.network = network
+  @property
+  def client_vm(self):
+    """Client VM which will drive the database test.
+
+    This is required by subclasses to perform client-vm
+    network-specific tasks, such as getting information about
+    the VPC, IP address, etc.
+    """
+    if not hasattr(self, '_client_vm'):
+      raise Exception('client_vm is not set')
+    return self._client_vm
+
+  @client_vm.setter
+  def client_vm(self, client_vm):
+    self._client_vm = client_vm
 
   def MakePsqlConnectionString(self, database_name):
     return '\'host={0} user={1} password={2} dbname={3}\''.format(
@@ -126,11 +138,11 @@ class BaseManagedRelationalDb(resource.BaseResource):
         'zone': self.spec.vm_spec.zone,
         'disk_type': self.spec.disk_spec.disk_type,
         'disk_size': self.spec.disk_spec.disk_size,
-        'database': self.spec.database,
+        'engine': self.spec.engine,
         'high_availability': self.spec.high_availability,
         'backup_enabled': self.spec.backup_enabled,
         'backup_start_time': self.spec.backup_start_time,
-        'database_version': self.spec.database_version,
+        'engine_version': self.spec.engine_version,
     }
     if self.spec.vm_spec.machine_type:
       metadata.update({

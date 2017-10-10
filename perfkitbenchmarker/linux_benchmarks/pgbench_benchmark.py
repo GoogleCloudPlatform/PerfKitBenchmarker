@@ -42,7 +42,7 @@ BENCHMARK_CONFIG = """
 pgbench:
   description: test managed relational database provisioning
   managed_relational_db:
-    database: postgres
+    engine: postgres
     vm_spec:
       GCP:
         machine_type:

@@ -264,6 +264,11 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
         _COMPONENT, flag_values=self.flags, **self.full_spec)
     self.assertEqual(result.backup_start_time, '12:23')
 
+  def testZoneFlag(self):
+    self.flags['managed_db_zone'].parse('us-east1-b')
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **self.full_spec)
+    self.assertEqual(result.vm_spec.zone, 'us-east1-b')
 
 if __name__ == '__main__':
   unittest.main()

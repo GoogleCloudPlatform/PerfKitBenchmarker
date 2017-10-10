@@ -350,7 +350,7 @@ class BenchmarkSpec(object):
     if self.dpb_service:
       self.dpb_service.Create()
     if self.managed_relational_db:
-      self.managed_relational_db.SetNetwork(self.vms[0].network)
+      self.managed_relational_db.client_vm = self.vms[0]
       self.managed_relational_db.Create()
 
   def Delete(self):

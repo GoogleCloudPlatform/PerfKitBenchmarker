@@ -73,9 +73,9 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
 
-    # TODO: Close authorized networks to VM once spec is updated so client
-    # VM is child of managed_relational_db. Then client VM ip address will be
-    # available from managed_relational_db_spec.
+    # TODO: We should create the client VM with a static IP, and
+    # only authorize that specific IP address. The client VM can be accessed
+    # like so: self.client_vm
     authorized_network = '0.0.0.0/0'
     database_version_string = self._GetEngineVersionString(
         self.spec.engine, self.spec.engine_version)
@@ -110,10 +110,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       self._ValidateMachineType(memory, cpus)
       cmd_string.append('--cpu={}'.format(cpus))
       cmd_string.append('--memory={}MiB'.format(memory))
-    # postgres HA requires a manual curl command to enable,
-    # so don't do anything special. the samples will still have
-    # high_availability in the metadata, so be sure to enable it
-    # if the flag is specified.
+
+    # Postgres HA requires a manual curl command to enable, which is why there
+    # are no flags appended here. This is done in the _EnableHighAvailability
+    # method.
     if (self.spec.high_availability and
         self.spec.engine == managed_relational_db.MYSQL):
       ha_flag = '--failover-replica-name=replica-' + self.instance_id

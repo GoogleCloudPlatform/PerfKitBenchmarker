@@ -405,7 +405,10 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
-    # TODO(ferneyhough): add flags for managed db zone, machine spec, and disk
+    # TODO(ferneyhough): Add flags for vm_spec.machine_type and disk_spec.
+    # Currently the only way to modify the vm_spec or disk_spec of the
+    # managed_db is to change the benchmark spec in the benchmark source code
+    # itself.
     super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
@@ -431,6 +434,10 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       config_values['backup_start_time'] = (
           flag_values.managed_db_backup_start_time)
 
+    cloud = config_values['cloud']
+    if flag_values['managed_db_zone'].present:
+      config_values['vm_spec'][cloud]['zone'] = (
+          flag_values.managed_db_zone)
 
 class _SparkServiceSpec(spec.BaseSpec):
   """Configurable options of an Apache Spark Service.
