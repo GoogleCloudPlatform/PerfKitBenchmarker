@@ -54,7 +54,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.region = util.GetRegionFromZone(self.zone)
 
   def GetResourceMetadata(self):
-    metadata = super(AwsManagedRelationalDb, self).GetMetadata()
+    metadata = super(AwsManagedRelationalDb, self).GetResourceMetadata()
     metadata.update({
         'zone': self.primary_zone,
     })
@@ -115,7 +115,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         new_subnet = (
             aws_network.AwsSubnet(
                 new_subnet_zone,
-                self._GetClientVm().network.regional_network.vpc.id,
+                self.client_vm.network.regional_network.vpc.id,
                 '10.0.1.0/24'))
         new_subnet.Create()
         logging.info('Successfully created a new subnet, subnet id is: %s',
@@ -124,8 +124,9 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         # save for cleanup
         self.extra_subnet_for_db = new_subnet
         return new_subnet
-      except:
-        logging.info('Unable to create subnet in zone %s', new_subnet_zone)
+      except Exception as e:
+        logging.exception('Unable to create subnet in zone %s', new_subnet_zone)
+        logging.exception('Details: %s' % e)
     raise Exception('Unable to create subnet in any availability zones')
 
   def _CreateDbSubnetGroup(self, new_subnet):
@@ -138,12 +139,12 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         'create-db-subnet-group',
         '--db-subnet-group-name', db_subnet_group_name,
         '--db-subnet-group-description', 'pkb_subnet_group_for_db',
-        '--subnet-ids', self._GetClientVm().network.subnet.id, new_subnet.id,
+        '--subnet-ids', self.client_vm.network.subnet.id, new_subnet.id,
         '--region', region]
     stdout, stderr, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
     # save for cleanup
     self.db_subnet_group_name = db_subnet_group_name
-    self.security_group_id = (self._GetClientVm().network.regional_network.
+    self.security_group_id = (self.client_vm.network.regional_network.
                               vpc.default_security_group_id)
 
   def _SetupNetworking(self):
@@ -184,7 +185,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         'rds',
         'create-db-instance',
         '--db-instance-identifier=%s' % self.instance_id,
-        '--engine=%s' % self.spec.database,
+        '--engine=%s' % self.spec.engine,
         '--master-username=%s' % self.spec.database_username,
         '--master-user-password=%s' % self.spec.database_password,
         '--allocated-storage=%s' % self.spec.disk_spec.disk_size,
@@ -192,7 +193,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
         '--no-auto-minor-version-upgrade',
         '--region=%s' % self.region,
-        '--engine-version=%s' % self.spec.database_version,
+        '--engine-version=%s' % self.spec.engine_version,
         '--db-subnet-group-name=%s' % self.db_subnet_group_name,
         '--vpc-security-group-ids=%s' % self.security_group_id,
     ]
