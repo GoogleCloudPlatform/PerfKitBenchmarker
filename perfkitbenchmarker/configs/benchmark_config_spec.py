@@ -337,7 +337,7 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     if not self.engine_version:
       managed_db_class = managed_relational_db.GetManagedRelationalDbClass(
           self.cloud)
-      self.database_version = managed_db_class.GetDefaultEngineVersion(
+      self.engine_version = managed_db_class.GetDefaultEngineVersion(
           self.engine)
     if not self.database_name:
       self.database_name = 'pkb-db-%s' % flag_values.run_uri

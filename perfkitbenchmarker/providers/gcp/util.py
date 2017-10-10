@@ -32,6 +32,10 @@ def GetDefaultProject():
   return result['core']['project']
 
 
+def GetRegionFromZone(zone):
+  return zone[:-2]
+
+
 class GcloudCommand(object):
   """A gcloud command.
 

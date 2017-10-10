@@ -41,7 +41,10 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
 
   def createMySQLSpecDict(self):
     vm_spec = virtual_machine.BaseVmSpec('NAME',
-                                         **{'machine_type': 'db-n1-standard-1'})
+                                         **{
+                                             'machine_type': 'db-n1-standard-1',
+                                             'zone': 'us-west1-b',
+                                         })
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     # TODO: Database version has more than one supported value. Test should
     # reflect that by not declaring a database version and letting the default
@@ -60,7 +63,10 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     }
 
   def createPostgresSpecDict(self):
-    machine_type = {'machine_type': {'cpus': 1, 'memory': '3840MiB'}}
+    machine_type = {
+        'machine_type': {'cpus': 1, 'memory': '3840MiB'},
+        'zone': 'us-west1-b',
+    }
     vm_spec = gce_virtual_machine.GceVmSpec('NAME', **machine_type)
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     # TODO: Database version has more than one supported value. Test should
@@ -136,6 +142,8 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--storage-size=50', command_string)
       self.assertIn('--backup', command_string)
       self.assertIn('--backup-start-time=07:00', command_string)
+      self.assertIn('--gce-zone=us-west1-b', command_string)
+      self.assertIn('--region=us-west1', command_string)
 
   def testCreatePostgres(self):
     with self._PatchCriticalObjects() as issue_command:

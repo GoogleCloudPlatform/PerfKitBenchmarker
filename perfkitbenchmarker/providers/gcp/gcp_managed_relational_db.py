@@ -95,9 +95,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--authorized-networks=%s' % authorized_network,
         '--enable-bin-log',
         '--gce-zone=%s' % instance_zone,
+        '--region=%s' % util.GetRegionFromZone(instance_zone),
         '--database-version=%s' % database_version_string,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
-        '--storage-size=%d' % storage_size
+        '--storage-size=%d' % storage_size,
     ]
     # TODO(ferneyhough): add tier machine types support for Postgres
     if self.spec.engine == managed_relational_db.MYSQL:
