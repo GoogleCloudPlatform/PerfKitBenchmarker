@@ -47,8 +47,8 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     # reflect that by not declaring a database version and letting the default
     # version be returned.
     return {
-        'database': MYSQL,
-        'database_version': '5.7',
+        'engine': MYSQL,
+        'engine_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
@@ -67,8 +67,8 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     # reflect that by not declaring a database version and letting the default
     # version be returned.
     return {
-        'database': POSTGRES,
-        'database_version': '5.7',
+        'engine': POSTGRES,
+        'engine_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
@@ -140,8 +140,8 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
   def testCreatePostgres(self):
     with self._PatchCriticalObjects() as issue_command:
       spec = self.createPostgresSpecDict()
-      spec['database'] = 'postgres'
-      spec['database_version'] = '9.6'
+      spec['engine'] = 'postgres'
+      spec['engine_version'] = '9.6'
       db = self.createManagedDbFromSpec(spec)
       db._Create()
       self.assertEquals(issue_command.call_count, 1)

@@ -21,31 +21,30 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
 # TODO (ferneyhough): change to enum
-flags.DEFINE_string('database', None,
+flags.DEFINE_string('managed_db_engine', None,
                     'Managed database flavor to use (mysql, postgres)')
-flags.DEFINE_string('database_name', None,
+flags.DEFINE_string('managed_db_engine_version', None,
+                    'Version of the database flavor selected, e.g. 5.7')
+flags.DEFINE_string('managed_db_database_name', None,
                     'Name of the database to create. Defaults to '
                     'pkb-db-[run-uri]')
-flags.DEFINE_string('database_username', None,
+flags.DEFINE_string('managed_db_database_username', None,
                     'Database username. Defaults to '
                     'pkb-db-user-[run-uri]')
-flags.DEFINE_string('database_password', None,
+flags.DEFINE_string('managed_db_database_password', None,
                     'Database password. Defaults to '
                     'a random 10-character alpha-numeric string')
-# TODO (ferneyhough): write a validator
-flags.DEFINE_string('database_version', None,
-                    'Version of the database flavor selected, e.g. 5.7')
-flags.DEFINE_boolean('high_availability', False,
+flags.DEFINE_boolean('managed_db_high_availability', False,
                      'Specifies if the database should be high availability')
-flags.DEFINE_boolean('database_backup_enabled', True,
+flags.DEFINE_boolean('managed_db_backup_enabled', True,
                      'Whether or not to enable automated backups')
-flags.DEFINE_string('database_backup_start_time', '07:00',
+flags.DEFINE_string('managed_db_backup_start_time', '07:00',
                     'Time in UTC that automated backups (if enabled) '
                     'will be scheduled. In the form HH:MM UTC. '
                     'Defaults to 07:00 UTC')
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
-flags.RegisterValidator('database_backup_start_time',
+flags.RegisterValidator('managed_db_backup_start_time',
                         lambda value: re.search(BACKUP_TIME_REGULAR_EXPRESSION,
                                                 value) is not None,
                         message=('--database_backup_start_time must be in the '
@@ -55,6 +54,7 @@ MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
 
+
 _MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
 
@@ -62,7 +62,7 @@ FLAGS = flags.FLAGS
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
 
 
-def generateRandomDbPassword():
+def GenerateRandomDbPassword():
   """Generate a random password 10 characters in length."""
   return str(uuid.uuid4())[:10]
 
@@ -175,13 +175,13 @@ class BaseManagedRelationalDb(resource.BaseResource):
     pass
 
   @abstractmethod
-  def GetDefaultDatabaseVersion(self, database):
-    """Return the default version (for PKB) for the given database.
+  def GetDefaultEngineVersion(self, engine):
+    """Return the default version (for PKB) for the given database engine.
 
     Args:
-      database: name of the database
+      engine: name of the database engine
 
-    Returns: default database version as a string for the given database.
+    Returns: default version as a string for the given engine.
   """
 
   def GetUsername(self):

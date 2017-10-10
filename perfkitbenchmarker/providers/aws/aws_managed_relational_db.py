@@ -29,7 +29,10 @@ FLAGS = flags.FLAGS
 
 DEFAULT_MYSQL_VERSION = '5.7.11'
 DEFAULT_POSTGRES_VERSION = '9.6.2'
+
+DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_PORT = 5432
+
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
 
 
@@ -42,7 +45,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """
 
   CLOUD = providers.AWS
-  SERVICE_NAME = 'managed_relational_db'
 
   def __init__(self, managed_relational_db_spec):
     super(AwsManagedRelationalDb, self).__init__(managed_relational_db_spec)
@@ -73,19 +75,19 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return self.network
 
   @staticmethod
-  def GetDefaultDatabaseVersion(database):
-    """Returns the default version of a given database.
+  def GetDefaultEngineVersion(engine):
+    """Returns the default version of a given database engine.
 
     Args:
-      database (string): type of database (my_sql or postgres).
+      engine (string): type of database (my_sql or postgres).
     Returns:
-      (string): Default database version.
+      (string): Default engine version.
     """
-    if database == managed_relational_db.MYSQL:
+    if engine == managed_relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
-    elif database == managed_relational_db.POSTGRES:
+    elif engine == managed_relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
-    elif database == managed_relational_db.AURORA_POSTGRES:
+    elif engine == managed_relational_db.AURORA_POSTGRES:
       return DEFAULT_POSTGRES_VERSION
 
   def GetEndpoint(self):

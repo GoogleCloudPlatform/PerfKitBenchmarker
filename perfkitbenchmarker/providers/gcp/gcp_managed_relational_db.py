@@ -41,6 +41,9 @@ DEFAULT_POSTGRES_VERSION = '9.6'
 DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
 DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
 
+DEFAULT_MYSQL_PORT = 3306
+DEFAULT_POSTGRES_PORT = 5432
+
 # PostgreSQL restrictions on memory.
 # Source: https://cloud.google.com/sql/docs/postgres/instance-settings.
 CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND = 0.9
@@ -57,10 +60,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """
 
   CLOUD = providers.GCP
-  SERVICE_NAME = 'managed_relational_db'
-  # These are the constants that should be specified in GCP's cloud SQL command.
   GCP_PRICING_PLAN = 'PACKAGE'
-  MYSQL_DEFAULT_PORT = 3306
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
@@ -77,8 +77,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # VM is child of managed_relational_db. Then client VM ip address will be
     # available from managed_relational_db_spec.
     authorized_network = '0.0.0.0/0'
-    cloudsql_specific_database_version = self._GetDatabaseVersionNameFromFlavor(
-        self.spec.database, self.spec.database_version)
+    database_version_string = self._GetEngineVersionString(
+        self.spec.engine, self.spec.engine_version)
 
     cmd_string = [
         self,
@@ -95,12 +95,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--authorized-networks=%s' % authorized_network,
         '--enable-bin-log',
         '--gce-zone=%s' % instance_zone,
-        '--database-version=%s' % cloudsql_specific_database_version,
+        '--database-version=%s' % database_version_string,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
         '--storage-size=%d' % storage_size
     ]
-    # TODO(ferneyhough): tier machine types are supported on Posgres too
-    if self.spec.database == managed_relational_db.MYSQL:
+    # TODO(ferneyhough): add tier machine types support for Postgres
+    if self.spec.engine == managed_relational_db.MYSQL:
       machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
       cmd_string.append(machine_type_flag)
     else:
@@ -115,7 +115,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     # high_availability in the metadata, so be sure to enable it
     # if the flag is specified.
     if (self.spec.high_availability and
-        self.spec.database == managed_relational_db.MYSQL):
+        self.spec.engine == managed_relational_db.MYSQL):
       ha_flag = '--failover-replica-name=replica-' + self.instance_id
       cmd_string.append(ha_flag)
     if self.spec.backup_enabled:
@@ -242,7 +242,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         return False
       time.sleep(5)
     self.endpoint = self._ParseEndpoint(json_output)
-    self.port = self.MYSQL_DEFAULT_PORT
+    self.port = DEFAULT_MYSQL_PORT
     return True
 
   def _ParseEndpoint(self, describe_instance_json):
@@ -303,33 +303,33 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     pass
 
   @staticmethod
-  def GetDefaultDatabaseVersion(database):
-    """Returns the default version of a given database.
+  def GetDefaultEngineVersion(engine):
+    """Returns the default version of a given database engine.
 
     Args:
-      database (string): type of database (my_sql or postgres).
+      engine (string): type of database (my_sql or postgres).
     Returns:
-      (string): Default database version.
+      (string): Default database engine version.
     """
-    if database == managed_relational_db.MYSQL:
+    if engine == managed_relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
-    elif database == managed_relational_db.POSTGRES:
+    elif engine == managed_relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
 
   @staticmethod
-  def _GetDatabaseVersionNameFromFlavor(flavor, version):
-    """Returns internal name for database type.
+  def _GetEngineVersionString(engine, version):
+    """Returns GCP-specific version string for givin database engine.
 
     Args:
-      flavor:
-      version:
+      engine: database engine
+      version: engine version
     Returns:
       (string): Internal name for database type.
     """
-    if flavor == managed_relational_db.MYSQL:
+    if engine == managed_relational_db.MYSQL:
       if version == DEFAULT_MYSQL_VERSION:
         return DEFAULT_GCP_MYSQL_VERSION
-    elif flavor == managed_relational_db.POSTGRES:
+    elif engine == managed_relational_db.POSTGRES:
       if version == DEFAULT_POSTGRES_VERSION:
         return DEFAULT_GCP_POSTGRES_VERSION
     raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'
