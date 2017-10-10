@@ -11,7 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Pgbench benchmark"""
+"""Pgbench benchmark
+
+  Pgbench is a TPC-B like database benchmark for Postgres and
+  is published by the PostgreSQL group.
+
+  This implementation of pgbench in PKB uses the ManagedRelationalDB
+  resource. A client VM is also required. To change the specs of the
+  database server, change the vm_spec nested inside
+  managed_relational_db spec. To change the specs of the client,
+  change the vm_spec nested directly inside the pgbench spec.
+
+  The scale factor can be used to set the size of the test database.
+  Additionally, the runtime per step, as well as the number of clients
+  at each step can be specified.
+
+  This benchmark is written for pgbench 9.5, which is the default
+  (as of 10/2017) version installed on Ubuntu 16.04.
+"""
 
 import time
 
@@ -32,8 +49,7 @@ flags.DEFINE_integer(
 flag_util.DEFINE_integerlist(
     'pgbench_client_counts',
     flag_util.IntegerList([1, 2, 4, 8, 16, 32, 64]),
-    'array of client counts passed to pgbench',
-    on_nonincreasing=flag_util.IntegerListParser.WARN)
+    'array of client counts passed to pgbench')
 FLAGS = flags.FLAGS
 
 
