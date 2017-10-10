@@ -39,9 +39,9 @@ flags.DEFINE_enum(
     [LRS, PLRS, ZRS, GRS, RAGRS],
     'The type of storage account to create. See '
     'http://azure.microsoft.com/en-us/pricing/details/storage/ for more '
-    'information. To use remote ssd scratch disks, you must use PLRS. If you '
-    'use PLRS, you must use the DS series of machines, or else VM creation '
-    'will fail.')
+    'information. To use remote ssd scratch disks, you must use Premium_LRS. '
+    'If you use Premium_LRS, you must use the DS series of machines, or else '
+    'VM creation will fail.')
 
 flags.DEFINE_enum(
     'azure_blob_account_kind', BLOB_STORAGE,

@@ -735,7 +735,7 @@ Cloud name | Network-attached SSD | Network-attached HDD
 -----------|----------------------|---------------------
 GCP | pd-ssd | pd-standard
 AWS | gp2 | standard
-Azure | premium-storage | standard-disk
+Azure | Premium_LRS | Standard_LRS
 Rackspace | cbs-ssd | cbs-sata
 
 Also note that `--data_disk_type=local` tells PKB not to allocate a separate
