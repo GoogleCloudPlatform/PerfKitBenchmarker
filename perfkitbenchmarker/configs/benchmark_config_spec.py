@@ -439,6 +439,7 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       config_values['vm_spec'][cloud]['zone'] = (
           flag_values.managed_db_zone)
 
+
 class _SparkServiceSpec(spec.BaseSpec):
   """Configurable options of an Apache Spark Service.
 

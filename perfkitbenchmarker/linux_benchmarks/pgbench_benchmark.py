@@ -197,4 +197,5 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
+  vm = benchmark_spec.vms[0]
   vm.Uninstall('pgbench')

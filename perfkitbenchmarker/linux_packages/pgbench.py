@@ -13,7 +13,10 @@
 # limitations under the License.
 
 
-"""Module containing pgbench installation and cleanup functions."""
+"""Module containing pgbench installation and cleanup functions.
+
+  On Ubuntu 16.04, this will install pgbench 9.5.
+"""
 
 
 APT_PACKAGES = (
@@ -22,17 +25,18 @@ APT_PACKAGES = (
     'postgresql-contrib',
 )
 
+
 def AptInstall(vm):
   """Installs pgbench on the Debian VM."""
   for package in APT_PACKAGES:
-    vm.InstallPackages(packge)
+    vm.InstallPackages(package)
 
 
 def YumInstall(vm):
   """Raises exception when trying to install on yum-based VMs"""
   raise NotImplementedError(
-	'PKB currently only supports the installation of pgbench on '
-	'Debian-based VMs')
+      'PKB currently only supports the installation of pgbench on '
+      'Debian-based VMs')
 
 
 def AptUninstall(vm):

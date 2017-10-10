@@ -91,8 +91,8 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
         'NAME', **{'machine_type': 'db.t1.micro',
                    'zone': 'us-west-2b'})
     spec_dict = {
-        'database': MYSQL,
-        'database_version': '5.7.11',
+        'engine': MYSQL,
+        'engine_version': '5.7.11',
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
@@ -174,7 +174,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
 
   def testSpecifiedDatabaseVersion(self):
     spec_dict = {
-        'database_version': '5.6.29',
+        'engine_version': '5.6.29',
     }
     command_string = self.create(spec_dict)
 
