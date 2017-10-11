@@ -84,8 +84,10 @@ class TestSysctl(unittest.TestCase):
 
     self.assertEqual(
         remote_command.call_args_list,
-        [mock.call('sudo sysctl -w vm.dirty_background_ratio=10 '
-                   'vm.dirty_ratio=25')])
+        [mock.call('sudo bash -c \'echo "vm.dirty_background_ratio=10" >> '
+                   '/etc/sysctl.conf\''),
+         mock.call('sudo bash -c \'echo "vm.dirty_ratio=25" >> '
+                   '/etc/sysctl.conf\'')])
 
   def testNoSysctl(self):
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
