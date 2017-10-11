@@ -341,7 +341,7 @@ class BaseVirtualMachine(resource.BaseResource):
     if self.use_dedicated_host is not None:
       result['dedicated_host'] = self.use_dedicated_host
     if self.tcp_congestion_control is not None:
-      result['tcp_congestion_control'] =  self.tcp_congestion_control
+      result['tcp_congestion_control'] = self.tcp_congestion_control
 
     return result
 
