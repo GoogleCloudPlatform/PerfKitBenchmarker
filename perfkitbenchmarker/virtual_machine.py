@@ -248,6 +248,7 @@ class BaseVirtualMachine(resource.BaseResource):
 
     self.network = None
     self.firewall = None
+    self.tcp_congestion_control = None
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -339,6 +340,9 @@ class BaseVirtualMachine(resource.BaseResource):
       result['machine_type'] = self.machine_type
     if self.use_dedicated_host is not None:
       result['dedicated_host'] = self.use_dedicated_host
+    if self.tcp_congestion_control is not None:
+      result['tcp_congestion_control'] = self.tcp_congestion_control
+
     return result
 
   def SimulateMaintenanceEvent(self):
@@ -369,6 +373,7 @@ class BaseOsMixin(object):
 
     self.bootable_time = None
     self.hostname = None
+    self.tcp_congestion_control = None
 
     # Ports that will be opened by benchmark_spec to permit access to the VM.
     self.remote_access_ports = []
@@ -417,13 +422,30 @@ class BaseOsMixin(object):
 
   def Reboot(self):
     """Reboot the VM."""
+
+    vm_bootable_time = None
+
+    # Use self.bootable_time to determine if this is the first boot.
+    # On the first boot, WaitForBootCompletion will only run once.
+    # On subsequent boots, need to WaitForBootCompletion and ensure
+    # the last boot time changed.
+    if self.bootable_time is not None:
+      vm_bootable_time = self.VMLastBootTime()
+
     self._Reboot()
-    self.WaitForBootCompletion()
+
+    while True:
+      self.WaitForBootCompletion()
+      # WaitForBootCompletion ensures that the machine is up
+      # this is sufficient check for the first boot - but not for a reboot
+      if vm_bootable_time != self.VMLastBootTime():
+        break
+
     self._AfterReboot()
 
   @abc.abstractmethod
   def _Reboot(self):
-    """OS-specific implementation of reboot command"""
+    """OS-specific implementation of reboot command."""
     raise NotImplementedError()
 
   def _AfterReboot(self):
@@ -453,6 +475,12 @@ class BaseOsMixin(object):
 
     Implementations of this method should set the 'bootable_time' attribute
     and the 'hostname' attribute.
+    """
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def VMLastBootTime(self):
+    """Returns the UTC time the VM was last rebooted as reported by the VM.
     """
     raise NotImplementedError()
 
