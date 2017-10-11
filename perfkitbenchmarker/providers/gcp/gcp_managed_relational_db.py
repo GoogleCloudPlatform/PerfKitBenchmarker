@@ -133,11 +133,11 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     _, _, _ = cmd.Issue()
 
   def _ValidateSpec(self):
-    """Validate PostgreSQL spec for CPU and memory.
+    """Validates PostgreSQL spec for CPU and memory.
 
     Raises:
       data.ResourceNotFound: On missing memory or cpus in postgres benchmark
-                              config.
+        config.
     """
     if not hasattr(self.spec.vm_spec, 'cpus'):
       raise data.ResourceNotFound(
@@ -151,14 +151,17 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           'details about size restrictions.')
 
   def _ValidateMachineType(self, memory, cpus):
-    """ validated machine configurations.
+    """Validates the custom machine type configuration.
+
+    Memory and CPU must be within the parameters described here:
+    https://cloud.google.com/sql/docs/postgres/instance-settings
 
     Args:
-      memory: (int) in MiB.
-      cpus: (int).
+      memory: (int) in MiB
+      cpus: (int)
 
     Raises:
-      ValueError.
+      ValueError on invalid configuration.
     """
     if cpus not in [1] + range(2, 32, 2):
       raise ValueError(
@@ -263,30 +266,15 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
 
-  def _CreateDependencies(self):
-    """Method that will be called once before _CreateResource() is called.
-
-    Supplying this method is optional. It is intended to allow additional
-    flexibility in creating resource dependencies separately from _Create().
-    """
-    pass
-
-  def _DeleteDependencies(self):
-    """Method that will be called once after _DeleteResource() is called.
-
-    Supplying this method is optional. It is intended to allow additional
-    flexibility in deleting resource dependencies separately from _Delete().
-    """
-    pass
-
   @staticmethod
   def GetDefaultEngineVersion(engine):
     """Returns the default version of a given database engine.
 
     Args:
       engine (string): type of database (my_sql or postgres).
+
     Returns:
-      (string): Default database engine version.
+      (string): Default version for the given database engine.
     """
     if engine == managed_relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
@@ -295,13 +283,17 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   @staticmethod
   def _GetEngineVersionString(engine, version):
-    """Returns GCP-specific version string for givin database engine.
+    """Returns CloudSQL-specific version string for givin database engine.
 
     Args:
       engine: database engine
       version: engine version
+
     Returns:
-      (string): Internal name for database type.
+      (string): CloudSQL-specific name for requested engine and version.
+
+    Raises:
+      NotImplementedError on invalid engine / version combination.
     """
     if engine == managed_relational_db.MYSQL:
       if version == DEFAULT_MYSQL_VERSION:
@@ -313,7 +305,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
                               'POSTGRES 9.6')
 
   def GetEndpoint(self):
-    """Return the endpoint of the managed database.
+    """Returns the endpoint of the managed database.
 
     Returns:
       database endpoint (IP or dns name)
@@ -321,7 +313,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return self.endpoint
 
   def GetPort(self):
-    """Return the port of the managed database.
+    """Returns the port of the managed database.
 
     Returns:
       database port number
