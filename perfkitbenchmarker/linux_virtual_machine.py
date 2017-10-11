@@ -502,7 +502,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if not ignore_failure:
         raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-    return (stdout, stderr, retcode) if include_return_code else (stdout, stderr)
+    return ((stdout, stderr, retcode) if include_return_code
+            else (stdout, stderr))
 
   def _Reboot(self):
     """OS-specific implementation of reboot command"""
