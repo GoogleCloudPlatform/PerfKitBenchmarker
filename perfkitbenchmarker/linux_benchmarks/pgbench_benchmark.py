@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Pgbench benchmark
+"""Pgbench benchmark for PostgreSQL databases.
 
   Pgbench is a TPC-B like database benchmark for Postgres and
   is published by the PostgreSQL group.
@@ -56,7 +56,7 @@ FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'pgbench'
 BENCHMARK_CONFIG = """
 pgbench:
-  description: test managed relational database provisioning
+  description: pgbench benchmark for managed PostgreSQL databases
   managed_relational_db:
     engine: postgres
     vm_spec:
@@ -100,7 +100,7 @@ pgbench:
 
 TEST_DB_NAME = 'perftest'
 DEFAULT_DB_NAME = 'postgres'
-MAX_JOBS = 16  # TODO(ferneyhough): use test VM num_cpus
+MAX_JOBS = 16  # TODO(ferneyhough): determine MAX_JOBS from VM num_cpus
 
 
 def GetConfig(user_config):
@@ -118,16 +118,27 @@ def CheckPrerequisites(benchmark_config):
 
 
 def UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec):
+  """Updates benchmark_spec with flags that are used in the prepare stage."""
   benchmark_spec.scale_factor = FLAGS.pgbench_scale_factor
 
 
 def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
+  """Updates benchmark_spec with flags that are used in the run stage."""
   benchmark_spec.seconds_per_test = FLAGS.pgbench_seconds_per_test
   benchmark_spec.seconds_to_pause = FLAGS.pgbench_seconds_to_pause_before_steps
   benchmark_spec.client_counts = FLAGS.pgbench_client_counts
 
 
 def Prepare(benchmark_spec):
+  """Prepares the client and server VM for the pgbench test.
+
+  This function installs pgbench on the client and creates and populates
+  the test database on the server.
+
+  If DEFAULT_DB_NAME exists, it will be dropped and recreated,
+  else it will be created. pgbench will populate the database
+  with sample data using FLAGS.pgbench_scale_factor.
+  """
   vm = benchmark_spec.vms[0]
   vm.Install('pgbench')
 
@@ -143,30 +154,70 @@ def Prepare(benchmark_spec):
       connection_string, benchmark_spec.scale_factor))
 
 
-def DoesDatabaseExist(benchmark_spec, connection_string, database):
+def DoesDatabaseExist(client_vm, connection_string, database_name):
+  """Returns whether or not the specifid database exists on the server.
+
+  Args:
+    client_vm: client vm which will run the query
+    connection_string: database server connection string understood by psql
+    database_name: name of database to check for existense
+
+  Returns:
+    True if database_name exists, else False
+  """
   command = 'psql {0} -lqt | cut -d \| -f 1 | grep -qw {1}'.format(
-      connection_string, database)
-  _, _, return_value = benchmark_spec.vms[0].RemoteCommand(
+      connection_string, database_name)
+  _, _, return_value = client_vm.RemoteCommand(
       command, ignore_failure=True, with_return_value=True)
   return return_value == 0
 
 
-def CreateDatabase(benchmark_spec, default_database, new_database):
-  db = benchmark_spec.managed_relational_db
-  connection_string = db.MakePsqlConnectionString(default_database)
+def CreateDatabase(benchmark_spec, default_database_name, new_database_name):
+  """Creates a new database on the database server.
 
-  if DoesDatabaseExist(benchmark_spec, connection_string, new_database):
+  If new_database_name already exists on the server, it will be dropped and
+  recreated.
+
+  Args:
+    benchmark_spec: benchmark_spec object which contains the database server
+      and client_vm
+    default_database_name: name of the default database guaranteed to exist on
+      the server
+    new_database_name: name of the new database to create, or drop and recreate
+  """
+  client_vm = benchmark_spec.vms[0]
+  db = benchmark_spec.managed_relational_db
+  connection_string = db.MakePsqlConnectionString(default_database_name)
+
+  if DoesDatabaseExist(client_vm, connection_string, new_database_name):
     command = 'psql {0} -c "DROP DATABASE {1};"'.format(
-        connection_string, new_database)
-    stdout, _ = benchmark_spec.vms[0].RemoteCommand(command, should_log=True)
+        connection_string, new_database_name)
+    stdout, _ = client_vm.RemoteCommand(command, should_log=True)
 
   command = 'psql {0} -c "CREATE DATABASE {1};"'.format(
-      connection_string, new_database)
-  stdout, _ = benchmark_spec.vms[0].RemoteCommand(command, should_log=True)
+      connection_string, new_database_name)
+  stdout, _ = client_vm.RemoteCommand(command, should_log=True)
 
 
-def _MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
-                           additional_metadata):
+def MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
+                          additional_metadata):
+  """Creates sample objects from the given pgbench output and metadata.
+
+  Two samples will be returned, one containing a latency list and
+  the other a tps (transactions per second) list. Each will contain
+  N floating point samples, where N = FLAGS.pgbench_seconds_per_test.
+
+  Args:
+    pgbench_stderr: stderr from the pgbench run command
+    num_clients: number of pgbench clients used
+    num_jobs: number of pgbench jobs (threads) used
+    additional_metadata: additional metadata to add to each sample
+
+  Returns:
+    A list containing a latency sample and a tps sample. Each sample
+    consists of a list of floats, sorted by time that were collected
+    by running pgbench with the given client and job counts.
+  """
   lines = pgbench_stderr.splitlines()[2:]
   tps_numbers = [float(line.split(' ')[3]) for line in lines]
   latency_numbers = [float(line.split(' ')[6]) for line in lines]
@@ -184,6 +235,15 @@ def _MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
 
 
 def Run(benchmark_spec):
+  """Runs the pgbench benchark on the client vm, against the db server.
+
+  Args:
+    benchmark_spec: benchmark_spec object which contains the database server
+      and client_vm
+
+  Returns:
+    a list of sample objects
+  """
   UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec)
 
   db = benchmark_spec.managed_relational_db
@@ -207,11 +267,12 @@ def Run(benchmark_spec):
                    benchmark_spec.seconds_per_test))
     stdout, stderr = benchmark_spec.vms[0].RobustRemoteCommand(
         command, should_log=True)
-    samples.extend(_MakeSamplesFromOutput(
+    samples.extend(MakeSamplesFromOutput(
         stderr, client, jobs, common_metadata))
   return samples
 
 
 def Cleanup(benchmark_spec):
+  """Uninstalls pgbench from the client vm."""
   vm = benchmark_spec.vms[0]
   vm.Uninstall('pgbench')

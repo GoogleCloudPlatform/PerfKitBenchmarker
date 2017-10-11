@@ -49,7 +49,7 @@ class PgbenchBenchmarkTestCase(unittest.TestCase):
         'latency': [435.396, 1038.548, 1055.813, 1123.461, 1358.214],
     })
 
-    actual = pgbench_benchmark._MakeSamplesFromOutput(
+    actual = pgbench_benchmark.MakeSamplesFromOutput(
         self.stderr_output, num_clients, num_jobs, testMetadata)
     self.assertEqual(2, len(actual))
 

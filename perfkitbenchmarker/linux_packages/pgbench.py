@@ -15,7 +15,7 @@
 
 """Module containing pgbench installation and cleanup functions.
 
-  On Ubuntu 16.04, this will install pgbench 9.5.
+  On Ubuntu 16.04 this will install pgbench 9.5.
 """
 
 
