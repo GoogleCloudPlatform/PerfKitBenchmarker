@@ -52,13 +52,13 @@ MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
 
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
-  """An object representing a GCP managed relational database.
+  """A GCP CloudSQL database resource.
 
-  Attributes:
-    created: True if the resource has been created.
-    pkb_managed: Whether the resource is managed (created and deleted) by PKB.
+  This class contains logic required to provision and teardown the database.
+  Currently, the database will be open to the world (0.0.0.0/0) which is not
+  ideal; however, a password is still required to connect. Currently only
+  MySQL 5.7 and Postgres 9.6 are supported.
   """
-
   CLOUD = providers.GCP
   GCP_PRICING_PLAN = 'PACKAGE'
 
@@ -69,7 +69,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
 
   def _Create(self):
-    """Creates the GCP Cloud SQL instance."""
+    """Creates the Cloud SQL instance and authorizes traffic from anywhere."""
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
 
