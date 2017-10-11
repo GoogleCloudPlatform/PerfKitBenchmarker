@@ -18,7 +18,6 @@ import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.providers.gcp import gcp_tpu
 
 FLAGS = flags.FLAGS
 
@@ -30,10 +29,14 @@ mnist:
     default:
       vm_spec:
         GCP:
-          image: debian-9-tf-v20171002
+          image: debian-9-tf-v20171009
           image_project: ml-images
           machine_type: n1-standard-8
           zone: us-central1-c
+  cloud_tpu:
+    tpu_tf_version: nightly
+    tpu_zone: us-central1-c
+    tpu_cidr_range: 10.240.0.0/29
   flags:
     gcloud_scopes: https://www.googleapis.com/auth/cloud-platform
 """
@@ -78,8 +81,6 @@ def Prepare(benchmark_spec):
   master_vm = vms[0]
   master_vm.RemoteCommand(
       'git clone https://github.com/tensorflow/tpu-demos.git', should_log=True)
-  benchmark_spec.tpu = gcp_tpu.GcpCloudTpu(FLAGS.run_uri, FLAGS.project)
-  benchmark_spec.tpu.Create()
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -97,7 +98,7 @@ def _CreateMetadataDict(benchmark_spec):
   return metadata
 
 
-def _ExtractThroughput(output):
+def ExtractThroughput(output):
   """Extract throughput from MNIST output.
 
   Args:
@@ -122,7 +123,7 @@ def _MakeSamplesFromOutput(benchmark_spec, output):
     a Sample containing the MNIST throughput
   """
   metadata = _CreateMetadataDict(benchmark_spec)
-  global_step_sec = _ExtractThroughput(output)
+  global_step_sec = ExtractThroughput(output)
   return [sample.Sample('tensorflow', global_step_sec,
                         'global_step/sec', metadata)]
 
@@ -141,7 +142,7 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   master_vm = vms[0]
   mnist_benchmark_dir = 'tpu-demos/cloud_tpu/models/mnist'
-  tpu_master = 'grpc://{}:8470'.format(benchmark_spec.tpu.tpu_ip)
+  tpu_master = 'grpc://{}:8470'.format(benchmark_spec.cloud_tpu.GetCloudTpuIp())
   mnist_benchmark_cmd = (
       'python mnist.py --master={0} --train_file={1} --use_tpu={2}'.format(
           tpu_master, benchmark_spec.train_file, benchmark_spec.use_tpu))
@@ -152,4 +153,4 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
   """Cleanup MNIST on the cluster."""
-  benchmark_spec.tpu.Delete()
+  pass

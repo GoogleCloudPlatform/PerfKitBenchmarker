@@ -24,6 +24,7 @@ import threading
 import uuid
 
 from perfkitbenchmarker import benchmark_status
+from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
@@ -114,6 +115,7 @@ class BenchmarkSpec(object):
     self.dpb_service = None
     self.container_cluster = None
     self.managed_relational_db = None
+    self.cloud_tpu = None
 
     self._zone_index = 0
 
@@ -166,6 +168,15 @@ class BenchmarkSpec(object):
         managed_relational_db.GetManagedRelationalDbClass(cloud))
     self.managed_relational_db = managed_relational_db_class(
         self.config.managed_relational_db)
+
+  def ConstructCloudTpu(self):
+    """Constructs the BenchmarkSpec's cloud TPU objects."""
+    if self.config.cloud_tpu is None:
+      return
+    cloud = self.config.cloud_tpu.cloud
+    providers.LoadProvider(cloud)
+    cloud_tpu_class = cloud_tpu.GetCloudTpuClass(cloud)
+    self.cloud_tpu = cloud_tpu_class(self.config.cloud_tpu)
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
@@ -351,6 +362,8 @@ class BenchmarkSpec(object):
       self.dpb_service.Create()
     if self.managed_relational_db:
       self.managed_relational_db.Create()
+    if self.cloud_tpu:
+      self.cloud_tpu.Create()
 
   def Delete(self):
     if self.deleted:
@@ -362,6 +375,8 @@ class BenchmarkSpec(object):
       self.dpb_service.Delete()
     if self.managed_relational_db:
       self.managed_relational_db.Delete()
+    if self.cloud_tpu:
+      self.cloud_tpu.Delete()
 
     if self.vms:
       try:
