@@ -425,18 +425,29 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     (retcode, full_cmd, stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
+  def RemoteCommandWithReturnCode(self, command, should_log=False,
+                                  retries=SSH_RETRIES, ignore_failure=False,
+                                  login_shell=False, suppress_warning=False,
+                                  timeout=None):
+    return self.RemoteHostCommandWithReturnCode(
+        command, should_log, retries,
+        ignore_failure, login_shell,
+        suppress_warning, timeout)
+
   def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False,
                     suppress_warning=False, timeout=None):
-    return self.RemoteHostCommand(command, should_log, retries,
-                                  ignore_failure, login_shell,
-                                  suppress_warning, timeout)
+    return self.RemoteCommandWithReturnCode(
+        command, should_log, retries,
+        ignore_failure, login_shell,
+        suppress_warning, timeout)[:2]
 
-  def RemoteHostCommand(self, command,
-                        should_log=False, retries=SSH_RETRIES,
-                        ignore_failure=False, login_shell=False,
-                        suppress_warning=False, timeout=None):
+  def RemoteHostCommandWithReturnCode(self, command, should_log=False,
+                                      retries=SSH_RETRIES,
+                                      ignore_failure=False,
+                                      login_shell=False,
+                                      suppress_warning=False, timeout=None):
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run
@@ -455,7 +466,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           return code is non-zero.
 
     Returns:
-      A tuple of stdout and stderr from running the command.
+      A tuple of stdout, stderr, return_code from running the command.
 
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
@@ -494,7 +505,37 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if not ignore_failure:
         raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-    return stdout, stderr
+    return (stdout, stderr, retcode)
+
+  def RemoteHostCommand(self, command, should_log=False, retries=SSH_RETRIES,
+                        ignore_failure=False, login_shell=False,
+                        suppress_warning=False, timeout=None):
+    """Runs a command on the VM.
+
+    This is guaranteed to run on the host VM, whereas RemoteCommand might run
+    within i.e. a container in the host VM.
+
+    Args:
+      command: A valid bash command.
+      should_log: A boolean indicating whether the command result should be
+          logged at the info level. Even if it is false, the results will
+          still be logged at the debug level.
+      retries: The maximum number of times RemoteCommand should retry SSHing
+          when it receives a 255 return code.
+      ignore_failure: Ignore any failure if set to true.
+      login_shell: Run command in a login shell.
+      suppress_warning: Suppress the result logging from IssueCommand when the
+          return code is non-zero.
+
+    Returns:
+      A tuple of stdout, stderr from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection.
+    """
+    return self.RemoteHostCommandWithReturnCode(
+        command, should_log, retries, ignore_failure, login_shell,
+        suppress_warning, timeout)[:2]
 
   def _Reboot(self):
     """OS-specific implementation of reboot command"""
