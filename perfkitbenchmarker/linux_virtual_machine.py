@@ -428,15 +428,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False,
-                    suppress_warning=False, timeout=None):
+                    suppress_warning=False, timeout=None,
+                    with_return_value=False):
     return self.RemoteHostCommand(command, should_log, retries,
                                   ignore_failure, login_shell,
-                                  suppress_warning, timeout)
+                                  suppress_warning, timeout,
+                                  with_return_value)
 
   def RemoteHostCommand(self, command,
                         should_log=False, retries=SSH_RETRIES,
                         ignore_failure=False, login_shell=False,
-                        suppress_warning=False, timeout=None):
+                        suppress_warning=False, timeout=None,
+                        with_return_value=False):
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run
@@ -453,9 +456,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       login_shell: Run command in a login shell.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
+      with_return_value: Append the return code to the stdout, stderr tuple
+        that is returned from the function
 
     Returns:
-      A tuple of stdout and stderr from running the command.
+      If with_return_value is False:
+        A tuple of stdout and stderr from running the command
+      If with_return_value is True:
+        A tuple of stdout, stderr, return_value from running the command
 
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
@@ -494,7 +502,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if not ignore_failure:
         raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-    return stdout, stderr
+    return (stdout, stderr, retcode) if with_return_value else (stdout, stderr)
 
   def _Reboot(self):
     """OS-specific implementation of reboot command"""
