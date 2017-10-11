@@ -41,7 +41,6 @@ TEST_OUTPUT_SPECINT = """
 GOOD_METADATA = {'runspec_config': 'linux64-x64-gcc47.cfg',
                  'num_cpus': 256,
                  'runspec_define': '',
-                 'machine_type': 'big',
                  'runspec_iterations': '3',
                  'runspec_enable_32bit': 'False'}
 
@@ -280,9 +279,6 @@ class DummyVM(object):
 
   def __init__(self):
     self.num_cpus = 256
-
-  def GetMachineTypeDict(self):
-    return {'machine_type': 'big'}
 
 
 class Speccpu2006BenchmarkTestCase(unittest.TestCase,

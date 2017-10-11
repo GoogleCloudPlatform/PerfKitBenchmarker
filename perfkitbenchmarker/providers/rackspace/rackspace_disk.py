@@ -116,7 +116,7 @@ class RackspaceDisk(disk.BaseDisk):
     self.project = project
     self.image = image
     self.attached_vm_id = None
-    self.metadata = DISK_METADATA[disk_spec.disk_type]
+    self.metadata.update(DISK_METADATA[disk_spec.disk_type])
 
   def _Create(self):
     """Creates the disk."""

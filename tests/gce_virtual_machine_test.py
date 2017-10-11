@@ -279,26 +279,31 @@ class GceVirtualMachineTestCase(unittest.TestCase):
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT, machine_type='test_machine_type', project='p')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertEqual(vm.GetMachineTypeDict(), {
-        'dedicated_host': False, 'machine_type': 'test_machine_type',
-        'project': 'p'})
+    self.assertDictContainsSubset(
+        {'dedicated_host': False, 'machine_type': 'test_machine_type',
+         'project': 'p'},
+        vm.GetResourceMetadata()
+    )
 
   def testVmWithMachineTypePreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT, machine_type='test_machine_type', preemptible=True,
         project='p')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertEqual(vm.GetMachineTypeDict(), {
-        'dedicated_host': False, 'machine_type': 'test_machine_type',
-        'preemptible': True, 'project': 'p'})
+    self.assertDictContainsSubset(
+        {'dedicated_host': False, 'machine_type': 'test_machine_type',
+         'preemptible': True, 'project': 'p'},
+        vm.GetResourceMetadata()
+    )
 
   def testCustomVmNonPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
         'cpus': 1, 'memory': '1.0GiB'}, project='p')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertEqual(vm.GetMachineTypeDict(),
-                     {'cpus': 1, 'memory_mib': 1024, 'project': 'p',
-                      'dedicated_host': False})
+    self.assertDictContainsSubset(
+        {'cpus': 1, 'memory_mib': 1024, 'project': 'p',
+         'dedicated_host': False},
+        vm.GetResourceMetadata())
 
   def testCustomVmPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
@@ -306,9 +311,9 @@ class GceVirtualMachineTestCase(unittest.TestCase):
         preemptible=True,
         project='fakeproject')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertEqual(vm.GetMachineTypeDict(),
-                     {'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
-                      'dedicated_host': False, 'preemptible': True})
+    self.assertDictContainsSubset({
+        'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
+        'dedicated_host': False, 'preemptible': True}, vm.GetResourceMetadata())
 
   def testCustomVmWithGpus(self):
     spec = gce_virtual_machine.GceVmSpec(
@@ -318,10 +323,10 @@ class GceVirtualMachineTestCase(unittest.TestCase):
         gpu_type='k80',
         project='fakeproject')
     vm = gce_virtual_machine.GceVirtualMachine(spec)
-    self.assertDictEqual(vm.GetMachineTypeDict(), {
+    self.assertDictContainsSubset({
         'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
         'dedicated_host': False, 'gpu_count': 2, 'gpu_type': 'k80'
-    })
+    }, vm.GetResourceMetadata())
 
 
 class GCEVMFlagsTestCase(unittest.TestCase):

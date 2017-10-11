@@ -35,17 +35,14 @@ DISK_METADATA = {
     PD_STANDARD: {
         disk.MEDIA: disk.HDD,
         disk.REPLICATION: disk.ZONE,
-        disk.LEGACY_DISK_TYPE: disk.STANDARD
     },
     PD_SSD: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
-        disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD
     },
     disk.LOCAL: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.NONE,
-        disk.LEGACY_DISK_TYPE: disk.LOCAL
     }
 }
 
@@ -67,7 +64,9 @@ class GceDisk(disk.BaseDisk):
     self.name = name
     self.zone = zone
     self.project = project
-    self.metadata = DISK_METADATA[disk_spec.disk_type]
+    self.metadata.update(DISK_METADATA[disk_spec.disk_type])
+    if self.disk_type == disk.LOCAL:
+      self.metadata['interface'] = FLAGS.gce_ssd_interface
 
   def _Create(self):
     """Creates the disk."""

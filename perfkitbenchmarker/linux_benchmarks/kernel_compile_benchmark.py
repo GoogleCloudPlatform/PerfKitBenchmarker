@@ -88,13 +88,11 @@ def Run(benchmark_spec):
   clean_time = make('clean')
   warm_build_time = make()
 
-  metadata = dict(vm.GetMachineTypeDict())
-
   return [
-      sample.Sample('Untar time', untar_time, 'seconds', metadata),
-      sample.Sample('Cold build time', cold_build_time, 'seconds', metadata),
-      sample.Sample('Clean time', clean_time, 'seconds', metadata),
-      sample.Sample('Warm build time', warm_build_time, 'seconds', metadata),
+      sample.Sample('Untar time', untar_time, 'seconds'),
+      sample.Sample('Cold build time', cold_build_time, 'seconds'),
+      sample.Sample('Clean time', clean_time, 'seconds'),
+      sample.Sample('Warm build time', warm_build_time, 'seconds'),
   ]
 
 

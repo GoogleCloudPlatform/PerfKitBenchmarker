@@ -1,5 +1,7 @@
 Breaking changes:
 - Removed gpus_per_node metadata from stencil2d and hpcg benchmarks (GH-1455)
+- Removed legacy disk metadata (use data_disk\* not scratch_disk\* and removed
+  num_striped_disks + aws_provisioned_iops metadata) (GH-1506)
 
 New features:
 - Added YCSB benchmark for Cloud Spanner (GH-1387 from @haih-g)
@@ -9,6 +11,7 @@ New features:
 - Added flag_zip_defs which functions like flag_matrix_defs, but performs a zip
   operation on the axes instead of a cross-product (GH-1414)
 - Added TensorFlow Benchmarks. (GH-1420)
+- Added --network_enable_BBR flag (GH-1515)
 
 Enhancements:
 - Added basic auth support for Mesos provider. (GH-1390)
@@ -33,3 +36,4 @@ Bug fixes and maintenance updates:
 - Fix multi-threading issue in fio.job filename (GH-1474)
 - Decreased speccpu2006 default disk size to 50gb (GH-1484)
 - Added azure_host_caching to metadata (GH-1500)
+- Fixed fio histograms when generated with numjobs>1 (GH-1501)
