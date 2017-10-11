@@ -19,7 +19,7 @@ import unittest
 import mock
 
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker.tests import mock_flags
+from tests import mock_flags
 
 
 # Need to provide implementations for all of the abstract methods in
