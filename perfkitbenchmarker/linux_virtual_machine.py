@@ -95,11 +95,11 @@ flags.DEFINE_list('set_files', [],
                   'the benchmark.')
 
 flags.DEFINE_bool('network_enable_BBR', False,
-                  'A short cut to enable BBR congestion control on the network.'
-                  'equivalent to appending to --sysctls the following values'
+                  'A shortcut to enable BBR congestion control on the network. '
+                  'equivalent to appending to --sysctls the following values '
                   '"net.core.default_qdisc=fq, '
                   '"net.ipv4.tcp_congestion_control=bbr" '
-                  'As with other sysctrls, will cause a reboot to happen')
+                  'As with other sysctrls, will cause a reboot to happen.')
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -265,7 +265,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       key: a string - the key to write as part of the pair
       value: a string - the value to write as part of the pair
     """
-
     self.RemoteCommand('sudo bash -c \'echo "%s=%s" >> /etc/sysctl.conf\''
                        % (key, value))
 
@@ -277,14 +276,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
        The Sysctl pairs are written persistently so that if a reboot
        occurs, the flags are not lost.
     """
-
     for pair in FLAGS.sysctl:
       key, value = pair.split('=')
       self.ApplySysctlPersistent(key, value)
 
   def DoConfigureNetworkForBBR(self):
     """Apply --network_enable_BBR to the VM."""
-
     if not FLAGS.network_enable_BBR:
       return
 
@@ -302,19 +299,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def _RebootIfNecessary(self):
     """Will reboot the VM if self._needs_reboot has been set."""
-
     if self._needs_reboot:
       self.Reboot()
       self._needs_reboot = False
 
   def TcpCongestionControl(self):
-    """Returns the congestion control used for tcp."""
+    """Return the congestion control used for tcp."""
     resp, _ = self.RemoteCommand(
         'cat /proc/sys/net/ipv4/tcp_congestion_control')
     return resp.rstrip('\n')
 
   def CheckKernelVersion(self):
-    """Returns a KernelVersion from the host VM."""
+    """Return a KernelVersion from the host VM."""
     uname, _ = self.RemoteCommand('uname -r')
     return KernelVersion(uname)
 
@@ -332,7 +328,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
-    """Returns the UTC time the VM was last rebooted as reported by the VM."""
+    """Return the UTC time the VM was last rebooted as reported by the VM."""
     resp, _ = self.RemoteHostCommand('uptime -s', retries=1,
                                      suppress_warning=True)
     return resp
@@ -1155,7 +1151,6 @@ class KernelVersion(object):
     Args:
       uname: A string in the format of "uname -r" command
     """
-
     # example format would be: "4.5.0-96-generic"
     # major.minor.Rest
     # in this example, major = 4, minor = 5
