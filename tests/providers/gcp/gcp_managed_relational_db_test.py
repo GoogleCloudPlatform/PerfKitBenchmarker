@@ -46,9 +46,6 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
                                              'zone': 'us-west1-b',
                                          })
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
-    # TODO: Database version has more than one supported value. Test should
-    # reflect that by not declaring a database version and letting the default
-    # version be returned.
     return {
         'engine': MYSQL,
         'engine_version': '5.7',
@@ -69,9 +66,6 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     }
     vm_spec = gce_virtual_machine.GceVmSpec('NAME', **machine_type)
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
-    # TODO: Database version has more than one supported value. Test should
-    # reflect that by not declaring a database version and letting the default
-    # version be returned.
     return {
         'engine': POSTGRES,
         'engine_version': '5.7',

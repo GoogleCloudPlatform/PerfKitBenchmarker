@@ -25,8 +25,6 @@ import datetime
 import json
 import logging
 import time
-import os
-import subprocess
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -67,6 +65,10 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.spec = managed_relational_db_spec
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
+    if (self.spec.engine == managed_relational_db.POSTGRES and
+        self.spec.high_availability):
+      raise Exception(('High availability configuration is not supported on '
+                       'CloudSQL PostgreSQL'))
 
   def _Create(self):
     """Creates the Cloud SQL instance and authorizes traffic from anywhere."""
@@ -112,13 +114,13 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       cmd_string.append('--cpu={}'.format(cpus))
       cmd_string.append('--memory={}MiB'.format(memory))
 
-    # Postgres HA requires a manual curl command to enable, which is why there
-    # are no flags appended here. This is done in the _EnableHighAvailability
-    # method.
+    # High availability only supported on MySQL. A check is done in
+    # __init__ to ensure that a Postgres HA configuration is not requested.
     if (self.spec.high_availability and
         self.spec.engine == managed_relational_db.MYSQL):
-      ha_flag = '--failover-replica-name=replica-' + self.instance_id
-      cmd_string.append(ha_flag)
+        ha_flag = '--failover-replica-name=replica-' + self.instance_id
+        cmd_string.append(ha_flag)
+
     if self.spec.backup_enabled:
       cmd_string.append('--backup')
       cmd_string.append('--backup-start-time={}'.format(
@@ -131,7 +133,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     _, _, _ = cmd.Issue()
 
   def _ValidateSpec(self):
-    """Validate postgreSQL spec for CPU and memory.
+    """Validate PostgreSQL spec for CPU and memory.
 
     Raises:
       data.ResourceNotFound: On missing memory or cpus in postgres benchmark
@@ -260,32 +262,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
-
-  def _EnableHighAvailability(self):
-    print 'Using CURL to enable high availability'
-    enable_ha_script_path = data.ResourcePath('enable_gcp_ha.sh')
-    subprocess.check_call([enable_ha_script_path], shell=True,
-                          env=dict(os.environ, INSTANCENAME=self.instance_id))
-    print 'Done. Waiting for 5 minutes for changes to take effect'
-    time.sleep(5 * 60)
-
-  def _PostCreate(self):
-    """Method that will be called once after _CreateReource is called.
-
-    Supplying this method is optional. If it is supplied, it will be called
-    once, after the resource is confirmed to exist. It is intended to allow
-    data about the resource to be collected or for the resource to be tagged.
-    """
-    # TODO(ferneyhough): raise exception on failure
-    cmd = util.GcloudCommand(
-        self, 'sql', 'users', 'create', self.GetUsername(), 'dummy_host',
-        '--instance={0}'.format(self.instance_id),
-        '--password={0}'.format(self.GetPassword()))
-    stdout, _, _ = cmd.Issue()
-    print(stdout)
-
-    if self.spec.high_availability:
-      self._EnableHighAvailability()
 
   def _CreateDependencies(self):
     """Method that will be called once before _CreateResource() is called.
