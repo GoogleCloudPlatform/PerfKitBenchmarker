@@ -167,8 +167,8 @@ def DoesDatabaseExist(client_vm, connection_string, database_name):
   """
   command = 'psql {0} -lqt | cut -d \| -f 1 | grep -qw {1}'.format(
       connection_string, database_name)
-  _, _, return_value = client_vm.RemoteCommand(
-      command, ignore_failure=True, with_return_value=True)
+  _, _, return_value = client_vm.RemoteCommandWithReturnCode(
+      command, ignore_failure=True)
   return return_value == 0
 
 
