@@ -128,6 +128,7 @@ BENCHMARK_SETS = {
             'netperf',
             'object_storage_service',
             'oldisim',
+            'pgbench',
             'ping',
             'redis_ycsb',
             'stencil2d',
