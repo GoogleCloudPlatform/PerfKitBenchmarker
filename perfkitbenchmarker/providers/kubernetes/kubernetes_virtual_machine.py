@@ -14,6 +14,7 @@
 
 import json
 import logging
+import posixpath
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -23,20 +24,12 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
-from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
-    OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
+from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
 FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu-upstart'
 SELECTOR_PREFIX = 'pkb'
-
-
-def CreateResource(resource_body):
-  with vm_util.NamedTemporaryFile() as tf:
-    tf.write(resource_body)
-    tf.close()
-    return kubernetes_helper.CreateFromFile(tf.name)
 
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -97,10 +90,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Creates a POD (Docker container with optional volumes).
     """
     create_rc_body = self._BuildPodBody()
-    output = CreateResource(create_rc_body)
-    if output[EXIT_CODE]:
-      raise Exception("Creating POD failed: %s" % output[STDERR])
-    logging.info(output[STDOUT].rstrip())
+    kubernetes_helper.CreateResource(create_rc_body)
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
   def _WaitForPodBootCompletion(self):
@@ -297,6 +287,20 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       raise errors.VirtualMachine.RemoteCommandError(error_text)
     return stdout, stderr
 
+  def MoveHostFile(self, target, source_path, remote_path=''):
+    """Copies a file from one VM to a target VM.
+
+    Args:
+      target: The target BaseVirtualMachine object.
+      source_path: The location of the file on the REMOTE machine.
+      remote_path: The destination of the file on the TARGET machine, default
+          is the home directory.
+    """
+    file_name = vm_util.PrependTempDir(posixpath.basename(source_path))
+    self.RemoteHostCopy(file_name, source_path, copy_to=False)
+    target.RemoteHostCopy(file_name, remote_path)
+
+
   def RemoteHostCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.
 
@@ -308,9 +312,12 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     Raises:
       RemoteCommandError: If there was a problem copying the file.
     """
-    src_spec, dest_spec = file_path, '%s:%s' % (self.name, remote_path)
-    if not copy_to:
-      src_spec, dest_spec = dest_spec, src_spec
+    if copy_to:
+      src_spec, dest_spec = file_path, '%s:' % (self.name,)
+    else:
+      remote_path, _ = self.RemoteCommand('readlink -f %s' % remote_path)
+      remote_path = remote_path.strip()
+      src_spec, dest_spec = '%s:%s' % (self.name, remote_path), file_path
     cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
            'cp', src_spec, dest_spec]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd)
@@ -319,3 +326,15 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
                     'STDOUT: %sSTDERR: %s' %
                     (retcode, ' '.join(cmd), stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
+    if copy_to:
+      file_name = posixpath.basename(file_path)
+      remote_path = remote_path or file_name
+      self.RemoteCommand('mv %s %s; chmod 777 %s' %
+                         (file_name, remote_path, remote_path))
+
+  def PrepareVMEnvironment(self):
+    super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
+    self.RemoteCommand('mkdir ~/.ssh')
+    with open(self.ssh_public_key) as f:
+      key = f.read()
+      self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)

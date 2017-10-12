@@ -48,6 +48,11 @@ class BaseResource(object):
     self.create_end_time = None
     self.delete_end_time = None
     self.resource_ready_time = None
+    self.metadata = dict()
+
+  def GetResourceMetadata(self):
+    """Returns a dictionary of metadata about the resource."""
+    return self.metadata.copy()
 
   @abc.abstractmethod
   def _Create(self):

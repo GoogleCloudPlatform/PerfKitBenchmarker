@@ -104,7 +104,7 @@ speccpu2006:
   vm_groups:
     default:
       vm_spec: *default_single_core
-      disk_spec: *default_500_gb
+      disk_spec: *default_50_gb
 """
 
 _BENCHMARK_SPECIFIC_VM_STATE_ATTR = 'speccpu2006_vm_state'
@@ -410,7 +410,6 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
               'runspec_iterations': str(FLAGS.runspec_iterations),
               'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
               'runspec_define': FLAGS.runspec_define}
-  metadata.update(vm.GetMachineTypeDict())
 
   missing_results = []
   scores = []

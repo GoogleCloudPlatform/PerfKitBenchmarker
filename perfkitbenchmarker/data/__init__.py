@@ -29,6 +29,8 @@ import shutil
 
 import pkg_resources
 
+import perfkitbenchmarker
+
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import temp_dir
 
@@ -147,7 +149,8 @@ class PackageResourceLoader(ResourceLoader):
 
 
 DATA_PACKAGE_NAME = 'perfkitbenchmarker.data'
-YCSB_WORKLOAD_DIR_NAME = 'perfkitbenchmarker/data/ycsb'
+YCSB_WORKLOAD_DIR_NAME = os.path.join(
+    os.path.dirname(perfkitbenchmarker.__file__), 'data/ycsb')
 SCRIPT_PACKAGE_NAME = 'perfkitbenchmarker.scripts'
 CONFIG_PACKAGE_NAME = 'perfkitbenchmarker.configs'
 DEFAULT_RESOURCE_LOADERS = [PackageResourceLoader(DATA_PACKAGE_NAME),

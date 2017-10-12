@@ -7,14 +7,14 @@ tuned for any particular platform or instance type. These settings are recommend
 Only in the rare case where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
-This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [wiki] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contains more detailed information:
+This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [wiki](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contains more detailed information:
 
-* [FAQ] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
-* [Tech Talks] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
-* [Governing rules] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
-* [Community meeting decks and notes] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
-* [Design documents] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
-* You are always welcome to [open an issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues), or to join us on #PerfKitBenchmarker on freenode to discuss issues you're having, pull requests, or anything else related to PerfKitBenchmarker
+* [FAQ](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
+* [Tech Talks](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
+* [Governing rules](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
+* [Community meeting decks and notes](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
+* [Design documents](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
+* You are always welcome to [open an issue](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues), or to join us on #PerfKitBenchmarker on freenode to discuss issues you're having, pull requests, or anything else related to PerfKitBenchmarker
 
 
 Known Issues
@@ -108,7 +108,7 @@ Before you can run the PerfKit Benchmarker, you need account(s) on the cloud pro
 * [Google Cloud Platform](https://cloud.google.com)
 * [AWS](http://aws.amazon.com)
 * [Azure](http://azure.microsoft.com)
-* [AliCloud](http://www.alicloud.com)
+* [AliCloud](http://www.aliyun.com)
 * [DigitalOcean](https://www.digitalocean.com)
 * [Rackspace Cloud](https://www.rackspace.com)
 * [ProfitBricks](https://www.profitbricks.com/)
@@ -415,6 +415,13 @@ Run the following command to install `aliyuncli` (omit the `sudo` on Windows)
    ```bash
    $ sudo pip install -r perfkitbenchmarker/providers/alicloud/requirements.txt
    ```
+   In some CentOS version, you may need:
+   
+   ```bash
+   $ sudo yum install libffi-devel.x86_64
+   $ sudo yum install openssl-devel.x86_64
+   $ sudo pip install 'colorama<=0.3.3'
+   ```
 
    To check if AliCloud is installed:
 
@@ -544,7 +551,10 @@ Open the `.boto` file and edit the following fields:
 
 1. In the [Credentials] section:
 
-   `gs_oauth2_refresh_token`: set it to be the same as the `refresh_token` field in your gcloud credential file (~/.config/gcloud/credentials), which was setup as part of the `gcloud auth login` step.
+   `gs_oauth2_refresh_token`: set it to be the same as the `refresh_token` field in your gcloud credential file (~/.config/gcloud/credentials.db), which was setup as part of the `gcloud auth login` step. To see the refresh token, run
+   ```bash
+   $ strings ~/.config/gcloud/credentials.db.
+   ```
 
    `aws_access_key_id`, `aws_secret_access_key`: set these to be the AWS access keys you intend to use for these tests, or you can use the same keys as those in your existing AWS credentials file (`~/.aws/credentials`).
 
@@ -554,7 +564,7 @@ Open the `.boto` file and edit the following fields:
 
 3. In the `[OAuth2]` section:
 
-   `client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials`), which was setup as part of the `gcloud auth login` step.
+   `client_id`, `client_secret`: set these to be the same as those in your gcloud credentials file (`~/.config/gcloud/credentials.db`), which was setup as part of the `gcloud auth login` step.
 
 
 Running a Single Benchmark
@@ -725,7 +735,7 @@ Cloud name | Network-attached SSD | Network-attached HDD
 -----------|----------------------|---------------------
 GCP | pd-ssd | pd-standard
 AWS | gp2 | standard
-Azure | premium-storage | standard-disk
+Azure | Premium_LRS | Standard_LRS
 Rackspace | cbs-ssd | cbs-sata
 
 Also note that `--data_disk_type=local` tells PKB not to allocate a separate

@@ -84,6 +84,11 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
           (start_time - pending_time).total_seconds())
     return stats
 
+  @staticmethod
+  def CheckPrerequisites(benchmark_config):
+    del benchmark_config  # Unused
+    pass
+
   def _Create(self):
     """Creates the cluster."""
 
@@ -163,6 +168,8 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     else:
       cmd.flags['jar'] = jarfile
 
+    self.append_region(cmd)
+
     # Dataproc gives as stdout an object describing job execution.
     # Its stderr contains a mix of the stderr of the job, and the
     # stdout of the job.  We set the driver log level to FATAL
@@ -215,10 +222,25 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
                           str(size_file)])
     cmd.additional_flags = ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None)
-    if retcode != 0:
-      return {dpb_service.SUCCESS: False}
-    else:
-      return {dpb_service.SUCCESS: True}
+    return {dpb_service.SUCCESS: retcode == 0}
+
+  def read_data(self, source_dir, udpate_default_fs, num_files, size_file):
+    """Method to read data using a distributed job on the cluster."""
+    cmd = util.GcloudCommand(self, 'dataproc', 'jobs', 'submit', 'hadoop')
+    cmd.flags['cluster'] = self.cluster_id
+    cmd.flags['jar'] = TESTDFSIO_JAR_LOCATION
+
+    self.append_region(cmd)
+
+    job_arguments = [TESTDFSIO_PROGRAM]
+    if udpate_default_fs:
+      job_arguments.append('-Dfs.default.name={}'.format(source_dir))
+    job_arguments.append('-Dtest.build.data={}'.format(source_dir))
+    job_arguments.extend(['-read', '-nrFiles', str(num_files), '-fileSize',
+                          str(size_file)])
+    cmd.additional_flags = ['--'] + job_arguments
+    stdout, stderr, retcode = cmd.Issue(timeout=None)
+    return {dpb_service.SUCCESS: retcode == 0}
 
 
   def distributed_copy(self, source_location, destination_location):

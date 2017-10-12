@@ -35,6 +35,11 @@ flags.DEFINE_string('kubeconfig', None,
 flags.DEFINE_string('kubectl', 'kubectl',
                     'Path to kubectl tool')
 
+flags.DEFINE_string('container_cluster_cloud', None,
+                    'Sets the cloud to use for the container cluster. '
+                    'This will override both the value set in the config and '
+                    'the value set using the generic "cloud" flag.')
+
 
 def GetContainerClusterClass(cloud):
   return _CLUSTER_REGISTRY[cloud]
@@ -61,12 +66,13 @@ class BaseContainerCluster(resource.BaseResource):
     self.zone = spec.vm_spec.zone
     self.num_nodes = spec.vm_count
 
-  def GetMetadata(self):
+  def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
     metadata = {
-        'container_cluster_machine_type': self.machine_type,
-        'container_cluster_zone': self.zone,
-        'container_cluster_size': self.num_nodes,
+        'cloud': self.CLOUD,
+        'machine_type': self.machine_type,
+        'zone': self.zone,
+        'size': self.num_nodes,
     }
     return metadata
 

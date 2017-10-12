@@ -53,7 +53,7 @@ run=run
 cleanup_teardown=cleanup,teardown
 
 while true
-  do
+do
   # provision, prepare phase of mysql_service
   run_uri=$(python perfkitbenchmarker/scripts/database_scripts/launch_mysql_service.py --run_stage=${prepare_provision} --mysql_svc_db_instance_cores=${mysql_svc_db_instance_cores} --mysql_svc_oltp_table_size=${mysql_svc_oltp_table_size} --mysql_svc_oltp_tables_count=${mysql_svc_oltp_tables_count} --mysql_instance_storage_size=${mysql_instance_storage_size} --additional_flags='"'"--cloud_storage_bucket=${cloud_storage_bucket}"'"')
   # for 3 days

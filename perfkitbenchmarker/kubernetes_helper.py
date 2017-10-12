@@ -34,14 +34,14 @@ def CreateFromFile(file_name):
   checkKubernetesFlags()
   create_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'create',
                 '-f', file_name]
-  return vm_util.IssueCommand(create_cmd)
+  vm_util.IssueRetryableCommand(create_cmd)
 
 
 def DeleteFromFile(file_name):
   checkKubernetesFlags()
   delete_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'delete',
                 '-f', file_name]
-  return vm_util.IssueCommand(delete_cmd)
+  vm_util.IssueRetryableCommand(delete_cmd)
 
 
 def DeleteAllFiles(file_list):
@@ -77,3 +77,17 @@ def GetWithWaitForContents(resource, resourceInstanceName, filter, jsonFilter):
     ret = Get(resource, resourceInstanceName, filter, jsonFilter)
     numWaitsLeft -= 1
   return ret
+
+
+def CreateResource(resource_body):
+  with vm_util.NamedTemporaryFile() as tf:
+    tf.write(resource_body)
+    tf.close()
+    CreateFromFile(tf.name)
+
+
+def DeleteResource(resource_body):
+  with vm_util.NamedTemporaryFile() as tf:
+    tf.write(resource_body)
+    tf.close()
+    DeleteFromFile(tf.name)

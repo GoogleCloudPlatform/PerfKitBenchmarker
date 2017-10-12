@@ -29,14 +29,14 @@ import jinja2
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
 
 PKB_FIO_LOG_FILE_NAME = 'pkb_fio_avg'
-LOCAL_JOB_FILE_NAME = 'fio.job'  # used with vm_util.PrependTempDir()
+LOCAL_JOB_FILE_SUFFIX = '_fio.job'  # used with vm_util.PrependTempDir()
 REMOTE_JOB_FILE_PATH = posixpath.join(vm_util.VM_TMP_DIR, 'fio.job')
 DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
 MOUNT_POINT = '/scratch'
@@ -67,6 +67,16 @@ SCENARIOS = {
     'random_read_write': {
         'name': 'random_read_write',
         'rwkind': 'randrw',
+        'blocksize': '4k'
+    },
+    'sequential_trim': {
+        'name': 'sequential_trim',
+        'rwkind': 'trim',
+        'blocksize': '512k'
+    },
+    'rand_trim': {
+        'name': 'rand_trim',
+        'rwkind': 'randtrim',
         'blocksize': '4k'
     }
 }
@@ -233,7 +243,11 @@ stonewall
 rw={{scenario['rwkind']}}
 blocksize={{scenario['blocksize']}}
 iodepth={{iodepth}}
+{%- if scenario['size'] is defined %}
+size={{scenario['size']}}
+{%- else %}
 size={{size}}
+{%- endif%}
 numjobs={{numjob}}
 {%- endfor %}
 {%- endfor %}
@@ -336,7 +350,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
       in GB.
     block_size: Quantity or None. If Quantity, the block size to use.
     runtime: int. The number of seconds to run each job.
-    paramters: list. Other fio parameters to apply to all jobs.
+    parameters: list. Other fio parameters to apply to all jobs.
 
   Returns:
     A string containing a fio job file.
@@ -413,6 +427,7 @@ def GetLogFlags(log_file_base):
 
 def CheckPrerequisites(benchmark_config):
   """Perform flag checks."""
+  del benchmark_config  # unused
   WarnOnBadFlags()
 
 
@@ -476,10 +491,11 @@ def Run(benchmark_spec):
       FLAGS.fio_blocksize,
       FLAGS.fio_runtime,
       FLAGS.fio_parameters)
-  job_file_path = vm_util.PrependTempDir(LOCAL_JOB_FILE_NAME)
+  job_file_path = vm_util.PrependTempDir(vm.name + LOCAL_JOB_FILE_SUFFIX)
   with open(job_file_path, 'w') as job_file:
     job_file.write(job_file_string)
     logging.info('Wrote fio job file at %s', job_file_path)
+    logging.info(job_file_string)
 
   vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
 
@@ -503,7 +519,7 @@ def Run(benchmark_spec):
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
 
-  stdout, stderr = vm.RobustRemoteCommand(fio_command, should_log=True)
+  stdout, _ = vm.RobustRemoteCommand(fio_command, should_log=True)
   bin_vals = []
   if collect_logs:
     vm.PullFile(vm_util.GetTempDir(), '%s*.log' % log_file_base)

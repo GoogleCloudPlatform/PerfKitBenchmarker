@@ -69,7 +69,7 @@ INSTANCE_EXISTS_STATUSES = frozenset(
 INSTANCE_DELETED_STATUSES = frozenset([])
 INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 
-DEFAULT_IMAGE = "ubuntu1404_64_20G_aliaegis_20150325.vhd",
+DEFAULT_IMAGE = "ubuntu_14_0405_64_40G_alibase_20170711.vhd",
 
 
 class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -78,7 +78,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.ALICLOUD
   DEFAULT_ZONE = 'cn-hangzhou-d'
   DEFAULT_MACHINE_TYPE = 'ecs.s3.large'
-  IMAGE_NAME_FILTER = 'ubuntu1404_64_20G_aliaegis*'
+  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64_40G_alibase*'
 
   _lock = threading.Lock()
   imported_keyfile_set = set()
@@ -98,13 +98,14 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.bandwidth_out = FLAGS.ali_bandwidth_out
     self.scratch_disk_size = FLAGS.scratch_disk_size or DEFAULT_DISK_SIZE
     self.system_disk_type = FLAGS.ali_system_disk_type
+    self.eip_address_bandwidth = FLAGS.ali_eip_address_bandwidth
     self.network = ali_network.AliNetwork.GetNetwork(self)
     self.firewall = ali_network.AliFirewall.GetFirewall()
 
   @vm_util.Retry(poll_interval=1, log_errors=False)
   def _WaitForInstanceStatus(self, status_list):
     """Waits until the instance's status is in status_list"""
-    logging.info('Waits until the instance\'s stastus is one of statuses: %s',
+    logging.info('Waits until the instance\'s status is one of statuses: %s',
                  status_list)
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
@@ -122,7 +123,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def _WaitForEipStatus(self, status_list):
     """Waits until the instance's status is in status_list"""
-    logging.info('Waits until the eip\'s stastus is one of statuses: %s',
+    logging.info('Waits until the eip\'s status is one of statuses: %s',
                  status_list)
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
@@ -144,7 +145,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
           'ecs',
           'AllocateEipAddress',
           '--RegionId %s' % region,
-          '--InternetChargeType PayByTraffic']
+          '--InternetChargeType PayByTraffic',
+          '--Bandwidth %s' % self.eip_address_bandwidth]
       allocatip_cmd = util.GetEncodedCmd(allocatip_cmd)
       stdout, _ = vm_util.IssueRetryableCommand(allocatip_cmd)
       response = json.loads(stdout)
@@ -326,6 +328,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       release_eip_cmd = util.ALI_PREFIX + [
           'ecs',
           'ReleaseEipAddress',
+          '--RegionId %s' % self.region,
           '--AllocationId %s' % self.eip_id]
       release_eip_cmd = util.GetEncodedCmd(release_eip_cmd)
       vm_util.IssueRetryableCommand(release_eip_cmd)
@@ -376,7 +379,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class DebianBasedAliVirtualMachine(AliVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
-  IMAGE_NAME_FILTER = 'ubuntu1404_64*aliaegis*.vhd'
+  IMAGE_NAME_FILTER = 'ubuntu_14_0405_64*alibase*.vhd'
 
 
 class RhelBasedAliVirtualMachine(AliVirtualMachine,

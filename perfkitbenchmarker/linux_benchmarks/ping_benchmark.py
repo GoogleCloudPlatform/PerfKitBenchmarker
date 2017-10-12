@@ -14,13 +14,21 @@
 
 """Runs ping.
 
-This benchmark runs ping using the internal ips of vms in the same zone.
+This benchmark runs ping using the internal, and optionally external, ips of
+vms in the same zone.
 """
 
 import logging
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 import re
+
+flags.DEFINE_boolean('ping_also_run_using_external_ip', False,
+                     'If set to True, the ping command will also be executed '
+                     'using the external ips of the vms.')
+
+FLAGS = flags.FLAGS
 
 
 BENCHMARK_NAME = 'ping'
@@ -52,6 +60,10 @@ def Prepare(benchmark_spec):  # pylint: disable=unused-argument
     raise ValueError(
         'Ping benchmark requires exactly two machines, found {0}'
         .format(len(benchmark_spec.vms)))
+  if FLAGS.ping_also_run_using_external_ip:
+    vms = benchmark_spec.vms
+    for vm in vms:
+      vm.AllowIcmp()
 
 
 def Run(benchmark_spec):
@@ -71,6 +83,12 @@ def Run(benchmark_spec):
                                  receiving_vm,
                                  receiving_vm.internal_ip,
                                  'internal')
+  if FLAGS.ping_also_run_using_external_ip:
+    for sending_vm, receiving_vm in vms, reversed(vms):
+      results = results + _RunPing(sending_vm,
+                                   receiving_vm,
+                                   receiving_vm.ip_address,
+                                   'external')
   return results
 
 
@@ -89,7 +107,7 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
     logging.warn('%s is not reachable from %s', receiving_vm, sending_vm)
     return []
 
-  logging.info('Ping results:')
+  logging.info('Ping results (ip_type = %s):', ip_type)
   ping_cmd = 'ping -c 100 %s' % receiving_ip
   stdout, _ = sending_vm.RemoteCommand(ping_cmd, should_log=True)
   stats = re.findall('([0-9]*\\.[0-9]*)', stdout.splitlines()[-1])

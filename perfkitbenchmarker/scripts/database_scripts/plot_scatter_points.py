@@ -26,7 +26,8 @@ import datetime
 
 
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
-CHART_TITLE = 'Sysbench TPS'
+DATETIME_TITLE_FORMAT = '{: %m %d %Y %H %M}'
+CHART_TITLE_PREFIX = 'Sysbench TPS'
 
 X_LABEL = 'Thread Count'
 Y_LABEL = 'TPS'
@@ -34,7 +35,7 @@ Y_LABEL = 'TPS'
 # This variable controls the verticle lines inside the chart.
 #   0 means no vertical lines.
 Y_TICS = '100'
-ITERATIONS = '10'
+DEFAULT_ITERATIONS = '10'
 
 
 class GnuplotInfo():
@@ -44,6 +45,7 @@ class GnuplotInfo():
                entries_per_run,
                run_uri,
                y_max,
+               iterations=DEFAULT_ITERATIONS,
                title=None):
     """Initialize GnuplotInfo object.
     Args:
@@ -58,6 +60,7 @@ class GnuplotInfo():
     self.X_INTERVAL = str(entries_per_run)
     self.Y_HEIGHT = str(int(100 * round(float(y_max) / 100)))
     self.title = title
+    self.iterations = str(iterations)
 
   def _generate_filenames(self, run_uri):
     """Sets filename (with path) of gnuplot input and chart.
@@ -65,7 +68,9 @@ class GnuplotInfo():
       run_uri: (string) run identifier.
     """
     date_string = DATETIME_FORMAT.format(datetime.datetime.now())
-    identifier = date_string + run_uri + '_innodb_pages.png'
+    date_title_string = DATETIME_TITLE_FORMAT.format(datetime.datetime.now())
+    self.chart_title = CHART_TITLE_PREFIX + date_title_string
+    identifier = date_string + run_uri + '_sysbench_run.png'
     self.output_chart = os.path.join(
         os.path.dirname(__file__), '..', '..', '..', 'charts',
         identifier)
@@ -80,7 +85,7 @@ class GnuplotInfo():
     color = '38761d'
 
     # Titles for the data series
-    title = self.title or '1TB DB Instance'
+    title = self.title or 'Cloud SQL Prod'
 
     output_file = open(self.output_gnuplot_file, 'w')
     output_file.write('set terminal pngcairo size 1500,800 '
@@ -89,8 +94,8 @@ class GnuplotInfo():
     output_file.write('set multiplot\n')
     output_file.write('set grid\n')
     output_file.write('set border 4095 ls 0 lc rgb \"black\"\n')
-    output_file.write('set title (\"' + CHART_TITLE +
-                      '") font \"aerial, 14\"\n')
+    output_file.write('set title (\"' + self.chart_title +
+                      '") font \"aerial, 14\" noenhanced\n')
     output_file.write('set xlabel "' + X_LABEL + '"\n')
     output_file.write('set ylabel "' + Y_LABEL + '"\n')
 
@@ -105,7 +110,7 @@ class GnuplotInfo():
 
       output_file.write('thread=1\n')
       output_file.write('x=0\n')
-      output_file.write('do for [t=1:' + ITERATIONS + ':+1] {\n')
+      output_file.write('do for [t=1:' + self.iterations + ':+1] {\n')
       output_file.write(
           '\tset label (sprintf(\"%d\", thread)) at x+20, 0  offset -2\n')
       output_file.write(

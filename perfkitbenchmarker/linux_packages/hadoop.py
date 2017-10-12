@@ -28,7 +28,7 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-HADOOP_VERSION = '2.7.2'
+HADOOP_VERSION = '2.8.1'
 HADOOP_URL = ('http://www.us.apache.org/dist/hadoop/common/hadoop-{0}/'
               'hadoop-{0}.tar.gz').format(HADOOP_VERSION)
 

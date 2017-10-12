@@ -243,7 +243,8 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     self.mock_flags.configure_mock(metadata=[],
                                    num_striped_disks=1,
                                    sysctl=[],
-                                   set_files=[])
+                                   set_files=[],
+                                   simulate_maintenance=False)
     self.addCleanup(p.stop)
 
     self.maxDiff = None
@@ -256,8 +257,15 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     # mock_disk.iops returns a mock.MagicMock, which is not None,
     # which defeats the getattr check in
     # publisher.DefaultMetadataProvider.
-    self.mock_disk = mock.MagicMock(disk_size=20, num_striped_disks=1,
+    self.mock_disk = mock.MagicMock(disk_type='disk-type',
+                                    disk_size=20, num_striped_disks=1,
                                     iops=None)
+    self.disk_metadata = {
+        'type': self.mock_disk.disk_type,
+        'size': self.mock_disk.disk_size,
+        'num_stripes': self.mock_disk.num_striped_disks,
+    }
+    self.mock_disk.GetResourceMetadata.return_value = self.disk_metadata
 
     self.mock_vm = mock.MagicMock(CLOUD='GCP',
                                   zone='us-central1-a',
@@ -265,8 +273,12 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                                   image='ubuntu-14-04',
                                   scratch_disks=[],
                                   hostname='Hostname')
-    self.mock_vm.GetMachineTypeDict.return_value = {
-        'machine_type': self.mock_vm.machine_type}
+    self.mock_vm.GetResourceMetadata.return_value = {
+        'machine_type': self.mock_vm.machine_type,
+        'image': self.mock_vm.image,
+        'zone': self.mock_vm.zone,
+        'cloud': self.mock_vm.CLOUD,
+    }
     self.mock_spec = mock.MagicMock(vm_groups={'default': [self.mock_vm]},
                                     vms=[self.mock_vm])
 
@@ -276,7 +288,6 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                          'machine_type': self.mock_vm.machine_type,
                          'image': self.mock_vm.image,
                          'vm_count': 1,
-                         'num_striped_disks': 1,
                          'hostnames': 'Hostname'}
 
   def _RunTest(self, spec, expected, input_metadata=None):
@@ -285,27 +296,19 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     result = instance.AddMetadata(input_metadata, self.mock_spec)
     self.assertIsNot(input_metadata, result,
                      msg='Input metadata was not copied.')
-    self.assertDictEqual(expected, result)
+    self.assertDictContainsSubset(expected, result)
 
   def testAddMetadata_ScratchDiskUndefined(self):
-    del self.mock_spec.scratch_disk
-    meta = self.default_meta.copy()
-    meta.pop('num_striped_disks')
-    self._RunTest(self.mock_spec, meta)
+    self._RunTest(self.mock_spec, self.default_meta)
 
   def testAddMetadata_NoScratchDisk(self):
     self.mock_spec.scratch_disk = False
-    meta = self.default_meta.copy()
-    meta.pop('num_striped_disks')
-    self._RunTest(self.mock_spec, meta)
+    self._RunTest(self.mock_spec, self.default_meta)
 
   def testAddMetadata_WithScratchDisk(self):
-    self.mock_disk.configure_mock(disk_type='disk-type')
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(scratch_disk_size=20,
-                    scratch_disk_type='disk-type',
-                    data_disk_0_size=20,
+    expected.update(data_disk_0_size=20,
                     data_disk_0_type='disk-type',
                     data_disk_count=1,
                     data_disk_0_num_stripes=1)
@@ -313,61 +316,35 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
 
   def testAddMetadata_DiskSizeNone(self):
     # This situation can happen with static VMs
-    self.mock_disk.configure_mock(disk_type='disk-type',
-                                  disk_size=None)
+    self.disk_metadata['size'] = None
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(scratch_disk_size=None,
-                    scratch_disk_type='disk-type',
-                    data_disk_0_size=None,
+    expected.update(data_disk_0_size=None,
                     data_disk_0_type='disk-type',
                     data_disk_count=1,
                     data_disk_0_num_stripes=1)
     self._RunTest(self.mock_spec, expected)
 
   def testAddMetadata_PIOPS(self):
-    self.mock_disk.configure_mock(disk_type='disk-type',
-                                  iops=1000)
+    self.disk_metadata['iops'] = 1000
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(scratch_disk_size=20,
-                    scratch_disk_type='disk-type',
-                    scratch_disk_iops=1000,
-                    data_disk_0_size=20,
+    expected.update(data_disk_0_size=20,
                     data_disk_0_type='disk-type',
                     data_disk_count=1,
                     data_disk_0_num_stripes=1,
-                    aws_provisioned_iops=1000)
+                    data_disk_0_iops=1000)
     self._RunTest(self.mock_spec, expected)
 
   def testDiskMetadata(self):
-    self.mock_disk.configure_mock(disk_type='disk-type',
-                                  metadata={'foo': 'bar'})
+    self.disk_metadata['foo'] = 'bar'
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(scratch_disk_size=20,
-                    scratch_disk_type='disk-type',
-                    data_disk_0_size=20,
+    expected.update(data_disk_0_size=20,
                     data_disk_0_type='disk-type',
                     data_disk_count=1,
                     data_disk_0_num_stripes=1,
                     data_disk_0_foo='bar')
-    self._RunTest(self.mock_spec, expected)
-
-  def testDiskLegacyDiskType(self):
-    self.mock_disk.configure_mock(disk_type='disk-type',
-                                  metadata={'foo': 'bar',
-                                            'legacy_disk_type': 'remote_ssd'})
-    self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
-    expected = self.default_meta.copy()
-    expected.update(scratch_disk_size=20,
-                    scratch_disk_type='remote_ssd',
-                    data_disk_0_size=20,
-                    data_disk_0_type='disk-type',
-                    data_disk_count=1,
-                    data_disk_0_num_stripes=1,
-                    data_disk_0_foo='bar',
-                    data_disk_0_legacy_disk_type='remote_ssd')
     self._RunTest(self.mock_spec, expected)
 
 

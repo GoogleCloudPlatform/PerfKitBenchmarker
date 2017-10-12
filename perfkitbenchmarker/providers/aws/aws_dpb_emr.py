@@ -42,6 +42,7 @@ READY_CHECK_SLEEP = 30
 READY_CHECK_TRIES = 60
 READY_STATE = 'WAITING'
 JOB_WAIT_SLEEP = 30
+EMR_TIMEOUT = 3600
 
 MANAGER_SG = 'EmrManagedMasterSecurityGroup'
 WORKER_SG = 'EmrManagedSlaveSecurityGroup'
@@ -110,6 +111,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.bucket_to_delete = None
     self.emr_release_label = FLAGS.dpb_emr_release_label
 
+  @staticmethod
+  def CheckPrerequisites(benchmark_config):
+    del benchmark_config  # Unused
+    pass
 
   def _CreateLogBucket(self):
     bucket_name = 's3://pkb-{0}-emr'.format(FLAGS.run_uri)
@@ -274,7 +279,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                 job_arguments=None, job_stdout_file=None,
                 job_type=None):
     """See base class."""
-    @vm_util.Retry(timeout=600,
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=job_poll_interval, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
@@ -334,7 +339,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def generate_data(self, source_dir, udpate_default_fs, num_files,
                     size_file):
     """Method to generate data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=600,
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
@@ -376,9 +381,54 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     else:
       return {dpb_service.SUCCESS: True}
 
+  def read_data(self, source_dir, udpate_default_fs, num_files, size_file):
+    """Method to read data using a distributed job on the cluster."""
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
+                   poll_interval=5, fuzz=0)
+    def WaitForStep(step_id):
+      result = self._IsStepDone(step_id)
+      if result is None:
+        raise EMRRetryableException('Step {0} not complete.'.format(step_id))
+      return result
+
+    job_arguments = ['TestDFSIO']
+    if udpate_default_fs:
+      job_arguments.append('-Dfs.default.name={}'.format(source_dir))
+    job_arguments.append('-Dtest.build.data={}'.format(source_dir))
+    job_arguments.extend(['-read', '-nrFiles', str(num_files), '-fileSize',
+                          str(size_file)])
+    arg_spec = '[' + ','.join(job_arguments) + ']'
+
+    step_type_spec = 'Type=CUSTOM_JAR'
+    step_name = 'Name="TestDFSIO"'
+    step_action_on_failure = 'ActionOnFailure=CONTINUE'
+    jar_spec = GENERATE_HADOOP_JAR
+
+    step_list = [step_type_spec, step_name, step_action_on_failure, jar_spec]
+    step_list.append('Args=' + arg_spec)
+    step_string = ','.join(step_list)
+
+    step_cmd = self.cmd_prefix + ['emr',
+                                  'add-steps',
+                                  '--cluster-id',
+                                  self.cluster_id,
+                                  '--steps',
+                                  step_string]
+    stdout, _, _ = vm_util.IssueCommand(step_cmd)
+    result = json.loads(stdout)
+    step_id = result['StepIds'][0]
+
+    result = WaitForStep(step_id)
+    step_state = result['Step']['Status']['State']
+    if step_state != 'COMPLETED':
+      return {dpb_service.SUCCESS: False}
+    else:
+      return {dpb_service.SUCCESS: True}
+
+
   def distributed_copy(self, source_location, destination_location):
     """Method to copy data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=600,
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
@@ -423,7 +473,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def cleanup_data(self, base_dir, udpate_default_fs):
     """Method to cleanup data using a distributed job on the cluster."""
-    @vm_util.Retry(timeout=600,
+    @vm_util.Retry(timeout=EMR_TIMEOUT,
                    poll_interval=5, fuzz=0)
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)

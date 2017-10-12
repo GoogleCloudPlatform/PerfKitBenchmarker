@@ -47,7 +47,7 @@ class FakeManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _Delete(self):
     pass
 
-  def GetDefaultDatabaseVersion(self, _):
+  def GetDefaultEngineVersion(self, _):
     pass
 
 
@@ -59,7 +59,7 @@ class ManagedRelationalDbSpecTestCase(unittest.TestCase):
 
     self.minimal_spec = {
         'cloud': 'GCP',
-        'database': 'mysql',
+        'engine': 'mysql',
         'vm_spec': {
             'GCP': {
                 'machine_type': 'n1-standard-1'
@@ -82,7 +82,7 @@ class ManagedRelationalDbSpecTestCase(unittest.TestCase):
   def testMinimalConfig(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.minimal_spec)
-    self.assertEqual(result.database, 'mysql')
+    self.assertEqual(result.engine, 'mysql')
     self.assertEqual(result.cloud, 'GCP')
     self.assertIsInstance(result.vm_spec, gce_virtual_machine.GceVmSpec)
 
@@ -98,10 +98,10 @@ class ManagedRelationalDbSpecTestCase(unittest.TestCase):
     self.assertEqual(result.database_name, 'fakename')
 
   def testCustomDatabaseVersion(self):
-    spec = _mergeDicts(self.minimal_spec, {'database_version': '6.6'})
+    spec = _mergeDicts(self.minimal_spec, {'engine_version': '6.6'})
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **spec)
-    self.assertEqual(result.database_version, '6.6')
+    self.assertEqual(result.engine_version, '6.6')
 
   def testDefaultDatabasePassword(self):
     result = benchmark_config_spec._ManagedRelationalDbSpec(
@@ -157,7 +157,7 @@ class ManagedRelationalDbMinimalSpecTestCase(unittest.TestCase):
 
     self.spec = {
         'cloud': 'GCP',
-        'database': 'mysql',
+        'engine': 'mysql',
         'vm_spec': {
             'GCP': {
                 'machine_type': 'n1-standard-1'
@@ -191,19 +191,20 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
 
     self.full_spec = {
         'cloud': 'GCP',
-        'database': 'mysql',
+        'engine': 'mysql',
         'database_name': 'fake_name',
         'database_password': 'fake_password',
         'backup_enabled': True,
         'backup_start_time': '07:00',
         'vm_spec': {
             'GCP': {
-                'machine_type': 'n1-standard-1'
+                'machine_type': 'n1-standard-1',
+                'zone': 'us-west1-a',
             }
         },
         'disk_spec': {
             'GCP': {
-                'disk_size': 500
+                'disk_size': 500,
             }
         }
     }
@@ -222,47 +223,52 @@ class ManagedRelationalDbFlagsTestCase(unittest.TestCase):
     pass
 
   def testDatabaseFlag(self):
-    self.flags['database'].parse('postgres')
+    self.flags['managed_db_engine'].parse('postgres')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
-    self.assertEqual(result.database, 'postgres')
+    self.assertEqual(result.engine, 'postgres')
 
   def testDatabaseNameFlag(self):
-    self.flags['database_name'].parse('fakedbname')
+    self.flags['managed_db_database_name'].parse('fakedbname')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
     self.assertEqual(result.database_name, 'fakedbname')
 
   def testDatabasePasswordFlag(self):
-    self.flags['database_password'].parse('fakepassword')
+    self.flags['managed_db_database_password'].parse('fakepassword')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
     self.assertEqual(result.database_password, 'fakepassword')
 
   def testHighAvailabilityFlag(self):
-    self.flags['high_availability'].parse(True)
+    self.flags['managed_db_high_availability'].parse(True)
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
     self.assertEqual(result.high_availability, True)
 
   def testDatabaseVersionFlag(self):
-    self.flags['database_version'].parse('5.6')
+    self.flags['managed_db_engine_version'].parse('5.6')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
-    self.assertEqual(result.database_version, '5.6')
+    self.assertEqual(result.engine_version, '5.6')
 
   def testBackupEnabledFlag(self):
-    self.flags['database_backup_enabled'].parse(False)
+    self.flags['managed_db_backup_enabled'].parse(False)
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
     self.assertEqual(result.backup_enabled, False)
 
   def testBackupStartTimeFlag(self):
-    self.flags['database_backup_start_time'].parse('12:23')
+    self.flags['managed_db_backup_start_time'].parse('12:23')
     result = benchmark_config_spec._ManagedRelationalDbSpec(
         _COMPONENT, flag_values=self.flags, **self.full_spec)
     self.assertEqual(result.backup_start_time, '12:23')
 
+  def testZoneFlag(self):
+    self.flags['managed_db_zone'].parse('us-east1-b')
+    result = benchmark_config_spec._ManagedRelationalDbSpec(
+        _COMPONENT, flag_values=self.flags, **self.full_spec)
+    self.assertEqual(result.vm_spec.zone, 'us-east1-b')
 
 if __name__ == '__main__':
   unittest.main()

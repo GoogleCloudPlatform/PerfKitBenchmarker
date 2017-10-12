@@ -24,13 +24,12 @@ during the cluster setup.
 
 dpb_wordcount_out_base: The output directory to capture the word count results
 
-For dataflow jobs, please build the dpb_dataflow_jar based on
+For dataflow jobs, please build the dpb_job_jarfile based on
 https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
 """
 
 import copy
 import datetime
-import os
 import tempfile
 
 from perfkitbenchmarker import configs
@@ -72,7 +71,7 @@ WORD_COUNT_CONFIGURATION = dict(
                                 'org.apache.spark.examples.JavaWordCount',
                                 BaseDpbService.SPARK_JOB_TYPE)),
         (dpb_service.DATAFLOW, (None,
-                                'com.google.cloud.dataflow.examples.WordCount',
+                                'org.example.WordCount',
                                 BaseDpbService.DATAFLOW_JOB_TYPE)),
         (dpb_service.EMR, (aws_dpb_emr.SPARK_SAMPLE_LOCATION,
                            'org.apache.spark.examples.JavaWordCount',
@@ -103,8 +102,11 @@ def CheckPrerequisites(benchmark_config):
   if (FLAGS.dpb_wordcount_input is None and
           FLAGS.dpb_wordcount_fs != BaseDpbService.GCS_FS):
     raise errors.Config.InvalidValue('Invalid default input directory.')
-  if FLAGS.dpb_dataflow_jar and not os.path.exists(FLAGS.dpb_dataflow_jar):
-    raise errors.Config.InvalidValue('Dataflow jar missing.')
+  # Get handle to the dpb service
+  dpb_service_class = dpb_service.GetDpbServiceClass(
+      benchmark_config.dpb_service.service_type)
+  dpb_service_class.CheckPrerequisites(benchmark_config)
+
 
 
 def Prepare(benchmark_spec):
@@ -134,13 +136,13 @@ def Run(benchmark_spec):
   job_arguments = []
   jarfile, classname, job_type = _GetJobArguments(
       dpb_service_instance.SERVICE_TYPE)
-
+  if FLAGS.dpb_job_classname:
+    classname = FLAGS.dpb_job_classname
   if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
-    jarfile = FLAGS.dpb_dataflow_jar
+    jarfile = FLAGS.dpb_job_jarfile
     job_arguments.append('--stagingLocation={}'.format(
         FLAGS.dpb_dataflow_staging_location))
-    job_arguments.append('--runner={}'.format(
-        gcp_dpb_dataflow.DATAFLOW_BLOCKING_RUNNER))
+    job_arguments.append('--runner={}'.format(FLAGS.dpb_dataflow_runner))
     job_arguments.append('--inputFile={}'.format(input_location))
     if not FLAGS.dpb_wordcount_out_base:
       base_out = FLAGS.dpb_dataflow_staging_location

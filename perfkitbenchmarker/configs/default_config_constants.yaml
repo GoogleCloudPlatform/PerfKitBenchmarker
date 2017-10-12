@@ -90,3 +90,51 @@ default_500_gb: &default_500_gb
     disk_type: standard
     disk_size: 500
     mount_point: /scratch
+
+
+# TODO(nlavine): update the disk types below as more providers are
+# updated for the disk types refactor.
+default_50_gb: &default_50_gb
+  GCP:
+    disk_type: pd-standard
+    disk_size: 50
+    mount_point: /scratch
+  Azure:
+    disk_type: Standard_LRS
+    disk_size: 50
+    mount_point: /scratch
+  AWS:
+    disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  AliCloud:
+    disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  DigitalOcean:
+    disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  OpenStack:
+    disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  CloudStack:
+    disk_size: 50
+    mount_point: /scratch
+  Rackspace:
+    disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  Kubernetes:
+    disk_type: emptyDir
+    disk_size: 50
+    mount_point: /scratch
+  Mesos:
+    disk_type: local
+    disk_size: 50
+    mount_point: /scratch
+  ProfitBricks:
+    disk_type: standard
+    disk_size: 50
+    mount_point: /scratch

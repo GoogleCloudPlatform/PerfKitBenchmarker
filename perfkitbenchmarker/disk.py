@@ -53,7 +53,6 @@ SSD = 'ssd'
 NONE = 'none'
 ZONE = 'zone'
 REGION = 'region'
-LEGACY_DISK_TYPE = 'legacy_disk_type'
 
 
 # TODO(nlavine): remove this function when we remove the deprecated
@@ -242,6 +241,11 @@ class BaseDisk(resource.BaseResource):
     self.disk_type = disk_spec.disk_type
     self.mount_point = disk_spec.mount_point
     self.num_striped_disks = disk_spec.num_striped_disks
+    self.metadata.update({
+        'type': self.disk_type,
+        'size': self.disk_size,
+        'num_stripes': self.num_striped_disks,
+    })
 
     # Linux related attributes.
     self.device_path = disk_spec.device_path
@@ -299,6 +303,9 @@ class StripedDisk(BaseDisk):
     """
     super(StripedDisk, self).__init__(disk_spec)
     self.disks = disks
+    self.metadata = disks[0].metadata.copy()
+    if self.disk_size:
+      self.metadata['size'] = self.disk_size * self.num_striped_disks
 
   def _Create(self):
     for disk in self.disks:
