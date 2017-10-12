@@ -282,7 +282,7 @@ def _ParseFlags(argv=sys.argv):
   """Parses the command-line flags."""
   try:
     argv = FLAGS(argv)
-  except flags.FlagsError as e:
+  except flags.Error as e:
     logging.error(e)
     logging.info('For usage instructions, use --helpmatch={module_name}')
     logging.info('For example, ./pkb.py --helpmatch=benchmarks.fio')

@@ -1187,7 +1187,7 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
 
 def PrepareVM(vm, service):
   vm.Install('pip')
-  vm.RemoteCommand('sudo pip install python-gflags==2.0')
+  vm.RemoteCommand('sudo pip install absl-py')
   vm.RemoteCommand('sudo pip install pyyaml')
 
   vm.Install('openssl')
@@ -1213,7 +1213,7 @@ def PrepareVM(vm, service):
 
 def CleanupVM(vm, service):
   service.CleanupVM(vm)
-  vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
+  vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall absl-py')
   vm.RemoteCommand('sudo rm -rf /tmp/run/')
   objects_written_file = posixpath.join(vm_util.VM_TMP_DIR,
                                         OBJECTS_WRITTEN_FILE)

@@ -84,7 +84,7 @@ flags.DEFINE_string('benchmark_config_file', None,
                     'a path relative to the current working directory, '
                     'an absolute path, or just the name of a file in the '
                     'configs/ directory.')
-flags.DEFINE_multistring(
+flags.DEFINE_multi_string(
     'config_override', None,
     'This flag can be used to override any config value. It is applied after '
     'the user config (specified via --benchmark_config_file_path), so it has '

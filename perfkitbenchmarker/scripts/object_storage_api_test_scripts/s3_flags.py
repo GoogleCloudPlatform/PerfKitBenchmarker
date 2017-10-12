@@ -14,6 +14,6 @@
 
 """Flags for the S3 provider interface."""
 
-import gflags as flags
+from absl import flags
 
 flags.DEFINE_string('host', None, 'The hostname of the storage endpoint.')

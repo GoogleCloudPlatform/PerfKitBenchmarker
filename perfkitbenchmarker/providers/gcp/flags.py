@@ -43,7 +43,7 @@ flags.DEFINE_string('gce_subnet_addr', '10.128.0.0/20', 'Address range to the '
 flags.DEFINE_string('gce_remote_access_firewall_rule', None, 'The name of an '
                     'already created firewall rule which allows remote access '
                     'instead of creating a new one.')
-flags.DEFINE_multistring(
+flags.DEFINE_multi_string(
     'gcp_instance_metadata_from_file',
     [],
     'A colon separated key-value pair that will be added to the '
@@ -52,7 +52,7 @@ flags.DEFINE_multistring(
     'each pair by commas. This option can be repeated multiple times. For '
     'information about GCP instance metadata, see: --metadata-from-file from '
     '`gcloud help compute instances create`.')
-flags.DEFINE_multistring(
+flags.DEFINE_multi_string(
     'gcp_instance_metadata',
     [],
     'A colon separated key-value pair that will be added to the '

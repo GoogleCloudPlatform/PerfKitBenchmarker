@@ -47,11 +47,10 @@ flags.DEFINE_string('managed_db_zone', None,
                     'Defaults to the client vm\'s zone.')
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
-flags.RegisterValidator('managed_db_backup_start_time',
-                        lambda value: re.search(BACKUP_TIME_REGULAR_EXPRESSION,
-                                                value) is not None,
-                        message=('--database_backup_start_time must be in the '
-                                 'form HH:MM'))
+flags.register_validator(
+    'managed_db_backup_start_time',
+    lambda value: re.search(BACKUP_TIME_REGULAR_EXPRESSION, value) is not None,
+    message=('--database_backup_start_time must be in the form HH:MM'))
 
 MYSQL = 'mysql'
 POSTGRES = 'postgres'

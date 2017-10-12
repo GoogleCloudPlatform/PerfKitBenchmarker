@@ -14,7 +14,7 @@
 
 """Flags for the Azure Blob Storage interface."""
 
-import gflags as flags
+from absl import flags
 
 flags.DEFINE_string('azure_account', None,
                     'The name of the storage account for Azure.')
