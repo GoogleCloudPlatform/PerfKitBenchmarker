@@ -44,8 +44,13 @@ In its current release these are the benchmarks that are executed:
   - `coremark`: [EEMBC](https://www.eembc.org/)
   - `copy_throughput`: Apache v2
   - `fio`: [GPL v2](https://github.com/axboe/fio/blob/master/COPYING)
+  - [`gpu_pcie_bandwidth`](https://developer.nvidia.com/cuda-downloads): [NVIDIA
+    Software Licence
+    Agreement](http://docs.nvidia.com/cuda/eula/index.html#nvidia-driver-license)
   - `hadoop_terasort`: [Apache v2](http://hadoop.apache.org/)
   - `hpcc`: [Original BSD license](http://icl.cs.utk.edu/hpcc/faq/#263)
+  - [`hpcg`](https://github.com/hpcg-benchmark/hpcg/): [BSD
+    3-clause](https://github.com/hpcg-benchmark/hpcg/blob/master/LICENSE)
   - `iperf`: [BSD license](http://iperf.sourceforge.net/)
   - `memtier_benchmark`: [GPL v2](https://github.com/RedisLabs/memtier_benchmark)
   - `mesh_network`: [HP license](http://www.calculate-linux.org/packages/licenses/netperf)
@@ -57,11 +62,16 @@ In its current release these are the benchmarks that are executed:
   - [`oldisim`](https://github.com/GoogleCloudPlatform/oldisim):
     [Apache v2](https://github.com/GoogleCloudPlatform/oldisim/blob/master/LICENSE.txt)
   - `object_storage_service`: Apache v2
+  - `pgbench`: [PostgreSQL Licence](https://www.postgresql.org/about/licence/)
   - `ping`: No license needed.
   - `silo`: MIT License
   - `scimark2`: [public domain](http://math.nist.gov/scimark2/credits.html)
   - `speccpu2006`: [SPEC CPU2006](http://www.spec.org/cpu2006/)
+  - [`SHOC`](https://github.com/vetter/shoc): [BSD
+    3-clause](https://github.com/vetter/shoc/blob/master/LICENSE.txt)
   - `sysbench_oltp`: [GPL v2](https://github.com/akopytov/sysbench)
+  - [`TensorFlow`](https://github.com/tensorflow/tensorflow): [Apache
+    v2](https://github.com/tensorflow/tensorflow/blob/master/LICENSE)
   - [`tomcat`](https://github.com/apache/tomcat):
     [Apache v2](https://github.com/apache/tomcat/blob/trunk/LICENSE)
   - [`unixbench`](https://github.com/kdlucas/byte-unixbench):
