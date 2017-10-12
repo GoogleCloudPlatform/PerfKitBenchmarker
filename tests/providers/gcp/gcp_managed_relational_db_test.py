@@ -41,14 +41,14 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
 
   def createMySQLSpecDict(self):
     vm_spec = virtual_machine.BaseVmSpec('NAME',
-                                         **{'machine_type': 'db-n1-standard-1'})
+                                         **{
+                                             'machine_type': 'db-n1-standard-1',
+                                             'zone': 'us-west1-b',
+                                         })
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
-    # TODO: Database version has more than one supported value. Test should
-    # reflect that by not declaring a database version and letting the default
-    # version be returned.
     return {
-        'database': MYSQL,
-        'database_version': '5.7',
+        'engine': MYSQL,
+        'engine_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
@@ -60,15 +60,15 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     }
 
   def createPostgresSpecDict(self):
-    machine_type = {'machine_type': {'cpus': 1, 'memory': '3840MiB'}}
+    machine_type = {
+        'machine_type': {'cpus': 1, 'memory': '3840MiB'},
+        'zone': 'us-west1-b',
+    }
     vm_spec = gce_virtual_machine.GceVmSpec('NAME', **machine_type)
     disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
-    # TODO: Database version has more than one supported value. Test should
-    # reflect that by not declaring a database version and letting the default
-    # version be returned.
     return {
-        'database': POSTGRES,
-        'database_version': '5.7',
+        'engine': POSTGRES,
+        'engine_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
@@ -136,19 +136,21 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
       self.assertIn('--storage-size=50', command_string)
       self.assertIn('--backup', command_string)
       self.assertIn('--backup-start-time=07:00', command_string)
+      self.assertIn('--gce-zone=us-west1-b', command_string)
+      self.assertIn('--region=us-west1', command_string)
 
   def testCreatePostgres(self):
     with self._PatchCriticalObjects() as issue_command:
       spec = self.createPostgresSpecDict()
-      spec['database'] = 'postgres'
-      spec['database_version'] = '9.6'
+      spec['engine'] = 'postgres'
+      spec['engine_version'] = '9.6'
       db = self.createManagedDbFromSpec(spec)
       db._Create()
       self.assertEquals(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertIn('database-version=POSTGRES_9_6', command_string)
       self.assertIn('--cpu=1', command_string)
-      self.assertIn('--ram=3840', command_string)
+      self.assertIn('--memory=3840MiB', command_string)
 
   def testCreateWithBackupDisabled(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -222,7 +224,7 @@ class GcpManagedRelationalDbTestCase(unittest.TestCase):
     with self._PatchCriticalObjects():
       db = self.createManagedDbFromSpec(self.createMySQLSpecDict())
       self.assertEquals('', db._ParseEndpoint(None))
-      self.assertIn('pkb-db-instance-123',
+      self.assertIn('10.10.0.35',
                     db._ParseEndpoint(json.loads(test_output)))
 
   def testValidateSpec(self):
