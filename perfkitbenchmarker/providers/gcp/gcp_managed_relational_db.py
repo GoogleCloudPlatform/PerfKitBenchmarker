@@ -303,19 +303,3 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         return DEFAULT_GCP_POSTGRES_VERSION
     raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'
                               'POSTGRES 9.6')
-
-  def GetEndpoint(self):
-    """Returns the endpoint of the managed database.
-
-    Returns:
-      database endpoint (IP or dns name)
-    """
-    return self.endpoint
-
-  def GetPort(self):
-    """Returns the port of the managed database.
-
-    Returns:
-      database port number
-    """
-    return self.port

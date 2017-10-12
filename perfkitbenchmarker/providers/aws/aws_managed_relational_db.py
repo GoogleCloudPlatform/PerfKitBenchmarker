@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Managed relational database provisioning and teardown for AWS RDS."""
+
 
 import datetime
 import json
@@ -36,14 +38,47 @@ DEFAULT_POSTGRES_PORT = 5432
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
 
 
+class ManagedRelationalDbCrossRegionException(Exception):
+  pass
+
+
 class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
-  """An object representing an AWS managed relational database.
+  """An object representing an AWS RDS managed relational database.
 
-  Attributes:
-    created: True if the resource has been created.
-    pkb_managed: Whether the resource is managed (created and deleted) by PKB.
+  Currenty MySQL and Postgres are supported. This class requires that a
+  client vm be available as an attribute on the instance before Create() is
+  called, which is the current behavior of PKB. This is necessary to setup the
+  networking correctly. The following steps are performed to provision the
+  database:
+    1. get the client's VPC
+    2. get the client's zone
+    3. create a new subnet in the VPC's region that is different from the
+        client's zone
+    4. create a new db subnet group using the client's zone, and the newly
+        created zone
+    5. authorize Postgres traffic on the VPC's default security group
+    6. create the RDS instance in the requested region using the new db
+        subnet group and VPC security group.
+
+  On teardown, all resources are deleted.
+
+  Note that the client VM's region and the region requested for the database
+  must be the same.
+
+  At the moment there is no way to specify the primary zone when creating a
+  high availability instance, which means that the client and server may
+  be launched in different zones, which hurts network performance.
+  In other words, the 'zone' attribute on the managed_relational_db vm_spec
+  has no effect, and is only used to specify the region.
+
+  To filter out runs that cross zones, be sure to check the sample metadata for
+  'zone' (client's zone), 'managed_relational_db_zone' (primary RDS zone),
+  and 'managed_relational_db_secondary_zone' (secondary RDS zone).
+
+  If the instance was NOT launched in the high availability configuration, the
+  server will be launched in the zone requested, and
+  managed_relational_db_secondary_zone will not exist in the metadata.
   """
-
   CLOUD = providers.AWS
 
   def __init__(self, managed_relational_db_spec):
@@ -54,6 +89,14 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.region = util.GetRegionFromZone(self.zone)
 
   def GetResourceMetadata(self):
+    """Returns the metadata associated with the resource.
+
+    All keys will be prefaced with managed_relational_db before
+    being published (done in publisher.py).
+
+    Returns:
+      metadata: dict of AWS Managed DB metadata.
+    """
     metadata = super(AwsManagedRelationalDb, self).GetResourceMetadata()
     metadata.update({
         'zone': self.primary_zone,
@@ -62,6 +105,11 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     if self.spec.high_availability:
       metadata.update({
           'secondary_zone': self.secondary_zone,
+      })
+
+    if hasattr(self.spec.disk_spec, 'iops'):
+      metadata.update({
+          'disk_iops': self.spec.disk_spec.iops,
       })
 
     return metadata
@@ -81,12 +129,6 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       return DEFAULT_POSTGRES_VERSION
     elif engine == managed_relational_db.AURORA_POSTGRES:
       return DEFAULT_POSTGRES_VERSION
-
-  def GetEndpoint(self):
-    return self.endpoint
-
-  def GetPort(self):
-    return self.port
 
   def _GetNewZones(self):
     # Get a list of zones, excluding the one that the VM is in.
@@ -180,7 +222,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       self.extra_subnet_for_db.Delete()
 
   def _Create(self):
-    """Creates the AWS RDS instance"""
+    """Creates the AWS RDS instance."""
     cmd = util.AWS_PREFIX + [
         'rds',
         'create-db-instance',
@@ -241,26 +283,54 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return retcode == 0
 
   def _ParseEndpoint(self, describe_instance_json):
+    """Parses the json output from the CLI and returns the endpoint.
+
+    Args:
+      describe_instance_json: output in json format from calling
+        'aws rds describe-db-instances'
+
+    Returns:
+      endpoint of the server as a string
+    """
     return describe_instance_json['DBInstances'][0]['Endpoint']['Address']
 
   def _ParsePort(self, describe_instance_json):
-    return describe_instance_json['DBInstances'][0]['Endpoint']['Port']
+    """Parses the json output from the CLI and returns the port.
 
-  def _SavePrimaryAndSecondaryZones(self, json_output):
-      self.primary_zone = json_output['DBInstances'][0]['AvailabilityZone']
-      if self.spec.high_availability:
-        self.secondary_zone = (
-            json_output['DBInstances'][0]['SecondaryAvailabilityZone'])
+    Args:
+      describe_instance_json: output in json format from calling
+        'aws rds describe-db-instances'
+
+    Returns:
+      port on which the server is listening, as an int
+    """
+    return int(describe_instance_json['DBInstances'][0]['Endpoint']['Port'])
+
+  def _SavePrimaryAndSecondaryZones(self, describe_instance_json):
+    """Saves the primary, and secondary (only if HA) zone of the server.
+
+    Args:
+      describe_instance_json: output in json format from calling
+        'aws rds describe-db-instances'
+    """
+    self.primary_zone = (
+        describe_instance_json['DBInstances'][0]['AvailabilityZone'])
+    if self.spec.high_availability:
+      self.secondary_zone = (describe_instance_json['DBInstances'][0]
+                             ['SecondaryAvailabilityZone'])
 
   def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
 
-    Supplying this method is optional.  Use it when a resource can exist
-    without being ready.  If the subclass does not implement
-    it then it just returns true.
+    This method will query the instance every 5 seconds until
+    its instance state is 'available', or until a timeout occurs.
+
+    Args:
+      timeout: timeout in seconds
 
     Returns:
-      True if the resource was ready in time, False if the wait timed out.
+      True if the resource was ready in time, False if the wait timed out
+        or an Exception occured.
     """
     cmd = util.AWS_PREFIX + [
         'rds',
@@ -292,14 +362,13 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.port = self._ParsePort(json_output)
     return True
 
-  def _PostCreate(self):
-    """Method that will be called once after _CreateReource is called.
-
-    Supplying this method is optional. If it is supplied, it will be called
-    once, after the resource is confirmed to exist. It is intended to allow
-    data about the resource to be collected or for the resource to be tagged.
-    """
-    pass
+  def _AssertClientAndDbInSameRegion(self):
+    client_region = self.client_vm.region
+    db_region = util.GetRegionFromZone(self.zone)
+    if client_region != db_region:
+      raise ManagedRelationalDbCrossRegionException((
+          'client_vm and managed_relational_db server '
+          'must be in the same region'))
 
   def _CreateDependencies(self):
     """Method that will be called once before _CreateResource() is called.
@@ -307,6 +376,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Supplying this method is optional. It is intended to allow additional
     flexibility in creating resource dependencies separately from _Create().
     """
+    self._AssertClientAndDbInSameRegion()
     self._SetupNetworking()
 
   def _DeleteDependencies(self):

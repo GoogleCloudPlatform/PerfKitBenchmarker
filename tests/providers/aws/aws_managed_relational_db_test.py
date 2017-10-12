@@ -26,7 +26,6 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.managed_relational_db import MYSQL
 from perfkitbenchmarker.providers.aws import aws_managed_relational_db
 from perfkitbenchmarker.providers.aws import aws_disk
-from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws.aws_managed_relational_db import (
     AwsManagedRelationalDb)
 
@@ -35,12 +34,6 @@ _BENCHMARK_UID = 'benchmark_uid'
 _COMPONENT = 'test_component'
 _FLAGS = None
 _AWS_PREFIX = 'aws --output json'
-
-# Helper functions
-
-
-def createNetworkMock():
-  return Mock(spec=aws_network.AwsNetwork)
 
 
 def readTestDataFile(filename):
@@ -81,13 +74,13 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
       yield issue_command
 
   def createMockSpec(self, additional_spec_items={}):
-    default_disk_spec = aws_disk.AwsDiskSpec(
+    default_server_disk_spec = aws_disk.AwsDiskSpec(
         _COMPONENT,
         disk_size=5,
         disk_type=aws_disk.IO1,
         iops=1000)
 
-    default_vm_spec = virtual_machine.BaseVmSpec(
+    default_server_vm_spec = virtual_machine.BaseVmSpec(
         'NAME', **{'machine_type': 'db.t1.micro',
                    'zone': 'us-west-2b'})
     spec_dict = {
@@ -98,8 +91,8 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
         'database_password': 'fakepassword',
         'database_username': 'fakeusername',
         'high_availability': False,
-        'vm_spec': default_vm_spec,
-        'disk_spec': default_disk_spec,
+        'vm_spec': default_server_vm_spec,
+        'disk_spec': default_server_disk_spec,
     }
     spec_dict.update(additional_spec_items)
 

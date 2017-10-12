@@ -63,6 +63,10 @@ FLAGS = flags.FLAGS
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
 
 
+class ManagedRelationalDbPropertyNotSet(Exception):
+  pass
+
+
 def GenerateRandomDbPassword():
   """Generate a random password 10 characters in length."""
   return str(uuid.uuid4())[:10]
@@ -76,7 +80,8 @@ def GetManagedRelationalDbClass(cloud):
   """
   if cloud in _MANAGED_RELATIONAL_DB_REGISTRY:
     return _MANAGED_RELATIONAL_DB_REGISTRY.get(cloud)
-  raise Exception('No ManagedDb found for {0}'.format(cloud))
+  raise NotImplementedError(('No ManagedRelationalDatabase implementation '
+                             'found for {0}'.format(cloud)))
 
 
 class AutoRegisterManagedRelationalDbMeta(ABCMeta):
@@ -115,7 +120,7 @@ class BaseManagedRelationalDb(resource.BaseResource):
     the VPC, IP address, etc.
     """
     if not hasattr(self, '_client_vm'):
-      raise Exception('client_vm is not set')
+      raise ManagedRelationalDbPropertyNotSet('client_vm is not set')
     return self._client_vm
 
   @client_vm.setter
@@ -124,13 +129,35 @@ class BaseManagedRelationalDb(resource.BaseResource):
 
   def MakePsqlConnectionString(self, database_name):
     return '\'host={0} user={1} password={2} dbname={3}\''.format(
-        self.GetEndpoint(),
-        self.GetUsername(),
-        self.GetPassword(),
+        self.endpoint,
+        self.spec.username,
+        self.spec.password,
         database_name)
 
+  @property
+  def endpoint(self):
+    """Endpoint of the database server (exclusing port)."""
+    if not hasattr(self, '_endpoint'):
+      raise ManagedRelationalDbPropertyNotSet('endpoint not set')
+    return self._endpoint
+
+  @endpoint.setter
+  def endpoint(self, endpoint):
+    self._endpoint = endpoint
+
+  @property
+  def port(self):
+    """Port (int) on which the database server is listening."""
+    if not hasattr(self, '_port'):
+      raise ManagedRelationalDbPropertyNotSet('port not set')
+    return self._port
+
+  @port.setter
+  def port(self, port):
+    self._port = int(port)
+
   def GetResourceMetadata(self):
-    """Returns a dictionary of metadata
+    """Returns a dictionary of metadata.
 
    Child classes can extend this if needed.
    """
@@ -149,42 +176,12 @@ class BaseManagedRelationalDb(resource.BaseResource):
           'machine_type': self.spec.vm_spec.machine_type,
       })
     else:
-      # TOOD(ferneyhough): fix this. Azure has no vm_spec, hence the need for
-      # the try block
-      try:
-        metadata.update({
-            'cpus': self.spec.vm_spec.cpus,
-            'memory': self.spec.vm_spec.memory,
-        })
-      except:
-        pass
-
-    try:
       metadata.update({
-          'disk_iops': self.spec.disk_spec.iops,
+          'cpus': self.spec.vm_spec.cpus,
+          'memory': self.spec.vm_spec.memory,
       })
-    except:
-      pass
 
     return metadata
-
-  @abstractmethod
-  def GetEndpoint(self):
-    """Return the endpoint of the managed database.
-
-    Returns:
-      database endpoint (IP or dns name)
-    """
-    pass
-
-  @abstractmethod
-  def GetPort(self):
-    """Return the port of the managed database.
-
-    Returns:
-      database port number
-    """
-    pass
 
   @abstractmethod
   def GetDefaultEngineVersion(self, engine):
@@ -195,19 +192,3 @@ class BaseManagedRelationalDb(resource.BaseResource):
 
     Returns: default version as a string for the given engine.
   """
-
-  def GetUsername(self):
-    """Return the username associated with the managed database.
-
-    Returns:
-      database username
-    """
-    return self.spec.database_username
-
-  def GetPassword(self):
-    """Return the password associated with the managed database.
-
-    Returns:
-      database password
-    """
-    return self.spec.database_password
