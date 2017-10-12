@@ -334,17 +334,17 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
 
     # Set defaults that were not able to be set in
     # GetOptionDecoderConstructions()
-    if not self.database_version:
+    if not self.engine_version:
       managed_db_class = managed_relational_db.GetManagedRelationalDbClass(
           self.cloud)
-      self.database_version = managed_db_class.GetDefaultDatabaseVersion(
-          self.database)
+      self.engine_version = managed_db_class.GetDefaultEngineVersion(
+          self.engine)
     if not self.database_name:
       self.database_name = 'pkb-db-%s' % flag_values.run_uri
     if not self.database_username:
       self.database_username = 'pkb%s' % flag_values.run_uri
     if not self.database_password:
-      self.database_password = managed_relational_db.generateRandomDbPassword()
+      self.database_password = managed_relational_db.GenerateRandomDbPassword()
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -361,15 +361,17 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
         }),
-        'database': (option_decoders.EnumDecoder, {
+        'engine': (option_decoders.EnumDecoder, {
             'valid_values': [
-                managed_relational_db.MYSQL, managed_relational_db.POSTGRES
+                managed_relational_db.MYSQL,
+                managed_relational_db.POSTGRES,
+                managed_relational_db.AURORA_POSTGRES,
             ]
         }),
-        'database_name': (option_decoders.StringDecoder, {
+        'engine_version': (option_decoders.StringDecoder, {
             'default': None
         }),
-        'database_version': (option_decoders.StringDecoder, {
+        'database_name': (option_decoders.StringDecoder, {
             'default': None
         }),
         'database_password': (option_decoders.StringDecoder, {
@@ -403,26 +405,39 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
+    # TODO(ferneyhough): Add flags for vm_spec.machine_type and disk_spec.
+    # Currently the only way to modify the vm_spec or disk_spec of the
+    # managed_db is to change the benchmark spec in the benchmark source code
+    # itself.
     super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
-    if flag_values['database'].present:
-      config_values['database'] = flag_values.database
-    if flag_values['database_name'].present:
-      config_values['database_name'] = flag_values.database_name
-    if flag_values['database_version'].present:
-      config_values['database_version'] = flag_values.database_version
-    if flag_values['database_username'].present:
-      config_values['database_username'] = flag_values.database_username
-    if flag_values['database_password'].present:
-      config_values['database_password'] = flag_values.database_password
-    if flag_values['high_availability'].present:
-      config_values['high_availability'] = flag_values.high_availability
-    if flag_values['database_backup_enabled'].present:
-      config_values['backup_enabled'] = flag_values.database_backup_enabled
-    if flag_values['database_backup_start_time'].present:
+    if flag_values['managed_db_engine'].present:
+      config_values['engine'] = flag_values.managed_db_engine
+    if flag_values['managed_db_engine_version'].present:
+      config_values['engine_version'] = flag_values.managed_db_engine_version
+    if flag_values['managed_db_database_name'].present:
+      config_values['database_name'] = flag_values.managed_db_database_name
+    if flag_values['managed_db_database_username'].present:
+      config_values['database_username'] = (
+          flag_values.managed_db_database_username)
+    if flag_values['managed_db_database_password'].present:
+      config_values['database_password'] = (
+          flag_values.managed_db_database_password)
+    if flag_values['managed_db_high_availability'].present:
+      config_values['high_availability'] = (
+          flag_values.managed_db_high_availability)
+    if flag_values['managed_db_backup_enabled'].present:
+      config_values['backup_enabled'] = (
+          flag_values.managed_db_backup_enabled)
+    if flag_values['managed_db_backup_start_time'].present:
       config_values['backup_start_time'] = (
-          flag_values.database_backup_start_time)
+          flag_values.managed_db_backup_start_time)
+
+    cloud = config_values['cloud']
+    if flag_values['managed_db_zone'].present:
+      config_values['vm_spec'][cloud]['zone'] = (
+          flag_values.managed_db_zone)
 
 
 class _SparkServiceSpec(spec.BaseSpec):
