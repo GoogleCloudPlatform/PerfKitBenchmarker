@@ -270,8 +270,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _PostCreate(self):
     """Creates the user and set password."""
     cmd = util.GcloudCommand(
-        self, 'sql', 'users', 'create', self.spec.database_username, 'dummy_host',
-        '--instance={0}'.format(self.instance_id),
+        self, 'sql', 'users', 'create', self.spec.database_username,
+        'dummy_host', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
     stdout, _, _ = cmd.Issue()
 
