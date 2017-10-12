@@ -38,7 +38,7 @@ DEFAULT_POSTGRES_PORT = 5432
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
 
 
-class ManagedRelationalDbCrossRegionException(Exception):
+class AwsManagedRelationalDbCrossRegionException(Exception):
   pass
 
 
@@ -131,7 +131,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       return DEFAULT_POSTGRES_VERSION
 
   def _GetNewZones(self):
-    # Get a list of zones, excluding the one that the VM is in.
+    """Returns a list of zones, excluding the one that the client VM is in."""
     zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     get_zones_cmd = util.AWS_PREFIX + [
@@ -147,7 +147,16 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return all_zones
 
   def _CreateSubnetInAdditionalZone(self):
-    # Now create a new subnet in the zone that's different from where the VM is
+    """Creates a new subnet in the same region as the client VM.
+
+    The zone will be different from the client's zone (but in the same region).
+
+    Returns:
+      the new subnet resource
+
+    Raises:
+      Exception if unable to create a subnet in any zones in the region.
+    """
     new_subnet_zones = self._GetNewZones()
     while len(new_subnet_zones) >= 1:
       try:
@@ -166,13 +175,19 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         # save for cleanup
         self.extra_subnet_for_db = new_subnet
         return new_subnet
-      except Exception as e:
-        logging.exception('Unable to create subnet in zone %s', new_subnet_zone)
-        logging.exception('Details: %s' % e)
+      except:
+        logging.info('Unable to create subnet in zone %s', new_subnet_zone)
     raise Exception('Unable to create subnet in any availability zones')
 
   def _CreateDbSubnetGroup(self, new_subnet):
-    # Now we can create a new DB subnet group that has two subnets in it.
+    """Creates a new db subnet group.
+
+    The db subnet group will consit of two zones: the client vm zone,
+    and another zone in the same region.
+
+    Args:
+      new_subnet: a subnet in the same region as the client VM's subnet
+    """
     zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     db_subnet_group_name = 'pkb-db-subnet-group-{0}'.format(FLAGS.run_uri)
@@ -184,12 +199,14 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--subnet-ids', self.client_vm.network.subnet.id, new_subnet.id,
         '--region', region]
     stdout, stderr, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
+
     # save for cleanup
     self.db_subnet_group_name = db_subnet_group_name
     self.security_group_id = (self.client_vm.network.regional_network.
                               vpc.default_security_group_id)
 
   def _SetupNetworking(self):
+    """Sets up the networking required for the RDS database."""
     zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     new_subnet = self._CreateSubnetInAdditionalZone()
@@ -208,6 +225,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
                  stdout, stderr)
 
   def _TeardownNetworking(self):
+    """Tears down all network resources that were created for the database."""
     zone = self.spec.vm_spec.zone
     region = util.GetRegionFromZone(zone)
     if hasattr(self, 'db_subnet_group_name'):
@@ -363,10 +381,16 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return True
 
   def _AssertClientAndDbInSameRegion(self):
+    """Asserts that the client vm is in the same region requested by the server.
+
+    Raises:
+      AwsManagedRelationalDbCrossRegionException if the client vm is in a
+        different region that is requested by the server.
+    """
     client_region = self.client_vm.region
     db_region = util.GetRegionFromZone(self.zone)
     if client_region != db_region:
-      raise ManagedRelationalDbCrossRegionException((
+      raise AwsManagedRelationalDbCrossRegionException((
           'client_vm and managed_relational_db server '
           'must be in the same region'))
 

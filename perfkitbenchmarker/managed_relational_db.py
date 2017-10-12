@@ -130,8 +130,8 @@ class BaseManagedRelationalDb(resource.BaseResource):
   def MakePsqlConnectionString(self, database_name):
     return '\'host={0} user={1} password={2} dbname={3}\''.format(
         self.endpoint,
-        self.spec.username,
-        self.spec.password,
+        self.spec.database_username,
+        self.spec.database_password,
         database_name)
 
   @property

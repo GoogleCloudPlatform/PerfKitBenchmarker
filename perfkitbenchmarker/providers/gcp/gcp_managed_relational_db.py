@@ -48,6 +48,8 @@ CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND = 0.9
 CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND = 6.5
 MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
+IS_READY_TIMEOUT = 600  # 10 minutes
+
 
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """A GCP CloudSQL database resource.
@@ -216,7 +218,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     except:
       return False
 
-  def _IsReady(self):
+  def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
 
     Supplying this method is optional.  Use it when a resource can exist
@@ -226,7 +228,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    timeout = 600  # 10 minutes
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
     start_time = datetime.datetime.now()
