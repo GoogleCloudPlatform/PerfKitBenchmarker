@@ -266,6 +266,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     else:
       cmd.append('--availability-zone=%s' % self.spec.vm_spec.zone)
 
+    # TODO(ferneyhough): add backup_enabled and backup_window
+
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):

@@ -253,7 +253,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return True
 
   def _ParseEndpoint(self, describe_instance_json):
-    """Return the IP of the resource given the metadata as JSON.
+    """Returns the IP of the resource given the metadata as JSON.
 
     Args:
       describe_instance_json: JSON output.
@@ -266,6 +266,14 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
+
+  def _PostCreate(self):
+    """Creates the user and set password."""
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'create', self.spec.database_username, 'dummy_host',
+        '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.spec.database_password))
+    stdout, _, _ = cmd.Issue()
 
   @staticmethod
   def GetDefaultEngineVersion(engine):
