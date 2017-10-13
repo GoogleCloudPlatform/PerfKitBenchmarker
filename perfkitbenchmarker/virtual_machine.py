@@ -249,6 +249,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.network = None
     self.firewall = None
     self.tcp_congestion_control = None
+    self.numa_node_count = None
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -342,6 +343,8 @@ class BaseVirtualMachine(resource.BaseResource):
       result['dedicated_host'] = self.use_dedicated_host
     if self.tcp_congestion_control is not None:
       result['tcp_congestion_control'] = self.tcp_congestion_control
+    if self.numa_node_count is not None:
+      result['numa_node_count'] = self.numa_node_count
 
     return result
 
@@ -373,7 +376,6 @@ class BaseOsMixin(object):
 
     self.bootable_time = None
     self.hostname = None
-    self.tcp_congestion_control = None
 
     # Ports that will be opened by benchmark_spec to permit access to the VM.
     self.remote_access_ports = []
