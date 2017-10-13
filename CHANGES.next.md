@@ -22,6 +22,7 @@ Enhancements:
   Linux vms (GH-1397)
 - Created hpc_util for a place to share common HPC functions
 - Added --runspec_estimate_spec flag to calculate an estimated spec score (GH-1401)
+- Added all HPCC metrics as samples when running HPCC (GH-1448)
 - Added support for P100 gpus on Google Cloud Platform (GH-1450)
 - Added gpu type to cuda_toolkit_8 metadata (GH-1453)
 - Added num_gpus to cuda_toolkit_8 metadata (GH-1455)
@@ -37,5 +38,6 @@ Bug fixes and maintenance updates:
 - Changed default AWS P2 region for gpu benchmarks (GH-1454)
 - Fix multi-threading issue in fio.job filename (GH-1474)
 - Decreased speccpu2006 default disk size to 50gb (GH-1484)
+- Updated azure library version 1.0.3 for blob storage (GH-1491)
 - Added azure_host_caching to metadata (GH-1500)
 - Fixed fio histograms when generated with numjobs>1 (GH-1501)
