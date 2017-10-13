@@ -12,6 +12,7 @@ New features:
   operation on the axes instead of a cross-product (GH-1414)
 - Added TensorFlow Benchmarks. (GH-1420)
 - Added --network_enable_BBR flag (GH-1515)
+- Added pgbench benchmark for managed PostgreSQL (GH-1505)
 
 Enhancements:
 - Added basic auth support for Mesos provider. (GH-1390)
@@ -27,6 +28,7 @@ Enhancements:
 - Added range mode to gpu_pcie_bandwidth which calculates average bandwidth over
   a provided range of transfer sizes (GH-1482)
 - Added size support to fio_benchmark scenarios (GH-1489)
+- Added RemoteCommandWithReturnValue (GH-1516)
 
 Bug fixes and maintenance updates:
 - Fixed provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
