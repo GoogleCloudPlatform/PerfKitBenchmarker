@@ -15,7 +15,6 @@
 """Set of utility functions for working with virtual machines."""
 
 import contextlib
-import functools32
 import logging
 import os
 import random
@@ -107,9 +106,6 @@ flags.DEFINE_enum('background_network_ip_type', IpAddressSubset.EXTERNAL,
                   'traffic')
 
 
-# Caching this will have the effect that even if the
-# run_uri changes, the temp dir will stay the same.
-@functools32.lru_cache()
 def GetTempDir():
   """Returns the tmp dir of the current run."""
   return temp_dir.GetRunDirPath()

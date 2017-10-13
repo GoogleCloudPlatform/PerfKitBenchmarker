@@ -49,7 +49,6 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcs
@@ -1037,13 +1036,16 @@ def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
         "object_storage_read_objects file specified requires exactly %d " \
         "VMs, but %d were provisioned." % (len(read_objects), len(vms))
     for vm, vm_objects_written in zip(vms, read_objects):
-      # Note that this overwrites the same local file over and over, because
-      # each VM's worker process expects it to have the same file name.
-      tmp_objects_written_path = os.path.join(temp_dir.GetRunDirPath(),
-                                              OBJECTS_WRITTEN_FILE)
+      # Note that each file is written with a unique name so that parallel runs
+      # don't overwrite the same local file. They are pushed to the VM to a file
+      # named OBJECTS_WRITTEN_FILE.
+      tmp_objects_written_path = os.path.join(vm_util.GetTempDir(),
+                                              '%s-%s' % (OBJECTS_WRITTEN_FILE,
+                                                         vm.name))
       with open(tmp_objects_written_path, 'w') as objects_written_file:
         objects_written_file.write(json.dumps(vm_objects_written))
-      vm.PushFile(tmp_objects_written_path, '/tmp/pkb/')
+      vm.PushFile(tmp_objects_written_path,
+                  posixpath.join(vm_util.VM_TMP_DIR, OBJECTS_WRITTEN_FILE))
   except Exception as e:
     raise Exception("Failed to upload the objects written files to the VMs: "
                     "%s" % e)
