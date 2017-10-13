@@ -27,6 +27,7 @@ Enhancements:
 - Added range mode to gpu_pcie_bandwidth which calculates average bandwidth over
   a provided range of transfer sizes (GH-1482)
 - Added size support to fio_benchmark scenarios (GH-1489)
+- Added all HPCC metrics as samples when running HPCC (GH-1448)
 
 Bug fixes and maintenance updates:
 - Fixed provision phase of memcached_ycsb benchmark for non-managed memcached instances (GH-1384)
@@ -37,3 +38,4 @@ Bug fixes and maintenance updates:
 - Decreased speccpu2006 default disk size to 50gb (GH-1484)
 - Added azure_host_caching to metadata (GH-1500)
 - Fixed fio histograms when generated with numjobs>1 (GH-1501)
+- Updated azure library version 1.0.3 for blob storage (GH-1491)
