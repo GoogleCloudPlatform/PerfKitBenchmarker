@@ -1,0 +1,47 @@
+Warning: Permanently added '35.202.70.29' (ECDSA) to the list of known hosts.
+INFO:tensorflow:If checkpoint is expected, please set --save_checkpoints_secs.
+WARNING:tensorflow:Estimator's model_fn (<function model_fn at 0x7fc784c8b0c8>) includes params argument, but params are not passed to Estimator.
+WARNING:tensorflow:Using temporary folder as model directory: /tmp/tmpxjU7jr
+INFO:tensorflow:Using config: {'_save_checkpoints_secs': None, '_session_config': allow_soft_placement: true
+log_device_placement: true
+, '_keep_checkpoint_max': 5, '_task_type': 'worker', '_is_chief': True, '_cluster_spec': <tensorflow.python.training.server_lib.ClusterSpec object at 0x7fc784c7bed0>, '_evaluation_master': 'grpc://10.240.0.2:8470', '_save_checkpoints_steps': None, '_keep_checkpoint_every_n_hours': 10000, '_service': None, '_num_ps_replicas': 0, '_tpu_config': TPUConfig(iterations_per_loop=50, num_shards=8, per_host_input_for_training=False), '_tf_random_seed': 1, '_master': 'grpc://10.240.0.2:8470', '_num_worker_replicas': 1, '_task_id': 0, '_log_step_count_steps': 100, '_model_dir': '/tmp/tmpxjU7jr', '_save_summary_steps': 100}
+WARNING:tensorflow:From mnist.py:140: __init__ (from tensorflow.contrib.data.python.ops.readers) is deprecated and will be removed in a future version.
+Instructions for updating:
+Use `tf.data.TFRecordDataset`.
+INFO:tensorflow:TPU job name tpu_worker
+E1011 16:47:29.154391405    5866 ev_epoll1_linux.c:1051]     grpc epoll fd: 5
+INFO:tensorflow:Init TPU system
+INFO:tensorflow:Start infeed thread controller
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:loss = 2.01462, step = 0
+INFO:tensorflow:loss = 2.01462, step = 0
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:global_step/sec: 74.8278
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:global_step/sec: 28.9749
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:global_step/sec: 20.8336
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:global_step/sec: 31.2365
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:global_step/sec: 31.6943
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:global_step/sec: 39.1528
+INFO:tensorflow:Enqueue next batch of data to infeed.
+INFO:tensorflow:Stop infeed thread controller
+INFO:tensorflow:Waiting for Infeed Thread to exit.
+INFO:tensorflow:Stop Infeed input thread.
+INFO:tensorflow:Shutdown TPU system.
+INFO:tensorflow:Loss for final step: 0.229941.
