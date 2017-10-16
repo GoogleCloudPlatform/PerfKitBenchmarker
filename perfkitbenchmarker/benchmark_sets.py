@@ -123,6 +123,7 @@ BENCHMARK_SETS = {
             'hpcg',
             'iperf',
             'mesh_network',
+            'mnist',
             'mongodb_ycsb',
             'multichase',
             'netperf',
