@@ -109,3 +109,18 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
                     self.spec.tpu_name)
     result = json.loads(stdout)
     return result['ipAddress']
+
+  def GetResourceMetadata(self):
+    """Returns the metadata associated with the resource.
+
+    All keys will be prefaced with cloud_tpu before
+    being published (done in publisher.py).
+
+    Returns:
+      metadata: dict of GCP cloud TPU metadata.
+    """
+    metadata = super(GcpCloudTpu, self).GetResourceMetadata()
+    metadata.update({
+        'tpu_project': self.project,
+    })
+    return metadata

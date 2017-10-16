@@ -19,7 +19,13 @@ from perfkitbenchmarker import resource
 
 
 flags.DEFINE_string('tpu_cidr_range', None, """CIDR Range for the TPU. The IP
-                    range that the TPU will select an IP address from.""")
+                    range that the TPU will select an IP address from. Must be
+                    in CIDR notation and a /29 range, for example
+                    192.168.0.0/29. Errors will occur if the CIDR range has
+                    already been used for a currently existing TPU, the CIDR
+                    range conflicts with any networks in the user's provided
+                    network, or the provided network is peered with another
+                    network that is using that CIDR range.""")
 flags.DEFINE_string('tpu_accelerator_type', None,
                     'TPU accelerator type for the TPU.')
 flags.DEFINE_string('tpu_description', None,
@@ -72,6 +78,7 @@ class BaseCloudTpu(resource.BaseResource):
   """Object representing a cloud TPU."""
 
   __metaclass__ = AutoRegisterCloudTpuMeta
+  CLOUD = None
 
   def __init__(self, cloud_tpu_spec):
     """Initialize the cloud TPU object.
@@ -94,3 +101,17 @@ class BaseCloudTpu(resource.BaseResource):
   @abc.abstractmethod
   def GetCloudTpuIp(self):
     raise NotImplementedError()
+
+  def GetResourceMetadata(self):
+    """Returns a dictionary of cluster metadata."""
+    metadata = {
+        'cloud': self.CLOUD,
+        'tpu_cidr_range': self.spec.tpu_cidr_range,
+        'tpu_accelerator_type': self.spec.tpu_accelerator_type,
+        'tpu_description': self.spec.tpu_description,
+        'tpu_network': self.spec.tpu_network,
+        'tpu_tf_version': self.spec.tpu_tf_version,
+        'tpu_zone': self.spec.tpu_zone,
+        'tpu_name': self.spec.tpu_name
+    }
+    return metadata
