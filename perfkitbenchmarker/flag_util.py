@@ -334,7 +334,7 @@ def DEFINE_units(name, default, help, convertible_to,
         specifications, where each unit specification is either a string (e.g.
         'byte') or a units.Unit. The flag value must be convertible to at least
         one of the specified Units to be considered valid.
-    flag_values: the gflags.FlagValues object to define the flag in.
+    flag_values: the absl.flags.FlagValues object to define the flag in.
   """
   parser = UnitsParser(convertible_to=convertible_to)
   serializer = UnitsSerializer()
@@ -455,8 +455,8 @@ def DEFINE_yaml(name, default, help, flag_values=flags.FLAGS, **kwargs):
     name: string. The name of the flag.
     default: object. The default value of the flag.
     help: string. A help message for the user.
-    flag_values: the gflags.FlagValues object to define the flag in.
-    kwargs: extra arguments to pass to gflags.DEFINE().
+    flag_values: the absl.flags.FlagValues object to define the flag in.
+    kwargs: extra arguments to pass to absl.flags.DEFINE().
   """
 
   parser = YAMLParser()

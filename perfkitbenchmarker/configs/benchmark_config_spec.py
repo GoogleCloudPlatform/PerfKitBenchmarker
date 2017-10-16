@@ -73,7 +73,7 @@ class FlagsDecoder(option_decoders.TypeVerifier):
         if not merged_flag_values[key].present:
           try:
             merged_flag_values[key].parse(value)
-          except flags.IllegalFlagValue as e:
+          except flags.IllegalFlagValueError as e:
             raise errors.Config.InvalidValue(
                 'Invalid {0}.{1} value: "{2}" (of type "{3}").{4}{5}'.format(
                     self._GetOptionFullName(component_full_name), key, value,

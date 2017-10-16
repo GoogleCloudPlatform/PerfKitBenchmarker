@@ -110,7 +110,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_string('es_type', 'result', 'Elasticsearch document type')
 
-flags.DEFINE_multistring(
+flags.DEFINE_multi_string(
     'metadata',
     [],
     'A colon separated key-value pair that will be added to the labels field '
@@ -891,7 +891,7 @@ if __name__ == '__main__':
 
   try:
     argv = FLAGS(sys.argv)
-  except flags.FlagsError as e:
+  except flags.Error as e:
     logging.error(e)
     logging.info('Flag error. Usage: publisher.py <flags> path-to-json-file')
     sys.exit(1)
