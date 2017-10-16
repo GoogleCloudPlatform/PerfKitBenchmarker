@@ -126,6 +126,11 @@ class BenchmarkSpec(object):
     # Set the current thread's BenchmarkSpec object to this one.
     context.SetThreadBenchmarkSpec(self)
 
+  def __str__(self):
+    return(
+        'Benchmark name: {0}\nFlags: {1}'
+        .format(self.name, self.config.flags))
+
   @contextlib.contextmanager
   def RedirectGlobalFlags(self):
     """Redirects flag reads and writes to the benchmark-specific flags object.
