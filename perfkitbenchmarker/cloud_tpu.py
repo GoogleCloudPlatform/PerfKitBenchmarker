@@ -106,12 +106,12 @@ class BaseCloudTpu(resource.BaseResource):
     """Returns a dictionary of cluster metadata."""
     metadata = {
         'cloud': self.CLOUD,
-        'tpu_cidr_range': self.spec.tpu_cidr_range,
-        'tpu_accelerator_type': self.spec.tpu_accelerator_type,
-        'tpu_description': self.spec.tpu_description,
-        'tpu_network': self.spec.tpu_network,
-        'tpu_tf_version': self.spec.tpu_tf_version,
-        'tpu_zone': self.spec.tpu_zone,
-        'tpu_name': self.spec.tpu_name
+        'cidr_range': self.spec.tpu_cidr_range,
+        'accelerator_type': self.spec.tpu_accelerator_type,
+        'description': self.spec.tpu_description,
+        'network': self.spec.tpu_network,
+        'tf_version': self.spec.tpu_tf_version,
+        'zone': self.spec.tpu_zone,
+        'name': self.spec.tpu_name
     }
     return metadata

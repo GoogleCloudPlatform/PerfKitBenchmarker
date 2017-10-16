@@ -188,6 +188,11 @@ class DefaultMetadataProvider(MetadataProvider):
       for k, v in managed_db.GetResourceMetadata().iteritems():
         metadata['managed_relational_db_' + k] = v
 
+    if benchmark_spec.cloud_tpu:
+      cloud_tpu = benchmark_spec.cloud_tpu
+      for k, v in cloud_tpu.GetResourceMetadata().iteritems():
+        metadata['cloud_tpu_' + k] = v
+
     for name, vms in benchmark_spec.vm_groups.iteritems():
       if len(vms) == 0:
         continue
