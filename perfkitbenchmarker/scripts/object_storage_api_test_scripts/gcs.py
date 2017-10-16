@@ -16,7 +16,7 @@
 
 import time
 
-import gflags as flags
+from absl import flags
 import gcs_oauth2_boto_plugin  # noqa
 
 import boto_service

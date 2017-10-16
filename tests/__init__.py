@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 from perfkitbenchmarker import flags
 
 
 # Many places in the PKB codebase directly reference the global FLAGS. Several
 # tests were written using python-gflags==2.0, which allows accessing flag
-# values before they are parsed. python-gflags>=3.0.4 discourages this behavior,
-# so parse program name + an empty list of flags before any tests are executed.
-flags.FLAGS([sys.argv[0]])
+# values before they are parsed. Abseil forbids this behavior, so mark flags
+# as parsed before any tests are executed.
+flags.FLAGS.mark_as_parsed()

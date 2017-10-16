@@ -18,7 +18,7 @@ import json
 import logging
 import subprocess
 import sys
-import gflags as flags
+from absl import flags
 
 FLAGS = flags.FLAGS
 
@@ -35,7 +35,7 @@ def Main(argv=sys.argv):
   # Parse command-line flags
   try:
     argv = FLAGS(argv)
-  except flags.FlagsError as e:
+  except flags.Error as e:
     logging.error('%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
 

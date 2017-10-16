@@ -49,7 +49,7 @@ import shlex
 import subprocess
 import sys
 import time
-import gflags
+from absl import flags
 
 import plot_sysbench_results
 
@@ -101,45 +101,45 @@ RUN = 'run'
 CLEANUP = 'cleanup'
 TEARDOWN = 'teardown'
 
-FLAGS = gflags.FLAGS
-gflags.DEFINE_bool(PER_SECOND_GRAPHS, False,
-                   'Indicator for using per second data collection.'
-                   'To enable set True.')
-gflags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
-                      'The duration, in seconds, of each run phase with varying'
-                      'thread count.')
-gflags.DEFINE_integer(SYSBENCH_WARMUP_SECONDS, 0,
-                      'The duration, in seconds, of the warmup run in which '
-                      'results are discarded.')
-gflags.DEFINE_list(THREAD_COUNT_LIST, [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
-                   'The number of test threads on the client side.')
-gflags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 1,
-                      'The interval, in seconds, we ask sysbench to report '
-                      'results.')
-gflags.DEFINE_string(RUN_URI, None,
-                     'Run identifier, if provided, only run phase '
-                     'will be completed.')
-gflags.DEFINE_string(RUN_STAGE, None,
-                     'List of phases to be executed. For example:'
-                     '"--run_uri=provision,prepare". Available phases:'
-                     'prepare, provision, run, cleanup, teardown.')
-gflags.DEFINE_string(GCE_BOOT_DISK_SIZE, '1000',
-                     'The boot disk size in GB for GCP VMs..')
-gflags.DEFINE_string(GCE_BOOT_DISK_TYPE, 'pd-ssd',
-                     'The boot disk type for GCP VMs.')
-gflags.DEFINE_string(MACHINE_TYPE, 'n1-standard-16',
-                     'Machine type for GCE Virtual machines.')
-gflags.DEFINE_enum(MYSQL_SVC_DB_INSTANCE_CORES, '4', ['1', '4', '8', '16'],
-                   'The number of cores to be provisioned for the DB instance.')
-gflags.DEFINE_string(MYSQL_SVC_OLTP_TABLES_COUNT, '4',
-                     'The number of tables used in sysbench oltp.lua tests')
-gflags.DEFINE_string(MYSQL_SVC_OLTP_TABLE_SIZE, '100000',
-                     'The number of rows of each table used in the oltp tests')
-gflags.DEFINE_string(MYSQL_INSTANCE_STORAGE_SIZE, '300',
-                     'Storage size (in GB) for SQL instance.')
-gflags.DEFINE_list(ADDITIONAL_FLAGS, None,
-                   'List of additional PKB mysql_service valid flags (strings).'
-                   'For example: "--cloud_storage_bucket=bucket_name".')
+FLAGS = flags.FLAGS
+flags.DEFINE_bool(PER_SECOND_GRAPHS, False,
+                  'Indicator for using per second data collection.'
+                  'To enable set True.')
+flags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
+                     'The duration, in seconds, of each run phase with varying'
+                     'thread count.')
+flags.DEFINE_integer(SYSBENCH_WARMUP_SECONDS, 0,
+                     'The duration, in seconds, of the warmup run in which '
+                     'results are discarded.')
+flags.DEFINE_list(THREAD_COUNT_LIST, [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
+                  'The number of test threads on the client side.')
+flags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 1,
+                     'The interval, in seconds, we ask sysbench to report '
+                     'results.')
+flags.DEFINE_string(RUN_URI, None,
+                    'Run identifier, if provided, only run phase '
+                    'will be completed.')
+flags.DEFINE_string(RUN_STAGE, None,
+                    'List of phases to be executed. For example:'
+                    '"--run_uri=provision,prepare". Available phases:'
+                    'prepare, provision, run, cleanup, teardown.')
+flags.DEFINE_string(GCE_BOOT_DISK_SIZE, '1000',
+                    'The boot disk size in GB for GCP VMs..')
+flags.DEFINE_string(GCE_BOOT_DISK_TYPE, 'pd-ssd',
+                    'The boot disk type for GCP VMs.')
+flags.DEFINE_string(MACHINE_TYPE, 'n1-standard-16',
+                    'Machine type for GCE Virtual machines.')
+flags.DEFINE_enum(MYSQL_SVC_DB_INSTANCE_CORES, '4', ['1', '4', '8', '16'],
+                  'The number of cores to be provisioned for the DB instance.')
+flags.DEFINE_string(MYSQL_SVC_OLTP_TABLES_COUNT, '4',
+                    'The number of tables used in sysbench oltp.lua tests')
+flags.DEFINE_string(MYSQL_SVC_OLTP_TABLE_SIZE, '100000',
+                    'The number of rows of each table used in the oltp tests')
+flags.DEFINE_string(MYSQL_INSTANCE_STORAGE_SIZE, '300',
+                    'Storage size (in GB) for SQL instance.')
+flags.DEFINE_list(ADDITIONAL_FLAGS, None,
+                  'List of additional PKB mysql_service valid flags (strings).'
+                  'For example: "--cloud_storage_bucket=bucket_name".')
 
 # TODO: Implement flag for STDOUT/STDERR file paths.
 
@@ -167,7 +167,7 @@ def driver(argv):
   """
   try:  # Parse command line flags
     argv = FLAGS(argv)
-  except gflags.FlagsError as e:
+  except flags.Error as e:
     logging.error('%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
   run_uri = FLAGS.run_uri

@@ -36,10 +36,10 @@ from perfkitbenchmarker import temp_dir
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_multistring('data_search_paths', ['.'],
-                         'Additional paths to search for data files. '
-                         'These paths will be searched prior to using files '
-                         'bundled with PerfKitBenchmarker.')
+flags.DEFINE_multi_string('data_search_paths', ['.'],
+                          'Additional paths to search for data files. '
+                          'These paths will be searched prior to using files '
+                          'bundled with PerfKitBenchmarker.')
 
 _RESOURCES = 'resources'
 

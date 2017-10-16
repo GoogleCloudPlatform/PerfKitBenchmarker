@@ -76,7 +76,7 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
 
   def CleanupVM(self, vm):
     vm.Uninstall('swift_client')
-    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall python-gflags')
+    vm.RemoteCommand('/usr/bin/yes | sudo pip uninstall absl-py')
 
   def CLIUploadDirectory(self, vm, directory, file_names, bucket):
     return vm.RemoteCommand(
