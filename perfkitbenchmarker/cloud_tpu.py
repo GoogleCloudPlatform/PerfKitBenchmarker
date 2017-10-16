@@ -78,7 +78,6 @@ class BaseCloudTpu(resource.BaseResource):
   """Object representing a cloud TPU."""
 
   __metaclass__ = AutoRegisterCloudTpuMeta
-  CLOUD = None
 
   def __init__(self, cloud_tpu_spec):
     """Initialize the cloud TPU object.
@@ -105,7 +104,6 @@ class BaseCloudTpu(resource.BaseResource):
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
     metadata = {
-        'cloud': self.CLOUD,
         'cidr_range': self.spec.tpu_cidr_range,
         'accelerator_type': self.spec.tpu_accelerator_type,
         'description': self.spec.tpu_description,

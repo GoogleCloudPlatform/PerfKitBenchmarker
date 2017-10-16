@@ -122,5 +122,6 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
     metadata = super(GcpCloudTpu, self).GetResourceMetadata()
     metadata.update({
         'project': self.project,
+        'cloud': self.CLOUD
     })
     return metadata
