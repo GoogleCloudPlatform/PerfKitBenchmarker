@@ -26,7 +26,7 @@ flags.DEFINE_string('tpu_cidr_range', None, """CIDR Range for the TPU. The IP
                     range conflicts with any networks in the user's provided
                     network, or the provided network is peered with another
                     network that is using that CIDR range.""")
-flags.DEFINE_string('tpu_accelerator_type', None,
+flags.DEFINE_string('tpu_accelerator_type', 'tpu-v2',
                     'TPU accelerator type for the TPU.')
 flags.DEFINE_string('tpu_description', None,
                     'Specifies a text description of the TPU.')
