@@ -311,6 +311,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.client_token = str(uuid.uuid4())
     self.host = None
     self.id = None
+    self.metadata.update({
+        'spot_instance': self.use_spot_instance,
+        'spot_price': self.spot_price,
+    })
 
     if self.use_dedicated_host and util.IsRegion(self.zone):
       raise ValueError(
@@ -645,17 +649,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
-
-  def GetMachineTypeDict(self):
-    """Returns a dict containing properties that specify the machine type.
-
-    Returns:
-      dict mapping string property key to value.
-    """
-    result = super(AwsVirtualMachine, self).GetMachineTypeDict()
-    result['spot_instance'] = self.use_spot_instance
-    result['spot_price'] = self.spot_price
-    return result
 
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,

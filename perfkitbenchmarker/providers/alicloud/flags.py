@@ -33,3 +33,5 @@ flags.DEFINE_string('ali_system_disk_type', 'cloud',
                     '"ephemeral_ssd" for local ssd disk')
 flags.DEFINE_boolean('ali_use_vpc', True,
                      'Use VPC to create networks')
+flags.DEFINE_integer('ali_eip_address_bandwidth', 5,
+                     'The rate limit of the EIP in Mbps.')

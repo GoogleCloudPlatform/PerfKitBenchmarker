@@ -115,8 +115,8 @@ flags.DEFINE_integer(
     'Argument to refine the chase type specified with --multichase_chase_type. '
     'Applicable for the following types: {0}.'.format(', '.join(
         _CHASES_WITH_ARGS)))
-flags.DEFINE_integer(
-    'multichase_thread_count', 1,
+flag_util.DEFINE_integerlist(
+    'multichase_thread_count', flag_util.IntegerList([1]),
     'Number of threads (one per core), to use when executing multichase. '
     'Passed to multichase via its -t flag.')
 _DefineMemorySizeFlag(
@@ -265,8 +265,7 @@ def Run(benchmark_spec):
   samples = []
   base_metadata = {'additional_flags': FLAGS.multichase_additional_flags,
                    'chase_type': FLAGS.multichase_chase_type,
-                   'multichase_version': multichase.GIT_VERSION,
-                   'thread_count': FLAGS.multichase_thread_count}
+                   'multichase_version': multichase.GIT_VERSION}
   vm = benchmark_spec.vms[0]
   vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR)
 
@@ -283,29 +282,32 @@ def Run(benchmark_spec):
     chase_type = '{0}:{1}'.format(chase_type, FLAGS.multichase_chase_arg)
     base_metadata['chase_arg'] = FLAGS.multichase_chase_arg
   base_cmd.extend(('-c', chase_type))
-  base_cmd.extend(('-t', FLAGS.multichase_thread_count))
 
-  memory_size_iterator = _IterMemorySizes(
-      lambda: vm.total_memory_kb * 1024, FLAGS.multichase_memory_size_min,
-      FLAGS.multichase_memory_size_max)
-  for memory_size in memory_size_iterator:
-    stride_size_iterator = _IterMemorySizes(
-        lambda: memory_size, FLAGS.multichase_stride_size_min,
-        FLAGS.multichase_stride_size_max)
-    for stride_size in stride_size_iterator:
-      cmd = ' '.join(str(s) for s in itertools.chain(base_cmd, (
-          '-m', memory_size, '-s', stride_size,
-          FLAGS.multichase_additional_flags)))
-      stdout, _ = vm.RemoteCommand(cmd)
+  for thread_count in FLAGS.multichase_thread_count:
+    if thread_count > vm.num_cpus:
+      break
+    memory_size_iterator = _IterMemorySizes(
+        lambda: vm.total_memory_kb * 1024, FLAGS.multichase_memory_size_min,
+        FLAGS.multichase_memory_size_max)
+    for memory_size in memory_size_iterator:
+      stride_size_iterator = _IterMemorySizes(
+          lambda: memory_size, FLAGS.multichase_stride_size_min,
+          FLAGS.multichase_stride_size_max)
+      for stride_size in stride_size_iterator:
+        cmd = ' '.join(str(s) for s in itertools.chain(base_cmd, (
+            '-m', memory_size, '-s', stride_size, '-t', thread_count,
+            FLAGS.multichase_additional_flags)))
+        stdout, _ = vm.RemoteCommand(cmd)
 
-      # Latency is printed in ns in the last line.
-      latency_ns = float(stdout.split()[-1])
+        # Latency is printed in ns in the last line.
+        latency_ns = float(stdout.split()[-1])
 
-      # Generate one sample from one run of multichase.
-      metadata = base_metadata.copy()
-      metadata.update({'memory_size_bytes': memory_size,
-                       'stride_size_bytes': stride_size})
-      samples.append(sample.Sample('latency', latency_ns, 'ns', metadata))
+        # Generate one sample from one run of multichase.
+        metadata = base_metadata.copy()
+        metadata.update({'memory_size_bytes': memory_size,
+                         'stride_size_bytes': stride_size,
+                         'thread_count': thread_count})
+        samples.append(sample.Sample('latency', latency_ns, 'ns', metadata))
 
   return samples
 

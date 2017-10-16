@@ -75,11 +75,15 @@ flags.DEFINE_bool('setup_remote_firewall', False,
 
 flags.DEFINE_list('sysctl', [],
                   'Sysctl values to set. This flag should be a comma-separated '
-                  'list of path=value pairs. Each value will be written to the '
-                  'corresponding path. For example, if you pass '
+                  'list of path=value pairs. Each pair will be appended to'
+                  '/etc/sysctl.conf.  The presence of any items in this list '
+                  'will cause a reboot to occur after VM prepare. '
+                  'For example, if you pass '
                   '--sysctls=vm.dirty_background_ratio=10,vm.dirty_ratio=25, '
-                  'PKB will run "sysctl vm.dirty_background_ratio=10 '
-                  'vm.dirty_ratio=25" before starting the benchmark.')
+                  'PKB will append "vm.dirty_background_ratio=10" and'
+                  '"vm.dirty_ratio=25" on separate lines to /etc/sysctrl.conf'
+                  ' and then the machine will be rebooted before starting'
+                  'the benchmark.')
 
 flags.DEFINE_list('set_files', [],
                   'Arbitrary filesystem configuration. This flag should be a '
@@ -89,6 +93,13 @@ flags.DEFINE_list('set_files', [],
                   'then PKB will write "always" to '
                   '/sys/kernel/mm/transparent_hugepage/enabled before starting '
                   'the benchmark.')
+
+flags.DEFINE_bool('network_enable_BBR', False,
+                  'A shortcut to enable BBR congestion control on the network. '
+                  'equivalent to appending to --sysctls the following values '
+                  '"net.core.default_qdisc=fq, '
+                  '"net.ipv4.tcp_congestion_control=bbr" '
+                  'As with other sysctrls, will cause a reboot to happen.')
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -107,9 +118,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     self._remote_command_script_upload_lock = threading.Lock()
     self._has_remote_command_script = False
+    self._needs_reboot = False
 
   def _CreateVmTmpDir(self):
-        self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
 
   def _PushRobustCommandScripts(self):
     """Pushes the scripts required by RobustRemoteCommand to this VM.
@@ -231,6 +243,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.InstallPackages('python')
     self.SetFiles()
     self.DoSysctls()
+    self.DoConfigureNetworkForBBR()
+    self._RebootIfNecessary()
+    self.RecordAdditionalMetadata()
     self.BurnCpu()
 
   def SetFiles(self):
@@ -241,11 +256,69 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand('echo "%s" | sudo tee %s' %
                          (value, path))
 
-  def DoSysctls(self):
-    """Apply --sysctl to the VM."""
+  def ApplySysctlPersistent(self, key, value):
+    """Apply "key=value" pair to /etc/sysctl.conf and reboot.
 
-    if FLAGS.sysctl:
-      self.RemoteCommand('sudo sysctl -w %s' % (' '.join(FLAGS.sysctl),))
+    The reboot ensures the values take effect and remain persistent across
+    future reboots.
+
+    Args:
+      key: a string - the key to write as part of the pair
+      value: a string - the value to write as part of the pair
+    """
+    self.RemoteCommand('sudo bash -c \'echo "%s=%s" >> /etc/sysctl.conf\''
+                       % (key, value))
+
+    self._needs_reboot = True
+
+  def DoSysctls(self):
+    """Apply --sysctl to the VM.
+
+       The Sysctl pairs are written persistently so that if a reboot
+       occurs, the flags are not lost.
+    """
+    for pair in FLAGS.sysctl:
+      key, value = pair.split('=')
+      self.ApplySysctlPersistent(key, value)
+
+  def DoConfigureNetworkForBBR(self):
+    """Apply --network_enable_BBR to the VM."""
+    if not FLAGS.network_enable_BBR:
+      return
+
+    if not self.CheckKernelVersion().AtLeast(4, 9):
+      raise flags.ValidationError(
+          'BBR requires a linux image with kernel 4.9 or newer')
+
+    # if the current congestion control mechanism is already BBR
+    # then nothing needs to be done (avoid unnecessary reboot)
+    if self.TcpCongestionControl() == 'bbr':
+      return
+
+    self.ApplySysctlPersistent('net.core.default_qdisc', 'fq')
+    self.ApplySysctlPersistent('net.ipv4.tcp_congestion_control', 'bbr')
+
+  def _RebootIfNecessary(self):
+    """Will reboot the VM if self._needs_reboot has been set."""
+    if self._needs_reboot:
+      self.Reboot()
+      self._needs_reboot = False
+
+  def TcpCongestionControl(self):
+    """Return the congestion control used for tcp."""
+    resp, _ = self.RemoteCommand(
+        'cat /proc/sys/net/ipv4/tcp_congestion_control')
+    return resp.rstrip('\n')
+
+  def CheckKernelVersion(self):
+    """Return a KernelVersion from the host VM."""
+    uname, _ = self.RemoteCommand('uname -r')
+    return KernelVersion(uname)
+
+  def CheckLsCpu(self):
+    """Returns a LsCpuResults from the host VM."""
+    lscpu, _ = self.RemoteCommand('lscpu')
+    return LsCpuResults(lscpu)
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
@@ -256,6 +329,19 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.bootable_time = time.time()
     if self.hostname is None:
       self.hostname = resp[:-1]
+
+  def RecordAdditionalMetadata(self):
+    """After the VM has been prepared, store metadata about the VM."""
+    self.tcp_congestion_control = self.TcpCongestionControl()
+    lscpu_results = self.CheckLsCpu()
+    self.numa_node_count = lscpu_results.numa_node_count
+
+  @vm_util.Retry(log_errors=False, poll_interval=1)
+  def VMLastBootTime(self):
+    """Return the UTC time the VM was last rebooted as reported by the VM."""
+    resp, _ = self.RemoteHostCommand('uptime -s', retries=1,
+                                     suppress_warning=True)
+    return resp
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
@@ -349,18 +435,29 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     (retcode, full_cmd, stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
+  def RemoteCommandWithReturnCode(self, command, should_log=False,
+                                  retries=SSH_RETRIES, ignore_failure=False,
+                                  login_shell=False, suppress_warning=False,
+                                  timeout=None):
+    return self.RemoteHostCommandWithReturnCode(
+        command, should_log, retries,
+        ignore_failure, login_shell,
+        suppress_warning, timeout)
+
   def RemoteCommand(self, command,
                     should_log=False, retries=SSH_RETRIES,
                     ignore_failure=False, login_shell=False,
                     suppress_warning=False, timeout=None):
-    return self.RemoteHostCommand(command, should_log, retries,
-                                  ignore_failure, login_shell,
-                                  suppress_warning, timeout)
+    return self.RemoteCommandWithReturnCode(
+        command, should_log, retries,
+        ignore_failure, login_shell,
+        suppress_warning, timeout)[:2]
 
-  def RemoteHostCommand(self, command,
-                        should_log=False, retries=SSH_RETRIES,
-                        ignore_failure=False, login_shell=False,
-                        suppress_warning=False, timeout=None):
+  def RemoteHostCommandWithReturnCode(self, command, should_log=False,
+                                      retries=SSH_RETRIES,
+                                      ignore_failure=False,
+                                      login_shell=False,
+                                      suppress_warning=False, timeout=None):
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run
@@ -379,7 +476,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           return code is non-zero.
 
     Returns:
-      A tuple of stdout and stderr from running the command.
+      A tuple of stdout, stderr, return_code from running the command.
 
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
@@ -418,7 +515,37 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if not ignore_failure:
         raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-    return stdout, stderr
+    return (stdout, stderr, retcode)
+
+  def RemoteHostCommand(self, command, should_log=False, retries=SSH_RETRIES,
+                        ignore_failure=False, login_shell=False,
+                        suppress_warning=False, timeout=None):
+    """Runs a command on the VM.
+
+    This is guaranteed to run on the host VM, whereas RemoteCommand might run
+    within i.e. a container in the host VM.
+
+    Args:
+      command: A valid bash command.
+      should_log: A boolean indicating whether the command result should be
+          logged at the info level. Even if it is false, the results will
+          still be logged at the debug level.
+      retries: The maximum number of times RemoteCommand should retry SSHing
+          when it receives a 255 return code.
+      ignore_failure: Ignore any failure if set to true.
+      login_shell: Run command in a login shell.
+      suppress_warning: Suppress the result logging from IssueCommand when the
+          return code is non-zero.
+
+    Returns:
+      A tuple of stdout, stderr from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection.
+    """
+    return self.RemoteHostCommandWithReturnCode(
+        command, should_log, retries, ignore_failure, login_shell,
+        suppress_warning, timeout)[:2]
 
   def _Reboot(self):
     """OS-specific implementation of reboot command"""
@@ -1064,6 +1191,87 @@ class ContainerizedDebianMixin(DebianMixin):
 
     # Copies the file to its final destination in the container
     target.ContainerCopy(file_name, remote_path)
+
+
+class KernelVersion(object):
+  """Holds the contents of the linux kernel version returned from uname -r."""
+
+  def __init__(self, uname):
+    """KernelVersion Constructor.
+
+    Args:
+      uname: A string in the format of "uname -r" command
+    """
+
+    # example format would be: "4.5.0-96-generic"
+    # major.minor.Rest
+    # in this example, major = 4, minor = 5
+    major_string, minor_string, _ = uname.split('.')
+    self.major = int(major_string)
+    self.minor = int(minor_string)
+
+  def AtLeast(self, major, minor):
+    """Check If the kernel version meets a minimum bar.
+
+    The kernel version needs to be at least as high as the major.minor
+    specified in args.
+
+    Args:
+      major: The major number to test, as an integer
+      minor: The minor number to test, as an integer
+
+    Returns:
+      True if the kernel version is at least as high as major.minor,
+      False otherwise
+    """
+    if self.major < major:
+      return False
+    if self.major > major:
+      return True
+    return self.minor >= minor
+
+
+class LsCpuResults(object):
+  """Holds the contents of the command lscpu."""
+
+  def __init__(self, lscpu):
+    """LsCpuResults Constructor.
+
+    Args:
+      lscpu: A string in the format of "lscpu" command
+
+    Raises:
+      ValueError: if the format of lscpu isnt what was expected for parsing
+
+    Example value of lscpu is:
+    Architecture:          x86_64
+    CPU op-mode(s):        32-bit, 64-bit
+    Byte Order:            Little Endian
+    CPU(s):                12
+    On-line CPU(s) list:   0-11
+    Thread(s) per core:    2
+    Core(s) per socket:    6
+    Socket(s):             1
+    NUMA node(s):          1
+    Vendor ID:             GenuineIntel
+    CPU family:            6
+    Model:                 79
+    Stepping:              1
+    CPU MHz:               1202.484
+    BogoMIPS:              7184.10
+    Virtualization:        VT-x
+    L1d cache:             32K
+    L1i cache:             32K
+    L2 cache:              256K
+    L3 cache:              15360K
+    NUMA node0 CPU(s):     0-11
+    """
+    match = re.search(r'NUMA\ node\(s\):\s*(\d+)$', lscpu, re.MULTILINE)
+    if match:
+      self.numa_node_count = int(match.group(1))
+    else:
+      raise ValueError('NUMA Node(s) could not be found in lscpu value:\n%s' %
+                       lscpu)
 
 
 class JujuMixin(DebianMixin):

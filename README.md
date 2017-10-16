@@ -7,14 +7,14 @@ tuned for any particular platform or instance type. These settings are recommend
 Only in the rare case where there is a common practice like setting the buffer pool size of a database do we
 change any settings.
 
-This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [wiki] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contains more detailed information:
+This README is designed to give you the information you need to get running with the benchmarker and the basics of working with the code.  The [wiki](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki) contains more detailed information:
 
-* [FAQ] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
-* [Tech Talks] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
-* [Governing rules] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
-* [Community meeting decks and notes] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
-* [Design documents] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
-* You are always welcome to [open an issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues), or to join us on #PerfKitBenchmarker on freenode to discuss issues you're having, pull requests, or anything else related to PerfKitBenchmarker
+* [FAQ](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/FAQ)
+* [Tech Talks](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Tech-Talks)
+* [Governing rules](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Governing-Rules)
+* [Community meeting decks and notes](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Community-Meeting-Notes-Decks)
+* [Design documents](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki/Design-Docs)
+* You are always welcome to [open an issue](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues), or to join us on #PerfKitBenchmarker on freenode to discuss issues you're having, pull requests, or anything else related to PerfKitBenchmarker
 
 
 Known Issues
@@ -44,8 +44,13 @@ In its current release these are the benchmarks that are executed:
   - `coremark`: [EEMBC](https://www.eembc.org/)
   - `copy_throughput`: Apache v2
   - `fio`: [GPL v2](https://github.com/axboe/fio/blob/master/COPYING)
+  - [`gpu_pcie_bandwidth`](https://developer.nvidia.com/cuda-downloads): [NVIDIA
+    Software Licence
+    Agreement](http://docs.nvidia.com/cuda/eula/index.html#nvidia-driver-license)
   - `hadoop_terasort`: [Apache v2](http://hadoop.apache.org/)
   - `hpcc`: [Original BSD license](http://icl.cs.utk.edu/hpcc/faq/#263)
+  - [`hpcg`](https://github.com/hpcg-benchmark/hpcg/): [BSD
+    3-clause](https://github.com/hpcg-benchmark/hpcg/blob/master/LICENSE)
   - `iperf`: [BSD license](http://iperf.sourceforge.net/)
   - `memtier_benchmark`: [GPL v2](https://github.com/RedisLabs/memtier_benchmark)
   - `mesh_network`: [HP license](http://www.calculate-linux.org/packages/licenses/netperf)
@@ -57,11 +62,16 @@ In its current release these are the benchmarks that are executed:
   - [`oldisim`](https://github.com/GoogleCloudPlatform/oldisim):
     [Apache v2](https://github.com/GoogleCloudPlatform/oldisim/blob/master/LICENSE.txt)
   - `object_storage_service`: Apache v2
+  - `pgbench`: [PostgreSQL Licence](https://www.postgresql.org/about/licence/)
   - `ping`: No license needed.
   - `silo`: MIT License
   - `scimark2`: [public domain](http://math.nist.gov/scimark2/credits.html)
   - `speccpu2006`: [SPEC CPU2006](http://www.spec.org/cpu2006/)
+  - [`SHOC`](https://github.com/vetter/shoc): [BSD
+    3-clause](https://github.com/vetter/shoc/blob/master/LICENSE.txt)
   - `sysbench_oltp`: [GPL v2](https://github.com/akopytov/sysbench)
+  - [`TensorFlow`](https://github.com/tensorflow/tensorflow): [Apache
+    v2](https://github.com/tensorflow/tensorflow/blob/master/LICENSE)
   - [`tomcat`](https://github.com/apache/tomcat):
     [Apache v2](https://github.com/apache/tomcat/blob/trunk/LICENSE)
   - [`unixbench`](https://github.com/kdlucas/byte-unixbench):
@@ -735,7 +745,7 @@ Cloud name | Network-attached SSD | Network-attached HDD
 -----------|----------------------|---------------------
 GCP | pd-ssd | pd-standard
 AWS | gp2 | standard
-Azure | premium-storage | standard-disk
+Azure | Premium_LRS | Standard_LRS
 Rackspace | cbs-ssd | cbs-sata
 
 Also note that `--data_disk_type=local` tells PKB not to allocate a separate

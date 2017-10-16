@@ -39,11 +39,26 @@ BENCHMARK_SETS = {
         MESSAGE: ('The standard_set is a community agreed upon set of '
                   'benchmarks to measure Cloud performance.'),
         BENCHMARK_LIST: [
-            'aerospike', 'block_storage_workload', 'cassandra_stress',
-            'cluster_boot', 'copy_throughput', 'coremark', 'fio',
-            'hadoop_terasort', 'hpcc', 'iperf', 'mesh_network',
-            'mongodb_ycsb', 'netperf', 'object_storage_service', 'ping',
-            'redis', 'speccpu2006', 'sysbench_oltp', 'unixbench']
+            'aerospike',
+            'block_storage_workload',
+            'cassandra_stress',
+            'cluster_boot',
+            'copy_throughput',
+            'coremark',
+            'fio',
+            'hadoop_terasort',
+            'hpcc',
+            'iperf',
+            'mesh_network',
+            'mongodb_ycsb',
+            'netperf',
+            'object_storage_service',
+            'ping',
+            'redis',
+            'speccpu2006',
+            'sysbench_oltp',
+            'unixbench',
+        ]
     },
     'arm_set': {
         MESSAGE: 'ARM benchmark set.',
@@ -63,9 +78,18 @@ BENCHMARK_SETS = {
     },
     'centurylinkcloud_set': {
         MESSAGE: 'This benchmark set is supported on CenturyLink Cloud.',
-        BENCHMARK_LIST: ['hpcc', 'unixbench', 'sysbench_oltp', 'mongodb_ycsb',
-                         'mesh_network', 'ping', 'iperf', 'redis',
-                         'cassandra_stress', 'copy_throughput']
+        BENCHMARK_LIST: [
+            'cassandra_stress',
+            'copy_throughput',
+            'hpcc',
+            'iperf',
+            'mesh_network',
+            'mongodb_ycsb',
+            'ping',
+            'redis',
+            'sysbench_oltp',
+            'unixbench',
+        ]
     },
     'cisco_set': {
         MESSAGE: 'Cisco benchmark set.',
@@ -73,7 +97,10 @@ BENCHMARK_SETS = {
     },
     'cloudharmony_set': {
         MESSAGE: 'CloudHarmony benchmark set.',
-        BENCHMARK_LIST: ['speccpu2006', 'unixbench']
+        BENCHMARK_LIST: [
+            'speccpu2006',
+            'unixbench',
+        ]
     },
     'cloudspectator_set': {
         MESSAGE: 'CloudSpectator benchmark set.',
@@ -83,26 +110,65 @@ BENCHMARK_SETS = {
         MESSAGE: ('This benchmark set is maintained by Google Cloud Platform '
                   'Performance Team.'),
         BENCHMARK_LIST: [
-            'aerospike_ycsb', 'block_storage_workload', 'cassandra_stress',
-            'cassandra_ycsb', 'cluster_boot', 'copy_throughput',
-            'fio', 'gpu_pcie_bandwidth', 'hadoop_terasort', 'hpcc', 'hpcg',
-            'iperf', 'multichase', 'mesh_network', 'mongodb_ycsb', 'netperf',
-            'object_storage_service', 'oldisim', 'ping', 'redis_ycsb',
-            'stencil2d', 'speccpu2006', 'sysbench_oltp', 'tomcat_wrk',
-            'tensorflow', 'unixbench', 'mnist']
+            'aerospike_ycsb',
+            'block_storage_workload',
+            'cassandra_stress',
+            'cassandra_ycsb',
+            'cluster_boot',
+            'copy_throughput',
+            'fio',
+            'gpu_pcie_bandwidth',
+            'hadoop_terasort',
+            'hpcc',
+            'hpcg',
+            'iperf',
+            'mesh_network',
+            'mnist',
+            'mongodb_ycsb',
+            'multichase',
+            'netperf',
+            'object_storage_service',
+            'oldisim',
+            'pgbench',
+            'ping',
+            'redis_ycsb',
+            'stencil2d',
+            'speccpu2006',
+            'sysbench_oltp',
+            'tensorflow',
+            'tomcat_wrk',
+            'unixbench',
+        ]
     },
     'intel_set': {
         MESSAGE: 'Intel benchmark set.',
-        BENCHMARK_LIST: ['fio', 'iperf', 'unixbench', 'hpcc',
-                         'cluster_boot', 'redis', 'cassandra_stress',
-                         'object_storage_service', 'sysbench_oltp']
+        BENCHMARK_LIST: [
+            'fio',
+            'iperf',
+            'unixbench',
+            'hpcc',
+            'cluster_boot',
+            'redis',
+            'cassandra_stress',
+            'object_storage_service',
+            'sysbench_oltp',
+        ]
     },
     'kubernetes_set': {
         MESSAGE: 'Kubernetes benchmark set.',
-        BENCHMARK_LIST: ['block_storage_workload', 'cassandra_ycsb',
-                         'cassandra_stress', 'cluster_boot', 'fio', 'iperf',
-                         'mesh_network', 'mongodb_ycsb', 'netperf', 'redis',
-                         'sysbench_oltp']
+        BENCHMARK_LIST: [
+            'block_storage_workload',
+            'cassandra_ycsb',
+            'cassandra_stress',
+            'cluster_boot',
+            'fio',
+            'iperf',
+            'mesh_network',
+            'mongodb_ycsb',
+            'netperf',
+            'redis',
+            'sysbench_oltp',
+        ]
     },
     'mellanox_set': {
         MESSAGE: 'Mellanox benchmark set.',
@@ -118,11 +184,25 @@ BENCHMARK_SETS = {
     },
     'rackspace_set': {
         MESSAGE: 'Rackspace benchmark set.',
-        BENCHMARK_LIST: ['aerospike', 'cassandra_stress', 'cluster_boot',
-                         'copy_throughput', 'fio', 'hpcc', 'iperf',
-                         'mesh_network', 'mongodb_ycsb', 'netperf', 'ping',
-                         'redis', 'block_storage_workload', 'sysbench_oltp',
-                         'unixbench', 'oldisim', 'silo']
+        BENCHMARK_LIST: [
+            'aerospike',
+            'block_storage_workload',
+            'cassandra_stress',
+            'cluster_boot',
+            'copy_throughput',
+            'fio',
+            'hpcc',
+            'iperf',
+            'mesh_network',
+            'mongodb_ycsb',
+            'netperf',
+            'oldisim',
+            'ping',
+            'redis',
+            'silo',
+            'sysbench_oltp',
+            'unixbench',
+        ]
     },
     'red_hat_set': {
         MESSAGE: 'Red Hat benchmark set.',
@@ -146,15 +226,25 @@ BENCHMARK_SETS = {
     },
     'cloudsuite_set': {
         MESSAGE: 'CloudSuite benchmark set.',
-        BENCHMARK_LIST: ['cloudsuite_data_analytics',
-                         'cloudsuite_data_caching',
-                         'cloudsuite_graph_analytics',
-                         'cloudsuite_in_memory_analytics',
-                         'cloudsuite_media_streaming',
-                         'cloudsuite_web_search',
-                         'cloudsuite_web_serving']
+        BENCHMARK_LIST: [
+            'cloudsuite_data_analytics',
+            'cloudsuite_data_caching',
+            'cloudsuite_graph_analytics',
+            'cloudsuite_in_memory_analytics',
+            'cloudsuite_media_streaming',
+            'cloudsuite_web_search',
+            'cloudsuite_web_serving',
+        ]
     }
 }
+
+
+class FlagMatrixNotFoundException(Exception):
+  pass
+
+
+class FlagZipNotFoundException(Exception):
+  pass
 
 
 def _GetValidBenchmarks():
@@ -197,6 +287,40 @@ def _AssertZipAxesHaveSameLength(axes):
   for axis in axes[1:]:
     if len(axis) != expected_length:
       raise ValueError('flag_zip axes must all be the same length')
+
+
+
+def _AssertFlagMatrixAndZipDefsExist(benchmark_config,
+                                     flag_matrix_name,
+                                     flag_zip_name):
+  """Asserts that specified flag_matrix and flag_zip exist.
+
+  Both flag_matrix_name and flag_zip_name can be None, meaning that the user
+  (or the benchmark_config) did not specify them.
+
+  Args:
+    benchmark_config: benchmark_config
+    flag_matrix_name: name of the flag_matrix_def specified by the user via a
+      flag, specified in the benchmark_config, or None.
+    flag_zip_name: name of the flag_zip_def specified by the user via a flag,
+      specified in the benchmark_config, or None.
+
+  Raises:
+    FlagMatrixNotFoundException if flag_matrix_name is not None, and is not
+      found in the flag_matrix_defs section of the benchmark_config.
+    FlagZipNotFoundException if flag_zip_name is not None, and is not
+      found in the flag_zip_defs section of the benchmark_config.
+  """
+  if (flag_matrix_name and
+      flag_matrix_name not in
+      benchmark_config.get('flag_matrix_defs', {})):
+    raise FlagMatrixNotFoundException('No flag_matrix with name {0}'
+                                      .format(flag_matrix_name))
+  if (flag_zip_name and
+      flag_zip_name not in
+      benchmark_config.get('flag_zip_defs', {})):
+    raise FlagZipNotFoundException('No flag_zip with name {0}'
+                                   .format(flag_zip_name))
 
 
 def GetBenchmarksFromFlags():
@@ -246,21 +370,27 @@ def GetBenchmarksFromFlags():
       raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
                        (benchmark_name, FLAGS.os_type))
 
+    flag_matrix_name = (
+        FLAGS.flag_matrix or benchmark_config.get('flag_matrix', None)
+    )
+    flag_zip_name = (
+        FLAGS.flag_zip or benchmark_config.get('flag_zip', None)
+    )
+    _AssertFlagMatrixAndZipDefsExist(benchmark_config,
+                                     flag_matrix_name,
+                                     flag_zip_name)
 
     # We need to remove the 'flag_matrix', 'flag_matrix_defs', 'flag_zip',
     # 'flag_zip_defs', and 'flag_matrix_filters' keys from the config
     # dictionary since they aren't actually part of the config spec and will
     # cause errors if they are left in.
-    flag_matrix_name = benchmark_config.pop(
-        'flag_matrix', None)
-    flag_matrix_name = FLAGS.flag_matrix or flag_matrix_name
+    benchmark_config.pop('flag_matrix', None)
+    benchmark_config.pop('flag_zip', None)
+
     flag_matrix = benchmark_config.pop(
         'flag_matrix_defs', {}).get(flag_matrix_name, {})
     flag_matrix_filter = benchmark_config.pop(
-        'flag_matrix_filters', {}).get(flag_matrix_name)
-    flag_zip_name = benchmark_config.pop(
-        'flag_zip', None)
-    flag_zip_name = FLAGS.flag_zip or flag_zip_name
+        'flag_matrix_filters', {}).get(flag_matrix_name, {})
     flag_zip = benchmark_config.pop(
         'flag_zip_defs', {}).get(flag_zip_name, {})
 

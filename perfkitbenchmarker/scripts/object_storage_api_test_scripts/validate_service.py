@@ -20,7 +20,7 @@ import cStringIO
 import logging
 import sys
 
-import gflags as flags
+from absl import flags
 
 import object_storage_api_tests
 

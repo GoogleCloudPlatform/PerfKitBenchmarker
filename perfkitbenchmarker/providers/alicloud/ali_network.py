@@ -190,12 +190,17 @@ class AliSecurityGroup(resource.BaseResource):
     """Returns true if the security group exists."""
     show_cmd = util.ALI_PREFIX + [
         'ecs',
-        'DescribeSecurityGroupAttribute',
+        'DescribeSecurityGroups',
         '--RegionId %s' % self.region,
         '--SecurityGroupId %s' % self.group_id]
     show_cmd = util.GetEncodedCmd(show_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(show_cmd)
-    return 'SecurityGroupId' in json.loads(stdout)
+    response = json.loads(stdout)
+    securityGroups = response['SecurityGroups']['SecurityGroup']
+    assert len(securityGroups) < 2, 'Too many securityGroups.'
+    if not securityGroups:
+      return False
+    return True
 
 
 
@@ -207,6 +212,28 @@ class AliFirewall(network.BaseFirewall):
   def __init__(self):
     self.firewall_set = set()
     self._lock = threading.Lock()
+
+  def AllowIcmp(self, vm):
+    """Opens the ICMP protocol on the firewall.
+
+    Args:
+      vm: The BaseVirtualMachine object to open the ICMP protocol for.
+    """
+    if vm.is_static:
+      return
+    with self._lock:
+      authorize_cmd = util.ALI_PREFIX + [
+          'ecs',
+          'AuthorizeSecurityGroup',
+          '--IpProtocol ICMP',
+          '--PortRange -1/-1',
+          '--SourceCidrIp 0.0.0.0/0',
+          '--RegionId %s' % vm.region,
+          '--SecurityGroupId %s' % vm.group_id]
+      if FLAGS.ali_use_vpc:
+        authorize_cmd.append('--NicType intranet')
+      authorize_cmd = util.GetEncodedCmd(authorize_cmd)
+      vm_util.IssueRetryableCommand(authorize_cmd)
 
   def AllowPort(self, vm, port):
     """Opens a port on the firewall.

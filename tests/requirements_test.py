@@ -52,7 +52,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     requirements_content = """
     # Comment line, blank line, and a fulfilled requirement.
 
-    python-gflags>=2.0
+    absl-py
     """
     with self._MockOpen(requirements_content) as mocked_open:
       requirements._CheckRequirements(_PATH)
@@ -70,8 +70,8 @@ class CheckRequirementsTestCase(unittest.TestCase):
 
   def testInstalledVersionLowerThanRequirement(self):
     requirements_content = """
-    # The version of the installed python-gflags will be less than 42.
-    python-gflags>=42
+    # The version of the installed absl-py will be less than 42.
+    absl-py>=42
     """
     with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
@@ -80,8 +80,8 @@ class CheckRequirementsTestCase(unittest.TestCase):
 
   def testInstalledVersionGreaterThanRequirement(self):
     requirements_content = """
-    # The version of the installed python-gflags will be greater than 0.5.
-    python-gflags==0.5
+    # The version of the installed absl-py will be greater than 0.0.1.
+    absl-py==0.0.1
     """
     with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):

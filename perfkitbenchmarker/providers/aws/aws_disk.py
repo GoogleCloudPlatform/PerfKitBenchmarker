@@ -52,17 +52,14 @@ DISK_METADATA = {
     STANDARD: {
         disk.MEDIA: disk.HDD,
         disk.REPLICATION: disk.ZONE,
-        disk.LEGACY_DISK_TYPE: disk.STANDARD
     },
     GP2: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
-        disk.LEGACY_DISK_TYPE: disk.REMOTE_SSD
     },
     IO1: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
-        disk.LEGACY_DISK_TYPE: disk.PIOPS
     },
     ST1: {
         disk.MEDIA: disk.HDD,
@@ -77,13 +74,11 @@ DISK_METADATA = {
 LOCAL_SSD_METADATA = {
     disk.MEDIA: disk.SSD,
     disk.REPLICATION: disk.NONE,
-    disk.LEGACY_DISK_TYPE: disk.LOCAL
 }
 
 LOCAL_HDD_METADATA = {
     disk.MEDIA: disk.HDD,
     disk.REPLICATION: disk.NONE,
-    disk.LEGACY_DISK_TYPE: disk.LOCAL
 }
 
 LOCAL_HDD_PREFIXES = ['d2', 'hs']
@@ -160,11 +155,13 @@ class AwsDisk(disk.BaseDisk):
     self.attached_vm_id = None
     self.machine_type = machine_type
     if self.disk_type != disk.LOCAL:
-      self.metadata = DISK_METADATA[self.disk_type]
+      self.metadata.update(DISK_METADATA[self.disk_type])
     else:
-      self.metadata = (LOCAL_HDD_METADATA
-                       if LocalDiskIsHDD(machine_type)
-                       else LOCAL_SSD_METADATA)
+      self.metadata.update((LOCAL_HDD_METADATA
+                            if LocalDiskIsHDD(machine_type)
+                            else LOCAL_SSD_METADATA))
+    if self.iops:
+      self.metadata['iops'] = self.iops
 
   def _Create(self):
     """Creates the disk."""

@@ -248,6 +248,8 @@ class BaseVirtualMachine(resource.BaseResource):
 
     self.network = None
     self.firewall = None
+    self.tcp_congestion_control = None
+    self.numa_node_count = None
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -287,6 +289,13 @@ class BaseVirtualMachine(resource.BaseResource):
               disk_num, len(self.scratch_disks)))
     return self.scratch_disks[disk_num].mount_point
 
+  def AllowIcmp(self):
+    """Opens the ICMP protocol on the firewall corresponding to the VM if
+    one exists.
+    """
+    if self.firewall:
+      self.firewall.AllowIcmp(self)
+
   def AllowPort(self, start_port, end_port=None):
     """Opens the port on the firewall corresponding to the VM if one exists."""
     if self.firewall:
@@ -316,17 +325,27 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     pass
 
-  def GetMachineTypeDict(self):
-    """Returns a dict containing properties that specify the machine type.
+  def GetResourceMetadata(self):
+    """Returns a dict containing VM metadata.
 
     Returns:
       dict mapping string property key to value.
     """
-    result = {}
+    result = self.metadata.copy()
+    result.update({
+        'image': self.image,
+        'zone': self.zone,
+        'cloud': self.CLOUD,
+    })
     if self.machine_type is not None:
       result['machine_type'] = self.machine_type
     if self.use_dedicated_host is not None:
       result['dedicated_host'] = self.use_dedicated_host
+    if self.tcp_congestion_control is not None:
+      result['tcp_congestion_control'] = self.tcp_congestion_control
+    if self.numa_node_count is not None:
+      result['numa_node_count'] = self.numa_node_count
+
     return result
 
   def SimulateMaintenanceEvent(self):
@@ -405,13 +424,30 @@ class BaseOsMixin(object):
 
   def Reboot(self):
     """Reboot the VM."""
+
+    vm_bootable_time = None
+
+    # Use self.bootable_time to determine if this is the first boot.
+    # On the first boot, WaitForBootCompletion will only run once.
+    # On subsequent boots, need to WaitForBootCompletion and ensure
+    # the last boot time changed.
+    if self.bootable_time is not None:
+      vm_bootable_time = self.VMLastBootTime()
+
     self._Reboot()
-    self.WaitForBootCompletion()
+
+    while True:
+      self.WaitForBootCompletion()
+      # WaitForBootCompletion ensures that the machine is up
+      # this is sufficient check for the first boot - but not for a reboot
+      if vm_bootable_time != self.VMLastBootTime():
+        break
+
     self._AfterReboot()
 
   @abc.abstractmethod
   def _Reboot(self):
-    """OS-specific implementation of reboot command"""
+    """OS-specific implementation of reboot command."""
     raise NotImplementedError()
 
   def _AfterReboot(self):
@@ -441,6 +477,12 @@ class BaseOsMixin(object):
 
     Implementations of this method should set the 'bootable_time' attribute
     and the 'hostname' attribute.
+    """
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def VMLastBootTime(self):
+    """Returns the UTC time the VM was last rebooted as reported by the VM.
     """
     raise NotImplementedError()
 
