@@ -19,22 +19,12 @@ with a non-default storage size is in beta right now. This can be removed when
 this feature is part of the default components.
 See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
 for more information.
-To run this benchmark for GCP it is required to install a non-default gcloud
-component. Otherwise this benchmark will fail.
-To ensure that gcloud beta is installed, type
-        'gcloud components list'
-into the terminal. This will output all components and status of each.
-Make sure that
-  name: gcloud Beta Commands
-  id:  beta
-has status: Installed.
-If not, run
-        'gcloud components install beta'
-to install it. This will allow this benchmark to properly create an instance.
 """
 
+import datetime
 import json
 import logging
+import time
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
@@ -49,52 +39,51 @@ DEFAULT_POSTGRES_VERSION = '9.6'
 DEFAULT_GCP_MYSQL_VERSION = 'MYSQL_5_7'
 DEFAULT_GCP_POSTGRES_VERSION = 'POSTGRES_9_6'
 
+DEFAULT_MYSQL_PORT = 3306
+DEFAULT_POSTGRES_PORT = 5432
+
 # PostgreSQL restrictions on memory.
 # Source: https://cloud.google.com/sql/docs/postgres/instance-settings.
 CUSTOM_MACHINE_CPU_MEM_RATIO_LOWER_BOUND = 0.9
 CUSTOM_MACHINE_CPU_MEM_RATIO_UPPER_BOUND = 6.5
 MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
+IS_READY_TIMEOUT = 600  # 10 minutes
+
 
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
-  """An object representing a GCP managed relational database.
+  """A GCP CloudSQL database resource.
 
-  Attributes:
-    created: True if the resource has been created.
-    pkb_managed: Whether the resource is managed (created and deleted) by PKB.
+  This class contains logic required to provision and teardown the database.
+  Currently, the database will be open to the world (0.0.0.0/0) which is not
+  ideal; however, a password is still required to connect. Currently only
+  MySQL 5.7 and Postgres 9.6 are supported.
   """
-
   CLOUD = providers.GCP
-  SERVICE_NAME = 'managed_relational_db'
-  # These are the constants that should be specified in GCP's cloud SQL command.
   GCP_PRICING_PLAN = 'PACKAGE'
-  MYSQL_DEFAULT_PORT = 3306
 
   def __init__(self, managed_relational_db_spec):
     super(GCPManagedRelationalDb, self).__init__(managed_relational_db_spec)
     self.spec = managed_relational_db_spec
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
+    if (self.spec.engine == managed_relational_db.POSTGRES and
+        self.spec.high_availability):
+      raise Exception(('High availability configuration is not supported on '
+                       'CloudSQL PostgreSQL'))
 
   def _Create(self):
-    """Creates the GCP Cloud SQL instance."""
+    """Creates the Cloud SQL instance and authorizes traffic from anywhere."""
     storage_size = self.spec.disk_spec.disk_size
     instance_zone = self.spec.vm_spec.zone
 
-    # TODO: Close authorized networks to VM once spec is updated so client
-    # VM is child of managed_relational_db. Then client VM ip address will be
-    # available from managed_relational_db_spec.
+    # TODO: We should create the client VM with a static IP, and
+    # only authorize that specific IP address. The client VM can be accessed
+    # like so: self.client_vm
     authorized_network = '0.0.0.0/0'
-    cloudsql_specific_database_version = self._GetDatabaseVersionNameFromFlavor(
-        self.spec.database, self.spec.database_version)
-    # Please install gcloud component beta for this to work. See note in
-    # module level docstring.
-    # This is necessary only because creating a SQL instance with a non-default
-    # storage size is in beta right now in gcloud. This can be removed when
-    # this feature is part of the default components. See
-    # https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
-    # for more information. When this flag is allowed in the default gcloud
-    # components the create_db_cmd below can be updated.
+    database_version_string = self._GetEngineVersionString(
+        self.spec.engine, self.spec.engine_version)
+
     cmd_string = [
         self,
         'beta',
@@ -110,22 +99,30 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--authorized-networks=%s' % authorized_network,
         '--enable-bin-log',
         '--gce-zone=%s' % instance_zone,
-        '--database-version=%s' % cloudsql_specific_database_version,
+        '--region=%s' % util.GetRegionFromZone(instance_zone),
+        '--database-version=%s' % database_version_string,
         '--pricing-plan=%s' % self.GCP_PRICING_PLAN,
-        '--storage-size=%d' % storage_size
+        '--storage-size=%d' % storage_size,
     ]
-    if self.spec.database == managed_relational_db.MYSQL:
+    # TODO(ferneyhough): add tier machine types support for Postgres
+    if self.spec.engine == managed_relational_db.MYSQL:
       machine_type_flag = '--tier=%s' % self.spec.vm_spec.machine_type
+      cmd_string.append(machine_type_flag)
     else:
       self._ValidateSpec()
       memory = self.spec.vm_spec.memory
       cpus = self.spec.vm_spec.cpus
       self._ValidateMachineType(memory, cpus)
-      machine_type_flag = ('--cpu={} --ram={}'.format(cpus, memory))
-    cmd_string.append(machine_type_flag)
-    if self.spec.high_availability:
-      ha_flag = '--failover-replica-name=replica-' + self.instance_id
-      cmd_string.append(ha_flag)
+      cmd_string.append('--cpu={}'.format(cpus))
+      cmd_string.append('--memory={}MiB'.format(memory))
+
+    # High availability only supported on MySQL. A check is done in
+    # __init__ to ensure that a Postgres HA configuration is not requested.
+    if (self.spec.high_availability and
+        self.spec.engine == managed_relational_db.MYSQL):
+        ha_flag = '--failover-replica-name=replica-' + self.instance_id
+        cmd_string.append(ha_flag)
+
     if self.spec.backup_enabled:
       cmd_string.append('--backup')
       cmd_string.append('--backup-start-time={}'.format(
@@ -138,11 +135,11 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     _, _, _ = cmd.Issue()
 
   def _ValidateSpec(self):
-    """Validate postgreSQL spec for CPU and memory.
+    """Validates PostgreSQL spec for CPU and memory.
 
     Raises:
       data.ResourceNotFound: On missing memory or cpus in postgres benchmark
-                              config.
+        config.
     """
     if not hasattr(self.spec.vm_spec, 'cpus'):
       raise data.ResourceNotFound(
@@ -156,14 +153,17 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           'details about size restrictions.')
 
   def _ValidateMachineType(self, memory, cpus):
-    """ validated machine configurations.
+    """Validates the custom machine type configuration.
+
+    Memory and CPU must be within the parameters described here:
+    https://cloud.google.com/sql/docs/postgres/instance-settings
 
     Args:
-      memory: (int) in MiB.
-      cpus: (int).
+      memory: (int) in MiB
+      cpus: (int)
 
     Raises:
-      ValueError.
+      ValueError on invalid configuration.
     """
     if cpus not in [1] + range(2, 32, 2):
       raise ValueError(
@@ -218,7 +218,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     except:
       return False
 
-  def _IsReady(self):
+  def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
 
     Supplying this method is optional.  Use it when a resource can exist
@@ -230,103 +230,85 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
-    stdout, _, _ = cmd.Issue()
-    try:
-      json_output = json.loads(stdout)
-      if not json_output['state'] == 'RUNNABLE':
+    start_time = datetime.datetime.now()
+
+    while True:
+      if (datetime.datetime.now() - start_time).seconds > timeout:
+        logging.exception('Timeout waiting for sql instance to be ready')
         return False
-    except:
-      logging.exception('Error attempting to read stdout. Creation failure.')
-      return False
+      stdout, _, retcode = cmd.Issue(suppress_warning=True)
+
+      try:
+        json_output = json.loads(stdout)
+        state = json_output['state']
+        logging.info('Instance state: {0}'.format(state))
+        if state == 'RUNNABLE':
+          break
+      except:
+        logging.exception('Error attempting to read stdout. Creation failure.')
+        return False
+      time.sleep(5)
     self.endpoint = self._ParseEndpoint(json_output)
-    self.port = self.MYSQL_DEFAULT_PORT
+    self.port = DEFAULT_MYSQL_PORT
     return True
 
   def _ParseEndpoint(self, describe_instance_json):
-    """Return the URI of the resource given the metadata as JSON.
+    """Returns the IP of the resource given the metadata as JSON.
 
     Args:
       describe_instance_json: JSON output.
     Returns:
-      resource URI (string)
+      public IP address (string)
     """
     try:
-      selflink = describe_instance_json['selfLink']
+      selflink = describe_instance_json['ipAddresses'][0]['ipAddress']
     except:
       selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
 
   def _PostCreate(self):
-    """Method that will be called once after _CreateReource is called.
-
-    Supplying this method is optional. If it is supplied, it will be called
-    once, after the resource is confirmed to exist. It is intended to allow
-    data about the resource to be collected or for the resource to be tagged.
-    """
-    pass
-
-  def _CreateDependencies(self):
-    """Method that will be called once before _CreateResource() is called.
-
-    Supplying this method is optional. It is intended to allow additional
-    flexibility in creating resource dependencies separately from _Create().
-    """
-    pass
-
-  def _DeleteDependencies(self):
-    """Method that will be called once after _DeleteResource() is called.
-
-    Supplying this method is optional. It is intended to allow additional
-    flexibility in deleting resource dependencies separately from _Delete().
-    """
-    pass
+    """Creates the user and set password."""
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'create', self.spec.database_username,
+        'dummy_host', '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.spec.database_password))
+    stdout, _, _ = cmd.Issue()
 
   @staticmethod
-  def GetDefaultDatabaseVersion(database):
-    """Returns the default version of a given database.
+  def GetDefaultEngineVersion(engine):
+    """Returns the default version of a given database engine.
 
     Args:
-      database (string): type of database (my_sql or postgres).
+      engine (string): type of database (my_sql or postgres).
+
     Returns:
-      (string): Default database version.
+      (string): Default version for the given database engine.
     """
-    if database == managed_relational_db.MYSQL:
+    if engine == managed_relational_db.MYSQL:
       return DEFAULT_MYSQL_VERSION
-    elif database == managed_relational_db.POSTGRES:
+    elif engine == managed_relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
 
   @staticmethod
-  def _GetDatabaseVersionNameFromFlavor(flavor, version):
-    """Returns internal name for database type.
+  def _GetEngineVersionString(engine, version):
+    """Returns CloudSQL-specific version string for givin database engine.
 
     Args:
-      flavor:
-      version:
+      engine: database engine
+      version: engine version
+
     Returns:
-      (string): Internal name for database type.
+      (string): CloudSQL-specific name for requested engine and version.
+
+    Raises:
+      NotImplementedError on invalid engine / version combination.
     """
-    if flavor == managed_relational_db.MYSQL:
+    if engine == managed_relational_db.MYSQL:
       if version == DEFAULT_MYSQL_VERSION:
         return DEFAULT_GCP_MYSQL_VERSION
-    elif flavor == managed_relational_db.POSTGRES:
+    elif engine == managed_relational_db.POSTGRES:
       if version == DEFAULT_POSTGRES_VERSION:
         return DEFAULT_GCP_POSTGRES_VERSION
     raise NotImplementedError('GCP managed databases only support MySQL 5.7 and'
                               'POSTGRES 9.6')
-
-  def GetEndpoint(self):
-    """Return the endpoint of the managed database.
-
-    Returns:
-      database endpoint (IP or dns name)
-    """
-    return self.endpoint
-
-  def GetPort(self):
-    """Return the port of the managed database.
-
-    Returns:
-      database port number
-    """
-    return self.port

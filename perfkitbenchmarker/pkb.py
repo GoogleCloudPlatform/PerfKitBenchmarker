@@ -237,6 +237,11 @@ flags.DEFINE_integer(
     'failed_run_samples_error_length', 10240,
     'If create_failed_run_samples is true, PKB will truncate any error '
     'messages at failed_run_samples_error_length.')
+flags.DEFINE_boolean(
+    'dry_run', False,
+    'If true, PKB will print the flags configurations to be run and exit. '
+    'The configurations are generated from the command line flags, the '
+    'flag_matrix, and flag_zip.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -282,7 +287,7 @@ def _ParseFlags(argv=sys.argv):
   """Parses the command-line flags."""
   try:
     argv = FLAGS(argv)
-  except flags.FlagsError as e:
+  except flags.Error as e:
     logging.error(e)
     logging.info('For usage instructions, use --helpmatch={module_name}')
     logging.info('For example, ./pkb.py --helpmatch=benchmarks.fio')
@@ -735,8 +740,14 @@ def RunBenchmarks():
     Exit status for the process.
   """
   benchmark_specs = _CreateBenchmarkSpecs()
-  collector = SampleCollector()
+  if FLAGS.dry_run:
+    print('PKB will run with the following configurations:')
+    for spec in benchmark_specs:
+      print(spec)
+      print('')
+    return 0
 
+  collector = SampleCollector()
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]

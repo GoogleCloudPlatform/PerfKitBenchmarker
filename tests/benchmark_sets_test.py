@@ -151,6 +151,9 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
     self.addCleanup(configs.GetConfigFlags.cache_clear)
 
+    self.mock_flags.flag_matrix = None
+    self.mock_flags.flag_zip = None
+
   def testStandardSet(self):
     self.assertIn(benchmark_sets.STANDARD_SET, benchmark_sets.BENCHMARK_SETS)
     standard_set = (benchmark_sets.BENCHMARK_SETS[
@@ -268,7 +271,6 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testMatrices(self):
     self.mock_flags.benchmarks = ['netperf']
-    self.mock_flags.flag_matrix = None
     with patch('perfkitbenchmarker.configs.GetUserConfig',
                return_value=yaml.load(MATRIX_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -279,16 +281,12 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testZipWithDifferentAxesLengths(self):
     self.mock_flags.benchmarks = ['netperf']
-    self.mock_flags.flag_matrix = None
-    self.mock_flags.flag_zip = None
     with patch('perfkitbenchmarker.configs.GetUserConfig',
                return_value=yaml.load(ZIP_CONFIG_DIFFERENT_AXES_LENGTH)):
       self.assertRaises(ValueError, benchmark_sets.GetBenchmarksFromFlags)
 
   def testZip(self):
     self.mock_flags.benchmarks = ['netperf']
-    self.mock_flags.flag_matrix = None
-    self.mock_flags.flag_zip = None
     with patch('perfkitbenchmarker.configs.GetUserConfig',
                return_value=yaml.load(ZIP_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -299,8 +297,6 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testZipSingleAxis(self):
     self.mock_flags.benchmarks = ['netperf']
-    self.mock_flags.flag_matrix = None
-    self.mock_flags.flag_zip = None
     with patch('perfkitbenchmarker.configs.GetUserConfig',
                return_value=yaml.load(SINGLE_ZIP_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -311,8 +307,6 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testZipAndMatrix(self):
     self.mock_flags.benchmarks = ['netperf']
-    self.mock_flags.flag_matrix = None
-    self.mock_flags.flag_zip = None
     with patch('perfkitbenchmarker.configs.GetUserConfig',
                return_value=yaml.load(ZIP_AND_MATRIX_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -323,7 +317,6 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testFilters(self):
     self.mock_flags.benchmarks = ['netperf']
-    self.mock_flags.flag_matrix = None
     with patch('perfkitbenchmarker.configs.GetUserConfig',
                return_value=yaml.load(FILTER_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -334,7 +327,6 @@ class BenchmarkSetsTestCase(unittest.TestCase):
 
   def testFlagPrecedence(self):
     self.mock_flags.benchmarks = ['netperf']
-    self.mock_flags.flag_matrix = None
     with patch('perfkitbenchmarker.configs.GetUserConfig',
                return_value=yaml.load(FLAG_PRECEDENCE_CONFIG)):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -343,3 +335,19 @@ class BenchmarkSetsTestCase(unittest.TestCase):
                      {'netperf_benchmarks': 'TCP_STREAM',
                       'netperf_test_length': 40,
                       'netperf_max_iter': 3})
+
+  def testFlagMatrixNotFound(self):
+    self.mock_flags.benchmarks = ['netperf']
+    self.mock_flags.flag_matrix = 'bad_flag_matrix_name'
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(USER_CONFIG)):
+      with self.assertRaises(benchmark_sets.FlagMatrixNotFoundException):
+        benchmark_sets.GetBenchmarksFromFlags()
+
+  def testFlagZipNotFound(self):
+    self.mock_flags.benchmarks = ['netperf']
+    self.mock_flags.flag_zip = 'bad_flag_zip_name'
+    with patch('perfkitbenchmarker.configs.GetUserConfig',
+               return_value=yaml.load(USER_CONFIG)):
+      with self.assertRaises(benchmark_sets.FlagZipNotFoundException):
+        benchmark_sets.GetBenchmarksFromFlags()

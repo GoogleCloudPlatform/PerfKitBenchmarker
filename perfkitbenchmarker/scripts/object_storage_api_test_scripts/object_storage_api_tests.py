@@ -35,7 +35,7 @@ import time
 
 import yaml
 
-import gflags as flags
+from absl import flags
 
 import azure_flags  # noqa
 import s3_flags  # noqa
@@ -1055,7 +1055,7 @@ def Main(argv=sys.argv):
 
   try:
     argv = FLAGS(argv)  # parse flags
-  except flags.FlagsError as e:
+  except flags.Error as e:
     logging.error(
         '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
