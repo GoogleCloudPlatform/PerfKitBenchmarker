@@ -54,6 +54,7 @@ def _Configure(vm):
 
 def _Install(vm):
   """Installs the blaze package on the VM."""
+  vm.Install('wget')
   vm.RemoteCommand(
       'cd {tmp_dir}; wget {tar_url}; tar xzvf {tar}'.format(
           tmp_dir=vm_util.VM_TMP_DIR,
