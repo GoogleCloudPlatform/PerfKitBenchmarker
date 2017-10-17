@@ -39,6 +39,7 @@ class BaseResource(object):
   def __init__(self, user_managed=False):
     super(BaseResource, self).__init__()
     self.created = user_managed
+    self.deleted = user_managed
     self.user_managed = user_managed
 
     # Creation and deletion time information
@@ -120,8 +121,11 @@ class BaseResource(object):
     """Reliably creates the underlying resource."""
     if self.created:
       return
-    if not self.create_start_time:
-      self.create_start_time = time.time()
+    # Overwrite create_start_time each time this is called,
+    # with the assumption that multple calls to Create() imply
+    # that the resource was not actually being created on the
+    # backend during previous failed attempts.
+    self.create_start_time = time.time()
     self._Create()
     try:
       if not self._Exists():
@@ -130,12 +134,13 @@ class BaseResource(object):
     except NotImplementedError:
       pass
     self.created = True
-    if not self.create_end_time:
-      self.create_end_time = time.time()
+    self.create_end_time = time.time()
 
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,))
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
+    if self.deleted:
+      return
     if not self.delete_start_time:
       self.delete_start_time = time.time()
     self._Delete()
@@ -145,8 +150,8 @@ class BaseResource(object):
             'Deletion of %s failed.' % type(self).__name__)
     except NotImplementedError:
       pass
-    if not self.delete_end_time:
-      self.delete_end_time = time.time()
+    self.deleted = True
+    self.delete_end_time = time.time()
 
   def Create(self):
     """Creates a resource and its dependencies."""

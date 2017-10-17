@@ -27,8 +27,6 @@ category:
   a: Single byte object upload and download, measures latency.
   b: List-after-write and list-after-update consistency measurement.
   c: Single stream large object upload and download, measures throughput.
-
-Documentation: https://goto.google.com/perfkitbenchmarker-storage
 """
 
 import json
