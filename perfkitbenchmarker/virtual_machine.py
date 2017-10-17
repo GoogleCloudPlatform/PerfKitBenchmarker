@@ -250,6 +250,7 @@ class BaseVirtualMachine(resource.BaseResource):
     self.firewall = None
     self.tcp_congestion_control = None
     self.numa_node_count = None
+    self.num_disable_cpus = None
 
   def __repr__(self):
     return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
@@ -345,6 +346,8 @@ class BaseVirtualMachine(resource.BaseResource):
       result['tcp_congestion_control'] = self.tcp_congestion_control
     if self.numa_node_count is not None:
       result['numa_node_count'] = self.numa_node_count
+    if self.num_disable_cpus is not None:
+      result['num_disable_cpus'] = self.num_disable_cpus
 
     return result
 
