@@ -20,6 +20,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
+from perfkitbenchmarker.linux_packages import tensorflow
 
 FLAGS = flags.FLAGS
 
@@ -80,6 +81,9 @@ flags.DEFINE_boolean('tf_use_nccl', True,
 flags.DEFINE_boolean('tf_distortions', True,
                      '''Enable/disable distortions during image preprocessing.
                      These include bbox and color distortions.''')
+flags.DEFINE_string('tf_benchmarks_commit_hash',
+                    'abe3c808933c85e6db1719cdb92fcbbd9eac6dec',
+                    'git commit hash of desired tensorflow benchmark commit.')
 
 
 def LocalParameterDeviceValidator(value):
@@ -139,6 +143,25 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.data_format = FLAGS.tf_data_format
   benchmark_spec.use_nccl = FLAGS.tf_use_nccl
   benchmark_spec.distortions = FLAGS.tf_distortions
+  benchmark_spec.benchmarks_commit_hash = FLAGS.tf_benchmarks_commit_hash
+
+
+def _InstallTensorFlowBenchmarks(benchmark_spec):
+  """Install and set up TensorFlow Benchmarks on the target vm.
+
+  A specific commit which works best with TensorFlow 1.3 is used,
+  but can be overrided with the flag tf_benchmarks_commit_hash.
+
+  Args:
+    benchmark_spec: The benchmark specification
+  """
+  vm = benchmark_spec.vms[0]
+  vm.RemoteCommand(
+      'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
+  vm.RemoteCommand(
+      'cd benchmarks && git checkout {}'.format(
+          benchmark_spec.benchmarks_commit_hash)
+  )
 
 
 def Prepare(benchmark_spec):
@@ -151,8 +174,8 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   master_vm = vms[0]
   master_vm.Install('tensorflow')
-  master_vm.RemoteCommand(
-      'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
+  benchmark_spec.tensorflow_version = tensorflow.GetTensorFlowVersion(master_vm)
+  _InstallTensorFlowBenchmarks(benchmark_spec)
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -179,6 +202,8 @@ def _CreateMetadataDict(benchmark_spec):
   metadata['data_format'] = benchmark_spec.data_format
   metadata['use_nccl'] = benchmark_spec.use_nccl
   metadata['distortions'] = benchmark_spec.distortions
+  metadata['benchmarks_commit_hash'] = benchmark_spec.benchmarks_commit_hash
+  metadata['tensorflow_version'] = benchmark_spec.tensorflow_version
   return metadata
 
 

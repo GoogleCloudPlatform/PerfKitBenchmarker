@@ -13,9 +13,24 @@
 # limitations under the License.
 
 
-"""Module containing TensorFlow installation and cleanup functions."""
+"""Module containing TensorFlow 1.3 installation and cleanup functions."""
 from perfkitbenchmarker import flags
 FLAGS = flags.FLAGS
+
+
+def GetTensorFlowVersion(vm):
+  """Returns the version of tensorflow installed on the vm.
+
+  Args:
+    vm: the target vm on which to check the tensorflow version
+
+  Returns:
+    installed python tensorflow version as a string
+  """
+  stdout, _ = vm.RemoteCommand(
+      'echo -e "import tensorflow\nprint(tensorflow.__version__)" | python'
+  )
+  return stdout.strip()
 
 
 def Install(vm):
@@ -24,12 +39,14 @@ def Install(vm):
   if FLAGS.tf_device == 'gpu':
     vm.Install('cuda_toolkit_8')
     vm.Install('cudnn')
-    vm.RemoteCommand('sudo pip install --upgrade tensorflow-gpu',
+    vm.RemoteCommand('sudo pip install --upgrade tensorflow-gpu==1.3',
                      should_log=True)
   elif FLAGS.tf_device == 'cpu':
-    vm.RemoteCommand('sudo pip install --upgrade tensorflow', should_log=True)
+    vm.RemoteCommand('sudo pip install --upgrade tensorflow==1.3',
+                     should_log=True)
 
 
 def Uninstall(vm):
   """Uninstalls TensorFlow on the VM."""
-  vm.RemoteCommand('sudo pip uninstall --upgrade tensorflow', should_log=True)
+  vm.RemoteCommand('sudo pip uninstall --upgrade tensorflow',
+                   should_log=True)
