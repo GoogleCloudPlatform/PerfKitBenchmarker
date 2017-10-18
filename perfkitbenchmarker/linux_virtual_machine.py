@@ -101,6 +101,11 @@ flags.DEFINE_bool('network_enable_BBR', False,
                   '"net.ipv4.tcp_congestion_control=bbr" '
                   'As with other sysctrls, will cause a reboot to happen.')
 
+flags.DEFINE_integer('num_disable_cpus', None,
+                     'Number of CPUs to disable on the virtual machine.'
+                     'If the VM has n CPUs, you can disable at most n-1.',
+                     lower_bound=1)
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -245,6 +250,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.DoSysctls()
     self.DoConfigureNetworkForBBR()
     self._RebootIfNecessary()
+    self._DisableCpus()
     self.RecordAdditionalMetadata()
     self.BurnCpu()
 
@@ -255,6 +261,36 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       path, value = pair.split('=')
       self.RemoteCommand('echo "%s" | sudo tee %s' %
                          (value, path))
+
+  def _DisableCpus(self):
+    """Apply num_disable_cpus to the VM.
+
+    This setting does not persist if the VM is rebooted.
+
+    Raises:
+      ValueError: if num_disable_cpus is outside of (0 ... num_cpus-1)
+                  inclusive
+    """
+    if not FLAGS.num_disable_cpus:
+      return
+
+    self.num_disable_cpus = FLAGS.num_disable_cpus
+
+    if (self.num_disable_cpus <= 0 or
+        self.num_disable_cpus >= self.num_cpus):
+      raise ValueError('num_disable_cpus must be between 1 and '
+                       '(num_cpus - 1) inclusive.  '
+                       'num_disable_cpus: %i, num_cpus: %i' %
+                       (self.num_disable_cpus, self.num_cpus))
+
+    # We can't disable cpu 0, but we want to disable a contiguous range
+    # of cpus for symmetry. So disable the last cpus in the range.
+    # e.g.  If num_cpus = 4 and num_disable_cpus = 2,
+    # then want cpus 0,1 active and 2,3 inactive.
+    for x in xrange(self.num_cpus - self.num_disable_cpus, self.num_cpus):
+      self.RemoteCommand('sudo bash -c '
+                         '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
+                         x)
 
   def ApplySysctlPersistent(self, key, value):
     """Apply "key=value" pair to /etc/sysctl.conf and reboot.
