@@ -21,7 +21,15 @@ import logging
 import re
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
+
+DEFAULT_MAX_CONNECTIONS = 151
+flags.DEFINE_integer(
+    'mysql_max_connections', DEFAULT_MAX_CONNECTIONS,
+    'The maximum permitted number of simultaneous client connections. '
+    'By default, this is 151.')
+FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'sysbench_oltp'
 BENCHMARK_CONFIG = """
@@ -87,11 +95,23 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('Sysbench OLTP Results:')
+  mysql_max_connections = FLAGS.mysql_max_connections
+  if mysql_max_connections < vm.num_cpus:
+    logging.info('--mysql_max_connection should be at least num_cpus %d.'
+                 ' Setting max_connection to num_cpus.',
+                 vm.num_cpus)
+    mysql_max_connections = vm.num_cpus
+  if mysql_max_connections != DEFAULT_MAX_CONNECTIONS:
+    vm.RemoteCommand(
+        'sudo mysql -u root --password=perfkitbenchmarker '
+        '-e "SET GLOBAL max_connections=%d";' % mysql_max_connections)
   sysbench_cmd = SYSBENCH_CMD + '--num-threads=%s ' % vm.num_cpus
   stdout, _ = vm.RemoteCommand(sysbench_cmd + 'run', should_log=True)
   match = re.search('\\s+transactions:.+\\(([0-9]+\\.[0-9]+)', stdout)
   value = float(match.group(1))
-  return [sample.Sample('OLTP Transaction Rate', value, 'Transactions/sec')]
+  metadata = {'mysql_max_connections': mysql_max_connections}
+  return [sample.Sample('OLTP Transaction Rate', value, 'Transactions/sec',
+                        metadata)]
 
 
 def Cleanup(benchmark_spec):

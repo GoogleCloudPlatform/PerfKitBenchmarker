@@ -101,6 +101,11 @@ flags.DEFINE_bool('network_enable_BBR', False,
                   '"net.ipv4.tcp_congestion_control=bbr" '
                   'As with other sysctrls, will cause a reboot to happen.')
 
+flags.DEFINE_integer('num_disable_cpus', None,
+                     'Number of CPUs to disable on the virtual machine.'
+                     'If the VM has n CPUs, you can disable at most n-1.',
+                     lower_bound=1)
+
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
@@ -245,6 +250,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.DoSysctls()
     self.DoConfigureNetworkForBBR()
     self._RebootIfNecessary()
+    self._DisableCpus()
+    self.RecordAdditionalMetadata()
     self.BurnCpu()
 
   def SetFiles(self):
@@ -254,6 +261,36 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       path, value = pair.split('=')
       self.RemoteCommand('echo "%s" | sudo tee %s' %
                          (value, path))
+
+  def _DisableCpus(self):
+    """Apply num_disable_cpus to the VM.
+
+    This setting does not persist if the VM is rebooted.
+
+    Raises:
+      ValueError: if num_disable_cpus is outside of (0 ... num_cpus-1)
+                  inclusive
+    """
+    if not FLAGS.num_disable_cpus:
+      return
+
+    self.num_disable_cpus = FLAGS.num_disable_cpus
+
+    if (self.num_disable_cpus <= 0 or
+        self.num_disable_cpus >= self.num_cpus):
+      raise ValueError('num_disable_cpus must be between 1 and '
+                       '(num_cpus - 1) inclusive.  '
+                       'num_disable_cpus: %i, num_cpus: %i' %
+                       (self.num_disable_cpus, self.num_cpus))
+
+    # We can't disable cpu 0, but we want to disable a contiguous range
+    # of cpus for symmetry. So disable the last cpus in the range.
+    # e.g.  If num_cpus = 4 and num_disable_cpus = 2,
+    # then want cpus 0,1 active and 2,3 inactive.
+    for x in xrange(self.num_cpus - self.num_disable_cpus, self.num_cpus):
+      self.RemoteCommand('sudo bash -c '
+                         '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
+                         x)
 
   def ApplySysctlPersistent(self, key, value):
     """Apply "key=value" pair to /etc/sysctl.conf and reboot.
@@ -314,6 +351,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     uname, _ = self.RemoteCommand('uname -r')
     return KernelVersion(uname)
 
+  def CheckLsCpu(self):
+    """Returns a LsCpuResults from the host VM."""
+    lscpu, _ = self.RemoteCommand('lscpu')
+    return LsCpuResults(lscpu)
+
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
     """Waits until VM is has booted."""
@@ -324,7 +366,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if self.hostname is None:
       self.hostname = resp[:-1]
 
+  def RecordAdditionalMetadata(self):
+    """After the VM has been prepared, store metadata about the VM."""
     self.tcp_congestion_control = self.TcpCongestionControl()
+    lscpu_results = self.CheckLsCpu()
+    self.numa_node_count = lscpu_results.numa_node_count
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
@@ -1192,6 +1238,7 @@ class KernelVersion(object):
     Args:
       uname: A string in the format of "uname -r" command
     """
+
     # example format would be: "4.5.0-96-generic"
     # major.minor.Rest
     # in this example, major = 4, minor = 5
@@ -1218,6 +1265,49 @@ class KernelVersion(object):
     if self.major > major:
       return True
     return self.minor >= minor
+
+
+class LsCpuResults(object):
+  """Holds the contents of the command lscpu."""
+
+  def __init__(self, lscpu):
+    """LsCpuResults Constructor.
+
+    Args:
+      lscpu: A string in the format of "lscpu" command
+
+    Raises:
+      ValueError: if the format of lscpu isnt what was expected for parsing
+
+    Example value of lscpu is:
+    Architecture:          x86_64
+    CPU op-mode(s):        32-bit, 64-bit
+    Byte Order:            Little Endian
+    CPU(s):                12
+    On-line CPU(s) list:   0-11
+    Thread(s) per core:    2
+    Core(s) per socket:    6
+    Socket(s):             1
+    NUMA node(s):          1
+    Vendor ID:             GenuineIntel
+    CPU family:            6
+    Model:                 79
+    Stepping:              1
+    CPU MHz:               1202.484
+    BogoMIPS:              7184.10
+    Virtualization:        VT-x
+    L1d cache:             32K
+    L1i cache:             32K
+    L2 cache:              256K
+    L3 cache:              15360K
+    NUMA node0 CPU(s):     0-11
+    """
+    match = re.search(r'NUMA\ node\(s\):\s*(\d+)$', lscpu, re.MULTILINE)
+    if match:
+      self.numa_node_count = int(match.group(1))
+    else:
+      raise ValueError('NUMA Node(s) could not be found in lscpu value:\n%s' %
+                       lscpu)
 
 
 class JujuMixin(DebianMixin):
