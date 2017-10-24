@@ -138,12 +138,15 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration_id):
   metadata = metadata.copy()
 
   # Extract stats from stdout
-  # pylint: disable=line-too-long
   # Sample output:
-  # MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 10.240.0.61 () port 20005 AF_INET : histogram
-  # Throughput,Throughput Units,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds,Stddev Latency Microseconds,Minimum Latency Microseconds,Maximum Latency Microseconds,Confidence Iterations Run,Throughput Confidence Width (%)
+  # MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to \
+  # 10.240.0.61 () port 20005 AF_INET : histogram
+  # Throughput,Throughput Units,50th Percentile Latency Microseconds,\
+  # 90th Percentile Latency Microseconds,99th Percentile Latency \
+  # Microseconds,Stddev Latency Microseconds,Minimum Latency \
+  # Microseconds,Maximum Latency Microseconds,Confidence Iterations \
+  # Run,Throughput Confidence Width (%)
   # 408.78,10^6bits/s,3,4,5793,3235.53,0,61003,1,-1.000
-  # pylint: enable=line-too-long
   try:
     fp = io.StringIO(stdout)
     # "-o" flag above specifies CSV output, but there is one extra header line:
@@ -230,15 +233,16 @@ def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams,
   local_results = []
 
   # Metadata to attach to samples
-  metadata = {'bidirectional_network_test_length':
-              FLAGS.bidirectional_network_test_length,
-              'bidirectional_stream_num_streams': num_streams,
-              'ip_type': 'internal',
-              'primary_machine_type': primary_vm.machine_type,
-              'primary_zone': primary_vm.zone,
-              'secondary_machine_type': secondary_vm.machine_type,
-              'secondary_zone': secondary_vm.zone,
-             }
+  metadata = {
+      'bidirectional_network_test_length':
+          FLAGS.bidirectional_network_test_length,
+      'bidirectional_stream_num_streams': num_streams,
+      'ip_type': 'internal',
+      'primary_machine_type': primary_vm.machine_type,
+      'primary_zone': primary_vm.zone,
+      'secondary_machine_type': secondary_vm.machine_type,
+      'secondary_zone': secondary_vm.zone,
+  }
 
   stream_start_delta = end_starting_processes - begin_starting_processes
   local_results.append(sample.Sample('%s_%s_start_delta' %
@@ -285,7 +289,7 @@ def Run(benchmark_spec):
   num_streams = FLAGS.bidirectional_stream_num_streams
   test_results = [None] * num_tests
 
-  args = [((vms[0], vms[i+1], FLAGS.bidirectional_network_tests[i],
+  args = [((vms[0], vms[i + 1], FLAGS.bidirectional_network_tests[i],
             num_streams, i, test_results), {}) for i in xrange(num_tests)]
 
   vm_util.RunThreaded(RunNetperf, args, num_tests)

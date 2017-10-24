@@ -82,7 +82,7 @@ class BidirectionalNetworkBenchmarkTestCase(unittest.TestCase):
   def testRun(self):
     mocked_flags = mock_flags.PatchTestCaseFlags(self)
     mocked_flags.bidirectional_network_tests = ['TCP_STREAM', 'TCP_MAERTS',
-                                                'TCP_MAERTS', 'TCP_MAERTS',]
+                                                'TCP_MAERTS', 'TCP_MAERTS']
     mocked_flags.bidirectional_network_test_length = 60
     mocked_flags.bidirectional_stream_num_streams = 8
 
@@ -182,9 +182,9 @@ class BidirectionalNetworkBenchmarkTestCase(unittest.TestCase):
     # summary metrics
     self._AssertSample(results, 'outbound_network_total', sum(samples0), MBPS)
     self._AssertSample(results, 'inbound_network_total',
-                       sum(samples1+samples2+samples3), MBPS)
+                       sum(samples1 + samples2 + samples3), MBPS)
     self._AssertSample(results, 'all_streams_start_delta',
-                       1508187617.100678-1508187614.93243, 'seconds')
+                       1508187617.100678 - 1508187614.93243, 'seconds')
 
     metrics_per_test = 9  # 8 throughput samples, 1 delta
     num_tests = 4
