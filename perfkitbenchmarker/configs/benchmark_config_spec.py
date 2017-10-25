@@ -73,7 +73,7 @@ class FlagsDecoder(option_decoders.TypeVerifier):
         if not merged_flag_values[key].present:
           try:
             merged_flag_values[key].parse(value)
-          except flags.IllegalFlagValue as e:
+          except flags.IllegalFlagValueError as e:
             raise errors.Config.InvalidValue(
                 'Invalid {0}.{1} value: "{2}" (of type "{3}").{4}{5}'.format(
                     self._GetOptionFullName(component_full_name), key, value,
@@ -131,11 +131,9 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
 
 class _DpbServiceSpec(spec.BaseSpec):
   """Configurable options of an Distributed Processing Backend Service.
-
     We may add more options here, such as disk specs, as necessary.
     When there are flags for these attributes, the convention is that
     the flag is prefixed with dpb.
-
     Attributes:
       service_type: string.  pkb_managed or dataflow,dataproc,emr, etc.
       static_dpb_service_instance: if user has pre created a container, the id
@@ -152,7 +150,6 @@ class _DpbServiceSpec(spec.BaseSpec):
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     """Gets decoder classes and constructor args for each configurable option.
-
         Returns:
           dict. Maps option name string to a (ConfigOptionDecoder class, dict)
            pair. The pair specifies a decoder class and its __init__() keyword
@@ -203,6 +200,85 @@ class _DpbServiceSpec(spec.BaseSpec):
           for cloud in config_values[group]['vm_spec']:
             config_values[group]['vm_spec'][cloud]['zone'] = (
                 flag_values.zones[0])
+
+
+class _CloudTpuSpec(spec.BaseSpec):
+  """Configurable options of a cloud TPU.
+  """
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_CloudTpuSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
+    if not self.tpu_name:
+      self.tpu_name = 'pkb-tpu-%s' % flag_values.run_uri
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments
+      to construct in order to decode the named option.
+    """
+    result = super(_CloudTpuSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'cloud': (option_decoders.EnumDecoder, {
+            'valid_values': providers.VALID_CLOUDS
+        }),
+        'tpu_cidr_range': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'tpu_accelerator_type': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'tpu_description': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'tpu_network': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'tpu_tf_version': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'tpu_zone': (option_decoders.StringDecoder, {
+            'default': None
+        }),
+        'tpu_name': (option_decoders.StringDecoder, {
+            'default': None
+        })
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(_CloudTpuSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present:
+      config_values['cloud'] = flag_values.cloud
+    if flag_values['tpu_cidr_range'].present:
+      config_values['tpu_cidr_range'] = flag_values.tpu_cidr_range
+    if flag_values['tpu_accelerator_type'].present:
+      config_values['tpu_accelerator_type'] = flag_values.tpu_accelerator_type
+    if flag_values['tpu_description'].present:
+      config_values['tpu_description'] = flag_values.tpu_description
+    if flag_values['tpu_network'].present:
+      config_values['tpu_network'] = flag_values.tpu_network
+    if flag_values['tpu_tf_version'].present:
+      config_values['tpu_tf_version'] = flag_values.tpu_tf_version
+    if flag_values['tpu_zone'].present:
+      config_values['tpu_zone'] = flag_values.tpu_zone
+    if flag_values['tpu_name'].present:
+      config_values['tpu_name'] = flag_values.tpu_name
 
 
 class _PerCloudConfigSpec(spec.BaseSpec):
@@ -334,17 +410,17 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
 
     # Set defaults that were not able to be set in
     # GetOptionDecoderConstructions()
-    if not self.database_version:
+    if not self.engine_version:
       managed_db_class = managed_relational_db.GetManagedRelationalDbClass(
           self.cloud)
-      self.database_version = managed_db_class.GetDefaultDatabaseVersion(
-          self.database)
+      self.engine_version = managed_db_class.GetDefaultEngineVersion(
+          self.engine)
     if not self.database_name:
       self.database_name = 'pkb-db-%s' % flag_values.run_uri
     if not self.database_username:
       self.database_username = 'pkb%s' % flag_values.run_uri
     if not self.database_password:
-      self.database_password = managed_relational_db.generateRandomDbPassword()
+      self.database_password = managed_relational_db.GenerateRandomDbPassword()
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -361,15 +437,17 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
         }),
-        'database': (option_decoders.EnumDecoder, {
+        'engine': (option_decoders.EnumDecoder, {
             'valid_values': [
-                managed_relational_db.MYSQL, managed_relational_db.POSTGRES
+                managed_relational_db.MYSQL,
+                managed_relational_db.POSTGRES,
+                managed_relational_db.AURORA_POSTGRES,
             ]
         }),
-        'database_name': (option_decoders.StringDecoder, {
+        'engine_version': (option_decoders.StringDecoder, {
             'default': None
         }),
-        'database_version': (option_decoders.StringDecoder, {
+        'database_name': (option_decoders.StringDecoder, {
             'default': None
         }),
         'database_password': (option_decoders.StringDecoder, {
@@ -403,26 +481,39 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
           provided config values.
     """
+    # TODO(ferneyhough): Add flags for vm_spec.machine_type and disk_spec.
+    # Currently the only way to modify the vm_spec or disk_spec of the
+    # managed_db is to change the benchmark spec in the benchmark source code
+    # itself.
     super(_ManagedRelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
-    if flag_values['database'].present:
-      config_values['database'] = flag_values.database
-    if flag_values['database_name'].present:
-      config_values['database_name'] = flag_values.database_name
-    if flag_values['database_version'].present:
-      config_values['database_version'] = flag_values.database_version
-    if flag_values['database_username'].present:
-      config_values['database_username'] = flag_values.database_username
-    if flag_values['database_password'].present:
-      config_values['database_password'] = flag_values.database_password
-    if flag_values['high_availability'].present:
-      config_values['high_availability'] = flag_values.high_availability
-    if flag_values['database_backup_enabled'].present:
-      config_values['backup_enabled'] = flag_values.database_backup_enabled
-    if flag_values['database_backup_start_time'].present:
+    if flag_values['managed_db_engine'].present:
+      config_values['engine'] = flag_values.managed_db_engine
+    if flag_values['managed_db_engine_version'].present:
+      config_values['engine_version'] = flag_values.managed_db_engine_version
+    if flag_values['managed_db_database_name'].present:
+      config_values['database_name'] = flag_values.managed_db_database_name
+    if flag_values['managed_db_database_username'].present:
+      config_values['database_username'] = (
+          flag_values.managed_db_database_username)
+    if flag_values['managed_db_database_password'].present:
+      config_values['database_password'] = (
+          flag_values.managed_db_database_password)
+    if flag_values['managed_db_high_availability'].present:
+      config_values['high_availability'] = (
+          flag_values.managed_db_high_availability)
+    if flag_values['managed_db_backup_enabled'].present:
+      config_values['backup_enabled'] = (
+          flag_values.managed_db_backup_enabled)
+    if flag_values['managed_db_backup_start_time'].present:
       config_values['backup_start_time'] = (
-          flag_values.database_backup_start_time)
+          flag_values.managed_db_backup_start_time)
+
+    cloud = config_values['cloud']
+    if flag_values['managed_db_zone'].present:
+      config_values['vm_spec'][cloud]['zone'] = (
+          flag_values.managed_db_zone)
 
 
 class _SparkServiceSpec(spec.BaseSpec):
@@ -753,6 +844,38 @@ class _ManagedRelationalDbDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _CloudTpuDecoder(option_decoders.TypeVerifier):
+  """Validate the cloud_tpu dictionary of a benchmark config object.
+  """
+
+  def __init__(self, **kwargs):
+    super(_CloudTpuDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify cloud_tpu dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+      component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _CloudTpu built from the config passed in in value.
+
+    Raises:
+      errors.Config.InvalidateValue upon invalid input value.
+    """
+    cloud_tpu_config = super(
+        _CloudTpuDecoder, self).Decode(value, component_full_name,
+                                       flag_values)
+    result = _CloudTpuSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **cloud_tpu_config)
+    return result
+
+
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -831,6 +954,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'default': None
         }),
         'managed_relational_db': (_ManagedRelationalDbDecoder, {
+            'default': None
+        }),
+        'cloud_tpu': (_CloudTpuDecoder, {
             'default': None
         })
     })

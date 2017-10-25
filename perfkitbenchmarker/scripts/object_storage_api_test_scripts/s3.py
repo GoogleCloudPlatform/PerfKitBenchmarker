@@ -17,7 +17,7 @@
 import logging
 import time
 
-import gflags as flags
+from absl import flags
 
 import boto_service
 

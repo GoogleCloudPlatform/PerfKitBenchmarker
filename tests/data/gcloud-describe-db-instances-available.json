@@ -6,7 +6,7 @@
   "instanceType": "CLOUD_SQL_INSTANCE",
   "ipAddresses": [
     {
-      "ipAddress": "000.000.000.35",
+      "ipAddress": "10.10.0.35",
       "type": "PRIMARY"
     }
   ],

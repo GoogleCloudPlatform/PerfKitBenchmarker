@@ -15,7 +15,6 @@
 """Set of utility functions for working with virtual machines."""
 
 import contextlib
-import functools32
 import logging
 import os
 import random
@@ -107,9 +106,6 @@ flags.DEFINE_enum('background_network_ip_type', IpAddressSubset.EXTERNAL,
                   'traffic')
 
 
-# Caching this will have the effect that even if the
-# run_uri changes, the temp dir will stay the same.
-@functools32.lru_cache()
 def GetTempDir():
   """Returns the tmp dir of the current run."""
   return temp_dir.GetRunDirPath()
@@ -257,7 +253,7 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
             raise
           else:
             if log_errors:
-              logging.error('Retrying exception running %s: %s', f.__name__, e)
+              logging.info('Retrying exception running %s: %s', f.__name__, e)
             time.sleep(sleep_time)
     return WrappedFunction
   return Wrap

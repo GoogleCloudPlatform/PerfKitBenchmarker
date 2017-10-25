@@ -18,7 +18,8 @@ import json
 import logging
 import subprocess
 import sys
-import gflags as flags
+import time
+from absl import flags
 
 FLAGS = flags.FLAGS
 
@@ -35,7 +36,7 @@ def Main(argv=sys.argv):
   # Parse command-line flags
   try:
     argv = FLAGS(argv)
-  except flags.FlagsError as e:
+  except flags.Error as e:
     logging.error('%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
 
@@ -43,9 +44,9 @@ def Main(argv=sys.argv):
   num_streams = FLAGS.num_streams
   port_start = FLAGS.port_start
 
-  assert(netperf_cmd)
-  assert(num_streams >= 1)
-  assert(port_start)
+  assert netperf_cmd
+  assert num_streams >= 1
+  assert port_start
 
   stdouts = [None] * num_streams
   stderrs = [None] * num_streams
@@ -53,18 +54,21 @@ def Main(argv=sys.argv):
   processes = [None] * num_streams
 
   # Start all of the netperf processes
+  begin_starting_processes = time.time()
   for i in range(num_streams):
     command_port = port_start + i * 2
     data_port = port_start + i * 2 + 1
     cmd = netperf_cmd.format(command_port=command_port, data_port=data_port)
     processes[i] = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, shell=True)
+  end_starting_processes = time.time()
   # Wait for all of the netperf processes to finish and save their return codes
   for i, process in enumerate(processes):
     stdouts[i], stderrs[i] = process.communicate()
     return_codes[i] = process.returncode
   # Dump the stdouts, stderrs, and return_codes to stdout in json form
-  print(json.dumps((stdouts, stderrs, return_codes)))
+  print(json.dumps((stdouts, stderrs, return_codes,
+                    begin_starting_processes, end_starting_processes)))
 
 if __name__ == '__main__':
   sys.exit(Main())

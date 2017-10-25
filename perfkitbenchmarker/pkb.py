@@ -200,6 +200,10 @@ flags.DEFINE_boolean(
     'each benchmark. This may be useful in scenarios where the PKB run time '
     'for all benchmarks is much greater than a single benchmark.')
 flags.DEFINE_integer(
+    'publish_period', None,
+    'The period in seconds to publish samples from repeated run stages. '
+    'This will only publish samples if publish_after_run is True.')
+flags.DEFINE_integer(
     'run_stage_time', 0,
     'PKB will run/re-run the run stage of each benchmark until it has spent '
     'at least this many seconds. It defaults to 0, so benchmarks will only '
@@ -237,6 +241,11 @@ flags.DEFINE_integer(
     'failed_run_samples_error_length', 10240,
     'If create_failed_run_samples is true, PKB will truncate any error '
     'messages at failed_run_samples_error_length.')
+flags.DEFINE_boolean(
+    'dry_run', False,
+    'If true, PKB will print the flags configurations to be run and exit. '
+    'The configurations are generated from the command line flags, the '
+    'flag_matrix, and flag_zip.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -282,7 +291,7 @@ def _ParseFlags(argv=sys.argv):
   """Parses the command-line flags."""
   try:
     argv = FLAGS(argv)
-  except flags.FlagsError as e:
+  except flags.Error as e:
     logging.error(e)
     logging.info('For usage instructions, use --helpmatch={module_name}')
     logging.info('For example, ./pkb.py --helpmatch=benchmarks.fio')
@@ -421,6 +430,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructDpbService()
   spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
+  spec.ConstructCloudTpu()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
@@ -463,6 +473,7 @@ def DoRunPhase(spec, collector, timer):
   deadline = time.time() + FLAGS.run_stage_time
   run_number = 0
   consecutive_failures = 0
+  last_publish_time = time.time()
   while True:
     samples = []
     logging.info('Running benchmark %s', spec.name)
@@ -489,8 +500,10 @@ def DoRunPhase(spec, collector, timer):
       for s in samples:
         s.metadata['run_number'] = run_number
     collector.AddSamples(samples, spec.name, spec)
-    if FLAGS.publish_after_run:
+    if (FLAGS.publish_after_run and FLAGS.publish_period is not None and
+        FLAGS.publish_period < (time.time() - last_publish_time)):
       collector.PublishSamples()
+      last_publish_time = time.time()
     run_number += 1
     if time.time() > deadline:
       break
@@ -590,6 +603,8 @@ def RunBenchmark(spec, collector):
           DoCleanupPhase(spec, detailed_timer)
         raise
       finally:
+        if FLAGS.publish_after_run:
+          collector.PublishSamples()
         if stages.TEARDOWN in FLAGS.run_stage:
           spec.Delete()
         events.benchmark_end.send(benchmark_spec=spec)
@@ -734,8 +749,14 @@ def RunBenchmarks():
     Exit status for the process.
   """
   benchmark_specs = _CreateBenchmarkSpecs()
-  collector = SampleCollector()
+  if FLAGS.dry_run:
+    print('PKB will run with the following configurations:')
+    for spec in benchmark_specs:
+      print(spec)
+      print('')
+    return 0
 
+  collector = SampleCollector()
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]

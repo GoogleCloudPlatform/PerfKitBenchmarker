@@ -110,7 +110,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_string('es_type', 'result', 'Elasticsearch document type')
 
-flags.DEFINE_multistring(
+flags.DEFINE_multi_string(
     'metadata',
     [],
     'A colon separated key-value pair that will be added to the labels field '
@@ -182,6 +182,16 @@ class DefaultMetadataProvider(MetadataProvider):
       cluster = benchmark_spec.container_cluster
       for k, v in cluster.GetResourceMetadata().iteritems():
         metadata['container_cluster_' + k] = v
+
+    if benchmark_spec.managed_relational_db:
+      managed_db = benchmark_spec.managed_relational_db
+      for k, v in managed_db.GetResourceMetadata().iteritems():
+        metadata['managed_relational_db_' + k] = v
+
+    if benchmark_spec.cloud_tpu:
+      cloud_tpu = benchmark_spec.cloud_tpu
+      for k, v in cloud_tpu.GetResourceMetadata().iteritems():
+        metadata['cloud_tpu_' + k] = v
 
     for name, vms in benchmark_spec.vm_groups.iteritems():
       if len(vms) == 0:
@@ -886,7 +896,7 @@ if __name__ == '__main__':
 
   try:
     argv = FLAGS(sys.argv)
-  except flags.FlagsError as e:
+  except flags.Error as e:
     logging.error(e)
     logging.info('Flag error. Usage: publisher.py <flags> path-to-json-file')
     sys.exit(1)
