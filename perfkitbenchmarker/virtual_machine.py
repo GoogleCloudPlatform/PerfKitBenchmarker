@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,6 +49,8 @@ flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
                   'via the provider\'s AddMetadata function. It expects'
                   'key:value pairs')
 
+VALID_GPU_TYPES = ['k80', 'p100']
+
 
 def GetVmSpecClass(cloud):
   """Returns the VmSpec class corresponding to 'cloud'."""
@@ -92,6 +94,8 @@ class BaseVmSpec(spec.BaseSpec):
   Attributes:
     zone: The region / zone the in which to launch the VM.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
+    gpu_count: None or int. Number of gpus to attach to the VM.
+    gpu_type: None or string. Type of gpus to attach to the VM.
     image: The disk image to boot from.
     install_packages: If false, no packages will be installed. This is
         useful if benchmark dependencies have already been installed.
@@ -140,6 +144,17 @@ class BaseVmSpec(spec.BaseSpec):
           flag_values.background_network_ip_type)
     if flag_values['dedicated_hosts'].present:
       config_values['use_dedicated_host'] = flag_values.dedicated_hosts
+    if flag_values['gpu_type'].present:
+      config_values['gpu_type'] = flag_values.gpu_type
+    if flag_values['gpu_count'].present:
+      config_values['gpu_count'] = flag_values.gpu_count
+
+    if 'gpu_count' in config_values and 'gpu_type' not in config_values:
+      raise errors.Config.MissingOption(
+          'gpu_type must be specified if gpu_count is set')
+    if 'gpu_type' in config_values and 'gpu_count' not in config_values:
+      raise errors.Config.MissingOption(
+          'gpu_count must be specified if gpu_type is set')
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -160,6 +175,10 @@ class BaseVmSpec(spec.BaseSpec):
         'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
         'machine_type': (option_decoders.StringDecoder, {'none_ok': True,
                                                          'default': None}),
+        'gpu_type': (option_decoders.EnumDecoder, {
+            'valid_values': VALID_GPU_TYPES,
+            'default': None}),
+        'gpu_count': (option_decoders.IntDecoder, {'min': 1, 'default': None}),
         'zone': (option_decoders.StringDecoder, {'none_ok': True,
                                                  'default': None}),
         'use_dedicated_host': (option_decoders.BooleanDecoder,
@@ -227,6 +246,8 @@ class BaseVirtualMachine(resource.BaseResource):
       BaseVirtualMachine._instance_counter += 1
     self.zone = vm_spec.zone
     self.machine_type = vm_spec.machine_type
+    self.gpu_count = vm_spec.gpu_count
+    self.gpu_type = vm_spec.gpu_type
     self.image = vm_spec.image
     self.install_packages = vm_spec.install_packages
     self.ip_address = None
