@@ -722,11 +722,6 @@ def SetUpPKB():
   if not FLAGS.ignore_package_requirements:
     requirements.CheckBasicRequirements()
 
-  if FLAGS.os_type == os_types.WINDOWS and not vm_util.RunningOnWindows():
-    logging.error('In order to run benchmarks on Windows VMs, you must be '
-                  'running on Windows.')
-    sys.exit(1)
-
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):
       raise errors.Setup.MissingExecutableError(

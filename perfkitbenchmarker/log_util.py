@@ -175,3 +175,4 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
   handler.setLevel(file_log_level)
   handler.setFormatter(logging.Formatter(file_format))
   logger.addHandler(handler)
+  logging.getLogger('requests').setLevel(logging.ERROR)
