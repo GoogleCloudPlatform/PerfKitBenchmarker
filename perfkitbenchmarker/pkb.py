@@ -129,6 +129,15 @@ flags.DEFINE_list(
 flags.DEFINE_string('machine_type', None, 'Machine '
                     'types that will be created for benchmarks that don\'t '
                     'require a particular type.')
+flags.DEFINE_integer(
+    'gpu_count', None,
+    'Number of gpus to attach to the VM. Requires gpu_type to be '
+    'specified.')
+flags.DEFINE_enum(
+    'gpu_type', None,
+    ['k80', 'p100'],
+    'Type of gpus to attach to the VM. Requires gpu_count to be '
+    'specified.')
 flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
                      'variable number of machines, the number of VMs to use.')
 flags.DEFINE_string('image', None, 'Default image that will be '

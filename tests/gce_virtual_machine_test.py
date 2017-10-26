@@ -217,51 +217,6 @@ class GceVmSpecTestCase(unittest.TestCase):
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
 
-  def testMissingGpuCount(self):
-    flags = mock_flags.MockFlags()
-    with self.assertRaises(errors.Config.MissingOption) as cm:
-      gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', flags,
-          machine_type='test_machine_type', gpu_type='k80')
-
-    self.assertEqual(str(cm.exception), (
-        'gpu_count must be specified if gpu_type is set'))
-
-  def testMissingGpuType(self):
-    flags = mock_flags.MockFlags()
-    with self.assertRaises(errors.Config.MissingOption) as cm:
-      gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', flags,
-          machine_type='test_machine_type', gpu_count=1)
-
-    self.assertEqual(str(cm.exception), (
-        'gpu_type must be specified if gpu_count is set'))
-
-  def testInvalidGpuType(self):
-    flags = mock_flags.MockFlags()
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', flags,
-          machine_type='test_machine_type', gpu_count=1, gpu_type='bad_type')
-
-    self.assertIn((
-        'Invalid test_vm_spec.GCP.gpu_type value: "bad_type". '
-        'Value must be one of the following:'), str(cm.exception))
-
-    self.assertIn('k80', str(cm.exception))
-    self.assertIn('p100', str(cm.exception))
-
-  def testInvalidGpuCount(self):
-    flags = mock_flags.MockFlags()
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      gce_virtual_machine.GceVmSpec(
-          'test_vm_spec.GCP', flags,
-          machine_type='test_machine_type', gpu_count=0, gpu_type='k80')
-
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_vm_spec.GCP.gpu_count value: "0". '
-        'Value must be at least 1.'))
-
 
 class GceVirtualMachineTestCase(unittest.TestCase):
 

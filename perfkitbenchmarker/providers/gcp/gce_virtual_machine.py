@@ -181,8 +181,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     memory: None or string. For custom VMs, a string representation of the size
         of memory, expressed in MiB or GiB. Must be an integer number of MiB
         (e.g. "1280MiB", "7.5GiB").
-    gpu_count: None or int. Number of gpus to attach to the VM.
-    gpu_type: None or string. Type of gpus to attach to the VM.
     num_local_ssds: int. The number of local SSDs to attach to the instance.
     preemptible: boolean. True if the VM should be preemptible, False otherwise.
     project: string or None. The project to create the VM in.
@@ -237,17 +235,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['num_vms_per_host'] = flag_values.gcp_num_vms_per_host
     if flag_values['gcp_min_cpu_platform'].present:
       config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
-    if flag_values['gcp_gpu_type'].present:
-      config_values['gpu_type'] = flag_values.gcp_gpu_type
-    if flag_values['gcp_gpu_count'].present:
-      config_values['gpu_count'] = flag_values.gcp_gpu_count
-
-    if 'gpu_count' in config_values and 'gpu_type' not in config_values:
-        raise errors.Config.MissingOption(
-            'gpu_type must be specified if gpu_count is set')
-    if 'gpu_type' in config_values and 'gpu_count' not in config_values:
-        raise errors.Config.MissingOption(
-            'gpu_count must be specified if gpu_type is set')
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -272,10 +259,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
                       {'default': 'n1-host-64-416'}),
         'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
         'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
-        'gpu_type': (option_decoders.EnumDecoder, {
-            'valid_values': GPU_TYPE_TO_INTERAL_NAME_MAP.keys(),
-            'default': None}),
-        'gpu_count': (option_decoders.IntDecoder, {'min': 1, 'default': None})
     })
     return result
 
@@ -349,8 +332,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.boot_metadata = {}
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
-    self.gpu_count = vm_spec.gpu_count
-    self.gpu_type = vm_spec.gpu_type
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
