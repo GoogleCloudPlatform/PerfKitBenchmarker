@@ -434,6 +434,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     mnt_cmd = ('sudo mkdir -p {1};sudo mount -o discard {0} {1};'
                'sudo chown -R $USER:$USER {1};').format(device_path, mount_path)
     self.RemoteHostCommand(mnt_cmd)
+    # add to /etc/fstab to mount on reboot
+    mnt_cmd = ('echo "{0} {1} ext4 defaults" '
+               '| sudo tee -a /etc/fstab').format(device_path, mount_path)
+    self.RemoteHostCommand(mnt_cmd)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     self.RemoteHostCopy(file_path, remote_path, copy_to)
