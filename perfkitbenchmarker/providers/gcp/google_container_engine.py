@@ -70,3 +70,6 @@ class GkeCluster(container_service.KubernetesCluster):
         self, 'container', 'clusters', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return retcode == 0
+
+
+
