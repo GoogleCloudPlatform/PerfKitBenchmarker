@@ -16,6 +16,7 @@
 import contextlib
 import copy
 import copy_reg
+import importlib
 import logging
 import os
 import pickle
@@ -29,6 +30,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
@@ -116,7 +118,7 @@ class BenchmarkSpec(object):
     self.container_cluster = None
     self.managed_relational_db = None
     self.cloud_tpu = None
-
+    self.edw_service = None
     self._zone_index = 0
 
     # Modules can't be pickled, but functions can, so we store the functions
@@ -182,6 +184,23 @@ class BenchmarkSpec(object):
     providers.LoadProvider(cloud)
     cloud_tpu_class = cloud_tpu.GetCloudTpuClass(cloud)
     self.cloud_tpu = cloud_tpu_class(self.config.cloud_tpu)
+
+  def ConstructEdwService(self):
+    """Create the edw_service object."""
+    if self.config.edw_service is None:
+      return
+    # Load necessary modules from the provider to account for dependencies
+    providers.LoadProvider(
+        edw_service.TYPE_2_PROVIDER.get(self.config.edw_service.type))
+    # Load the module for the edw service based on type
+    edw_service_module = importlib.import_module(edw_service.TYPE_2_MODULE.get(
+        self.config.edw_service.type))
+    edw_service_class = getattr(edw_service_module,
+                                self.config.edw_service.type[0].upper() +
+                                self.config.edw_service.type[1:])
+    # Check if a new instance needs to be created or restored from snapshot
+    self.edw_service = edw_service_class(self.config.edw_service)
+
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
@@ -370,6 +389,8 @@ class BenchmarkSpec(object):
       self.managed_relational_db.Create()
     if self.cloud_tpu:
       self.cloud_tpu.Create()
+    if self.edw_service:
+      self.edw_service.Create()
 
   def Delete(self):
     if self.deleted:
@@ -383,6 +404,8 @@ class BenchmarkSpec(object):
       self.managed_relational_db.Delete()
     if self.cloud_tpu:
       self.cloud_tpu.Delete()
+    if self.edw_service:
+      self.edw_service.Delete()
 
     if self.vms:
       try:
