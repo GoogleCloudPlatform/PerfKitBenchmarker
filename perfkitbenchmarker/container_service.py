@@ -23,14 +23,18 @@ expanded to support first-class container benchmarks.
 
 import abc
 
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 _CLUSTER_REGISTRY = {}
 
 flags.DEFINE_string('kubeconfig', None,
-                    'Path to kubeconfig to be used by kubectl')
+                    'Path to kubeconfig to be used by kubectl. '
+                    'If unspecified, it will be set to a file in this run\'s '
+                    'temporary directory.')
 
 flags.DEFINE_string('kubectl', 'kubectl',
                     'Path to kubectl tool')
@@ -39,6 +43,16 @@ flags.DEFINE_string('container_cluster_cloud', None,
                     'Sets the cloud to use for the container cluster. '
                     'This will override both the value set in the config and '
                     'the value set using the generic "cloud" flag.')
+
+
+@events.benchmark_start.connect
+def _SetKubeConfig(unused_sender, benchmark_spec):
+  """Sets the value for the kubeconfig flag if it's unspecified."""
+  if not FLAGS.kubeconfig:
+    FLAGS.kubeconfig = vm_util.PrependTempDir(
+        'kubeconfig' + str(benchmark_spec.sequence_number))
+    # Store the value for subsequent run stages.
+    benchmark_spec.config.flags['kubeconfig'] = FLAGS.kubeconfig
 
 
 def GetContainerClusterClass(cloud):
