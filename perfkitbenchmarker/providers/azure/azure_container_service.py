@@ -70,8 +70,6 @@ class AcsKubernetesCluster(container_service.KubernetesCluster):
 
   def _PostCreate(self):
     """Get cluster info."""
-    if not FLAGS.kubeconfig:
-      FLAGS.kubeconfig = vm_util.PrependTempDir('kubeconfig')
     vm_util.IssueRetryableCommand([
         azure.AZURE_PATH, 'acs', 'kubernetes', 'get-credentials',
         '--name', self.name, '--file', FLAGS.kubeconfig,
