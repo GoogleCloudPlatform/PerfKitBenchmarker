@@ -346,7 +346,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       resp, _ = self.RemoteCommand(
           'cat /proc/sys/net/ipv4/tcp_congestion_control')
       return resp.rstrip('\n')
-    except errors.VirtualMachine.RemoteCommandError as e:
+    except errors.VirtualMachine.RemoteCommandError:
       return 'unknown'
 
   def CheckKernelVersion(self):

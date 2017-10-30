@@ -19,7 +19,6 @@ import os
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -68,6 +67,3 @@ class GkeCluster(container_service.KubernetesCluster):
         self, 'container', 'clusters', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return retcode == 0
-
-
-
