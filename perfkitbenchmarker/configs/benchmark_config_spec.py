@@ -339,29 +339,29 @@ class _EdwServiceSpec(spec.BaseSpec):
       construct in order to decode the named option.
     """
     result = super(_EdwServiceSpec, cls)._GetOptionDecoderConstructions()
-    result.update({'type':
-                     (option_decoders.StringDecoder, {'default': 'redshift',
-                                                      'none_ok': False}),
-                   'cluster_identifier':
-                     (option_decoders.StringDecoder, {'default': None,
-                                                      'none_ok': True}),
-                   'username':
-                     (option_decoders.StringDecoder, {'default': None,
-                                                      'none_ok': True}),
-                   'password':
-                     (option_decoders.StringDecoder, {'default': None,
-                                                      'none_ok': True}),
-                   'node_type':
-                     (option_decoders.StringDecoder, {'default': None,
-                                                      'none_ok': True}),
-                   'node_count':
-                     (option_decoders.IntDecoder, {
-                         'default': edw_service.DEFAULT_NUMBER_OF_NODES,
-                         'min': edw_service.DEFAULT_NUMBER_OF_NODES}),
-                   'snapshot':
-                     (option_decoders.StringDecoder, {'default': None,
-                                                      'none_ok': True})
-                   })
+    result.update({
+        'type': (option_decoders.StringDecoder, {
+            'default': 'redshift',
+            'none_ok': False}),
+        'cluster_identifier': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'username': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'password': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'node_type': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'node_count': (option_decoders.IntDecoder, {
+            'default': edw_service.DEFAULT_NUMBER_OF_NODES,
+            'min': edw_service.DEFAULT_NUMBER_OF_NODES}),
+        'snapshot': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True})
+    })
     return result
 
   @classmethod
