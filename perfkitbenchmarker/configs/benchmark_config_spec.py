@@ -19,10 +19,12 @@ configuration files.
 
 import contextlib
 import copy
+import logging
 import os
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
@@ -279,6 +281,111 @@ class _CloudTpuSpec(spec.BaseSpec):
       config_values['tpu_zone'] = flag_values.tpu_zone
     if flag_values['tpu_name'].present:
       config_values['tpu_name'] = flag_values.tpu_name
+
+
+class _EdwServiceDecoder(option_decoders.TypeVerifier):
+  """Validates the edw service dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super(_EdwServiceDecoder, self).__init__(
+        valid_types=(dict,), **kwargs)
+    logging.info('Initializing the edw service decoder')
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies edw service dictionary of a benchmark config object
+
+    Args:
+      value: dict edw service config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+      component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated
+      to BaseSpec constructors.
+    Returns:
+      _EdwServiceSpec Built from the config passed in in value.
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    edw_service_config = super(_EdwServiceDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    result = _EdwServiceSpec(self._GetOptionFullName(
+        component_full_name), flag_values, **edw_service_config)
+    return result
+
+
+class _EdwServiceSpec(spec.BaseSpec):
+  """Configurable options of an EDW service.
+
+    When there are flags for these attributes, the convention is that
+    the flag is prefixed with edw_service.
+
+  Attributes:
+    cluster_name  : string. If set, the name of the cluster
+    type: string. The type of EDW service (redshift)
+    node_type: string, type of node comprising the cluster
+    node_count: integer, number of nodes in the cluster
+  """
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_EdwServiceSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments to
+      construct in order to decode the named option.
+    """
+    result = super(_EdwServiceSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'type': (option_decoders.StringDecoder, {
+            'default': 'redshift',
+            'none_ok': False}),
+        'cluster_identifier': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'username': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'password': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'node_type': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'node_count': (option_decoders.IntDecoder, {
+            'default': edw_service.DEFAULT_NUMBER_OF_NODES,
+            'min': edw_service.DEFAULT_NUMBER_OF_NODES}),
+        'snapshot': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True})
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+        Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May be
+       modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+      provided config values.
+    """
+    super(_EdwServiceSpec, cls)._ApplyFlags(config_values, flag_values)
+
+    # Restoring from a snapshot, so defer to the user supplied cluster details
+    if flag_values['edw_service_cluster_snapshot'].present:
+      config_values['snapshot'] = flag_values[
+          'edw_service_cluster_snapshot']._value
+      config_values['username'] = flag_values[
+          'edw_service_cluster_user']._value
+      config_values['password'] = flag_values[
+          'edw_service_cluster_password']._value
 
 
 class _PerCloudConfigSpec(spec.BaseSpec):
@@ -957,6 +1064,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'default': None
         }),
         'cloud_tpu': (_CloudTpuDecoder, {
+            'default': None
+        }),
+        'edw_service': (_EdwServiceDecoder, {
             'default': None
         })
     })

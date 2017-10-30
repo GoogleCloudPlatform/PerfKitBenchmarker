@@ -305,7 +305,7 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
     vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'vm', 'extension', 'set',
          '--vm-name', self.name,
-         'CustomScriptExtension',
-         'Microsoft.Compute',
-         '1.4',
-         '--public-config=%s' % config] + self.resource_group.args)
+         '--name', 'CustomScriptExtension',
+         '--publisher', 'Microsoft.Compute',
+         '--version', '1.4',
+         '--protected-settings=%s' % config] + self.resource_group.args)

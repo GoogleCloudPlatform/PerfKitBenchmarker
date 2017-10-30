@@ -58,8 +58,6 @@ class AwsKopsCluster(container_service.KubernetesCluster):
         '--node-size=%s' % self.machine_type,
         '--yes'
     ]
-    if not FLAGS.kubeconfig:
-      FLAGS.kubeconfig = vm_util.PrependTempDir('kubeconfig')
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     vm_util.IssueCommand(create_cmd, env=env)

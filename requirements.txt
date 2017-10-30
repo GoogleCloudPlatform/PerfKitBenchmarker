@@ -22,3 +22,4 @@ pint>=0.7
 numpy
 functools32
 contextlib2>=0.5.1
+pywinrm

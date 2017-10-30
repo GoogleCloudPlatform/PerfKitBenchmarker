@@ -342,8 +342,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def TcpCongestionControl(self):
     """Return the congestion control used for tcp."""
-    # TODO(b/68257366): This was failing on default docker image used by
-    # kubernetes_virtual_machine, hence the addition of the try block.
     try:
       resp, _ = self.RemoteCommand(
           'cat /proc/sys/net/ipv4/tcp_congestion_control')
@@ -435,6 +433,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Mounts a formatted disk in the VM."""
     mnt_cmd = ('sudo mkdir -p {1};sudo mount -o discard {0} {1};'
                'sudo chown -R $USER:$USER {1};').format(device_path, mount_path)
+    self.RemoteHostCommand(mnt_cmd)
+    # add to /etc/fstab to mount on reboot
+    mnt_cmd = ('echo "{0} {1} ext4 defaults" '
+               '| sudo tee -a /etc/fstab').format(device_path, mount_path)
     self.RemoteHostCommand(mnt_cmd)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):

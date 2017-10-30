@@ -19,7 +19,6 @@ import os
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -52,8 +51,6 @@ class GkeCluster(container_service.KubernetesCluster):
     """Acquire cluster authentication."""
     cmd = util.GcloudCommand(
         self, 'container', 'clusters', 'get-credentials', self.name)
-    if not FLAGS.kubeconfig:
-      FLAGS.kubeconfig = vm_util.PrependTempDir('kubeconfig')
     env = self._GetRequiredGkeEnv()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)

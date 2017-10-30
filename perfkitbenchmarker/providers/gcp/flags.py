@@ -80,12 +80,3 @@ flags.DEFINE_enum(
     ['sandybridge', 'ivybridge', 'haswell', 'broadwell', 'skylake'],
     'When specified, the VM will have either the specified '
     'architecture or a newer one. Architecture availability is zone dependent.')
-flags.DEFINE_integer(
-    'gcp_gpu_count', None,
-    'Number of gpus to attach to the VM. Requires gce_gpu_type to be '
-    'specified.')
-flags.DEFINE_enum(
-    'gcp_gpu_type', None,
-    ['k80', 'p100'],
-    'Type of gpus to attach to the VM. Requires gce_gpu_count to be '
-    'specified.')
