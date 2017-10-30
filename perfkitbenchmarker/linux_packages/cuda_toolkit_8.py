@@ -31,13 +31,21 @@ from perfkitbenchmarker import vm_util
 
 NVIDIA_TESLA_K80 = 'k80'
 NVIDIA_TESLA_P100 = 'p100'
+NVIDIA_TESLA_V100 = 'v100'
 GPU_DEFAULTS = {
     NVIDIA_TESLA_K80: {
         'base_clock': [2505, 562],
+        'max_clock': [2505, 875],
         'autoboost_enabled': True,
     },
     NVIDIA_TESLA_P100: {
         'base_clock': [715, 1189],
+        'max_clock': [715, 1328],
+        'autoboost_enabled': None,
+    },
+    NVIDIA_TESLA_V100: {
+        'base_clock': [877, 1312],
+        'max_clock': [877, 1530],
         'autoboost_enabled': None,
     },
 }
@@ -119,10 +127,12 @@ def GetGpuType(vm):
     raise HeterogeneousGpuTypesException(
         'PKB only supports one type of gpu per VM')
 
-  if 'P100' in gpu_types[0]:
-    return NVIDIA_TESLA_P100
   if 'K80' in gpu_types[0]:
     return NVIDIA_TESLA_K80
+  if 'P100' in gpu_types[0]:
+    return NVIDIA_TESLA_P100
+  if 'V100' in gpu_types[0]:
+    return NVIDIA_TESLA_V100
   raise UnsupportedClockSpeedException(
       'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
 
