@@ -270,10 +270,10 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
                                           linux_virtual_machine.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
-  def RemoteHostCommand(self, command,
-                        should_log=False, retries=None,
-                        ignore_failure=False, login_shell=False,
-                        suppress_warning=False, timeout=None):
+  def RemoteHostCommandWithReturnCode(self, command,
+                                      should_log=False, retries=None,
+                                      ignore_failure=False, login_shell=False,
+                                      suppress_warning=False, timeout=None):
     """Runs a command in the Kubernetes container."""
     cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'exec', '-i',
            self.name, '--', '/bin/bash', '-c', command]
@@ -285,7 +285,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
                     'Full command: %s\nSTDOUT: %sSTDERR: %s' %
                     (retcode, command, ' '.join(cmd), stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
-    return stdout, stderr
+    return stdout, stderr, retcode
 
   def MoveHostFile(self, target, source_path, remote_path=''):
     """Copies a file from one VM to a target VM.
