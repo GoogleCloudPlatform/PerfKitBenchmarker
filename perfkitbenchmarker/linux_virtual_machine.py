@@ -342,9 +342,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def TcpCongestionControl(self):
     """Return the congestion control used for tcp."""
-    resp, _ = self.RemoteCommand(
-        'cat /proc/sys/net/ipv4/tcp_congestion_control')
-    return resp.rstrip('\n')
+    # TODO(b/68257366): This was failing on default docker image used by
+    # kubernetes_virtual_machine, hence the addition of the try block.
+    try:
+      resp, _ = self.RemoteCommand(
+          'cat /proc/sys/net/ipv4/tcp_congestion_control')
+      return resp.rstrip('\n')
+    except errors.VirtualMachine.RemoteCommandError:
+      return 'unknown'
 
   def CheckKernelVersion(self):
     """Return a KernelVersion from the host VM."""
@@ -1240,9 +1245,10 @@ class KernelVersion(object):
     """
 
     # example format would be: "4.5.0-96-generic"
+    # or "3.10.0-514.26.2.el7.x86_64" for centos
     # major.minor.Rest
     # in this example, major = 4, minor = 5
-    major_string, minor_string, _ = uname.split('.')
+    major_string, minor_string, _ = uname.split('.', 2)
     self.major = int(major_string)
     self.minor = int(minor_string)
 
