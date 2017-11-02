@@ -42,7 +42,6 @@ cloud_spanner_ycsb:
       https://www.googleapis.com/auth/spanner.data"""
 BENCHMARK_INSTANCE_PREFIX = 'ycsb-'
 BENCHMARK_DESCRIPTION = 'YCSB'
-BENCHMARK_DATABASE = 'ycsb'
 BENCHMARK_TABLE = 'usertable'
 BENCHMARK_ZERO_PADDING = 12
 BENCHMARK_SCHEMA = """
@@ -90,6 +89,21 @@ flags.DEFINE_enum('cloud_spanner_ycsb_readmode',
 flags.DEFINE_list('cloud_spanner_ycsb_custom_vm_install_commands', [],
                   'A list of strings. If specified, execute them on every '
                   'VM during the installation phase.')
+# Separate spanner instance from benchmark resources lifecycle management.
+# Note:
+# (1) Only when specifying the two parameters will instance or database be
+# reused. When only specifying run_uri, the instance and database will be
+# recreated still.
+# (2) On specifying instance and database, user need to take care of deleting
+# any instance or database after use.
+flags.DEFINE_string('cloud_spanner_instance',
+                    None,
+                    'If provided, reuse the given instance. Create instance if'
+                    'the instance doesn\'t exist')
+flags.DEFINE_string('cloud_spanner_database',
+                    'ycsb',
+                    'If provided, reuse the given database. Create database if'
+                    'the database doesn\'t exist.')
 
 
 def GetConfig(user_config):
@@ -105,8 +119,16 @@ def CheckPrerequisites(benchmark_config):
       raise ValueError('Scope {0} required.'.format(scope))
 
 
+def _GetInstanceName():
+  if FLAGS.cloud_spanner_instance:
+    return FLAGS.cloud_spanner_instance
+  else:
+    return BENCHMARK_INSTANCE_PREFIX + FLAGS.run_uri
+
+
 def Prepare(benchmark_spec):
-  """Prepare the virtual machines to run cloud spanner benchmarks.
+  """Prepare the virtual machines and Cloud Spanner instance and database to
+  run cloud spanner benchmarks.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -115,16 +137,23 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
 
   benchmark_spec.spanner_instance = gcp_spanner.GcpSpannerInstance(
-      name=BENCHMARK_INSTANCE_PREFIX + FLAGS.run_uri,
+      name=_GetInstanceName(),
       description=BENCHMARK_DESCRIPTION,
-      database=BENCHMARK_DATABASE,
+      database=FLAGS.cloud_spanner_database,
       ddl=BENCHMARK_SCHEMA)
-  if benchmark_spec.spanner_instance._Exists(instance_only=True):
+  instance_exist=benchmark_spec.spanner_instance._Exists(instance_only=True)
+  if (not FLAGS.cloud_spanner_instance
+      and instance_exist):
     logging.warning('Cloud Spanner instance %s exists, delete it first.' %
-                    FLAGS.cloud_spanner_ycsb_instance)
+                    _GetInstanceName())
     benchmark_spec.spanner_instance.Delete()
-  benchmark_spec.spanner_instance.Create()
-  if not benchmark_spec.spanner_instance._Exists():
+  database_exist=benchmark_spec.spanner_instance._Exists()
+  create_instance=not instance_exist or not FLAGS.cloud_spanner_instance
+  benchmark_spec.spanner_instance._Create(create_instance=create_instance,
+                                         create_database=create_instance or
+                                         not database_exist)
+  if (not FLAGS.cloud_spanner_instance
+      and not benchmark_spec.spanner_instance._Exists()):
     logging.warning('Failed to create Cloud Spanner instance and database.')
     benchmark_spec.spanner_instance.Delete()
 
@@ -163,8 +192,8 @@ def Run(benchmark_spec):
   run_kwargs = {
       'table': BENCHMARK_TABLE,
       'zeropadding': BENCHMARK_ZERO_PADDING,
-      'cloudspanner.instance': BENCHMARK_INSTANCE_PREFIX + FLAGS.run_uri,
-      'cloudspanner.database': BENCHMARK_DATABASE,
+      'cloudspanner.instance': _GetInstanceName(),
+      'cloudspanner.database': FLAGS.cloud_spanner_database,
       'cloudspanner.readmode': FLAGS.cloud_spanner_ycsb_readmode,
       'cloudspanner.boundedstaleness':
           FLAGS.cloud_spanner_ycsb_boundedstaleness,
@@ -187,7 +216,8 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  benchmark_spec.spanner_instance.Delete()
+  if not FLAGS.cloud_spanner_instance:
+    benchmark_spec.spanner_instance.Delete()
 
 
 def _Install(vm):

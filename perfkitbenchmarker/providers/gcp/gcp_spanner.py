@@ -72,34 +72,36 @@ class GcpSpannerInstance(resource.BaseResource):
     self.project = FLAGS.cloud_spanner_project or util.GetDefaultProject()
     self.zone = None
 
-  def _Create(self):
+  def _Create(self, create_instance=True, create_database=True):
     """Creates the instance, the database, and update the schema."""
-    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create', self._name)
-    cmd.flags['description'] = self._description
-    cmd.flags['nodes'] = self._nodes
-    cmd.flags['config'] = self._config
-    _, _, retcode = cmd.Issue()
-    if retcode != 0:
-      logging.error('Create GCP Spanner instance failed.')
-      return
+    if create_instance:
+      cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create', self._name)
+      cmd.flags['description'] = self._description
+      cmd.flags['nodes'] = self._nodes
+      cmd.flags['config'] = self._config
+      _, _, retcode = cmd.Issue()
+      if retcode != 0:
+        logging.error('Create GCP Spanner instance failed.')
+        return
 
-    cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
-                             self._database)
-    cmd.flags['instance'] = self._name
-    _, _, retcode = cmd.Issue()
-    if retcode != 0:
-      logging.error('Create GCP Spanner database failed.')
-      return
+    if create_database:
+      cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
+                               self._database)
+      cmd.flags['instance'] = self._name
+      _, _, retcode = cmd.Issue()
+      if retcode != 0:
+        logging.error('Create GCP Spanner database failed.')
+        return
 
-    cmd = util.GcloudCommand(self, 'spanner', 'databases', 'ddl', 'update',
-                             self._database)
-    cmd.flags['instance'] = self._name
-    cmd.flags['ddl'] = self._ddl
-    _, _, retcode = cmd.Issue()
-    if retcode != 0:
-      logging.error('Update GCP Spanner database schema failed.')
-    else:
-      logging.info('Created GCP Spanner instance and database.')
+      cmd = util.GcloudCommand(self, 'spanner', 'databases', 'ddl', 'update',
+                               self._database)
+      cmd.flags['instance'] = self._name
+      cmd.flags['ddl'] = self._ddl
+      _, _, retcode = cmd.Issue()
+      if retcode != 0:
+        logging.error('Update GCP Spanner database schema failed.')
+      else:
+        logging.info('Created GCP Spanner instance and database.')
 
   def _Delete(self):
     """Deletes the instance."""
