@@ -57,6 +57,8 @@ RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
+STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
+                    'potential stockout scenario.')
 GPU_TYPE_K80 = 'k80'
 GPU_TYPE_P100 = 'p100'
 GPU_TYPE_TO_INTERAL_NAME_MAP = {
@@ -464,6 +466,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           host.Create()
         self.host = self.host_list[-1]
       raise errors.Resource.RetryableCreationError()
+    if (not self.use_dedicated_host and retcode and
+        _INSUFFICIENT_HOST_CAPACITY in stderr):
+      logging.error(STOCKOUT_MESSAGE)
+      raise errors.Resource.CreationError(STOCKOUT_MESSAGE)
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
