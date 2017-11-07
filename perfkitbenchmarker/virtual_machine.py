@@ -28,6 +28,7 @@ from perfkitbenchmarker import background_workload
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -48,7 +49,6 @@ flags.DEFINE_boolean(
 flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
                   'via the provider\'s AddMetadata function. It expects'
                   'key:value pairs')
-
 VALID_GPU_TYPES = ['k80', 'p100']
 
 
@@ -397,7 +397,8 @@ class BaseOsMixin(object):
   def __init__(self):
     super(BaseOsMixin, self).__init__()
     self._installed_packages = set()
-
+    self.startup_script_output = None
+    self.postrun_script_output = None
     self.bootable_time = None
     self.hostname = None
 
@@ -515,7 +516,7 @@ class BaseOsMixin(object):
 
     This will be called once immediately after the VM has booted.
     """
-    pass
+    events.on_vm_startup.send(vm=self)
 
   def PrepareVMEnvironment(self):
     """Performs any necessary setup on the VM specific to the OS.

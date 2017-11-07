@@ -822,10 +822,10 @@ class RhelMixin(BaseLinuxMixin):
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
+    super(RhelMixin, self).OnStartup()
     self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
                            'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                            login_shell=True)
-
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
