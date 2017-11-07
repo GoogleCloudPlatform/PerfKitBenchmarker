@@ -129,6 +129,15 @@ flags.DEFINE_list(
 flags.DEFINE_string('machine_type', None, 'Machine '
                     'types that will be created for benchmarks that don\'t '
                     'require a particular type.')
+flags.DEFINE_integer(
+    'gpu_count', None,
+    'Number of gpus to attach to the VM. Requires gpu_type to be '
+    'specified.')
+flags.DEFINE_enum(
+    'gpu_type', None,
+    ['k80', 'p100'],
+    'Type of gpus to attach to the VM. Requires gpu_count to be '
+    'specified.')
 flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
                      'variable number of machines, the number of VMs to use.')
 flags.DEFINE_string('image', None, 'Default image that will be '
@@ -199,6 +208,10 @@ flags.DEFINE_boolean(
     'If true, PKB will publish all samples available immediately after running '
     'each benchmark. This may be useful in scenarios where the PKB run time '
     'for all benchmarks is much greater than a single benchmark.')
+flags.DEFINE_integer(
+    'publish_period', None,
+    'The period in seconds to publish samples from repeated run stages. '
+    'This will only publish samples if publish_after_run is True.')
 flags.DEFINE_integer(
     'run_stage_time', 0,
     'PKB will run/re-run the run stage of each benchmark until it has spent '
@@ -427,6 +440,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
   spec.ConstructCloudTpu()
+  spec.ConstructEdwService()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
@@ -469,6 +483,7 @@ def DoRunPhase(spec, collector, timer):
   deadline = time.time() + FLAGS.run_stage_time
   run_number = 0
   consecutive_failures = 0
+  last_publish_time = time.time()
   while True:
     samples = []
     logging.info('Running benchmark %s', spec.name)
@@ -495,8 +510,10 @@ def DoRunPhase(spec, collector, timer):
       for s in samples:
         s.metadata['run_number'] = run_number
     collector.AddSamples(samples, spec.name, spec)
-    if FLAGS.publish_after_run:
+    if (FLAGS.publish_after_run and FLAGS.publish_period is not None and
+        FLAGS.publish_period < (time.time() - last_publish_time)):
       collector.PublishSamples()
+      last_publish_time = time.time()
     run_number += 1
     if time.time() > deadline:
       break
@@ -596,6 +613,8 @@ def RunBenchmark(spec, collector):
           DoCleanupPhase(spec, detailed_timer)
         raise
       finally:
+        if FLAGS.publish_after_run:
+          collector.PublishSamples()
         if stages.TEARDOWN in FLAGS.run_stage:
           spec.Delete()
         events.benchmark_end.send(benchmark_spec=spec)
@@ -712,11 +731,6 @@ def SetUpPKB():
   # Check environment.
   if not FLAGS.ignore_package_requirements:
     requirements.CheckBasicRequirements()
-
-  if FLAGS.os_type == os_types.WINDOWS and not vm_util.RunningOnWindows():
-    logging.error('In order to run benchmarks on Windows VMs, you must be '
-                  'running on Windows.')
-    sys.exit(1)
 
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):

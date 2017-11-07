@@ -652,14 +652,11 @@ $ ./pkb.py --cloud=ProfitBricks --machine_type=Small --benchmarks=iperf
 
 How to Run Windows Benchmarks
 ==================
-You must be running on a Windows machine in order to run Windows benchmarks.
-Install all dependencies as above and set TrustedHosts to accept all hosts so
-that you can open PowerShell sessions with the VMs (both machines having each
-other in their TrustedHosts list is necessary, but not sufficient to issue
-remote commands; valid credentials are still required):
-
-```
-set-item wsman:\localhost\Client\TrustedHosts -value *
+Install all dependencies as above and ensure that smbclient is installed on
+your system if you are running on a linux controller:
+```bash
+$ which smbclient
+/usr/bin/smbclient
 ```
 
 Now you can run Windows benchmarks by running with `--os_type=windows`. Windows has a

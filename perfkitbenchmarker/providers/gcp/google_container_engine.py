@@ -19,7 +19,6 @@ import os
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -29,6 +28,12 @@ FLAGS = flags.FLAGS
 class GkeCluster(container_service.KubernetesCluster):
 
   CLOUD = providers.GCP
+
+  @staticmethod
+  def _GetRequiredGkeEnv():
+    env = os.environ.copy()
+    env['CLOUDSDK_CONTAINER_USE_APPLICATION_DEFAULT_CREDENTIALS'] = 'true'
+    return env
 
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)
@@ -40,15 +45,13 @@ class GkeCluster(container_service.KubernetesCluster):
     cmd.flags['num-nodes'] = self.num_nodes
     cmd.flags['machine-type'] = self.machine_type
 
-    cmd.Issue(timeout=600)
+    cmd.Issue(timeout=600, env=self._GetRequiredGkeEnv())
 
   def _PostCreate(self):
     """Acquire cluster authentication."""
     cmd = util.GcloudCommand(
         self, 'container', 'clusters', 'get-credentials', self.name)
-    if not FLAGS.kubeconfig:
-      FLAGS.kubeconfig = vm_util.PrependTempDir('kubeconfig')
-    env = os.environ.copy()
+    env = self._GetRequiredGkeEnv()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
 
