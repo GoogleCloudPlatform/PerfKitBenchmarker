@@ -70,6 +70,10 @@ flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM. '
                     'Upon creation, these directories will have numbers '
                     'appended to them (for example /scratch0, /scratch1, etc).')
+flags.DEFINE_string('startup_script', None,
+                    'Script to run right after vm boot.')
+flags.DEFINE_string('postrun_script', None,
+                    'Script to run right after run stage.')
 # pyformat: disable
 flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
                   [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
