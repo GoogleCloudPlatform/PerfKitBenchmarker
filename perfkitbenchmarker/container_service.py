@@ -77,6 +77,8 @@ class BaseContainerCluster(resource.BaseResource):
     super(BaseContainerCluster, self).__init__()
     self.name = 'pkb-%s' % FLAGS.run_uri
     self.machine_type = spec.vm_spec.machine_type
+    self.gpu_count = spec.vm_spec.gpu_count
+    self.gpu_type = spec.vm_spec.gpu_type
     self.zone = spec.vm_spec.zone
     self.num_nodes = spec.vm_count
 
