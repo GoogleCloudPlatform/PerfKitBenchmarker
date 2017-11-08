@@ -14,7 +14,7 @@
 
 """Run Tensorflow benchmarks (https://github.com/tensorflow/benchmarks)."""
 
-import os
+import posixpath
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -23,8 +23,6 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 from perfkitbenchmarker.linux_packages import tensorflow
 
 FLAGS = flags.FLAGS
-
-CUDA_TOOLKIT_INSTALL_DIR = cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
 
 BENCHMARK_NAME = 'tensorflow'
 BENCHMARK_CONFIG = """
@@ -174,6 +172,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   master_vm = vms[0]
   master_vm.Install('tensorflow')
+  master_vm.InstallPackages('git')
   benchmark_spec.tensorflow_version = tensorflow.GetTensorFlowVersion(master_vm)
   _InstallTensorFlowBenchmarks(benchmark_spec)
 
@@ -221,10 +220,10 @@ def _GetEnvironmentVars(vm):
   lib_name = 'lib' if long_bit == '32' else 'lib64'
   return ' '.join([
       'PATH=%s${PATH:+:${PATH}}' %
-      os.path.join(CUDA_TOOLKIT_INSTALL_DIR, 'bin'),
-      'CUDA_HOME=%s' % CUDA_TOOLKIT_INSTALL_DIR,
+      posixpath.join(FLAGS.cuda_toolkit_installation_dir, 'bin'),
+      'CUDA_HOME=%s' % FLAGS.cuda_toolkit_installation_dir,
       'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
-      os.path.join(CUDA_TOOLKIT_INSTALL_DIR, lib_name),
+      posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name),
   ])
 
 

@@ -18,11 +18,14 @@ import os
 
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
+NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.8/device-plugin-daemonset.yaml'
 
 
 class GkeCluster(container_service.KubernetesCluster):
@@ -41,7 +44,24 @@ class GkeCluster(container_service.KubernetesCluster):
 
   def _Create(self):
     """Creates the cluster."""
-    cmd = util.GcloudCommand(self, 'container', 'clusters', 'create', self.name)
+    if self.gpu_count:
+      gcp_specific_gpu_type = (gce_virtual_machine.
+                               GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpu_type])
+      # TODO(ferneyhough): Make cluster version a flag, and allow it
+      # to be specified in the spec (this will require a new spec class
+      # for google_container_engine however).
+      cmd = util.GcloudCommand(
+          self, 'alpha', 'container', 'clusters', 'create', self.name,
+          '--enable-kubernetes-alpha', '--cluster-version', '1.8.1-gke.1')
+
+      cmd.flags['accelerator'] = 'type={0},count={1}'.format(
+          gcp_specific_gpu_type,
+          self.gpu_count)
+
+    else:
+      cmd = util.GcloudCommand(
+          self, 'container', 'clusters', 'create', self.name)
+
     cmd.flags['num-nodes'] = self.num_nodes
     cmd.flags['machine-type'] = self.machine_type
 
@@ -54,6 +74,9 @@ class GkeCluster(container_service.KubernetesCluster):
     env = self._GetRequiredGkeEnv()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
+
+    if self.gpu_count:
+      kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
 
   def _Delete(self):
     """Deletes the cluster."""
