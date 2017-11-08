@@ -21,6 +21,7 @@ Tesla K80 and P100 gpus are supported, provided that there is only a single
 type of gpu per system.
 """
 
+import posixpath
 import re
 
 from perfkitbenchmarker import regex_util
@@ -57,6 +58,12 @@ flag_util.DEFINE_integerlist('gpu_clock_speeds',
 flags.DEFINE_boolean('gpu_autoboost_enabled', None,
                      'whether gpu autoboost is enabled')
 
+flags.DEFINE_string('cuda_toolkit_installation_dir', '/usr/local/cuda',
+                    'installation directory to use for CUDA toolkit. '
+                    'If the toolkit is not installed, it will be installed '
+                    'here. If it is already installed, the installation at '
+                    'this path will be used.')
+
 FLAGS = flags.FLAGS
 
 
@@ -66,7 +73,6 @@ CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604_8.0.61-1_amd64.deb'
 CUDA_TOOLKIT_UBUNTU_URL = (
     'http://developer.download.nvidia.com/compute/cuda'
     '/repos/ubuntu1604/x86_64/%s' % CUDA_TOOLKIT_UBUNTU)
-CUDA_TOOLKIT_INSTALL_DIR = '/usr/local/cuda'
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
 
@@ -84,6 +90,11 @@ class HeterogeneousGpuTypesException(Exception):
 
 class UnsupportedGpuTypeException(Exception):
   pass
+
+
+def SmiPath():
+  return posixpath.join(flags.cuda_toolkit_installation_dir,
+                        'nvidia-smi')
 
 
 def GetMetadata(vm):
@@ -341,4 +352,4 @@ def Uninstall(vm):
   CUDA by calling _Install() again.
   """
   vm.RemoteCommand('rm %s' % CUDA_TOOLKIT_UBUNTU)
-  vm.RemoteCommand('sudo rm -rf %s' % CUDA_TOOLKIT_INSTALL_DIR)
+  vm.RemoteCommand('sudo rm -rf %s' % FLAGS.cuda_toolkit_installation_dir)
