@@ -863,13 +863,21 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
 
 
 class _ContainerClusterSpec(_VmGroupSpec):
-  """Spec conntaining info needed to create a container cluster."""
+  """Spec containing info needed to create a container cluster."""
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     super(_ContainerClusterSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['container_cluster_cloud'].present:
       config_values['cloud'] = flag_values.container_cluster_cloud
+
+    # Need to apply the first zone in the zones flag, if specified,
+    # to the spec. ContainerClusters do not currently support
+    # running in multiple zones in a single PKB invocation.
+    if flag_values['zones'].present:
+      for cloud in config_values['vm_spec']:
+        config_values['vm_spec'][cloud]['zone'] = (
+            flag_values.zones[0])
 
 
 class _ContainerClusterSpecDecoder(option_decoders.TypeVerifier):
