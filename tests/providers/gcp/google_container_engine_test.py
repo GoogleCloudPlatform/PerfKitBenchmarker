@@ -61,7 +61,8 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
             'os_type': 'debian',
             'vm_spec': {
                 'GCP': {
-                    'machine_type': 'fake-machine-type'
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a'
                 },
             },
             'vm_count': 2,
@@ -79,6 +80,7 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
       self.assertIn('gcloud container clusters create', command_string)
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
+      self.assertIn('--zone us-central1-a', command_string)
 
   def testPostCreate(self):
     spec = self.create_container_engine_spec()
@@ -103,6 +105,7 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud container clusters delete pkb-{0}'.format(_RUN_URI),
                     command_string)
+      self.assertIn('--zone us-central1-a', command_string)
 
   def testExists(self):
     spec = self.create_container_engine_spec()
