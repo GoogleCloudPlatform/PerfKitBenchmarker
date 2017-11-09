@@ -160,7 +160,8 @@ flags.DEFINE_integer('duration_in_seconds', None,
 flags.DEFINE_string('static_vm_file', None,
                     'The file path for the Static Machine file. See '
                     'static_virtual_machine.py for a description of this file.')
-flags.DEFINE_boolean('version', False, 'Display the version and exit.')
+# TODO(b/69064835): version flag is disabled. See bug.
+# flags.DEFINE_boolean('version', False, 'Display the version and exit.')
 flags.DEFINE_enum(
     'scratch_disk_type', None,
     [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
@@ -237,9 +238,10 @@ flags.DEFINE_string(
     'object per line, each with the following format:\n'
     '{ "name": <benchmark name>, "flags": <flags dictionary>, '
     '"status": <completion status> }')
-flags.DEFINE_string(
-    'helpmatch', '',
-    'Shows only flags defined in a module whose name matches the given regex.')
+# TODO(b/69064835): helpmatch flag is disabled. See bug.
+# flags.DEFINE_string(
+#     'helpmatch', '',
+#     'Shows only flags defined in a module whose name matches the given regex.')
 flags.DEFINE_boolean(
     'create_failed_run_samples', False,
     'If true, PKB will create a sample specifying that a run stage failed. '
