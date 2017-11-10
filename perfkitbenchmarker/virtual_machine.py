@@ -321,11 +321,7 @@ class BaseVirtualMachine(resource.BaseResource):
   def AllowPort(self, start_port, end_port=None):
     """Opens the port on the firewall corresponding to the VM if one exists."""
     if self.firewall:
-      if end_port:
-          for port in range(start_port, end_port + 1):
-              self.firewall.AllowPort(self, port)
-      else:
-          self.firewall.AllowPort(self, start_port)
+      self.firewall.AllowPort(self, start_port, end_port)
 
   def AllowRemoteAccessPorts(self):
     """Allow all ports in self.remote_access_ports."""
