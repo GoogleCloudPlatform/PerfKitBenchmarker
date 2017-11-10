@@ -12,4 +12,5 @@
 
 ###Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
+- Bulk AllowPort restored.
 
