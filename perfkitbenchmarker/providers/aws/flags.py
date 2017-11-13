@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing flags applicable across benchmark run on AWS."""
 
 from perfkitbenchmarker import flags
 
@@ -39,3 +40,5 @@ flags.DEFINE_integer('aws_boot_disk_size', None,
                      'The boot disk size in GiB for AWS VMs.')
 flags.DEFINE_string('kops', 'kops',
                     'The path to the kops binary.')
+flags.DEFINE_string('edw_redshift_cluster_version', 'redshift-1.0',
+                    'The redshift version to use for the cluster.')
