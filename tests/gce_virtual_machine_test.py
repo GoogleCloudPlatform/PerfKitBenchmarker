@@ -338,6 +338,19 @@ class GCEVMFlagsTestCase(unittest.TestCase):
       vm._Create()
       self.assertEquals(issue_command.call_count, 1)
 
+  def testAcceleratorTypeOverrideFlag(self):
+    with PatchCriticalObjects() as issue_command:
+      self._mocked_flags['gce_accelerator_type_override'].parse('fake_type')
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP', self._mocked_flags, image='image',
+          machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
+      vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
+      vm._Create()
+      self.assertEquals(issue_command.call_count, 1)
+      self.assertIn('--accelerator', issue_command.call_args[0][0])
+      self.assertIn('type=fake_type,count=1',
+                    issue_command.call_args[0][0])
+
   def testImageProjectFlag(self):
     """Tests that custom image_project flag is supported."""
     with PatchCriticalObjects() as issue_command:
