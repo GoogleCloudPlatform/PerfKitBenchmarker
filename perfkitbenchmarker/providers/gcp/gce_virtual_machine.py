@@ -350,11 +350,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
+    self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
 
   @property
   def host_list(self):
     """Returns the list of hosts that are compatible with this VM."""
     return self.host_map[(self.project, self.zone)]
+
+  def _GenerateAcceleratorSpecString(self):
+    accelerator_type = (self.gce_accelerator_type_override or
+                        GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpu_type])
+    return 'type={0},count={1}'.format(
+        accelerator_type,
+        self.gpu_count)
 
   def _GenerateCreateCommand(self, ssh_keys_path):
     """Generates a command to create the VM instance.
@@ -390,9 +398,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       cmd.flags['machine-type'] = self.machine_type
     if self.gpu_count:
-      cmd.flags['accelerator'] = 'type={0},count={1}'.format(
-          GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpu_type],
-          self.gpu_count)
+      cmd.flags['accelerator'] = self._GenerateAcceleratorSpecString()
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
     if self.host:
@@ -597,6 +603,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.gpu_count:
       result['gpu_type'] = self.gpu_type
       result['gpu_count'] = self.gpu_count
+    if self.gce_accelerator_type_override:
+      result['accelerator_type_override'] = self.gce_accelerator_type_override
     return result
 
   def SimulateMaintenanceEvent(self):

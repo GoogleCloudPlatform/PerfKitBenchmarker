@@ -80,3 +80,7 @@ flags.DEFINE_enum(
     ['sandybridge', 'ivybridge', 'haswell', 'broadwell', 'skylake'],
     'When specified, the VM will have either the specified '
     'architecture or a newer one. Architecture availability is zone dependent.')
+flags.DEFINE_string(
+    'gce_accelerator_type_override', None,
+    'When specified, override the accelerator_type string passed to the gcloud '
+    'compute instance create command.')
