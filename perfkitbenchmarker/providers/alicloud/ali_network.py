@@ -19,17 +19,17 @@ others in the
 same project. See https://developers.google.com/compute/docs/networking for
 more information about AliCloud VM networking.
 """
-import threading
 import json
-import uuid
 import logging
+import threading
+import uuid
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import network
+from perfkitbenchmarker import providers
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.alicloud import util
-from perfkitbenchmarker import resource
-from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 MAX_NAME_LENGTH = 128
@@ -203,7 +203,6 @@ class AliSecurityGroup(resource.BaseResource):
     return True
 
 
-
 class AliFirewall(network.BaseFirewall):
   """An object representing the AliCloud Firewall."""
 
@@ -248,7 +247,7 @@ class AliFirewall(network.BaseFirewall):
     if not end_port:
       end_port = start_port
 
-    for port in range(start_port, end_port+1):
+    for port in range(start_port, end_port + 1):
       self._AllowPort(vm, port)
 
   def _AllowPort(self, vm, port):
