@@ -41,12 +41,22 @@ class GkeCluster(container_service.KubernetesCluster):
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
+    self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the VM.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    result = super(GkeCluster, self).GetResourceMetadata()
+    if self.gce_accelerator_type_override:
+      result['accelerator_type_override'] = self.gce_accelerator_type_override
+    return result
 
   def _Create(self):
     """Creates the cluster."""
     if self.gpu_count:
-      gcp_specific_gpu_type = (gce_virtual_machine.
-                               GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpu_type])
       # TODO(ferneyhough): Make cluster version a flag, and allow it
       # to be specified in the spec (this will require a new spec class
       # for google_container_engine however).
@@ -54,10 +64,9 @@ class GkeCluster(container_service.KubernetesCluster):
           self, 'alpha', 'container', 'clusters', 'create', self.name,
           '--enable-kubernetes-alpha', '--cluster-version', '1.8.1-gke.1')
 
-      cmd.flags['accelerator'] = 'type={0},count={1}'.format(
-          gcp_specific_gpu_type,
-          self.gpu_count)
-
+      cmd.flags['accelerator'] = (gce_virtual_machine.
+                                  GenerateAcceleratorSpecString(self.gpu_type,
+                                                                self.gpu_count))
     else:
       cmd = util.GcloudCommand(
           self, 'container', 'clusters', 'create', self.name)
