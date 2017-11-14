@@ -35,7 +35,9 @@ flags.DEFINE_string('edw_service_cluster_password', None,
                     'applicable when using snapshots).')
 flags.DEFINE_integer('edw_service_cluster_concurrency', 5,
                      'Number of queries to run concurrently on the cluster.')
-
+flags.DEFINE_enum('edw_query_execution_mode', 'sequential', ['sequential',
+                                                             'concurrent'],
+                  'The mode for executing the queries on the edw cluster.')
 
 FLAGS = flags.FLAGS
 
@@ -66,6 +68,5 @@ class EdwService(resource.BaseResource):
                   'edw_cluster_identifier': self.cluster_identifier,
                   'edw_cluster_node_type': self.spec.node_type,
                   'edw_cluster_node_count': self.spec.node_count
-                 }
+                  }
     return basic_data
-
