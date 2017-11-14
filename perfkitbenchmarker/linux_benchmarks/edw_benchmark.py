@@ -42,7 +42,8 @@ edw_benchmark:
     client:
       vm_spec: *default_single_core
 """
-flags.DEFINE_string('benchmark_scripts', 'sample.sql', 'Csv list of scripts.')
+flags.DEFINE_list('edw_benchmark_scripts', 'sample.sql', 'Comma separated '
+                                                           'list of scripts.')
 
 FLAGS = flags.FLAGS
 
@@ -68,18 +69,45 @@ def Run(benchmark_spec):
   vm.PushFile(driver_path)
   vm.PushFile(scripts_path)
 
+  driver_perms_update_cmd = 'chmod 755 {}'.format(driver_name)
+  vm.RemoteCommand(driver_perms_update_cmd)
+
   endpoint = benchmark_spec.edw_service.endpoint
   db = benchmark_spec.edw_service.db
   user = benchmark_spec.edw_service.user
   password = benchmark_spec.edw_service.password
-  scripts_list = ' '.join(FLAGS.benchmark_scripts.split(','))
-  launch_command = './{} {} {} {} {} {}'.format(driver_name, endpoint, db, user,
-                                                password, scripts_list)
-  stdout, _ = vm.RemoteCommand(launch_command)
+
+  launch_command_generic = './{} {} {} {} {} '.format(driver_name, endpoint, db,
+                                                      user, password)
+  scripts_list = FLAGS.edw_benchmark_scripts
+
   results = []
   edw_service_instance = benchmark_spec.edw_service
-  metadata = copy.copy(edw_service_instance.GetMetadata())
-  results.append(sample.Sample('run_time', float(stdout), 'seconds', metadata))
+  edw_metadata = copy.copy(edw_service_instance.GetMetadata())
+
+  if FLAGS.edw_query_execution_mode == 'sequential':
+    total_time = 0.0
+    for script in scripts_list:
+      launch_command = '{}{}'.format(launch_command_generic, script)
+      stdout, _ = vm.RemoteCommand(launch_command)
+      sql_script_metadata = copy.copy(edw_metadata)
+      sql_script_metadata['edw_benchmark_script'] = script
+      results.append(sample.Sample('sql_script_run_time', float(stdout),
+                                   'seconds', sql_script_metadata))
+      total_time += float(stdout)
+    edw_metadata['edw_query_execution_mode'] = 'sequential'
+    edw_metadata['edw_benchmark_scripts'] = FLAGS.edw_benchmark_scripts
+    results.append(sample.Sample('all_sql_run_time', total_time, 'seconds',
+                                 edw_metadata))
+  else:
+    scripts_list_serialized = ' '.join(scripts_list)
+    launch_command = '{}{}'.format(launch_command_generic,
+                                   scripts_list_serialized)
+    stdout, _ = vm.RemoteCommand(launch_command)
+    edw_metadata['edw_query_execution_mode'] = 'concurrent'
+    edw_metadata['edw_benchmark_scripts'] = FLAGS.edw_benchmark_scripts
+    results.append(sample.Sample('all_sql_run_time', float(stdout), 'seconds',
+                                 edw_metadata))
   return results
 
 
