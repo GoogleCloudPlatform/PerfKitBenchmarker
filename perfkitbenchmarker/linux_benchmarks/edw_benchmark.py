@@ -43,7 +43,7 @@ edw_benchmark:
       vm_spec: *default_single_core
 """
 flags.DEFINE_list('edw_benchmark_scripts', 'sample.sql', 'Comma separated '
-                                                           'list of scripts.')
+                                                         'list of scripts.')
 
 FLAGS = flags.FLAGS
 
