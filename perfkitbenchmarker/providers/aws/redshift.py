@@ -30,7 +30,8 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 
 
-VALID_EXIST_STATUSES = ['creating', 'available', 'deleting']
+VALID_EXIST_STATUSES = ['creating', 'available']
+DELETION_STATUSES = ['deleting']
 READY_STATUSES = ['available']
 
 
@@ -163,6 +164,7 @@ class Redshift(edw_service.EdwService):
     self.db = ''
     self.user = ''
     self.password = ''
+    self.supports_wait_on_delete = True
 
   def _Create(self):
     """Create a new redshift cluster."""
@@ -299,6 +301,15 @@ class Redshift(edw_service.EdwService):
                              '--cluster-identifier', self.cluster_identifier,
                              '--skip-final-cluster-snapshot']
     vm_util.IssueCommand(cmd)
+
+  def _IsDeleting(self):
+    """Method to check if the cluster is being deleting."""
+    stdout, _, _ = self.__DescribeCluster()
+    if not stdout:
+      return False
+    else:
+      return (json.loads(stdout)['Clusters'][0]['ClusterStatus'] in
+              DELETION_STATUSES)
 
   def _DeleteDependencies(self):
     """Delete dependencies of a redshift cluster."""
