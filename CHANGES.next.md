@@ -14,6 +14,7 @@
   - Add new location, `us/ewr`
 
 ###Bug fixes and maintenance updates:
+- Moved GPU-related specs from GceVmSpec to BaseVmSpec
 - Fix ProfitBricks issue with extra `/` in the API url
 - Fix ProfitBricks volume availability zone issue
 
