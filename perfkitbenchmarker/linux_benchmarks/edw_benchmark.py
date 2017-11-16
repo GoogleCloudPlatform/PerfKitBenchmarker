@@ -20,6 +20,7 @@ managed data warehouse solutions such as Redshift and BigQuery.
 
 
 import copy
+import os
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -59,15 +60,16 @@ def Prepare(benchmark_spec):
 
 def Run(benchmark_spec):
   """Run phase executes the sql scripts on edw cluster and collects duration."""
-  driver_name = '{}_driver.sh'.format(benchmark_spec.edw_service.SERVICE_TYPE)
-  driver_path = data.ResourcePath(driver_name)
-
-  scripts_name = '{}_sql'.format(benchmark_spec.edw_service.SERVICE_TYPE)
-  scripts_path = data.ResourcePath(scripts_name)
-
   vm = benchmark_spec.vms[0]
+  driver_name = '{}_driver.sh'.format(benchmark_spec.edw_service.SERVICE_TYPE)
+  driver_path = data.ResourcePath(os.path.join('edw', driver_name))
   vm.PushFile(driver_path)
-  vm.PushFile(scripts_path)
+
+  scripts_dir = '{}_sql'.format(benchmark_spec.edw_service.SERVICE_TYPE)
+  scripts_list = FLAGS.edw_benchmark_scripts
+  for script in scripts_list:
+    script_path = data.ResourcePath(os.path.join('edw', scripts_dir, script))
+    vm.PushFile(script_path)
 
   driver_perms_update_cmd = 'chmod 755 {}'.format(driver_name)
   vm.RemoteCommand(driver_perms_update_cmd)
