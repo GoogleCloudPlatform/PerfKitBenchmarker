@@ -615,10 +615,12 @@ def RunBenchmark(spec, collector):
           DoCleanupPhase(spec, detailed_timer)
         raise
       finally:
-        if FLAGS.publish_after_run:
-          collector.PublishSamples()
+        # Deleting resources should happen first so any errors with publishing
+        # don't prevent teardown.
         if stages.TEARDOWN in FLAGS.run_stage:
           spec.Delete()
+        if FLAGS.publish_after_run:
+          collector.PublishSamples()
         events.benchmark_end.send(benchmark_spec=spec)
         # Pickle spec to save final resource state.
         spec.Pickle()
