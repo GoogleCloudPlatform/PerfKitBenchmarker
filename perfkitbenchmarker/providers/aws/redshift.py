@@ -242,8 +242,7 @@ class Redshift(edw_service.EdwService):
                                '--cluster-parameter-group-name',
                                self.cluster_subnet_group.name,
                                '--publicly-accessible',
-                               '--automated-snapshot-retention-period=0'
-                              ]
+                               '--automated-snapshot-retention-period=0']
       stdout, stderr, _ = vm_util.IssueCommand(cmd)
       if not stdout:
         raise errors.Resource.CreationError('Cluster creation failure: '
