@@ -132,16 +132,16 @@ GCS_OBJECT_NAME_LENGTH = 20
 
 
 def GetLabelsFromDict(metadata):
-  """Converts a metadata dictionary to a string of labels.
+  """Converts a metadata dictionary to a string of labels sorted by key.
 
   Args:
     metadata: a dictionary of string key value pairs.
 
   Returns:
-    A string of labels in the format that Perfkit uses.
+    A string of labels, sorted by key, in the format that Perfkit uses.
   """
   labels = []
-  for k, v in metadata.iteritems():
+  for k, v in sorted(metadata.iteritems()):
     labels.append('|%s:%s|' % (k, v))
   return ','.join(labels)
 

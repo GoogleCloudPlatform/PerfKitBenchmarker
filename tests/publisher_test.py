@@ -89,7 +89,7 @@ class NewlineDelimitedJSONPublisherTestCase(unittest.TestCase):
                                                      ('foo', 'bar')])}]
     self.instance.PublishSamples(samples)
     d = json.load(self.fp)
-    self.assertDictEqual({'test': 'testa', 'labels': '|key:value|,|foo:bar|'},
+    self.assertDictEqual({'test': 'testa', 'labels': '|foo:bar|,|key:value|'},
                          d)
 
   def testJSONRecordPerLine(self):
