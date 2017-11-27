@@ -135,7 +135,7 @@ flags.DEFINE_integer(
     'specified.')
 flags.DEFINE_enum(
     'gpu_type', None,
-    ['k80', 'p100'],
+    ['k80', 'p100', 'v100'],
     'Type of gpus to attach to the VM. Requires gpu_count to be '
     'specified.')
 flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
