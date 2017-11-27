@@ -28,6 +28,7 @@ from perfkitbenchmarker import background_workload
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -48,7 +49,6 @@ flags.DEFINE_boolean(
 flags.DEFINE_list('vm_metadata', [], 'Metadata to add to the vm '
                   'via the provider\'s AddMetadata function. It expects'
                   'key:value pairs')
-
 VALID_GPU_TYPES = ['k80', 'p100']
 
 
@@ -321,11 +321,7 @@ class BaseVirtualMachine(resource.BaseResource):
   def AllowPort(self, start_port, end_port=None):
     """Opens the port on the firewall corresponding to the VM if one exists."""
     if self.firewall:
-      if end_port:
-          for port in range(start_port, end_port + 1):
-              self.firewall.AllowPort(self, port)
-      else:
-          self.firewall.AllowPort(self, start_port)
+      self.firewall.AllowPort(self, start_port, end_port)
 
   def AllowRemoteAccessPorts(self):
     """Allow all ports in self.remote_access_ports."""
@@ -397,7 +393,8 @@ class BaseOsMixin(object):
   def __init__(self):
     super(BaseOsMixin, self).__init__()
     self._installed_packages = set()
-
+    self.startup_script_output = None
+    self.postrun_script_output = None
     self.bootable_time = None
     self.hostname = None
 
@@ -515,7 +512,7 @@ class BaseOsMixin(object):
 
     This will be called once immediately after the VM has booted.
     """
-    pass
+    events.on_vm_startup.send(vm=self)
 
   def PrepareVMEnvironment(self):
     """Performs any necessary setup on the VM specific to the OS.

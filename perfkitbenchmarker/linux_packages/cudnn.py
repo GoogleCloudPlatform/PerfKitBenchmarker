@@ -15,29 +15,27 @@
 
 """Module containing CUDA Deep Neural Network library installation functions."""
 
-import os
+import posixpath
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 
 flags.DEFINE_string('cudnn', 'libcudnn6_6.0.21-1+cuda8.0_amd64.deb',
                     '''The NVIDIA CUDA Deep Neural Network library.
                     Please put in data directory and specify the name''')
 FLAGS = flags.FLAGS
-CUDA_TOOLKIT_INSTALL_DIR = cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
 
 
 def _Install(vm, dest_path):
   vm.RemoteCommand('tar -zxf %s' % dest_path, should_log=True)
   vm.RemoteCommand('sudo cp -P cuda/include/cudnn.h %s/include/' %
-                   CUDA_TOOLKIT_INSTALL_DIR)
+                   FLAGS.cuda_toolkit_installation_dir)
   vm.RemoteCommand('sudo cp -P cuda/lib64/libcudnn* %s/lib64/' %
-                   CUDA_TOOLKIT_INSTALL_DIR)
+                   FLAGS.cuda_toolkit_installation_dir)
 
 
 def _CopyLib(vm):
   src_path = data.ResourcePath(FLAGS.cudnn)
-  dest_path = os.path.join('/tmp', FLAGS.cudnn)
+  dest_path = posixpath.join('/tmp', FLAGS.cudnn)
   vm.RemoteCopy(src_path, dest_path)
   return dest_path
 

@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Contains code related to lifecycle management of Kubernetes Pods."""
 
 import json
 import logging
@@ -90,6 +92,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Creates a POD (Docker container with optional volumes).
     """
     create_rc_body = self._BuildPodBody()
+    logging.info('About to create a pod with the following configuration:')
+    logging.info(create_rc_body)
     kubernetes_helper.CreateResource(create_rc_body)
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
@@ -263,7 +267,41 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     for scratch_disk in self.scratch_disks:
       scratch_disk.AttachVolumeMountInfo(container['volumeMounts'])
 
+    if self.gpu_count:
+      container['resources'] = self._BuildResourceBodyWithGpus()
+
+    # The nvidia/cuda image does not have sudo installed,
+    # so install it and configure the sudoers file such
+    # that the root user's environment is preserved when
+    # running as sudo. Then run tail indefinitely so that
+    # the container does not exit.
+    if self.image == 'nvidia/cuda:8.0-devel-ubuntu16.04':
+      container_command = ' && '.join([
+          'apt-get update',
+          'apt-get install -y sudo',
+          'sed -i \'/env_reset/d\' /etc/sudoers',
+          'sed -i \'/secure_path/d\' /etc/sudoers',
+          'sudo ldconfig',
+          'tail -f /dev/null',
+      ])
+      container['command'] = ['bash', '-c', container_command]
+
     return container
+
+  def _BuildResourceBodyWithGpus(self):
+    """Constructs a resource body specific to GKE that lists the requested GPUs.
+
+    This is likely to change in the future.
+    See https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus
+
+    Returns:
+      kubernetes pod resource body containing gpu limits
+    """
+    return {
+        'limits': {
+            'nvidia.com/gpu': str(self.gpu_count)
+        }
+    }
 
 
 class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
@@ -283,7 +321,8 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     if not ignore_failure and retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'Full command: %s\nSTDOUT: %sSTDERR: %s' %
-                    (retcode, command, ' '.join(cmd), stdout, stderr))
+                    (retcode, command, ' '.join(cmd),
+                     stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
     return stdout, stderr, retcode
 
@@ -299,7 +338,6 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     file_name = vm_util.PrependTempDir(posixpath.basename(source_path))
     self.RemoteHostCopy(file_name, source_path, copy_to=False)
     target.RemoteHostCopy(file_name, remote_path)
-
 
   def RemoteHostCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.
@@ -332,6 +370,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       self.RemoteCommand('mv %s %s; chmod 777 %s' %
                          (file_name, remote_path, remote_path))
 
+  @vm_util.Retry(log_errors=False, poll_interval=1)
   def PrepareVMEnvironment(self):
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
     self.RemoteCommand('mkdir ~/.ssh')

@@ -160,7 +160,8 @@ flags.DEFINE_integer('duration_in_seconds', None,
 flags.DEFINE_string('static_vm_file', None,
                     'The file path for the Static Machine file. See '
                     'static_virtual_machine.py for a description of this file.')
-flags.DEFINE_boolean('version', False, 'Display the version and exit.')
+flags.DEFINE_boolean('version', False, 'Display the version and exit.',
+                     allow_override_cpp=True)
 flags.DEFINE_enum(
     'scratch_disk_type', None,
     [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
@@ -239,12 +240,13 @@ flags.DEFINE_string(
     '"status": <completion status> }')
 flags.DEFINE_string(
     'helpmatch', '',
-    'Shows only flags defined in a module whose name matches the given regex.')
+    'Shows only flags defined in a module whose name matches the given regex.',
+    allow_override_cpp=True)
 flags.DEFINE_boolean(
     'create_failed_run_samples', False,
     'If true, PKB will create a sample specifying that a run stage failed. '
     'This sample will include metadata specifying the run stage that '
-    'failed, the exception that occured, as well as all the flags that '
+    'failed, the exception that occurred, as well as all the flags that '
     'were provided to PKB on the command line.')
 flags.DEFINE_integer(
     'failed_run_samples_error_length', 10240,

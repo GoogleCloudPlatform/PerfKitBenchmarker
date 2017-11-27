@@ -17,4 +17,4 @@
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
 - Fix ProfitBricks issue with extra `/` in the API url
 - Fix ProfitBricks volume availability zone issue
-
+- Bulk AllowPort restored.

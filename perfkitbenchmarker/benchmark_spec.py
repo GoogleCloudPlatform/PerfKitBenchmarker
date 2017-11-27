@@ -70,6 +70,10 @@ flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM. '
                     'Upon creation, these directories will have numbers '
                     'appended to them (for example /scratch0, /scratch1, etc).')
+flags.DEFINE_string('startup_script', None,
+                    'Script to run right after vm boot.')
+flags.DEFINE_string('postrun_script', None,
+                    'Script to run right after run stage.')
 # pyformat: disable
 flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
                   [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
@@ -390,6 +394,11 @@ class BenchmarkSpec(object):
     if self.cloud_tpu:
       self.cloud_tpu.Create()
     if self.edw_service:
+      # The benchmark creates the Redshift cluster's subnet group in the already
+      # provisioned virtual private cloud (vpc).
+      for network in networks:
+        if network.__class__.__name__ == 'AwsNetwork':
+          self.config.edw_service.subnet_id = network.subnet.id
       self.edw_service.Create()
 
   def Delete(self):
