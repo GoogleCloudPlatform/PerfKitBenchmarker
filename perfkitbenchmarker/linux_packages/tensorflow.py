@@ -48,5 +48,5 @@ def Install(vm):
 
 def Uninstall(vm):
   """Uninstalls TensorFlow on the VM."""
-  vm.RemoteCommand('sudo pip uninstall --upgrade tensorflow',
+  vm.RemoteCommand('sudo pip uninstall tensorflow',
                    should_log=True)
