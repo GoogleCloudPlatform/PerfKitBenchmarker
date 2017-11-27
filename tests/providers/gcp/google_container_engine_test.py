@@ -27,6 +27,7 @@ from tests import mock_flags
 
 _COMPONENT = 'test_component'
 _RUN_URI = 'fake-urn-uri'
+_NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.8/device-plugin-daemonset.yaml'
 
 
 @contextlib2.contextmanager
@@ -50,25 +51,26 @@ def patch_critical_objects(stdout='', stderr='', return_code=0):
     yield issue_command
 
 
-def create_container_engine_spec():
-  container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
-      'NAME', **{
-          'cloud': 'GCP',
-          'os_type': 'debian',
-          'vm_spec': {
-              'GCP': {
-                  'machine_type': 'fake-machine-type'
-              },
-          },
-          'vm_count': 2,
-      })
-  return container_engine_spec
-
-
 class GoogleContainerEngineTestCase(unittest.TestCase):
 
+  @staticmethod
+  def create_container_engine_spec():
+    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'os_type': 'debian',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a'
+                },
+            },
+            'vm_count': 2,
+        })
+    return container_engine_spec
+
   def testCreate(self):
-    spec = create_container_engine_spec()
+    spec = self.create_container_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_container_engine.GkeCluster(spec)
       cluster._Create()
@@ -78,9 +80,10 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
       self.assertIn('gcloud container clusters create', command_string)
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
+      self.assertIn('--zone us-central1-a', command_string)
 
   def testPostCreate(self):
-    spec = create_container_engine_spec()
+    spec = self.create_container_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_container_engine.GkeCluster(spec)
       cluster._PostCreate()
@@ -93,7 +96,7 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
 
   def testDelete(self):
-    spec = create_container_engine_spec()
+    spec = self.create_container_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_container_engine.GkeCluster(spec)
       cluster._Delete()
@@ -102,9 +105,10 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud container clusters delete pkb-{0}'.format(_RUN_URI),
                     command_string)
+      self.assertIn('--zone us-central1-a', command_string)
 
   def testExists(self):
-    spec = create_container_engine_spec()
+    spec = self.create_container_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_container_engine.GkeCluster(spec)
       cluster._Exists()
@@ -114,6 +118,59 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
       self.assertIn(
           'gcloud container clusters describe pkb-{0}'.format(_RUN_URI),
           command_string)
+
+
+class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
+
+  @staticmethod
+  def create_container_engine_spec():
+    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'os_type': 'debian',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'gpu_type': 'k80',
+                    'gpu_count': 2,
+                },
+            },
+            'vm_count': 2,
+        })
+    return container_engine_spec
+
+  def testCreate(self):
+    spec = self.create_container_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud alpha container clusters create', command_string)
+      self.assertIn('--enable-kubernetes-alpha', command_string)
+      self.assertIn('--cluster-version 1.8.1-gke.1', command_string)
+      self.assertIn('--num-nodes 2', command_string)
+      self.assertIn('--machine-type fake-machine-type', command_string)
+      self.assertIn('--accelerator type=nvidia-tesla-k80,count=2',
+                    command_string)
+
+  @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')
+  def testPostCreate(self, create_from_file_patch):
+    spec = self.create_container_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      cluster._PostCreate()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn(
+          'gcloud container clusters get-credentials pkb-{0}'.format(_RUN_URI),
+          command_string)
+      self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
+
+      create_from_file_patch.assert_called_with(
+          _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
 
 
 if __name__ == '__main__':

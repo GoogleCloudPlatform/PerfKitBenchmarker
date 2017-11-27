@@ -14,7 +14,7 @@
 
 """Run Tensorflow benchmarks (https://github.com/tensorflow/benchmarks)."""
 
-import os
+import posixpath
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -23,8 +23,6 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 from perfkitbenchmarker.linux_packages import tensorflow
 
 FLAGS = flags.FLAGS
-
-CUDA_TOOLKIT_INSTALL_DIR = cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR
 
 BENCHMARK_NAME = 'tensorflow'
 BENCHMARK_CONFIG = """
@@ -52,12 +50,19 @@ tensorflow:
 
 GPU = 'gpu'
 CPU = 'cpu'
+
+MODELS = ['vgg11', 'vgg16', 'vgg19', 'lenet', 'googlenet', 'overfeat',
+          'alexnet', 'trivial', 'inception3', 'inception4', 'resnet50',
+          'resnet101', 'resnet152']
+
 flags.DEFINE_boolean('tf_forward_only', False, '''whether use forward-only or
                      training for benchmarking''')
-flags.DEFINE_enum('tf_model', 'vgg16',
-                  ['vgg11', 'vgg16', 'vgg19', 'lenet', 'googlenet', 'overfeat',
-                   'alexnet', 'trivial', 'inception3', 'inception4', 'resnet50',
-                   'resnet101', 'resnet152'], 'name of the model to run')
+flags.DEFINE_list('tf_models', ['inception3', 'vgg16', 'alexnet', 'resnet50'],
+                  'name of the models to run')
+flags.register_validator('tf_models',
+                         lambda models: models and set(models).issubset(MODELS),
+                         'Invalid models list. tf_models must be a subset of '
+                         + ', '.join(MODELS))
 flags.DEFINE_enum('tf_data_name', 'imagenet', ['imagenet', 'flowers'],
                   'Name of dataset: imagenet or flowers.')
 flags.DEFINE_integer('tf_batch_size', None, 'batch size per compute device. '
@@ -134,9 +139,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   benchmark_spec.forward_only = FLAGS.tf_forward_only
-  benchmark_spec.model = FLAGS.tf_model
   benchmark_spec.data_name = FLAGS.tf_data_name
-  benchmark_spec.batch_size = _GetBatchSize(benchmark_spec.model)
   benchmark_spec.variable_update = FLAGS.tf_variable_update
   benchmark_spec.local_parameter_device = FLAGS.tf_local_parameter_device
   benchmark_spec.device = FLAGS.tf_device
@@ -174,6 +177,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   master_vm = vms[0]
   master_vm.Install('tensorflow')
+  master_vm.InstallPackages('git')
   benchmark_spec.tensorflow_version = tensorflow.GetTensorFlowVersion(master_vm)
   _InstallTensorFlowBenchmarks(benchmark_spec)
 
@@ -221,10 +225,10 @@ def _GetEnvironmentVars(vm):
   lib_name = 'lib' if long_bit == '32' else 'lib64'
   return ' '.join([
       'PATH=%s${PATH:+:${PATH}}' %
-      os.path.join(CUDA_TOOLKIT_INSTALL_DIR, 'bin'),
-      'CUDA_HOME=%s' % CUDA_TOOLKIT_INSTALL_DIR,
+      posixpath.join(FLAGS.cuda_toolkit_installation_dir, 'bin'),
+      'CUDA_HOME=%s' % FLAGS.cuda_toolkit_installation_dir,
       'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
-      os.path.join(CUDA_TOOLKIT_INSTALL_DIR, lib_name),
+      posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name),
   ])
 
 
@@ -262,7 +266,7 @@ def _MakeSamplesFromOutput(benchmark_spec, output):
 
 
 def Run(benchmark_spec):
-  """Run TensorFlow on the cluster.
+  """Run TensorFlow on the cluster for each model specified.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -275,30 +279,37 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   master_vm = vms[0]
   tf_cnn_benchmark_dir = 'benchmarks/scripts/tf_cnn_benchmarks'
-  tf_cnn_benchmark_cmd = (
-      'python tf_cnn_benchmarks.py --local_parameter_device=%s '
-      '--batch_size=%s --model=%s --data_name=%s --variable_update=%s '
-      '--use_nccl=%s --distortions=%s --device=%s --data_format=%s '
-      '--forward_only=%s') % (
-          benchmark_spec.local_parameter_device,
-          benchmark_spec.batch_size,
-          benchmark_spec.model,
-          benchmark_spec.data_name,
-          benchmark_spec.variable_update,
-          benchmark_spec.use_nccl,
-          benchmark_spec.distortions,
-          benchmark_spec.device,
-          benchmark_spec.data_format,
-          benchmark_spec.forward_only)
-  if benchmark_spec.device == GPU:
-    benchmark_spec.num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
-    tf_cnn_benchmark_cmd = '%s %s --num_gpus=%s' % (
-        _GetEnvironmentVars(master_vm), tf_cnn_benchmark_cmd,
-        benchmark_spec.num_gpus)
-  run_command = 'cd %s && %s' % (tf_cnn_benchmark_dir,
-                                 tf_cnn_benchmark_cmd)
-  output, _ = master_vm.RobustRemoteCommand(run_command, should_log=True)
-  return _MakeSamplesFromOutput(benchmark_spec, output)
+
+  results = []
+  for model in FLAGS.tf_models:
+    benchmark_spec.model = model
+    benchmark_spec.batch_size = _GetBatchSize(benchmark_spec.model)
+    tf_cnn_benchmark_cmd = (
+        'python tf_cnn_benchmarks.py --local_parameter_device=%s '
+        '--batch_size=%s --model=%s --data_name=%s --variable_update=%s '
+        '--use_nccl=%s --distortions=%s --device=%s --data_format=%s '
+        '--forward_only=%s') % (
+            benchmark_spec.local_parameter_device,
+            benchmark_spec.batch_size,
+            benchmark_spec.model,
+            benchmark_spec.data_name,
+            benchmark_spec.variable_update,
+            benchmark_spec.use_nccl,
+            benchmark_spec.distortions,
+            benchmark_spec.device,
+            benchmark_spec.data_format,
+            benchmark_spec.forward_only)
+    if benchmark_spec.device == GPU:
+      benchmark_spec.num_gpus = cuda_toolkit_8.QueryNumberOfGpus(master_vm)
+      tf_cnn_benchmark_cmd = '%s %s --num_gpus=%s' % (
+          _GetEnvironmentVars(master_vm), tf_cnn_benchmark_cmd,
+          benchmark_spec.num_gpus)
+    run_command = 'cd %s && %s' % (tf_cnn_benchmark_dir,
+                                   tf_cnn_benchmark_cmd)
+    output, _ = master_vm.RobustRemoteCommand(run_command, should_log=True)
+    results.extend(_MakeSamplesFromOutput(benchmark_spec, output))
+
+  return results
 
 
 def Cleanup(benchmark_spec):

@@ -14,6 +14,7 @@
 
 """Utilities for working with Amazon Web Services resources."""
 
+import json
 import re
 import string
 
@@ -76,6 +77,21 @@ def AddDefaultTags(resource_id, region):
   """
   tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
   AddTags(resource_id, region, **tags)
+
+
+def GetAccount():
+  """Retrieve details about the current IAM identity.
+
+  http://docs.aws.amazon.com/cli/latest/reference/sts/get-caller-identity.html
+
+  Returns:
+    A string of the AWS account ID number of the account that owns or contains
+    the calling entity.
+  """
+
+  cmd = AWS_PREFIX + ['sts', 'get-caller-identity']
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  return json.loads(stdout)['Account']
 
 
 @vm_util.Retry()

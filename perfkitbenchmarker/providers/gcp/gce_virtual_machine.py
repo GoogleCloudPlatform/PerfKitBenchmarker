@@ -57,12 +57,36 @@ RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
-GPU_TYPE_K80 = 'k80'
-GPU_TYPE_P100 = 'p100'
-GPU_TYPE_TO_INTERAL_NAME_MAP = {
-    GPU_TYPE_K80: 'nvidia-tesla-k80',
-    GPU_TYPE_P100: 'nvidia-tesla-p100',
+STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
+                    'potential stockout scenario.')
+_GPU_TYPE_TO_INTERAL_NAME_MAP = {
+    'k80': 'nvidia-tesla-k80',
+    'p100': 'nvidia-tesla-p100',
 }
+
+
+def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
+  """Generates a string to be used to attach accelerators to a VM using gcloud.
+
+  This function takes a cloud-agnostic accelerator type (k80, p100, etc.) and
+  returns a gce-specific accelerator name (nvidia-tesla-k80, etc).
+
+  If FLAGS.gce_accelerator_type_override is specified, the value of said flag
+  will be used as the name of the accelerator.
+
+  Args:
+    accelerator_type: cloud-agnostic accelerator type (p100, k80, etc.)
+    accelerator_count: number of accelerators to attach to the VM
+
+  Returns:
+    String to be used by gcloud to attach accelerators to a VM.
+    Must be prepended by the flag '--accelerator'.
+  """
+  gce_accelerator_type = (FLAGS.gce_accelerator_type_override or
+                          _GPU_TYPE_TO_INTERAL_NAME_MAP[accelerator_type])
+  return 'type={0},count={1}'.format(
+      gce_accelerator_type,
+      accelerator_count)
 
 
 class MemoryDecoder(option_decoders.StringDecoder):
@@ -348,11 +372,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
+    self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
 
   @property
   def host_list(self):
     """Returns the list of hosts that are compatible with this VM."""
     return self.host_map[(self.project, self.zone)]
+
 
   def _GenerateCreateCommand(self, ssh_keys_path):
     """Generates a command to create the VM instance.
@@ -388,9 +414,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       cmd.flags['machine-type'] = self.machine_type
     if self.gpu_count:
-      cmd.flags['accelerator'] = 'type={0},count={1}'.format(
-          GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpu_type],
-          self.gpu_count)
+      cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
+                                                               self.gpu_count)
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
     if self.host:
@@ -464,6 +489,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           host.Create()
         self.host = self.host_list[-1]
       raise errors.Resource.RetryableCreationError()
+    if (not self.use_dedicated_host and retcode and
+        _INSUFFICIENT_HOST_CAPACITY in stderr):
+      logging.error(STOCKOUT_MESSAGE)
+      raise errors.Resource.CreationError(STOCKOUT_MESSAGE)
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
@@ -591,6 +620,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.gpu_count:
       result['gpu_type'] = self.gpu_type
       result['gpu_count'] = self.gpu_count
+    if self.gce_accelerator_type_override:
+      result['accelerator_type_override'] = self.gce_accelerator_type_override
     return result
 
   def SimulateMaintenanceEvent(self):
