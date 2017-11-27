@@ -19,6 +19,7 @@ from perfkitbenchmarker import flags
 
 # Locations
 US_LAS = 'us/las'
+US_EWR = 'us/ewr'
 DE_FKB = 'de/fkb'
 DE_FRA = 'de/fra'
 
@@ -39,11 +40,17 @@ flags.DEFINE_string('profitbricks_config',
                      'Can also be set via $PROFITBRICKS_CONFIG environment '
                      'variable.\n(File format: email:password)'))
 
+flags.DEFINE_string('profitbricks_image_alias', None,
+                    'An alias to a ProfitBricks public image. If given, '
+                    'it will be used instead of a default Ubuntu 14 image. '
+                    'E.g., "ubuntu:latest" indicates the latest version of '
+                    'Ubuntu is to be used to provision a volume.')
+
 flags.DEFINE_enum('profitbricks_location',
                   US_LAS,
-                  [US_LAS, DE_FKB, DE_FRA],
+                  [US_LAS, US_EWR, DE_FKB, DE_FRA],
                   ('Location of data center to be provisioned (us/las, '
-                   'de/fkb, de/fra)'))
+                   'us/ewr, de/fkb, de/fra)'))
 
 flags.DEFINE_enum('profitbricks_boot_volume_type',
                   HDD,
@@ -56,7 +63,7 @@ flags.DEFINE_integer('profitbricks_boot_volume_size',
 
 flags.DEFINE_enum('availability_zone',
                   AUTO,
-                  [AUTO, ZONE_1, ZONE_2, ZONE_2],
+                  [AUTO, ZONE_1, ZONE_2, ZONE_3],
                   ('Direct a storage volume to be created in one of three '
                    'zones per data center (AUTO, '
                    'ZONE_1, ZONE_2, ZONE_3)'))
