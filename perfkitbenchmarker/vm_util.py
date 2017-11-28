@@ -172,7 +172,7 @@ def GetCertPath():
   return PrependTempDir(CERT_FILE)
 
 
-def GetSshOptions(ssh_key_filename):
+def GetSshOptions(ssh_key_filename, connect_timeout=5):
   """Return common set of SSH and SCP options."""
   options = [
       '-2',
@@ -181,7 +181,7 @@ def GetSshOptions(ssh_key_filename):
       '-o', 'IdentitiesOnly=yes',
       '-o', 'PreferredAuthentications=publickey',
       '-o', 'PasswordAuthentication=no',
-      '-o', 'ConnectTimeout=5',
+      '-o', 'ConnectTimeout=%d' % connect_timeout,
       '-o', 'GSSAPIAuthentication=no',
       '-o', 'ServerAliveInterval=30',
       '-o', 'ServerAliveCountMax=10',
