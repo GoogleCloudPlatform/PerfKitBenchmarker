@@ -24,18 +24,19 @@ SPEC CPU2006 homepage: http://www.spec.org/cpu2006/
 
 import itertools
 import logging
+from operator import mul
 import os
 import posixpath
 import re
 import tarfile
 
-from operator import mul
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
+from perfkitbenchmarker.linux_packages import build_tools
 
 
 FLAGS = flags.FLAGS
@@ -62,6 +63,14 @@ flags.DEFINE_string(
     'cfg file must be placed in the local PKB data directory and will be '
     'copied to the remote machine prior to executing runspec. See README.md '
     'for instructions if running with a repackaged cpu2006v1.2.tgz file.')
+flags.DEFINE_string(
+    'runspec_build_tool_version', None,
+    'Version of gcc/g++/gfortran. This should match runspec_config. Note, if '
+    'neither runspec_config and runspec_build_tool_version is set, the test '
+    'install gcc/g++/gfortran-4.7, since that matches default config version. '
+    'If runspec_config is set, but not runspec_build_tool_version, default '
+    'version of build tools will be installed. Also this flag only works with '
+    'debian.')
 flags.DEFINE_integer(
     'runspec_iterations', 3,
     'Used by the PKB speccpu2006 benchmark. The number of benchmark iterations '
@@ -119,7 +128,7 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(benchmark_config):
+def CheckPrerequisites(unused_benchmark_config):
   """Verifies that the required input files are present."""
   try:
     # Peeking into the tar file is slow. If running in stages, it's
@@ -227,6 +236,7 @@ class _SpecCpu2006SpecificState(object):
         where the SPEC files are stored.
     tar_file_path: Optional string. Path of the tar file on the remote machine.
   """
+
   def __init__(self):
     self.cfg_file_path = None
     self.iso_file_path = None
@@ -246,8 +256,15 @@ def Prepare(benchmark_spec):
   speccpu_vm_state = _SpecCpu2006SpecificState()
   setattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR, speccpu_vm_state)
   vm.Install('wget')
-  vm.Install('build_tools')
   vm.Install('fortran')
+  vm.Install('build_tools')
+
+  # If using default config files and runspec_build_tool_version is not set,
+  # install 4.7 gcc/g++/gfortan. If either one of the flag is set, we assume
+  # user is smart
+  if not FLAGS['runspec_config'].present or FLAGS.runspec_build_tool_version:
+    build_tool_version = FLAGS.runspec_build_tool_version or '4.7'
+    build_tools.Reinstall(vm, version=build_tool_version)
   if FLAGS.runspec_enable_32bit:
     vm.Install('multilib')
   vm.Install('numactl')
@@ -329,6 +346,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
     keep_partial_results: A boolean indicating whether partial results should
         be extracted in the event that not all benchmarks were successfully
         run. See the "runspec_keep_partial_results" flag for more info.
+    estimate_spec: A boolean indicating whether should we estimate spec score.
 
   Sample input for SPECint:
       ...
@@ -449,7 +467,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
 
 
 def _GeometricMean(arr):
-  "Calculates the geometric mean of the array."
+  """Calculates the geometric mean of the array."""
   return reduce(mul, arr) ** (1.0 / len(arr))
 
 
