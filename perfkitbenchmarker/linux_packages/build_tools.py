@@ -27,10 +27,10 @@ def AptInstall(vm):
   vm.InstallPackages('build-essential git libtool autoconf automake')
 
 
-def GetVersion(vm, pkg):
+def _GetVersion(vm, pkg):
   """Get version of package."""
-  out, _ = vm.RemoteCommand('{pkg} -v'.format(pkg=pkg), ignore_failure=True)
-  return out
+  _, err = vm.RemoteCommand('{pkg} -v'.format(pkg=pkg), ignore_failure=True)
+  return err
 
 
 def Reinstall(vm, version='4.7'):
@@ -43,7 +43,7 @@ def Reinstall(vm, version='4.7'):
   if vm.OS_TYPE != os_types.DEBIAN:
     return
   for pkg in ('gcc', 'gfortran', 'g++'):
-    version_string = GetVersion(vm, pkg)
+    version_string = _GetVersion(vm, pkg)
     if version in version_string:
       continue
     else:
