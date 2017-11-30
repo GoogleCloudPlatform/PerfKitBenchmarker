@@ -1,0 +1,23 @@
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  name: nvidia-add-unrestricted-permissions-dameon-set
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-add-unrestricted-permissions
+  template:
+    metadata:
+      labels:
+        name: nvidia-add-unrestricted-permissions
+    spec:
+      containers:
+      - name: nvidia-add-unrestricted-permissions
+        image: nvidia/cuda:8.0-devel-ubuntu16.04
+        securityContext:
+          privileged: true
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        command: [ "/bin/bash", "-c", "nvidia-smi -pm 1 && nvidia-smi --applications-clocks-permission=UNRESTRICTED && nvidia-smi --auto-boost-permission=UNRESTRICTED && tail -f /dev/null" ]
+

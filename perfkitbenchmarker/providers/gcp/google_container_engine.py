@@ -17,6 +17,7 @@
 import os
 
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
@@ -26,6 +27,7 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.8/device-plugin-daemonset.yaml'
+NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 
 
 class GkeCluster(container_service.KubernetesCluster):
@@ -86,6 +88,8 @@ class GkeCluster(container_service.KubernetesCluster):
 
     if self.gpu_count:
       kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
+      kubernetes_helper.CreateFromFile(
+          data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET))
 
   def _Delete(self):
     """Deletes the cluster."""
