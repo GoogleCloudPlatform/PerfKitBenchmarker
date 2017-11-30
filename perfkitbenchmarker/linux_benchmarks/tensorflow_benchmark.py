@@ -214,27 +214,6 @@ def _CreateMetadataDict(benchmark_spec, model, batch_size, num_gpus):
   return metadata
 
 
-def _GetEnvironmentVars(vm):
-  """Return a string containing TensorFlow-related environment variables.
-
-  Args:
-    vm: vm to get environment varibles
-
-  Returns:
-    string of environment variables
-  """
-  output, _ = vm.RemoteCommand('getconf LONG_BIT', should_log=True)
-  long_bit = output.strip()
-  lib_name = 'lib' if long_bit == '32' else 'lib64'
-  return ' '.join([
-      'PATH=%s${PATH:+:${PATH}}' %
-      posixpath.join(FLAGS.cuda_toolkit_installation_dir, 'bin'),
-      'CUDA_HOME=%s' % FLAGS.cuda_toolkit_installation_dir,
-      'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
-      posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name),
-  ])
-
-
 def _ExtractThroughput(output):
   """Extract throughput from TensorFlow output.
 
@@ -304,7 +283,7 @@ def _RunOnVm(vm, benchmark_spec):
     if benchmark_spec.device == GPU:
       num_gpus = cuda_toolkit_8.QueryNumberOfGpus(vm)
       tf_cnn_benchmark_cmd = '%s %s --num_gpus=%s' % (
-          _GetEnvironmentVars(vm), tf_cnn_benchmark_cmd,
+          tensorflow._GetEnvironmentVars(vm), tf_cnn_benchmark_cmd,
           num_gpus)
     else:
       num_gpus = 0
