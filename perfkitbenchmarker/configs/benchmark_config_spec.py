@@ -551,6 +551,13 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
                 managed_relational_db.AURORA_POSTGRES,
             ]
         }),
+        'zones': (option_decoders.ListDecoder, {
+            'item_decoder': option_decoders.StringDecoder(),
+            'default': None
+        }),
+        'machine_type': (option_decoders.StringDecoder, {
+            'default': None
+        }),
         'engine_version': (option_decoders.StringDecoder, {
             'default': None
         }),
