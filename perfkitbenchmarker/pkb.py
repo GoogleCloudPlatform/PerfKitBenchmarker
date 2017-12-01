@@ -493,9 +493,6 @@ def DoRunPhase(spec, collector, timer):
     try:
       with timer.Measure('Benchmark Run'):
         samples = spec.BenchmarkRun(spec)
-      if (FLAGS.boot_samples or
-          spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
-        samples.extend(cluster_boot_benchmark.GetTimeToBoot(spec.vms))
     except Exception:
       consecutive_failures += 1
       if consecutive_failures > FLAGS.run_stage_retries:
@@ -518,6 +515,10 @@ def DoRunPhase(spec, collector, timer):
       last_publish_time = time.time()
     run_number += 1
     if time.time() > deadline:
+      if (FLAGS.boot_samples or
+          spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
+        collector.AddSamples(
+            cluster_boot_benchmark.GetTimeToBoot(spec.vms), spec.name, spec)
       break
 
 
