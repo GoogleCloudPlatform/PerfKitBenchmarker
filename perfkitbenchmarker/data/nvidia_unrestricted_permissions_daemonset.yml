@@ -1,3 +1,15 @@
+# This file defines a daemonset which runs automatically on all
+# kubernetes nodes. It is used like so: kubectl create -f <this file_path>.
+# The daemonset does the following:
+#   - enables persistence mode on the nvidia driver
+#   - allows all users to set the GPU clock speed
+# In effect, this allows pods created without a privilaged security context to 
+# set the GPU clock speeds
+# This daemonset config does not define GPU resources, because otherwise it
+# would consume them, leaving them unavaliable to pods. Instead, it runs in 
+# privilaged mode (so it can see all GPUs), and manually mounts the CUDA
+# lib and bin directories.
+
 apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
@@ -16,8 +28,16 @@ spec:
         image: nvidia/cuda:8.0-devel-ubuntu16.04
         securityContext:
           privileged: true
-        resources:
-          limits:
-            nvidia.com/gpu: 1
-        command: [ "/bin/bash", "-c", "nvidia-smi -pm 1 && nvidia-smi --applications-clocks-permission=UNRESTRICTED && nvidia-smi --auto-boost-permission=UNRESTRICTED && tail -f /dev/null" ]
-
+        command: [ "/bin/bash", "-c", "export PATH=$PATH:/usr/local/bin/nvidia/ && nvidia-smi -pm 1 && nvidia-smi --applications-clocks-permission=UNRESTRICTED && nvidia-smi --auto-boost-permission=UNRESTRICTED && tail -f /dev/null" ]
+        volumeMounts:
+          - name: nvidia-debug-tools
+            mountPath: /usr/local/bin/nvidia
+          - name: nvidia-libraries
+            mountPath: /usr/local/nvidia/lib64
+      volumes:
+        - name: nvidia-debug-tools
+          hostPath:
+            path: /home/kubernetes/bin/nvidia/bin
+        - name: nvidia-libraries
+          hostPath:
+            path: /home/kubernetes/bin/nvidia/lib
