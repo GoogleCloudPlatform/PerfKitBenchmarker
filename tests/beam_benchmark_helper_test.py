@@ -108,6 +108,12 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
     beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
     self.assertListEqual(["-Dkey=value", "-Dkey2=value2"], actual_mvn_command)
 
+  def test_integrationPipelineOptions_rejection(self):
+    testOptionVal = "[\"integrationTestPipelineOptions=...\"]"
+    actual_mvn_command = []
+    with self.assertRaises(ValueError):
+      beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+
 
 if __name__ == '__main__':
   unittest.main()

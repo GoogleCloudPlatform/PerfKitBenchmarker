@@ -105,7 +105,10 @@ def AddRunnerOptionMvnArgument(service_type, beam_args, runner_option_override):
 
 def AddExtraMvnProperties(mvn_command, beam_extra_mvn_properties):
   if not beam_extra_mvn_properties:
-      return
+    return
+  if "integrationTestPipelineOptions=" in beam_extra_mvn_properties:
+    raise ValueError("integrationTestPipelineOptions must not be in beam_extra_mvn_properties")
+
   extra_mvn_properties = beam_extra_mvn_properties.rstrip(']').lstrip('[').split(',')
   extra_mvn_properties = [p.rstrip('" ').lstrip('" ') for p in extra_mvn_properties]
   for p in extra_mvn_properties:
