@@ -46,7 +46,7 @@ class GkeCluster(container_service.KubernetesCluster):
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
 
   def GetResourceMetadata(self):
-    """Returns a dict containing metadata about the VM.
+    """Returns a dict containing metadata about the cluster.
 
     Returns:
       dict mapping string property key to value.
@@ -64,7 +64,7 @@ class GkeCluster(container_service.KubernetesCluster):
       # for google_container_engine however).
       cmd = util.GcloudCommand(
           self, 'alpha', 'container', 'clusters', 'create', self.name,
-          '--enable-kubernetes-alpha', '--cluster-version', '1.8.1-gke.1')
+          '--enable-kubernetes-alpha', '--cluster-version', '1.8.4-gke.0')
 
       cmd.flags['accelerator'] = (gce_virtual_machine.
                                   GenerateAcceleratorSpecString(self.gpu_type,
