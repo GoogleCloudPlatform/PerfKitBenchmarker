@@ -319,7 +319,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     elif self.spec.engine == managed_relational_db.AURORA_POSTGRES:
 
       cluster_identifier = 'pkb-db-cluster-' + FLAGS.run_uri
-      #create the cluster
+      # Create the cluster.
       cmd = util.AWS_PREFIX + [
           'rds', 'create-db-cluster',
           '--db-cluster-identifier=%s' % cluster_identifier,

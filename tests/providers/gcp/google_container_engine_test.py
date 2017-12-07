@@ -31,6 +31,7 @@ _RUN_URI = 'fake-urn-uri'
 _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.8/device-plugin-daemonset.yaml'
 _NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 
+
 @contextlib2.contextmanager
 def patch_critical_objects(stdout='', stderr='', return_code=0):
   with contextlib2.ExitStack() as stack:
@@ -184,5 +185,3 @@ class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
       # driver setup daemon set, followed by the
       # NVIDIA unrestricted permissions daemon set.
       create_from_file_patch.assert_has_calls(expected_calls)
-
-

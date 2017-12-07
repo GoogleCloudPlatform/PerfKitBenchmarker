@@ -14,7 +14,6 @@
 
 """Run Tensorflow benchmarks (https://github.com/tensorflow/benchmarks)."""
 
-import posixpath
 import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
@@ -313,8 +312,8 @@ def Run(benchmark_spec):
 
   # Add vm index to results metadata
   for idx, vm_result in enumerate(run_results):
-    for sample in vm_result:
-      sample.metadata['vm_index'] = idx
+    for result_sample in vm_result:
+      result_sample.metadata['vm_index'] = idx
 
   # Flatten the list
   flattened_results = (

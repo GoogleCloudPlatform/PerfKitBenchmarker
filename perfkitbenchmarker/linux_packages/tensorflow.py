@@ -39,6 +39,7 @@ def _GetEnvironmentVars(vm):
       posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name),
   ])
 
+
 def GetTensorFlowVersion(vm):
   """Returns the version of tensorflow installed on the vm.
 
