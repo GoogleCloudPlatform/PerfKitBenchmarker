@@ -29,6 +29,7 @@ from perfkitbenchmarker.providers.gcp import gcp_managed_relational_db
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker import disk
+from tests import mock_flags
 
 _BENCHMARK_NAME = 'name'
 _BENCHMARK_UID = 'benchmark_uid'
@@ -40,7 +41,10 @@ def CreateManagedDbFromSpec(spec_dict):
   mock_db_spec = mock.Mock(
       spec=benchmark_config_spec._ManagedRelationalDbSpec)
   mock_db_spec.configure_mock(**spec_dict)
-  db_class = gcp_managed_relational_db.GCPManagedRelationalDb(mock_db_spec)
+  mocked_flags = mock_flags.MockFlags()
+  mocked_flags.run_uri = 'mock-run-uri'
+  with mock_flags.PatchFlags(mocked_flags):
+    db_class = gcp_managed_relational_db.GCPManagedRelationalDb(mock_db_spec)
   return db_class
 
 

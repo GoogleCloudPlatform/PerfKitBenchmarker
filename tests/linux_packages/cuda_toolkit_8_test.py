@@ -129,8 +129,8 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
   @mock.patch(cuda_toolkit_8.__name__ + '.QueryAutoboostPolicy',
               return_value=AUTOBOOST_DISABLED_DICT)
   def testSetAutoboostPolicyWhenValuesAreDifferent(self,
-                                                 query_autoboost_mock,
-                                                 num_gpus_mock):
+                                                   query_autoboost_mock,
+                                                   num_gpus_mock):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock()
 
@@ -140,7 +140,7 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
   @mock.patch(cuda_toolkit_8.__name__ + '.QueryGpuClockSpeed',
-              return_value=(2505,875))
+              return_value=(2505, 875))
   def testSetClockSpeedWhenValuesAreTheSame(self,
                                             query_clock_speed_mock,
                                             num_gpus_mock):
@@ -153,7 +153,7 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
   @mock.patch(cuda_toolkit_8.__name__ + '.QueryGpuClockSpeed',
-              return_value=(2505,875))
+              return_value=(2505, 875))
   def testSetClockSpeedWhenValuesAreDifferent(self,
                                               query_clock_speed_mock,
                                               num_gpus_mock):

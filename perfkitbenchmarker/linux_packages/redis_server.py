@@ -58,13 +58,14 @@ def AptInstall(vm):
 
 def Configure(vm):
   """Configure redis server."""
-  sed_cmd = (r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
-             "{0}/redis.conf").format(REDIS_DIR)
+  sed_cmd = (
+      r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
+      "{0}/redis.conf").format(REDIS_DIR)
   vm.RemoteCommand(sed_cmd)
   if FLAGS.redis_enable_aof:
     vm.RemoteCommand(
-        (r'sed -i -e "s/appendonly no/appendonly yes/g" {0}/redis.conf'
-        ).format(REDIS_DIR))
+        r'sed -i -e "s/appendonly no/appendonly yes/g" {0}/redis.conf'.format(
+            REDIS_DIR))
     vm.RemoteCommand((
         r'sed -i -e "s/appendfsync everysec/# appendfsync everysec/g" '
         r'{0}/redis.conf'
