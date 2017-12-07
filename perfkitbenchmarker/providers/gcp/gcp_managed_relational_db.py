@@ -51,6 +51,10 @@ MIN_CUSTOM_MACHINE_MEM_MB = 3840
 IS_READY_TIMEOUT = 600  # 10 minutes
 
 
+class UnsupportedDatabaseEngineException(Exception):
+  pass
+
+
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """A GCP CloudSQL database resource.
 
@@ -67,10 +71,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.spec = managed_relational_db_spec
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
-    if (self.spec.engine == managed_relational_db.POSTGRES and
-        self.spec.high_availability):
-      raise Exception(('High availability configuration is not supported on '
-                       'CloudSQL PostgreSQL'))
 
   def _Create(self):
     """Creates the Cloud SQL instance and authorizes traffic from anywhere."""
@@ -116,12 +116,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       cmd_string.append('--cpu={}'.format(cpus))
       cmd_string.append('--memory={}MiB'.format(memory))
 
-    # High availability only supported on MySQL. A check is done in
-    # __init__ to ensure that a Postgres HA configuration is not requested.
-    if (self.spec.high_availability and
-        self.spec.engine == managed_relational_db.MYSQL):
-        ha_flag = '--failover-replica-name=replica-' + self.instance_id
-        cmd_string.append(ha_flag)
+    if self.spec.high_availability:
+      cmd_string.append(self._GetHighAvailabilityFlag())
 
     if self.spec.backup_enabled:
       cmd_string.append('--backup')
@@ -133,6 +129,25 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     cmd.flags['project'] = self.project
 
     _, _, _ = cmd.Issue()
+
+  def _GetHighAvailabilityFlag(self):
+    """Returns a flag that enables high-availability for the specified engine.
+
+    Returns:
+      Flag (as string) to be appended to the gcloud sql create command.
+
+    Raises:
+      UnsupportedDatabaseEngineException:
+        if engine does not support high availability.
+    """
+    if self.spec.engine == managed_relational_db.MYSQL:
+      return '--failover-replica-name=replica-' + self.instance_id
+    elif self.spec.engine == managed_relational_db.POSTGRES:
+      return '--availability-type=REGIONAL'
+    else:
+      raise UnsupportedDatabaseEngineException(
+          'High availability not supported on engine {0}'.format(
+              self.spec.engine))
 
   def _ValidateSpec(self):
     """Validates PostgreSQL spec for CPU and memory.

@@ -19,6 +19,7 @@ import unittest
 import contextlib2
 import mock
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import google_container_engine
@@ -28,6 +29,7 @@ from tests import mock_flags
 _COMPONENT = 'test_component'
 _RUN_URI = 'fake-urn-uri'
 _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.8/device-plugin-daemonset.yaml'
+_NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 
 
 @contextlib2.contextmanager
@@ -36,6 +38,7 @@ def patch_critical_objects(stdout='', stderr='', return_code=0):
     flags = mock_flags.MockFlags()
     flags.gcloud_path = 'gcloud'
     flags.run_uri = _RUN_URI
+    flags.data_search_paths = ''
 
     stack.enter_context(mock_flags.PatchFlags(flags))
     stack.enter_context(mock.patch('__builtin__.open'))
@@ -149,7 +152,7 @@ class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud alpha container clusters create', command_string)
       self.assertIn('--enable-kubernetes-alpha', command_string)
-      self.assertIn('--cluster-version 1.8.1-gke.1', command_string)
+      self.assertIn('--cluster-version 1.8.4-gke.0', command_string)
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn('--accelerator type=nvidia-tesla-k80,count=2',
@@ -169,9 +172,16 @@ class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
           command_string)
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
 
-      create_from_file_patch.assert_called_with(
-          _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
+      expected_args_to_create_from_file = (
+          _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT,
+          data.ResourcePath(
+              _NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET)
+      )
+      expected_calls = [mock.call(arg)
+                        for arg in expected_args_to_create_from_file]
 
-
-if __name__ == '__main__':
-  unittest.main()
+      # Assert that create_from_file was called twice,
+      # and that the args were as expected (should be the NVIDIA
+      # driver setup daemon set, followed by the
+      # NVIDIA unrestricted permissions daemon set.
+      create_from_file_patch.assert_has_calls(expected_calls)

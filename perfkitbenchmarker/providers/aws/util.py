@@ -42,6 +42,24 @@ def GetRegionFromZone(zone_or_region):
   return zone_or_region[:-1]
 
 
+def GetRegionFromZones(zones):
+  """Returns the region a set of zones are in.
+
+  Raises:
+      Exception: if the zones are in different regions.
+  """
+  region = None
+  for zone in zones:
+    current_region = GetRegionFromZone(zone)
+    if region is None:
+      region = current_region
+    else:
+      if region != current_region:
+        raise Exception('Not All zones are in the same region %s not same as %s. zones: %s' %
+                        (region, current_region, ','.join(zones)))
+  return region
+
+
 def AddTags(resource_id, region, **kwargs):
   """Adds tags to an AWS resource created by PerfKitBenchmarker.
 

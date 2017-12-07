@@ -135,7 +135,7 @@ flags.DEFINE_integer(
     'specified.')
 flags.DEFINE_enum(
     'gpu_type', None,
-    ['k80', 'p100'],
+    ['k80', 'p100', 'v100'],
     'Type of gpus to attach to the VM. Requires gpu_count to be '
     'specified.')
 flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
@@ -493,9 +493,6 @@ def DoRunPhase(spec, collector, timer):
     try:
       with timer.Measure('Benchmark Run'):
         samples = spec.BenchmarkRun(spec)
-      if (FLAGS.boot_samples or
-          spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
-        samples.extend(cluster_boot_benchmark.GetTimeToBoot(spec.vms))
     except Exception:
       consecutive_failures += 1
       if consecutive_failures > FLAGS.run_stage_retries:
@@ -518,6 +515,10 @@ def DoRunPhase(spec, collector, timer):
       last_publish_time = time.time()
     run_number += 1
     if time.time() > deadline:
+      if (FLAGS.boot_samples or
+          spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
+        collector.AddSamples(
+            cluster_boot_benchmark.GetTimeToBoot(spec.vms), spec.name, spec)
       break
 
 
@@ -615,10 +616,12 @@ def RunBenchmark(spec, collector):
           DoCleanupPhase(spec, detailed_timer)
         raise
       finally:
-        if FLAGS.publish_after_run:
-          collector.PublishSamples()
+        # Deleting resources should happen first so any errors with publishing
+        # don't prevent teardown.
         if stages.TEARDOWN in FLAGS.run_stage:
           spec.Delete()
+        if FLAGS.publish_after_run:
+          collector.PublishSamples()
         events.benchmark_end.send(benchmark_spec=spec)
         # Pickle spec to save final resource state.
         spec.Pickle()

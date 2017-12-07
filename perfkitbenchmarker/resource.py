@@ -91,6 +91,20 @@ class BaseResource(object):
     """
     return True
 
+  def _IsDeleting(self):
+    """Return true if the underlying resource is getting deleted.
+
+    Supplying this method is optional.  Potentially use when the resource has an
+    aynchcronous deletion operation to avoid rerunning the deletion command and
+    track the deletion time correctly. If the subclass does not implement it
+    then it just returns false.
+
+    Returns:
+      True if the resource was being deleted, False if the resource was in a non
+      deleting state.
+    """
+    return False
+
   def _PostCreate(self):
     """Method that will be called once after _CreateReource is called.
 
@@ -150,8 +164,6 @@ class BaseResource(object):
             'Deletion of %s failed.' % type(self).__name__)
     except NotImplementedError:
       pass
-    self.deleted = True
-    self.delete_end_time = time.time()
 
   def Create(self):
     """Creates a resource and its dependencies."""
@@ -176,7 +188,19 @@ class BaseResource(object):
 
   def Delete(self):
     """Deletes a resource and its dependencies."""
+
+    # Retryable method which allows waiting for deletion of the resource.
+    @vm_util.Retry(poll_interval=5, fuzz=0, timeout=3600,
+                   retryable_exceptions=(
+                       errors.Resource.RetryableDeletionError,))
+    def WaitUntilDeleted():
+      if self._IsDeleting():
+        raise errors.Resource.RetryableDeletionError('Not yet deleted')
+
     if self.user_managed:
       return
     self._DeleteResource()
+    WaitUntilDeleted()
+    self.deleted = True
+    self.delete_end_time = time.time()
     self._DeleteDependencies()

@@ -14,8 +14,30 @@
 
 
 """Module containing TensorFlow 1.3 installation and cleanup functions."""
+import posixpath
 from perfkitbenchmarker import flags
 FLAGS = flags.FLAGS
+
+
+def _GetEnvironmentVars(vm):
+  """Return a string containing TensorFlow-related environment variables.
+
+  Args:
+    vm: vm to get environment varibles
+
+  Returns:
+    string of environment variables
+  """
+  output, _ = vm.RemoteCommand('getconf LONG_BIT', should_log=True)
+  long_bit = output.strip()
+  lib_name = 'lib' if long_bit == '32' else 'lib64'
+  return ' '.join([
+      'PATH=%s${PATH:+:${PATH}}' %
+      posixpath.join(FLAGS.cuda_toolkit_installation_dir, 'bin'),
+      'CUDA_HOME=%s' % FLAGS.cuda_toolkit_installation_dir,
+      'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
+      posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name),
+  ])
 
 
 def GetTensorFlowVersion(vm):
@@ -28,7 +50,8 @@ def GetTensorFlowVersion(vm):
     installed python tensorflow version as a string
   """
   stdout, _ = vm.RemoteCommand(
-      'echo -e "import tensorflow\nprint(tensorflow.__version__)" | python'
+      ('echo -e "import tensorflow\nprint(tensorflow.__version__)" | {0} python'
+       .format(_GetEnvironmentVars(vm)))
   )
   return stdout.strip()
 
@@ -48,5 +71,5 @@ def Install(vm):
 
 def Uninstall(vm):
   """Uninstalls TensorFlow on the VM."""
-  vm.RemoteCommand('sudo pip uninstall --upgrade tensorflow',
+  vm.RemoteCommand('sudo pip uninstall tensorflow',
                    should_log=True)
