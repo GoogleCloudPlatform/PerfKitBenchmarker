@@ -92,8 +92,8 @@ class BaseContainerCluster(resource.BaseResource):
     }
     if self.gpu_count:
       metadata.update({
-        'gpu_type': self.gpu_type,
-        'num_gpus': self.gpu_count,
+          'gpu_type': self.gpu_type,
+          'num_gpus': self.gpu_count,
       })
     return metadata
 
