@@ -12,6 +12,7 @@
 - Support for ProfitBricks API v4:
   - Add `profitbricks_image_alias` flag and support for image aliases
   - Add new location, `us/ewr`
+- Add aws_image_name_filter flag to ease specifying images.
 
 ###Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

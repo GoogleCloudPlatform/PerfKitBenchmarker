@@ -21,6 +21,10 @@ from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit_8
 
 
+AUTOBOOST_ENABLED_DICT = {'autoboost': True, 'autoboost_default': True}
+AUTOBOOST_DISABLED_DICT = {'autoboost': False, 'autoboost_default': False}
+
+
 class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
@@ -108,6 +112,57 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
                             'PKB only supports one type of gpu per VM',
                             cuda_toolkit_8.GetGpuType, vm)
 
+  @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
+  @mock.patch(cuda_toolkit_8.__name__ + '.QueryAutoboostPolicy',
+              return_value=AUTOBOOST_ENABLED_DICT)
+  def testSetAutoboostPolicyWhenValuesAreTheSame(self,
+                                                 query_autoboost_mock,
+                                                 num_gpus_mock):
+    vm = mock.MagicMock()
+    vm.RemoteCommand = mock.MagicMock()
+
+    cuda_toolkit_8.SetAutoboostDefaultPolicy(vm, True)
+    query_autoboost_mock.assetCalled()
+    vm.RemoteCommand.assert_not_called()
+
+  @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
+  @mock.patch(cuda_toolkit_8.__name__ + '.QueryAutoboostPolicy',
+              return_value=AUTOBOOST_DISABLED_DICT)
+  def testSetAutoboostPolicyWhenValuesAreDifferent(self,
+                                                   query_autoboost_mock,
+                                                   num_gpus_mock):
+    vm = mock.MagicMock()
+    vm.RemoteCommand = mock.MagicMock()
+
+    cuda_toolkit_8.SetAutoboostDefaultPolicy(vm, True)
+    query_autoboost_mock.assetCalled()
+    self.assertEqual(2, vm.RemoteCommand.call_count)
+
+  @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
+  @mock.patch(cuda_toolkit_8.__name__ + '.QueryGpuClockSpeed',
+              return_value=(2505, 875))
+  def testSetClockSpeedWhenValuesAreTheSame(self,
+                                            query_clock_speed_mock,
+                                            num_gpus_mock):
+    vm = mock.MagicMock()
+    vm.RemoteCommand = mock.MagicMock()
+
+    cuda_toolkit_8.SetGpuClockSpeed(vm, 2505, 875)
+    query_clock_speed_mock.assetCalled()
+    vm.RemoteCommand.assert_not_called()
+
+  @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
+  @mock.patch(cuda_toolkit_8.__name__ + '.QueryGpuClockSpeed',
+              return_value=(2505, 875))
+  def testSetClockSpeedWhenValuesAreDifferent(self,
+                                              query_clock_speed_mock,
+                                              num_gpus_mock):
+    vm = mock.MagicMock()
+    vm.RemoteCommand = mock.MagicMock()
+
+    cuda_toolkit_8.SetGpuClockSpeed(vm, 2505, 562)
+    query_clock_speed_mock.assetCalled()
+    self.assertEqual(2, vm.RemoteCommand.call_count)
 
 if __name__ == '__main__':
   unittest.main()
