@@ -105,7 +105,7 @@ DEFAULT_BATCH_SIZE = 64
 DEFAULT_BATCH_SIZES_BY_MODEL = {
     'vgg16': 32,
     'alexnet': 512,
-    'restnet152': 32,
+    'resnet152': 32,
 }
 
 
