@@ -90,6 +90,11 @@ class BaseContainerCluster(resource.BaseResource):
         'zone': self.zone,
         'size': self.num_nodes,
     }
+    if self.gpu_count:
+      metadata.update({
+          'gpu_type': self.gpu_type,
+          'num_gpus': self.gpu_count,
+      })
     return metadata
 
 

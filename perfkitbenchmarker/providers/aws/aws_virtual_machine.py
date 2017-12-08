@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from collections import OrderedDict
 
 """Class to represent an AWS Virtual Machine object.
 
@@ -21,16 +20,17 @@ operate on the VM: boot, shutdown, etc.
 
 import base64
 import collections
+from collections import OrderedDict
 import json
 import logging
-import uuid
 import threading
 import time
-
+import uuid
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -39,7 +39,6 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
-from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
@@ -87,7 +86,7 @@ SPOT_INSTANCE_REQUEST_TERMINAL_STATUSES = frozenset(
 
 
 def GetRootBlockDeviceSpecForImage(image_id, region):
-  """ Queries the CLI and returns the root block device specification as a dict.
+  """Queries the CLI and returns the root block device specification as a dict.
 
   Args:
     image_id: The EC2 image id to query
@@ -107,8 +106,8 @@ def GetRootBlockDeviceSpecForImage(image_id, region):
   stdout, _ = util.IssueRetryableCommand(command)
   images = json.loads(stdout)
   assert images
-  assert len(images) == 1, \
-      'Expected to receive only one image description for %s' % image_id
+  assert len(images) == 1, (
+      'Expected to receive only one image description for %s' % image_id)
   image_spec = images[0]
   root_device_name = image_spec['RootDeviceName']
   block_device_mappings = image_spec['BlockDeviceMappings']
@@ -123,9 +122,9 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
 
   Args:
     machine_type: The machine type to create a block device map for.
-    root_volume_size: The desired size of the root volume, in GiB,
+    root_volume_size_gb: The desired size of the root volume, in GiB,
       or None to the default provided by AWS.
-    image: The image id (AMI) to use in order to lookup the default
+    image_id: The image id (AMI) to use in order to lookup the default
       root device specs. This is only required if root_volume_size
       is specified.
     region: The region which contains the specified image. This is only
@@ -136,15 +135,18 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
     with the AWS CLI, or if the machine type has no local disks, it will
     return None. If root_volume_size_gb and image_id are provided, the block
     device map will include the specification for the root volume.
+
+  Raises:
+    ValueError: If required parameters are not passed.
   """
   mappings = []
   if root_volume_size_gb is not None:
     if image_id is None:
       raise ValueError(
-          "image_id must be provided if root_volume_size_gb is specified")
+          'image_id must be provided if root_volume_size_gb is specified')
     if region is None:
       raise ValueError(
-          "region must be provided if image_id is specified")
+          'region must be provided if image_id is specified')
     root_block_device = GetRootBlockDeviceSpecForImage(image_id, region)
     root_block_device['Ebs']['VolumeSize'] = root_volume_size_gb
     # The 'Encrypted' key must be removed or the CLI will complain
@@ -158,7 +160,7 @@ def GetBlockDeviceMap(machine_type, root_volume_size_gb=None,
       od['VirtualName'] = 'ephemeral%s' % i
       od['DeviceName'] = '/dev/xvd%s' % chr(ord(DRIVE_START_LETTER) + i)
       mappings.append(od)
-  if len(mappings):
+  if mappings:
     return json.dumps(mappings)
   return None
 
@@ -282,6 +284,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   CLOUD = providers.AWS
   IMAGE_NAME_FILTER = None
+  IMAGE_OWNER = None
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
 
   _lock = threading.Lock()
@@ -295,6 +298,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+
+    Raises:
+      ValueError: If an incompatible vm_spec is passed.
     """
     super(AwsVirtualMachine, self).__init__(vm_spec)
     self.region = util.GetRegionFromZone(self.zone)
@@ -320,10 +326,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise ValueError(
           'In order to use dedicated hosts, you must specify an availability '
           'zone, not a region ("zone" was %s).' % self.zone)
-    if self.machine_type[:2].lower() == 'i3' and not self.image:
-      # TODO(user): Remove this check when pkb defaults to ubuntu-1604.
-      raise ValueError(
-          'In order to use i3 instances, you must specify --image.')
 
     if self.use_spot_instance and self.spot_price <= 0.0:
       raise ValueError(
@@ -344,10 +346,19 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _GetDefaultImage(cls, machine_type, region):
     """Returns the default image given the machine type and region.
 
+    If specified, aws_image_name_filter will override os_type defaults.
     If no default is configured, this will return None.
+
+    Args:
+      machine_type: The machine_type of the VM, used to determine virtualization
+        type.
+      region: The region of the VM, as images are region specific.
     """
     if cls.IMAGE_NAME_FILTER is None:
       return None
+
+    if FLAGS.aws_image_name_filter:
+      cls.IMAGE_NAME_FILTER = FLAGS.aws_image_name_filter
 
     prefix = machine_type.split('.')[0]
     virt_type = 'paravirtual' if prefix in NON_HVM_PREFIXES else 'hvm'
@@ -362,6 +373,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'Name=block-device-mapping.volume-type,Values=%s' %
         cls.DEFAULT_ROOT_DISK_TYPE,
         'Name=virtualization-type,Values=%s' % virt_type]
+    if cls.IMAGE_OWNER:
+      describe_cmd.extend(['--owners', cls.IMAGE_OWNER])
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
 
     if not stdout:
@@ -541,10 +554,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--client-token=%s' % self.client_token,
         '--launch-specification=%s' % json.dumps(launch_specification,
                                                  separators=(',', ':'))]
-    stdout, stderr, _ = vm_util.IssueCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
     create_response = json.loads(stdout)
-    self.spot_instance_request_id =\
-        create_response['SpotInstanceRequests'][0]['SpotInstanceRequestId']
+    self.spot_instance_request_id = (
+        create_response['SpotInstanceRequests'][0]['SpotInstanceRequestId'])
 
     util.AddDefaultTags(self.spot_instance_request_id, self.region)
 
@@ -554,18 +567,18 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'ec2',
           'describe-spot-instance-requests',
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
-      stdout, stderr, _ = vm_util.IssueCommand(describe_sir_cmd)
+      stdout, _, _ = vm_util.IssueCommand(describe_sir_cmd)
 
       sir_response = json.loads(stdout)['SpotInstanceRequests']
       assert len(sir_response) == 1, 'Expected exactly 1 SpotInstanceRequest'
 
       status_code = sir_response[0]['Status']['Code']
 
-      if status_code in SPOT_INSTANCE_REQUEST_HOLDING_STATUSES or \
-         status_code in SPOT_INSTANCE_REQUEST_TERMINAL_STATUSES:
+      if (status_code in SPOT_INSTANCE_REQUEST_HOLDING_STATUSES or
+          status_code in SPOT_INSTANCE_REQUEST_TERMINAL_STATUSES):
         message = sir_response[0]['Status']['Message']
         raise errors.Resource.CreationError(message)
-      elif status_code == "fulfilled":
+      elif status_code == 'fulfilled':
         self.id = sir_response[0]['InstanceId']
         break
 
@@ -587,7 +600,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'cancel-spot-instance-requests',
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
       vm_util.IssueCommand(cancel_cmd)
-
 
   def _Exists(self):
     """Returns true if the VM exists."""
@@ -654,11 +666,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
+  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
 
 
 class JujuBasedAwsVirtualMachine(AwsVirtualMachine,
                                  linux_virtual_machine.JujuMixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
+  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
 
 
 class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
@@ -684,7 +698,7 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
 
   @vm_util.Retry()
   def _GetDecodedPasswordData(self):
-    # Retreive a base64 encoded, encrypted password for the VM.
+    # Retrieve a base64 encoded, encrypted password for the VM.
     get_password_cmd = util.AWS_PREFIX + [
         'ec2',
         'get-password-data',
@@ -701,7 +715,6 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
 
     # Decode the password data.
     return base64.b64decode(password_data)
-
 
   def _PostCreate(self):
     """Retrieve generic VM info and then retrieve the VM's password."""

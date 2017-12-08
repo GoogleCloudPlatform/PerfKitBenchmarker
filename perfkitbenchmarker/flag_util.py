@@ -109,8 +109,8 @@ class IntegerList(object):
 
   def _CreateXrangeFromTuple(self, input_tuple):
     start = input_tuple[0]
-    stop_inclusive = input_tuple[1] + 1
     step = 1 if len(input_tuple) == 2 else input_tuple[2]
+    stop_inclusive = input_tuple[1] + (1 if step > 0 else -1)
     return xrange(start, stop_inclusive, step)
 
 
@@ -187,6 +187,7 @@ class IntegerListParser(flags.ArgumentParser):
         low = int(match.group(1))
         high = int(match.group(3))
         step = int(match.group(5)) if match.group(5) is not None else 1
+        step = step if low <= high else -step
 
         if high <= low or (len(result) > 0 and low <= result[-1]):
           HandleNonIncreasing()

@@ -14,6 +14,7 @@
 
 
 """Module containing build tools installation and cleanup functions."""
+from perfkitbenchmarker import os_types
 
 
 def YumInstall(vm):
@@ -24,3 +25,31 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs build tools on the VM."""
   vm.InstallPackages('build-essential git libtool autoconf automake')
+
+
+def _GetVersion(vm, pkg):
+  """Get version of package."""
+  _, err = vm.RemoteCommand('{pkg} -v'.format(pkg=pkg), ignore_failure=True)
+  return err
+
+
+def Reinstall(vm, version='4.7'):
+  """Install specific version of gcc.
+
+  Args:
+    vm: VirtualMachine object.
+    version: string. GCC version.
+  """
+  if vm.OS_TYPE != os_types.DEBIAN:
+    return
+  for pkg in ('gcc', 'gfortran', 'g++'):
+    version_string = _GetVersion(vm, pkg)
+    if version in version_string:
+      continue
+    else:
+      new_pkg = pkg + '-' + version
+      vm.RemoteCommand('sudo apt-get remove {pkg} -y'.format(pkg=pkg),
+                       ignore_failure=True)
+      vm.InstallPackages(new_pkg)
+      vm.RemoteCommand('sudo ln -s /usr/bin/{new_pkg} /usr/bin/{pkg}'.format(
+          new_pkg=new_pkg, pkg=pkg))

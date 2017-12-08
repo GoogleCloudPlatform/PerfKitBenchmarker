@@ -17,6 +17,7 @@
 import os
 
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
@@ -26,6 +27,7 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.8/device-plugin-daemonset.yaml'
+NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 
 
 class GkeCluster(container_service.KubernetesCluster):
@@ -44,7 +46,7 @@ class GkeCluster(container_service.KubernetesCluster):
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
 
   def GetResourceMetadata(self):
-    """Returns a dict containing metadata about the VM.
+    """Returns a dict containing metadata about the cluster.
 
     Returns:
       dict mapping string property key to value.
@@ -62,7 +64,7 @@ class GkeCluster(container_service.KubernetesCluster):
       # for google_container_engine however).
       cmd = util.GcloudCommand(
           self, 'alpha', 'container', 'clusters', 'create', self.name,
-          '--enable-kubernetes-alpha', '--cluster-version', '1.8.1-gke.1')
+          '--enable-kubernetes-alpha', '--cluster-version', '1.8.4-gke.0')
 
       cmd.flags['accelerator'] = (gce_virtual_machine.
                                   GenerateAcceleratorSpecString(self.gpu_type,
@@ -86,6 +88,8 @@ class GkeCluster(container_service.KubernetesCluster):
 
     if self.gpu_count:
       kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
+      kubernetes_helper.CreateFromFile(
+          data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET))
 
   def _Delete(self):
     """Deletes the cluster."""

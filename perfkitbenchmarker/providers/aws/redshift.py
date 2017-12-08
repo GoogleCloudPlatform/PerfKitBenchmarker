@@ -30,7 +30,8 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 
 
-VALID_EXIST_STATUSES = ['creating', 'available', 'deleting']
+VALID_EXIST_STATUSES = ['creating', 'available']
+DELETION_STATUSES = ['deleting']
 READY_STATUSES = ['available']
 
 
@@ -51,6 +52,14 @@ def AddTags(resource_arn, region, **kwargs):
   for key, value in kwargs.iteritems():
     tag_cmd.append('Key={0},Value={1}'.format(key, value))
   vm_util.IssueCommand(tag_cmd)
+
+
+def GetDefaultRegion():
+  """Get the default region for the aws account."""
+  cmd_prefix = util.AWS_PREFIX
+  default_region_cmd = cmd_prefix + ['configure', 'get', 'region']
+  stdout, _, _ = vm_util.IssueCommand(default_region_cmd)
+  return stdout
 
 
 class RedshiftClusterSubnetGroup(object):
@@ -153,7 +162,9 @@ class Redshift(edw_service.EdwService):
     if FLAGS.zones:
       self.zone = FLAGS.zones[0]
       self.region = util.GetRegionFromZone(self.zone)
-      self.cmd_prefix += ['--region', self.region]
+    else:
+      self.region = GetDefaultRegion()
+    self.cmd_prefix += ['--region', self.region]
     self.arn = ''
     self.cluster_identifier = 'pkb-' + FLAGS.run_uri
     self.cluster_subnet_group = None
@@ -163,6 +174,8 @@ class Redshift(edw_service.EdwService):
     self.db = ''
     self.user = ''
     self.password = ''
+    self.supports_wait_on_delete = True
+    self.snapshot = None
 
   def _Create(self):
     """Create a new redshift cluster."""
@@ -171,6 +184,7 @@ class Redshift(edw_service.EdwService):
     self.cluster_parameter_group = RedshiftClusterParameterGroup(
         self.concurrency, self.cmd_prefix)
     if self.spec.snapshot:
+      self.snapshot = self.spec.snapshot
       self.Restore(self.spec.snapshot, self.cluster_identifier)
     else:
       # TODO(saksena@): Implmement the new Redshift cluster creation
@@ -299,6 +313,15 @@ class Redshift(edw_service.EdwService):
                              '--skip-final-cluster-snapshot']
     vm_util.IssueCommand(cmd)
 
+  def _IsDeleting(self):
+    """Method to check if the cluster is being deleting."""
+    stdout, _, _ = self.__DescribeCluster()
+    if not stdout:
+      return False
+    else:
+      return (json.loads(stdout)['Clusters'][0]['ClusterStatus'] in
+              DELETION_STATUSES)
+
   def _DeleteDependencies(self):
     """Delete dependencies of a redshift cluster."""
     self.cluster_subnet_group._Delete()
@@ -308,4 +331,7 @@ class Redshift(edw_service.EdwService):
     """Return a dictionary of the metadata for this cluster."""
     basic_data = super(Redshift, self).GetMetadata()
     basic_data['edw_cluster_concurrency'] = self.concurrency
+    basic_data['region'] = self.region
+    if self.snapshot is not None:
+      basic_data['snapshot'] = self.snapshot
     return basic_data

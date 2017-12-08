@@ -463,7 +463,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     remote_location = '%s@%s:%s' % (
         self.user_name, self.ip_address, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
-    scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
+    # An scp is not retried, so increase the connection timeout.
+    scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key,
+                                         connect_timeout=30))
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
     else:

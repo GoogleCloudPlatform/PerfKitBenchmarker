@@ -192,8 +192,9 @@ def SetAndConfirmGpuClocks(vm):
 
   desired_memory_clock = gpu_clock_speeds[0]
   desired_graphics_clock = gpu_clock_speeds[1]
-  SetGpuClockSpeedAndAutoboost(vm, autoboost_enabled, desired_memory_clock,
-                               desired_graphics_clock)
+  EnablePersistenceMode(vm)
+  SetGpuClockSpeed(vm, desired_memory_clock, desired_graphics_clock)
+  SetAutoboostDefaultPolicy(vm, autoboost_enabled)
   num_gpus = QueryNumberOfGpus(vm)
   for i in range(num_gpus):
     if QueryGpuClockSpeed(vm, i) != (desired_memory_clock,
@@ -204,27 +205,54 @@ def SetAndConfirmGpuClocks(vm):
                                                    desired_graphics_clock))
 
 
-def SetGpuClockSpeedAndAutoboost(vm,
-                                 autoboost_enabled,
-                                 memory_clock_speed,
-                                 graphics_clock_speed):
-  """Sets autoboost and memory and graphics clocks to the specified frequency.
-
-  Persistence mode is enabled as well. Note that these settings are
-  lost after reboot.
+def EnablePersistenceMode(vm):
+  """Enables persistence mode on the NVIDIA driver.
 
   Args:
     vm: virtual machine to operate on
+  """
+  vm.RemoteCommand('sudo nvidia-smi -pm 1')
+
+
+def SetAutoboostDefaultPolicy(vm, autoboost_enabled):
+  """Sets the autoboost policy to the specified value.
+
+  For each GPU on the VM, this function will set the autoboost policy
+  to the value specified by autoboost_enabled.
+  Args:
+    vm: virtual machine to operate on
     autoboost_enabled: bool or None. Value (if any) to set autoboost policy to
+  """
+  if autoboost_enabled is None:
+    return
+
+  num_gpus = QueryNumberOfGpus(vm)
+  for device_id in range(0, num_gpus):
+    current_state = QueryAutoboostPolicy(vm, device_id)
+    if current_state['autoboost_default'] != autoboost_enabled:
+      vm.RemoteCommand('sudo nvidia-smi --auto-boost-default={0} --id={1}'
+                       .format(1 if autoboost_enabled else 0, device_id))
+
+
+def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
+  """Sets autoboost and memory and graphics clocks to the specified frequency.
+
+  Args:
+    vm: virtual machine to operate on
     memory_clock_speed: desired speed of the memory clock, in MHz
     graphics_clock_speed: desired speed of the graphics clock, in MHz
   """
-  vm.RemoteCommand('sudo nvidia-smi -pm 1')
-  if autoboost_enabled is not None:
-    vm.RemoteCommand('sudo nvidia-smi --auto-boost-default=%s' % (
-        1 if autoboost_enabled else 0))
-  vm.RemoteCommand('sudo nvidia-smi -ac {},{}'.format(memory_clock_speed,
-                                                      graphics_clock_speed))
+  num_gpus = QueryNumberOfGpus(vm)
+  for device_id in range(0, num_gpus):
+    current_clock_speeds = QueryGpuClockSpeed(vm, device_id)
+    if (
+        current_clock_speeds[0] != memory_clock_speed or
+        current_clock_speeds[1] != graphics_clock_speed):
+      vm.RemoteCommand('sudo nvidia-smi -ac {},{} --id={}'.format(
+          memory_clock_speed,
+          graphics_clock_speed,
+          device_id
+      ))
 
 
 def QueryAutoboostPolicy(vm, device_id):
