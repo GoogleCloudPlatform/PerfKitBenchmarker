@@ -61,6 +61,9 @@ flags.DEFINE_enum('beam_sdk', None, [BEAM_JAVA_SDK, BEAM_PYTHON_SDK],
 flags.DEFINE_string('beam_python_attr', 'IT',
                     'Test decorator that is used in Beam Python to filter a '
                     'specific category.')
+flags.DEFINE_string('beam_extra_mvn_properties', None,
+                    'Allows to specify list of key-value pairs that will be forwarded to '
+                    'target mvn command as system properties')
 
 FLAGS = flags.FLAGS
 
@@ -98,6 +101,18 @@ def AddRunnerOptionMvnArgument(service_type, beam_args, runner_option_override):
 
   if len(runner_pipeline_option) > 0:
     beam_args.append(runner_pipeline_option)
+
+
+def AddExtraMvnProperties(mvn_command, beam_extra_mvn_properties):
+  if not beam_extra_mvn_properties:
+    return
+  if "integrationTestPipelineOptions=" in beam_extra_mvn_properties:
+    raise ValueError("integrationTestPipelineOptions must not be in beam_extra_mvn_properties")
+
+  extra_mvn_properties = beam_extra_mvn_properties.rstrip(']').lstrip('[').split(',')
+  extra_mvn_properties = [p.rstrip('" ').lstrip('" ') for p in extra_mvn_properties]
+  for p in extra_mvn_properties:
+    mvn_command.append('-D{}'.format(p))
 
 
 def InitializeBeamRepo(benchmark_spec):
@@ -210,6 +225,7 @@ def _BuildMavenCommand(benchmark_spec, classname, job_arguments):
                               FLAGS.beam_runner_profile)
   AddRunnerOptionMvnArgument(benchmark_spec.service_type, beam_args,
                              FLAGS.beam_runner_option)
+  AddExtraMvnProperties(cmd, FLAGS.beam_extra_mvn_properties)
 
   cmd.append("-DintegrationTestPipelineOptions="
              "[{}]".format(','.join(beam_args)))
