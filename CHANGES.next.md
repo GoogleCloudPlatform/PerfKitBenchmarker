@@ -20,3 +20,4 @@
 - Fix ProfitBricks issue with extra `/` in the API url
 - Fix ProfitBricks volume availability zone issue
 - Bulk AllowPort restored.
+- Moved CustomMachineTypeSpec and related decoders to their own module
