@@ -42,6 +42,9 @@ class FakeCloudTpu(cloud_tpu.BaseCloudTpu):
   def GetCloudTpuIp(self):
     pass
 
+  def GetCloudTpuPort(self):
+    pass
+
 
 class CloudTpuSpecTestCase(unittest.TestCase):
 

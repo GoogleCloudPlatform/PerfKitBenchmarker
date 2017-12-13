@@ -14,6 +14,7 @@
   - Add new location, `us/ewr`
 - Add aws_image_name_filter flag to ease specifying images.
 - Add c5/m5 support for NVME disks.
+- Add MNIST benchmark support for TPU, CPU and GPU
 
 ###Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
