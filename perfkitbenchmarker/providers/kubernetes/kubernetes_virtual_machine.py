@@ -37,13 +37,6 @@ SELECTOR_PREFIX = 'pkb'
 
 class KubernetesPodSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a Kubernetes Pod.
-
-  Attributes:
-    cpus: None or int. Number of vCPUs for custom VMs.
-    memory: None or string. For custom VMs, a string representation of the size
-        of memory, expressed in MiB or GiB. Must be an integer number of MiB
-        (e.g. "1280MiB", "7.5GiB").
-    project: string or None. The project to create the VM in.
   """
 
   CLOUD = providers.KUBERNETES
@@ -89,12 +82,16 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def GetResourceMetadata(self):
     metadata = super(KubernetesVirtualMachine, self).GetResourceMetadata()
-    metadata.update({
-        'pod_cpu_limit': self.resource_limits.cpus,
-        'pod_memory_limit_mb': self.resource_limits.memory,
-        'pod_cpu_request': self.resource_requests.cpus,
-        'pod_memory_request_mb': self.resource_requests.memory,
-    })
+    if self.resource_limits:
+      metadata.update({
+          'pod_cpu_limit': self.resource_limits.cpus,
+          'pod_memory_limit_mb': self.resource_limits.memory,
+      })
+    if self.resource_requests:
+      metadata.update({
+          'pod_cpu_request': self.resource_requests.cpus,
+          'pod_memory_request_mb': self.resource_requests.memory,
+      })
     return metadata
 
   def _CreateDependencies(self):
