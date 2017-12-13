@@ -17,9 +17,10 @@
 import posixpath
 from perfkitbenchmarker import flags
 FLAGS = flags.FLAGS
+flags.DEFINE_string('tf_version', '1.3', 'version of tensorflow')
 
 
-def _GetEnvironmentVars(vm):
+def GetEnvironmentVars(vm):
   """Return a string containing TensorFlow-related environment variables.
 
   Args:
@@ -51,7 +52,7 @@ def GetTensorFlowVersion(vm):
   """
   stdout, _ = vm.RemoteCommand(
       ('echo -e "import tensorflow\nprint(tensorflow.__version__)" | {0} python'
-       .format(_GetEnvironmentVars(vm)))
+       .format(GetEnvironmentVars(vm)))
   )
   return stdout.strip()
 
@@ -62,11 +63,11 @@ def Install(vm):
   if FLAGS.tf_device == 'gpu':
     vm.Install('cuda_toolkit_8')
     vm.Install('cudnn')
-    vm.RemoteCommand('sudo pip install --upgrade tensorflow-gpu==1.3',
-                     should_log=True)
+    vm.RemoteCommand('sudo pip install --upgrade tensorflow-gpu==%s' %
+                     FLAGS.tf_version, should_log=True)
   elif FLAGS.tf_device == 'cpu':
-    vm.RemoteCommand('sudo pip install --upgrade tensorflow==1.3',
-                     should_log=True)
+    vm.RemoteCommand('sudo pip install --upgrade tensorflow==%s' %
+                     FLAGS.tf_version, should_log=True)
 
 
 def Uninstall(vm):

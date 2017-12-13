@@ -29,7 +29,7 @@ class MnistBenchmarkTestCase(unittest.TestCase,
       self.contents = fp.read()
 
   def testParseSysbenchResult(self):
-    result = mnist_benchmark.ExtractThroughput(self.contents)
+    result = mnist_benchmark._ExtractThroughput(self.contents)
     self.assertEqual(result, 37.786650)
 
 

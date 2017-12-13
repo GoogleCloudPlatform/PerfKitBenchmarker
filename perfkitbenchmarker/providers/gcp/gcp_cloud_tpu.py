@@ -19,9 +19,9 @@ cloud TPU can be created and deleted.
 import json
 import logging
 
+from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -82,22 +82,8 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
     else:
       logging.info('Deleted GCP cloud TPU.')
 
-  def _Exists(self):
-    """Returns true if the cloud TPU exists."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'describe',
-                             self.spec.tpu_name)
-    if self.spec.tpu_zone:
-      cmd.flags['zone'] = self.spec.tpu_zone
-    cmd.flags['project'] = self.project
-    _, _, retcode = cmd.Issue()
-    if retcode != 0:
-      logging.info('Could not found GCP cloud TPU %s.',
-                   self.spec.tpu_name)
-      return False
-    return True
-
-  def GetCloudTpuIp(self):
-    """Gets the cloud TPU IP."""
+  def _GetCloudTpuDescription(self):
+    """Gets the cloud TPU description."""
     cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'describe',
                              self.spec.tpu_name)
     if self.spec.tpu_zone:
@@ -105,10 +91,24 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
     cmd.flags['project'] = self.project
     stdout, _, retcode = cmd.Issue()
     if retcode != 0:
-      logging.error('Could not found GCP cloud TPU %s.',
-                    self.spec.tpu_name)
-    result = json.loads(stdout)
-    return result['ipAddress']
+      logging.info('Could not found GCP cloud TPU %s.',
+                   self.spec.tpu_name)
+    return stdout and json.loads(stdout), retcode
+
+  def _Exists(self):
+    """Returns true if the cloud TPU exists."""
+    _, retcode = self._GetCloudTpuDescription()
+    return retcode == 0
+
+  def GetCloudTpuIp(self):
+    """Gets the cloud TPU IP."""
+    result, _ = self._GetCloudTpuDescription()
+    return result.get('ipAddress')
+
+  def GetCloudTpuPort(self):
+    """Gets the cloud TPU port."""
+    result, _ = self._GetCloudTpuDescription()
+    return result.get('port')
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.

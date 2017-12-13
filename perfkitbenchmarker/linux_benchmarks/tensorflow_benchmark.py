@@ -73,7 +73,7 @@ flags.DEFINE_enum('tf_variable_update', 'parameter_server',
                    'distributed_replicated', 'independent'],
                   '''The method for managing variables: parameter_server,
                   replicated, distributed_replicated, independent''')
-flags.DEFINE_enum('tf_local_parameter_device', GPU, [CPU, GPU],
+flags.DEFINE_enum('tf_local_parameter_device', CPU, [CPU, GPU],
                   '''Device to use as parameter server: cpu or gpu. For
                   distributed training, it can affect where caching of
                   variables happens.''')
@@ -282,7 +282,7 @@ def _RunOnVm(vm, benchmark_spec):
     if benchmark_spec.device == GPU:
       num_gpus = cuda_toolkit_8.QueryNumberOfGpus(vm)
       tf_cnn_benchmark_cmd = '%s %s --num_gpus=%s' % (
-          tensorflow._GetEnvironmentVars(vm), tf_cnn_benchmark_cmd,
+          tensorflow.GetEnvironmentVars(vm), tf_cnn_benchmark_cmd,
           num_gpus)
     else:
       num_gpus = 0
@@ -322,6 +322,6 @@ def Run(benchmark_spec):
   return flattened_results
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(unused_benchmark_spec):
   """Cleanup TensorFlow on the cluster."""
   pass
