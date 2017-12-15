@@ -18,7 +18,6 @@ import json
 import logging
 import posixpath
 
-from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -33,31 +32,6 @@ FLAGS = flags.FLAGS
 
 UBUNTU_IMAGE = 'ubuntu-upstart'
 SELECTOR_PREFIX = 'pkb'
-
-
-class KubernetesPodSpec(virtual_machine.BaseVmSpec):
-  """Object containing the information needed to create a Kubernetes Pod.
-  """
-
-  CLOUD = providers.KUBERNETES
-
-  @classmethod
-  def _GetOptionDecoderConstructions(cls):
-    """Gets decoder classes and constructor args for each configurable option.
-
-    Returns:
-      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
-          The pair specifies a decoder class and its __init__() keyword
-          arguments to construct in order to decode the named option.
-    """
-    result = super(KubernetesPodSpec, cls)._GetOptionDecoderConstructions()
-    result.update({
-        'resource_limits': (custom_virtual_machine_spec.MachineTypeDecoder,
-                            {'default': None}),
-        'resource_requests': (custom_virtual_machine_spec.MachineTypeDecoder,
-                              {'default': None})
-    })
-    return result
 
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
