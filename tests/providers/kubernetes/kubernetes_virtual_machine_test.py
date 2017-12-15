@@ -20,6 +20,7 @@ import unittest
 import contextlib2
 import mock
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
 from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine
 from tests import mock_flags
 
@@ -181,14 +182,14 @@ class KubernetesResourcesTestCase(
 
   @staticmethod
   def create_virtual_machine_spec():
-    spec = kubernetes_virtual_machine.KubernetesPodSpec(
+    spec = kubernetes_pod_spec.KubernetesPodSpec(
         _COMPONENT,
         resource_limits={
             'cpus': 2,
             'memory': '5GiB'
         },
         resource_requests={
-            'cpus': 1,
+            'cpus': 1.5,
             'memory': '4GiB'
         },
         gpu_count=2,
@@ -213,7 +214,7 @@ class KubernetesResourcesTestCase(
               'nvidia.com/gpu': '2'
           },
           'requests': {
-              'cpu': '1',
+              'cpu': '1.5',
               'memory': '4096Mi',
               'nvidia.com/gpu': '2'
           }
@@ -228,7 +229,7 @@ class KubernetesResourcesTestCase(
       subset_of_expected_metadata = {
           'pod_cpu_limit': 2,
           'pod_memory_limit_mb': 5120,
-          'pod_cpu_request': 1,
+          'pod_cpu_request': 1.5,
           'pod_memory_request_mb': 4096,
       }
       actual = kub_vm.GetResourceMetadata()
@@ -240,7 +241,7 @@ class KubernetesVirtualMachineTestCase(
 
   @staticmethod
   def create_virtual_machine_spec():
-    spec = kubernetes_virtual_machine.KubernetesPodSpec(
+    spec = kubernetes_pod_spec.KubernetesPodSpec(
         _COMPONENT,
         image='test_image',
         install_packages=False,
@@ -285,7 +286,7 @@ class KubernetesVirtualMachineWithGpusTestCase(
 
   @staticmethod
   def create_virtual_machine_spec():
-    spec = kubernetes_virtual_machine.KubernetesPodSpec(
+    spec = kubernetes_pod_spec.KubernetesPodSpec(
         _COMPONENT,
         image='test_image',
         gpu_count=2,
@@ -332,7 +333,7 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
 
   @staticmethod
   def create_virtual_machine_spec():
-    spec = kubernetes_virtual_machine.KubernetesPodSpec(
+    spec = kubernetes_pod_spec.KubernetesPodSpec(
         _COMPONENT,
         image='nvidia/cuda:8.0-devel-ubuntu16.04',
         install_packages=False,
