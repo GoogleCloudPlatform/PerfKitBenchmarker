@@ -7,6 +7,7 @@
 
 ###New features:
 - Windows benchmarks can now be run from linux controllers
+- MXNet benchmarks can now be run from linux controllers
 
 ###Enhancements:
 - Support for ProfitBricks API v4:

@@ -127,6 +127,7 @@ BENCHMARK_SETS = {
             'mnist',
             'mongodb_ycsb',
             'multichase',
+            'mxnet',
             'netperf',
             'object_storage_service',
             'oldisim',
