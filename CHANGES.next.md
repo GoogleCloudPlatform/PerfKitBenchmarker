@@ -1,25 +1,26 @@
-###Breaking changes:
+### Breaking changes:
 - Replaced gflags with absl-py. (GH-1518)
 - Renamed GPU-related flags like so (old_flag_value -> new_flag_value):
   - gce_gpu_count -> gpu_count
   - gce_gpu_type -> gpu_type
 - Replaced object_storage_objects_written_file* flags with prefix versions.
 
-###New features:
+### New features:
 - Windows benchmarks can now be run from linux controllers
 - MXNet benchmarks can now be run from linux controllers
 
-###Enhancements:
+### Enhancements:
 - Support for ProfitBricks API v4:
   - Add `profitbricks_image_alias` flag and support for image aliases
   - Add new location, `us/ewr`
-- Add aws_image_name_filter flag to ease specifying images.
+- Add `aws_image_name_filter` flag to ease specifying images.
 - Add c5/m5 support for NVME disks.
 - Add MNIST benchmark support for TPU, CPU and GPU
 - Created KubernetesPodSpec which allows the user to specify kubernetes resource
   requests and limits, including fractional CPUs.
+- Add `skip_pending_runs_file` flag to workaround SIGINT issues.
 
-###Bug fixes and maintenance updates:
+### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
 - Fix ProfitBricks issue with extra `/` in the API url
 - Fix ProfitBricks volume availability zone issue
