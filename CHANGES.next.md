@@ -27,3 +27,4 @@
 - Fix ProfitBricks volume availability zone issue
 - Bulk AllowPort restored.
 - Moved CustomMachineTypeSpec and related decoders to their own module
+- Updated GKE engine version to 1.8.4-gke.1 when using a GPU-accelerated cluster
