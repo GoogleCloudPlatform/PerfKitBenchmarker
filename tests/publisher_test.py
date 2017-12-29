@@ -104,6 +104,18 @@ class NewlineDelimitedJSONPublisherTestCase(unittest.TestCase):
                          result)
 
 
+class RemoteJSONPublisherTestCase(unittest.TestCase):
+
+  def setUp(self):
+
+  def testNoSamples(self):
+    self.instance = publisher.RemoteJSONPublisher("")
+
+  def testPublish(self):
+
+  def cleanup(self):
+
+
 class BigQueryPublisherTestCase(unittest.TestCase):
 
   def setUp(self):

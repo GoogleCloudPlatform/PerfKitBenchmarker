@@ -33,6 +33,7 @@ import sys
 import time
 import urllib
 import uuid
+import requests
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
@@ -461,6 +462,19 @@ class NewlineDelimitedJSONPublisher(SamplePublisher):
           sample['labels'] = GetLabelsFromDict(sample.pop('metadata', {}))
         fp.write(json.dumps(sample) + '\n')
 
+class RemoteJSONPublisher(SamplePublisher):
+  """Publishes pure JSON via requests POST
+
+  Attributes:
+    json_uri: string. URI to which will JSON data be published. It should
+      be in format protocol://domain:port/endpoint
+  """
+
+  def __init__(self, json_uri):
+    self.json_uri = json_uri
+
+  def PublishSamples(self, samples):
+    requests.post(self.json_uri, json=samples)
 
 class BigQueryPublisher(SamplePublisher):
   """Publishes samples to BigQuery.
