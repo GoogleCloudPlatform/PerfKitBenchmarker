@@ -106,14 +106,17 @@ class NewlineDelimitedJSONPublisherTestCase(unittest.TestCase):
 
 class RemoteJSONPublisherTestCase(unittest.TestCase):
 
-  def setUp(self):
+  @mock.patch.object(publisher.RemoteJSONPublisher, 'PublishSamples')
+  def testPublishSamples(self, mock_publish_samples):
+    samples = [{'test': 'testa', 'metric': '1', 'value': 1.0, 'unit': 'MB',
+                'metadata': {}, 'labels': '|machine_type:StandardA1|,|cloud:Azb|'},
+               {'test': 'testb', 'metric': '2', 'value': 14.0, 'unit': 'MB',
+                'metadata': {}, 'labels': '|machine_type:StandardA2|,|cloud:Azb|'}]
 
-  def testNoSamples(self):
-    self.instance = publisher.RemoteJSONPublisher("")
-
-  def testPublish(self):
-
-  def cleanup(self):
+    self.instance = publisher.RemoteJSONPublisher('testuri')
+    self.instance.PublishSamples(samples)
+    mock_publish_samples.return_value = None
+    mock_publish_samples.assert_called_once_with(samples)
 
 
 class BigQueryPublisherTestCase(unittest.TestCase):
