@@ -998,6 +998,10 @@ the user is required to at the very least call the `--influx_uri` flag to publis
 | `--influx_uri`     | The Influx DB address and port. Expects the format hostname:port     | localhost:8086 |
 | `--influx_db_name` | The name of Influx DB database that you wish to publish to or create | perfkit        |
 
+Using Plain JSON Publisher
+=================
+To send JSON data from benchmark results to remote server using HTTP POST, you can specify argument `--remote_json_uri` (eg. `--remote_json_uri http://localhost:9000/results`).
+
 How to Extend PerfKit Benchmarker
 =================
 First start with the [CONTRIBUTING.md](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/CONTRIBUTING.md)
