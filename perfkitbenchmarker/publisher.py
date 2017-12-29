@@ -480,7 +480,11 @@ class RemoteJSONPublisher(SamplePublisher):
     self.remote_json_uri = remote_json_uri
 
   def PublishSamples(self, samples):
+    if not samples:
+      logging.warn('No samples: not publishing to RemoteJSONPublisher')
+      return
     try:
+      logging.info('Publishing %d samples to %s', len(samples), str(self.remote_json_uri))
       r = requests.post(self.remote_json_uri, json=samples)
       r.raise_for_status()
     except requests.exceptions.RequestException as e:
