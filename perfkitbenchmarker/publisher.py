@@ -466,15 +466,15 @@ class RemoteJSONPublisher(SamplePublisher):
   """Publishes pure JSON via requests POST
 
   Attributes:
-    json_uri: string. URI to which will JSON data be published. It should
+    remote_json_uri: string. URI to which will JSON data be published. It should
       be in format protocol://domain:port/endpoint
   """
 
-  def __init__(self, json_uri):
-    self.json_uri = json_uri
+  def __init__(self, remote_json_uri=None):
+    self.remote_json_uri = remote_json_uri
 
   def PublishSamples(self, samples):
-    requests.post(self.json_uri, json=samples)
+    requests.post(self.remote_json_uri, json=samples)
 
 class BigQueryPublisher(SamplePublisher):
   """Publishes samples to BigQuery.
@@ -848,6 +848,9 @@ class SampleCollector(object):
     if FLAGS.influx_uri:
       publishers.append(InfluxDBPublisher(influx_uri=FLAGS.influx_uri,
                                           influx_db_name=FLAGS.influx_db_name))
+
+    if FLAGS.remote_json_uri:
+      publishers.append(RemoteJSONPublisher(remote_json_uri=FLAGS.remote_json_uri)
 
     return publishers
 
