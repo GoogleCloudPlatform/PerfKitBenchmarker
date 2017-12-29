@@ -474,7 +474,11 @@ class RemoteJSONPublisher(SamplePublisher):
     self.remote_json_uri = remote_json_uri
 
   def PublishSamples(self, samples):
-    requests.post(self.remote_json_uri, json=samples)
+    try:
+      requests.post(self.remote_json_uri, json=samples)
+    except requests.exceptions.RequestException as e:
+      logging.error(e)
+
 
 class BigQueryPublisher(SamplePublisher):
   """Publishes samples to BigQuery.
