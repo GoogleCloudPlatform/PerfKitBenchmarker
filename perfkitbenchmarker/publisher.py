@@ -473,7 +473,7 @@ class RemoteJSONPublisher(SamplePublisher):
 
   Attributes:
     remote_json_uri: string. URI to which will JSON data be published. It should
-      be in format protocol://domain:port/endpoint
+      be in format hostname:port
   """
 
   def __init__(self, remote_json_uri=None):
@@ -861,7 +861,7 @@ class SampleCollector(object):
                                           influx_db_name=FLAGS.influx_db_name))
 
     if FLAGS.remote_json_uri:
-      publishers.append(RemoteJSONPublisher(remote_json_uri=FLAGS.remote_json_uri)
+      publishers.append(RemoteJSONPublisher(remote_json_uri=FLAGS.remote_json_uri))
 
     return publishers
 
