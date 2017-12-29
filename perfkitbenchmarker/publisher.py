@@ -127,6 +127,12 @@ flags.DEFINE_string(
     'influx_db_name', 'perfkit',
     'Name of Influx DB database that you wish to publish to or create')
 
+flags.DEFINE_string(
+    'remote_json_uri', None,
+    'URI to remote listener for JSON data. Expects format '
+    'hostname:port or format accepted by python requests library e.g. '
+    'http://localhost:9000/endpoint')
+
 DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
 GCS_OBJECT_NAME_LENGTH = 20
