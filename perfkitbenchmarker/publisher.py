@@ -18,7 +18,7 @@
 
 import abc
 import collections
-import copy
+from copy import copy, deepcopy
 import csv
 import fcntl
 import httplib
@@ -483,9 +483,15 @@ class RemoteJSONPublisher(SamplePublisher):
     if not samples:
       logging.warn('No samples: not publishing to RemoteJSONPublisher')
       return
+
+    # Copy `metadata` object to string `labels` with format |key:value|,...
+    samples_copy = deepcopy(samples)
+    for sample in samples_copy:
+      sample['labels'] = GetLabelsFromDict(sample['metadata'])
+
     try:
-      logging.info('Publishing %d samples to %s', len(samples), str(self.remote_json_uri))
-      r = requests.post(self.remote_json_uri, json=samples)
+      logging.info('Publishing %d samples to %s', len(samples_copy), str(self.remote_json_uri))
+      r = requests.post(self.remote_json_uri, json=samples_copy)
       r.raise_for_status()
     except requests.exceptions.RequestException as e:
       logging.error(e)
