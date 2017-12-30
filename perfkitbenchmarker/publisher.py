@@ -468,6 +468,7 @@ class NewlineDelimitedJSONPublisher(SamplePublisher):
           sample['labels'] = GetLabelsFromDict(sample.pop('metadata', {}))
         fp.write(json.dumps(sample) + '\n')
 
+
 class RemoteJSONPublisher(SamplePublisher):
   """Publishes pure JSON via requests POST
 
