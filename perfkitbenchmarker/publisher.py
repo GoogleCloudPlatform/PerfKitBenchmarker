@@ -18,7 +18,7 @@
 
 import abc
 import collections
-import copy
+from copy import copy, deepcopy
 import csv
 import fcntl
 import httplib
@@ -33,6 +33,7 @@ import sys
 import time
 import urllib
 import uuid
+import requests
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
@@ -125,6 +126,12 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'influx_db_name', 'perfkit',
     'Name of Influx DB database that you wish to publish to or create')
+
+flags.DEFINE_string(
+    'remote_json_uri', None,
+    'URI to remote listener for JSON data. Expects format '
+    'hostname:port or format accepted by python requests library e.g. '
+    'http://localhost:9000/endpoint')
 
 DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
@@ -460,6 +467,35 @@ class NewlineDelimitedJSONPublisher(SamplePublisher):
         if self.collapse_labels:
           sample['labels'] = GetLabelsFromDict(sample.pop('metadata', {}))
         fp.write(json.dumps(sample) + '\n')
+
+
+class RemoteJSONPublisher(SamplePublisher):
+  """Publishes pure JSON via requests POST
+
+  Attributes:
+    remote_json_uri: string. URI to which will JSON data be published. It should
+      be in format hostname:port
+  """
+
+  def __init__(self, remote_json_uri=None):
+    self.remote_json_uri = remote_json_uri
+
+  def PublishSamples(self, samples):
+    if not samples:
+      logging.warn('No samples: not publishing to RemoteJSONPublisher')
+      return
+
+    # Copy `metadata` object to string `labels` with format |key:value|,...
+    samples_copy = deepcopy(samples)
+    for sample in samples_copy:
+      sample['labels'] = GetLabelsFromDict(sample['metadata'])
+
+    try:
+      logging.info('Publishing %d samples to %s', len(samples_copy), str(self.remote_json_uri))
+      r = requests.post(self.remote_json_uri, json=samples_copy)
+      r.raise_for_status()
+    except requests.exceptions.RequestException as e:
+      logging.error(e)
 
 
 class BigQueryPublisher(SamplePublisher):
@@ -834,6 +870,9 @@ class SampleCollector(object):
     if FLAGS.influx_uri:
       publishers.append(InfluxDBPublisher(influx_uri=FLAGS.influx_uri,
                                           influx_db_name=FLAGS.influx_db_name))
+
+    if FLAGS.remote_json_uri:
+      publishers.append(RemoteJSONPublisher(remote_json_uri=FLAGS.remote_json_uri))
 
     return publishers
 
