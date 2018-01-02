@@ -871,6 +871,9 @@ class SampleCollector(object):
 
   def PublishSamples(self):
     """Publish samples via all registered publishers."""
+    if not self.samples:
+      logging.warn('No samples to publish.')
+      return
     for publisher in self.publishers:
       publisher.PublishSamples(self.samples)
     self.samples = []
