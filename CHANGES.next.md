@@ -20,7 +20,8 @@
   requests and limits, including fractional CPUs.
 - Add `skip_pending_runs_file` flag to workaround SIGINT issues.
 - Add support for `specsfs2014_load` parameter as an integer list.
-- Publishers can be extended through external modules
+- Publishers can be extended through external modules.
+- Add `run_processes_delay` flag to stagger parallel runs.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

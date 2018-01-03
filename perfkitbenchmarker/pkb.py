@@ -232,6 +232,11 @@ flags.DEFINE_integer(
     'run_processes', 1,
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
+flags.DEFINE_float(
+    'run_processes_delay', None,
+    'The delay in seconds between parallel processes\' invocation. '
+    'Increasing this value may reduce provider throttling issues.',
+    lower_bound=0)
 flags.DEFINE_string(
     'completion_status_file', None,
     'If specified, this file will contain the completion status of each '
@@ -782,7 +787,7 @@ def RunBenchmarks():
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
     spec_sample_tuples = background_tasks.RunParallelProcesses(
-        tasks, FLAGS.run_processes)
+        tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
     benchmark_specs, sample_lists = zip(*spec_sample_tuples)
     for sample_list in sample_lists:
       collector.samples.extend(sample_list)
