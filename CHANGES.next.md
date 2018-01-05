@@ -22,6 +22,7 @@
 - Add support for `specsfs2014_load` parameter as an integer list.
 - Publishers can be extended through external modules.
 - Add `run_processes_delay` flag to stagger parallel runs.
+- Add support for SPECspeed.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
