@@ -44,13 +44,29 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Initialize a Kubernetes virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      vm_spec: KubernetesPodSpec object of the vm.
     """
     super(KubernetesVirtualMachine, self).__init__(vm_spec)
     self.num_scratch_disks = 0
     self.name = self.name.replace('_', '-')
     self.user_name = FLAGS.username
     self.image = self.image or UBUNTU_IMAGE
+    self.resource_limits = vm_spec.resource_limits
+    self.resource_requests = vm_spec.resource_requests
+
+  def GetResourceMetadata(self):
+    metadata = super(KubernetesVirtualMachine, self).GetResourceMetadata()
+    if self.resource_limits:
+      metadata.update({
+          'pod_cpu_limit': self.resource_limits.cpus,
+          'pod_memory_limit_mb': self.resource_limits.memory,
+      })
+    if self.resource_requests:
+      metadata.update({
+          'pod_cpu_request': self.resource_requests.cpus,
+          'pod_memory_request_mb': self.resource_requests.memory,
+      })
+    return metadata
 
   def _CreateDependencies(self):
     self._CheckPrerequisites()
@@ -267,8 +283,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     for scratch_disk in self.scratch_disks:
       scratch_disk.AttachVolumeMountInfo(container['volumeMounts'])
 
-    if self.gpu_count:
-      container['resources'] = self._BuildResourceBodyWithGpus()
+    resource_body = self._BuildResourceBody()
+    if resource_body:
+      container['resources'] = resource_body
 
     # The nvidia/cuda image does not have sudo installed,
     # so install it and configure the sudoers file such
@@ -288,20 +305,43 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return container
 
-  def _BuildResourceBodyWithGpus(self):
-    """Constructs a resource body specific to GKE that lists the requested GPUs.
+  def _BuildResourceBody(self):
+    """Constructs a dictionary that specifies resource limits and requests.
 
-    This is likely to change in the future.
+    The syntax for including GPUs is specific to GKE and is likely to
+    change in the future.
     See https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus
 
     Returns:
-      kubernetes pod resource body containing gpu limits
+      kubernetes pod resource body containing pod limits and requests.
     """
-    return {
-        'limits': {
-            'nvidia.com/gpu': str(self.gpu_count)
-        }
+    resources = {
+        'limits': {},
+        'requests': {},
     }
+
+    if self.resource_requests:
+      resources['requests'].update({
+          'cpu': str(self.resource_requests.cpus),
+          'memory': '{0}Mi'.format(self.resource_requests.memory),
+      })
+
+    if self.resource_limits:
+      resources['limits'].update({
+          'cpu': str(self.resource_limits.cpus),
+          'memory': '{0}Mi'.format(self.resource_limits.memory),
+      })
+
+    if self.gpu_count:
+      gpu_dict = {
+          'nvidia.com/gpu': str(self.gpu_count)
+      }
+      resources['limits'].update(gpu_dict)
+      resources['requests'].update(gpu_dict)
+
+    result_with_empty_values_removed = (
+        {k: v for k, v in resources.iteritems() if v})
+    return result_with_empty_values_removed
 
 
 class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,

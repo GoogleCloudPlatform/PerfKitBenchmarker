@@ -53,7 +53,6 @@ keeping the risk of deadlock low.
 
 import abc
 from collections import deque
-from concurrent import futures
 import ctypes
 import functools
 import logging
@@ -63,6 +62,7 @@ import signal
 import threading
 import time
 import traceback
+from concurrent import futures
 
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -270,7 +270,7 @@ class _BackgroundTaskManager(object):
       thread_context: _BackgroundTaskThreadContext. Thread-specific state to be
           inherited from parent to child thread.
     """
-    raise NotImplemented()
+    raise NotImplementedError()
 
   @abc.abstractmethod
   def AwaitAnyTask(self):
@@ -279,7 +279,7 @@ class _BackgroundTaskManager(object):
     Returns:
       int. Index of the task that completed in self.tasks.
     """
-    raise NotImplemented()
+    raise NotImplementedError()
 
   @abc.abstractmethod
   def HandleKeyboardInterrupt(self):
@@ -288,7 +288,7 @@ class _BackgroundTaskManager(object):
     Ensures that any child thread also receives a KeyboardInterrupt, and then
     waits for each child thread to stop executing.
     """
-    raise NotImplemented()
+    raise NotImplementedError()
 
 
 def _ExecuteBackgroundThreadTasks(worker_id, task_queue, response_queue):
@@ -472,7 +472,7 @@ class _BackgroundProcessTaskManager(_BackgroundTaskManager):
 
 
 def _RunParallelTasks(target_arg_tuples, max_concurrency, get_task_manager,
-                      parallel_exception_class):
+                      parallel_exception_class, post_task_delay=0):
   """Executes function calls concurrently in separate threads or processes.
 
   Args:
@@ -484,6 +484,7 @@ def _RunParallelTasks(target_arg_tuples, max_concurrency, get_task_manager,
         returns a _TaskManager.
     parallel_exception_class: Type of exception to raise upon an exception in
         one of the called functions.
+    post_task_delay: Delay in seconds between parallel task invocations.
 
   Returns:
     list of function return values in the order corresponding to the order of
@@ -508,6 +509,8 @@ def _RunParallelTasks(target_arg_tuples, max_concurrency, get_task_manager,
           task_manager.StartTask(target, args, kwargs, thread_context)
           started_task_count += 1
           active_task_count += 1
+          if post_task_delay:
+            time.sleep(post_task_delay)
           continue
 
         # Wait for a task to complete.
@@ -621,7 +624,8 @@ def RunThreaded(target, thread_params, max_concurrent_threads=200):
                             max_concurrency=max_concurrent_threads)
 
 
-def RunParallelProcesses(target_arg_tuples, max_concurrency):
+def RunParallelProcesses(target_arg_tuples, max_concurrency,
+                         post_process_delay=0):
   """Executes function calls concurrently in separate processes.
 
   Args:
@@ -630,6 +634,7 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency):
     max_concurrency: int or None. The maximum number of concurrent new
         processes. If None, it will default to the number of processors on the
         machine.
+    post_process_delay: Delay in seconds between parallel process invocations.
 
   Returns:
     list of function return values in the order corresponding to the order of
@@ -649,7 +654,8 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency):
     old_handler = signal.signal(signal.SIGINT, handle_sigint)
     ret_val = _RunParallelTasks(
         target_arg_tuples, max_concurrency, _BackgroundProcessTaskManager,
-        errors.VmUtil.CalledProcessException)
+        errors.VmUtil.CalledProcessException,
+        post_task_delay=post_process_delay)
   finally:
     if old_handler:
       signal.signal(signal.SIGINT, old_handler)

@@ -22,9 +22,9 @@ added after installation.
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
-def _Install(vm):
+def _Install(vm, package_name='python-pip'):
   """Install pip on the VM."""
-  vm.InstallPackages('python-pip')
+  vm.InstallPackages(package_name)
   vm.RemoteCommand('sudo pip install -U pip')  # Make pip upgrade pip
   vm.RemoteCommand('mkdir -p {0} && pip freeze > {0}/requirements.txt'.format(
       INSTALL_DIR))
@@ -33,7 +33,7 @@ def _Install(vm):
 def YumInstall(vm):
   """Installs the pip package on the VM."""
   vm.InstallEpelRepo()
-  _Install(vm)
+  _Install(vm, 'python27-pip')
 
 
 def AptInstall(vm):
