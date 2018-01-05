@@ -55,6 +55,9 @@ flags.DEFINE_enum(
     _SPECFP_BENCHMARKS | _SPECINT_BENCHMARKS | _SPECCPU_SUBSETS,
     'Used by the PKB speccpu2006 benchmark. Specifies a subset of SPEC CPU2006 '
     'benchmarks to run.')
+flags.DEFINE_enum('runspec_metric', 'rate', ['rate', 'speed'],
+                  'SPEC test to run. Speed is time-based metric, rate is '
+                  'throughput-based metric.')
 flags.DEFINE_string(
     'runspec_config', 'linux64-x64-gcc47.cfg',
     'Used by the PKB speccpu2006 benchmark. Name of the cfg file to use as the '
@@ -414,6 +417,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
     if match:
       assert in_result_section
       spec_name = str(match.group(1))
+      if FLAGS.runspec_metric == 'speed':
+        spec_name += ':speed'
       try:
         spec_score = float(match.group(2))
       except ValueError:
@@ -427,7 +432,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
               'runspec_config': FLAGS.runspec_config,
               'runspec_iterations': str(FLAGS.runspec_iterations),
               'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
-              'runspec_define': FLAGS.runspec_define}
+              'runspec_define': FLAGS.runspec_define,
+              'runspec_metric': FLAGS.runspec_metric}
 
   missing_results = []
   scores = []
@@ -441,6 +447,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
       continue
     # name, ref_time, time, score, misc
     name, _, _, score_str, _ = benchmark.split()
+    if FLAGS.runspec_metric == 'speed':
+      name += ':speed'
     score_float = float(score_str)
     scores.append(score_float)
     results.append(sample.Sample(str(name), score_float, '', metadata))
@@ -517,18 +525,20 @@ def Run(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   speccpu_vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR)
-  num_cpus = vm.num_cpus
-
   runspec_flags = [
       ('config', posixpath.basename(speccpu_vm_state.cfg_file_path)),
-      ('tune', 'base'), ('size', 'ref'), ('rate', num_cpus),
+      ('tune', 'base'), ('size', 'ref'),
       ('iterations', FLAGS.runspec_iterations)]
   if FLAGS.runspec_define:
     for runspec_define in FLAGS.runspec_define.split(','):
       runspec_flags.append(('define', runspec_define))
+  fl = ' '.join('--{0}={1}'.format(k, v) for k, v in runspec_flags)
+  if FLAGS.runspec_metric == 'rate':
+    fl += ' --rate=%s' % vm.num_cpus
+  else:
+    fl += ' --speed'
   runspec_cmd = 'runspec --noreportable {flags} {subset}'.format(
-      flags=' '.join('--{0}={1}'.format(k, v) for k, v in runspec_flags),
-      subset=FLAGS.benchmark_subset)
+      flags=fl, subset=FLAGS.benchmark_subset)
 
   cmd = ' && '.join((
       'cd {0}'.format(speccpu_vm_state.spec_dir), '. ./shrc', './bin/relocate',
