@@ -130,6 +130,12 @@ DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
 GCS_OBJECT_NAME_LENGTH = 20
 
+# A list of SamplePublishers that can be extended to add support for publishing
+# types beyond those in this module. The classes should not require any
+# arguments to their __init__ methods. The SampleCollector will unconditionally
+# call PublishSamples using Publishers added via this method.
+EXTERNAL_PUBLISHERS = []
+
 
 def GetLabelsFromDict(metadata):
   """Converts a metadata dictionary to a string of labels sorted by key.
@@ -785,6 +791,8 @@ class SampleCollector(object):
       self.publishers.extend(SampleCollector._PublishersFromFlags())
     if add_default_publishers:
       self.publishers.extend(SampleCollector._DefaultPublishers())
+    for publisher_class in EXTERNAL_PUBLISHERS:
+      self.publishers.append(publisher_class())
 
     logging.debug('Using publishers: {0}'.format(self.publishers))
 
@@ -863,6 +871,9 @@ class SampleCollector(object):
 
   def PublishSamples(self):
     """Publish samples via all registered publishers."""
+    if not self.samples:
+      logging.warn('No samples to publish.')
+      return
     for publisher in self.publishers:
       publisher.PublishSamples(self.samples)
     self.samples = []

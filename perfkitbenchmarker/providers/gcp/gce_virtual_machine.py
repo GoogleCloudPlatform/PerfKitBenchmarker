@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,12 +30,12 @@ import json
 import logging
 import re
 import threading
-import yaml
 
+from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
@@ -43,10 +43,11 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
+
+import yaml
 
 FLAGS = flags.FLAGS
 
@@ -63,138 +64,6 @@ _GPU_TYPE_TO_INTERAL_NAME_MAP = {
     'k80': 'nvidia-tesla-k80',
     'p100': 'nvidia-tesla-p100',
 }
-
-
-def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
-  """Generates a string to be used to attach accelerators to a VM using gcloud.
-
-  This function takes a cloud-agnostic accelerator type (k80, p100, etc.) and
-  returns a gce-specific accelerator name (nvidia-tesla-k80, etc).
-
-  If FLAGS.gce_accelerator_type_override is specified, the value of said flag
-  will be used as the name of the accelerator.
-
-  Args:
-    accelerator_type: cloud-agnostic accelerator type (p100, k80, etc.)
-    accelerator_count: number of accelerators to attach to the VM
-
-  Returns:
-    String to be used by gcloud to attach accelerators to a VM.
-    Must be prepended by the flag '--accelerator'.
-  """
-  gce_accelerator_type = (FLAGS.gce_accelerator_type_override or
-                          _GPU_TYPE_TO_INTERAL_NAME_MAP[accelerator_type])
-  return 'type={0},count={1}'.format(
-      gce_accelerator_type,
-      accelerator_count)
-
-
-class MemoryDecoder(option_decoders.StringDecoder):
-  """Verifies and decodes a config option value specifying a memory size."""
-
-  _CONFIG_MEMORY_PATTERN = re.compile(r'([0-9.]+)([GM]iB)')
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Decodes memory size in MiB from a string.
-
-    The value specified in the config must be a string representation of the
-    memory size expressed in MiB or GiB. It must be an integer number of MiB
-    Examples: "1280MiB", "7.5GiB".
-
-    Args:
-      value: The value specified in the config.
-      component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
-      flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
-
-    Returns:
-      int. Memory size in MiB.
-
-    Raises:
-      errors.Config.InvalidValue upon invalid input value.
-    """
-    string = super(MemoryDecoder, self).Decode(value, component_full_name,
-                                               flag_values)
-    match = self._CONFIG_MEMORY_PATTERN.match(string)
-    if not match:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". Examples of valid values: "1280MiB", '
-          '"7.5GiB".'.format(self._GetOptionFullName(component_full_name),
-                             string))
-    try:
-      memory_value = float(match.group(1))
-    except ValueError:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". "{2}" is not a valid float.'.format(
-              self._GetOptionFullName(component_full_name), string,
-              match.group(1)))
-    memory_units = match.group(2)
-    if memory_units == 'GiB':
-      memory_value *= 1024
-    memory_mib_int = int(memory_value)
-    if memory_value != memory_mib_int:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". The specified size must be an integer '
-          'number of MiB.'.format(self._GetOptionFullName(component_full_name),
-                                  string))
-    return memory_mib_int
-
-
-class CustomMachineTypeSpec(spec.BaseSpec):
-  """Properties of a GCE custom machine type.
-
-  Attributes:
-    cpus: int. Number of vCPUs.
-    memory: string. Representation of the size of memory, expressed in MiB or
-        GiB. Must be an integer number of MiB (e.g. "1280MiB", "7.5GiB").
-  """
-
-  @classmethod
-  def _GetOptionDecoderConstructions(cls):
-    """Gets decoder classes and constructor args for each configurable option.
-
-    Returns:
-      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
-          The pair specifies a decoder class and its __init__() keyword
-          arguments to construct in order to decode the named option.
-    """
-    result = super(CustomMachineTypeSpec, cls)._GetOptionDecoderConstructions()
-    result.update({'cpus': (option_decoders.IntDecoder, {'min': 1}),
-                   'memory': (MemoryDecoder, {})})
-    return result
-
-
-class MachineTypeDecoder(option_decoders.TypeVerifier):
-  """Decodes the machine_type option of a GCE VM config."""
-
-  def __init__(self, **kwargs):
-    super(MachineTypeDecoder, self).__init__((basestring, dict), **kwargs)
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Decodes the machine_type option of a GCE VM config.
-
-    Args:
-      value: Either a string name of a GCE machine type or a dict containing
-          'cpu' and 'memory' keys describing a custom VM.
-      component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
-      flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
-
-    Returns:
-      If value is a string, returns it unmodified. Otherwise, returns the
-      decoded CustomMachineTypeSpec.
-
-    Raises:
-      errors.Config.InvalidValue upon invalid input value.
-    """
-    super(MachineTypeDecoder, self).Decode(value, component_full_name,
-                                           flag_values)
-    if isinstance(value, basestring):
-      return value
-    return CustomMachineTypeSpec(self._GetOptionFullName(component_full_name),
-                                 flag_values=flag_values, **value)
 
 
 class GceVmSpec(virtual_machine.BaseVmSpec):
@@ -218,7 +87,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
 
   def __init__(self, *args, **kwargs):
     super(GceVmSpec, self).__init__(*args, **kwargs)
-    if isinstance(self.machine_type, CustomMachineTypeSpec):
+    if isinstance(self.machine_type,
+                  custom_virtual_machine_spec.CustomMachineTypeSpec):
       self.cpus = self.machine_type.cpus
       self.memory = self.machine_type.memory
       self.machine_type = None
@@ -271,7 +141,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'machine_type': (MachineTypeDecoder, {}),
+        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder, {}),
         'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
                                                         'min': 0}),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
@@ -325,6 +195,30 @@ class GceSoleTenantHost(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy', 'hosts',
                              'delete', self.name)
     cmd.Issue()
+
+
+def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
+  """Generates a string to be used to attach accelerators to a VM using gcloud.
+
+  This function takes a cloud-agnostic accelerator type (k80, p100, etc.) and
+  returns a gce-specific accelerator name (nvidia-tesla-k80, etc).
+
+  If FLAGS.gce_accelerator_type_override is specified, the value of said flag
+  will be used as the name of the accelerator.
+
+  Args:
+    accelerator_type: cloud-agnostic accelerator type (p100, k80, etc.)
+    accelerator_count: number of accelerators to attach to the VM
+
+  Returns:
+    String to be used by gcloud to attach accelerators to a VM.
+    Must be prepended by the flag '--accelerator'.
+  """
+  gce_accelerator_type = (FLAGS.gce_accelerator_type_override or
+                          _GPU_TYPE_TO_INTERAL_NAME_MAP[accelerator_type])
+  return 'type={0},count={1}'.format(
+      gce_accelerator_type,
+      accelerator_count)
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):

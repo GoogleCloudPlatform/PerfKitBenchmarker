@@ -61,6 +61,7 @@ import itertools
 import json
 import logging
 import multiprocessing
+from os.path import isfile
 import re
 import sys
 import time
@@ -76,8 +77,8 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
@@ -231,6 +232,11 @@ flags.DEFINE_integer(
     'run_processes', 1,
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
+flags.DEFINE_float(
+    'run_processes_delay', None,
+    'The delay in seconds between parallel processes\' invocation. '
+    'Increasing this value may reduce provider throttling issues.',
+    lower_bound=0)
 flags.DEFINE_string(
     'completion_status_file', None,
     'If specified, this file will contain the completion status of each '
@@ -257,6 +263,9 @@ flags.DEFINE_boolean(
     'If true, PKB will print the flags configurations to be run and exit. '
     'The configurations are generated from the command line flags, the '
     'flag_matrix, and flag_zip.')
+flags.DEFINE_string(
+    'skip_pending_runs_file', None,
+    'If file exists, any pending runs will be not be executed.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -313,7 +322,7 @@ def _PrintHelp(matches=None):
   """Prints help for flags defined in matching modules.
 
   Args:
-    matches regex string or None. Filters help to only those whose name
+    matches: regex string or None. Filters help to only those whose name
       matched the regex. If None then all flags are printed.
   """
   if not matches:
@@ -532,7 +541,7 @@ def DoCleanupPhase(spec, timer):
   """
   logging.info('Cleaning up benchmark %s', spec.name)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
-          spec.dpb_service is not None):
+      spec.dpb_service is not None):
     spec.StopBackgroundWorkload()
     with timer.Measure('Benchmark Cleanup'):
       spec.BenchmarkCleanup(spec)
@@ -542,7 +551,6 @@ def DoTeardownPhase(spec, timer):
   """Performs the Teardown phase of benchmark execution.
 
   Args:
-    name: A string containing the benchmark name.
     spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of
       resource teardown.
@@ -560,6 +568,14 @@ def RunBenchmark(spec, collector):
     spec: The BenchmarkSpec object with run information.
     collector: The SampleCollector object to add samples to.
   """
+
+  # Since there are issues with the handling SIGINT/KeyboardInterrupt (see
+  # further dicussion in _BackgroundProcessTaskManager) this mechanism is
+  # provided for defense in depth to force skip pending runs after SIGINT.
+  if FLAGS.skip_pending_runs_file and isfile(FLAGS.skip_pending_runs_file):
+    logging.warning('%s exists.  Skipping benchmark.',
+                    FLAGS.skip_pending_runs_file)
+    return
   spec.status = benchmark_status.FAILED
   current_run_stage = stages.PROVISION
   # Modify the logger prompt for messages logged within this function.
@@ -632,7 +648,7 @@ def MakeFailedRunSample(error_message, run_stage_that_failed):
   """Create a sample.Sample representing a failed run stage.
 
   The sample metric will have the name 'Run Failed';
-  the value will be 1 (has to be convertable to a float),
+  the value will be 1 (has to be convertible to a float),
   and the unit will be 'Run Failed' (for lack of a better idea).
 
   The sample metadata will include the error message from the
@@ -760,10 +776,10 @@ def RunBenchmarks():
   """
   benchmark_specs = _CreateBenchmarkSpecs()
   if FLAGS.dry_run:
-    print('PKB will run with the following configurations:')
+    print 'PKB will run with the following configurations:'
     for spec in benchmark_specs:
-      print(spec)
-      print('')
+      print spec
+      print ''
     return 0
 
   collector = SampleCollector()
@@ -771,7 +787,7 @@ def RunBenchmarks():
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
     spec_sample_tuples = background_tasks.RunParallelProcesses(
-        tasks, FLAGS.run_processes)
+        tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
     benchmark_specs, sample_lists = zip(*spec_sample_tuples)
     for sample_list in sample_lists:
       collector.samples.extend(sample_list)
@@ -787,7 +803,6 @@ def RunBenchmarks():
                  vm_util.PrependTempDir(LOG_FILE_NAME))
     logging.info('Completion statuses can be found at: %s',
                  vm_util.PrependTempDir(COMPLETION_STATUS_FILE_NAME))
-
 
   if stages.TEARDOWN not in FLAGS.run_stage:
     logging.info(
