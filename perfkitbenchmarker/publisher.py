@@ -29,11 +29,11 @@ import logging
 import math
 import operator
 import pprint
+import requests
 import sys
 import time
 import urllib
 import uuid
-import requests
 
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
