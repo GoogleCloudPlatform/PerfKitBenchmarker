@@ -18,7 +18,7 @@
 
 import abc
 import collections
-from copy import copy, deepcopy
+import copy
 import csv
 import fcntl
 import httplib
@@ -486,7 +486,7 @@ class RemoteJSONPublisher(SamplePublisher):
       return
 
     # Copy `metadata` object to string `labels` with format |key:value|,...
-    samples_copy = deepcopy(samples)
+    samples_copy = copy.deepcopy(samples)
     for sample in samples_copy:
       sample['labels'] = GetLabelsFromDict(sample['metadata'])
 
