@@ -34,3 +34,4 @@
 - Lock pip to python2.7 when installed with Yum
 - Don't try to publish samples if there aren't any
 - Disallow overwriting of benchmarks using the same benchmark name.
+- Log exception thrown in RunBenchmark
