@@ -698,6 +698,7 @@ def RunBenchmarkTask(spec):
   try:
     RunBenchmark(spec, collector)
   except BaseException as e:
+    logging.exception('Exception running benchmark')
     msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
         spec.sequence_number, spec.total_benchmarks, spec.name, spec.uid)
     if isinstance(e, KeyboardInterrupt) or FLAGS.stop_after_benchmark_failure:
