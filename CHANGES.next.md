@@ -21,6 +21,7 @@
 - Added cuda_toolkit_version flag
 - Added support for CUDA Toolkit 9.0
 - Added MXNet support for CUDA Toolkit 9.0
+- Added new version of HPCG, with CUDA 9 support
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
