@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +14,7 @@
 
 """Run HPCG.
 
-Requires:
-* openmpi 1.10.2
-
-Binaries are provided which are statically linked to CUDA 8.0.44 and
-OpenMPI 1.10.2 and 1.6.5. If different versions of these libs are to be used,
-modify the HPCG package to build from source, located here:
-https://github.com/hpcg-benchmark/hpcg/
+Requires openmpi 1.10.2
 """
 
 import logging
