@@ -30,11 +30,18 @@ import winrm
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_bool(
+    'log_windows_password', False,
+    'Whether to log passwords for Windows machines. This can be useful in '
+    'the event of needing to manually RDP to the instance.')
+
 SMB_PORT = 445
 WINRM_PORT = 5986
+RDP_PORT = 3389
 # This startup script enables remote mangement of the instance. It does so
 # by creating a WinRM listener (using a self-signed cert) and opening
 # the WinRM port in the Windows firewall.
+# It also sets up RDP for manual debugging.
 _STARTUP_SCRIPT = """
 Enable-PSRemoting -Force
 $cert = New-SelfSignedCertificate -DnsName hostname -CertStoreLocation `
@@ -43,8 +50,13 @@ New-Item WSMan:\\localhost\\Listener -Transport HTTPS -Address * `
     -CertificateThumbPrint $cert.Thumbprint -Force
 Set-Item -Path 'WSMan:\\localhost\\Service\\Auth\\Basic' -Value $true
 netsh advfirewall firewall add rule name='Allow WinRM' dir=in action=allow `
-    protocol=TCP localport={port}
-""".format(port=WINRM_PORT)
+    protocol=TCP localport={winrm_port}
+Set-ItemProperty -Path `
+    "HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server" `
+    -Name "fDenyTSConnections" -Value 0
+netsh advfirewall firewall add rule name='Allow RDP' dir=in action=allow `
+    protocol=TCP localport={rdp_port}
+""".format(winrm_port=WINRM_PORT, rdp_port=RDP_PORT)
 STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
     encoded_command=base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le')))
 
@@ -57,7 +69,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     super(WindowsMixin, self).__init__()
     self.winrm_port = WINRM_PORT
     self.smb_port = SMB_PORT
-    self.remote_access_ports = [self.winrm_port, self.smb_port]
+    self.remote_access_ports = [self.winrm_port, self.smb_port, RDP_PORT]
     self.temp_dir = None
     self.home_dir = None
     self.system_drive = None
@@ -226,6 +238,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       self.bootable_time = time.time()
     if self.hostname is None:
       self.hostname = stdout.rstrip()
+    if FLAGS.log_windows_password:
+      logging.info('Password for %s: %s', self, self.password)
 
   def OnStartup(self):
     stdout, _ = self.RemoteCommand('echo $env:TEMP')
