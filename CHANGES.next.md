@@ -23,6 +23,7 @@
 - Publishers can be extended through external modules.
 - Add `run_processes_delay` flag to stagger parallel runs.
 - Add support for SPECspeed.
+- Add new `os_types` Ubuntu1404 and Ubuntu1604.
 - Make it easier to RDP to PKB VMs
 
 ### Bug fixes and maintenance updates:

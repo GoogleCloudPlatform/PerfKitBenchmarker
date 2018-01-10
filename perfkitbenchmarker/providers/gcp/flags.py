@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing flags applicable across benchmark run on GCP."""
 
 from perfkitbenchmarker import flags
 
@@ -29,6 +30,10 @@ flags.DEFINE_boolean('gce_migrate_on_maintenance', True, 'If true, allow VM '
                      'migration on GCE host maintenance.')
 flags.DEFINE_boolean('gce_preemptible_vms', False, 'If true, use preemptible '
                      'VMs on GCE.')
+flags.DEFINE_string(
+    'image_family', None, 'The family of the image that the boot disk will be '
+    'initialized with. The --image flag will take priority over this flag. See:'
+    ' https://cloud.google.com/sdk/gcloud/reference/compute/instances/create')
 flags.DEFINE_string(
     'image_project', None, 'The project against which all image references will'
     ' be resolved. See: '

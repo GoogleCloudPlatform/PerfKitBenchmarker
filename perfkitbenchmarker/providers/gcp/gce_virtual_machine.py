@@ -77,6 +77,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     num_local_ssds: int. The number of local SSDs to attach to the instance.
     preemptible: boolean. True if the VM should be preemptible, False otherwise.
     project: string or None. The project to create the VM in.
+    image_family: string or None. The image family used to locate the image.
     image_project: string or None. The image project used to locate the
         specifed image.
     boot_disk_size: None or int. The size of the boot disk in GB.
@@ -121,6 +122,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['machine_type'] = yaml.load(flag_values.machine_type)
     if flag_values['project'].present:
       config_values['project'] = flag_values.project
+    if flag_values['image_family'].present:
+      config_values['image_family'] = flag_values.image_family
     if flag_values['image_project'].present:
       config_values['image_project'] = flag_values.image_project
     if flag_values['gcp_host_type'].present:
@@ -148,6 +151,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
         'boot_disk_type': (option_decoders.StringDecoder, {'default': None}),
         'project': (option_decoders.StringDecoder, {'default': None}),
+        'image_family': (option_decoders.StringDecoder, {'default': None}),
         'image_project': (option_decoders.StringDecoder, {'default': None}),
         'host_type': (option_decoders.StringDecoder,
                       {'default': 'n1-host-64-416'}),
@@ -225,8 +229,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
   CLOUD = providers.GCP
-  # Subclasses should override the default image.
+  # Subclasses should override the default image OR
+  # both the image family and image_project.
   DEFAULT_IMAGE = None
+  DEFAULT_IMAGE_FAMILY = None
+  DEFAULT_IMAGE_PROJECT = None
   BOOT_DISK_SIZE_GB = 10
   BOOT_DISK_TYPE = gce_disk.PD_STANDARD
 
@@ -254,7 +261,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
     self.project = vm_spec.project or util.GetDefaultProject()
-    self.image_project = vm_spec.image_project
+    self.image_family = vm_spec.image_family or self.DEFAULT_IMAGE_FAMILY
+    self.image_project = vm_spec.image_project or self.DEFAULT_IMAGE_PROJECT
     self.network = gce_network.GceNetwork.GetNetwork(self)
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size
@@ -272,7 +280,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def host_list(self):
     """Returns the list of hosts that are compatible with this VM."""
     return self.host_map[(self.project, self.zone)]
-
 
   def _GenerateCreateCommand(self, ssh_keys_path):
     """Generates a command to create the VM instance.
@@ -296,10 +303,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['subnet'] = self.network.subnet_resource.name
     else:
       cmd.flags['network'] = self.network.network_resource.name
-    cmd.flags['image'] = self.image
-    cmd.flags['boot-disk-auto-delete'] = True
+    if self.image:
+      cmd.flags['image'] = self.image
+    elif self.image_family:
+      cmd.flags['image-family'] = self.image_family
     if self.image_project is not None:
       cmd.flags['image-project'] = self.image_project
+    cmd.flags['boot-disk-auto-delete'] = True
     cmd.flags['boot-disk-size'] = self.boot_disk_size or self.BOOT_DISK_SIZE_GB
     cmd.flags['boot-disk-type'] = self.boot_disk_type or self.BOOT_DISK_TYPE
     if self.machine_type is None:
@@ -488,7 +498,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.Issue()
 
   def AllowRemoteAccessPorts(self):
-    """Creates firewall rules for remote access if required. """
+    """Creates firewall rules for remote access if required."""
 
     # If gce_remote_access_firewall_rule is specified, access is already
     # granted by that rule.
@@ -508,6 +518,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       attr_value = getattr(self, attr_name)
       if attr_value:
         result[attr_name] = attr_value
+    if not self.image and self.image_family:
+      result['image_family'] = self.image_family
+    if self.image_project:
+      result['image_project'] = self.image_project
     if self.use_dedicated_host:
       result['host_type'] = self.host_type
       result['num_vms_per_host'] = self.num_vms_per_host
@@ -541,6 +555,18 @@ class DebianBasedGceVirtualMachine(GceVirtualMachine,
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  linux_vm.RhelMixin):
   DEFAULT_IMAGE = RHEL_IMAGE
+
+
+class Ubuntu1404BasedGceVirtualMachine(GceVirtualMachine,
+                                       linux_vm.Ubuntu1404Mixin):
+  DEFAULT_IMAGE_FAMILY = 'ubuntu-1404-lts'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
+class Ubuntu1604BasedGceVirtualMachine(GceVirtualMachine,
+                                       linux_vm.Ubuntu1604Mixin):
+  DEFAULT_IMAGE_FAMILY = 'ubuntu-1604-lts'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
 class WindowsGceVirtualMachine(GceVirtualMachine,
