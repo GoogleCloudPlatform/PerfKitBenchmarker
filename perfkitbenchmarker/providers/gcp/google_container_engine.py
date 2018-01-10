@@ -64,7 +64,7 @@ class GkeCluster(container_service.KubernetesCluster):
       # for google_container_engine however).
       cmd = util.GcloudCommand(
           self, 'alpha', 'container', 'clusters', 'create', self.name,
-          '--enable-kubernetes-alpha', '--cluster-version', '1.8.4-gke.1')
+          '--enable-kubernetes-alpha', '--cluster-version', '1.8.6-gke.0')
 
       cmd.flags['accelerator'] = (gce_virtual_machine.
                                   GenerateAcceleratorSpecString(self.gpu_type,
