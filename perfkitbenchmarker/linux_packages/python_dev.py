@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,15 +13,15 @@
 # limitations under the License.
 
 
-"""Module containing python 2.7 installation and cleanup functions."""
+"""Module containing python 2.7 dev installation and cleanup functions."""
 
 
 def YumInstall(vm):
   """Installs the package on the VM."""
-  package_name = getattr(vm, 'python_package_config', 'python-2.7.5')
+  package_name = getattr(vm, 'python_dev_package_config', 'python-devel')
   vm.InstallPackages(package_name)
 
 
 def AptInstall(vm):
   """Installs the package on the VM."""
-  vm.InstallPackages('python2.7')
+  vm.InstallPackages('python-dev')

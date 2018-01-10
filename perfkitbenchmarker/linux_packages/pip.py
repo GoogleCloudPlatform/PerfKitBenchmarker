@@ -33,7 +33,8 @@ def _Install(vm, package_name='python-pip'):
 def YumInstall(vm):
   """Installs the pip package on the VM."""
   vm.InstallEpelRepo()
-  _Install(vm, 'python27-pip')
+  package_name = getattr(vm, 'python_pip_package_config', 'python27-pip')
+  _Install(vm, package_name)
 
 
 def AptInstall(vm):
