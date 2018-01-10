@@ -37,3 +37,4 @@
 - Don't try to publish samples if there aren't any
 - Disallow overwriting of benchmarks using the same benchmark name.
 - Log exception thrown in RunBenchmark
+- Explicitly state python package names for RedHat on GCP

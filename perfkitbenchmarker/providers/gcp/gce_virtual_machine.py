@@ -556,6 +556,12 @@ class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  linux_vm.RhelMixin):
   DEFAULT_IMAGE = RHEL_IMAGE
 
+  def __init__(self, vm_spec):
+    super(RhelBasedGceVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
+
 
 class Ubuntu1404BasedGceVirtualMachine(GceVirtualMachine,
                                        linux_vm.Ubuntu1404Mixin):
