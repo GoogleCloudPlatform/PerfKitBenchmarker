@@ -15,7 +15,7 @@
 """Module containing mixin classes for linux virtual machines.
 
 These classes allow installation on both Debian and RHEL based linuxes.
-They also handle some intial setup (especially on RHEL based linuxes
+They also handle some initial setup (especially on RHEL based linuxes
 since by default sudo commands without a tty don't work) and
 can restore the VM to the state it was in before packages were
 installed.
@@ -34,7 +34,6 @@ import re
 import threading
 import time
 import uuid
-import yaml
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -43,6 +42,8 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+
+import yaml
 
 FLAGS = flags.FLAGS
 
@@ -212,7 +213,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    env_file = "/etc/environment"
+    env_file = '/etc/environment'
     commands = []
 
     if FLAGS.http_proxy:
@@ -228,7 +229,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           FLAGS.ftp_proxy, env_file))
 
     if commands:
-      self.RemoteCommand(";".join(commands))
+      self.RemoteCommand(';'.join(commands))
 
   def SetupPackageManager(self):
     """Specific Linux flavors should override this."""
@@ -927,7 +928,7 @@ class RhelMixin(BaseLinuxMixin):
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
     super(RhelMixin, self).SetupProxy()
-    yum_proxy_file = "/etc/yum.conf"
+    yum_proxy_file = '/etc/yum.conf'
 
     if FLAGS.http_proxy:
       self.RemoteCommand("echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (
@@ -1079,6 +1080,16 @@ class DebianMixin(BaseLinuxMixin):
     self.RemoteCommand('sudo service ssh restart')
 
 
+class Ubuntu1404Mixin(DebianMixin):
+  """Class holding Ubuntu1404 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1404
+
+
+class Ubuntu1604Mixin(DebianMixin):
+  """Class holding Ubuntu1604 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1604
+
+
 class ContainerizedDebianMixin(DebianMixin):
   """Class representing a Containerized Virtual Machine.
 
@@ -1095,7 +1106,7 @@ class ContainerizedDebianMixin(DebianMixin):
     """Returns whether docker is installed or not."""
     resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
                                      suppress_warning=True)
-    if resp.rstrip() == "":
+    if resp.rstrip() == '':
       return False
     return True
 

@@ -25,13 +25,14 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-import json
 import itertools
+import json
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -39,13 +40,13 @@ from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
-from perfkitbenchmarker import providers
 
 FLAGS = flags.FLAGS
 
 
 # Per-VM resources are defined here.
 class AzurePublicIPAddress(resource.BaseResource):
+
   def __init__(self, location, name):
     super(AzurePublicIPAddress, self).__init__()
     self.location = location
@@ -87,6 +88,7 @@ class AzurePublicIPAddress(resource.BaseResource):
 
 
 class AzureNIC(resource.BaseResource):
+
   def __init__(self, subnet, name, public_ip):
     super(AzureNIC, self).__init__()
     self.subnet = subnet
@@ -282,6 +284,16 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
                                      linux_virtual_machine.DebianMixin):
   IMAGE_URN = 'Canonical:UbuntuServer:14.04.4-LTS:latest'
+
+
+class Ubuntu1404BasedAzureVirtualMachine(AzureVirtualMachine,
+                                         linux_virtual_machine.Ubuntu1404Mixin):
+  IMAGE_URN = 'Canonical:UbuntuServer:14.04.4-LTS:latest'
+
+
+class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
+                                         linux_virtual_machine.Ubuntu1604Mixin):
+  IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'
 
 
 class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
