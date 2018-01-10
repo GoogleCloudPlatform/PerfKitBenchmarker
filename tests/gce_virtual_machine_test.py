@@ -12,23 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for perfkitbenchmarker.providers.gcp.gce_virtual_machine"""
+"""Tests for perfkitbenchmarker.providers.gcp.gce_virtual_machine."""
 
 import contextlib
-import mock
 import re
 import unittest
+
+import mock
+import mock_flags
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
-import mock_flags
 
 
 _BENCHMARK_NAME = 'name'
@@ -177,6 +179,68 @@ class GceVirtualMachineTestCase(unittest.TestCase):
     }, vm.GetResourceMetadata())
 
 
+class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
+
+  def setUp(self):
+    p = mock.patch(gce_virtual_machine.__name__ +
+                   '.gce_network.GceNetwork.GetNetwork')
+    self.mock_get_network = p.start()
+    self.addCleanup(p.stop)
+    p = mock.patch(gce_virtual_machine.__name__ +
+                   '.gce_network.GceFirewall.GetFirewall')
+    self.mock_get_firewall = p.start()
+    self.addCleanup(p.stop)
+    self.spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                              machine_type='fake-machine-type')
+
+  def testCreateDebian(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.DEBIAN)
+    with PatchCriticalObjects() as issue_command:
+      vm = vm_class(self.spec)
+      vm._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn('--image ubuntu-14-04', command_string)
+      self.assertDictContainsSubset({'image': 'ubuntu-14-04'},
+                                    vm.GetResourceMetadata())
+
+  def testCreateUbuntu1404(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1404)
+    with PatchCriticalObjects() as issue_command:
+      vm = vm_class(self.spec)
+      vm._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn(
+          '--image-family ubuntu-1404-lts --image-project ubuntu-os-cloud',
+          command_string)
+      self.assertDictContainsSubset({'image': None,
+                                     'image_family': 'ubuntu-1404-lts',
+                                     'image_project': 'ubuntu-os-cloud'},
+                                    vm.GetResourceMetadata())
+
+  def testCreateUbuntu1604(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1604)
+    with PatchCriticalObjects() as issue_command:
+      vm = vm_class(self.spec)
+      vm._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn(
+          '--image-family ubuntu-1604-lts --image-project ubuntu-os-cloud',
+          command_string)
+      self.assertDictContainsSubset({'image': None,
+                                     'image_family': 'ubuntu-1604-lts',
+                                     'image_project': 'ubuntu-os-cloud'},
+                                    vm.GetResourceMetadata())
+
+
 class GCEVMFlagsTestCase(unittest.TestCase):
 
   def setUp(self):
@@ -195,7 +259,6 @@ class GCEVMFlagsTestCase(unittest.TestCase):
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
         mock.MagicMock(), config_spec, _BENCHMARK_UID)
 
-
   def testPreemptibleVMFlag(self):
     with PatchCriticalObjects() as issue_command:
       self._mocked_flags['gce_preemptible_vms'].parse(True)
@@ -204,7 +267,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
           machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
-      self.assertEquals(issue_command.call_count, 1)
+      self.assertEqual(issue_command.call_count, 1)
       self.assertIn('--preemptible', issue_command.call_args[0][0])
 
   def testMigrateOnMaintenanceFlagTrueWithGpus(self):
@@ -229,7 +292,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
           machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
-      self.assertEquals(issue_command.call_count, 1)
+      self.assertEqual(issue_command.call_count, 1)
 
   def testAcceleratorTypeOverrideFlag(self):
     with PatchCriticalObjects() as issue_command:
@@ -239,7 +302,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
           machine_type='test_machine_type', gpu_count=1, gpu_type='k80')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
-      self.assertEquals(issue_command.call_count, 1)
+      self.assertEqual(issue_command.call_count, 1)
       self.assertIn('--accelerator', issue_command.call_args[0][0])
       self.assertIn('type=fake_type,count=1',
                     issue_command.call_args[0][0])
@@ -253,7 +316,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
           machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
-      self.assertEquals(issue_command.call_count, 1)
+      self.assertEqual(issue_command.call_count, 1)
       self.assertIn('--image-project bar',
                     ' '.join(issue_command.call_args[0][0]))
 
@@ -266,7 +329,7 @@ class GCEVMFlagsTestCase(unittest.TestCase):
           machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
-      self.assertEquals(issue_command.call_count, 1)
+      self.assertEqual(issue_command.call_count, 1)
       actual_metadata = re.compile('--metadata\s+(.*)(\s+--)?').search(
           ' '.join(issue_command.call_args[0][0])).group(1)
       self.assertIn('k1=v1', actual_metadata)
@@ -284,10 +347,10 @@ class GCEVMFlagsTestCase(unittest.TestCase):
           machine_type='test_machine_type')
       vm = gce_virtual_machine.GceVirtualMachine(vm_spec)
       vm._Create()
-      self.assertEquals(issue_command.call_count, 1)
+      self.assertEqual(issue_command.call_count, 1)
       actual_metadata_from_file = re.compile(
           '--metadata-from-file\s+(.*)(\s+--)?').search(
-          ' '.join(issue_command.call_args[0][0])).group(1)
+              ' '.join(issue_command.call_args[0][0])).group(1)
       self.assertIn('k1=p1', actual_metadata_from_file)
       self.assertIn('k2=p2', actual_metadata_from_file)
       self.assertIn('k3=p3', actual_metadata_from_file)
@@ -314,7 +377,7 @@ class GCEVMCreateTestCase(unittest.TestCase):
           })
       vm = gce_virtual_machine.GceVirtualMachine(spec)
       vm._Create()
-      self.assertEquals(issue_command.call_count, 1)
+      self.assertEqual(issue_command.call_count, 1)
       self.assertNotIn('--accelerator', issue_command.call_args[0][0])
 
   def testVmWithGpu(self):
@@ -326,7 +389,7 @@ class GCEVMCreateTestCase(unittest.TestCase):
           gpu_type='k80')
       vm = gce_virtual_machine.GceVirtualMachine(spec)
       vm._Create()
-      self.assertEquals(issue_command.call_count, 1)
+      self.assertEqual(issue_command.call_count, 1)
       self.assertIn('--accelerator', issue_command.call_args[0][0])
       self.assertIn('type=nvidia-tesla-k80,count=2',
                     issue_command.call_args[0][0])
