@@ -650,7 +650,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           'please make sure that %s can ssh into %s without supplying any '
           'arguments except the ip address.' % (self, peer))
 
-
   def CheckJavaVersion(self):
     """Check the version of java on remote machine.
 
@@ -666,7 +665,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Deletes a file on a remote machine.
 
     Args:
-      filename: Path to the the file to delete.
+      filename: Path to the file to delete.
     """
     self.RemoteCommand('sudo rm -rf %s' % filename)
 
@@ -1175,7 +1174,7 @@ class ContainerizedDebianMixin(DebianMixin):
                                   ignore_failure, login_shell, suppress_warning)
 
   def ContainerCopy(self, file_name, container_path='', copy_to=True):
-    """Copies a file to and from container_path to the host's vm_util.VM_TMP_DIR.
+    """Copies a file to or from container_path to the host's vm_util.VM_TMP_DIR.
 
     Args:
       file_name: Name of the file in the host's vm_util.VM_TMP_DIR.
