@@ -25,6 +25,8 @@
 - Add support for SPECspeed.
 - Add new `os_types` Ubuntu1404 and Ubuntu1604.
 - Make it easier to RDP to PKB VMs
+- Avoid setting up thread pool etc when run_processes is set
+  to 1 to simplify debugging using --run_with_pdb flag
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

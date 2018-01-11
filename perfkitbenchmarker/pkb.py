@@ -769,6 +769,17 @@ def SetUpPKB():
   events.initialization_complete.send(parsed_flags=FLAGS)
 
 
+def RunBenchmarkTasksInSeries(tasks):
+  """
+  Runs benchmarks in series.
+
+  Arguments: list of tuples of task: [(RunBenchmarkTask, (spec,), {}),]
+
+  Returns: list of tuples of func results
+  """
+  return [func(*args, **kwargs) for func, args, kwargs in tasks]
+
+
 def RunBenchmarks():
   """Runs all benchmarks in PerfKitBenchmarker.
 
@@ -787,8 +798,11 @@ def RunBenchmarks():
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
-    spec_sample_tuples = background_tasks.RunParallelProcesses(
-        tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
+    if FLAGS.run_processes == 1:
+      spec_sample_tuples = RunBenchmarkTasksInSeries(tasks)
+    else:
+      spec_sample_tuples = background_tasks.RunParallelProcesses(
+          tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
     benchmark_specs, sample_lists = zip(*spec_sample_tuples)
     for sample_list in sample_lists:
       collector.samples.extend(sample_list)
