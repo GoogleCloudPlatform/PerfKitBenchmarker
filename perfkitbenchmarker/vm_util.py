@@ -291,9 +291,24 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
-  shell_value = RunningOnWindows()
-  with tempfile.TemporaryFile() as tf_out, tempfile.TemporaryFile() as tf_err:
-    process = subprocess.Popen(cmd, env=env, shell=shell_value,
+  time_file_path = '/usr/bin/time'
+
+  runningOnWindows = RunningOnWindows()
+  should_time = not runningOnWindows and os.path.isfile(time_file_path)
+  shell_value = runningOnWindows
+  with tempfile.TemporaryFile() as tf_out,\
+       tempfile.TemporaryFile() as tf_err,\
+       tempfile.NamedTemporaryFile(mode='r') as tf_timing:
+
+    cmd_to_use = cmd
+    if should_time:
+      cmd_to_use = [time_file_path,
+                    '-o', tf_timing.name,
+                    '--quiet',
+                    '-f', ',  WallTime:%Es,  CPU:%Us,  MaxMemory:%Mkb '
+                   ] + cmd
+
+    process = subprocess.Popen(cmd_to_use, env=env, shell=shell_value,
                                stdin=subprocess.PIPE, stdout=tf_out,
                                stderr=tf_err, cwd=cwd)
 
@@ -315,8 +330,12 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     tf_err.seek(0)
     stderr = tf_err.read().decode('ascii', 'ignore')
 
-  debug_text = ('Ran %s. Got return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
-                (full_cmd, process.returncode, stdout, stderr))
+    timing_output = ''
+    if should_time:
+      timing_output = tf_timing.read().rstrip('\n')
+
+  debug_text = ('Ran: {%s}  ReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' %
+                (full_cmd, process.returncode, timing_output, stdout, stderr))
   if force_info_log or (process.returncode and not suppress_warning):
     logging.info(debug_text)
   else:
