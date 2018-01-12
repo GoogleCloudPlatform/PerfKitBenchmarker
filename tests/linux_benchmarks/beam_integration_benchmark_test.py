@@ -59,6 +59,29 @@ class BeamArgsOptionsTestCase(unittest.TestCase):
                          ["\"--project=testProj\"",
                           "\"--gcpTempLocation=gs://test-bucket/staging\""])
 
+  def testDynamicPipelineOpionsWithFormat(self):
+      dynamic_options = [
+          {
+              "name": "test_value_A",
+              "type": "TestValue",
+              "value": "a_value",
+              "format": "other representation of {{TestValue}}",
+          },
+          {
+              "name": "test_value_B",
+              "type": "TestValue",
+              "value": "b_value"
+          }
+      ]
+
+      self.assertListEqual(
+          beam_pipeline_options.EvaluateDynamicPipelineOptions(dynamic_options),
+          [
+              ("test_value_A", "other representation of a_value"),
+              ("test_value_B", "b_value"),
+          ]
+      )
+
 
   def dynamicPipelineOptions(self):
     beam_pipeline_options.EvaluateDynamicPipelineOptions()
