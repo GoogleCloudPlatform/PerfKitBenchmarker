@@ -113,7 +113,40 @@ def GetMetadata(vm):
   metadata['nvidia_driver_version'] = GetDriverVersion(vm)
   metadata['gpu_type'] = GetGpuType(vm)
   metadata['num_gpus'] = QueryNumberOfGpus(vm)
+  metadata['peer_to_peer_gpu_topology'] = GetPeerToPeerTopology(vm)
   return metadata
+
+
+def GetPeerToPeerTopology(vm):
+  """Returns a string specifying which GPUs can access each other via p2p.
+
+  Example:
+    If p2p topology from nvidia-smi topo -p2p r looks like this:
+
+      0   1   2   3
+    0 X   OK  NS  NS
+    1 OK  X   NS  NS
+    2 NS  NS  X   OK
+    3 NS  NS  OK  X
+
+    GetTopology will return 'Y Y N N;Y Y N N;N N Y Y;N N Y Y'
+  """
+  stdout, _ = vm.RemoteCommand('nvidia-smi topo -p2p r', should_log=True)
+  lines = [line.split() for line in stdout.splitlines()]
+  num_gpus = len(lines[0])
+
+  results = []
+  for idx, line in enumerate(lines[1:]):
+    if idx >= num_gpus:
+      break
+    results.append(' '.join(line[1:]))
+
+  # Delimit each GPU result with semicolons,
+  # and simplify the result character set to 'Y' and 'N'.
+  return (';'.join(results)
+          .replace('X', 'Y')   # replace X (self) with Y
+          .replace('OK', 'Y')  # replace OK with Y
+          .replace('NS', 'N')) # replace NS (not supported) with N
 
 
 def GetGpuType(vm):
