@@ -23,6 +23,7 @@ import collections
 from collections import OrderedDict
 import json
 import logging
+import posixpath
 import threading
 import time
 import uuid
@@ -661,6 +662,24 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
+
+  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                          filename):
+    """Downloads a data file from an AWS S3 bucket with pre-provisioned data.
+
+    Use --aws_preprovisioned_data_bucket to specify the name of the bucket.
+
+    Args:
+      install_path: The install path on this VM.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: The name of the file that was downloaded.
+    """
+    self.Install('aws_credentials')
+    self.Install('awscli')
+    # TODO(deitz): Add retry logic.
+    self.RemoteCommand('aws s3 cp s3://%s/%s/%s %s' % (
+        FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
+        posixpath.join(install_path, benchmark_name, filename)))
 
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,

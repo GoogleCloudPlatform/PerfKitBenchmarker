@@ -89,3 +89,6 @@ flags.DEFINE_string(
     'gce_accelerator_type_override', None,
     'When specified, override the accelerator_type string passed to the gcloud '
     'compute instance create command.')
+flags.DEFINE_string(
+    'gcp_preprovisioned_data_bucket', None,
+    'GCS bucket where pre-provisioned data has been copied.')

@@ -816,6 +816,27 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         'sudo blockdev --setra {0} {1}; sudo blockdev --setfra {0} {1};'.format(
             num_sectors, ' '.join(devices)))
 
+  def CheckPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                       filename, expected_md5sum):
+    """Checks the preprovisioned benchmark data md5sum hash.
+
+    Args:
+      install_path: Path to download the data file.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: Name of the downloaded file.
+      expected_md5sum: Expected md5sum hash.
+
+    Raises:
+      errors.BadPreProvisionedDataError: If the checksum does not match.
+    """
+    stdout, _ = self.RemoteCommand(
+        'md5sum %s' % posixpath.join(install_path, benchmark_name, filename))
+    actual_md5sum, _ = stdout.split()
+    if actual_md5sum != expected_md5sum:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Invalid md5sum for %s/%s: %s (actual) != %s (expected)' % (
+              benchmark_name, filename, actual_md5sum, expected_md5sum))
+
 
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
