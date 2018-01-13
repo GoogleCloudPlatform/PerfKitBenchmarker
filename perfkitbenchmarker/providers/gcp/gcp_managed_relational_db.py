@@ -283,12 +283,24 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return selflink
 
   def _PostCreate(self):
-    """Creates the user and set password."""
+    """Creates the PKB user and sets the password.
+
+    Also sets the password on the postgres user if this is a postgres database.
+    """
     cmd = util.GcloudCommand(
         self, 'sql', 'users', 'create', self.spec.database_username,
         'dummy_host', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
-    stdout, _, _ = cmd.Issue()
+    _, _, _ = cmd.Issue()
+
+    if self.spec.engine != managed_relational_db.POSTGRES:
+      return
+
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'set-password', 'postgres',
+        'dummy_host', '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.spec.database_password))
+    _, _, _ = cmd.Issue()
 
   @staticmethod
   def GetDefaultEngineVersion(engine):
