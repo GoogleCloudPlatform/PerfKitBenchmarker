@@ -162,6 +162,17 @@ $ cd /path/to/PerfKitBenchmarker
 $ sudo pip install -r requirements.txt
 ```
 
+## Preprovisioned data
+
+Some benchmarks may require data to be preprovisioned in a cloud. To
+preprovision data, you will need to obtain the data and then upload it to that
+cloud. See more information below about which benchmarks require preprovisioned
+data and how to upload it to different clouds.
+
+Note. Before we start to switch over to preprovisioned data, we should support
+a fallback strategy of downloading files to the data/ directory on the machine
+used to run PerfKitBenchmarker (as is done today for CoreMark and SPEC CPU2006).
+
 ## Cloud account setup
 
 This section describes the setup steps needed for each cloud system. Note that you only need to perform setup steps on the clouds you wish to test. If you only want to test Google Cloud, you only need to install and configure `gcloud`.
@@ -768,6 +779,49 @@ Flag | Notes
 `--http_proxy`       | Needed for package manager on Guest OS and for some Perfkit packages
 `--https_proxy`      | Needed for package manager or Ubuntu guest and for from github downloaded packages
 `--ftp_proxy`       | Needed for some Perfkit packages
+
+
+## Preprovisioned Data
+
+As mentioned above, some benchmarks require preprovisioned data. This section
+describes how to preprovision this data.
+
+### Benchmarks with Preprovisioned Data
+
+#### Sample Preprovision Benchmark
+
+This benchmark demonstrates the use of preprovisioned data. Create the following
+file to upload using the command line:
+```bash
+echo "1234567890" > preprovisioned_data.txt
+```
+To upload, follow the instructions below with a filename of
+`preprovisioned_data.txt` and a benchmark name of `sample`.
+
+### Clouds with Preprovisioned Data
+
+#### Google Cloud
+
+To preprovision data on Google Cloud, you will need to upload each file to
+Google Cloud Storage using gsutil. First, you will need to create a storage
+bucket that is accessible from VMs created in Google Cloud by PKB. Then copy
+each file to this bucket using the command
+```bash
+gsutil cp <filename> gs://<bucket>/<benchmark-name>/<filename>
+```
+To run a benchmark on Google Cloud that uses the preprovisioned data, use the
+flag `--gcp_preprovisioned_data_bucket=<bucket>`.
+
+#### AWS
+
+To preprovision data on AWS, you will need to upload each file to S3 using the
+AWS CLI. First, you will need to create a storage bucket that is accessible from
+VMs created in AWS by PKB. Then copy each file to this bucket using the command
+```bash
+aws s3 cp <filename> s3://<bucket>/<benchmark-name>/<filename>
+```
+To run a benchmark on AWS that uses the preprovisioned data, use the flag
+`--aws_preprovisioned_data_bucket=<bucket>`.
 
 Configurations and Configuration Overrides
 ==================

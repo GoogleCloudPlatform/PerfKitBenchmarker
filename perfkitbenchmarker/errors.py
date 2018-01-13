@@ -40,6 +40,13 @@ class Setup(object):
     """Error raised when the given run_uri is invalid."""
     pass
 
+  class BadPreprovisionedDataError(Error):
+    """Error raised when the pre-provisioned data is invalid."""
+    pass
+
+  class InvalidSetupError(Error):
+    """Error raised when SetUpPKB was not called correctly."""
+
 
 class VirtualMachine(object):
   """Errors raised by virtual_machine.py."""
