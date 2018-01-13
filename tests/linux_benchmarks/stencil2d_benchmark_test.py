@@ -67,6 +67,8 @@ class Stencil2DBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(testMetadata, stencil_sp_stddev_results.metadata)
 
   @mock.patch(('perfkitbenchmarker.linux_packages.'
+               'cuda_toolkit_8.GetPeerToPeerTopology'))
+  @mock.patch(('perfkitbenchmarker.linux_packages.'
                'cuda_toolkit_8.GetGpuType'))
   @mock.patch(('perfkitbenchmarker.linux_packages.'
                'cuda_toolkit_8.GetDriverVersion'))
@@ -84,7 +86,8 @@ class Stencil2DBenchmarkTestCase(unittest.TestCase):
               query_gpu_clock_speed_mock,
               query_number_of_gpus_mock,
               get_driver_version_mock,
-              get_gpu_type):
+              get_gpu_type,
+              get_peer_to_peer_topology):
     get_gpu_type.return_value = 'k80'
     get_driver_version_mock.return_value = '123.45'
     query_number_of_gpus_mock.return_value = 8
