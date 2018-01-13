@@ -56,6 +56,23 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
         return_value=(self.nvidia_smi_output, ''))
     self.assertEqual('375.66', cuda_toolkit_8.GetDriverVersion(vm))
 
+  def testGetPeerToPeerTopology(self):
+    path = os.path.join(os.path.dirname(__file__), '../data',
+                        'nvidia_smi_topo_output.txt')
+    with open(path) as fp:
+      nvidia_smi_output = fp.read()
+
+    vm = mock.MagicMock()
+    vm.RemoteCommand = mock.MagicMock(
+        return_value=(nvidia_smi_output, ''))
+
+    expected = 'Y Y N N;Y Y N N;N N Y Y;N N Y Y'
+    actual = cuda_toolkit_8.GetPeerToPeerTopology(vm)
+    self.assertEqual(expected, actual)
+    vm.RemoteCommand.assert_called_with('nvidia-smi topo -p2p r',
+                                        should_log=True)
+
+
   def testQueryAutoboostNull(self):
     path = os.path.join(os.path.dirname(__file__), '../data',
                         'nvidia_smi_describe_clocks_p100.txt')
