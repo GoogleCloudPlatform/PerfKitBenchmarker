@@ -43,3 +43,5 @@
 - Disallow overwriting of benchmarks using the same benchmark name.
 - Log exception thrown in RunBenchmark
 - Explicitly state python package names for RedHat on GCP
+- Always set password for 'postgres' user when creating PostgreSQL CloudSQL
+  instances.
