@@ -256,6 +256,19 @@ def _GetValidBenchmarks():
   return linux_benchmarks.VALID_BENCHMARKS
 
 
+def BenchmarkModule(benchmark_name):
+  """Finds the module for a benchmark by name.
+
+  Args:
+    benchmark_name: The name of the benchmark.
+
+  Returns:
+    The benchmark's module, or None if the benchmark is invalid.
+  """
+  valid_benchmarks = _GetValidBenchmarks()
+  return valid_benchmarks.get(benchmark_name)
+
+
 def _GetBenchmarksFromUserConfig(user_config):
   """Returns a list of benchmark module, config tuples."""
   benchmarks = user_config.get('benchmarks', [])

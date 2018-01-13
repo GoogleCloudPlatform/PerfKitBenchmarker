@@ -8,6 +8,7 @@
 ### New features:
 - Windows benchmarks can now be run from linux controllers
 - MXNet benchmarks can now be run from linux controllers
+- Added initial support for preprovisioning benchmark binaries in the cloud.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -27,6 +28,7 @@
 - Make it easier to RDP to PKB VMs
 - Avoid setting up thread pool etc when run_processes is set
   to 1 to simplify debugging using --run_with_pdb flag
+- Added a sample benchmark for descriptive purposes.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

@@ -25,6 +25,7 @@ import threading
 import jinja2
 
 from perfkitbenchmarker import background_workload
+from perfkitbenchmarker import benchmark_lookup
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -370,6 +371,70 @@ class BaseVirtualMachine(resource.BaseResource):
 
   def SimulateMaintenanceEvent(self):
     """Simulates a maintenance event on the VM."""
+    raise NotImplementedError()
+
+  def InstallPreprovisionedBenchmarkData(self, benchmark_name, filenames,
+                                         install_path):
+    """Installs preprovisioned benchmark data on this VM.
+
+    Some benchmarks require importing many bytes of data into the virtual
+    machine. This data can be staged in a particular cloud and the virtual
+    machine implementation can override how the preprovisioned data is
+    installed in the VM by overriding DownloadPreprovisionedBenchmarkData.
+
+    For example, for GCP VMs, benchmark data can be preprovisioned in a GCS
+    bucket that the VMs may access. For a benchmark that requires
+    preprovisioned data, follow the instructions for that benchmark to download
+    and store the data so that it may be accessed by a VM via this method.
+
+    Args:
+      benchmark_name: The name of the benchmark defining the preprovisioned
+          data. The benchmark's module must define the dict BENCHMARK_DATA
+          mapping filenames to md5sum hashes.
+      filenames: An iterable of preprovisioned data filenames for a particular
+          benchmark.
+      install_path: The path to download the data file.
+
+    Raises:
+      errors.Setup.BadPreProvisionedDataError: If the benchmark or filename are
+          not defined with preprovisioned data, or if the md5sum hash in the
+          code does not match the md5sum of the file.
+    """
+    benchmark_module = benchmark_lookup.BenchmarkModule(benchmark_name)
+    if not benchmark_module:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Cannot install preprovisioned data for undefined benchmark %s.' %
+          benchmark_name)
+    try:
+      benchmark_data = benchmark_module.BENCHMARK_DATA
+    except AttributeError:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Benchmark %s does not define a BENCHMARK_DATA dict with '
+          'preprovisioned data.' % benchmark_name)
+    for filename in filenames:
+      md5sum = benchmark_data.get(filename)
+      if not md5sum:
+        raise errors.Setup.BadPreprovisionedDataError(
+            'Cannot find md5sum hash for file %s in benchmark %s.' %
+            (filename, benchmark_name))
+      self.DownloadPreprovisionedBenchmarkData(install_path, benchmark_name,
+                                               filename)
+      self.CheckPreprovisionedBenchmarkData(install_path, benchmark_name,
+                                            filename, md5sum)
+
+  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                          filename):
+    """Downloads preprovisioned benchmark data.
+
+    This function should be overridden by each cloud provider VM. The file
+    should be downloaded into the install path within a subdirectory with the
+    benchmark name.
+
+    Args:
+      install_path: The install path on this VM.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: The name of the file that was downloaded.
+    """
     raise NotImplementedError()
 
 
@@ -731,5 +796,23 @@ class BaseOsMixin(object):
     Args:
       num_sectors: int. Number of sectors of read ahead.
       devices: list of strings. A list of block devices.
+    """
+    raise NotImplementedError()
+
+  def CheckPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                       filename, expected_md5sum):
+    """Checks preprovisioned benchmark data for a checksum.
+
+    Checks the expected md5sum against the actual md5sum. Called after the file
+    is downloaded.
+
+    This function should be overridden by each OS-specific MixIn.
+
+    Args:
+      install_path: The install path on this VM. The benchmark is installed at
+          this path in a subdirectory of the benchmark name.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: The name of the file that was downloaded.
+      expected_md5sum: The expected md5sum checksum value.
     """
     raise NotImplementedError()

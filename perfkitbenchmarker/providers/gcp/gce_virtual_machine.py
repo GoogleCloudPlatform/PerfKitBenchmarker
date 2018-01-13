@@ -28,6 +28,7 @@ import collections
 import itertools
 import json
 import logging
+import posixpath
 import re
 import threading
 
@@ -540,6 +541,22 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if retcode:
       raise errors.VirtualMachine.VirtualMachineError(
           'Unable to simulate maintenance event.')
+
+  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                          filename):
+    """Downloads a data file from a GCS bucket with pre-provisioned data.
+
+    Use --gce_preprovisioned_data_bucket to specify the name of the bucket.
+
+    Args:
+      install_path: The install path on this VM.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: The name of the file that was downloaded.
+    """
+    # TODO(deitz): Add retry logic.
+    self.RemoteCommand('gsutil cp gs://%s/%s/%s %s' % (
+        FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
+        posixpath.join(install_path, benchmark_name, filename)))
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,

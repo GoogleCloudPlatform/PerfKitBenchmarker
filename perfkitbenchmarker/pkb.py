@@ -69,6 +69,7 @@ import uuid
 
 from perfkitbenchmarker import archive
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import benchmark_lookup
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import benchmark_status
@@ -767,6 +768,8 @@ def SetUpPKB():
           fp)
 
   events.initialization_complete.send(parsed_flags=FLAGS)
+
+  benchmark_lookup.SetBenchmarkModuleFunction(benchmark_sets.BenchmarkModule)
 
 
 def RunBenchmarkTasksInSeries(tasks):
