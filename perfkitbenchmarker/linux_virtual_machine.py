@@ -48,9 +48,9 @@ import yaml
 FLAGS = flags.FLAGS
 
 EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-             '6/x86_64/epel-release-6-8.noarch.rpm')
+             '6/x86_64/Packages/e/epel-release-6-8.noarch.rpm')
 EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-             '7/x86_64/e/epel-release-7-8.noarch.rpm')
+             '7/x86_64/Packages/e/epel-release-7-11.noarch.rpm')
 
 UPDATE_RETRIES = 5
 SSH_RETRIES = 10
