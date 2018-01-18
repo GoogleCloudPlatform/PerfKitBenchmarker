@@ -679,7 +679,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # TODO(deitz): Add retry logic.
     self.RemoteCommand('aws s3 cp s3://%s/%s/%s %s' % (
         FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
-        posixpath.join(install_path, benchmark_name, filename)))
+        posixpath.join(install_path, filename)))
 
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,

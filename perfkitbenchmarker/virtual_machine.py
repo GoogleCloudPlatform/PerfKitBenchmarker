@@ -799,6 +799,18 @@ class BaseOsMixin(object):
     """
     raise NotImplementedError()
 
+  def GetMd5sum(self, path, filename):
+    """Gets the md5sum hash for a filename in a path on the VM.
+
+    Args:
+      path: string; Path on the VM.
+      filename: string; Name of the file in the path.
+
+    Returns:
+      string; The md5sum hash.
+    """
+    raise NotImplementedError()
+
   def CheckPreprovisionedBenchmarkData(self, install_path, benchmark_name,
                                        filename, expected_md5sum):
     """Checks preprovisioned benchmark data for a checksum.
@@ -815,4 +827,8 @@ class BaseOsMixin(object):
       filename: The name of the file that was downloaded.
       expected_md5sum: The expected md5sum checksum value.
     """
-    raise NotImplementedError()
+    actual_md5sum = self.GetMd5sum(install_path, filename)
+    if actual_md5sum != expected_md5sum:
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Invalid md5sum for %s/%s: %s (actual) != %s (expected)' % (
+              benchmark_name, filename, actual_md5sum, expected_md5sum))
