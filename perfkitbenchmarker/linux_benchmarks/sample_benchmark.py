@@ -56,7 +56,7 @@ def Prepare(benchmark_spec):
                                         vm_util.VM_TMP_DIR)
 
   stdout, _ = vm.RemoteCommand('cat %s' % (posixpath.join(
-      vm_util.VM_TMP_DIR, BENCHMARK_NAME, 'preprovisioned_data.txt')))
+      vm_util.VM_TMP_DIR, 'preprovisioned_data.txt')))
   assert stdout.strip() == '1234567890'
 
 
