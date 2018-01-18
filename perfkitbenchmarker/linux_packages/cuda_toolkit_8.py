@@ -67,12 +67,10 @@ flags.DEFINE_string('cuda_toolkit_installation_dir', '/usr/local/cuda',
 FLAGS = flags.FLAGS
 
 
-# TODO: Test the CUDA Ubuntu 14.04 installer, and if everything works ok,
-# automatically install the correct package depending on the OS image.
-CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604_8.0.61-1_amd64.deb'
+CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb'
 CUDA_TOOLKIT_UBUNTU_URL = (
-    'http://developer.download.nvidia.com/compute/cuda'
-    '/repos/ubuntu1604/x86_64/%s' % CUDA_TOOLKIT_UBUNTU)
+    'https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers'
+    '/%s' % CUDA_TOOLKIT_UBUNTU)
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
 
@@ -368,8 +366,13 @@ def _InstallCuda(vm):
   Steps taken from section 3.6 found here:
   http://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html
   """
+  # Need to append .deb to package name because the file downloaded from
+  # NVIDIA is missing the .deb extension.
+  fixed_debian_package_name = CUDA_TOOLKIT_UBUNTU + '.deb'
   vm.RemoteCommand('wget %s' % CUDA_TOOLKIT_UBUNTU_URL)
-  vm.RemoteCommand('sudo dpkg -i %s' % CUDA_TOOLKIT_UBUNTU)
+  vm.RemoteCommand('mv %s %s' % (CUDA_TOOLKIT_UBUNTU,
+                                 fixed_debian_package_name))
+  vm.RemoteCommand('sudo dpkg -i %s' % fixed_debian_package_name)
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo apt-get install -y cuda-8-0')
 
