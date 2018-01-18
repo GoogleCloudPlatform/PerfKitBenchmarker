@@ -49,3 +49,7 @@ flags.DEFINE_enum(
     'The type of storage account to use for blob storage. Choosing Storage '
     'will let you use ZRS storage. Choosing BlobStorage will give you access '
     'to Hot and Cold storage tiers.')
+
+flags.DEFINE_string('azure_preprovisioned_data_bucket', None,
+                    'Azure blob storage account where pre-provisioned data '
+                    'has been copied.')

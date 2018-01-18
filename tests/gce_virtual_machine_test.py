@@ -240,6 +240,23 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
 
+  def testCreateUbuntu1710(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1710)
+    with PatchCriticalObjects() as issue_command:
+      vm = vm_class(self.spec)
+      vm._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn(
+          '--image-family ubuntu-1710 --image-project ubuntu-os-cloud',
+          command_string)
+      self.assertDictContainsSubset({'image': None,
+                                     'image_family': 'ubuntu-1710',
+                                     'image_project': 'ubuntu-os-cloud'},
+                                    vm.GetResourceMetadata())
+
 
 class GCEVMFlagsTestCase(unittest.TestCase):
 

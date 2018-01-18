@@ -27,6 +27,7 @@ operate on the VM: boot, shutdown, etc.
 
 import itertools
 import json
+import posixpath
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -280,6 +281,30 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
+  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                          filename):
+    """Downloads a data file from Azure blob storage with pre-provisioned data.
+
+    Use --azure_preprovisioned_data_bucket to specify the name of the account.
+
+    Args:
+      install_path: The install path on this VM.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: The name of the file that was downloaded.
+    """
+    self.Install('azure_cli')
+    self.Install('azure_credentials')
+    destpath = posixpath.join(install_path, filename)
+    self.RemoteCommand('az storage blob download '
+                       '--account-name %s '
+                       '--container-name %s '
+                       '--name %s '
+                       '--file %s' % (
+                           FLAGS.azure_preprovisioned_data_bucket,
+                           benchmark_name,
+                           filename,
+                           destpath))
+
 
 class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
                                      linux_virtual_machine.DebianMixin):
@@ -294,6 +319,11 @@ class Ubuntu1404BasedAzureVirtualMachine(AzureVirtualMachine,
 class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1604Mixin):
   IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'
+
+
+class Ubuntu1710BasedAzureVirtualMachine(AzureVirtualMachine,
+                                         linux_virtual_machine.Ubuntu1710Mixin):
+  IMAGE_URN = 'Canonical:UbuntuServer:17.10:latest'
 
 
 class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
