@@ -330,8 +330,13 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
   def DownloadFile(self, url, dest):
     """Downloads the content at the url to the specified destination."""
 
-    command = 'Invoke-WebRequest {url} -OutFile {dest}'.format(
-        url=url, dest=dest)
+    # Allow more security protocols to make it easier to download from
+    # sites where we don't know the security protocol beforehand
+    command = ('[Net.ServicePointManager]::SecurityProtocol = '
+               '[System.Security.Authentication.SslProtocols] '
+               '"tls, tls11, tls12";'
+               'Invoke-WebRequest {url} -OutFile {dest}').format(
+                   url=url, dest=dest)
     self.RemoteCommand(command)
 
   def UnzipFile(self, zip_file, dest):
