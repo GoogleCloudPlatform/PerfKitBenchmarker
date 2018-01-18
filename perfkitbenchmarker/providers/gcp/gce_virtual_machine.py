@@ -592,6 +592,12 @@ class Ubuntu1604BasedGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
+class Ubuntu1710BasedGceVirtualMachine(GceVirtualMachine,
+                                       linux_vm.Ubuntu1710Mixin):
+  DEFAULT_IMAGE_FAMILY = 'ubuntu-1710'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
 class WindowsGceVirtualMachine(GceVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
 
