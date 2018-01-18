@@ -46,3 +46,4 @@
 - Always set password for 'postgres' user when creating PostgreSQL CloudSQL
   instances.
 - Fixed EPEL package URL for Redhat 7.
+- Update to latest version of NVIDIA CUDA Toolkit 8.
