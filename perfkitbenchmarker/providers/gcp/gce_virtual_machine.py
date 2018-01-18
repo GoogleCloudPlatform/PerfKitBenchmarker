@@ -556,7 +556,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # TODO(deitz): Add retry logic.
     self.RemoteCommand('gsutil cp gs://%s/%s/%s %s' % (
         FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
-        posixpath.join(install_path, benchmark_name, filename)))
+        posixpath.join(install_path, filename)))
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
