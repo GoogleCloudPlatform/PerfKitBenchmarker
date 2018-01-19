@@ -44,6 +44,10 @@ flags.DEFINE_string('container_cluster_cloud', None,
                     'This will override both the value set in the config and '
                     'the value set using the generic "cloud" flag.')
 
+flags.DEFINE_integer('container_cluster_num_vms', None,
+                     'Number of nodes in the cluster. Defaults to '
+                     'container_cluster.vm_count')
+
 
 @events.benchmark_start.connect
 def _SetKubeConfig(unused_sender, benchmark_spec):

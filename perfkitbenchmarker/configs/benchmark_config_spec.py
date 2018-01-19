@@ -877,6 +877,8 @@ class _ContainerClusterSpec(_VmGroupSpec):
     super(_ContainerClusterSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['container_cluster_cloud'].present:
       config_values['cloud'] = flag_values.container_cluster_cloud
+    if flag_values['container_cluster_num_vms'].present:
+      config_values['vm_count'] = flag_values.container_cluster_num_vms
 
     # Need to apply the first zone in the zones flag, if specified,
     # to the spec. ContainerClusters do not currently support

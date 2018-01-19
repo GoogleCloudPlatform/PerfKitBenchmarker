@@ -34,6 +34,7 @@
   that the user is root.
 - Modified KubernetesVirtualMachine to ensure that ssh is installed on the
   container.
+- Added container_cluster_num_vms flag.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
