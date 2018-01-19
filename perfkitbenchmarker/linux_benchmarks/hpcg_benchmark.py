@@ -81,6 +81,11 @@ flag_util.DEFINE_integerlist(
     'three dimensional problem size for each node. Must contain '
     'three integers')
 
+flags.DEFINE_boolean(
+    'hpcg_run_as_root', False, 'If true, pass --allow-run-as-root '
+    'to mpirun.')
+
+
 
 class HpcgParseOutputException(Exception):
   pass
@@ -142,6 +147,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.total_gpus = total_gpus
   benchmark_spec.hpcg_problem_size = FLAGS.hpcg_problem_size
   benchmark_spec.hpcg_runtime = FLAGS.hpcg_runtime
+  benchmark_spec.run_as_root = FLAGS.hpcg_run_as_root
 
 
 def _CopyAndUpdateRunScripts(vm, benchmark_spec):
@@ -151,16 +157,23 @@ def _CopyAndUpdateRunScripts(vm, benchmark_spec):
     vm: vm to place and update run scripts on
     benchmark_spec: benchmark specification
   """
-  src_path = _LocalDataPath(CONFIG_FILE)
-  dest_path = os.path.join(hpcg.HPCG_DIR, CONFIG_FILE)
-  context = {
+  config_file_context = {
       'PROBLEM_SIZE': '%s %s %s' % (benchmark_spec.hpcg_problem_size[0],
                                     benchmark_spec.hpcg_problem_size[1],
                                     benchmark_spec.hpcg_problem_size[2]),
       'RUNTIME': benchmark_spec.hpcg_runtime
   }
-  vm.RenderTemplate(src_path, dest_path, context)
-  vm.PushDataFile(RUN_SCRIPT, os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT))
+  vm.RenderTemplate(_LocalDataPath(CONFIG_FILE),
+                    os.path.join(hpcg.HPCG_DIR, CONFIG_FILE),
+                    config_file_context)
+
+  run_script_context = {
+      'ALLOW_RUN_AS_ROOT': (
+          '--allow-run-as-root' if benchmark_spec.run_as_root else ''),
+  }
+  vm.RenderTemplate(_LocalDataPath(RUN_SCRIPT),
+                    os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT),
+                    run_script_context)
 
 
 def _PrepareHpcg(vm):
@@ -208,6 +221,7 @@ def _CreateMetadataDict(benchmark_spec):
   metadata['total_gpus'] = int(benchmark_spec.total_gpus)
   metadata['benchmark_version'] = BENCHMARK_VERSION
   metadata['runtime'] = int(benchmark_spec.hpcg_runtime)
+  metadata['run_as_root'] = benchmark_spec.run_as_root
   metadata['problem_size'] = '%s,%s,%s' % (benchmark_spec.hpcg_problem_size[0],
                                            benchmark_spec.hpcg_problem_size[1],
                                            benchmark_spec.hpcg_problem_size[2])

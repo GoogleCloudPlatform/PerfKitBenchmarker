@@ -29,7 +29,11 @@
 - Avoid setting up thread pool etc when run_processes is set
   to 1 to simplify debugging using --run_with_pdb flag
 - Added a sample benchmark for descriptive purposes.
-- Add GPU peer to peer topology information to metadata.
+- Added GPU peer to peer topology information to metadata.
+- Added a flag, hpcg_run_as_root which allows OpenMPI to run HPCG in the case
+  that the user is root.
+- Modified KubernetesVirtualMachine to ensure that ssh is installed on the
+  container.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

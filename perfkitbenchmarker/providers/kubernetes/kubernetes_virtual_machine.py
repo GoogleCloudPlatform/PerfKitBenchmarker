@@ -413,6 +413,12 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def PrepareVMEnvironment(self):
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
+    # Don't rely on SSH being installed in Kubernetes containers,
+    # so install it and restart the service so that it is ready to go.
+    # Although ssh is not required to connect to the container, MPI
+    # benchmarks require it.
+    self.InstallPackages('ssh')
+    self.RemoteCommand('sudo /etc/init.d/ssh restart')
     self.RemoteCommand('mkdir ~/.ssh')
     with open(self.ssh_public_key) as f:
       key = f.read()
