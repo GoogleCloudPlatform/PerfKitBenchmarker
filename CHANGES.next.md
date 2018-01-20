@@ -35,6 +35,7 @@
 - Modified KubernetesVirtualMachine to ensure that ssh is installed on the
   container.
 - Added container_cluster_num_vms flag.
+- Added the cluster's worker shape and worker count into the dpb service metadata.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
