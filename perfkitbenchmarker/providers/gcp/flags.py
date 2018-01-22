@@ -15,6 +15,9 @@
 
 from perfkitbenchmarker import flags
 
+# Sentinel value for unspecified platform.
+GCP_MIN_CPU_PLATFORM_NONE = 'none'
+
 flags.DEFINE_string('gcloud_path',
                     'gcloud',
                     'The path for the gcloud utility.')
@@ -82,7 +85,7 @@ flags.DEFINE_string(
     'The host type of all sole tenant hosts that get created.')
 flags.DEFINE_enum(
     'gcp_min_cpu_platform', None,
-    ['sandybridge', 'ivybridge', 'haswell', 'broadwell', 'skylake'],
+    [GCP_MIN_CPU_PLATFORM_NONE, 'sandybridge', 'ivybridge', 'haswell', 'broadwell', 'skylake'],
     'When specified, the VM will have either the specified '
     'architecture or a newer one. Architecture availability is zone dependent.')
 flags.DEFINE_string(

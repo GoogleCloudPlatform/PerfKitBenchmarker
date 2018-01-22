@@ -44,6 +44,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
@@ -132,7 +133,9 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     if flag_values['gcp_num_vms_per_host'].present:
       config_values['num_vms_per_host'] = flag_values.gcp_num_vms_per_host
     if flag_values['gcp_min_cpu_platform'].present:
-      config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
+      if (flag_values.gcp_min_cpu_platform !=
+          gcp_flags.GCP_MIN_CPU_PLATFORM_NONE):
+        config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
