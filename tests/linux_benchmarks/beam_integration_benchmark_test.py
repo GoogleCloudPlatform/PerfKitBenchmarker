@@ -25,7 +25,6 @@ class BeamArgsOptionsTestCase(unittest.TestCase):
         None, None, [], [])
     self.assertListEqual(options_list, [])
 
-
   def testAllFlagsPassed(self):
     options_list = beam_pipeline_options.GenerateAllPipelineOptions(
         "--itargone=anarg,--itargtwo=anotherarg",
@@ -45,7 +44,6 @@ class BeamArgsOptionsTestCase(unittest.TestCase):
                           "\"--testier=another_test\"",
                           "\"--postgresUsername=postgres\"",
                           "\"--postgresPassword=mypass\""])
-
 
   def testItOptionsWithSpaces(self):
     options_list = beam_pipeline_options.GenerateAllPipelineOptions(
@@ -81,7 +79,6 @@ class BeamArgsOptionsTestCase(unittest.TestCase):
               ("test_value_B", "b_value"),
           ]
       )
-
 
   def dynamicPipelineOptions(self):
     beam_pipeline_options.EvaluateDynamicPipelineOptions()
