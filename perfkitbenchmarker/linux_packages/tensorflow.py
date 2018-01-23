@@ -16,8 +16,16 @@
 """Module containing TensorFlow 1.3 installation and cleanup functions."""
 import posixpath
 from perfkitbenchmarker import flags
+
+
+TENSORFLOW_CPU_OPTIMIZED_WHEEL = (
+    'https://anaconda.org/intel/tensorflow/1.4.0/download/tensorflow-1.4.0-cp27-cp27mu-linux_x86_64.whl')
+
+
 FLAGS = flags.FLAGS
-flags.DEFINE_string('tf_version', '1.3', 'version of tensorflow')
+flags.DEFINE_string('tf_pip_package', TENSORFLOW_CPU_OPTIMIZED_WHEEL,
+                    'Tensorflow pip package to install')
+
 
 
 def GetEnvironmentVars(vm):
@@ -66,8 +74,8 @@ def Install(vm):
     vm.RemoteCommand('sudo pip install --upgrade tensorflow-gpu==%s' %
                      FLAGS.tf_version, should_log=True)
   elif FLAGS.tf_device == 'cpu':
-    vm.RemoteCommand('sudo pip install --upgrade tensorflow==%s' %
-                     FLAGS.tf_version, should_log=True)
+    vm.RemoteCommand('sudo pip install --upgrade {0}'.format(
+        FLAGS.tf_pip_package), should_log=True)
 
 
 def Uninstall(vm):
