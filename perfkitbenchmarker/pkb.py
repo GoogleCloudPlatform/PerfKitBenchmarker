@@ -453,6 +453,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructVirtualMachines()
   spec.ConstructCloudTpu()
   spec.ConstructEdwService()
+  spec.ConstructCloudRedis()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
