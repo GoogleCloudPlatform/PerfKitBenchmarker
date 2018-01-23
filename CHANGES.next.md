@@ -54,4 +54,3 @@
 - Fixed EPEL package URL for Redhat 7.
 - Updated to latest version of NVIDIA CUDA Toolkit 8.
 - Updated Ubuntu image versions in Tensorflow benchmark.
-- Rolled back change 182851805 due to bug that breaks benchmark_spec class
