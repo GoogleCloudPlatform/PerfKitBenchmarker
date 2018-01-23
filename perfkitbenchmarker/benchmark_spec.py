@@ -37,6 +37,7 @@ from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -123,6 +124,7 @@ class BenchmarkSpec(object):
     self.managed_relational_db = None
     self.cloud_tpu = None
     self.edw_service = None
+    self.cloud_redis = None
     self._zone_index = 0
 
     # Modules can't be pickled, but functions can, so we store the functions
@@ -205,6 +207,14 @@ class BenchmarkSpec(object):
     # Check if a new instance needs to be created or restored from snapshot
     self.edw_service = edw_service_class(self.config.edw_service)
 
+  def ConstructCloudRedis(self):
+    """Create the cloud_redis object."""
+    if self.config.cloud_redis is None:
+      return
+    cloud = self.config.cloud_redis.cloud
+    providers.LoadProvider(cloud)
+    cloud_redis_class = cloud_redis.GetCloudRedisClass(cloud)
+    self.cloud_redis = cloud_redis_class(self.config.cloud_redis)
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
