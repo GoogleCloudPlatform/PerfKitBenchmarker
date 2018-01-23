@@ -13,18 +13,20 @@
 # limitations under the License.
 
 
-"""Module containing TensorFlow 1.3 installation and cleanup functions."""
+"""Module containing TensorFlow installation and cleanup functions."""
 import posixpath
 from perfkitbenchmarker import flags
 
 
-TENSORFLOW_CPU_OPTIMIZED_WHEEL = (
-    'https://anaconda.org/intel/tensorflow/1.4.0/download/tensorflow-1.4.0-cp27-cp27mu-linux_x86_64.whl')
+GPU_DEFAULT_PACKAGE = 'tensorflow-gpu==1.3'
+CPU_DEFAULT_PACKAGE = 'https://anaconda.org/intel/tensorflow/1.4.0/download/tensorflow-1.4.0-cp27-cp27mu-linux_x86_64.whl'
 
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('tf_pip_package', TENSORFLOW_CPU_OPTIMIZED_WHEEL,
-                    'Tensorflow pip package to install')
+flags.DEFINE_string('tf_pip_package', None,
+                    'Tensorflow pip package to install. By default, PKB '
+                    'will install tensorflow-gpu==1.3 when using GPUs, '
+                    'and an Intel-optimized CPU build when using CPUs.')
 
 
 
@@ -67,15 +69,17 @@ def GetTensorFlowVersion(vm):
 
 def Install(vm):
   """Installs TensorFlow on the VM."""
-  vm.Install('pip')
+  if FLAGS.tf_pip_package is None:
+    FLAGS.tf_pip_package = (CPU_DEFAULT_PACKAGE if FLAGS.tf_device == 'cpu'
+                            else GPU_DEFAULT_PACKAGE)
+
   if FLAGS.tf_device == 'gpu':
     vm.Install('cuda_toolkit_8')
     vm.Install('cudnn')
-    vm.RemoteCommand('sudo pip install --upgrade tensorflow-gpu==%s' %
-                     FLAGS.tf_version, should_log=True)
-  elif FLAGS.tf_device == 'cpu':
-    vm.RemoteCommand('sudo pip install --upgrade {0}'.format(
-        FLAGS.tf_pip_package), should_log=True)
+
+  vm.Install('pip')
+  vm.RemoteCommand('sudo pip install --upgrade %s' % FLAGS.tf_pip_package,
+                   should_log=True)
 
 
 def Uninstall(vm):
