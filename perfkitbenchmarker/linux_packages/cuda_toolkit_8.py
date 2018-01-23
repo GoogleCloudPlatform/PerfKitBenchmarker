@@ -369,7 +369,7 @@ def _InstallCuda(vm):
   # Need to append .deb to package name because the file downloaded from
   # NVIDIA is missing the .deb extension.
   fixed_debian_package_name = CUDA_TOOLKIT_UBUNTU + '.deb'
-  vm.RemoteCommand('wget %s' % CUDA_TOOLKIT_UBUNTU_URL)
+  vm.RemoteCommand('wget -q %s' % CUDA_TOOLKIT_UBUNTU_URL)
   vm.RemoteCommand('mv %s %s' % (CUDA_TOOLKIT_UBUNTU,
                                  fixed_debian_package_name))
   vm.RemoteCommand('sudo dpkg -i %s' % fixed_debian_package_name)
