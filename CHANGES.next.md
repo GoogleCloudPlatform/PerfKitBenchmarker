@@ -4,6 +4,9 @@
   - gce_gpu_count -> gpu_count
   - gce_gpu_type -> gpu_type
 - Replaced object_storage_objects_written_file* flags with prefix versions.
+- Replaced Tensorflow version flag with tf_pip_package flag.
+- Changed default pip package for Tensorflow CPU-only tests to an Intel
+  optimized version.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers
