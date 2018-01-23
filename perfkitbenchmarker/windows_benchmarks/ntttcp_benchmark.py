@@ -49,7 +49,7 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
-  """Measure the boot time for all VMs.
+  """Measure TCP stream throughput between two VMs.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
