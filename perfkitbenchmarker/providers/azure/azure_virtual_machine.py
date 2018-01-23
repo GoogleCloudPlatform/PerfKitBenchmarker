@@ -29,6 +29,7 @@ import itertools
 import json
 import posixpath
 
+from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -42,7 +43,55 @@ from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
 
+import yaml
+
 FLAGS = flags.FLAGS
+
+
+class AzureVmSpec(virtual_machine.BaseVmSpec):
+  """Object containing the information needed to create a AzureVirtualMachine.
+
+  Attributes:
+    tier: None or string. performance tier of the machine.
+    compute_units: int.  number of compute units for the machine.
+  """
+
+  CLOUD = providers.AZURE
+
+  def __init__(self, *args, **kwargs):
+    super(AzureVmSpec, self).__init__(*args, **kwargs)
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(AzureVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['machine_type'].present:
+      config_values['machine_type'] = yaml.load(flag_values.machine_type)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(AzureVmSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'machine_type': (custom_virtual_machine_spec.AzureMachineTypeDecoder,
+                         {}),
+    })
+    return result
 
 
 # Per-VM resources are defined here.
