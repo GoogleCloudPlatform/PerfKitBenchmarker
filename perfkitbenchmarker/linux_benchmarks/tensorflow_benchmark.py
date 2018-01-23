@@ -145,6 +145,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.use_nccl = FLAGS.tf_use_nccl
   benchmark_spec.distortions = FLAGS.tf_distortions
   benchmark_spec.benchmarks_commit_hash = FLAGS.tf_benchmarks_commit_hash
+  benchmark_spec.tensorflow_pip_package = FLAGS.tf_pip_package
 
 
 def _PrepareVm(vm):
@@ -208,6 +209,7 @@ def _CreateMetadataDict(benchmark_spec, model, batch_size, num_gpus):
   metadata['distortions'] = benchmark_spec.distortions
   metadata['benchmarks_commit_hash'] = benchmark_spec.benchmarks_commit_hash
   metadata['tensorflow_version'] = benchmark_spec.tensorflow_version
+  metadata['tensorflow_pip_package'] = benchmark_spec.tensorflow_pip_package
   return metadata
 
 
