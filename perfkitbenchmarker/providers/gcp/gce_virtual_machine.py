@@ -583,6 +583,18 @@ class RhelBasedGceVirtualMachine(GceVirtualMachine,
     self.python_pip_package_config = 'python2-pip'
 
 
+class Centos7BasedGceVirtualMachine(GceVirtualMachine,
+                                    linux_vm.Centos7Mixin):
+  DEFAULT_IMAGE_FAMILY = 'centos-7'
+  DEFAULT_IMAGE_PROJECT = 'centos-cloud'
+
+  def __init__(self, vm_spec):
+    super(Centos7BasedGceVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
+
+
 class Ubuntu1404BasedGceVirtualMachine(GceVirtualMachine,
                                        linux_vm.Ubuntu1404Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-1404-lts'
