@@ -948,6 +948,11 @@ class RhelMixin(BaseLinuxMixin):
           FLAGS.http_proxy, yum_proxy_file))
 
 
+class Centos7Mixin(RhelMixin):
+  """Class holding Centos 7 specific VM methods and attributes."""
+  OS_TYPE = os_types.CENTOS7
+
+
 class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
