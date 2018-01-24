@@ -1104,7 +1104,7 @@ class Ubuntu1604Mixin(DebianMixin):
 
 
 class Ubuntu1710Mixin(DebianMixin):
-  """Class holding Ubuntu1604 specific VM methods and attributes."""
+  """Class holding Ubuntu1710 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1710
 
 
