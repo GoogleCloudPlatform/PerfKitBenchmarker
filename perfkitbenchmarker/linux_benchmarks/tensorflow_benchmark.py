@@ -28,20 +28,22 @@ BENCHMARK_NAME = 'tensorflow'
 BENCHMARK_CONFIG = """
 tensorflow:
   description: Runs Tensorflow Benchmark.
-  flags:
-    os_type: ubuntu1604
   vm_groups:
     default:
       vm_spec:
         GCP:
+          image: ubuntu-1604-xenial-v20180122
+          image_project: ubuntu-os-cloud
           machine_type: n1-standard-4
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
+          image: ami-41e0b93b
           machine_type: p2.xlarge
           zone: us-east-1
           boot_disk_size: 200
         Azure:
+          image: Canonical:UbuntuServer:16.04.0-LTS:latest
           machine_type: Standard_NC6
           zone: eastus
 """
