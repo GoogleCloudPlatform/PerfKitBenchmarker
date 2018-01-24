@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing flags applicable across benchmark run on Azure."""
 
 from perfkitbenchmarker import flags
 
@@ -53,3 +54,9 @@ flags.DEFINE_enum(
 flags.DEFINE_string('azure_preprovisioned_data_bucket', None,
                     'Azure blob storage account where pre-provisioned data '
                     'has been copied.')
+
+flags.DEFINE_boolean('azure_accelerated_networking', False,
+                     'Enable Azure Accelerated Networking. See '
+                     'https://docs.microsoft.com/en-us/azure/virtual-network/'
+                     'create-vm-accelerated-networking-cli'
+                     'for more information.')
