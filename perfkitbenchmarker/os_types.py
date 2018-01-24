@@ -16,6 +16,7 @@
 from perfkitbenchmarker import flags
 
 
+CENTOS7 = 'centos7'
 DEBIAN = 'debian'
 JUJU = 'juju'
 RHEL = 'rhel'
@@ -26,6 +27,7 @@ UBUNTU1710 = 'ubuntu1710'
 WINDOWS = 'windows'
 
 LINUX_OS_TYPES = [
+    CENTOS7,
     DEBIAN,
     JUJU,
     RHEL,

@@ -286,6 +286,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.AWS
   IMAGE_NAME_FILTER = None
   IMAGE_OWNER = None
+  IMAGE_PRODUCT_CODE_FILTER = None
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
 
   _lock = threading.Lock()
@@ -374,6 +375,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'Name=block-device-mapping.volume-type,Values=%s' %
         cls.DEFAULT_ROOT_DISK_TYPE,
         'Name=virtualization-type,Values=%s' % virt_type]
+    if cls.IMAGE_PRODUCT_CODE_FILTER:
+      describe_cmd.extend(['Name=product-code,Values=%s' %
+                           cls.IMAGE_PRODUCT_CODE_FILTER])
     if cls.IMAGE_OWNER:
       describe_cmd.extend(['--owners', cls.IMAGE_OWNER])
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
@@ -708,6 +712,29 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
     super(RhelBasedAwsVirtualMachine, self).__init__(vm_spec)
     user_name_set = FLAGS['aws_user_name'].present
     self.user_name = FLAGS.aws_user_name if user_name_set else 'ec2-user'
+
+    # package_config
+    self.python_package_config = 'python27'
+    self.python_dev_package_config = 'python27-devel'
+    self.python_pip_package_config = 'python27-pip'
+
+
+class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
+                                    linux_virtual_machine.Centos7Mixin):
+  # Documentation on finding the Centos 7 image:
+  # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
+  IMAGE_NAME_FILTER = 'CentOS*Linux*7*'
+  IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
+  IMAGE_OWNER = 'aws-marketplace'
+
+  # Centos 7 images on AWS use standard EBS rather than GP2. See the bug at
+  # https://bugs.centos.org/view.php?id=13301.
+  DEFAULT_ROOT_DISK_TYPE = 'standard'
+
+  def __init__(self, vm_spec):
+    super(Centos7BasedAwsVirtualMachine, self).__init__(vm_spec)
+    user_name_set = FLAGS['aws_user_name'].present
+    self.user_name = FLAGS.aws_user_name if user_name_set else 'centos'
 
     # package_config
     self.python_package_config = 'python27'

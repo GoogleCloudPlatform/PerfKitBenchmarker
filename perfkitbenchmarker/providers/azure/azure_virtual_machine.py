@@ -398,6 +398,11 @@ class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'RedHat:RHEL:7.2:latest'
 
 
+class CentosBasedAzureVirtualMachine(AzureVirtualMachine,
+                                     linux_virtual_machine.Centos7Mixin):
+  IMAGE_URN = 'OpenLogic:CentOS:7.4:latest'
+
+
 class WindowsAzureVirtualMachine(AzureVirtualMachine,
                                  windows_virtual_machine.WindowsMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
