@@ -68,9 +68,15 @@ FLAGS = flags.FLAGS
 
 
 CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb'
+CUDA_TOOLKIT_PATCH = 'cuda-repo-ubuntu1604-8-0-local-cublas-performance-update_8.0.61-1_amd64-deb'
+
 CUDA_TOOLKIT_UBUNTU_URL = (
     'https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers'
     '/%s' % CUDA_TOOLKIT_UBUNTU)
+CUDA_TOOLKIT_PATCH_URL = (
+    'https://developer.nvidia.com/compute/cuda/8.0/Prod2/patches/2'
+    '/%s' % CUDA_TOOLKIT_PATCH)
+
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
 
@@ -359,6 +365,22 @@ def DoPostInstallActions(vm):
   SetAndConfirmGpuClocks(vm)
 
 
+def _InstallCudaPatch(vm):
+  """Installs CUDA Toolkit 8 patch from NVIDIA.
+
+  args:
+    vm: VM to install patch on
+  """
+  # Need to append .deb to package name because the file downloaded from
+  # NVIDIA is missing the .deb extension.
+  fixed_package_name = CUDA_TOOLKIT_PATCH + '.deb'
+  vm.RemoteCommand('wget -q %s -O %s' % (CUDA_TOOLKIT_PATCH_URL,
+                                         fixed_package_name))
+  vm.RemoteCommand('sudo apt-get update')
+  vm.RemoteCommand('sudo dpkg -i %s' % fixed_package_name)
+  vm.RemoteCommand('sudo apt-get upgrade -y cuda-8-0')
+
+
 @vm_util.Retry(timeout=900)
 def _InstallCuda(vm):
   """Installs CUDA Toolkit from NVIDIA, with retry.
@@ -368,11 +390,10 @@ def _InstallCuda(vm):
   """
   # Need to append .deb to package name because the file downloaded from
   # NVIDIA is missing the .deb extension.
-  fixed_debian_package_name = CUDA_TOOLKIT_UBUNTU + '.deb'
-  vm.RemoteCommand('wget -q %s' % CUDA_TOOLKIT_UBUNTU_URL)
-  vm.RemoteCommand('mv %s %s' % (CUDA_TOOLKIT_UBUNTU,
-                                 fixed_debian_package_name))
-  vm.RemoteCommand('sudo dpkg -i %s' % fixed_debian_package_name)
+  fixed_package_name = CUDA_TOOLKIT_UBUNTU + '.deb'
+  vm.RemoteCommand('wget -q %s -O %s' % (CUDA_TOOLKIT_UBUNTU_URL,
+                                         fixed_package_name))
+  vm.RemoteCommand('sudo dpkg -i %s' % fixed_package_name)
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo apt-get install -y cuda-8-0')
 
@@ -386,6 +407,7 @@ def AptInstall(vm):
   vm.Install('build_tools')
   vm.Install('wget')
   _InstallCuda(vm)
+  _InstallCudaPatch(vm)
   vm.Reboot()
   DoPostInstallActions(vm)
   # NVIDIA CUDA Profile Tools Interface.
