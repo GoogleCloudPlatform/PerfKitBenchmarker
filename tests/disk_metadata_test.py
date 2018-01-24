@@ -20,7 +20,6 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -105,7 +104,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                                     disk_type=disk_type,
                                     num_striped_disks=goal_stripes)
 
-      vm_spec = virtual_machine.BaseVmSpec(
+      vm_spec = azure_virtual_machine.AzureVmSpec(
           'test_vm_spec.AZURE', zone='East US 2', machine_type=machine_type)
       vm = azure_virtual_machine.DebianBasedAzureVirtualMachine(
           vm_spec)

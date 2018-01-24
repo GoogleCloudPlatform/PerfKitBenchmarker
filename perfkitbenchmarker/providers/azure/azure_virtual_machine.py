@@ -39,6 +39,7 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
@@ -54,6 +55,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
   Attributes:
     tier: None or string. performance tier of the machine.
     compute_units: int.  number of compute units for the machine.
+    accelerated_networking: boolean. True if supports accelerated_networking.
   """
 
   CLOUD = providers.AZURE
@@ -76,6 +78,9 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     super(AzureVmSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['machine_type'].present:
       config_values['machine_type'] = yaml.load(flag_values.machine_type)
+    if flag_values['azure_accelerated_networking'].present:
+      config_values['accelerated_networking'] = (
+          flag_values.azure_accelerated_networking)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -90,12 +95,15 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     result.update({
         'machine_type': (custom_virtual_machine_spec.AzureMachineTypeDecoder,
                          {}),
+        'accelerated_networking': (
+            option_decoders.BooleanDecoder, {'default': False}),
     })
     return result
 
 
 # Per-VM resources are defined here.
 class AzurePublicIPAddress(resource.BaseResource):
+  """Class to represent an Azure Public IP Address."""
 
   def __init__(self, location, name):
     super(AzurePublicIPAddress, self).__init__()
@@ -138,8 +146,9 @@ class AzurePublicIPAddress(resource.BaseResource):
 
 
 class AzureNIC(resource.BaseResource):
+  """Class to represent an Azure NIC."""
 
-  def __init__(self, subnet, name, public_ip):
+  def __init__(self, subnet, name, public_ip, accelerated_networking):
     super(AzureNIC, self).__init__()
     self.subnet = subnet
     self.name = name
@@ -148,15 +157,18 @@ class AzureNIC(resource.BaseResource):
     self.resource_group = azure_network.GetResourceGroup()
     self.location = self.subnet.vnet.location
     self.args = ['--nics', self.name]
+    self.accelerated_networking = accelerated_networking
 
   def _Create(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'nic', 'create',
-         '--location', self.location,
-         '--vnet-name', self.subnet.vnet.name,
-         '--subnet', self.subnet.name,
-         '--public-ip-address', self.public_ip,
-         '--name', self.name] + self.resource_group.args)
+    cmd = [azure.AZURE_PATH, 'network', 'nic', 'create',
+           '--location', self.location,
+           '--vnet-name', self.subnet.vnet.name,
+           '--subnet', self.subnet.name,
+           '--public-ip-address', self.public_ip,
+           '--name', self.name] + self.resource_group.args
+    if self.accelerated_networking:
+      cmd += ['--accelerated-networking', 'true']
+    vm_util.IssueCommand(cmd)
 
   def _Exists(self):
     if self._deleted:
@@ -194,12 +206,12 @@ class AzureVirtualMachineMetaClass(virtual_machine.AutoRegisterVmMeta):
   Registers default image pattern for each operating system.
   """
 
-  def __init__(cls, name, bases, dct):
-    super(AzureVirtualMachineMetaClass, cls).__init__(name, bases, dct)
-    if hasattr(cls, 'OS_TYPE'):
-      assert cls.OS_TYPE, '{0} did not override OS_TYPE'.format(cls.__name__)
-      assert cls.IMAGE_URN, (
-          '{0} did not override IMAGE_URN'.format(cls.__name__))
+  def __init__(self, name, bases, dct):
+    super(AzureVirtualMachineMetaClass, self).__init__(name, bases, dct)
+    if hasattr(self, 'OS_TYPE'):
+      assert self.OS_TYPE, '{0} did not override OS_TYPE'.format(self.__name__)
+      assert self.IMAGE_URN, (
+          '{0} did not override IMAGE_URN'.format(self.__name__))
 
 
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -214,7 +226,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Initialize an Azure virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
     super(AzureVirtualMachine, self).__init__(vm_spec)
     self.network = azure_network.AzureNetwork.GetNetwork(self)
@@ -226,7 +238,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.resource_group = azure_network.GetResourceGroup()
     self.public_ip = AzurePublicIPAddress(self.zone, self.name + '-public-ip')
     self.nic = AzureNIC(self.network.subnet,
-                        self.name + '-nic', self.public_ip.name)
+                        self.name + '-nic', self.public_ip.name,
+                        vm_spec.accelerated_networking)
     self.storage_account = self.network.storage_account
     self.image = vm_spec.image or self.IMAGE_URN
 
@@ -353,6 +366,11 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                            benchmark_name,
                            filename,
                            destpath))
+
+  def GetResourceMetadata(self):
+    result = super(AzureVirtualMachine, self).GetResourceMetadata()
+    result['accelerated_networking'] = self.nic.accelerated_networking
+    return result
 
 
 class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
