@@ -25,7 +25,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -150,7 +149,8 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(azure_disk.__name__ + '.AzureDisk'))
 
   def _CreateVm(self):
-    vm_spec = virtual_machine.BaseVmSpec('test_vm_spec.Azure')
+    vm_spec = azure_virtual_machine.AzureVmSpec(
+        'test_vm_spec.Azure', machine_type='test_machine_type')
     return azure_virtual_machine.DebianBasedAzureVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
@@ -188,13 +188,14 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
 
 class GceDeviceIdTest(unittest.TestCase):
+
   def testDeviceId(self):
     with mock.patch(disk.__name__ + '.FLAGS') as disk_flags:
       disk_flags.os_type = 'windows'
       disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_number=1, disk_size=2,
                                     disk_type=gce_disk.PD_STANDARD)
       disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
-      self.assertEquals(disk_obj.GetDeviceId(), r'\\.\PHYSICALDRIVE1')
+      self.assertEqual(disk_obj.GetDeviceId(), r'\\.\PHYSICALDRIVE1')
 
 
 if __name__ == '__main__':
