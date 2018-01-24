@@ -30,20 +30,17 @@ mnist:
   description: Runs MNIST Benchmark.
   vm_groups:
     default:
+      os_type: ubuntu1604
       vm_spec:
         GCP:
-          image: ubuntu-1604-xenial-v20171208
-          image_project: ubuntu-os-cloud
           machine_type: n1-standard-4
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
-          image: ami-aa2ea6d0
           machine_type: p2.xlarge
           zone: us-east-1
           boot_disk_size: 200
         Azure:
-          image: Canonical:UbuntuServer:16.04.0-LTS:latest
           machine_type: Standard_NC6
           zone: eastus
 """

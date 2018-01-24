@@ -61,3 +61,4 @@
 - Updated Ubuntu image versions in Tensorflow benchmark.
 - Don't log wget output when installing CUDA Toolkit 8.
 - Install CUDA Toolkit 8 patch from NVIDIA.
+- Updated Ubuntu image versions in MNIST and MXNet benchmarks.
