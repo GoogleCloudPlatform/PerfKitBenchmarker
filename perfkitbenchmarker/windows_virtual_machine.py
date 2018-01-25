@@ -170,6 +170,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       smb_command += 'get %s %s' % (remote_file, local_file)
     smb_copy = [
         'smbclient', network_drive,
+        '--max-protocol', 'SMB3',
         '--user', '%s%%%s' % (self.user_name, self.password),
         '--port', str(self.smb_port),
         '--command', smb_command
