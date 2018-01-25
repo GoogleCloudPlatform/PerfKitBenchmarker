@@ -64,3 +64,4 @@
 - Install CUDA Toolkit 8 patch from NVIDIA.
 - Updated Ubuntu image versions in MNIST and MXNet benchmarks.
 - Allow SMB3 protocol for file transfer which is required for windows 2012 with encrypted transport
+- Updated Ubuntu image versions in HPCG, MNIST and MXNet benchmarks.
