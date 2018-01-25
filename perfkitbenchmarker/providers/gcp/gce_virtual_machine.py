@@ -65,6 +65,7 @@ STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
 _GPU_TYPE_TO_INTERAL_NAME_MAP = {
     'k80': 'nvidia-tesla-k80',
     'p100': 'nvidia-tesla-p100',
+    'v100': 'nvidia-tesla-v100',
 }
 
 
