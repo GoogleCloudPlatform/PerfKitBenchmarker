@@ -692,6 +692,18 @@ class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
 
 
+class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
+                                       linux_virtual_machine.Ubuntu1404Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
+  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+
+
+class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
+                                       linux_virtual_machine.Ubuntu1604Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-amd64-server-20*'
+  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+
+
 class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1710Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-amd64-server-20*'
