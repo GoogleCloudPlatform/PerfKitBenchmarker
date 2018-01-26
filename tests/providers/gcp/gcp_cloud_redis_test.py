@@ -30,7 +30,7 @@ class GcpCloudRedisTestCase(unittest.TestCase):
         spec=benchmark_config_spec._CloudRedisSpec)
     mock_spec.redis_name = 'foobar'
     mock_spec.redis_tier = 'tier'
-    mock_spec.cluster_size_gb = 10
+    mock_spec.redis_size_gb = 5
     mock_spec.redis_version = 'version'
     with mock_flags.PatchFlags(mocked_flags):
       self.redis = gcp_cloud_redis.CloudRedis(mock_spec)
@@ -57,6 +57,11 @@ class GcpCloudRedisTestCase(unittest.TestCase):
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=('{}', '', 1)):
       self.assertFalse(self.redis._Exists())
+
+  def testGetInstanceDetails(self):
+    with mock.patch.object(util.GcloudCommand, 'Issue',
+                           return_value=('{"foo": "bar"}', '', 0)):
+      self.assertEqual(self.redis.GetInstanceDetails(), {'foo': 'bar'})
 
 if __name__ == '__main__':
   unittest.main()

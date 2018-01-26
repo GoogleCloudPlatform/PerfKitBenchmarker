@@ -6,6 +6,8 @@ Spins up a cloud redis instance, runs YCSB against it, then spins it down.
 import logging
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('redis_region',
@@ -20,8 +22,12 @@ cloud_redis_ycsb:
   description: Run YCSB against cloud redis
   cloud_redis:
     redis_version: REDIS_3_2
-    cluster_size_gb: 1
+    redis_size_gb: 5
     redis_tier: STANDARD
+  vm_groups:
+    clients:
+      vm_spec: *default_single_core
+      vm_count: 2
 """
 
 CLOUD_REDIS_CLASS_NAME = 'CloudRedis'
@@ -39,9 +45,20 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   benchmark_spec.always_call_cleanup = True
+
   benchmark_spec.cloud_redis.Create()
+  instance_details = benchmark_spec.cloud_redis.GetInstanceDetails()
   logging.info('Instance %s created successfully',
                benchmark_spec.cloud_redis.spec.redis_name)
+
+  ycsb_vms = benchmark_spec.vm_groups['clients']
+  vm_util.RunThreaded(_Install, ycsb_vms)
+
+  benchmark_spec.executor = ycsb.YCSBExecutor(
+      'redis', **{
+          'shardkeyspace': True,
+          'redis.host': instance_details['host'],
+          'redis.port': instance_details['port']})
 
 
 def Run(benchmark_spec):
@@ -54,7 +71,10 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample instances.
   """
-  return []
+  ycsb_vms = benchmark_spec.vm_groups['clients']
+  samples = benchmark_spec.executor.LoadAndRun(ycsb_vms)
+
+  return samples
 
 
 def Cleanup(benchmark_spec):
@@ -67,3 +87,7 @@ def Cleanup(benchmark_spec):
   benchmark_spec.cloud_redis.Delete()
   logging.info('Instance %s deleted successfully',
                benchmark_spec.cloud_redis.spec.redis_name)
+
+
+def _Install(vm):
+  vm.Install('ycsb')
