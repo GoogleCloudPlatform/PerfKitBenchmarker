@@ -14,6 +14,7 @@
 - Windows benchmarks can now be run from linux controllers
 - MXNet benchmarks can now be run from linux controllers
 - Added initial support for preprovisioning benchmark binaries in the cloud.
+- YCSB benchmark for Cloud Redis in GCP
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
