@@ -219,7 +219,13 @@ flags.DEFINE_integer(
     'run_stage_time', 0,
     'PKB will run/re-run the run stage of each benchmark until it has spent '
     'at least this many seconds. It defaults to 0, so benchmarks will only '
-    'be run once unless some other value is specified.')
+    'be run once unless some other value is specified. This flag and '
+    'run_stage_iterations are mutually exclusive.')
+flags.DEFINE_integer(
+    'run_stage_iterations', 1,
+    'PKB will run/re-run the run stage of each benchmark this many times. '
+    'It defaults to 1, so benchmarks will only be run once unless some other '
+    'value is specified. This flag and run_stage_time are mutually exclusive.')
 flags.DEFINE_integer(
     'run_stage_retries', 0,
     'The number of allowable consecutive failures during the run stage. After '
@@ -497,6 +503,13 @@ def DoRunPhase(spec, collector, timer):
   run_number = 0
   consecutive_failures = 0
   last_publish_time = time.time()
+
+  def _IsRunStageFinished():
+    if FLAGS.run_stage_time > 0:
+      return time.time() > deadline
+    else:
+      return run_number >= FLAGS.run_stage_iterations
+
   while True:
     samples = []
     logging.info('Running benchmark %s', spec.name)
@@ -516,7 +529,7 @@ def DoRunPhase(spec, collector, timer):
       events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
     events.samples_created.send(
         events.RUN_PHASE, benchmark_spec=spec, samples=samples)
-    if FLAGS.run_stage_time:
+    if FLAGS.run_stage_time or FLAGS.run_stage_iterations:
       for s in samples:
         s.metadata['run_number'] = run_number
     collector.AddSamples(samples, spec.name, spec)
@@ -525,7 +538,7 @@ def DoRunPhase(spec, collector, timer):
       collector.PublishSamples()
       last_publish_time = time.time()
     run_number += 1
-    if time.time() > deadline:
+    if _IsRunStageFinished():
       if (FLAGS.boot_samples or
           spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
         collector.AddSamples(
@@ -760,6 +773,11 @@ def SetUpPKB():
     if not vm_util.ExecutableOnPath(executable):
       raise errors.Setup.MissingExecutableError(
           'Could not find required executable "%s"', executable)
+
+  # Check mutually exclusive flags
+  if FLAGS.run_stage_iterations > 1 and FLAGS.run_stage_time > 0:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Flags run_stage_iterations and run_stage_time are mutually exclusive')
 
   vm_util.SSHKeyGen()
 
