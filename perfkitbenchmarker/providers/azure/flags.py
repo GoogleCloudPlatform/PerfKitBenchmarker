@@ -34,6 +34,7 @@ RAGRS = 'Standard_RAGRS'
 
 STORAGE = 'Storage'
 BLOB_STORAGE = 'BlobStorage'
+VALID_TIERS = ['Basic', 'Standard']
 
 flags.DEFINE_enum(
     'azure_storage_type', LRS,
@@ -60,3 +61,11 @@ flags.DEFINE_boolean('azure_accelerated_networking', False,
                      'https://docs.microsoft.com/en-us/azure/virtual-network/'
                      'create-vm-accelerated-networking-cli'
                      'for more information.')
+
+flags.DEFINE_enum('azure_tier', None, VALID_TIERS,
+                  'Performance tier to use for the machine type.')
+
+flags.DEFINE_integer(
+    'azure_compute_units', None,
+    'Number of compute units to allocate for the machine type')
+

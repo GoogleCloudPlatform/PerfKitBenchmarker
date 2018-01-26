@@ -66,6 +66,10 @@ class ManagedRelationalDbPropertyNotSet(Exception):
   pass
 
 
+class ManagedRelationalDbEngineNotFoundException(Exception):
+  pass
+
+
 def GenerateRandomDbPassword():
   """Generate a random password 10 characters in length."""
   return str(uuid.uuid4())[:10]
@@ -158,8 +162,11 @@ class BaseManagedRelationalDb(resource.BaseResource):
   def GetResourceMetadata(self):
     """Returns a dictionary of metadata.
 
-   Child classes can extend this if needed.
-   """
+    Child classes can extend this if needed.
+
+    Raises:
+       ManagedRelationalDbPropertyNotSet:  if any expected metadata is missing.
+    """
     metadata = {
         'zone': self.spec.vm_spec.zone,
         'disk_type': self.spec.disk_spec.disk_type,
@@ -170,15 +177,30 @@ class BaseManagedRelationalDb(resource.BaseResource):
         'backup_start_time': self.spec.backup_start_time,
         'engine_version': self.spec.engine_version,
     }
-    if self.spec.vm_spec.machine_type:
+    if hasattr(self.spec.vm_spec, 'machine_type'):
       metadata.update({
           'machine_type': self.spec.vm_spec.machine_type,
       })
-    else:
+    elif hasattr(self.spec.vm_spec, 'cpus') and (
+        hasattr(self.spec.vm_spec, 'memory')):
       metadata.update({
           'cpus': self.spec.vm_spec.cpus,
-          'memory': self.spec.vm_spec.memory,
       })
+      metadata.update({
+          'memory': self.spec.vm_spec.memory,
+
+      })
+    elif hasattr(self.spec.vm_spec, 'tier') and (
+        hasattr(self.spec.vm_spec, 'compute_units')):
+      metadata.update({
+          'tier': self.spec.vm_spec.tier,
+      })
+      metadata.update({
+          'compute_units': self.spec.vm_spec.compute_units,
+      })
+    else:
+      raise ManagedRelationalDbPropertyNotSet(
+          'Machine type of the database must be set.')
 
     return metadata
 
@@ -190,4 +212,4 @@ class BaseManagedRelationalDb(resource.BaseResource):
       engine: name of the database engine
 
     Returns: default version as a string for the given engine.
-  """
+    """
