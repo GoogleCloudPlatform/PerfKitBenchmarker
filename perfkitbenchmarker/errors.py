@@ -46,6 +46,11 @@ class Setup(object):
 
   class InvalidSetupError(Error):
     """Error raised when SetUpPKB was not called correctly."""
+    pass
+
+  class InvalidFlagConfigurationError(Error):
+    """Error raised when the set of command line flags is invalid."""
+    pass
 
 
 class VirtualMachine(object):
