@@ -232,6 +232,7 @@ def Run(benchmark_spec):
     batch_size = _GetBatchSize(model, num_layers)
     benchmark_spec.model = model
     benchmark_spec.batch_size = batch_size
+    benchmark_spec.num_layers = num_layers
     mx_benchmark_cmd = (
         'python train_imagenet.py --benchmark 1 --network %s --batch-size %s '
         '--image-shape %s --num-epochs %s --kv-store device') % (
@@ -246,7 +247,6 @@ def Run(benchmark_spec):
           ','.join(str(n) for n in range(gpus)))
     if num_layers:
       mx_benchmark_cmd = '%s --num-layers %s' % (mx_benchmark_cmd, num_layers)
-      benchmark_spec.num_layers = num_layers
     run_command = 'cd %s && %s' % (mx_benchmark_dir,
                                    mx_benchmark_cmd)
     stdout, stderr = vm.RobustRemoteCommand(run_command, should_log=True)
