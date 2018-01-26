@@ -44,6 +44,7 @@
 - Added the cluster's worker shape and worker count into the dpb service metadata.
 - Added `azure_accelerated_networking` flag for Azure SR-IOV support.
 - Added support for V100 GPUs on GCP.
+- Add support for distributed TensorFlow benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
