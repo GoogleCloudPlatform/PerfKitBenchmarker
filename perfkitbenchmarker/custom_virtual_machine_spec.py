@@ -19,6 +19,7 @@ import re
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 
 
 class MemoryDecoder(option_decoders.StringDecoder):
@@ -185,6 +186,25 @@ class AzurePerformanceTierDecoder(spec.BaseSpec):
     # https://docs.microsoft.com/en-us/azure/sql-database/sql-database-service-tiers
     result.update({'compute_units': (option_decoders.IntDecoder, {'min': 50}),
                    'tier': (option_decoders.EnumDecoder, {
-                       'valid_values': ['Basic', 'Standard']}
+                       'valid_values': azure_flags.VALID_TIERS}
                            )})
     return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values.
+        May be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    if flag_values['azure_tier'].present:
+      config_values['tier'] = flag_values.azure_tier
+
+    if flag_values['azure_compute_units'].present:
+      config_values['compute_units'] = flag_values.azure_compute_units
+

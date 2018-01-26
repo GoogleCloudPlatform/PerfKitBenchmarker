@@ -62,6 +62,14 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
 
   def __init__(self, *args, **kwargs):
     super(AzureVmSpec, self).__init__(*args, **kwargs)
+    if isinstance(self.machine_type,
+                  custom_virtual_machine_spec.AzurePerformanceTierDecoder):
+      self.tier = self.machine_type.tier
+      self.compute_units = self.machine_type.compute_units
+      self.machine_type = None
+    else:
+      self.tier = None
+      self.compute_units = None
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
