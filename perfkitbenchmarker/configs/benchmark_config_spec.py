@@ -1029,8 +1029,8 @@ class _CloudRedisSpec(spec.BaseSpec):
         'redis_version': (option_decoders.EnumDecoder, {
             'default': cloud_redis.REDIS_3_2,
             'valid_values': cloud_redis.REDIS_VERSIONS}),
-        'cluster_size_gb': (option_decoders.IntDecoder, {
-            'default': 1,
+        'redis_size_gb': (option_decoders.IntDecoder, {
+            'default': 5,
             'min': 1}),
         'redis_tier': (option_decoders.EnumDecoder, {
             'default': cloud_redis.STANDARD,

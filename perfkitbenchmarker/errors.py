@@ -166,6 +166,9 @@ class Resource(object):
   class RetryableDeletionError(Error):
     pass
 
+  class RetryableGetError(Error):
+    pass
+
 
 class Config(object):
   """Errors related to configs."""

@@ -446,11 +446,11 @@ class CloudRedisDecoderTestCase(unittest.TestCase):
 
   def testValidInput(self):
     result = self._decoder.Decode({
-        'redis_version': 'REDIS_3_2', 'cluster_size_gb': 1,
+        'redis_version': 'REDIS_3_2', 'redis_size_gb': 1,
         'redis_tier': 'STANDARD'}, _COMPONENT, self.flags)
     self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
     self.assertEqual(result.redis_version, 'REDIS_3_2')
-    self.assertEqual(result.cluster_size_gb, 1)
+    self.assertEqual(result.redis_size_gb, 1)
     self.assertEqual(result.redis_tier, 'STANDARD')
 
   def testInvalidInput(self):
@@ -471,7 +471,7 @@ class CloudRedisSpecTestCase(unittest.TestCase):
     self.flags['cloud'].value = providers.GCP
     self.flags['cloud'].present = True
     self.flags['run_uri'].value = 'test'
-    self._kwargs = {'cluster_size_gb': -1}
+    self._kwargs = {'redis_size_gb': -1}
 
   def testMissingValues(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
@@ -483,14 +483,14 @@ class CloudRedisSpecTestCase(unittest.TestCase):
     result = self._spec_class(_COMPONENT, flag_values=self.flags)
     self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
     self.assertEqual(result.redis_version, 'REDIS_3_2')
-    self.assertEqual(result.cluster_size_gb, 1)
+    self.assertEqual(result.redis_size_gb, 5)
     self.assertEqual(result.redis_tier, 'STANDARD')
 
   def testInvalidDClusterSize(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._spec_class(_COMPONENT, flag_values=self.flags, **self._kwargs)
       self.assertEqual(str(cm.exception), (
-          'Invalid test_component.cluster_size_gb value: "-1". '
+          'Invalid test_component.redis_size_gb value: "-1". '
           'Value must be at least 1.'))
 
 
