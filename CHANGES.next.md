@@ -47,7 +47,8 @@
 - Added `azure_accelerated_networking` flag for Azure SR-IOV support.
 - Added support for V100 GPUs on GCP.
 - Add support for distributed TensorFlow benchmark.
-- Added Azure Relational DB support for Postgres 9.6
+- Added Azure Relational DB support for Postgres 9.6.
+- Added `copy_benchmark_single_file_mb` flag for single file support.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
