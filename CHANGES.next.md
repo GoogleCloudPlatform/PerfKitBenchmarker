@@ -73,3 +73,4 @@
 - Allow SMB3 protocol for file transfer which is required for windows 2012 with encrypted transport
 - Updated Ubuntu image versions in HPCG, MNIST and MXNet benchmarks.
 - Fixed a bug getting the correct number of layers in MXNet.
+- Gcloud alpha version no longer required for GPU and minimum CPU platform.
