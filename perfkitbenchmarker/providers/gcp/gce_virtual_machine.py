@@ -296,10 +296,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
     args = []
-    # TODO: gcloud supports GPUs in the beta version, but we are using alpha
-    # here so that we can specify min_cpu_platform in addition to attaching
-    # gpus.
-    if self.host or self.min_cpu_platform or self.gpu_count:
+    if self.host:
       args = ['alpha']
     args.extend(['compute', 'instances', 'create', self.name])
 
