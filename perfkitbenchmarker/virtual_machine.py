@@ -470,6 +470,15 @@ class BaseOsMixin(object):
     self._reachable = {}
     self._total_memory_kb = None
     self._num_cpus = None
+    self.os_metadata = {}
+
+  def GetOSResourceMetadata(self):
+    """Returns a dict containing VM OS metadata.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    return self.os_metadata
 
   @abc.abstractmethod
   def RemoteCommand(self, command, should_log=False, ignore_failure=False,
