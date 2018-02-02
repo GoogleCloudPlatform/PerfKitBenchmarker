@@ -74,6 +74,13 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     self.home_dir = None
     self.system_drive = None
 
+  def RobustRemoteCommand(self, command, should_log=False, ignore_failure=False,
+                          suppress_warning=False, timeout=None):
+    logging.warning('RobustRemoteCommand not implemented for windows.'
+                    ' Using RemoteCommand instead.')
+    return self.RemoteCommand(command, should_log, ignore_failure,
+                              suppress_warning, timeout)
+
   def RemoteCommand(self, command, should_log=False, ignore_failure=False,
                     suppress_warning=False, timeout=None):
     """Runs a powershell command on the VM.
