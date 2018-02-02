@@ -51,6 +51,10 @@ FIO_HIST_LOG_PARSER_PATH = '%s/tools/hist' % FIO_DIR
 FIO_HIST_LOG_PARSER = 'fiologparser_hist.py'
 
 
+def GetFioExec():
+  return 'sudo {path}'.format(path=FIO_PATH)
+
+
 def _Install(vm):
   """Installs the fio package on the VM."""
   for p in ['build_tools', 'python', 'pip', 'python_dev']:
