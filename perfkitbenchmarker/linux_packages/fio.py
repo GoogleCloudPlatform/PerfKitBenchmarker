@@ -197,37 +197,46 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
         # '<metric_name>:latency:min' through
         # '<metric_name>:latency:p99.99' that hold the individual
         # latency numbers as values. This is for historical reasons.
-        clat_section = job[mode]['clat']
+        clat_key = 'clat' if 'clat' in job[mode] else 'clat_ns'
+        clat_section = job[mode][clat_key]
+
+        def _ConvertClat(value):
+          if clat_key is 'clat_ns':
+            # convert from nsec to usec
+            return value/1000
+          else:
+            return value
+
         percentiles = clat_section['percentile']
         lat_statistics = [
-            ('min', clat_section['min']),
-            ('max', clat_section['max']),
-            ('mean', clat_section['mean']),
-            ('stddev', clat_section['stddev']),
-            ('p1', percentiles['1.000000']),
-            ('p5', percentiles['5.000000']),
-            ('p10', percentiles['10.000000']),
-            ('p20', percentiles['20.000000']),
-            ('p30', percentiles['30.000000']),
-            ('p40', percentiles['40.000000']),
-            ('p50', percentiles['50.000000']),
-            ('p60', percentiles['60.000000']),
-            ('p70', percentiles['70.000000']),
-            ('p80', percentiles['80.000000']),
-            ('p90', percentiles['90.000000']),
-            ('p95', percentiles['95.000000']),
-            ('p99', percentiles['99.000000']),
-            ('p99.5', percentiles['99.500000']),
-            ('p99.9', percentiles['99.900000']),
-            ('p99.95', percentiles['99.950000']),
-            ('p99.99', percentiles['99.990000'])]
+            ('min', _ConvertClat(clat_section['min'])),
+            ('max', _ConvertClat(clat_section['max'])),
+            ('mean', _ConvertClat(clat_section['mean'])),
+            ('stddev', _ConvertClat(clat_section['stddev'])),
+            ('p1', _ConvertClat(percentiles['1.000000'])),
+            ('p5', _ConvertClat(percentiles['5.000000'])),
+            ('p10', _ConvertClat(percentiles['10.000000'])),
+            ('p20', _ConvertClat(percentiles['20.000000'])),
+            ('p30', _ConvertClat(percentiles['30.000000'])),
+            ('p40', _ConvertClat(percentiles['40.000000'])),
+            ('p50', _ConvertClat(percentiles['50.000000'])),
+            ('p60', _ConvertClat(percentiles['60.000000'])),
+            ('p70', _ConvertClat(percentiles['70.000000'])),
+            ('p80', _ConvertClat(percentiles['80.000000'])),
+            ('p90', _ConvertClat(percentiles['90.000000'])),
+            ('p95', _ConvertClat(percentiles['95.000000'])),
+            ('p99', _ConvertClat(percentiles['99.000000'])),
+            ('p99.5', _ConvertClat(percentiles['99.500000'])),
+            ('p99.9', _ConvertClat(percentiles['99.900000'])),
+            ('p99.95', _ConvertClat(percentiles['99.950000'])),
+            ('p99.99', _ConvertClat(percentiles['99.990000']))]
 
         lat_metadata = parameters.copy()
         for name, val in lat_statistics:
           lat_metadata[name] = val
         samples.append(
             sample.Sample('%s:latency' % metric_name,
-                          job[mode]['clat']['mean'],
+                          _ConvertClat(job[mode][clat_key]['mean']),
                           'usec', lat_metadata, timestamp))
 
         for stat_name, stat_val in lat_statistics:
