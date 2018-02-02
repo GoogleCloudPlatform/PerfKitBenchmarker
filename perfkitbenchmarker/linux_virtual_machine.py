@@ -39,6 +39,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -52,6 +53,7 @@ EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
 EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
              '7/x86_64/Packages/e/epel-release-7-11.noarch.rpm')
 
+LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
 UPDATE_RETRIES = 5
 SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
@@ -323,7 +325,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if not FLAGS.network_enable_BBR:
       return
 
-    if not self.CheckKernelVersion().AtLeast(4, 9):
+    if not KernelRelease(self.kernel_release).AtLeast(4, 9):
       raise flags.ValidationError(
           'BBR requires a linux image with kernel 4.9 or newer')
 
@@ -350,15 +352,29 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     except errors.VirtualMachine.RemoteCommandError:
       return 'unknown'
 
-  def CheckKernelVersion(self):
-    """Return a KernelVersion from the host VM."""
-    uname, _ = self.RemoteCommand('uname -r')
-    return KernelVersion(uname)
-
   def CheckLsCpu(self):
     """Returns a LsCpuResults from the host VM."""
     lscpu, _ = self.RemoteCommand('lscpu')
     return LsCpuResults(lscpu)
+
+  @property
+  def os_info(self):
+    """Get distribution-specific information."""
+    if self.os_metadata.get('os_info'):
+      return self.os_metadata['os_info']
+    else:
+      self.Install('lsb_release')
+      stdout, _ = self.RemoteCommand('lsb_release -d')
+      return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+
+  @property
+  def kernel_release(self):
+    """Return kernel release number."""
+    if self.os_metadata.get('kernel_release'):
+      return self.os_metadata.get('kernel_release')
+    else:
+      stdout, _ = self.RemoteCommand('uname -r')
+      return stdout.strip()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
@@ -375,6 +391,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.tcp_congestion_control = self.TcpCongestionControl()
     lscpu_results = self.CheckLsCpu()
     self.numa_node_count = lscpu_results.numa_node_count
+    self.os_metadata['os_info'] = self.os_info
+    self.os_metadata['kernel_release'] = self.kernel_release
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
@@ -1272,7 +1290,7 @@ class ContainerizedDebianMixin(DebianMixin):
     target.ContainerCopy(file_name, remote_path)
 
 
-class KernelVersion(object):
+class KernelRelease(object):
   """Holds the contents of the linux kernel version returned from uname -r."""
 
   def __init__(self, uname):
