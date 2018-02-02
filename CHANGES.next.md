@@ -49,6 +49,7 @@
 - Add support for distributed TensorFlow benchmark.
 - Added Azure Relational DB support for Postgres 9.6.
 - Added `copy_benchmark_single_file_mb` flag for single file support.
+- Record guest system information.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

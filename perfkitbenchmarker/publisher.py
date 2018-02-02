@@ -214,6 +214,8 @@ class DefaultMetadataProvider(MetadataProvider):
       for k, v in vm.GetResourceMetadata().iteritems():
         metadata[name_prefix + k] = v
       metadata[name_prefix + 'vm_count'] = len(vms)
+      for k, v in vm.GetOSResourceMetadata().iteritems():
+        metadata[name_prefix + k] = v
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
