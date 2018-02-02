@@ -132,16 +132,10 @@ filename = asdf
 blocksize = 8k
 """
 
-    open_mock = mock.MagicMock()
-    manager = open_mock.return_value.__enter__.return_value
-    manager.read.return_value = file_contents
-    manager.__exit__.return_value = mock.Mock()
-
-    with mock.patch('__builtin__.open', open_mock):
-      jobfile = fio_benchmark.ProcessedJobFileString('filename', True)
-      self.assertNotIn('filename', jobfile)
-      self.assertNotIn('zanzibar', jobfile)
-      self.assertNotIn('asdf', jobfile)
+    jobfile = fio_benchmark.ProcessedJobFileString(file_contents, True)
+    self.assertNotIn('filename', jobfile)
+    self.assertNotIn('zanzibar', jobfile)
+    self.assertNotIn('asdf', jobfile)
 
   def doTargetModeTest(self, mode,
                        expect_fill_device=None,
