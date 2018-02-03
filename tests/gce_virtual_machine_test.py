@@ -15,6 +15,8 @@
 """Tests for perfkitbenchmarker.providers.gcp.gce_virtual_machine."""
 
 import contextlib
+import copy
+import json
 import re
 import unittest
 
@@ -38,13 +40,37 @@ _BENCHMARK_UID = 'benchmark_uid'
 _COMPONENT = 'test_component'
 _FLAGS = None
 
+_FAKE_INSTANCE_METADATA = {
+    'id': '123456',
+    'networkInterfaces': [
+        {
+            'accessConfigs': [
+                {
+                    'natIP': '1.2.3.4'
+                }
+            ],
+            'networkIP': '1.2.3.4'
+        }
+    ]
+}
+_FAKE_DISK_METADATA = {
+    'id': '123456',
+    'kind': 'compute#disk',
+    'name': 'fakedisk',
+    'sizeGb': '10',
+    'sourceImage': ''
+}
+
 
 @contextlib.contextmanager
-def PatchCriticalObjects():
+def PatchCriticalObjects(retvals=None):
   """A context manager that patches a few critical objects with mocks."""
-  retval = ('', '', 0)
+
+  def ReturnVal(*unused_arg):
+    return ('', '', 0) if retvals is None else retvals.pop(0)
+
   with mock.patch(vm_util.__name__ + '.IssueCommand',
-                  return_value=retval) as issue_command, \
+                  side_effect=ReturnVal) as issue_command, \
           mock.patch('__builtin__.open'), \
           mock.patch(vm_util.__name__ + '.NamedTemporaryFile'), \
           mock.patch(util.__name__ + '.GetDefaultProject'):
@@ -179,6 +205,12 @@ class GceVirtualMachineTestCase(unittest.TestCase):
     }, vm.GetResourceMetadata())
 
 
+def _CreateFakeDiskMetadata(image):
+  fake_disk = copy.copy(_FAKE_DISK_METADATA)
+  fake_disk['sourceImage'] = image
+  return fake_disk
+
+
 class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
 
   def setUp(self):
@@ -193,9 +225,15 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
     self.spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                               machine_type='fake-machine-type')
 
+  def _CreateFakeReturnValues(self, fake_image=''):
+    fake_rets = [('', '', 0), (json.dumps(_FAKE_INSTANCE_METADATA), '', 0)]
+    if fake_image:
+      fake_rets.append((json.dumps(_CreateFakeDiskMetadata(fake_image)), '', 0))
+    return fake_rets
+
   def testCreateDebian(self):
     vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.DEBIAN)
-    with PatchCriticalObjects() as issue_command:
+    with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
       vm = vm_class(self.spec)
       vm._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -203,12 +241,16 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn('--image ubuntu-14-04', command_string)
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 2)
       self.assertDictContainsSubset({'image': 'ubuntu-14-04'},
                                     vm.GetResourceMetadata())
 
   def testCreateUbuntu1404(self):
     vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1404)
-    with PatchCriticalObjects() as issue_command:
+    fake_image = 'fake-ubuntu1404'
+    with PatchCriticalObjects(
+        self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
       vm._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -218,14 +260,18 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
       self.assertIn(
           '--image-family ubuntu-1404-lts --image-project ubuntu-os-cloud',
           command_string)
-      self.assertDictContainsSubset({'image': None,
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 3)
+      self.assertDictContainsSubset({'image': fake_image,
                                      'image_family': 'ubuntu-1404-lts',
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
 
   def testCreateUbuntu1604(self):
     vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1604)
-    with PatchCriticalObjects() as issue_command:
+    fake_image = 'fake-ubuntu1604'
+    with PatchCriticalObjects(
+        self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
       vm._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -235,14 +281,18 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
       self.assertIn(
           '--image-family ubuntu-1604-lts --image-project ubuntu-os-cloud',
           command_string)
-      self.assertDictContainsSubset({'image': None,
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 3)
+      self.assertDictContainsSubset({'image': fake_image,
                                      'image_family': 'ubuntu-1604-lts',
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
 
   def testCreateUbuntu1710(self):
     vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1710)
-    with PatchCriticalObjects() as issue_command:
+    fake_image = 'fake-ubuntu1704'
+    with PatchCriticalObjects(
+        self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
       vm._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -252,10 +302,60 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
       self.assertIn(
           '--image-family ubuntu-1710 --image-project ubuntu-os-cloud',
           command_string)
-      self.assertDictContainsSubset({'image': None,
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 3)
+      self.assertDictContainsSubset({'image': fake_image,
                                      'image_family': 'ubuntu-1710',
                                      'image_project': 'ubuntu-os-cloud'},
                                     vm.GetResourceMetadata())
+
+  def testCreateRhelCustomImage(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.RHEL)
+    fake_image = 'fake-custom-rhel-image'
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                         machine_type='fake-machine-type',
+                                         image=fake_image)
+    with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
+      vm = vm_class(spec)
+      vm._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn(
+          '--image ' + fake_image,
+          command_string)
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 2)
+      vm_metadata = vm.GetResourceMetadata()
+      self.assertDictContainsSubset({'image': fake_image}, vm_metadata)
+      self.assertNotIn('image_family', vm_metadata)
+      self.assertNotIn('image_project', vm_metadata)
+
+  def testCreateCentos7CustomImage(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.CENTOS7)
+    fake_image = 'fake-custom-centos7-image'
+    fake_image_project = 'fake-project'
+    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
+                                         machine_type='fake-machine-type',
+                                         image=fake_image,
+                                         image_project=fake_image_project)
+    with PatchCriticalObjects(self._CreateFakeReturnValues()) as issue_command:
+      vm = vm_class(spec)
+      vm._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud compute instances create', command_string)
+      self.assertIn('--image ' + fake_image, command_string)
+      self.assertIn('--image-project ' + fake_image_project, command_string)
+      vm._PostCreate()
+      self.assertEqual(issue_command.call_count, 2)
+      vm_metadata = vm.GetResourceMetadata()
+      self.assertDictContainsSubset({'image': fake_image,
+                                     'image_project': fake_image_project},
+                                    vm_metadata)
+      self.assertNotIn('image_family', vm_metadata)
 
 
 class GCEVMFlagsTestCase(unittest.TestCase):

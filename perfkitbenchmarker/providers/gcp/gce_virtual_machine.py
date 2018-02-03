@@ -268,6 +268,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.project = vm_spec.project or util.GetDefaultProject()
     self.image_family = vm_spec.image_family or self.DEFAULT_IMAGE_FAMILY
     self.image_project = vm_spec.image_project or self.DEFAULT_IMAGE_PROJECT
+    self.backfill_image = False
     self.network = gce_network.GceNetwork.GetNetwork(self)
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size
@@ -438,6 +439,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     network_interface = response['networkInterfaces'][0]
     self.internal_ip = network_interface['networkIP']
     self.ip_address = network_interface['accessConfigs'][0]['natIP']
+    if not self.image:
+      getdisk_cmd = util.GcloudCommand(
+          self, 'compute', 'disks', 'describe', self.name)
+      stdout, _, _ = getdisk_cmd.Issue()
+      response = json.loads(stdout)
+      self.image = response['sourceImage'].split('/')[-1]
+      self.backfill_image = True
 
   def _Delete(self):
     """Delete a GCE VM instance."""
@@ -520,7 +528,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       attr_value = getattr(self, attr_name)
       if attr_value:
         result[attr_name] = attr_value
-    if not self.image and self.image_family:
+    # Only record image_family flag when it is used in vm creation command.
+    # Note, when using non-debian/ubuntu based custom images, user will need
+    # to use --os_type flag. In that case, we do not want to
+    # record image_family in metadata.
+    if self.backfill_image and self.image_family:
       result['image_family'] = self.image_family
     if self.image_project:
       result['image_project'] = self.image_project
