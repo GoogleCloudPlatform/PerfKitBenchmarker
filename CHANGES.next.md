@@ -14,7 +14,7 @@
 - Windows benchmarks can now be run from linux controllers
 - MXNet benchmarks can now be run from linux controllers
 - Added initial support for preprovisioning benchmark binaries in the cloud.
-- YCSB benchmark for Cloud Redis in GCP
+- YCSB benchmark for Cloud Redis in GCP and Elasticache Redis in AWS
 - Added a flag, `run_stage_iterations`, which causes a benchmark's run stage to be
   called a specified number of times
 

@@ -44,3 +44,6 @@ flags.DEFINE_string('aws_image_name_filter', None,
                     'The filter to use when searching for an image for a VM.')
 flags.DEFINE_string('aws_preprovisioned_data_bucket', None,
                     'AWS bucket where pre-provisioned data has been copied.')
+flags.DEFINE_string('redis_node_type',
+                    'cache.m4.large',
+                    'The AWS node type to use for cloud redis')
