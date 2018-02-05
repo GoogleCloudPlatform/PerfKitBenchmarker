@@ -404,11 +404,12 @@ class BenchmarkSpec(object):
     if self.cloud_tpu:
       self.cloud_tpu.Create()
     if self.edw_service:
-      # The benchmark creates the Redshift cluster's subnet group in the already
-      # provisioned virtual private cloud (vpc).
-      for network in networks:
-        if network.__class__.__name__ == 'AwsNetwork':
-          self.config.edw_service.subnet_id = network.subnet.id
+      if not self.edw_service.user_managed:
+        # The benchmark creates the Redshift cluster's subnet group in the
+        # already provisioned virtual private cloud (vpc).
+        for network in networks:
+          if network.__class__.__name__ == 'AwsNetwork':
+            self.config.edw_service.subnet_id = network.subnet.id
       self.edw_service.Create()
     if self.cloud_redis:
       # Redis needs to be created in the same subnet and vpc as the already
