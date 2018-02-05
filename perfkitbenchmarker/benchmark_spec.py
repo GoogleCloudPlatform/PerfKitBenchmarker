@@ -410,6 +410,15 @@ class BenchmarkSpec(object):
         if network.__class__.__name__ == 'AwsNetwork':
           self.config.edw_service.subnet_id = network.subnet.id
       self.edw_service.Create()
+    if self.cloud_redis:
+      # Redis needs to be created in the same subnet and vpc as the already
+      # created client vms
+      for network in networks:
+        if network.__class__.__name__ == 'AwsNetwork':
+          self.config.cloud_redis.subnet_id = network.subnet.id
+          self.config.cloud_redis.security_group_id = (
+              network.regional_network.vpc.default_security_group_id)
+      self.cloud_redis.Create()
 
   def Delete(self):
     if self.deleted:
