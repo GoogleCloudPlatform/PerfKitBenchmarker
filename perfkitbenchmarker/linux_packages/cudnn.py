@@ -19,8 +19,11 @@ import posixpath
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 
-flags.DEFINE_string('cudnn', 'libcudnn6_6.0.21-1+cuda8.0_amd64.deb',
-                    '''The NVIDIA CUDA Deep Neural Network library.
+CUDNN_6 = 'libcudnn6_6.0.21-1+cuda8.0_amd64.deb'
+CUDNN_7 = 'libcudnn7_7.0.5.15-1+cuda9.0_amd64.deb'
+
+flags.DEFINE_string('cudnn', CUDNN_7,
+                   '''The NVIDIA CUDA Deep Neural Network library.
                     Please put in data directory and specify the name''')
 FLAGS = flags.FLAGS
 
@@ -34,8 +37,20 @@ def _Install(vm, dest_path):
 
 
 def _CopyLib(vm):
-  src_path = data.ResourcePath(FLAGS.cudnn)
-  dest_path = posixpath.join('/tmp', FLAGS.cudnn)
+  # If the cudnn flag was passed on the command line,
+  # use that value for the cudnn path. Otherwise, chose
+  # an intelligent default given the cuda toolkit version
+  # specified.
+  if FLAGS['cudnn'].present:
+    cudnn_path = FLAGS.cudnn
+  else:
+    if FLAGS.cuda_toolkit_version == '8.0':
+      cudnn_path = CUDNN_6
+    elif FLAGS.cuda_toolkit_version == '9.0':
+      cudnn_path = CUDNN_7
+
+  src_path = data.ResourcePath(cudnn_path)
+  dest_path = posixpath.join('/tmp', cudnn_path)
   vm.RemoteCopy(src_path, dest_path)
   return dest_path
 
