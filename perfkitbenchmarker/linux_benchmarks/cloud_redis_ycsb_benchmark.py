@@ -46,14 +46,9 @@ def Prepare(benchmark_spec):
   """
   benchmark_spec.always_call_cleanup = True
 
-  benchmark_spec.cloud_redis.Create()
-  instance_details = benchmark_spec.cloud_redis.GetInstanceDetails()
-  logging.info('Instance %s created successfully',
-               benchmark_spec.cloud_redis.spec.redis_name)
-
   ycsb_vms = benchmark_spec.vm_groups['clients']
   vm_util.RunThreaded(_Install, ycsb_vms)
-
+  instance_details = benchmark_spec.cloud_redis.GetInstanceDetails()
   benchmark_spec.executor = ycsb.YCSBExecutor(
       'redis', **{
           'shardkeyspace': True,
