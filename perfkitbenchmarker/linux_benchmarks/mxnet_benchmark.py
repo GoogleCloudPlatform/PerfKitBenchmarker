@@ -23,7 +23,7 @@ import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import cuda_toolkit_8
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import mxnet
 from perfkitbenchmarker.linux_packages import mxnet_cnn
 
@@ -163,7 +163,7 @@ def _CreateMetadataDict(benchmark_spec):
   vm = benchmark_spec.vms[0]
   metadata = dict()
   if benchmark_spec.device == GPU:
-    metadata.update(cuda_toolkit_8.GetMetadata(vm))
+    metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['batch_size'] = benchmark_spec.batch_size
   metadata['num_epochs'] = benchmark_spec.num_epochs
   metadata['device'] = benchmark_spec.device
@@ -241,7 +241,7 @@ def Run(benchmark_spec):
             IMAGENET_SHAPE,
             benchmark_spec.num_epochs)
     if benchmark_spec.device == GPU:
-      gpus = cuda_toolkit_8.QueryNumberOfGpus(vm)
+      gpus = cuda_toolkit.QueryNumberOfGpus(vm)
       mx_benchmark_cmd = '%s %s --gpus %s' % (
           mxnet.GetEnvironmentVars(vm), mx_benchmark_cmd,
           ','.join(str(n) for n in range(gpus)))

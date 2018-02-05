@@ -74,7 +74,7 @@ def Install(vm):
                             else GPU_DEFAULT_PACKAGE)
 
   if FLAGS.tf_device == 'gpu':
-    vm.Install('cuda_toolkit_8')
+    vm.Install('cuda_toolkit')
     vm.Install('cudnn')
 
   vm.Install('pip')

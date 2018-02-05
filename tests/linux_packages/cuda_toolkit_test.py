@@ -11,21 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.packages.cuda_toolkit_8."""
+"""Tests for perfkitbenchmarker.packages.cuda_toolkit."""
 
 import mock
 import os
 import unittest
 
 from perfkitbenchmarker import test_util
-from perfkitbenchmarker.linux_packages import cuda_toolkit_8
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 
 AUTOBOOST_ENABLED_DICT = {'autoboost': True, 'autoboost_default': True}
 AUTOBOOST_DISABLED_DICT = {'autoboost': False, 'autoboost_default': False}
 
 
-class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
+class CudaToolkitTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
     path = os.path.join(os.path.dirname(__file__), '../data',
@@ -36,7 +36,7 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
   def testQueryNumberOfGpus(self):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(return_value=("count\n8", None))
-    self.assertEqual(8, cuda_toolkit_8.QueryNumberOfGpus(vm))
+    self.assertEqual(8, cuda_toolkit.QueryNumberOfGpus(vm))
 
   def testQueryGpuClockSpeed(self):
     vm = mock.MagicMock()
@@ -44,7 +44,7 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
         return_value=("clocks.applications.graphics [MHz], "
                       "clocks.applications.memory [Mhz]\n"
                       "324 MHz, 527 MHz", None))
-    self.assertEqual((324, 527), cuda_toolkit_8.QueryGpuClockSpeed(vm, 3))
+    self.assertEqual((324, 527), cuda_toolkit.QueryGpuClockSpeed(vm, 3))
     vm.RemoteCommand.assert_called_with(
         "sudo nvidia-smi "
         "--query-gpu=clocks.applications.memory,"
@@ -54,7 +54,7 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(
         return_value=(self.nvidia_smi_output, ''))
-    self.assertEqual('375.66', cuda_toolkit_8.GetDriverVersion(vm))
+    self.assertEqual('375.66', cuda_toolkit.GetDriverVersion(vm))
 
   def testGetPeerToPeerTopology(self):
     path = os.path.join(os.path.dirname(__file__), '../data',
@@ -67,7 +67,7 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
         return_value=(nvidia_smi_output, ''))
 
     expected = 'Y Y N N;Y Y N N;N N Y Y;N N Y Y'
-    actual = cuda_toolkit_8.GetPeerToPeerTopology(vm)
+    actual = cuda_toolkit.GetPeerToPeerTopology(vm)
     self.assertEqual(expected, actual)
     vm.RemoteCommand.assert_called_with('nvidia-smi topo -p2p r',
                                         should_log=True)
@@ -82,7 +82,7 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm.RemoteCommand = mock.MagicMock(
         return_value=(nvidia_smi_output, ''))
     self.assertEqual({'autoboost': None, 'autoboost_default': None},
-                     cuda_toolkit_8.QueryAutoboostPolicy(vm, 0))
+                     cuda_toolkit.QueryAutoboostPolicy(vm, 0))
 
   def testQueryAutoboostOn(self):
     path = os.path.join(os.path.dirname(__file__), '../data',
@@ -93,7 +93,7 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm.RemoteCommand = mock.MagicMock(
         return_value=(nvidia_smi_output, ''))
     self.assertEqual({'autoboost': False, 'autoboost_default': True},
-                     cuda_toolkit_8.QueryAutoboostPolicy(vm, 0))
+                     cuda_toolkit.QueryAutoboostPolicy(vm, 0))
 
   def testGetGpuTypeP100(self):
     path = os.path.join(os.path.dirname(__file__), '../data',
@@ -103,8 +103,8 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(
         return_value=(nvidia_smi_output, ''))
-    self.assertEqual(cuda_toolkit_8.NVIDIA_TESLA_P100,
-                     cuda_toolkit_8.GetGpuType(vm))
+    self.assertEqual(cuda_toolkit.NVIDIA_TESLA_P100,
+                     cuda_toolkit.GetGpuType(vm))
 
   def testGetGpuTypeK80(self):
     path = os.path.join(os.path.dirname(__file__), '../data',
@@ -114,8 +114,8 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(
         return_value=(nvidia_smi_output, ''))
-    self.assertEqual(cuda_toolkit_8.NVIDIA_TESLA_K80,
-                     cuda_toolkit_8.GetGpuType(vm))
+    self.assertEqual(cuda_toolkit.NVIDIA_TESLA_K80,
+                     cuda_toolkit.GetGpuType(vm))
 
   def testHetergeneousGpuTypes(self):
     path = os.path.join(os.path.dirname(__file__), '../data',
@@ -125,12 +125,12 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(
         return_value=(nvidia_smi_output, ''))
-    self.assertRaisesRegexp(cuda_toolkit_8.HeterogeneousGpuTypesException,
+    self.assertRaisesRegexp(cuda_toolkit.HeterogeneousGpuTypesException,
                             'PKB only supports one type of gpu per VM',
-                            cuda_toolkit_8.GetGpuType, vm)
+                            cuda_toolkit.GetGpuType, vm)
 
-  @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
-  @mock.patch(cuda_toolkit_8.__name__ + '.QueryAutoboostPolicy',
+  @mock.patch(cuda_toolkit.__name__ + '.QueryNumberOfGpus', return_value=2)
+  @mock.patch(cuda_toolkit.__name__ + '.QueryAutoboostPolicy',
               return_value=AUTOBOOST_ENABLED_DICT)
   def testSetAutoboostPolicyWhenValuesAreTheSame(self,
                                                  query_autoboost_mock,
@@ -138,12 +138,12 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock()
 
-    cuda_toolkit_8.SetAutoboostDefaultPolicy(vm, True)
+    cuda_toolkit.SetAutoboostDefaultPolicy(vm, True)
     query_autoboost_mock.assetCalled()
     vm.RemoteCommand.assert_not_called()
 
-  @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
-  @mock.patch(cuda_toolkit_8.__name__ + '.QueryAutoboostPolicy',
+  @mock.patch(cuda_toolkit.__name__ + '.QueryNumberOfGpus', return_value=2)
+  @mock.patch(cuda_toolkit.__name__ + '.QueryAutoboostPolicy',
               return_value=AUTOBOOST_DISABLED_DICT)
   def testSetAutoboostPolicyWhenValuesAreDifferent(self,
                                                    query_autoboost_mock,
@@ -151,12 +151,12 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock()
 
-    cuda_toolkit_8.SetAutoboostDefaultPolicy(vm, True)
+    cuda_toolkit.SetAutoboostDefaultPolicy(vm, True)
     query_autoboost_mock.assetCalled()
     self.assertEqual(2, vm.RemoteCommand.call_count)
 
-  @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
-  @mock.patch(cuda_toolkit_8.__name__ + '.QueryGpuClockSpeed',
+  @mock.patch(cuda_toolkit.__name__ + '.QueryNumberOfGpus', return_value=2)
+  @mock.patch(cuda_toolkit.__name__ + '.QueryGpuClockSpeed',
               return_value=(2505, 875))
   def testSetClockSpeedWhenValuesAreTheSame(self,
                                             query_clock_speed_mock,
@@ -164,12 +164,12 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock()
 
-    cuda_toolkit_8.SetGpuClockSpeed(vm, 2505, 875)
+    cuda_toolkit.SetGpuClockSpeed(vm, 2505, 875)
     query_clock_speed_mock.assetCalled()
     vm.RemoteCommand.assert_not_called()
 
-  @mock.patch(cuda_toolkit_8.__name__ + '.QueryNumberOfGpus', return_value=2)
-  @mock.patch(cuda_toolkit_8.__name__ + '.QueryGpuClockSpeed',
+  @mock.patch(cuda_toolkit.__name__ + '.QueryNumberOfGpus', return_value=2)
+  @mock.patch(cuda_toolkit.__name__ + '.QueryGpuClockSpeed',
               return_value=(2505, 875))
   def testSetClockSpeedWhenValuesAreDifferent(self,
                                               query_clock_speed_mock,
@@ -177,7 +177,7 @@ class CudaToolkit8TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock()
 
-    cuda_toolkit_8.SetGpuClockSpeed(vm, 2505, 562)
+    cuda_toolkit.SetGpuClockSpeed(vm, 2505, 562)
     query_clock_speed_mock.assetCalled()
     self.assertEqual(2, vm.RemoteCommand.call_count)
 
