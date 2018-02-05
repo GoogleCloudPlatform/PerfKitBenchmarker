@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
 # limitations under the License.
 
 
-"""Module containing CUDA toolkit 8 installation and cleanup functions.
+"""Module containing CUDA toolkit installation and cleanup functions.
 
-This module installs cuda toolkit 8 from NVIDIA, configures gpu clock speeds
+This module installs cuda toolkit from NVIDIA, configures gpu clock speeds
 and autoboost settings, and exposes a method to collect gpu metadata. Currently
 Tesla K80 and P100 gpus are supported, provided that there is only a single
 type of gpu per system.
@@ -64,18 +64,17 @@ flags.DEFINE_string('cuda_toolkit_installation_dir', '/usr/local/cuda',
                     'here. If it is already installed, the installation at '
                     'this path will be used.')
 
+flags.DEFINE_enum('cuda_toolkit_version', '8.0', ['8.0', '9.0'],
+                  'Version of CUDA Toolkit to install')
+
 FLAGS = flags.FLAGS
 
 
-CUDA_TOOLKIT_UBUNTU = 'cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb'
-CUDA_TOOLKIT_PATCH = 'cuda-repo-ubuntu1604-8-0-local-cublas-performance-update_8.0.61-1_amd64-deb'
+CUDA_9_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb'
+CUDA_9_0_PATCH = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/patches/1/cuda-repo-ubuntu1604-9-0-local-cublas-performance-update_1.0-1_amd64-deb'
 
-CUDA_TOOLKIT_UBUNTU_URL = (
-    'https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers'
-    '/%s' % CUDA_TOOLKIT_UBUNTU)
-CUDA_TOOLKIT_PATCH_URL = (
-    'https://developer.nvidia.com/compute/cuda/8.0/Prod2/patches/2'
-    '/%s' % CUDA_TOOLKIT_PATCH)
+CUDA_8_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb'
+CUDA_8_PATCH = 'https://developer.nvidia.com/compute/cuda/8.0/Prod2/patches/2/cuda-repo-ubuntu1604-8-0-local-cublas-performance-update_8.0.61-1_amd64-deb'
 
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
@@ -96,6 +95,10 @@ class UnsupportedGpuTypeException(Exception):
   pass
 
 
+class UnsupportedCudaVersionException(Exception):
+  pass
+
+
 def SmiPath():
   return posixpath.join(flags.cuda_toolkit_installation_dir,
                         'nvidia-smi')
@@ -110,6 +113,7 @@ def GetMetadata(vm):
   metadata = {}
   clock_speeds = QueryGpuClockSpeed(vm, 0)
   autoboost_policy = QueryAutoboostPolicy(vm, 0)
+  metadata['cuda_toolkit_version'] = FLAGS.cuda_toolkit_version
   metadata['gpu_memory_clock'] = clock_speeds[0]
   metadata['gpu_graphics_clock'] = clock_speeds[1]
   metadata['gpu_autoboost'] = autoboost_policy['autoboost']
@@ -365,50 +369,70 @@ def DoPostInstallActions(vm):
   SetAndConfirmGpuClocks(vm)
 
 
-def _InstallCudaPatch(vm):
-  """Installs CUDA Toolkit 8 patch from NVIDIA.
+def _InstallCudaPatch(vm, patch_url):
+  """Installs CUDA Toolkit patch from NVIDIA.
 
   args:
     vm: VM to install patch on
+    path_url: url of the CUDA patch to install
   """
   # Need to append .deb to package name because the file downloaded from
   # NVIDIA is missing the .deb extension.
-  fixed_package_name = CUDA_TOOLKIT_PATCH + '.deb'
-  vm.RemoteCommand('wget -q %s -O %s' % (CUDA_TOOLKIT_PATCH_URL,
-                                         fixed_package_name))
+  basename = posixpath.basename(patch_url) + '.deb'
+  vm.RemoteCommand('wget -q %s -O %s' % (patch_url,
+                                         basename))
   vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo dpkg -i %s' % fixed_package_name)
-  vm.RemoteCommand('sudo apt-get upgrade -y cuda-8-0')
+  vm.RemoteCommand('sudo dpkg -i %s' % basename)
+  vm.RemoteCommand('sudo apt-get upgrade -y cuda')
 
 
-@vm_util.Retry(timeout=900)
-def _InstallCuda(vm):
-  """Installs CUDA Toolkit from NVIDIA, with retry.
+def _InstallCuda8(vm):
+  """Installs CUDA Toolkit from NVIDIA.
 
-  Steps taken from section 3.6 found here:
-  http://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html
+  args:
+    vm: VM to install CUDA on
   """
   # Need to append .deb to package name because the file downloaded from
   # NVIDIA is missing the .deb extension.
-  fixed_package_name = CUDA_TOOLKIT_UBUNTU + '.deb'
-  vm.RemoteCommand('wget -q %s -O %s' % (CUDA_TOOLKIT_UBUNTU_URL,
-                                         fixed_package_name))
-  vm.RemoteCommand('sudo dpkg -i %s' % fixed_package_name)
+  basename = posixpath.basename(CUDA_8_TOOLKIT) + '.deb'
+  vm.RemoteCommand('wget -q %s -O %s' % (CUDA_8_TOOLKIT,
+                                         basename))
+  vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo apt-get install -y cuda-8-0')
+  vm.RemoteCommand('sudo apt-get install -y cuda')
+  _InstallCudaPatch(vm, CUDA_8_PATCH)
+
+
+def _InstallCuda90(vm):
+  """Installs CUDA Toolkit 9.0 from NVIDIA.
+
+  args:
+    vm: VM to install CUDA on
+  """
+  basename = posixpath.basename(CUDA_9_0_TOOLKIT) + '.deb'
+  vm.RemoteCommand('wget -q %s -O %s' % (CUDA_9_0_TOOLKIT,
+                                         basename))
+  vm.RemoteCommand('sudo dpkg -i %s' % basename)
+  vm.RemoteCommand('sudo apt-key add /var/cuda-repo-9-0-local/7fa2af80.pub')
+  vm.RemoteCommand('sudo apt-get update')
+  vm.RemoteCommand('sudo apt-get install -y cuda')
+  _InstallCudaPatch(vm, CUDA_9_0_PATCH)
 
 
 def AptInstall(vm):
-  """Installs CUDA toolkit 8 on the VM if not already installed"""
+  """Installs CUDA toolkit on the VM if not already installed"""
   if _CheckNvidiaSmiExists(vm):
     DoPostInstallActions(vm)
     return
 
   vm.Install('build_tools')
   vm.Install('wget')
-  _InstallCuda(vm)
-  _InstallCudaPatch(vm)
-  vm.Reboot()
+  if FLAGS.cuda_toolkit_version == '8.0':
+    _InstallCuda8(vm)
+  elif FLAGS.cuda_toolkit_version == '9.0':
+    _InstallCuda90(vm)
+  else:
+    raise UnsupportedCudaVersionException()
   DoPostInstallActions(vm)
   # NVIDIA CUDA Profile Tools Interface.
   # This library provides advanced profiling support
@@ -437,5 +461,5 @@ def Uninstall(vm):
   Note that reinstallation does not work correctly, i.e. you cannot reinstall
   CUDA by calling _Install() again.
   """
-  vm.RemoteCommand('rm %s' % CUDA_TOOLKIT_UBUNTU)
+  vm.RemoteCommand('rm -f cuda-repo-ubuntu1604*')
   vm.RemoteCommand('sudo rm -rf %s' % FLAGS.cuda_toolkit_installation_dir)
