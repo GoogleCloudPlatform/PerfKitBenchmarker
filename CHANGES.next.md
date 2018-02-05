@@ -80,3 +80,4 @@
 - Fixed a bug getting the correct number of layers in MXNet.
 - Gcloud alpha version no longer required for GPU and minimum CPU platform.
 - Backfill image on GCE if empty.
+- Remove logging of empty environment variables in vm_util.IssueCommand.
