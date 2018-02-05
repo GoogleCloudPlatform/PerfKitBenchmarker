@@ -35,7 +35,7 @@ def AptInstall(vm):
   """
   vm.Install('wget')
   vm.InstallPackages('libopenmpi-dev numactl')
-  vm.Install('cuda_toolkit_8')
+  vm.Install('cuda_toolkit')
   vm.RemoteCommand('cd %s && wget %s' % (INSTALL_DIR, HPCG_URL))
   vm.RemoteCommand('cd %s && tar xvf %s' % (INSTALL_DIR, HPCG_TAR))
 

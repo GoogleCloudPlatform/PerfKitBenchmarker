@@ -28,7 +28,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import cuda_toolkit_8
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import tensorflow
 
 FLAGS = flags.FLAGS
@@ -214,7 +214,7 @@ def _CreateMetadataDict(benchmark_spec, model, batch_size, num_gpus):
   vm = benchmark_spec.vms[0]
   metadata = dict()
   if benchmark_spec.device == GPU:
-    metadata.update(cuda_toolkit_8.GetMetadata(vm))
+    metadata.update(cuda_toolkit.GetMetadata(vm))
     metadata['num_gpus'] = num_gpus
   metadata['model'] = model
   metadata['batch_size'] = batch_size
@@ -329,7 +329,7 @@ def _RunModelOnVm(vm, model, benchmark_spec, args='', job_name=''):
           data_format=benchmark_spec.data_format,
           forward_only=benchmark_spec.forward_only))
   if benchmark_spec.device == GPU:
-    num_gpus = cuda_toolkit_8.QueryNumberOfGpus(vm)
+    num_gpus = cuda_toolkit.QueryNumberOfGpus(vm)
     tf_cnn_benchmark_cmd = '{env} {cmd} --num_gpus={gpus}'.format(
         env=tensorflow.GetEnvironmentVars(vm),
         cmd=tf_cnn_benchmark_cmd,
