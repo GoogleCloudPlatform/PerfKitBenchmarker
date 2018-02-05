@@ -286,7 +286,8 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
   """
-  logging.debug('Environment variables: %s' % env)
+  if env:
+    logging.debug('Environment variables: %s' % env)
 
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
