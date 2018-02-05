@@ -341,27 +341,45 @@ class _EdwServiceSpec(spec.BaseSpec):
     """
     result = super(_EdwServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'type': (option_decoders.StringDecoder, {
-            'default': 'redshift',
-            'none_ok': False}),
-        'cluster_identifier': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True}),
-        'username': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True}),
-        'password': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True}),
-        'node_type': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True}),
-        'node_count': (option_decoders.IntDecoder, {
-            'default': edw_service.DEFAULT_NUMBER_OF_NODES,
-            'min': edw_service.DEFAULT_NUMBER_OF_NODES}),
-        'snapshot': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True})
+      'type': (option_decoders.StringDecoder, {
+        'default': 'redshift',
+        'none_ok': False}),
+      'cluster_identifier': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True}),
+      'endpoint': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True}),
+      'concurrency': (option_decoders.IntDecoder, {
+        'default': 5,
+        'none_ok': True}),
+      'endpoint': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True}),
+      'db': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True}),
+      'user': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True}),
+      'password': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True}),
+      'node_type': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True}),
+      'node_count': (option_decoders.IntDecoder, {
+        'default': edw_service.DEFAULT_NUMBER_OF_NODES,
+        'min': edw_service.DEFAULT_NUMBER_OF_NODES}),
+      'snapshot': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True}),
+      'cluster_subnet_group': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True}),
+      'cluster_parameter_group': (option_decoders.StringDecoder, {
+        'default': None,
+        'none_ok': True})
     })
     return result
 
@@ -378,15 +396,22 @@ class _EdwServiceSpec(spec.BaseSpec):
       provided config values.
     """
     super(_EdwServiceSpec, cls)._ApplyFlags(config_values, flag_values)
-
+    # TODO(saksena): Add cluster_subnet_group and cluster_parameter_group flags
     # Restoring from a snapshot, so defer to the user supplied cluster details
     if flag_values['edw_service_cluster_snapshot'].present:
-      config_values['snapshot'] = flag_values[
-          'edw_service_cluster_snapshot']._value
-      config_values['username'] = flag_values[
-          'edw_service_cluster_user']._value
-      config_values['password'] = flag_values[
-          'edw_service_cluster_password']._value
+      config_values['snapshot'] = flag_values.edw_service_cluster_snapshot
+    if flag_values['edw_service_cluster_identifier'].present:
+      config_values['cluster_identifier'] = flag_values.edw_service_cluster_identifier
+    if flag_values['edw_service_endpoint'].present:
+      config_values['endpoint'] = flag_values.edw_service_endpoint
+    if flag_values['edw_service_cluster_concurrency'].present:
+      config_values['concurrency'] = flag_values.edw_service_cluster_concurrency
+    if flag_values['edw_service_cluster_db'].present:
+      config_values['db'] = flag_values.edw_service_cluster_db
+    if flag_values['edw_service_cluster_user'].present:
+      config_values['user'] = flag_values.edw_service_cluster_user
+    if flag_values['edw_service_cluster_password'].present:
+      config_values['password'] = flag_values.edw_service_cluster_password
 
 
 class _PerCloudConfigSpec(spec.BaseSpec):

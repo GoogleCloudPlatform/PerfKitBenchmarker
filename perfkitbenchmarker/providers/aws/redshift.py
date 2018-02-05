@@ -55,7 +55,7 @@ def AddTags(resource_arn, region, **kwargs):
 
 
 def GetDefaultRegion():
-  """Get the default region for the aws account."""
+  """Utility method to supply the default region."""
   cmd_prefix = util.AWS_PREFIX
   default_region_cmd = cmd_prefix + ['configure', 'get', 'region']
   stdout, _, _ = vm_util.IssueCommand(default_region_cmd)
@@ -157,6 +157,7 @@ class Redshift(edw_service.EdwService):
 
   def __init__(self, edw_service_spec):
     super(Redshift, self).__init__(edw_service_spec)
+    # pkb setup attribute
     self.project = None
     self.cmd_prefix = util.AWS_PREFIX
     if FLAGS.zones:
@@ -165,27 +166,20 @@ class Redshift(edw_service.EdwService):
     else:
       self.region = GetDefaultRegion()
     self.cmd_prefix += ['--region', self.region]
-    self.arn = ''
-    self.cluster_identifier = 'pkb-' + FLAGS.run_uri
+
+    # Redshift specific attribute (see if they can be set)
     self.cluster_subnet_group = None
     self.cluster_parameter_group = None
-    self.concurrency = FLAGS.edw_service_cluster_concurrency
-    self.endpoint = ''
-    self.db = ''
-    self.user = ''
-    self.password = ''
-    self.supports_wait_on_delete = True
-    self.snapshot = None
+    self.arn = ''
 
   def _Create(self):
-    """Create a new redshift cluster."""
+    """Create the redshift cluster resource."""
     self.cluster_subnet_group = RedshiftClusterSubnetGroup(self.spec.subnet_id,
                                                            self.cmd_prefix)
     self.cluster_parameter_group = RedshiftClusterParameterGroup(
         self.concurrency, self.cmd_prefix)
-    if self.spec.snapshot:
-      self.snapshot = self.spec.snapshot
-      self.Restore(self.spec.snapshot, self.cluster_identifier)
+    if self.snapshot:
+      self.Restore(self.snapshot, self.cluster_identifier)
     else:
       # TODO(saksena@): Implmement the new Redshift cluster creation
       raise NotImplementedError()
@@ -232,20 +226,17 @@ class Redshift(edw_service.EdwService):
     Returns:
       None
     """
-    if not (FLAGS.edw_service_cluster_user and
-            FLAGS.edw_service_cluster_password and
-            FLAGS.edw_service_cluster_db):
+
+    if not (self.user and self.password and self.db):
       raise errors.MissingOption('Need the db, user and password set for '
                                  'restoring a cluster')
-    else:
-      self.db = FLAGS.edw_service_cluster_db
-      self.user = FLAGS.edw_service_cluster_user
-      self.password = FLAGS.edw_service_cluster_password
 
     if self._ValidateSnapshot(snapshot_identifier):
       node_type, node_count = self._SnapshotDetails(snapshot_identifier)
-      self.spec.node_type = node_type
-      self.spec.node_count = node_count
+      # For a restored cluster update the cluster shape and size based on the
+      # snapshot's configuration
+      self.node_type = node_type
+      self.node_count = node_count
       cmd = self.cmd_prefix + ['redshift', 'restore-from-cluster-snapshot',
                                '--cluster-identifier', cluster_identifier,
                                '--snapshot-identifier', snapshot_identifier,
