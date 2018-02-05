@@ -33,7 +33,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import cuda_toolkit_8
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import hpcg
 
 FLAGS = flags.FLAGS
@@ -136,7 +136,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   gpus_per_node = (FLAGS.hpcg_gpus_per_node or
-                   cuda_toolkit_8.QueryNumberOfGpus(benchmark_spec.vms[0]))
+                   cuda_toolkit.QueryNumberOfGpus(benchmark_spec.vms[0]))
   cpus_per_rank = int(benchmark_spec.vms[0].num_cpus / gpus_per_node)
   num_vms = len(benchmark_spec.vms)
   total_gpus = gpus_per_node * num_vms
@@ -186,7 +186,7 @@ def _PrepareHpcg(vm):
   logging.info('Installing HPCG on %s', vm)
   vm.Install('hpcg')
   vm.AuthenticateVm()
-  cuda_toolkit_8.SetAndConfirmGpuClocks(vm)
+  cuda_toolkit.SetAndConfirmGpuClocks(vm)
 
 
 def Prepare(benchmark_spec):
@@ -216,7 +216,7 @@ def _CreateMetadataDict(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   metadata = dict()
-  metadata.update(cuda_toolkit_8.GetMetadata(vm))
+  metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['num_nodes'] = len(benchmark_spec.vms)
   metadata['cpus_per_rank'] = int(benchmark_spec.cpus_per_rank)
   metadata['total_gpus'] = int(benchmark_spec.total_gpus)

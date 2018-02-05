@@ -9,6 +9,7 @@
   able to control the version.
 - Changed default Tensorflow package when using CPUs to an Intel CPU-optimized
   build.
+- Renamed cuda_toolkit_8 to cuda_toolkit,
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers

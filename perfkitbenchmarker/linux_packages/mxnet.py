@@ -59,7 +59,7 @@ def Install(vm):
   vm.Install('pip')
   vm.InstallPackages('libatlas-base-dev')
   if FLAGS.mx_device == 'gpu':
-    vm.Install('cuda_toolkit_8')
+    vm.Install('cuda_toolkit')
     vm.RemoteCommand('sudo pip install mxnet-cu80', should_log=True)
   elif FLAGS.mx_device == 'cpu':
     vm.RemoteCommand('sudo pip install mxnet', should_log=True)

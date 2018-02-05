@@ -22,7 +22,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import regex_util
-from perfkitbenchmarker.linux_packages import cuda_toolkit_8
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 DEFAULT_RANGE_START = 1 << 26  # 64 MB
 DEFAULT_RANGE_STEP = 1 << 26  # 64 MB
@@ -100,7 +100,7 @@ def CheckPrerequisites(benchmark_config):
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  cuda_toolkit_8.CheckPrerequisites()
+  cuda_toolkit.CheckPrerequisites()
 
 
 def Prepare(benchmark_spec):
@@ -111,7 +111,7 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  vm.Install('cuda_toolkit_8')
+  vm.Install('cuda_toolkit')
 
 
 def _ParseDeviceInfo(test_output):
@@ -269,13 +269,13 @@ def Run(benchmark_spec):
   # Note:  The clock speed is set in this function rather than Prepare()
   # so that the user can perform multiple runs with a specified
   # clock speed without having to re-prepare the VM.
-  cuda_toolkit_8.SetAndConfirmGpuClocks(vm)
+  cuda_toolkit.SetAndConfirmGpuClocks(vm)
   num_iterations = FLAGS.gpu_pcie_bandwidth_iterations
   mode = FLAGS.gpu_pcie_bandwidth_mode
   transfer_size_range = FLAGS.gpu_pcie_bandwidth_transfer_sizes
   raw_results = []
   metadata = {}
-  metadata.update(cuda_toolkit_8.GetMetadata(vm))
+  metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['num_iterations'] = num_iterations
   metadata['mode'] = mode
   if mode == 'range':
@@ -284,7 +284,7 @@ def Run(benchmark_spec):
     metadata['range_step'] = transfer_size_range[2]
 
   run_command = ('%s/extras/demo_suite/bandwidthTest --device=all' %
-                 cuda_toolkit_8.CUDA_TOOLKIT_INSTALL_DIR)
+                 cuda_toolkit.CUDA_TOOLKIT_INSTALL_DIR)
   if mode == 'range':
     run_command += (' --mode=range --start={0} --end={1} --increment={2}'
                     .format(transfer_size_range[0], transfer_size_range[1],
@@ -306,4 +306,4 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  vm.Uninstall('cuda_toolkit_8')
+  vm.Uninstall('cuda_toolkit')
