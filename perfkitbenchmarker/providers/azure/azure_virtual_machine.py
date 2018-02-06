@@ -405,10 +405,22 @@ class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
                                    linux_virtual_machine.RhelMixin):
   IMAGE_URN = 'RedHat:RHEL:7.2:latest'
 
+  def __init__(self, vm_spec):
+    super(RhelBasedAzureVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
+
 
 class CentosBasedAzureVirtualMachine(AzureVirtualMachine,
                                      linux_virtual_machine.Centos7Mixin):
   IMAGE_URN = 'OpenLogic:CentOS:7.4:latest'
+
+  def __init__(self, vm_spec):
+    super(CentosBasedAzureVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
 
 
 class WindowsAzureVirtualMachine(AzureVirtualMachine,
