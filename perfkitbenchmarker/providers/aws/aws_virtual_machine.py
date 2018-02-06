@@ -749,9 +749,9 @@ class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
     self.user_name = FLAGS.aws_user_name if user_name_set else 'centos'
 
     # package_config
-    self.python_package_config = 'python27'
-    self.python_dev_package_config = 'python27-devel'
-    self.python_pip_package_config = 'python27-pip'
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
 
 
 class WindowsAwsVirtualMachine(AwsVirtualMachine,
