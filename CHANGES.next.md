@@ -20,6 +20,7 @@
   called a specified number of times
 - Added cuda_toolkit_version flag
 - Added support for CUDA Toolkit 9.0
+- Added MXNet support for CUDA Toolkit 9.0
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
