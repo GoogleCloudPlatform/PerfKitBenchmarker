@@ -63,10 +63,12 @@ NUM_LOCAL_VOLUMES = {
     'i3.2xlarge': 1, 'i3.4xlarge': 2, 'i3.8xlarge': 4, 'i3.16xlarge': 8
 }
 DRIVE_START_LETTER = 'b'
-INSTANCE_EXISTS_STATUSES = frozenset(
-    ['pending', 'running', 'stopping', 'stopped'])
-INSTANCE_DELETED_STATUSES = frozenset(['shutting-down', 'terminated'])
-INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
+TERMINATED = 'terminated'
+INSTANCE_EXISTS_STATUSES = frozenset(['running', 'stopping', 'stopped'])
+INSTANCE_DELETED_STATUSES = frozenset(['shutting-down', TERMINATED])
+INSTANCE_TRANSITIONAL_STATUSES = frozenset(['pending'])
+INSTANCE_KNOWN_STATUSES = (INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
+                           | INSTANCE_TRANSITIONAL_STATUSES)
 HOST_EXISTS_STATES = frozenset(
     ['available', 'under-assessment', 'permanent-failure'])
 HOST_RELEASED_STATES = frozenset(['released', 'released-permanent-failure'])
@@ -633,6 +635,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     status = instances[0]['State']['Name']
     self.id = instances[0]['InstanceId']
     assert status in INSTANCE_KNOWN_STATUSES, status
+    if (status == TERMINATED and
+        instances[0]['StateReason']['Code'] ==
+        'Server.InsufficientInstanceCapacity'):
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+          instances[0]['StateReason']['Message'])
     return status in INSTANCE_EXISTS_STATUSES
 
   def CreateScratchDisk(self, disk_spec):
@@ -756,7 +763,7 @@ class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
 
 class WindowsAwsVirtualMachine(AwsVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
-
+  """Support for Windows machines on AWS."""
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
 
   def __init__(self, vm_spec):
