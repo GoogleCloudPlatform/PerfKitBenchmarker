@@ -90,8 +90,6 @@ flags.DEFINE_enum('tf_device', GPU, [CPU, GPU],
                   'Device to use for computation: cpu or gpu')
 flags.DEFINE_enum('tf_data_format', 'NCHW', ['NCHW', 'NHWC'], '''Data layout to
                   use: NHWC (TF native) or NCHW (cuDNN native).''')
-flags.DEFINE_boolean('tf_use_nccl', True,
-                     'Whether to use nccl all-reduce primitives where possible')
 flags.DEFINE_boolean('tf_distortions', True,
                      '''Enable/disable distortions during image preprocessing.
                      These include bbox and color distortions.''')
@@ -160,7 +158,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.local_parameter_device = FLAGS.tf_local_parameter_device
   benchmark_spec.device = FLAGS.tf_device
   benchmark_spec.data_format = FLAGS.tf_data_format
-  benchmark_spec.use_nccl = FLAGS.tf_use_nccl
   benchmark_spec.distortions = FLAGS.tf_distortions
   benchmark_spec.benchmarks_commit_hash = FLAGS.tf_benchmarks_commit_hash
   benchmark_spec.tensorflow_pip_package = FLAGS.tf_pip_package
@@ -224,7 +221,6 @@ def _CreateMetadataDict(benchmark_spec, model, batch_size, num_gpus):
   metadata['local_parameter_device'] = benchmark_spec.local_parameter_device
   metadata['device'] = benchmark_spec.device
   metadata['data_format'] = benchmark_spec.data_format
-  metadata['use_nccl'] = benchmark_spec.use_nccl
   metadata['distortions'] = benchmark_spec.distortions
   metadata['benchmarks_commit_hash'] = benchmark_spec.benchmarks_commit_hash
   metadata['tensorflow_version'] = benchmark_spec.tensorflow_version
@@ -312,7 +308,6 @@ def _RunModelOnVm(vm, model, benchmark_spec, args='', job_name=''):
       '--model={model} '
       '--data_name={data_name} '
       '--variable_update={variable_update} '
-      '--use_nccl={use_nccl} '
       '--distortions={distortions} '
       '--device={device} '
       '--data_format={data_format} '
@@ -323,7 +318,6 @@ def _RunModelOnVm(vm, model, benchmark_spec, args='', job_name=''):
           model=model,
           data_name=benchmark_spec.data_name,
           variable_update=benchmark_spec.variable_update,
-          use_nccl=benchmark_spec.use_nccl,
           distortions=benchmark_spec.distortions,
           device=benchmark_spec.device,
           data_format=benchmark_spec.data_format,

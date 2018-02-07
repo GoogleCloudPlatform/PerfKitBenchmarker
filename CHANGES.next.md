@@ -85,3 +85,5 @@
 - Backfill image on GCE if empty.
 - Remove logging of empty environment variables in vm_util.IssueCommand.
 - Explicitly state python package names for RedHat and Centos in AWS and Azure.
+- Remove flag "tf_use_nccl" because the latest TensorFlow benchmark removed this
+  argument.
