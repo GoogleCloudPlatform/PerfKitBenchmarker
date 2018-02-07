@@ -56,7 +56,7 @@
 - Added `copy_benchmark_single_file_mb` flag for single file support.
 - Record guest system information.
 - Support for static edw clusters.
-- Add more granularity to FAILED benchmarks with FailedSubstatus.
+- Add more granularity to FAILED benchmarks with FailedSubstatus (GCP and AWS).
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
