@@ -157,6 +157,12 @@ class Benchmarks(object):
   class RunError(Error):
     pass
 
+  class InsufficientCapacityCloudFailure(Error):
+    pass
+
+  class QuotaFailure(Error):
+    pass
+
 
 class Resource(object):
   """Errors related to resource creation and deletion."""
@@ -197,6 +203,7 @@ class Config(object):
 
 class Juju(object):
   """Errors related to the Juju OS_TYPE."""
+
   class TimeoutException(Error):
     pass
 

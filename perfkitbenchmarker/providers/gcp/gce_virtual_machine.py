@@ -62,6 +62,8 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
                     'potential stockout scenario.')
+_QUOTA_EXCEEDED_REGEX = re.compile('Quota \'.*\' exceeded.')
+QUOTA_EXCEEDED_MESSAGE = ('Creation failed due to quota exceeded: ')
 _GPU_TYPE_TO_INTERAL_NAME_MAP = {
     'k80': 'nvidia-tesla-k80',
     'p100': 'nvidia-tesla-p100',
@@ -355,7 +357,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['metadata'] = ','.join(
         ['%s=%s' % (k, v) for k, v in metadata.iteritems()])
 
-    # TODO: If GCE one day supports live migration on GPUs this can be revised.
+    # TODO(gareth-ferneyhough): If GCE one day supports live migration on GPUs
+    #                           this can be revised.
     if (FLAGS['gce_migrate_on_maintenance'].present and
         FLAGS.gce_migrate_on_maintenance and self.gpu_count):
       raise errors.Config.InvalidValue(
@@ -399,7 +402,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if (not self.use_dedicated_host and retcode and
         _INSUFFICIENT_HOST_CAPACITY in stderr):
       logging.error(STOCKOUT_MESSAGE)
-      raise errors.Resource.CreationError(STOCKOUT_MESSAGE)
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(STOCKOUT_MESSAGE)
+    if retcode and _QUOTA_EXCEEDED_REGEX.search(stderr):
+      message = QUOTA_EXCEEDED_MESSAGE + stderr
+      logging.error(message)
+      raise errors.Benchmarks.QuotaFailure(message)
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
