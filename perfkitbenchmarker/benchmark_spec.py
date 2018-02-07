@@ -107,6 +107,8 @@ class BenchmarkSpec(object):
     self.name = benchmark_module.BENCHMARK_NAME
     self.uid = benchmark_uid
     self.status = benchmark_status.SKIPPED
+    self.failed_substatus = None
+    self.status_detail = None
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
     self.vms = []

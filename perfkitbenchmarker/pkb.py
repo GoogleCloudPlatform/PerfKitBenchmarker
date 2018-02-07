@@ -426,6 +426,8 @@ def _WriteCompletionStatusFile(benchmark_specs, status_file):
   {
     "name": <benchmark name>,
     "status": <completion status>,
+    "failed_substatus": <failed substatus>,
+    "status_detail": <descriptive string (if present)>,
     "flags": <flags dictionary>
   }
 
@@ -438,6 +440,10 @@ def _WriteCompletionStatusFile(benchmark_specs, status_file):
     status_dict = collections.OrderedDict()
     status_dict['name'] = spec.name
     status_dict['status'] = spec.status
+    if spec.failed_substatus:
+      status_dict['failed_substatus'] = spec.failed_substatus
+    if spec.status_detail:
+      status_dict['status_detail'] = spec.status_detail
     status_dict['flags'] = spec.config.flags
     status_file.write(json.dumps(status_dict) + '\n')
 
@@ -633,6 +639,18 @@ def RunBenchmark(spec, collector):
               detailed_timer.GenerateSamples(), spec.name, spec)
 
       except Exception as e:
+        # Log specific type of failure, if known
+        # TODO(dlott) Move to exception chaining with Python3 support
+        if (isinstance(e, errors.Benchmarks.InsufficientCapacityCloudFailure)
+            or 'InsufficientCapacityCloudFailure' in str(e)):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY)
+          spec.status_detail = str(e)
+        elif (isinstance(e, errors.Benchmarks.QuotaFailure)
+              or 'QuotaFailure' in str(e)):
+          spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
+          spec.status_detail = str(e)
+
         # Resource cleanup (below) can take a long time. Log the error to give
         # immediate feedback, then re-throw.
         logging.exception('Error during benchmark %s', spec.name)
@@ -792,12 +810,13 @@ def SetUpPKB():
 
 
 def RunBenchmarkTasksInSeries(tasks):
-  """
-  Runs benchmarks in series.
+  """Runs benchmarks in series.
 
-  Arguments: list of tuples of task: [(RunBenchmarkTask, (spec,), {}),]
+  Arguments:
+    tasks: list of tuples of task: [(RunBenchmarkTask, (spec,), {}),]
 
-  Returns: list of tuples of func results
+  Returns:
+    list of tuples of func results
   """
   return [func(*args, **kwargs) for func, args, kwargs in tasks]
 
