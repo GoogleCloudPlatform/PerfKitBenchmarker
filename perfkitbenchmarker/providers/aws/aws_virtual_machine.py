@@ -525,6 +525,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.host = self.host_list[-1]
       self.client_token = str(uuid.uuid4())
       raise errors.Resource.RetryableCreationError()
+    if 'InsufficientInstanceCapacity' in stderr:
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
 
   def _CreateSpot(self):
     """Create a Spot VM instance."""
@@ -635,6 +637,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     status = instances[0]['State']['Name']
     self.id = instances[0]['InstanceId']
     assert status in INSTANCE_KNOWN_STATUSES, status
+    # In this path run-instances succeeded, a pending instance was created, but
+    # not fulfilled so it moved to terminated.
     if (status == TERMINATED and
         instances[0]['StateReason']['Code'] ==
         'Server.InsufficientInstanceCapacity'):
