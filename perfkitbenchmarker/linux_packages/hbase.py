@@ -24,10 +24,12 @@ import re
 import urllib2
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
+FLAGS = flags.FLAGS
 
 HBASE_URL_BASE = 'http://www.us.apache.org/dist/hbase/stable/'
 HBASE_PATTERN = r'>(hbase-\d+.\d+.\d+-bin.tar.gz)<'
@@ -38,6 +40,9 @@ DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
 HBASE_DIR = posixpath.join(INSTALL_DIR, 'hbase')
 HBASE_BIN = posixpath.join(HBASE_DIR, 'bin')
 HBASE_CONF_DIR = posixpath.join(HBASE_DIR, 'conf')
+
+flags.DEFINE_string('hbase_jar_url', None, 'Specify if do not want to use the '
+                    'existing ones on HBASE_URL_BASE.')
 
 
 def _GetHBaseURL():
@@ -61,7 +66,7 @@ def CheckPrerequisites():
 def _Install(vm):
   vm.Install('hadoop')
   vm.Install('curl')
-  hbase_url = _GetHBaseURL()
+  hbase_url = FLAGS.hbase_jar_url or _GetHBaseURL()
   vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
                         HBASE_DIR, hbase_url))

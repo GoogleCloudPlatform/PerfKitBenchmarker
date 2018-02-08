@@ -42,8 +42,11 @@ from perfkitbenchmarker.providers.gcp import gcp_bigtable
 
 FLAGS = flags.FLAGS
 
-HBASE_CLIENT_VERSION = '1.1'
-BIGTABLE_CLIENT_VERSION = '0.9.0'
+# Hbase 1.x was compiled against Hbase 1.3.1. When Hbase 2.x becomes stable, we
+# need to update the version to 2.x, and create a new artifact of Cloud Bigtable
+# client.
+HBASE_CLIENT_VERSION = '1.x'
+BIGTABLE_CLIENT_VERSION = '1.0.0-pre1'
 
 flags.DEFINE_string('google_bigtable_endpoint', 'bigtable.googleapis.com',
                     'Google API endpoint for Cloud Bigtable.')
@@ -54,12 +57,13 @@ flags.DEFINE_string('google_bigtable_admin_endpoint',
 flags.DEFINE_string('google_bigtable_zone_name', 'us-central1-b',
                     'Bigtable zone.')
 flags.DEFINE_string('google_bigtable_instance_name', None,
-                    'Bigtable instance name.')
+                    'Bigtable instance name. If not specified, new instance '
+                    'will be created and deleted on the fly.')
 flags.DEFINE_string(
     'google_bigtable_hbase_jar_url',
     'https://oss.sonatype.org/service/local/repositories/releases/content/'
-    'com/google/cloud/bigtable/bigtable-hbase-{0}/'
-    '{1}/bigtable-hbase-{0}-{1}.jar'.format(
+    'com/google/cloud/bigtable/bigtable-hbase-{0}-hadoop/'
+    '{1}/bigtable-hbase-{0}-hadoop-{1}.jar'.format(
         HBASE_CLIENT_VERSION,
         BIGTABLE_CLIENT_VERSION),
     'URL for the Bigtable-HBase client JAR.')
@@ -82,8 +86,11 @@ cloud_bigtable_ycsb:
 TCNATIVE_BORINGSSL_URL = (
     'http://search.maven.org/remotecontent?filepath='
     'io/netty/netty-tcnative-boringssl-static/'
-    '1.1.33.Fork13/'
-    'netty-tcnative-boringssl-static-1.1.33.Fork13-linux-x86_64.jar')
+    '1.1.33.Fork26/'
+    'netty-tcnative-boringssl-static-1.1.33.Fork26-linux-x86_64.jar')
+DROPWIZARD_METRICS_CORE_URL = (
+    'http://search.maven.org/remotecontent?filepath='
+    'io/dropwizard/metrics/metrics-core/3.1.2/metrics-core-3.1.2.jar')
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
 HBASE_BINDING = 'hbase10-binding'
@@ -191,7 +198,9 @@ def _Install(vm):
   instance_name = (FLAGS.google_bigtable_instance_name or
                    'pkb-bigtable-{0}'.format(FLAGS.run_uri))
   hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
-  for url in [FLAGS.google_bigtable_hbase_jar_url, TCNATIVE_BORINGSSL_URL]:
+  for url in [FLAGS.google_bigtable_hbase_jar_url,
+              TCNATIVE_BORINGSSL_URL,
+              DROPWIZARD_METRICS_CORE_URL]:
     jar_name = os.path.basename(url)
     jar_path = posixpath.join(YCSB_HBASE_LIB, jar_name)
     vm.RemoteCommand('curl -Lo {0} {1}'.format(jar_path, url))
