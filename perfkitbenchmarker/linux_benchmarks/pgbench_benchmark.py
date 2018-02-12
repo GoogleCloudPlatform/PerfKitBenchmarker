@@ -85,19 +85,16 @@ pgbench:
         disk_size: 128000
   vm_groups:
     default:
+      os_type: ubuntu1604
       vm_spec:
         AWS:
           machine_type: m4.4xlarge
-          image: ami-09d2fb69
           zone: us-west-1c
         Azure:
           machine_type: Standard_A8m_v2
-          image: Canonical:UbuntuServer:16.04-LTS:latest
           zone: eastus
         GCP:
           machine_type: n1-standard-16
-          image: ubuntu-1604-xenial-v20170815a
-          image_project: ubuntu-os-cloud
           zone: us-central1-c
 """
 

@@ -56,7 +56,7 @@ BENCHMARK_SETS = {
             'ping',
             'redis',
             'speccpu2006',
-            'sysbench_oltp',
+            'sysbench',
             'unixbench',
         ]
     },
@@ -87,7 +87,7 @@ BENCHMARK_SETS = {
             'mongodb_ycsb',
             'ping',
             'redis',
-            'sysbench_oltp',
+            'sysbench',
             'unixbench',
         ]
     },
@@ -136,7 +136,7 @@ BENCHMARK_SETS = {
             'redis_ycsb',
             'stencil2d',
             'speccpu2006',
-            'sysbench_oltp',
+            'sysbench',
             'tensorflow',
             'tomcat_wrk',
             'unixbench',
@@ -153,7 +153,7 @@ BENCHMARK_SETS = {
             'redis',
             'cassandra_stress',
             'object_storage_service',
-            'sysbench_oltp',
+            'sysbench',
         ]
     },
     'kubernetes_set': {
@@ -169,7 +169,7 @@ BENCHMARK_SETS = {
             'mongodb_ycsb',
             'netperf',
             'redis',
-            'sysbench_oltp',
+            'sysbench',
         ]
     },
     'mellanox_set': {
@@ -202,7 +202,7 @@ BENCHMARK_SETS = {
             'ping',
             'redis',
             'silo',
-            'sysbench_oltp',
+            'sysbench',
             'unixbench',
         ]
     },

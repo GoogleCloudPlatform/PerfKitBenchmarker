@@ -25,11 +25,10 @@ import datetime
 import json
 import logging
 import time
-
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
-from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -275,6 +274,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       public IP address (string)
     """
+    if describe_instance_json is None:
+      return ''
     try:
       selflink = describe_instance_json['ipAddresses'][0]['ipAddress']
     except:
@@ -287,20 +288,26 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     Also sets the password on the postgres user if this is a postgres database.
     """
-    cmd = util.GcloudCommand(
-        self, 'sql', 'users', 'create', self.spec.database_username,
-        'dummy_host', '--instance={0}'.format(self.instance_id),
-        '--password={0}'.format(self.spec.database_password))
-    _, _, _ = cmd.Issue()
 
-    if self.spec.engine != managed_relational_db.POSTGRES:
-      return
+    if self.spec.engine == managed_relational_db.POSTGRES or (
+        self.spec.engine == managed_relational_db.AURORA_POSTGRES):
+      cmd = util.GcloudCommand(
+          self, 'sql', 'users', 'create', self.spec.database_username,
+          'dummy_host', '--instance={0}'.format(self.instance_id),
+          '--password={0}'.format(self.spec.database_password))
+      _, _, _ = cmd.Issue()
 
-    cmd = util.GcloudCommand(
-        self, 'sql', 'users', 'set-password', 'postgres',
-        'dummy_host', '--instance={0}'.format(self.instance_id),
-        '--password={0}'.format(self.spec.database_password))
-    _, _, _ = cmd.Issue()
+      cmd = util.GcloudCommand(
+          self, 'sql', 'users', 'set-password', 'postgres',
+          'dummy_host', '--instance={0}'.format(self.instance_id),
+          '--password={0}'.format(self.spec.database_password))
+      _, _, _ = cmd.Issue()
+
+    elif self.spec.engine == managed_relational_db.MYSQL:
+      cmd = util.GcloudCommand(
+          self, 'sql', 'instances', 'set-root-password', self.instance_id,
+          '--password={0}'.format(self.spec.database_password))
+      _, _, _ = cmd.Issue()
 
   @staticmethod
   def GetDefaultEngineVersion(engine):

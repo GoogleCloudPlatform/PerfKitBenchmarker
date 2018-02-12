@@ -551,7 +551,11 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
     if not self.database_name:
       self.database_name = 'pkb-db-%s' % flag_values.run_uri
     if not self.database_username:
-      self.database_username = 'pkb%s' % flag_values.run_uri
+      if self.engine == managed_relational_db.MYSQL and (
+         self.cloud != 'Azure'):
+         self.database_username = 'root'
+      else:
+         self.database_username = 'pkb%s' % flag_values.run_uri
     if not self.database_password:
       self.database_password = managed_relational_db.GenerateRandomDbPassword()
 
