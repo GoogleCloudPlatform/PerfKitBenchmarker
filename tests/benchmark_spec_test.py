@@ -100,7 +100,7 @@ cluster_boot:
           machine_type: n1-standard-4
 """
 ALWAYS_SUPPORTED = 'iperf'
-NEVER_SUPPORTED = 'mysql_service'
+NEVER_SUPPORTED = 'sysbench'
 
 
 class _BenchmarkSpecTestCase(unittest.TestCase):
