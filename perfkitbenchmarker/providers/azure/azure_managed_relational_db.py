@@ -274,5 +274,3 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         self.instance_id,
         self.spec.database_password,
         database_name)
-
-

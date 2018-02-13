@@ -297,17 +297,16 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   runningOnWindows = RunningOnWindows()
   should_time = not runningOnWindows and os.path.isfile(time_file_path)
   shell_value = runningOnWindows
-  with tempfile.TemporaryFile() as tf_out,\
-       tempfile.TemporaryFile() as tf_err,\
-       tempfile.NamedTemporaryFile(mode='r') as tf_timing:
+  with tempfile.TemporaryFile() as tf_out, \
+      tempfile.TemporaryFile() as tf_err, \
+      tempfile.NamedTemporaryFile(mode='r') as tf_timing:
 
     cmd_to_use = cmd
     if should_time:
       cmd_to_use = [time_file_path,
                     '-o', tf_timing.name,
                     '--quiet',
-                    '-f', ',  WallTime:%Es,  CPU:%Us,  MaxMemory:%Mkb '
-                   ] + cmd
+                    '-f', ',  WallTime:%Es,  CPU:%Us,  MaxMemory:%Mkb '] + cmd
 
     process = subprocess.Popen(cmd_to_use, env=env, shell=shell_value,
                                stdin=subprocess.PIPE, stdout=tf_out,

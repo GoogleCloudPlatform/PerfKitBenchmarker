@@ -152,7 +152,7 @@ class BaseDpbService(resource.BaseResource):
     basic_data = {'dpb_service': self.SERVICE_TYPE,
                   'dpb_cluster_id': self.cluster_id,
                   'dpb_cluster_shape':
-                    self.spec.worker_group.vm_spec.machine_type,
+                  self.spec.worker_group.vm_spec.machine_type,
                   'dpb_cluster_size': self.spec.worker_count}
     return basic_data
 

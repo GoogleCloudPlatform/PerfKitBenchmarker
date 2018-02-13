@@ -186,8 +186,7 @@ class AzurePerformanceTierDecoder(spec.BaseSpec):
     # https://docs.microsoft.com/en-us/azure/sql-database/sql-database-service-tiers
     result.update({'compute_units': (option_decoders.IntDecoder, {'min': 50}),
                    'tier': (option_decoders.EnumDecoder, {
-                       'valid_values': azure_flags.VALID_TIERS}
-                           )})
+                       'valid_values': azure_flags.VALID_TIERS})})
     return result
 
   @classmethod
@@ -207,4 +206,3 @@ class AzurePerformanceTierDecoder(spec.BaseSpec):
 
     if flag_values['azure_compute_units'].present:
       config_values['compute_units'] = flag_values.azure_compute_units
-
