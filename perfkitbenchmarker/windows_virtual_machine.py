@@ -369,8 +369,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     with vm_util.NamedTemporaryFile(prefix='diskpart') as tf:
       tf.write(script)
       tf.close()
-      self.RemoteCopy(tf.name, self.temp_dir)
       script_path = ntpath.join(self.temp_dir, os.path.basename(tf.name))
+      self.RemoteCopy(tf.name, script_path)
       self.RemoteCommand('diskpart /s {script_path}'.format(
           script_path=script_path))
 
