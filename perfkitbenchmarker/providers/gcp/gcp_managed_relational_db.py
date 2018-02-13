@@ -289,26 +289,12 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Also sets the password on the postgres user if this is a postgres database.
     """
 
-    if self.spec.engine == managed_relational_db.POSTGRES or (
-        self.spec.engine == managed_relational_db.AURORA_POSTGRES):
-      cmd = util.GcloudCommand(
-          self, 'sql', 'users', 'create', self.spec.database_username,
-          'dummy_host', '--instance={0}'.format(self.instance_id),
-          '--password={0}'.format(self.spec.database_password))
-      _, _, _ = cmd.Issue()
-
-      cmd = util.GcloudCommand(
-          self, 'sql', 'users', 'set-password', 'postgres',
-          'dummy_host', '--instance={0}'.format(self.instance_id),
-          '--password={0}'.format(self.spec.database_password))
-      _, _, _ = cmd.Issue()
-
-    elif self.spec.engine == managed_relational_db.MYSQL:
-      cmd = util.GcloudCommand(
-          self, 'sql', 'instances', 'set-root-password', self.instance_id,
-          '--password={0}'.format(self.spec.database_password))
-      _, _, _ = cmd.Issue()
-
+    # The hostname '%' means unrestricted access from any host.
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'create', self.spec.database_username,
+        '%', '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.spec.database_password))
+    _, _, _ = cmd.Issue()
   @staticmethod
   def GetDefaultEngineVersion(engine):
     """Returns the default version of a given database engine.
