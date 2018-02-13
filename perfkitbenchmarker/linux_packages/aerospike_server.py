@@ -90,8 +90,16 @@ def _WaitForServerUp(server):
 
   logging.info("Trying to connect to Aerospike at %s:%s" % (address, port))
   try:
+    def _NetcatPrefix():
+      _, stderr = server.RemoteCommand('nc -h', ignore_failure=True)
+      if '-q' in stderr:
+        return 'nc -q 1'
+      else:
+        return 'nc -i 1'
+
     out, _ = server.RemoteCommand(
-        '(echo -e "status\n" ; sleep 1)| netcat -q 1 %s %s' % (address, port))
+        '(echo -e "status\n" ; sleep 1)| %s %s %s' % (
+            _NetcatPrefix(), address, port))
     if out.startswith('ok'):
       logging.info("Aerospike server status is OK. Server up and running.")
       return
