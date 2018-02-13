@@ -58,15 +58,33 @@ def Run(benchmark_spec):
   results = []
 
   def _RunTest(sending_vm, receiving_vm):
+    """Runs the tests depending on what is enabled.
+
+    Args:
+      sending_vm: The vm that will initiate the stream.
+      receiving_vm: The vm that will act as server.
+    """
     if vm_util.ShouldRunOnExternalIpAddress():
-      results.extend(iperf3.RunIperf3UDPStream(sending_vm,
-                                               receiving_vm,
-                                               use_internal_ip=False))
+      if FLAGS.run_udp:
+        results.extend(
+            iperf3.RunIperf3UDPStream(
+                sending_vm, receiving_vm, use_internal_ip=False))
+
+      if FLAGS.run_tcp:
+        results.extend(
+            iperf3.RunIperf3TCPMultiStream(
+                sending_vm, receiving_vm, use_internal_ip=False))
 
     if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
-      results.extend(iperf3.RunIperf3UDPStream(sending_vm,
-                                               receiving_vm,
-                                               use_internal_ip=True))
+      if FLAGS.run_udp:
+        results.extend(
+            iperf3.RunIperf3UDPStream(
+                sending_vm, receiving_vm, use_internal_ip=True))
+
+      if FLAGS.run_tcp:
+        results.extend(
+            iperf3.RunIperf3TCPMultiStream(
+                sending_vm, receiving_vm, use_internal_ip=True))
 
   _RunTest(vms[0], vms[1])
   _RunTest(vms[1], vms[0])
