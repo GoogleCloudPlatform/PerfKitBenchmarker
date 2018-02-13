@@ -90,3 +90,4 @@
 - Remove flag "tf_use_nccl" because the latest TensorFlow benchmark removed this
   argument.
 - "nightly" now is not a valid argument in GCP TPU commands.
+- Make aerospike_ycsb runnable on Amazon AMI.
