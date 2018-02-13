@@ -68,4 +68,3 @@ flags.DEFINE_enum('azure_tier', None, VALID_TIERS,
 flags.DEFINE_integer(
     'azure_compute_units', None,
     'Number of compute units to allocate for the machine type')
-
