@@ -23,8 +23,8 @@ CUDNN_6 = 'libcudnn6_6.0.21-1+cuda8.0_amd64.deb'
 CUDNN_7 = 'libcudnn7_7.0.5.15-1+cuda9.0_amd64.deb'
 
 flags.DEFINE_string('cudnn', CUDNN_7,
-                   '''The NVIDIA CUDA Deep Neural Network library.
-                    Please put in data directory and specify the name''')
+                    'The NVIDIA CUDA Deep Neural Network library. '
+                    'Please put in data directory and specify the name')
 FLAGS = flags.FLAGS
 
 

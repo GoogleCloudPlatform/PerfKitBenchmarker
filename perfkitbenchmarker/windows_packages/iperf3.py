@@ -157,7 +157,7 @@ def GetUDPStreamSamples(results, bandwidth, internal_ip_used):
   }
 
   # Get the percentage of packets lost.
-  loss_rate = round(lost*100.0/total, 3)
+  loss_rate = round(lost * 100.0 / total, 3)
   samples = [
       sample.Sample('Loss Rate', loss_rate, 'Percent',
                     metadata),

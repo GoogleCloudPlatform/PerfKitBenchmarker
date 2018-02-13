@@ -203,7 +203,7 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
         def _ConvertClat(value):
           if clat_key is 'clat_ns':
             # convert from nsec to usec
-            return value/1000
+            return value / 1000
           else:
             return value
 

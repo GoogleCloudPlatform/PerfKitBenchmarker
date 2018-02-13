@@ -27,7 +27,6 @@ import re
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import vm_util
 
 
 NVIDIA_TESLA_K80 = 'k80'
@@ -152,9 +151,9 @@ def GetPeerToPeerTopology(vm):
   # Delimit each GPU result with semicolons,
   # and simplify the result character set to 'Y' and 'N'.
   return (';'.join(results)
-          .replace('X', 'Y')   # replace X (self) with Y
-          .replace('OK', 'Y')  # replace OK with Y
-          .replace('NS', 'N')) # replace NS (not supported) with N
+          .replace('X', 'Y')    # replace X (self) with Y
+          .replace('OK', 'Y')   # replace OK with Y
+          .replace('NS', 'N'))  # replace NS (not supported) with N
 
 
 def GetGpuType(vm):

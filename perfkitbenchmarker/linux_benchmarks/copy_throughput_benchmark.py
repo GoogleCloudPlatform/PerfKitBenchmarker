@@ -48,8 +48,8 @@ class CopyThroughputBenchmarkSpec(
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(CopyThroughputBenchmarkSpec, cls
-                  )._GetOptionDecoderConstructions()
+    result = super(CopyThroughputBenchmarkSpec,
+                   cls)._GetOptionDecoderConstructions()
     result.update({
         'data_size_in_mb': (option_decoders.FloatDecoder, {'default': None}),
     })

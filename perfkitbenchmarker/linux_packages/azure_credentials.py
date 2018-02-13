@@ -25,6 +25,3 @@ def Install(vm):
   credential_file = object_storage_service.FindCredentialFile(
       os.path.join('~', AZURE_CREDENTIAL_LOCATION))
   vm.PushFile(credential_file, AZURE_CREDENTIAL_LOCATION)
-
-
-

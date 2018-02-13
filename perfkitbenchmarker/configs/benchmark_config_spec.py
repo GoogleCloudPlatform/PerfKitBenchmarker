@@ -341,45 +341,45 @@ class _EdwServiceSpec(spec.BaseSpec):
     """
     result = super(_EdwServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-      'type': (option_decoders.StringDecoder, {
-        'default': 'redshift',
-        'none_ok': False}),
-      'cluster_identifier': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True}),
-      'endpoint': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True}),
-      'concurrency': (option_decoders.IntDecoder, {
-        'default': 5,
-        'none_ok': True}),
-      'endpoint': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True}),
-      'db': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True}),
-      'user': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True}),
-      'password': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True}),
-      'node_type': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True}),
-      'node_count': (option_decoders.IntDecoder, {
-        'default': edw_service.DEFAULT_NUMBER_OF_NODES,
-        'min': edw_service.DEFAULT_NUMBER_OF_NODES}),
-      'snapshot': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True}),
-      'cluster_subnet_group': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True}),
-      'cluster_parameter_group': (option_decoders.StringDecoder, {
-        'default': None,
-        'none_ok': True})
+        'type': (option_decoders.StringDecoder, {
+            'default': 'redshift',
+            'none_ok': False}),
+        'cluster_identifier': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'endpoint': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'concurrency': (option_decoders.IntDecoder, {
+            'default': 5,
+            'none_ok': True}),
+        'endpoint': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'db': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'user': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'password': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'node_type': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'node_count': (option_decoders.IntDecoder, {
+            'default': edw_service.DEFAULT_NUMBER_OF_NODES,
+            'min': edw_service.DEFAULT_NUMBER_OF_NODES}),
+        'snapshot': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'cluster_subnet_group': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'cluster_parameter_group': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True})
     })
     return result
 
