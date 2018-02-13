@@ -28,7 +28,7 @@ from tests import mock_flags
 
 _COMPONENT = 'test_component'
 _RUN_URI = 'fake-urn-uri'
-_NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.8/device-plugin-daemonset.yaml'
+_NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.9/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 _NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 
 
@@ -150,9 +150,8 @@ class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud alpha container clusters create', command_string)
-      self.assertIn('--enable-kubernetes-alpha', command_string)
-      self.assertIn('--cluster-version 1.8.6-gke.0', command_string)
+      self.assertIn('gcloud beta container clusters create', command_string)
+      self.assertIn('--cluster-version 1.9.2-gke.1', command_string)
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn('--accelerator type=nvidia-tesla-k80,count=2',

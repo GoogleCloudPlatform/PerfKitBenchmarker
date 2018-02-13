@@ -292,7 +292,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     # that the root user's environment is preserved when
     # running as sudo. Then run tail indefinitely so that
     # the container does not exit.
-    if self.image == 'nvidia/cuda:8.0-devel-ubuntu16.04':
+    if self.image.startswith('nvidia/cuda'):
       container_command = ' && '.join([
           'apt-get update',
           'apt-get install -y sudo',
