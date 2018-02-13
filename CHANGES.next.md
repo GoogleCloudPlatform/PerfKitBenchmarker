@@ -58,6 +58,7 @@
 - Support for static edw clusters.
 - Add more granularity to FAILED benchmarks with FailedSubstatus (GCP and AWS).
 - Update sysbench benchmark to version 1.0. (deprecate 0.4 and 0.5 versions)
+- Change GCP TPU command from alpha to beta.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -88,3 +89,4 @@
 - Explicitly state python package names for RedHat and Centos in AWS and Azure.
 - Remove flag "tf_use_nccl" because the latest TensorFlow benchmark removed this
   argument.
+- "nightly" now is not a valid argument in GCP TPU commands.
