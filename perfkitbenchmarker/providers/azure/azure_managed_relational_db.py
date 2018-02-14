@@ -331,4 +331,3 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         self.spec.database_username,
         self.endpoint,
         self.spec.database_password)
-
