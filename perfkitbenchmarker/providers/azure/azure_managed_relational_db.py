@@ -151,7 +151,8 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           '--admin-password', self.spec.database_password,
           '--performance-tier', self.spec.vm_spec.tier,
           '--compute-units', str(self.spec.vm_spec.compute_units),
-          '--storage-size', str(self.spec.disk_spec.disk_size * 1024),
+          # AZ command line expects 128000MB-1024000MB in increments of 128000MB
+          '--storage-size', str(self.spec.disk_spec.disk_size * 1000),
           '--version', self.spec.engine_version,
       ]
       vm_util.IssueCommand(cmd)
