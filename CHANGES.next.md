@@ -91,3 +91,4 @@
   argument.
 - "nightly" now is not a valid argument in GCP TPU commands.
 - Make aerospike_ycsb runnable on Amazon AMI.
+- Fixed assumption that HOME was set.
