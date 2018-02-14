@@ -104,7 +104,9 @@ sysbench:
         disk_size: 6144
         disk_type: gp2
       Azure:
-        #Valid storage sizes range from minimum of 128000 MB and additional increments of 128000 MB up to maximum of 1024000 MB.
+        #From AZ command line:
+        #Valid storage sizes range from minimum of 128000 MB and additional
+        #increments of 128000 MB up to maximum of 1024000 MB.
         disk_size: 128
   vm_groups:
     default:
