@@ -92,7 +92,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         self.instance_id,
         '--quiet',
         '--format=json',
-        '--async',
         '--activation-policy=ALWAYS',
         '--assign-ip',
         '--authorized-networks=%s' % authorized_network,
@@ -140,7 +139,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         if engine does not support high availability.
     """
     if self.spec.engine == managed_relational_db.MYSQL:
-      return '--failover-replica-name=replica-' + self.instance_id
+      self.replica_instance_id = 'replica-' + self.instance_id
+      return '--failover-replica-name=' + self.replica_instance_id
     elif self.spec.engine == managed_relational_db.POSTGRES:
       return '--availability-type=REGIONAL'
     else:
@@ -212,6 +212,11 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
+    if hasattr(self, 'replica_instance_id'):
+      cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
+                               self.replica_instance_id, '--quiet')
+      cmd.Issue()
+
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                              self.instance_id, '--quiet')
     cmd.Issue()

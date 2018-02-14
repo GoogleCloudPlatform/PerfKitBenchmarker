@@ -49,6 +49,7 @@ import StringIO
 import time
 
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 
@@ -67,8 +68,10 @@ flags.DEFINE_integer('sysbench_warmup_seconds', 120,
 flags.DEFINE_integer('sysbench_run_seconds', 480,
                      'The duration of the actual run in which results are '
                      'collected, in seconds.')
-flags.DEFINE_integer('sysbench_thread_count', 16,
-                     'The number of test threads on the client side.')
+flag_util.DEFINE_integerlist(
+    'sysbench_thread_counts',
+    flag_util.IntegerList([1, 2, 4, 8, 16, 32, 64]),
+    'array of thread counts passed to sysbench, one at a time')
 flags.DEFINE_integer('sysbench_latency_percentile', 100,
                      'The latency percentile we ask sysbench to compute.')
 flags.DEFINE_integer('sysbench_report_interval', 2,
@@ -102,7 +105,7 @@ sysbench:
         disk_type: gp2
       Azure:
         #Valid storage sizes range from minimum of 128000 MB and additional increments of 128000 MB up to maximum of 1024000 MB.
-        disk_size: 128000
+        disk_size: 128
   vm_groups:
     default:
       os_type: ubuntu1604
@@ -172,7 +175,7 @@ def ParseSysbenchOutput(sysbench_output, results, metadata):
   results.append(latency_sample)
 
 
-def _IssueSysbenchCommand(vm, duration, benchmark_spec):
+def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
   """Issues a sysbench run command given a vm and a duration.
 
       Does nothing if duration is <= 0
@@ -182,6 +185,8 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec):
     duration: the duration of the sysbench run.
     benchmark_spec: The benchmark specification. Contains all data that is
                     required to run the benchmark.
+    sysbench_thread_count: count of number of threads to use in --threads
+                           parameter to sysbench
 
   Returns:
     stdout, stderr: the result of the command.
@@ -196,7 +201,7 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec):
                       '--table_size=%d' % FLAGS.sysbench_table_size,
                       '--db-ps-mode=%s' % DISABLE,
                       '--rand-type=%s' % UNIFORM,
-                      '--threads=%d' % FLAGS.sysbench_thread_count,
+                      '--threads=%d' % sysbench_thread_count,
                       '--percentile=%d' % FLAGS.sysbench_latency_percentile,
                       '--report-interval=%d' % FLAGS.sysbench_report_interval,
                       '--max-requests=0',
@@ -212,7 +217,7 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec):
   return stdout, stderr
 
 
-def _RunSysbench(vm, metadata, benchmark_spec):
+def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
   """Runs the Sysbench OLTP test.
 
   Args:
@@ -234,11 +239,13 @@ def _RunSysbench(vm, metadata, benchmark_spec):
   warmup_seconds = FLAGS.sysbench_warmup_seconds
   if warmup_seconds > 0:
     logging.info('Sysbench warm-up run, duration is %d', warmup_seconds)
-    _IssueSysbenchCommand(vm, warmup_seconds, benchmark_spec)
+    _IssueSysbenchCommand(vm, warmup_seconds, benchmark_spec,
+                          sysbench_thread_count)
 
   run_seconds = FLAGS.sysbench_run_seconds
   logging.info('Sysbench real run, duration is %d', run_seconds)
-  stdout, _ = _IssueSysbenchCommand(vm, run_seconds, benchmark_spec)
+  stdout, _ = _IssueSysbenchCommand(vm, run_seconds, benchmark_spec,
+                                    sysbench_thread_count)
   logging.info('\n Parsing Sysbench Results...\n')
   ParseSysbenchOutput(stdout, results, metadata)
 
@@ -272,8 +279,7 @@ def _PrepareSysbench(vm, metadata, benchmark_spec):
   data_load_start_time = time.time()
   # Data loading is write only so need num_threads less than or equal to the
   # amount of tables.
-  num_threads = min(FLAGS.sysbench_table_size,
-                    FLAGS.sysbench_thread_count)
+  num_threads = FLAGS.sysbench_tables
 
   data_load_cmd_tokens = ['sysbench',
                           FLAGS.sysbench_testname,
@@ -315,7 +321,6 @@ def CreateMetadataFromFlags():
       'sysbench_table_size': FLAGS.sysbench_table_size,
       'sysbench_warmup_seconds': FLAGS.sysbench_warmup_seconds,
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
-      'sysbench_thread_count': FLAGS.sysbench_thread_count,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval
   }
@@ -372,13 +377,17 @@ def Run(benchmark_spec):
   logging.info('Start benchmarking MySQL Service, '
                'Cloud Provider is %s.', FLAGS.cloud)
   vm = benchmark_spec.vms[0]
-  metadata = CreateMetadataFromFlags()
 
-  # The run phase is common across providers. The VMs[0] object contains all
-  # information and states necessary to carry out the run.
-  run_results = _RunSysbench(vm, metadata, benchmark_spec)
-  results = DATA_LOADING_RESULTS + run_results
-  print results
+  results = []
+  for thread_count in FLAGS.sysbench_thread_counts:
+    metadata = CreateMetadataFromFlags()
+    metadata['sysbench_thread_count'] = thread_count
+    # The run phase is common across providers. The VMs[0] object contains all
+    # information and states necessary to carry out the run.
+    run_results = _RunSysbench(vm, metadata, benchmark_spec, thread_count)
+    print run_results
+    results += run_results
+
   return results
 
 
