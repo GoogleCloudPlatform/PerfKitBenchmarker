@@ -302,10 +302,6 @@ def _PrepareSysbench(vm, metadata, benchmark_spec):
 
   return results
 
-# Needs to be a global variable so the data loading results will persist
-# from Prepare to Run stage when called together.
-DATA_LOADING_RESULTS = []
-
 
 def CreateMetadataFromFlags():
   """Create meta data with all flags for sysbench."""
@@ -356,8 +352,6 @@ def Prepare(benchmark_spec):
   prepare_results = _PrepareSysbench(vm, metadata, benchmark_spec)
   print prepare_results
 
-  DATA_LOADING_RESULTS = prepare_results
-
 
 def Run(benchmark_spec):
   """Run the MySQL Service benchmark and publish results.
@@ -377,7 +371,7 @@ def Run(benchmark_spec):
   # The run phase is common across providers. The VMs[0] object contains all
   # information and states necessary to carry out the run.
   run_results = _RunSysbench(vm, metadata, benchmark_spec)
-  results = DATA_LOADING_RESULTS + run_results
+  results = run_results
   print results
   return results
 
