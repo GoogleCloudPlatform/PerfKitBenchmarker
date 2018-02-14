@@ -137,12 +137,19 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       RemoteCommandError: If there was a problem copying the file.
     """
     remote_path = remote_path or '~/'
-    home = os.environ['HOME']
+    # In order to expand "~" and "~user" we use ntpath.expanduser(),
+    # but it relies on environment variables being set. This modifies
+    # the HOME environment variable in order to use that function, and then
+    # restores it to its previous value.
+    home = os.environ.get('HOME')
     try:
       os.environ['HOME'] = self.home_dir
       remote_path = ntpath.expanduser(remote_path)
     finally:
-      os.environ['HOME'] = home
+      if home is None:
+        del os.environ['HOME']
+      else:
+        os.environ['HOME'] = home
 
     drive, remote_path = ntpath.splitdrive(remote_path)
     remote_drive = (drive or self.system_drive).rstrip(':')
