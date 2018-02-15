@@ -137,6 +137,18 @@ class BaseManagedRelationalDb(resource.BaseResource):
         self.spec.database_password,
         database_name)
 
+  def MakeMysqlConnectionString(self):
+    return '-h {0} -u {1} -p{2}'.format(
+        self.endpoint,
+        self.spec.database_username,
+        self.spec.database_password)
+
+  def MakeSysbenchConnectionString(self):
+    return '--mysql-host={0} --mysql-user={1} --mysql-password="{2}" '.format(
+        self.endpoint,
+        self.spec.database_username,
+        self.spec.database_password)
+
   @property
   def endpoint(self):
     """Endpoint of the database server (exclusing port)."""

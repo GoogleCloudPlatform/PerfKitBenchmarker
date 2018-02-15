@@ -42,7 +42,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
   CLOUD = providers.GCP
   SERVICE_NAME = 'cloud_tpu'
   TPU_IP = '10.240.{}.2'
-  DEFAULT_CLOUD_TPU_VERSION = 'nightly'
+  DEFAULT_CLOUD_TPU_VERSION = '1.6'
 
   def __init__(self, cloud_tpu_spec):
     super(GcpCloudTpu, self).__init__(cloud_tpu_spec)
@@ -51,7 +51,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _Create(self):
     """Create Cloud TPU."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'create',
+    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'create',
                              self.spec.tpu_name)
     cmd.flags['range'] = self.spec.tpu_cidr_range
     if self.spec.tpu_accelerator_type:
@@ -71,7 +71,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _Delete(self):
     """Deletes the cloud TPU."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'delete',
+    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'delete',
                              self.spec.tpu_name)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
@@ -84,7 +84,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _GetCloudTpuDescription(self):
     """Gets the cloud TPU description."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'describe',
+    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'describe',
                              self.spec.tpu_name)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone

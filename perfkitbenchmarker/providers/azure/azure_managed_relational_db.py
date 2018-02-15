@@ -26,8 +26,9 @@ from perfkitbenchmarker.providers.azure import azure_network
 
 FLAGS = flags.FLAGS
 
+DEFAULT_MYSQL_VERSION = '5.7'
+DEFAULT_MYSQL_PORT = 3306
 DEFAULT_POSTGRES_VERSION = '9.6'
-
 DEFAULT_POSTGRES_PORT = 5432
 
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
@@ -97,9 +98,37 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     if engine == managed_relational_db.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
+    elif engine == managed_relational_db.MYSQL:
+      return DEFAULT_MYSQL_VERSION
     else:
       raise managed_relational_db.ManagedRelationalDbEngineNotFoundException(
           'Unsupported engine {0}'.format(engine))
+
+  def GetDefaultPort(self):
+    """Returns the default port of a given database engine.
+
+    Returns:
+      (string): Default port
+    Raises:
+      ManagedRelationalDbEngineNotFoundException: if an unknown engine is
+                                                  requested.
+    """
+    engine = self.spec.engine
+    if engine == managed_relational_db.POSTGRES:
+      return DEFAULT_POSTGRES_PORT
+    elif engine == managed_relational_db.MYSQL:
+      return DEFAULT_MYSQL_PORT
+    raise managed_relational_db.ManagedRelationalDbEngineNotFoundException(
+        'Unsupported engine {0}'.format(engine))
+
+  def GetAzCommandForEngine(self):
+    engine = self.spec.engine
+    if engine == managed_relational_db.POSTGRES:
+      return 'postgres'
+    elif engine == managed_relational_db.MYSQL:
+      return 'mysql'
+    raise managed_relational_db.ManagedRelationalDbEngineNotFoundException(
+        'Unsupported engine {0}'.format(engine))
 
   def _Create(self):
     """Creates the Azure RDS instance.
@@ -108,10 +137,11 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       NotImplementedError: if unknown how to create self.spec.engine.
 
     """
-    if self.spec.engine == managed_relational_db.POSTGRES:
+    if self.spec.engine == managed_relational_db.POSTGRES or (
+        self.spec.engine == managed_relational_db.MYSQL):
       cmd = [
           azure.AZURE_PATH,
-          'postgres',
+          self.GetAzCommandForEngine(),
           'server',
           'create',
           '--resource-group', self.resource_group.name,
@@ -140,7 +170,7 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     cmd = [
         azure.AZURE_PATH,
-        'postgres',
+        self.GetAzCommandForEngine(),
         'server',
         'delete',
         '--resource-group', self.resource_group.name,
@@ -157,7 +187,7 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     exceptions.
     """
 
-    json_server_show = self._AzPostgresServerShow()
+    json_server_show = self._AzServerShow()
     if json_server_show is None:
       return False
     return True
@@ -184,7 +214,7 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     cmd = [
         azure.AZURE_PATH,
-        'postgres',
+        self.GetAzCommandForEngine(),
         'server',
         'firewall-rule',
         'create',
@@ -217,7 +247,7 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         logging.warning('Timeout waiting for sql instance to be ready')
         return False
 
-      server_show_json = self._AzPostgresServerShow()
+      server_show_json = self._AzServerShow()
       if server_show_json is not None:
         user_visibile_state = server_show_json['userVisibleState']
         if user_visibile_state == 'Ready':
@@ -226,7 +256,7 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     return True
 
-  def _AzPostgresServerShow(self):
+  def _AzServerShow(self):
     """Runs the azure command az server show.
 
     Returns:
@@ -236,7 +266,7 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     """
     cmd = [
         azure.AZURE_PATH,
-        'postgres',
+        self.GetAzCommandForEngine(),
         'server',
         'show',
         '--resource-group', self.resource_group.name,
@@ -253,9 +283,9 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     These will be used to communicate with the data base
     """
-    server_show_json = self._AzPostgresServerShow()
+    server_show_json = self._AzServerShow()
     self.endpoint = server_show_json['fullyQualifiedDomainName']
-    self.port = DEFAULT_POSTGRES_PORT
+    self.port = self.GetDefaultPort()
 
   def MakePsqlConnectionString(self, database_name):
     """Makes the connection string used to connect via PSql.
@@ -274,3 +304,30 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         self.instance_id,
         self.spec.database_password,
         database_name)
+
+  def MakeMysqlConnectionString(self):
+    """Makes the connection string used to connect via mysql command.
+    Override implemenation in base class.  Azure postgres needs this format.
+
+    Returns:
+        The connection string to use.
+    """
+    return '-h {0} -u {1}@{2} -p{3}'.format(
+        self.endpoint,
+        self.spec.database_username,
+        self.endpoint,
+        self.spec.database_password)
+
+  def MakeSysbenchConnectionString(self):
+    """Makes the connection string used to connect via sysbench command.
+
+    Override implemenation in base class.  Azure postgres needs this format.
+
+    Returns:
+        The connection string to use.
+    """
+    return '--mysql-host={0} --mysql-user={1}@{2} --mysql-password="{3}" '.format(
+        self.endpoint,
+        self.spec.database_username,
+        self.endpoint,
+        self.spec.database_password)
