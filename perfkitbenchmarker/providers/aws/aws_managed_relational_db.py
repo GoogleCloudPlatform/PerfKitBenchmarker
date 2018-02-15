@@ -28,7 +28,7 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 
 
-DEFAULT_MYSQL_VERSION = '5.7.11'
+DEFAULT_MYSQL_VERSION = '5.7.16'
 DEFAULT_POSTGRES_VERSION = '9.6.2'
 
 DEFAULT_MYSQL_PORT = 3306
@@ -431,6 +431,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       port on which the server is listening, as an int
     """
+    if describe_instance_json is None:
+      return None
     return int(describe_instance_json['DBInstances'][0]['Endpoint']['Port'])
 
   def _SavePrimaryAndSecondaryZones(self, describe_instance_json):
