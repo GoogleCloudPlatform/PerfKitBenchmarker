@@ -21,8 +21,8 @@ import json
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import flags
-from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.providers import GCP
+from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
@@ -46,8 +46,8 @@ DISK_METADATA = {
     }
 }
 
-SCSI = "SCSI"
-NVME = "NVME"
+SCSI = 'SCSI'
+NVME = 'NVME'
 
 disk.RegisterDiskTypeMap(GCP, DISK_TYPE)
 
@@ -77,7 +77,8 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['image'] = self.image
     if self.image_project:
       cmd.flags['image-project'] = self.image_project
-    cmd.Issue()
+    _, stderr, retcode = cmd.Issue()
+    util.CheckGcloudResponseForQuotaExceeded(stderr, retcode)
 
   def _Delete(self):
     """Deletes the disk."""
