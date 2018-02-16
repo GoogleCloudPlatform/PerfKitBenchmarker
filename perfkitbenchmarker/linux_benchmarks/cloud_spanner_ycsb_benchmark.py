@@ -81,6 +81,10 @@ flags.DEFINE_integer('cloud_spanner_ycsb_boundedstaleness',
                      0,
                      'The Cloud Spanner bounded staleness used in the YCSB '
                      'benchmark.')
+flags.DEFINE_integer('cloud_spanner_ycsb_channels',
+                     100,
+                     'The Cloud Spanner GRPC client channels used in the YCSB '
+                     'benchmark.')
 flags.DEFINE_string('cloud_spanner_ycsb_custom_release',
                     None,
                     'If provided, the URL of a custom YCSB release')
@@ -168,6 +172,7 @@ def Run(benchmark_spec):
       'cloudspanner.readmode': FLAGS.cloud_spanner_ycsb_readmode,
       'cloudspanner.boundedstaleness':
           FLAGS.cloud_spanner_ycsb_boundedstaleness,
+      'cloudspanner.channels': FLAGS.cloud_spanner_ycsb_channels,
       'cloudspanner.batchinserts': FLAGS.cloud_spanner_ycsb_batchinserts,
       'cloudspanner.host': benchmark_spec.spanner_instance.GetEndPoint(),
   }
