@@ -364,6 +364,13 @@ def _CheckNvidiaSmiExists(vm):
   return True
 
 
+def CheckNvidiaGpuExists(vm):
+  """Returns whether NVIDIA GPU exists or not."""
+  output, _ = vm.RemoteCommand('lspci', should_log=True)
+  regex = re.compile(r'3D controller: NVIDIA Corporation')
+  return regex.search(output) is not None
+
+
 def DoPostInstallActions(vm):
   SetAndConfirmGpuClocks(vm)
 

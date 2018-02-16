@@ -59,6 +59,8 @@ tensorflow:
 
 GPU = 'gpu'
 CPU = 'cpu'
+NCHW = 'NCHW'
+NHWC = 'NHWC'
 PID_PREFIX = 'TF_PS_PID'
 MODELS = ['vgg11', 'vgg16', 'vgg19', 'lenet', 'googlenet', 'overfeat',
           'alexnet', 'trivial', 'inception3', 'inception4', 'resnet50',
@@ -88,7 +90,7 @@ flags.DEFINE_enum('tf_local_parameter_device', CPU, [CPU, GPU],
                   variables happens.''')
 flags.DEFINE_enum('tf_device', GPU, [CPU, GPU],
                   'Device to use for computation: cpu or gpu')
-flags.DEFINE_enum('tf_data_format', 'NCHW', ['NCHW', 'NHWC'], '''Data layout to
+flags.DEFINE_enum('tf_data_format', NCHW, [NCHW, NHWC], '''Data layout to
                   use: NHWC (TF native) or NCHW (cuDNN native).''')
 flags.DEFINE_boolean('tf_distortions', True,
                      '''Enable/disable distortions during image preprocessing.
@@ -155,12 +157,10 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.forward_only = FLAGS.tf_forward_only
   benchmark_spec.data_name = FLAGS.tf_data_name
   benchmark_spec.variable_update = FLAGS.tf_variable_update
-  benchmark_spec.local_parameter_device = FLAGS.tf_local_parameter_device
-  benchmark_spec.device = FLAGS.tf_device
-  benchmark_spec.data_format = FLAGS.tf_data_format
   benchmark_spec.distortions = FLAGS.tf_distortions
   benchmark_spec.benchmarks_commit_hash = FLAGS.tf_benchmarks_commit_hash
-  benchmark_spec.tensorflow_pip_package = FLAGS.tf_pip_package
+  benchmark_spec.tensorflow_cpu_pip_package = FLAGS.tf_cpu_pip_package
+  benchmark_spec.tensorflow_gpu_pip_package = FLAGS.tf_gpu_pip_package
   benchmark_spec.distributed = FLAGS.tf_distributed
 
 
@@ -210,7 +210,7 @@ def _CreateMetadataDict(benchmark_spec, model, batch_size, num_gpus):
   """
   vm = benchmark_spec.vms[0]
   metadata = dict()
-  if benchmark_spec.device == GPU:
+  if cuda_toolkit.CheckNvidiaGpuExists(vm):
     metadata.update(cuda_toolkit.GetMetadata(vm))
     metadata['num_gpus'] = num_gpus
   metadata['model'] = model
@@ -224,7 +224,10 @@ def _CreateMetadataDict(benchmark_spec, model, batch_size, num_gpus):
   metadata['distortions'] = benchmark_spec.distortions
   metadata['benchmarks_commit_hash'] = benchmark_spec.benchmarks_commit_hash
   metadata['tensorflow_version'] = benchmark_spec.tensorflow_version
-  metadata['tensorflow_pip_package'] = benchmark_spec.tensorflow_pip_package
+  metadata['tensorflow_cpu_pip_package'] = (
+      benchmark_spec.tensorflow_cpu_pip_package)
+  metadata['tensorflow_gpu_pip_package'] = (
+      benchmark_spec.tensorflow_gpu_pip_package)
   metadata['distributed'] = benchmark_spec.distributed
   return metadata
 
@@ -301,6 +304,13 @@ def _RunModelOnVm(vm, model, benchmark_spec, args='', job_name=''):
   """
   tf_cnn_benchmark_dir = 'benchmarks/scripts/tf_cnn_benchmarks'
   batch_size = _GetBatchSize(model)
+  benchmark_spec.local_parameter_device = FLAGS.tf_local_parameter_device
+  benchmark_spec.device = FLAGS.tf_device
+  benchmark_spec.data_format = FLAGS.tf_data_format
+  if not cuda_toolkit.CheckNvidiaGpuExists(vm):
+    benchmark_spec.local_parameter_device = CPU
+    benchmark_spec.device = CPU
+    benchmark_spec.data_format = NHWC
   tf_cnn_benchmark_cmd = (
       'python tf_cnn_benchmarks.py '
       '--local_parameter_device={local_parameter_device} '

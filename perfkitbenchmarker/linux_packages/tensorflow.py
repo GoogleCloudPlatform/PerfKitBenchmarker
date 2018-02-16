@@ -16,18 +16,19 @@
 """Module containing TensorFlow installation and cleanup functions."""
 import posixpath
 from perfkitbenchmarker import flags
-
-
-GPU_DEFAULT_PACKAGE = 'tensorflow-gpu==1.3'
-CPU_DEFAULT_PACKAGE = 'https://anaconda.org/intel/tensorflow/1.4.0/download/tensorflow-1.4.0-cp27-cp27mu-linux_x86_64.whl'
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('tf_pip_package', None,
-                    'Tensorflow pip package to install. By default, PKB '
-                    'will install tensorflow-gpu==1.3 when using GPUs, '
-                    'and an Intel-optimized CPU build when using CPUs.')
-
+flags.DEFINE_string('tf_cpu_pip_package',
+                    'https://anaconda.org/intel/tensorflow/1.4.0/download/'
+                    'tensorflow-1.4.0-cp27-cp27mu-linux_x86_64.whl',
+                    'TensorFlow CPU pip package to install. By default, PKB '
+                    'will install an Intel-optimized CPU build when using CPUs.'
+                   )
+flags.DEFINE_string('tf_gpu_pip_package', 'tensorflow-gpu==1.3',
+                    'TensorFlow GPU pip package to install. By default, PKB '
+                    'will install tensorflow-gpu==1.3 when using GPUs.')
 
 
 def GetEnvironmentVars(vm):
@@ -39,6 +40,8 @@ def GetEnvironmentVars(vm):
   Returns:
     string of environment variables
   """
+  if not cuda_toolkit.CheckNvidiaGpuExists(vm):
+    return ''
   output, _ = vm.RemoteCommand('getconf LONG_BIT', should_log=True)
   long_bit = output.strip()
   lib_name = 'lib' if long_bit == '32' else 'lib64'
@@ -69,16 +72,16 @@ def GetTensorFlowVersion(vm):
 
 def Install(vm):
   """Installs TensorFlow on the VM."""
-  if FLAGS.tf_pip_package is None:
-    FLAGS.tf_pip_package = (CPU_DEFAULT_PACKAGE if FLAGS.tf_device == 'cpu'
-                            else GPU_DEFAULT_PACKAGE)
+  has_gpu = cuda_toolkit.CheckNvidiaGpuExists(vm)
+  tf_pip_package = (FLAGS.tf_gpu_pip_package if has_gpu else
+                    FLAGS.tf_cpu_pip_package)
 
-  if FLAGS.tf_device == 'gpu':
+  if has_gpu:
     vm.Install('cuda_toolkit')
     vm.Install('cudnn')
 
   vm.Install('pip')
-  vm.RemoteCommand('sudo pip install --upgrade %s' % FLAGS.tf_pip_package,
+  vm.RemoteCommand('sudo pip install --upgrade %s' % tf_pip_package,
                    should_log=True)
 
 

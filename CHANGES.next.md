@@ -93,3 +93,5 @@
 - Make aerospike_ycsb runnable on Amazon AMI.
 - Fixed assumption that HOME was set.
 - Fixed issue with default K8s image setup.
+- Install the correct TensorFlow pip package based on whether VM has GPUs or
+  not.
