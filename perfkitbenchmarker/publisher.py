@@ -200,7 +200,7 @@ class DefaultMetadataProvider(MetadataProvider):
         metadata['cloud_tpu_' + k] = v
 
     if benchmark_spec.cloud_redis:
-          cloud_redis = benchmark_spec.cloud_redis
+      cloud_redis = benchmark_spec.cloud_redis
       for k, v in cloud_redis.GetResourceMetadata().iteritems():
         metadata['cloud_redis_' + k] = v
     if benchmark_spec.metadata:
@@ -217,7 +217,7 @@ class DefaultMetadataProvider(MetadataProvider):
         metadata[name_prefix + k] = v
       metadata[name_prefix + 'vm_count'] = len(vms)
       for k, v in vm.GetOSResourceMetadata().iteritems():
-            metadata[name_prefix + k] = v
+        metadata[name_prefix + k] = v
       # Accommodate for multi-zone provisioning of VMs
       if FLAGS.zones or FLAGS.extra_zones:
         zone_list = FLAGS.zones + FLAGS.extra_zones
