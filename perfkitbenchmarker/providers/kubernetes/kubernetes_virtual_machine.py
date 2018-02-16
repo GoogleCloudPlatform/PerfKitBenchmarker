@@ -418,7 +418,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     # Although ssh is not required to connect to the container, MPI
     # benchmarks require it.
     self.InstallPackages('ssh')
-    self.RemoteCommand('sudo /etc/init.d/ssh restart')
+    self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
     self.RemoteCommand('mkdir ~/.ssh')
     with open(self.ssh_public_key) as f:
       key = f.read()
