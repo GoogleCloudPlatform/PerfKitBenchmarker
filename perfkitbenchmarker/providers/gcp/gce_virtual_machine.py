@@ -55,7 +55,7 @@ FLAGS = flags.FLAGS
 
 NVME = 'NVME'
 SCSI = 'SCSI'
-UBUNTU_IMAGE = 'ubuntu-16-04'
+UBUNTU_IMAGE = 'ubuntu-14-04'
 RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
