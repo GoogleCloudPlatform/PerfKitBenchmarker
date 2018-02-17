@@ -95,3 +95,4 @@
 - Fixed issue with default K8s image setup.
 - Install the correct TensorFlow pip package based on whether VM has GPUs or
   not.
+- Change to root for command "lspci".
