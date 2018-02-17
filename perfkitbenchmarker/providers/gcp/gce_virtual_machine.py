@@ -462,8 +462,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Reset(self):
     """Reset a GCE VM instance."""
-    reset_cmd = util.GcloudCommand(self, 'compute', 'instances', 'reset',
-                                    self.name)
+    reset_cmd = util.GcloudCommand(self, 'compute', 'instances', 'reset', self.name)
     reset_cmd.Issue()
 
   def _Exists(self):

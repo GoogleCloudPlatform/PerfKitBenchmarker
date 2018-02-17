@@ -180,6 +180,7 @@ def Prepare(benchmark_spec):
   else:
     benchmark_spec.metadata = metadata
 
+
 def Run(benchmark_spec):
   """Spawn YCSB and gather the results.
 

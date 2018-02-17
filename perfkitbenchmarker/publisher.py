@@ -220,7 +220,7 @@ class DefaultMetadataProvider(MetadataProvider):
         metadata[name_prefix + k] = v
       # Accommodate for multi-zone provisioning of VMs
       if FLAGS.zones or FLAGS.extra_zones:
-        zone_list = FLAGS.zones + FLAGS.extra_zones 
+        zone_list = FLAGS.zones + FLAGS.extra_zones
         if len(zone_list) > 0:
           metadata[name_prefix + 'zone'] = ",".join(zone_list)
       if vm.scratch_disks:
