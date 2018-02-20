@@ -95,3 +95,5 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'gcp_preprovisioned_data_bucket', None,
     'GCS bucket where pre-provisioned data has been copied.')
+flags.DEFINE_integer(
+    'gcp_redis_gb', 5, 'Size of redis cluster in gb')
