@@ -60,6 +60,7 @@
 - Update sysbench benchmark to version 1.0. (deprecate 0.4 and 0.5 versions)
 - Change GCP TPU command from alpha to beta.
 - Update configurable parameters for ycsb benchmarks.
+- Added tags to AWS kops instances and increased loadbalancer timeout.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
