@@ -96,3 +96,4 @@
 - Install the correct TensorFlow pip package based on whether VM has GPUs or
   not.
 - Change to root for command "lspci".
+- Install package pciutils when install cuda_toolkit.
