@@ -300,6 +300,7 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '%', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
     _, _, _ = cmd.Issue()
+
   @staticmethod
   def GetDefaultEngineVersion(engine):
     """Returns the default version of a given database engine.
