@@ -26,35 +26,40 @@ class MockSpec(object):
   the "name" attribute of MagicMocks is difficult to set.
   """
 
-  def __init__(self, name, uid, status):
+  def __init__(self, name, uid, status, failed_substatus=None):
     self.name = name
     self.uid = uid
     self.status = status
+    self.failed_substatus = failed_substatus
 
 
 _BENCHMARK_SPECS = [
     MockSpec('iperf', 'iperf0', benchmark_status.SUCCEEDED),
     MockSpec('iperf', 'iperf1', benchmark_status.FAILED),
+    MockSpec('iperf', 'iperf2', benchmark_status.FAILED,
+             benchmark_status.FailedSubstatus.QUOTA),
     MockSpec('cluster_boot', 'cluster_boot0', benchmark_status.SKIPPED)
 ]
 _STATUS_TABLE = os.linesep.join((
-    '--------------------------------------',
-    'Name          UID            Status   ',
-    '--------------------------------------',
-    'iperf         iperf0         SUCCEEDED',
-    'iperf         iperf1         FAILED   ',
-    'cluster_boot  cluster_boot0  SKIPPED  ',
-    '--------------------------------------'))
+    '--------------------------------------------------------',
+    'Name          UID            Status     Failed Substatus',
+    '--------------------------------------------------------',
+    'iperf         iperf0         SUCCEEDED                  ',
+    'iperf         iperf1         FAILED                     ',
+    'iperf         iperf2         FAILED     QUOTA_EXCEEDED  ',
+    'cluster_boot  cluster_boot0  SKIPPED                    ',
+    '--------------------------------------------------------'))
 _STATUS_SUMMARY = os.linesep.join((
     'Benchmark run statuses:',
-    '--------------------------------------',
-    'Name          UID            Status   ',
-    '--------------------------------------',
-    'iperf         iperf0         SUCCEEDED',
-    'iperf         iperf1         FAILED   ',
-    'cluster_boot  cluster_boot0  SKIPPED  ',
-    '--------------------------------------',
-    'Success rate: 33.33% (1/3)'))
+    '--------------------------------------------------------',
+    'Name          UID            Status     Failed Substatus',
+    '--------------------------------------------------------',
+    'iperf         iperf0         SUCCEEDED                  ',
+    'iperf         iperf1         FAILED                     ',
+    'iperf         iperf2         FAILED     QUOTA_EXCEEDED  ',
+    'cluster_boot  cluster_boot0  SKIPPED                    ',
+    '--------------------------------------------------------',
+    'Success rate: 25.00% (1/4)'))
 
 
 class CreateSummaryTableTestCase(unittest.TestCase):

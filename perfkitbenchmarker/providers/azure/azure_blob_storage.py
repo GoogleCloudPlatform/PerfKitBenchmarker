@@ -23,7 +23,6 @@ from perfkitbenchmarker.providers.azure import azure_network
 FLAGS = flags.FLAGS
 
 DEFAULT_AZURE_REGION = 'eastus2'
-AZURE_CREDENTIAL_LOCATION = '.azure'
 
 
 class AzureBlobStorageService(object_storage_service.ObjectStorageService):
@@ -94,11 +93,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   def PrepareVM(self, vm):
     vm.Install('azure_cli')
     vm.Install('azure_sdk')
-
-    vm.PushFile(
-        object_storage_service.FindCredentialFile('~/' +
-                                                  AZURE_CREDENTIAL_LOCATION),
-        AZURE_CREDENTIAL_LOCATION)
+    vm.Install('azure_credentials')
 
   def CLIUploadDirectory(self, vm, directory, file_names, bucket):
     return vm.RemoteCommand(

@@ -15,7 +15,7 @@
 """Module containing mixin classes for linux virtual machines.
 
 These classes allow installation on both Debian and RHEL based linuxes.
-They also handle some intial setup (especially on RHEL based linuxes
+They also handle some initial setup (especially on RHEL based linuxes
 since by default sudo commands without a tty don't work) and
 can restore the VM to the state it was in before packages were
 installed.
@@ -34,23 +34,26 @@ import re
 import threading
 import time
 import uuid
-import yaml
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
+import yaml
+
 FLAGS = flags.FLAGS
 
 EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-             '6/x86_64/epel-release-6-8.noarch.rpm')
+             '6/x86_64/Packages/e/epel-release-6-8.noarch.rpm')
 EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-             '7/x86_64/e/epel-release-7-8.noarch.rpm')
+             '7/x86_64/Packages/e/epel-release-7-11.noarch.rpm')
 
+LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
 UPDATE_RETRIES = 5
 SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
@@ -212,7 +215,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    env_file = "/etc/environment"
+    env_file = '/etc/environment'
     commands = []
 
     if FLAGS.http_proxy:
@@ -228,7 +231,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           FLAGS.ftp_proxy, env_file))
 
     if commands:
-      self.RemoteCommand(";".join(commands))
+      self.RemoteCommand(';'.join(commands))
 
   def SetupPackageManager(self):
     """Specific Linux flavors should override this."""
@@ -322,7 +325,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if not FLAGS.network_enable_BBR:
       return
 
-    if not self.CheckKernelVersion().AtLeast(4, 9):
+    if not KernelRelease(self.kernel_release).AtLeast(4, 9):
       raise flags.ValidationError(
           'BBR requires a linux image with kernel 4.9 or newer')
 
@@ -349,15 +352,29 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     except errors.VirtualMachine.RemoteCommandError:
       return 'unknown'
 
-  def CheckKernelVersion(self):
-    """Return a KernelVersion from the host VM."""
-    uname, _ = self.RemoteCommand('uname -r')
-    return KernelVersion(uname)
-
   def CheckLsCpu(self):
     """Returns a LsCpuResults from the host VM."""
     lscpu, _ = self.RemoteCommand('lscpu')
     return LsCpuResults(lscpu)
+
+  @property
+  def os_info(self):
+    """Get distribution-specific information."""
+    if self.os_metadata.get('os_info'):
+      return self.os_metadata['os_info']
+    else:
+      self.Install('lsb_release')
+      stdout, _ = self.RemoteCommand('lsb_release -d')
+      return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+
+  @property
+  def kernel_release(self):
+    """Return kernel release number."""
+    if self.os_metadata.get('kernel_release'):
+      return self.os_metadata.get('kernel_release')
+    else:
+      stdout, _ = self.RemoteCommand('uname -r')
+      return stdout.strip()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
@@ -374,6 +391,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.tcp_congestion_control = self.TcpCongestionControl()
     lscpu_results = self.CheckLsCpu()
     self.numa_node_count = lscpu_results.numa_node_count
+    self.os_metadata['os_info'] = self.os_info
+    self.os_metadata['kernel_release'] = self.kernel_release
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
@@ -649,7 +668,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           'please make sure that %s can ssh into %s without supplying any '
           'arguments except the ip address.' % (self, peer))
 
-
   def CheckJavaVersion(self):
     """Check the version of java on remote machine.
 
@@ -665,7 +683,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Deletes a file on a remote machine.
 
     Args:
-      filename: Path to the the file to delete.
+      filename: Path to the file to delete.
     """
     self.RemoteCommand('sudo rm -rf %s' % filename)
 
@@ -816,6 +834,20 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         'sudo blockdev --setra {0} {1}; sudo blockdev --setfra {0} {1};'.format(
             num_sectors, ' '.join(devices)))
 
+  def GetMd5sum(self, path, filename):
+    """Gets the md5sum hash for a filename in a path on the VM.
+
+    Args:
+      path: string; Path on the VM.
+      filename: string; Name of the file in the path.
+
+    Returns:
+      string; The md5sum hash.
+    """
+    stdout, _ = self.RemoteCommand('md5sum %s' % posixpath.join(path, filename))
+    md5sum, _ = stdout.split()
+    return md5sum
+
 
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
@@ -927,11 +959,16 @@ class RhelMixin(BaseLinuxMixin):
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
     super(RhelMixin, self).SetupProxy()
-    yum_proxy_file = "/etc/yum.conf"
+    yum_proxy_file = '/etc/yum.conf'
 
     if FLAGS.http_proxy:
       self.RemoteCommand("echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (
           FLAGS.http_proxy, yum_proxy_file))
+
+
+class Centos7Mixin(RhelMixin):
+  """Class holding Centos 7 specific VM methods and attributes."""
+  OS_TYPE = os_types.CENTOS7
 
 
 class DebianMixin(BaseLinuxMixin):
@@ -1079,6 +1116,21 @@ class DebianMixin(BaseLinuxMixin):
     self.RemoteCommand('sudo service ssh restart')
 
 
+class Ubuntu1404Mixin(DebianMixin):
+  """Class holding Ubuntu1404 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1404
+
+
+class Ubuntu1604Mixin(DebianMixin):
+  """Class holding Ubuntu1604 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1604
+
+
+class Ubuntu1710Mixin(DebianMixin):
+  """Class holding Ubuntu1710 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1710
+
+
 class ContainerizedDebianMixin(DebianMixin):
   """Class representing a Containerized Virtual Machine.
 
@@ -1095,7 +1147,7 @@ class ContainerizedDebianMixin(DebianMixin):
     """Returns whether docker is installed or not."""
     resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
                                      suppress_warning=True)
-    if resp.rstrip() == "":
+    if resp.rstrip() == '':
       return False
     return True
 
@@ -1164,7 +1216,7 @@ class ContainerizedDebianMixin(DebianMixin):
                                   ignore_failure, login_shell, suppress_warning)
 
   def ContainerCopy(self, file_name, container_path='', copy_to=True):
-    """Copies a file to and from container_path to the host's vm_util.VM_TMP_DIR.
+    """Copies a file to or from container_path to the host's vm_util.VM_TMP_DIR.
 
     Args:
       file_name: Name of the file in the host's vm_util.VM_TMP_DIR.
@@ -1238,7 +1290,7 @@ class ContainerizedDebianMixin(DebianMixin):
     target.ContainerCopy(file_name, remote_path)
 
 
-class KernelVersion(object):
+class KernelRelease(object):
   """Holds the contents of the linux kernel version returned from uname -r."""
 
   def __init__(self, uname):

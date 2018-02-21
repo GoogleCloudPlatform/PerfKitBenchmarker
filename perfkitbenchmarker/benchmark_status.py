@@ -15,7 +15,6 @@
 
 import os
 
-
 SUCCEEDED = 'SUCCEEDED'
 FAILED = 'FAILED'
 SKIPPED = 'SKIPPED'
@@ -23,6 +22,17 @@ SKIPPED = 'SKIPPED'
 ALL = SUCCEEDED, FAILED, SKIPPED
 
 _COL_SEPARATOR = '  '
+
+
+class FailedSubstatus(object):
+  """Known failure modes for benchmarks."""
+
+  # Failure due to insufficient quota, user preventable
+  QUOTA = 'QUOTA_EXCEEDED'
+
+  # Failure due to insufficient capacity in the cloud provider, user
+  # non-preventable.
+  INSUFFICIENT_CAPACITY = 'INSUFFICIENT_CAPACITY'
 
 
 def _CreateSummaryTable(benchmark_specs):
@@ -33,19 +43,21 @@ def _CreateSummaryTable(benchmark_specs):
 
   Returns:
     string. Multi-line string summarizing benchmark success statuses. Example:
-        --------------------------------------
-        Name          UID            Status
-        --------------------------------------
+        --------------------------------------------------------
+        Name          UID            Status     Failed Substatus
+        --------------------------------------------------------
         iperf         iperf0         SUCCEEDED
         iperf         iperf1         FAILED
+        iperf         iperf2         FAILED     QUOTA_EXCEEDED
         cluster_boot  cluster_boot0  SKIPPED
-        --------------------------------------
+        --------------------------------------------------------
   """
-  run_status_tuples = [(spec.name, spec.uid, spec.status)
+  run_status_tuples = [(spec.name, spec.uid, spec.status,
+                        spec.failed_substatus if spec.failed_substatus else '')
                        for spec in benchmark_specs]
   assert run_status_tuples, ('run_status_tuples must contain at least one '
                              'element.')
-  col_headers = 'Name', 'UID', 'Status'
+  col_headers = 'Name', 'UID', 'Status', 'Failed Substatus'
   col_lengths = []
   for col_header, col_entries in zip(col_headers, zip(*run_status_tuples)):
     max_col_content_length = max(len(entry) for entry in col_entries)
@@ -71,14 +83,15 @@ def CreateSummary(benchmark_specs):
   Returns:
     string. Multi-line string summarizing benchmark success statuses. Example:
         Benchmark run statuses:
-        --------------------------------------
-        Name          UID            Status
-        --------------------------------------
+        --------------------------------------------------------
+        Name          UID            Status     Failed Substatus
+        --------------------------------------------------------
         iperf         iperf0         SUCCEEDED
         iperf         iperf1         FAILED
+        iperf         iperf2         FAILED     QUOTA_EXCEEDED
         cluster_boot  cluster_boot0  SKIPPED
-        --------------------------------------
-        Success rate: 33.33% (1/3)
+        --------------------------------------------------------
+        Success rate: 25.00% (1/4)
   """
   run_status_tuples = [(spec.name, spec.uid, spec.status)
                        for spec in benchmark_specs]

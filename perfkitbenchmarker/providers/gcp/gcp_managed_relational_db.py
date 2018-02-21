@@ -25,11 +25,10 @@ import datetime
 import json
 import logging
 import time
-
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
-from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -275,6 +274,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       public IP address (string)
     """
+    if describe_instance_json is None:
+      return ''
     try:
       selflink = describe_instance_json['ipAddresses'][0]['ipAddress']
     except:
@@ -283,12 +284,17 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return selflink
 
   def _PostCreate(self):
-    """Creates the user and set password."""
+    """Creates the PKB user and sets the password.
+
+    Also sets the password on the postgres user if this is a postgres database.
+    """
+
+    # The hostname '%' means unrestricted access from any host.
     cmd = util.GcloudCommand(
         self, 'sql', 'users', 'create', self.spec.database_username,
-        'dummy_host', '--instance={0}'.format(self.instance_id),
+        '%', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
-    stdout, _, _ = cmd.Issue()
+    _, _, _ = cmd.Issue()
 
   @staticmethod
   def GetDefaultEngineVersion(engine):

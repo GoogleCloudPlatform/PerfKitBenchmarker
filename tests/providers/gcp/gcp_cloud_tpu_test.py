@@ -81,7 +81,7 @@ class GcpTpuTestCase(unittest.TestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
           command_string.startswith(
-              'gcloud alpha compute tpus create pkb-tpu-123'),
+              'gcloud beta compute tpus create pkb-tpu-123'),
           command_string)
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--range 192.168.0.0/29', command_string)
@@ -99,7 +99,7 @@ class GcpTpuTestCase(unittest.TestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
           command_string.startswith(
-              'gcloud alpha compute tpus delete pkb-tpu-123'))
+              'gcloud beta compute tpus delete pkb-tpu-123'))
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--zone us-central1-a', command_string)
 
@@ -111,7 +111,7 @@ class GcpTpuTestCase(unittest.TestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
           command_string.startswith(
-              'gcloud alpha compute tpus describe pkb-tpu-123'))
+              'gcloud beta compute tpus describe pkb-tpu-123'))
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--zone us-central1-a', command_string)
 
@@ -140,7 +140,7 @@ class GcpTpuTestCase(unittest.TestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
           command_string.startswith(
-              'gcloud alpha compute tpus describe pkb-tpu-123'))
+              'gcloud beta compute tpus describe pkb-tpu-123'))
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--zone us-central1-a', command_string)
       self.assertEqual(tpu_ip, '196.168.0.2')

@@ -150,7 +150,10 @@ class BaseDpbService(resource.BaseResource):
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
     basic_data = {'dpb_service': self.SERVICE_TYPE,
-                  'dpb_cluster_id': self.cluster_id}
+                  'dpb_cluster_id': self.cluster_id,
+                  'dpb_cluster_shape':
+                  self.spec.worker_group.vm_spec.machine_type,
+                  'dpb_cluster_size': self.spec.worker_count}
     return basic_data
 
   def _Create(self):

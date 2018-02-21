@@ -143,6 +143,29 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]
     self.assertTrue(self.vm._Exists())
 
+  def testInstanceStockedOutDuringCreate(self):
+    stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
+              'the RunInstances operation (reached max retries: 4): '
+              'Insufficient capacity.')
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    with self.assertRaises(
+        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+      self.vm._Create()
+    self.assertEqual(e.exception.message, stderr)
+
+  def testInstanceStockedOutAfterCreate(self):
+    """This tests when run-instances succeeds and returns a pending instance.
+
+    The instance then is not fulfilled and transitions to terminated.
+    """
+    response = self.open_json_data('aws-describe-instance-stockout.json')
+    util.IssueRetryableCommand.side_effect = [(response, None)]
+    with self.assertRaises(
+        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+      self.vm._Exists()
+    self.assertEqual(e.exception.message, 'Server.InsufficientInstanceCapacity:'
+                     ' Insufficient capacity to satisfy instance request')
+
   def testInstanceDeleted(self):
     response = json.loads(self.response)
     state = response['Reservations'][0]['Instances'][0]['State']

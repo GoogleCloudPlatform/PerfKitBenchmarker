@@ -23,7 +23,7 @@ import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import cuda_toolkit_8
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import mxnet
 from perfkitbenchmarker.linux_packages import mxnet_cnn
 
@@ -36,20 +36,17 @@ mxnet:
   description: Runs MXNet Benchmark.
   vm_groups:
     default:
+      os_type: ubuntu1604
       vm_spec:
         GCP:
-          image: ubuntu-1604-xenial-v20171208
-          image_project: ubuntu-os-cloud
           machine_type: n1-highmem-4
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
-          image: ami-aa2ea6d0
           machine_type: p2.xlarge
           zone: us-east-1
           boot_disk_size: 200
         Azure:
-          image: Canonical:UbuntuServer:16.04.0-LTS:latest
           machine_type: Standard_NC6
           zone: eastus
 """
@@ -166,7 +163,7 @@ def _CreateMetadataDict(benchmark_spec):
   vm = benchmark_spec.vms[0]
   metadata = dict()
   if benchmark_spec.device == GPU:
-    metadata.update(cuda_toolkit_8.GetMetadata(vm))
+    metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['batch_size'] = benchmark_spec.batch_size
   metadata['num_epochs'] = benchmark_spec.num_epochs
   metadata['device'] = benchmark_spec.device
@@ -235,6 +232,7 @@ def Run(benchmark_spec):
     batch_size = _GetBatchSize(model, num_layers)
     benchmark_spec.model = model
     benchmark_spec.batch_size = batch_size
+    benchmark_spec.num_layers = num_layers
     mx_benchmark_cmd = (
         'python train_imagenet.py --benchmark 1 --network %s --batch-size %s '
         '--image-shape %s --num-epochs %s --kv-store device') % (
@@ -243,13 +241,12 @@ def Run(benchmark_spec):
             IMAGENET_SHAPE,
             benchmark_spec.num_epochs)
     if benchmark_spec.device == GPU:
-      gpus = cuda_toolkit_8.QueryNumberOfGpus(vm)
+      gpus = cuda_toolkit.QueryNumberOfGpus(vm)
       mx_benchmark_cmd = '%s %s --gpus %s' % (
           mxnet.GetEnvironmentVars(vm), mx_benchmark_cmd,
           ','.join(str(n) for n in range(gpus)))
     if num_layers:
       mx_benchmark_cmd = '%s --num-layers %s' % (mx_benchmark_cmd, num_layers)
-      benchmark_spec.num_layers = num_layers
     run_command = 'cd %s && %s' % (mx_benchmark_dir,
                                    mx_benchmark_cmd)
     stdout, stderr = vm.RobustRemoteCommand(run_command, should_log=True)

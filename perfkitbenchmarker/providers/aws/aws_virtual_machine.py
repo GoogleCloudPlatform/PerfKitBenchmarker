@@ -23,6 +23,7 @@ import collections
 from collections import OrderedDict
 import json
 import logging
+import posixpath
 import threading
 import time
 import uuid
@@ -62,10 +63,12 @@ NUM_LOCAL_VOLUMES = {
     'i3.2xlarge': 1, 'i3.4xlarge': 2, 'i3.8xlarge': 4, 'i3.16xlarge': 8
 }
 DRIVE_START_LETTER = 'b'
-INSTANCE_EXISTS_STATUSES = frozenset(
-    ['pending', 'running', 'stopping', 'stopped'])
-INSTANCE_DELETED_STATUSES = frozenset(['shutting-down', 'terminated'])
-INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
+TERMINATED = 'terminated'
+INSTANCE_EXISTS_STATUSES = frozenset(['running', 'stopping', 'stopped'])
+INSTANCE_DELETED_STATUSES = frozenset(['shutting-down', TERMINATED])
+INSTANCE_TRANSITIONAL_STATUSES = frozenset(['pending'])
+INSTANCE_KNOWN_STATUSES = (INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
+                           | INSTANCE_TRANSITIONAL_STATUSES)
 HOST_EXISTS_STATES = frozenset(
     ['available', 'under-assessment', 'permanent-failure'])
 HOST_RELEASED_STATES = frozenset(['released', 'released-permanent-failure'])
@@ -285,6 +288,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.AWS
   IMAGE_NAME_FILTER = None
   IMAGE_OWNER = None
+  IMAGE_PRODUCT_CODE_FILTER = None
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
 
   _lock = threading.Lock()
@@ -373,6 +377,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'Name=block-device-mapping.volume-type,Values=%s' %
         cls.DEFAULT_ROOT_DISK_TYPE,
         'Name=virtualization-type,Values=%s' % virt_type]
+    if cls.IMAGE_PRODUCT_CODE_FILTER:
+      describe_cmd.extend(['Name=product-code,Values=%s' %
+                           cls.IMAGE_PRODUCT_CODE_FILTER])
     if cls.IMAGE_OWNER:
       describe_cmd.extend(['--owners', cls.IMAGE_OWNER])
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
@@ -518,6 +525,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.host = self.host_list[-1]
       self.client_token = str(uuid.uuid4())
       raise errors.Resource.RetryableCreationError()
+    if 'InsufficientInstanceCapacity' in stderr:
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
 
   def _CreateSpot(self):
     """Create a Spot VM instance."""
@@ -628,6 +637,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     status = instances[0]['State']['Name']
     self.id = instances[0]['InstanceId']
     assert status in INSTANCE_KNOWN_STATUSES, status
+    # In this path run-instances succeeded, a pending instance was created, but
+    # not fulfilled so it moved to terminated.
+    if (status == TERMINATED and
+        instances[0]['StateReason']['Code'] ==
+        'Server.InsufficientInstanceCapacity'):
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+          instances[0]['StateReason']['Message'])
     return status in INSTANCE_EXISTS_STATUSES
 
   def CreateScratchDisk(self, disk_spec):
@@ -662,10 +678,46 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
 
+  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                          filename):
+    """Downloads a data file from an AWS S3 bucket with pre-provisioned data.
+
+    Use --aws_preprovisioned_data_bucket to specify the name of the bucket.
+
+    Args:
+      install_path: The install path on this VM.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: The name of the file that was downloaded.
+    """
+    self.Install('aws_credentials')
+    self.Install('awscli')
+    # TODO(deitz): Add retry logic.
+    self.RemoteCommand('aws s3 cp s3://%s/%s/%s %s' % (
+        FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
+        posixpath.join(install_path, filename)))
+
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.DebianMixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
+  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+
+
+class Ubuntu1404BasedAwsVirtualMachine(AwsVirtualMachine,
+                                       linux_virtual_machine.Ubuntu1404Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-trusty-14.04-amd64-server-20*'
+  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+
+
+class Ubuntu1604BasedAwsVirtualMachine(AwsVirtualMachine,
+                                       linux_virtual_machine.Ubuntu1604Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-xenial-16.04-amd64-server-20*'
+  IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
+
+
+class Ubuntu1710BasedAwsVirtualMachine(AwsVirtualMachine,
+                                       linux_virtual_machine.Ubuntu1710Mixin):
+  IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-artful-17.10-amd64-server-20*'
   IMAGE_OWNER = '099720109477'  # For Amazon-owned images.
 
 
@@ -684,10 +736,38 @@ class RhelBasedAwsVirtualMachine(AwsVirtualMachine,
     user_name_set = FLAGS['aws_user_name'].present
     self.user_name = FLAGS.aws_user_name if user_name_set else 'ec2-user'
 
+    # package_config
+    self.python_package_config = 'python27'
+    self.python_dev_package_config = 'python27-devel'
+    self.python_pip_package_config = 'python27-pip'
+
+
+class Centos7BasedAwsVirtualMachine(AwsVirtualMachine,
+                                    linux_virtual_machine.Centos7Mixin):
+  # Documentation on finding the Centos 7 image:
+  # https://wiki.centos.org/Cloud/AWS#head-cc841c2a7d874025ae24d427776e05c7447024b2
+  IMAGE_NAME_FILTER = 'CentOS*Linux*7*'
+  IMAGE_PRODUCT_CODE_FILTER = 'aw0evgkw8e5c1q413zgy5pjce'
+  IMAGE_OWNER = 'aws-marketplace'
+
+  # Centos 7 images on AWS use standard EBS rather than GP2. See the bug at
+  # https://bugs.centos.org/view.php?id=13301.
+  DEFAULT_ROOT_DISK_TYPE = 'standard'
+
+  def __init__(self, vm_spec):
+    super(Centos7BasedAwsVirtualMachine, self).__init__(vm_spec)
+    user_name_set = FLAGS['aws_user_name'].present
+    self.user_name = FLAGS.aws_user_name if user_name_set else 'centos'
+
+    # package_config
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
+
 
 class WindowsAwsVirtualMachine(AwsVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
-
+  """Support for Windows machines on AWS."""
   IMAGE_NAME_FILTER = 'Windows_Server-2012-R2_RTM-English-64Bit-Core-*'
 
   def __init__(self, vm_spec):

@@ -199,6 +199,11 @@ class DefaultMetadataProvider(MetadataProvider):
       for k, v in cloud_tpu.GetResourceMetadata().iteritems():
         metadata['cloud_tpu_' + k] = v
 
+    if benchmark_spec.cloud_redis:
+      cloud_redis = benchmark_spec.cloud_redis
+      for k, v in cloud_redis.GetResourceMetadata().iteritems():
+        metadata['cloud_redis_' + k] = v
+
     for name, vms in benchmark_spec.vm_groups.iteritems():
       if len(vms) == 0:
         continue
@@ -209,6 +214,8 @@ class DefaultMetadataProvider(MetadataProvider):
       for k, v in vm.GetResourceMetadata().iteritems():
         metadata[name_prefix + k] = v
       metadata[name_prefix + 'vm_count'] = len(vms)
+      for k, v in vm.GetOSResourceMetadata().iteritems():
+        metadata[name_prefix + k] = v
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]

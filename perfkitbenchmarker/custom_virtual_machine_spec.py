@@ -19,6 +19,7 @@ import re
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 
 
 class MemoryDecoder(option_decoders.StringDecoder):
@@ -127,3 +128,81 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
       return value
     return CustomMachineTypeSpec(self._GetOptionFullName(component_full_name),
                                  flag_values=flag_values, **value)
+
+
+class AzureMachineTypeDecoder(option_decoders.TypeVerifier):
+  """Decodes the machine_type option of a VM config."""
+
+  def __init__(self, **kwargs):
+    super(AzureMachineTypeDecoder, self).__init__((basestring, dict), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Decodes the machine_type option of a VM config.
+
+    Args:
+      value: Either a string name of a machine type or a dict containing
+          'compute_units' and 'tier' keys describing a machine type.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+
+    Returns:
+      If value is a string, returns it unmodified. Otherwise, returns the
+      decoded CustomMachineTypeSpec.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    super(AzureMachineTypeDecoder, self).Decode(value, component_full_name,
+                                                flag_values)
+    if isinstance(value, basestring):
+      return value
+    return AzurePerformanceTierDecoder(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values, **value)
+
+
+class AzurePerformanceTierDecoder(spec.BaseSpec):
+  """Properties of a An Azure custom machine type.
+
+  Attributes:
+    compute_units: int. Number of compute units.
+    tier: Basic, Standard or Premium
+  """
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(
+        AzurePerformanceTierDecoder, cls)._GetOptionDecoderConstructions()
+    # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/acu
+    # https://docs.microsoft.com/en-us/azure/sql-database/sql-database-service-tiers
+    result.update({'compute_units': (option_decoders.IntDecoder, {'min': 50}),
+                   'tier': (option_decoders.EnumDecoder, {
+                       'valid_values': azure_flags.VALID_TIERS})})
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values.
+        May be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    if flag_values['azure_tier'].present:
+      config_values['tier'] = flag_values.azure_tier
+
+    if flag_values['azure_compute_units'].present:
+      config_values['compute_units'] = flag_values.azure_compute_units

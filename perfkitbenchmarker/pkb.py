@@ -69,6 +69,7 @@ import uuid
 
 from perfkitbenchmarker import archive
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import benchmark_lookup
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import benchmark_status
@@ -218,7 +219,13 @@ flags.DEFINE_integer(
     'run_stage_time', 0,
     'PKB will run/re-run the run stage of each benchmark until it has spent '
     'at least this many seconds. It defaults to 0, so benchmarks will only '
-    'be run once unless some other value is specified.')
+    'be run once unless some other value is specified. This flag and '
+    'run_stage_iterations are mutually exclusive.')
+flags.DEFINE_integer(
+    'run_stage_iterations', 1,
+    'PKB will run/re-run the run stage of each benchmark this many times. '
+    'It defaults to 1, so benchmarks will only be run once unless some other '
+    'value is specified. This flag and run_stage_time are mutually exclusive.')
 flags.DEFINE_integer(
     'run_stage_retries', 0,
     'The number of allowable consecutive failures during the run stage. After '
@@ -419,6 +426,8 @@ def _WriteCompletionStatusFile(benchmark_specs, status_file):
   {
     "name": <benchmark name>,
     "status": <completion status>,
+    "failed_substatus": <failed substatus>,
+    "status_detail": <descriptive string (if present)>,
     "flags": <flags dictionary>
   }
 
@@ -431,6 +440,10 @@ def _WriteCompletionStatusFile(benchmark_specs, status_file):
     status_dict = collections.OrderedDict()
     status_dict['name'] = spec.name
     status_dict['status'] = spec.status
+    if spec.failed_substatus:
+      status_dict['failed_substatus'] = spec.failed_substatus
+    if spec.status_detail:
+      status_dict['status_detail'] = spec.status_detail
     status_dict['flags'] = spec.config.flags
     status_file.write(json.dumps(status_dict) + '\n')
 
@@ -452,6 +465,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructVirtualMachines()
   spec.ConstructCloudTpu()
   spec.ConstructEdwService()
+  spec.ConstructCloudRedis()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
@@ -495,6 +509,13 @@ def DoRunPhase(spec, collector, timer):
   run_number = 0
   consecutive_failures = 0
   last_publish_time = time.time()
+
+  def _IsRunStageFinished():
+    if FLAGS.run_stage_time > 0:
+      return time.time() > deadline
+    else:
+      return run_number >= FLAGS.run_stage_iterations
+
   while True:
     samples = []
     logging.info('Running benchmark %s', spec.name)
@@ -514,7 +535,7 @@ def DoRunPhase(spec, collector, timer):
       events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
     events.samples_created.send(
         events.RUN_PHASE, benchmark_spec=spec, samples=samples)
-    if FLAGS.run_stage_time:
+    if FLAGS.run_stage_time or FLAGS.run_stage_iterations:
       for s in samples:
         s.metadata['run_number'] = run_number
     collector.AddSamples(samples, spec.name, spec)
@@ -523,7 +544,7 @@ def DoRunPhase(spec, collector, timer):
       collector.PublishSamples()
       last_publish_time = time.time()
     run_number += 1
-    if time.time() > deadline:
+    if _IsRunStageFinished():
       if (FLAGS.boot_samples or
           spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
         collector.AddSamples(
@@ -618,6 +639,18 @@ def RunBenchmark(spec, collector):
               detailed_timer.GenerateSamples(), spec.name, spec)
 
       except Exception as e:
+        # Log specific type of failure, if known
+        # TODO(dlott) Move to exception chaining with Python3 support
+        if (isinstance(e, errors.Benchmarks.InsufficientCapacityCloudFailure)
+            or 'InsufficientCapacityCloudFailure' in str(e)):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY)
+          spec.status_detail = str(e)
+        elif (isinstance(e, errors.Benchmarks.QuotaFailure)
+              or 'QuotaFailure' in str(e)):
+          spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
+          spec.status_detail = str(e)
+
         # Resource cleanup (below) can take a long time. Log the error to give
         # immediate feedback, then re-throw.
         logging.exception('Error during benchmark %s', spec.name)
@@ -698,6 +731,7 @@ def RunBenchmarkTask(spec):
   try:
     RunBenchmark(spec, collector)
   except BaseException as e:
+    logging.exception('Exception running benchmark')
     msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
         spec.sequence_number, spec.total_benchmarks, spec.name, spec.uid)
     if isinstance(e, KeyboardInterrupt) or FLAGS.stop_after_benchmark_failure:
@@ -758,6 +792,11 @@ def SetUpPKB():
       raise errors.Setup.MissingExecutableError(
           'Could not find required executable "%s"', executable)
 
+  # Check mutually exclusive flags
+  if FLAGS.run_stage_iterations > 1 and FLAGS.run_stage_time > 0:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Flags run_stage_iterations and run_stage_time are mutually exclusive')
+
   vm_util.SSHKeyGen()
 
   if FLAGS.static_vm_file:
@@ -766,6 +805,20 @@ def SetUpPKB():
           fp)
 
   events.initialization_complete.send(parsed_flags=FLAGS)
+
+  benchmark_lookup.SetBenchmarkModuleFunction(benchmark_sets.BenchmarkModule)
+
+
+def RunBenchmarkTasksInSeries(tasks):
+  """Runs benchmarks in series.
+
+  Arguments:
+    tasks: list of tuples of task: [(RunBenchmarkTask, (spec,), {}),]
+
+  Returns:
+    list of tuples of func results
+  """
+  return [func(*args, **kwargs) for func, args, kwargs in tasks]
 
 
 def RunBenchmarks():
@@ -786,8 +839,11 @@ def RunBenchmarks():
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
-    spec_sample_tuples = background_tasks.RunParallelProcesses(
-        tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
+    if FLAGS.run_processes == 1:
+      spec_sample_tuples = RunBenchmarkTasksInSeries(tasks)
+    else:
+      spec_sample_tuples = background_tasks.RunParallelProcesses(
+          tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
     benchmark_specs, sample_lists = zip(*spec_sample_tuples)
     for sample_list in sample_lists:
       collector.samples.extend(sample_list)

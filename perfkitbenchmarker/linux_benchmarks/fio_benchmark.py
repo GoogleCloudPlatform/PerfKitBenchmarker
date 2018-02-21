@@ -191,19 +191,20 @@ def FillTarget():
   return FLAGS.fio_target_mode in FILL_TARGET_MODES
 
 
-def FillDevice(vm, disk, fill_size):
+def FillDevice(vm, disk, fill_size, exec_path):
   """Fill the given disk on the given vm up to fill_size.
 
   Args:
     vm: a linux_virtual_machine.BaseLinuxMixin object.
     disk: a disk.BaseDisk attached to the given vm.
     fill_size: amount of device to fill, in fio format.
+    exec_path: string path to the fio executable
   """
 
-  command = (('sudo %s --filename=%s --ioengine=libaio '
+  command = (('%s --filename=%s --ioengine=libaio '
               '--name=fill-device --blocksize=512k --iodepth=64 '
               '--rw=write --direct=1 --size=%s') %
-             (fio.FIO_PATH, disk.GetDevicePath(), fill_size))
+             (exec_path, disk.GetDevicePath(), fill_size))
 
   vm.RobustRemoteCommand(command)
 
@@ -308,11 +309,11 @@ def GenerateJobFileString(filename, scenario_strings,
 FILENAME_PARAM_REGEXP = re.compile('filename\s*=.*$', re.MULTILINE)
 
 
-def ProcessedJobFileString(fio_jobfile, remove_filename):
-  """Get the contents of a job file as a string, slightly edited.
+def ProcessedJobFileString(fio_jobfile_contents, remove_filename):
+  """Modify the fio job if requested.
 
   Args:
-    fio_jobfile: the path to a fio job file.
+    fio_jobfile_contents: the contents of a fio job file.
     remove_filename: bool. If true, remove the filename parameter from
       the job file.
 
@@ -320,17 +321,16 @@ def ProcessedJobFileString(fio_jobfile, remove_filename):
     The job file as a string, possibly without filename parameters.
   """
 
-  with open(fio_jobfile, 'r') as jobfile:
-    if remove_filename:
-      return FILENAME_PARAM_REGEXP.sub('', jobfile.read())
-    else:
-      return jobfile.read()
+  if remove_filename:
+    return FILENAME_PARAM_REGEXP.sub('', fio_jobfile_contents)
+  else:
+    return fio_jobfile_contents
 
 
 def GetOrGenerateJobFileString(job_file_path, scenario_strings,
                                against_device, disk, io_depths,
                                num_jobs, working_set_size, block_size,
-                               runtime, parameters):
+                               runtime, parameters, job_file_contents):
   """Get the contents of the fio job file we're working with.
 
   This will either read the user's job file, if given, or generate a
@@ -351,16 +351,19 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
     block_size: Quantity or None. If Quantity, the block size to use.
     runtime: int. The number of seconds to run each job.
     parameters: list. Other fio parameters to apply to all jobs.
+    job_file_contents: string contents of fio job.
 
   Returns:
     A string containing a fio job file.
   """
 
+  user_job_file_string = GetFileAsString(job_file_path)
+
   use_user_jobfile = job_file_path or not scenario_strings
 
   if use_user_jobfile:
     remove_filename = against_device
-    return ProcessedJobFileString(job_file_path or data.ResourcePath('fio.job'),
+    return ProcessedJobFileString(user_job_file_string or job_file_contents,
                                   remove_filename)
   else:
     if against_device:
@@ -432,6 +435,18 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
+  exec_path = fio.GetFioExec()
+  return PrepareWithExec(benchmark_spec, exec_path)
+
+
+def GetFileAsString(file_path):
+  if not file_path:
+    return None
+  with open(file_path, 'r') as jobfile:
+    return jobfile.read()
+
+
+def PrepareWithExec(benchmark_spec, exec_path):
   """Prepare the virtual machine to run FIO.
 
      This includes installing fio, bc, and libaio1 and pre-filling the
@@ -441,6 +456,7 @@ def Prepare(benchmark_spec):
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
+    exec_path: string path to the fio executable
 
   """
   vm = benchmark_spec.vms[0]
@@ -452,7 +468,7 @@ def Prepare(benchmark_spec):
 
   if FillTarget():
     logging.info('Fill device %s on %s', disk.GetDevicePath(), vm)
-    FillDevice(vm, disk, FLAGS.fio_fill_size)
+    FillDevice(vm, disk, FLAGS.fio_fill_size, exec_path)
 
   # We only need to format and mount if the target mode is against
   # file with fill because 1) if we're running against the device, we
@@ -465,11 +481,22 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
+  fio_exe = fio.GetFioExec()
+  default_job_file_contents = GetFileAsString(data.ResourcePath('fio.job'))
+  return RunWithExec(benchmark_spec, fio_exe, REMOTE_JOB_FILE_PATH,
+                     default_job_file_contents)
+
+
+def RunWithExec(benchmark_spec, exec_path, remote_job_file_path,
+                job_file_contents):
   """Spawn fio and gather the results.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
+    exec_path: string path to the fio executable.
+    remote_job_file_path: path, on the vm, to the location of the job file.
+    job_file_contents: string contents of the fio job file.
 
   Returns:
     A list of sample.Sample objects.
@@ -490,21 +517,22 @@ def Run(benchmark_spec):
       FLAGS.fio_working_set_size,
       FLAGS.fio_blocksize,
       FLAGS.fio_runtime,
-      FLAGS.fio_parameters)
+      FLAGS.fio_parameters,
+      job_file_contents)
   job_file_path = vm_util.PrependTempDir(vm.name + LOCAL_JOB_FILE_SUFFIX)
   with open(job_file_path, 'w') as job_file:
     job_file.write(job_file_string)
     logging.info('Wrote fio job file at %s', job_file_path)
     logging.info(job_file_string)
 
-  vm.PushFile(job_file_path, REMOTE_JOB_FILE_PATH)
+  vm.PushFile(job_file_path, remote_job_file_path)
 
   if AgainstDevice():
-    fio_command = 'sudo %s --output-format=json --filename=%s %s' % (
-        fio.FIO_PATH, disk.GetDevicePath(), REMOTE_JOB_FILE_PATH)
+    fio_command = '%s --output-format=json --filename=%s %s' % (
+        exec_path, disk.GetDevicePath(), remote_job_file_path)
   else:
-    fio_command = 'sudo %s --output-format=json --directory=%s %s' % (
-        fio.FIO_PATH, mount_point, REMOTE_JOB_FILE_PATH)
+    fio_command = '%s --output-format=json --directory=%s %s' % (
+        exec_path, mount_point, remote_job_file_path)
 
   collect_logs = any([FLAGS.fio_lat_log, FLAGS.fio_bw_log, FLAGS.fio_iops_log,
                       FLAGS.fio_hist_log])

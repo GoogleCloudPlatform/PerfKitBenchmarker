@@ -1,0 +1,49 @@
+{
+    "Reservations": [
+        {
+            "OwnerId": "835761027970",
+            "ReservationId": "r-0cd91de9557430677",
+            "Groups": [],
+            "Instances": [
+                {
+                    "Monitoring": {
+                        "State": "disabled"
+                    },
+                    "PublicDnsName": "",
+                    "RootDeviceType": "ebs",
+                    "State": {
+                        "Code": 48,
+                        "Name": "terminated"
+                    },
+                    "EbsOptimized": false,
+                    "LaunchTime": "2018-02-01T21:49:34.000Z",
+                    "ProductCodes": [],
+                    "StateTransitionReason": "Server.InternalError",
+                    "InstanceId": "i-0543b2bd9d2699ff9",
+                    "ImageId": "ami-66506c1c",
+                    "PrivateDnsName": "",
+                    "KeyName": "perfkit-key-a61a864f16",
+                    "SecurityGroups": [],
+                    "ClientToken": "10e759dd-ceda-43d1-89b8-8bf616d9f91f",
+                    "InstanceType": "m5.12xlarge",
+                    "NetworkInterfaces": [],
+                    "Placement": {
+                        "Tenancy": "default",
+                        "GroupName": "perfkit-a61a864f16-76d7c9ddd9ee",
+                        "AvailabilityZone": "us-east-1a"
+                    },
+                    "Hypervisor": "xen",
+                    "BlockDeviceMappings": [],
+                    "Architecture": "x86_64",
+                    "StateReason": {
+                        "Message": "Server.InsufficientInstanceCapacity: Insufficient capacity to satisfy instance request",
+                        "Code": "Server.InsufficientInstanceCapacity"
+                    },
+                    "RootDeviceName": "/dev/sda1",
+                    "VirtualizationType": "hvm",
+                    "AmiLaunchIndex": 0
+                }
+            ]
+        }
+    ]
+}
