@@ -47,3 +47,6 @@ flags.DEFINE_string('aws_preprovisioned_data_bucket', None,
 flags.DEFINE_string('redis_node_type',
                     'cache.m4.large',
                     'The AWS node type to use for cloud redis')
+flags.DEFINE_string('aws_elasticache_failover_zone',
+                    None,
+                    'AWS elasticache failover zone')

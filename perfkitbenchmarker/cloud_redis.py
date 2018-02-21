@@ -22,9 +22,21 @@ from perfkitbenchmarker import resource
 _CLOUD_REDIS_REGISTRY = {}
 FLAGS = flags.FLAGS
 
-# List of supported redis tiers
-STANDARD = 'STANDARD'
-BASIC = 'BASIC'
+
+class Failover(object):
+  """Enum for redis failover options."""
+  FAILOVER_NONE = 'failover_none'
+  FAILOVER_SAME_ZONE = 'failover_same_zone'
+  FAILOVER_SAME_REGION = 'failover_same_region'
+
+flags.DEFINE_enum(
+    'redis_failover_style',
+    Failover.FAILOVER_NONE,
+    [Failover.FAILOVER_NONE,
+     Failover.FAILOVER_SAME_ZONE,
+     Failover.FAILOVER_SAME_REGION],
+    'Failover behavior of cloud redis cluster. Acceptable values are:'
+    'failover_none, failover_same_zone, and failover_same_region')
 
 # List of redis versions
 REDIS_3_2 = 'REDIS_3_2'
@@ -74,3 +86,11 @@ class BaseCloudRedis(resource.BaseResource):
     """
     super(BaseCloudRedis, self).__init__()
     self.spec = cloud_redis_spec
+    self.failover_style = FLAGS.redis_failover_style
+
+  def GetResourceMetadata(self):
+    """Returns a dictionary of cluster metadata."""
+    metadata = {
+        'failover_style': self.failover_style
+    }
+    return metadata

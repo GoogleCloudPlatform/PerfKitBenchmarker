@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: nvidia-add-unrestricted-permissions
-        image: nvidia/cuda:8.0-devel-ubuntu16.04
+        image: nvidia/cuda:9.0-devel-ubuntu16.04
         securityContext:
           privileged: true
         command: [ "/bin/bash", "-c", "export PATH=$PATH:/usr/local/bin/nvidia/ && while [ ! $(type -p nvidia-smi) ]; do echo waiting for nvidia-smi to mount...; sleep 2; done && nvidia-smi -pm 1 && nvidia-smi --applications-clocks-permission=UNRESTRICTED && nvidia-smi --auto-boost-permission=UNRESTRICTED && tail -f /dev/null" ]
@@ -41,4 +41,4 @@ spec:
             path: /home/kubernetes/bin/nvidia/bin
         - name: nvidia-libraries
           hostPath:
-            path: /home/kubernetes/bin/nvidia/lib
+            path: /home/kubernetes/bin/nvidia/lib64

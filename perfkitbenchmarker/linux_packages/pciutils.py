@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,14 @@
 # limitations under the License.
 
 
-"""Module containing wget installation and cleanup functions."""
+"""Module containing pciutils installation functions."""
 
 
-def Install(vm):
-  """Installs the wget package on the VM."""
-  vm.InstallPackages('wget')
+def YumInstall(vm):
+  """Installs the package on the VM."""
+  vm.InstallPackages('pciutils')
+
+
+def AptInstall(vm):
+  """Installs the package on the VM."""
+  vm.InstallPackages('pciutils')
