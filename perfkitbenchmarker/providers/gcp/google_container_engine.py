@@ -26,7 +26,7 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.8/device-plugin-daemonset.yaml'
+NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.9/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 
 
@@ -63,8 +63,8 @@ class GkeCluster(container_service.KubernetesCluster):
       # to be specified in the spec (this will require a new spec class
       # for google_container_engine however).
       cmd = util.GcloudCommand(
-          self, 'alpha', 'container', 'clusters', 'create', self.name,
-          '--enable-kubernetes-alpha', '--cluster-version', '1.8.6-gke.0')
+          self, 'beta', 'container', 'clusters', 'create', self.name,
+          '--cluster-version', '1.9.2-gke.1')
 
       cmd.flags['accelerator'] = (gce_virtual_machine.
                                   GenerateAcceleratorSpecString(self.gpu_type,

@@ -4,6 +4,7 @@ Spins up a cloud redis instance, runs YCSB against it, then spins it down.
 """
 
 import logging
+from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
@@ -14,7 +15,6 @@ flags.DEFINE_string('redis_region',
                     'us-central1',
                     'The region to spin up cloud redis in')
 
-
 BENCHMARK_NAME = 'cloud_redis_ycsb'
 
 BENCHMARK_CONFIG = """
@@ -22,8 +22,6 @@ cloud_redis_ycsb:
   description: Run YCSB against cloud redis
   cloud_redis:
     redis_version: REDIS_3_2
-    redis_size_gb: 5
-    redis_tier: STANDARD
   vm_groups:
     clients:
       vm_spec: *default_single_core
@@ -35,6 +33,23 @@ CLOUD_REDIS_CLASS_NAME = 'CloudRedis'
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+
+def CheckPrerequisites(benchmark_config):
+  """Verifies that the required resources are present.
+
+  Args:
+    benchmark_config: benchmark_config
+  Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+  """
+  # TODO(ruwa): This CheckPrerequisites call checks the prerequisites
+  # on the resource. Ideally, the benchmark is not responsible for this task.
+  # Instead, BaseResource should check prerequisites as part of creation and
+  # child resources can override CheckPrerequisites and benefit from it.
+  cloud_redis_class = cloud_redis.GetCloudRedisClass(
+      benchmark_config.cloud_redis.cloud)
+  cloud_redis_class.CheckPrerequisites(benchmark_config)
 
 
 def Prepare(benchmark_spec):

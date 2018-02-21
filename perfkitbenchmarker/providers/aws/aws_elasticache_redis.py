@@ -22,6 +22,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_network
 
 FLAGS = flags.FLAGS
 REDIS_VERSION_MAPPING = {'REDIS_3_2': '3.2.10'}
@@ -38,6 +39,25 @@ class ElastiCacheRedis(cloud_redis.BaseCloudRedis):
     self.cluster_name = 'pkb-%s' % FLAGS.run_uri
     self.version = REDIS_VERSION_MAPPING[spec.redis_version]
     self.node_type = FLAGS.redis_node_type
+    self.redis_region = FLAGS.redis_region
+    self.failover_zone = FLAGS.aws_elasticache_failover_zone
+    self.failover_subnet = None
+
+  @staticmethod
+  def CheckPrerequisites(benchmark_config):
+    if FLAGS.redis_failover_style in [cloud_redis.Failover.FAILOVER_NONE,
+                                      cloud_redis.Failover.FAILOVER_SAME_ZONE]:
+      if FLAGS.aws_elasticache_failover_zone:
+        raise errors.Config.InvalidValue(
+            'The aws_elasticache_failover_zone flag is ignored. '
+            'There is no need for a failover zone when there is no failover. '
+            'Same zone failover will fail over to the same zone.')
+    else:
+      if (not FLAGS.aws_elasticache_failover_zone or
+          FLAGS.aws_elasticache_failover_zone[:-1] != FLAGS.redis_region):
+        raise errors.Config.InvalidValue(
+            'Invalid failover zone. '
+            'A failover zone in %s must be specified. ' % FLAGS.redis_region)
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the instance.
@@ -48,58 +68,87 @@ class ElastiCacheRedis(cloud_redis.BaseCloudRedis):
     result = super(ElastiCacheRedis, self).GetResourceMetadata()
     result['version'] = self.version
     result['node_type'] = self.node_type
+    result['region'] = self.redis_region
+    result['primary_zone'] = self.spec.client_vm.zone
+    result['failover_zone'] = self.failover_zone
     return result
 
   def _CreateDependencies(self):
     """Create the subnet dependencies."""
+    subnet_id = self.spec.client_vm.network.subnet.id
     cmd = ['aws', 'elasticache', 'create-cache-subnet-group',
-           '--region=%s' % FLAGS.redis_region,
-           '--cache-subnet-group-name=%s' % self.subnet_group_name,
-           '--cache-subnet-group-description="PKB redis benchmark subnet"',
-           '--subnet-ids=%s' % self.spec.subnet_id]
+           '--region', self.redis_region,
+           '--cache-subnet-group-name', self.subnet_group_name,
+           '--cache-subnet-group-description', '"PKB redis benchmark subnet"',
+           '--subnet-ids', subnet_id]
+
+    if self.failover_style == cloud_redis.Failover.FAILOVER_SAME_REGION:
+      regional_network = self.spec.client_vm.network.regional_network
+      vpc_id = regional_network.vpc.id
+      cidr = regional_network.vpc.NextSubnetCidrBlock()
+      self.failover_subnet = aws_network.AwsSubnet(
+          self.failover_zone, vpc_id, cidr_block=cidr)
+      self.failover_subnet.Create()
+      cmd += [self.failover_subnet.id]
+
     vm_util.IssueCommand(cmd)
 
   def _DeleteDependencies(self):
     """Delete the subnet dependencies."""
     cmd = ['aws', 'elasticache', 'delete-cache-subnet-group',
-           '--region=%s' % FLAGS.redis_region,
+           '--region=%s' % self.redis_region,
            '--cache-subnet-group-name=%s' % self.subnet_group_name]
     vm_util.IssueCommand(cmd)
 
+    if self.failover_subnet:
+      self.failover_subnet.Delete()
+
   def _Create(self):
     """Creates the cluster."""
-    cmd = ['aws', 'elasticache', 'create-cache-cluster',
-           '--engine=redis',
-           '--num-cache-nodes=1',  # must be 1 for redis clusters
-           '--engine-version=%s' % self.version,
-           '--region=%s' % FLAGS.redis_region,
-           '--cache-cluster-id=%s' % self.cluster_name,
-           '--cache-node-type=%s' % self.node_type,
-           '--cache-subnet-group-name=%s' % self.subnet_group_name]
+    cmd = ['aws', 'elasticache', 'create-replication-group',
+           '--engine', 'redis',
+           '--engine-version', self.version,
+           '--replication-group-id', self.cluster_name,
+           '--replication-group-description', self.cluster_name,
+           '--region', self.redis_region,
+           '--cache-node-type', self.node_type,
+           '--cache-subnet-group-name', self.subnet_group_name,
+           '--preferred-cache-cluster-a-zs', self.spec.client_vm.zone]
+
+    if self.failover_style == cloud_redis.Failover.FAILOVER_SAME_REGION:
+      cmd += [self.failover_zone]
+
+    elif self.failover_style == cloud_redis.Failover.FAILOVER_SAME_ZONE:
+      cmd += [self.spec.client_vm.zone]
+
+    if self.failover_style != cloud_redis.Failover.FAILOVER_NONE:
+      cmd += ['--automatic-failover-enabled',
+              '--num-cache-clusters', '2']
+
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):
     """Deletes the cluster."""
-    cmd = ['aws', 'elasticache', 'delete-cache-cluster',
-           '--region=%s' % FLAGS.redis_region,
-           '--cache-cluster-id=%s' % self.cluster_name]
+    cmd = ['aws', 'elasticache', 'delete-replication-group',
+           '--region', self.redis_region,
+           '--replication-group-id', self.cluster_name]
     vm_util.IssueCommand(cmd)
 
   def _IsDeleting(self):
     """Returns True if cluster is being deleted and false otherwise."""
     cluster_info = self.DescribeInstance()
-    return cluster_info.get('CacheClusterStatus', '') == 'deleting'
+    return cluster_info.get('Status', '') == 'deleting'
 
   def _IsReady(self):
     """Returns True if cluster is ready and false otherwise."""
     cluster_info = self.DescribeInstance()
-    return cluster_info.get('CacheClusterStatus', '') == 'available'
+    return cluster_info.get('Status', '') == 'available'
 
   def _Exists(self):
     """Returns true if the cluster exists and is not being deleted."""
     cluster_info = self.DescribeInstance()
-    return ('CacheClusterStatus' in cluster_info and
-            cluster_info['CacheClusterStatus'] != 'deleting')
+    return ('Status' in cluster_info and
+            cluster_info['Status'] not in ['deleting', 'create-failed'])
 
   def DescribeInstance(self):
     """Calls describe on cluster.
@@ -107,16 +156,15 @@ class ElastiCacheRedis(cloud_redis.BaseCloudRedis):
     Returns:
       dict mapping string cluster_info property key to value.
     """
-    cmd = ['aws', 'elasticache', 'describe-cache-clusters',
-           '--show-cache-node-info',
-           '--region=%s' % FLAGS.redis_region,
-           '--cache-cluster-id=%s' % self.cluster_name]
+    cmd = ['aws', 'elasticache', 'describe-replication-groups',
+           '--region', self.redis_region,
+           '--replication-group-id', self.cluster_name]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd)
     if retcode != 0:
       logging.info('Could not find cluster %s, %s', self.cluster_name, stderr)
       return {}
-    for cluster_info in json.loads(stdout)['CacheClusters']:
-      if cluster_info['CacheClusterId'] == self.cluster_name:
+    for cluster_info in json.loads(stdout)['ReplicationGroups']:
+      if cluster_info['ReplicationGroupId'] == self.cluster_name:
         return cluster_info
     return {}
 
@@ -135,11 +183,7 @@ class ElastiCacheRedis(cloud_redis.BaseCloudRedis):
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on %s', self.cluster_name)
 
-    if 'ConfigurationEndpoint' in cluster_info:   # multiple nodes
-      cluster_info['host'] = cluster_info['ConfigurationEndpoint']['Address']
-      cluster_info['port'] = cluster_info['ConfigurationEndpoint']['Port']
-    else:
-      cache_node = cluster_info['CacheNodes'][0]  # single node
-      cluster_info['host'] = cache_node['Endpoint']['Address']
-      cluster_info['port'] = cache_node['Endpoint']['Port']
+    primary_endpoint = cluster_info['NodeGroups'][0]['PrimaryEndpoint']
+    cluster_info['host'] = primary_endpoint['Address']
+    cluster_info['port'] = primary_endpoint['Port']
     return cluster_info

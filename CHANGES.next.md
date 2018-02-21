@@ -59,6 +59,8 @@
 - Add more granularity to FAILED benchmarks with FailedSubstatus (GCP and AWS).
 - Update sysbench benchmark to version 1.0. (deprecate 0.4 and 0.5 versions)
 - Change GCP TPU command from alpha to beta.
+- Update configurable parameters for ycsb benchmarks.
+- Added tags to AWS kops instances and increased loadbalancer timeout.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -91,3 +93,9 @@
   argument.
 - "nightly" now is not a valid argument in GCP TPU commands.
 - Make aerospike_ycsb runnable on Amazon AMI.
+- Fixed assumption that HOME was set.
+- Fixed issue with default K8s image setup.
+- Install the correct TensorFlow pip package based on whether VM has GPUs or
+  not.
+- Change to root for command "lspci".
+- Install package pciutils when install cuda_toolkit.
