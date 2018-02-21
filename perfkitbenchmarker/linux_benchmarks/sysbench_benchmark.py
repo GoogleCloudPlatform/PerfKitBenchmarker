@@ -383,7 +383,7 @@ def Run(benchmark_spec):
     run_results = _RunSysbench(vm, metadata, benchmark_spec, thread_count)
     print run_results
     results += run_results
-
+    
   return results
 
 
