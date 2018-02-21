@@ -310,10 +310,6 @@ def _PrepareSysbench(vm, metadata, benchmark_spec):
 
   return results
 
-# Needs to be a global variable so the data loading results will persist
-# from Prepare to Run stage when called together.
-DATA_LOADING_RESULTS = []
-
 
 def CreateMetadataFromFlags():
   """Create meta data with all flags for sysbench."""
@@ -362,8 +358,6 @@ def Prepare(benchmark_spec):
 
   prepare_results = _PrepareSysbench(vm, metadata, benchmark_spec)
   print prepare_results
-
-  DATA_LOADING_RESULTS = prepare_results
 
 
 def Run(benchmark_spec):
