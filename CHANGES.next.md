@@ -99,3 +99,4 @@
   not.
 - Change to root for command "lspci".
 - Install package pciutils when install cuda_toolkit.
+- Update TensorFlow benchmark arguments.
