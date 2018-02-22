@@ -10,6 +10,7 @@
 - Changed default Tensorflow package when using CPUs to an Intel CPU-optimized
   build.
 - Renamed cuda_toolkit_8 to cuda_toolkit
+- Migrated cluster boot benchmark default machines to 'default_dual_core'.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers
@@ -22,6 +23,7 @@
 - Added support for CUDA Toolkit 9.0
 - Added MXNet support for CUDA Toolkit 9.0
 - Added new version of HPCG, with CUDA 9 support
+- Added 'default_dual_core' machine type configuration for AWS, Azure and GCP.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
