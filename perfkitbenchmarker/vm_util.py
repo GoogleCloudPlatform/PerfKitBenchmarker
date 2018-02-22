@@ -17,6 +17,7 @@
 import contextlib
 import logging
 import os
+import platform
 import random
 import re
 import string
@@ -54,6 +55,7 @@ FUZZ = .5
 MAX_RETRIES = -1
 
 WINDOWS = 'nt'
+DARWIN = 'Darwin'
 PASSWORD_LENGTH = 15
 
 OUTPUT_STDOUT = 0
@@ -295,7 +297,9 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   time_file_path = '/usr/bin/time'
 
   runningOnWindows = RunningOnWindows()
-  should_time = not runningOnWindows and os.path.isfile(time_file_path)
+  runningOnDarwin = RunningOnDarwin()
+  should_time = (not (runningOnWindows or runningOnDarwin) and
+                 os.path.isfile(time_file_path))
   shell_value = runningOnWindows
   with tempfile.TemporaryFile() as tf_out, \
       tempfile.TemporaryFile() as tf_err, \
@@ -505,6 +509,11 @@ def GenerateSSHConfig(vms, vm_groups):
 def RunningOnWindows():
   """Returns True if PKB is running on Windows."""
   return os.name == WINDOWS
+
+
+def RunningOnDarwin():
+    """Returns True if PKB is running on a Darwin OS machine."""
+    return os.name != WINDOWS and platform.system() == DARWIN
 
 
 def ExecutableOnPath(executable_name):
