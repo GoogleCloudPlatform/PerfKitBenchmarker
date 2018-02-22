@@ -27,7 +27,7 @@ cluster_boot:
       Specify the cluster size with --num_vms.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: null
 """
 
