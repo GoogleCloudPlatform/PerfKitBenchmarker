@@ -23,7 +23,7 @@
 - Added support for CUDA Toolkit 9.0
 - Added MXNet support for CUDA Toolkit 9.0
 - Added new version of HPCG, with CUDA 9 support
-- Added 'default_dual_core' machine type configuration for AWS, Azure and GCP.
+- Added latest gen 'default_dual_core' machine type configuration for AWS, Azure and GCP.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
