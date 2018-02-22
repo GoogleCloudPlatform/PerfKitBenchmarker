@@ -50,7 +50,7 @@ default_dual_core: &default_dual_core
     zone: us-central1-a
     image: null
   Azure:
-    machine_type: Standard_A2
+    machine_type: Standard_D2_v3
     zone: eastus2
     image: null
   AWS:
