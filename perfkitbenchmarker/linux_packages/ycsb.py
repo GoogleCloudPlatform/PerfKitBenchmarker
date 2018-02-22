@@ -611,7 +611,7 @@ class YCSBExecutor(object):
 
     def PushWorkload(vm):
       vm.PushFile(workload_file, remote_path)
-    vm_util.RunThreaded(PushWorkload, vms)
+    vm_util.RunThreaded(PushWorkload, list(set(vms)))
 
     kwargs['parameter_files'] = [remote_path]
 
@@ -739,7 +739,7 @@ class YCSBExecutor(object):
 
       def PushWorkload(vm):
         vm.PushFile(workload_file, remote_path)
-      vm_util.RunThreaded(PushWorkload, vms)
+      vm_util.RunThreaded(PushWorkload, list(set(vms)))
 
       parameters['parameter_files'] = [remote_path]
       for client_count in _GetThreadsPerLoaderList():
