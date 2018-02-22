@@ -321,8 +321,7 @@ def _RunModelOnVm(vm, model, benchmark_spec, args='', job_name=''):
       '--distortions={distortions} '
       '--device={device} '
       '--data_format={data_format} '
-      '--forward_only={forward_only} '
-      '--flush_stdout=true'.format(
+      '--forward_only={forward_only}'.format(
           local_parameter_device=benchmark_spec.local_parameter_device,
           batch_size=batch_size,
           model=model,
