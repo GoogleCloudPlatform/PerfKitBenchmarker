@@ -480,6 +480,10 @@ class BaseOsMixin(object):
     """
     return self.os_metadata
 
+  def CreateRamDisk(self, disk_spec):
+    """Create and mount Ram disk."""
+    raise NotImplementedError()
+
   @abc.abstractmethod
   def RemoteCommand(self, command, should_log=False, ignore_failure=False,
                     suppress_warning=False, timeout=None, **kwargs):

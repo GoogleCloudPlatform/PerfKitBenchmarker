@@ -517,7 +517,10 @@ class BenchmarkSpec(object):
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
-      vm.CreateScratchDisk(disk_spec)
+      if disk_spec.disk_type == disk.RAM:
+        vm.CreateRamDisk(disk_spec)
+      else:
+        vm.CreateScratchDisk(disk_spec)
 
     # This must come after Scratch Disk creation to support the
     # Containerized VM case

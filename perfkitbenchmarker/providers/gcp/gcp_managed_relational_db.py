@@ -290,8 +290,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _PostCreate(self):
     """Creates the PKB user and sets the password.
-
-    Also sets the password on the postgres user if this is a postgres database.
     """
 
     # The hostname '%' means unrestricted access from any host.
@@ -300,6 +298,16 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '%', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
     _, _, _ = cmd.Issue()
+
+    # this is a fix for b/71594701
+    # by default the empty password on 'postgres'
+    # is a security violation.  Change the password to a non-default value.
+    if self.spec.engine == managed_relational_db.POSTGRES:
+      cmd = util.GcloudCommand(
+          self, 'sql', 'users', 'set-password', 'postgres',
+          'dummy_host', '--instance={0}'.format(self.instance_id),
+          '--password={0}'.format(self.spec.database_password))
+      _, _, _ = cmd.Issue()
 
   @staticmethod
   def GetDefaultEngineVersion(engine):
