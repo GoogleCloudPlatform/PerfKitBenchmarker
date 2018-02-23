@@ -24,6 +24,7 @@
 - Added MXNet support for CUDA Toolkit 9.0
 - Added new version of HPCG, with CUDA 9 support
 - Added latest gen 'default_dual_core' machine type configuration for AWS, Azure and GCP.
+- Added memory as disk type for Linux only.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -63,6 +64,7 @@
 - Change GCP TPU command from alpha to beta.
 - Update configurable parameters for ycsb benchmarks.
 - Added tags to AWS kops instances and increased loadbalancer timeout.
+- Allow cassandra_ycsb to run on a single vm.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
