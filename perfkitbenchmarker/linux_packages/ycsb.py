@@ -98,8 +98,7 @@ flags.DEFINE_boolean('ycsb_reload_database', True,
                      'Reload database, othewise skip load stage. '
                      'Note, this flag is only used if the database '
                      'is already loaded.')
-flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.',
-                     lower_bound=1)
+flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.')
 flags.DEFINE_list('ycsb_workload_files', ['workloada', 'workloadb'],
                   'Path to YCSB workload file to use during *run* '
                   'stage only. Comma-separated list')
