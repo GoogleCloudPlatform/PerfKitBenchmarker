@@ -36,6 +36,7 @@ from perfkitbenchmarker.providers.openstack import os_network
 from perfkitbenchmarker.providers.openstack import utils as os_utils
 
 RHEL_IMAGE = 'rhel-7.2'
+CENTOS_IMAGE = 'centos7'
 UBUNTU_IMAGE = 'ubuntu-14.04'
 NONE = 'None'
 
@@ -392,3 +393,20 @@ class DebianBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
 class RhelBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
                                        linux_virtual_machine.RhelMixin):
   DEFAULT_IMAGE = RHEL_IMAGE
+
+  def __init__(self, vm_spec):
+    super(RhelBasedOpenStackVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
+
+
+class Centos7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
+                                          linux_virtual_machine.Centos7Mixin):
+  DEFAULT_IMAGE = CENTOS_IMAGE
+
+  def __init__(self, vm_spec):
+    super(Centos7BasedOpenStackVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
