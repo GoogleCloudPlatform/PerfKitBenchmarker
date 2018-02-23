@@ -41,6 +41,8 @@ PIOPS = 'piops'  # Provisioned IOPS (SSD) in AWS and Alicloud
 # until that changes, 'local' is a special disk type.
 LOCAL = 'local'
 
+RAM = 'ram'
+
 # Map old disk type names to new disk type names
 DISK_TYPE_MAPS = dict()
 
@@ -322,3 +324,35 @@ class StripedDisk(BaseDisk):
   def Detach(self):
     for disk in self.disks:
       disk.Detach()
+
+
+class RamDisk(BaseDisk):
+  """Object representing a Ram Disk."""
+
+  def Attach(self, vm):
+    """Attaches the disk to a VM.
+
+    Args:
+      vm: The BaseVirtualMachine instance to which the disk will be attached.
+    """
+    pass
+
+  def Detach(self):
+    """Detaches the disk from a VM."""
+    pass
+
+  def GetDevicePath(self):
+    """Returns the path to the device inside a Linux VM."""
+    return None
+
+  def GetDeviceId(self):
+    """Return the Windows DeviceId of this disk."""
+    return None
+
+  def _Create(self):
+    """Creates the disk."""
+    pass
+
+  def _Delete(self):
+    """Deletes the disk."""
+    pass
