@@ -164,6 +164,7 @@ flags.DEFINE_string('static_vm_file', None,
                     'static_virtual_machine.py for a description of this file.')
 flags.DEFINE_boolean('version', False, 'Display the version and exit.',
                      allow_override_cpp=True)
+flags.DEFINE_boolean('time_commands', False, 'Times each command issued.')
 flags.DEFINE_enum(
     'scratch_disk_type', None,
     [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],

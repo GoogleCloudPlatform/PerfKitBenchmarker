@@ -71,6 +71,7 @@
 - Support negative numbers when parsing an integerlist.
 - Added float16 support for TensorFlow and MXNet Benchmarks.
 - Added flag --mx_key_value_store in MNXnet benchmark.
+- Added `time_commands` flag to enable diagnostic timing of commands
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -120,3 +121,4 @@
 - Updated MountDisk commands to use named parameters.
 - Calling repr(IntegerList) returns a readable string.
 - Support installing azure-cli on RedHat systems.
+- Fixed default behavior of using /usr/bin/time --quiet on all commands
