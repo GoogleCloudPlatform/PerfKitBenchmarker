@@ -65,6 +65,7 @@
 - Update configurable parameters for ycsb benchmarks.
 - Added tags to AWS kops instances and increased loadbalancer timeout.
 - Allow cassandra_ycsb to run on a single vm.
+- Adding support for using preprovisioned data for SPEC CPU 2006 benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
