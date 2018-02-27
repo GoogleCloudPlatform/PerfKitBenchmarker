@@ -34,11 +34,11 @@ edw_benchmark:
   description: Sample edw benchmark
   edw_service:
     type: redshift
-    cluster_identifier: cluster123
-    endpoint: cluster123.c85qhtyvrisa.us-west-2.redshift.amazonaws.com
-    db: dev
-    user: masteruser
-    password: Password123
+    cluster_identifier: _cluster_id_
+    endpoint: cluster.endpoint
+    db: _database_name_
+    user: _username_
+    password: _password_
     node_type: dc1.large
     node_count: 2
     snapshot:
