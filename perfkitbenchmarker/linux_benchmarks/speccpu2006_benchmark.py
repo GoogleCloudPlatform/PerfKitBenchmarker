@@ -28,7 +28,6 @@ from operator import mul
 import os
 import posixpath
 import re
-import tarfile
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -125,43 +124,33 @@ _SPECCPU2006_DIR = 'cpu2006'
 _SPECCPU2006_ISO = 'cpu2006-1.2.iso'
 _SPECCPU2006_TAR = 'cpu2006v1.2.tgz'
 _TAR_REQUIRED_MEMBERS = 'cpu2006', 'cpu2006/bin/runspec'
+# This benchmark can be run with an .iso file in the data directory, a tar file
+# in the data directory, or a tar file preprovisioned in cloud storage. To run
+# this benchmark with tar file preprovisioned in cloud storage, update the
+# following dict with md5sum of the file in cloud storage.
+BENCHMARK_DATA = {_SPECCPU2006_TAR: None}
 
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(unused_benchmark_config):
-  """Verifies that the required input files are present."""
-  try:
-    # Peeking into the tar file is slow. If running in stages, it's
-    # reasonable to do this only once and assume that the contents of the
-    # tar file will not change between stages.
-    _CheckTarFile(FLAGS.runspec_config,
-                  examine_members=stages.PROVISION in FLAGS.run_stage)
-  except data.ResourceNotFound:
-    _CheckIsoAndCfgFile(FLAGS.runspec_config)
-
-
-def _CheckTarFile(runspec_config, examine_members):
-  """Searches for the tar file and performs preliminary checks on its format.
+def _CheckTarFile(vm, runspec_config, examine_members):
+  """Performs preliminary checks on the format of tar file downloaded on vm.
 
   Args:
+    vm: virtual machine
     runspec_config: string. User-specified name of the config file that is
         expected to be in the tar file.
     examine_members: boolean. If True, this function will examine the tar file's
         members to verify that certain required members are present.
 
   Raises:
-    data.ResourcePath: If the tar file cannot be found.
     errors.Benchmarks.PrepareException: If the tar file does not contain a
         required member.
     errors.Config.InvalidValue: If the tar file is found, and runspec_config is
         not a valid file name.
   """
-  tar_file_path = data.ResourcePath(_SPECCPU2006_TAR)
-  logging.info('Found tar file at %s. Skipping search for %s.', tar_file_path,
-               _SPECCPU2006_ISO)
   if posixpath.basename(runspec_config) != runspec_config:
     raise errors.Config.InvalidValue(
         'Invalid runspec_config value: {0}{1}When running speccpu2006 with a '
@@ -171,18 +160,24 @@ def _CheckTarFile(runspec_config, examine_members):
   if not examine_members:
     return
 
-  with tarfile.open(tar_file_path, 'r') as tf:
-    members = tf.getnames()
+  scratch_dir = vm.GetScratchDir()
   cfg_member = 'cpu2006/config/{0}'.format(runspec_config)
   required_members = itertools.chain(_TAR_REQUIRED_MEMBERS, [cfg_member])
-  missing_members = set(required_members).difference(members)
+  missing_members = []
+  for member in required_members:
+    stdout, _ = vm.RemoteCommand(
+        'cd {scratch_dir} && (test -f {member} || test -d {member}) ; echo $?'
+        .format(scratch_dir=scratch_dir, member=member))
+    if stdout.strip() != '0':
+      missing_members.append(member)
+
   if missing_members:
     raise errors.Benchmarks.PrepareException(
-        'The following files were not found within {tar}:{linesep}{members}'
+        'The following files were not found within tar file:{linesep}{members}'
         '{linesep}This is an indication that the tar file is formatted '
         'incorrectly. See README.md for information about the expected format '
         'of the tar file.'.format(
-            linesep=os.linesep, tar=tar_file_path,
+            linesep=os.linesep,
             members=os.linesep.join(sorted(missing_members))))
 
 
@@ -276,8 +271,28 @@ def Prepare(benchmark_spec):
   speccpu_vm_state.spec_dir = posixpath.join(scratch_dir, _SPECCPU2006_DIR)
   try:
     _PrepareWithTarFile(vm, speccpu_vm_state)
+    _CheckTarFile(vm, FLAGS.runspec_config,
+                  examine_members=stages.PROVISION in FLAGS.run_stage)
   except data.ResourceNotFound:
-    _PrepareWithIsoFile(vm, speccpu_vm_state)
+    try:
+      _CheckIsoAndCfgFile(FLAGS.runspec_config)
+      _PrepareWithIsoFile(vm, speccpu_vm_state)
+    except data.ResourceNotFound:
+      _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state)
+      _CheckTarFile(vm, FLAGS.runspec_config,
+                    examine_members=stages.PROVISION in FLAGS.run_stage)
+
+
+def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
+  """Prepares the VM to run using tar file in preprovisioned cloud."""
+  scratch_dir = vm.GetScratchDir()
+  vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME,
+                                        [_SPECCPU2006_TAR],
+                                        scratch_dir)
+  vm.RemoteCommand('cd {dir} && tar xvfz {tar}'.format(dir=scratch_dir,
+                                                       tar=_SPECCPU2006_TAR))
+  speccpu_vm_state.cfg_file_path = posixpath.join(
+      speccpu_vm_state.spec_dir, 'config', FLAGS.runspec_config)
 
 
 def _PrepareWithTarFile(vm, speccpu_vm_state):
