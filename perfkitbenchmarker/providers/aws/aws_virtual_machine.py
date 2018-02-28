@@ -88,6 +88,14 @@ SPOT_INSTANCE_REQUEST_TERMINAL_STATUSES = frozenset(
      'instance-terminated-launch-group-constraint'])
 
 
+class AwsTransitionalVmRetryableError(Exception):
+  """Error for retrying _Exists when an AWS VM is in a transitional state."""
+
+
+class AwsUnknownStatusError(Exception):
+  """Error indicating an unknown status was encountered."""
+
+
 def GetRootBlockDeviceSpecForImage(image_id, region):
   """Queries the CLI and returns the root block device specification as a dict.
 
@@ -610,8 +618,19 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
       vm_util.IssueCommand(cancel_cmd)
 
+  @vm_util.Retry(poll_interval=1, log_errors=False,
+                 retryable_exceptions=(AwsTransitionalVmRetryableError,))
   def _Exists(self):
-    """Returns true if the VM exists."""
+    """Returns whether the VM exists.
+
+    This method waits until the VM is no longer pending.
+
+    Returns:
+      Whether the VM exists.
+
+    Raises:
+      errors.Resource.RetryableCreationError: If the VM is pending. Retried.
+    """
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-instances',
@@ -636,7 +655,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     assert len(instances) == 1, 'Wrong number of instances.'
     status = instances[0]['State']['Name']
     self.id = instances[0]['InstanceId']
-    assert status in INSTANCE_KNOWN_STATUSES, status
+    if status not in INSTANCE_KNOWN_STATUSES:
+      raise AwsUnknownStatusError('Unknown status %s' % status)
+    if status in INSTANCE_TRANSITIONAL_STATUSES:
+      logging.info('VM has status %s; retrying describe-instances command.',
+                   status)
+      raise AwsTransitionalVmRetryableError()
     # In this path run-instances succeeded, a pending instance was created, but
     # not fulfilled so it moved to terminated.
     if (status == TERMINATED and
