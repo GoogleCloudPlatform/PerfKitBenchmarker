@@ -66,6 +66,7 @@
 - Added tags to AWS kops instances and increased loadbalancer timeout.
 - Allow cassandra_ycsb to run on a single vm.
 - Adding support for using preprovisioned data for SPEC CPU 2006 benchmark.
+- Support negative numbers when parsing an integerlist.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
