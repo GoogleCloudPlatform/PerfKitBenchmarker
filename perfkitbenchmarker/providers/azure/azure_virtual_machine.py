@@ -208,7 +208,7 @@ class AzureNIC(resource.BaseResource):
     self._deleted = True
 
 
-class AzureVirtualMachineMetaClass(virtual_machine.AutoRegisterVmMeta):
+class AzureVirtualMachineMetaClass(resource.AutoRegisterResourceMeta):
   """Metaclass for AzureVirtualMachine.
 
   Registers default image pattern for each operating system.

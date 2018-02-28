@@ -13,13 +13,10 @@
 # limitations under the License.
 """Module containing class for cloud Redis."""
 
-import abc
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
 
-_CLOUD_REDIS_REGISTRY = {}
 FLAGS = flags.FLAGS
 
 
@@ -55,28 +52,13 @@ def GetCloudRedisClass(cloud):
   Raises:
     Exception: An invalid cloud was provided
   """
-  if cloud not in _CLOUD_REDIS_REGISTRY:
-    raise Exception('No cloud redis found for {0}'.format(cloud))
-  return _CLOUD_REDIS_REGISTRY.get(cloud)
-
-
-class AutoRegisterCloudRedisMeta(abc.ABCMeta):
-  """Metaclass which allows Cloud Redis to register."""
-
-  def __init__(cls, name, bases, dct):
-    if hasattr(cls, 'CLOUD'):
-      if cls.CLOUD is None:
-        raise Exception('cloud Redis concrete subclasses must have a cloud '
-                        'attribute.')
-      else:
-        _CLOUD_REDIS_REGISTRY[cls.CLOUD] = cls
-    super(AutoRegisterCloudRedisMeta, cls).__init__(name, bases, dct)
+  resource.GetResourceClass(BaseCloudRedis, CLOUD=cloud)
 
 
 class BaseCloudRedis(resource.BaseResource):
   """Object representing a cloud redis."""
 
-  __metaclass__ = AutoRegisterCloudRedisMeta
+  RESOURCE_TYPE = 'BaseCloudRedis'
 
   def __init__(self, cloud_redis_spec):
     """Initialize the cloud redis object.
