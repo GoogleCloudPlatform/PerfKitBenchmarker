@@ -629,7 +629,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       Whether the VM exists.
 
     Raises:
-      errors.Resource.RetryableCreationError: If the VM is pending. Retried.
+      AwsUnknownStatusError: If an unknown status is returned from AWS.
+      AwsTransitionalVmRetryableError: If the VM is pending. This is retried.
     """
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
