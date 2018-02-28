@@ -21,15 +21,12 @@ without pre-provisioning container clusters. In the future, this may be
 expanded to support first-class container benchmarks.
 """
 
-import abc
-
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-_CLUSTER_REGISTRY = {}
 
 flags.DEFINE_string('kubeconfig', None,
                     'Path to kubeconfig to be used by kubectl. '
@@ -60,22 +57,13 @@ def _SetKubeConfig(unused_sender, benchmark_spec):
 
 
 def GetContainerClusterClass(cloud):
-  return _CLUSTER_REGISTRY[cloud]
-
-
-class AutoRegisterContainerClusterMeta(abc.ABCMeta):
-  """Metaclass to auto register container cluster classes."""
-
-  def __init__(cls, name, bases, dct):
-    if cls.CLOUD:
-      _CLUSTER_REGISTRY[cls.CLOUD] = cls
+  return resource.GetResourceClass(BaseContainerCluster, CLOUD=cloud)
 
 
 class BaseContainerCluster(resource.BaseResource):
   """A cluster that can be used to schedule containers."""
 
-  __metaclass__ = AutoRegisterContainerClusterMeta
-  CLOUD = None
+  RESOURCE_TYPE = 'BaseContainerCluster'
 
   def __init__(self, spec):
     super(BaseContainerCluster, self).__init__()

@@ -56,7 +56,6 @@ MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
 
-_MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
 
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
@@ -81,10 +80,7 @@ def GetManagedRelationalDbClass(cloud):
   Args:
     cloud: name of cloud to get the class for
   """
-  if cloud in _MANAGED_RELATIONAL_DB_REGISTRY:
-    return _MANAGED_RELATIONAL_DB_REGISTRY.get(cloud)
-  raise NotImplementedError(('No ManagedRelationalDatabase implementation '
-                             'found for {0}'.format(cloud)))
+  return resource.GetResourceClass(BaseManagedRelationalDb, CLOUD=cloud)
 
 
 class AutoRegisterManagedRelationalDbMeta(ABCMeta):
@@ -103,7 +99,7 @@ class AutoRegisterManagedRelationalDbMeta(ABCMeta):
 class BaseManagedRelationalDb(resource.BaseResource):
   """Object representing a managed relational database Service."""
 
-  __metaclass__ = AutoRegisterManagedRelationalDbMeta
+  RESOURCE_TYPE = 'BaseManagedRelationalDb'
 
   def __init__(self, managed_relational_db_spec):
     """Initialize the managed relational database object
