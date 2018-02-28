@@ -111,3 +111,4 @@
 - Simplified resource and spec registration.
 - Fixed a bug in which the PKB recorded reboot time could be low for AWS because
   we would restart the creation timer for VMs that were reported as pending.
+- Increased timeout of GKE Cluster create command from 10 to 15 minutes.
