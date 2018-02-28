@@ -603,7 +603,7 @@ $ ./pkb.py --project=<GCP project ID> --benchmarks=iperf --machine_type=f1-micro
 
 ```bash
 $ cd PerfKitBenchmarker
-$ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro
+$ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t2.micro
 ```
 
 ## Example run on Azure
