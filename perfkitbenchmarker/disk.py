@@ -77,24 +77,9 @@ def RegisterDiskTypeMap(provider_name, type_map):
   DISK_TYPE_MAPS[provider_name] = type_map
 
 
-_DISK_SPEC_REGISTRY = {}
-
-
 def GetDiskSpecClass(cloud):
   """Get the DiskSpec class corresponding to 'cloud'."""
-  return _DISK_SPEC_REGISTRY.get(cloud, BaseDiskSpec)
-
-
-class AutoRegisterDiskSpecMeta(spec.BaseSpecMetaClass):
-  """Metaclass which automatically registers DiskSpecs."""
-
-  def __init__(cls, name, bases, dct):
-    super(AutoRegisterDiskSpecMeta, cls).__init__(name, bases, dct)
-    if cls.CLOUD in _DISK_SPEC_REGISTRY:
-      raise Exception('BaseDiskSpec subclasses must have a CLOUD attribute.')
-    else:
-      _DISK_SPEC_REGISTRY[cls.CLOUD] = cls
-    super(AutoRegisterDiskSpecMeta, cls).__init__(name, bases, dct)
+  return spec.GetSpecClass(BaseDiskSpec, CLOUD=cloud)
 
 
 def WarnAndTranslateDiskTypes(name, cloud):
@@ -174,7 +159,7 @@ class BaseDiskSpec(spec.BaseSpec):
         1, it means no striping will occur. This must be >= 1.
   """
 
-  __metaclass__ = AutoRegisterDiskSpecMeta
+  SPEC_TYPE = 'BaseDiskSpec'
   CLOUD = None
 
   @classmethod
