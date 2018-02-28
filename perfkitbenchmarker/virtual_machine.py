@@ -55,38 +55,13 @@ VALID_GPU_TYPES = ['k80', 'p100', 'v100']
 
 def GetVmSpecClass(cloud):
   """Returns the VmSpec class corresponding to 'cloud'."""
-  return _VM_SPEC_REGISTRY.get(cloud, BaseVmSpec)
+  return spec.GetSpecClass(BaseVmSpec, CLOUD=cloud)
 
 
 def GetVmClass(cloud, os_type):
   """Returns the VM class corresponding to 'cloud' and 'os_type'."""
-  return _VM_REGISTRY.get((cloud, os_type))
-
-
-class AutoRegisterVmSpecMeta(spec.BaseSpecMetaClass):
-  """Metaclass which allows VmSpecs to automatically be registered."""
-
-  def __init__(cls, name, bases, dct):
-    super(AutoRegisterVmSpecMeta, cls).__init__(name, bases, dct)
-    if cls.CLOUD in _VM_SPEC_REGISTRY:
-      raise Exception('BaseVmSpec subclasses must have a CLOUD attribute.')
-    _VM_SPEC_REGISTRY[cls.CLOUD] = cls
-
-
-class AutoRegisterVmMeta(abc.ABCMeta):
-  """Metaclass which allows VMs to automatically be registered."""
-
-  def __init__(cls, name, bases, dct):
-    if hasattr(cls, 'CLOUD') and hasattr(cls, 'OS_TYPE'):
-      if cls.CLOUD is None:
-        raise Exception('BaseVirtualMachine subclasses must have a CLOUD '
-                        'attribute.')
-      elif cls.OS_TYPE is None:
-        raise Exception('BaseOsMixin subclasses must have an OS_TYPE '
-                        'attribute.')
-      else:
-        _VM_REGISTRY[(cls.CLOUD, cls.OS_TYPE)] = cls
-    super(AutoRegisterVmMeta, cls).__init__(name, bases, dct)
+  return resource.GetResourceClass(BaseVirtualMachine,
+                                   CLOUD=cloud, OS_TYPE=os_type)
 
 
 class BaseVmSpec(spec.BaseSpec):
@@ -108,7 +83,7 @@ class BaseVmSpec(spec.BaseSpec):
         EXTERNAL) to use for generating background network workload.
   """
 
-  __metaclass__ = AutoRegisterVmSpecMeta
+  SPEC_TYPE = 'BaseVmSpec'
   CLOUD = None
 
   @classmethod
@@ -227,8 +202,10 @@ class BaseVirtualMachine(resource.BaseResource):
       background network workload
   """
 
-  __metaclass__ = AutoRegisterVmMeta
   is_static = False
+
+  RESOURCE_TYPE = 'BaseVirtualMachine'
+  REQUIRED_ATTRS = ['CLOUD', 'OS_TYPE']
   CLOUD = None
 
   _instance_counter_lock = threading.Lock()
