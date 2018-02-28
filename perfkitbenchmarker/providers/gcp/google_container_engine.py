@@ -76,7 +76,9 @@ class GkeCluster(container_service.KubernetesCluster):
     cmd.flags['num-nodes'] = self.num_nodes
     cmd.flags['machine-type'] = self.machine_type
 
-    cmd.Issue(timeout=600, env=self._GetRequiredGkeEnv())
+    # This command needs a long timeout due to the many minutes it
+    # can take to provision a large GPU-accelerated GKE cluster.
+    cmd.Issue(timeout=900, env=self._GetRequiredGkeEnv())
 
   def _PostCreate(self):
     """Acquire cluster authentication."""
