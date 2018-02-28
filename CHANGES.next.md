@@ -109,3 +109,5 @@
 - Isolate Darwin OS pkb runs to fix Issue # 1563
 - Fixed YCSB so it pushes workload once to each VM even if they are repeated.
 - Simplified resource and spec registration.
+- Fixed a bug in which the PKB recorded reboot time could be low for AWS because
+  we would restart the creation timer for VMs that were reported as pending.
