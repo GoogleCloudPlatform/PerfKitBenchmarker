@@ -108,3 +108,4 @@
 - Update TensorFlow benchmark arguments.
 - Isolate Darwin OS pkb runs to fix Issue # 1563
 - Fixed YCSB so it pushes workload once to each VM even if they are repeated.
+- Simplified resource and spec registration.
