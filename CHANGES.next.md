@@ -67,6 +67,8 @@
 - Allow cassandra_ycsb to run on a single vm.
 - Adding support for using preprovisioned data for SPEC CPU 2006 benchmark.
 - Support negative numbers when parsing an integerlist.
+- Added float16 support for TensorFlow and MXNet Benchmarks.
+- Added flag --mx_key_value_store in MNXnet benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -112,3 +114,4 @@
 - Fixed a bug in which the PKB recorded reboot time could be low for AWS because
   we would restart the creation timer for VMs that were reported as pending.
 - Increased timeout of GKE Cluster create command from 10 to 15 minutes.
+- Set ImageNet image shape as 3,224,224.
