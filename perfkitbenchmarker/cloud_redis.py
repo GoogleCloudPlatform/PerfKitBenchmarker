@@ -52,7 +52,7 @@ def GetCloudRedisClass(cloud):
   Raises:
     Exception: An invalid cloud was provided
   """
-  resource.GetResourceClass(BaseCloudRedis, CLOUD=cloud)
+  return resource.GetResourceClass(BaseCloudRedis, CLOUD=cloud)
 
 
 class BaseCloudRedis(resource.BaseResource):
