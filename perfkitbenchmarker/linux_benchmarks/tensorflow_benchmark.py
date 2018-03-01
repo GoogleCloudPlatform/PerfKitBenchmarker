@@ -65,6 +65,8 @@ PID_PREFIX = 'TF_PS_PID'
 MODELS = ['vgg11', 'vgg16', 'vgg19', 'lenet', 'googlenet', 'overfeat',
           'alexnet', 'trivial', 'inception3', 'inception4', 'resnet50',
           'resnet101', 'resnet152']
+FP16 = 'float16'
+FP32 = 'float32'
 
 flags.DEFINE_boolean('tf_forward_only', False, '''whether use forward-only or
                      training for benchmarking''')
@@ -101,6 +103,9 @@ flags.DEFINE_string('tf_benchmarks_commit_hash',
 flags.DEFINE_boolean('tf_distributed', False, 'Run TensorFlow distributed')
 flags.DEFINE_string('tf_distributed_port', '2222',
                     'The port to use in TensorFlow distributed job')
+flags.DEFINE_enum('tf_precision', FP32, [FP16, FP32],
+                  'Use 16-bit floats for certain tensors instead of 32-bit '
+                  'floats. This is currently experimental.')
 
 
 def LocalParameterDeviceValidator(value):
@@ -162,6 +167,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.tensorflow_cpu_pip_package = FLAGS.tf_cpu_pip_package
   benchmark_spec.tensorflow_gpu_pip_package = FLAGS.tf_gpu_pip_package
   benchmark_spec.distributed = FLAGS.tf_distributed
+  benchmark_spec.precision = FLAGS.tf_precision
 
 
 def _PrepareVm(vm):
@@ -229,6 +235,7 @@ def _CreateMetadataDict(benchmark_spec, model, batch_size, num_gpus):
   metadata['tensorflow_gpu_pip_package'] = (
       benchmark_spec.tensorflow_gpu_pip_package)
   metadata['distributed'] = benchmark_spec.distributed
+  metadata['precision'] = benchmark_spec.precision
   return metadata
 
 
@@ -321,7 +328,8 @@ def _RunModelOnVm(vm, model, benchmark_spec, args='', job_name=''):
       '--distortions={distortions} '
       '--device={device} '
       '--data_format={data_format} '
-      '--forward_only={forward_only}'.format(
+      '--forward_only={forward_only} '
+      '--use_fp16={use_fp16}'.format(
           local_parameter_device=benchmark_spec.local_parameter_device,
           batch_size=batch_size,
           model=model,
@@ -330,7 +338,8 @@ def _RunModelOnVm(vm, model, benchmark_spec, args='', job_name=''):
           distortions=benchmark_spec.distortions,
           device=benchmark_spec.device,
           data_format=benchmark_spec.data_format,
-          forward_only=benchmark_spec.forward_only))
+          forward_only=benchmark_spec.forward_only,
+          use_fp16=(benchmark_spec.precision == FP16)))
   if benchmark_spec.device == GPU:
     num_gpus = cuda_toolkit.QueryNumberOfGpus(vm)
     tf_cnn_benchmark_cmd = '{env} {cmd} --num_gpus={gpus}'.format(
