@@ -83,19 +83,6 @@ def GetManagedRelationalDbClass(cloud):
   return resource.GetResourceClass(BaseManagedRelationalDb, CLOUD=cloud)
 
 
-class AutoRegisterManagedRelationalDbMeta(ABCMeta):
-  """Metaclass which allows ManagedRelationalDb to register."""
-
-  def __init__(cls, name, bases, dct):
-    if hasattr(cls, 'CLOUD'):
-      if cls.CLOUD is None:
-        raise Exception('ManagedRelationalDb subclasses must '
-                        'have a CLOUD' 'attribute.')
-      else:
-        _MANAGED_RELATIONAL_DB_REGISTRY[cls.CLOUD] = cls
-    super(AutoRegisterManagedRelationalDbMeta, cls).__init__(name, bases, dct)
-
-
 class BaseManagedRelationalDb(resource.BaseResource):
   """Object representing a managed relational database Service."""
 
