@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 import re
 import uuid
 
