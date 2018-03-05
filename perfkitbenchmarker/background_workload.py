@@ -40,6 +40,7 @@ class BaseBackgroundWorkload(object):
   @staticmethod
   def IsEnabled(vm):
     """Returns true if this background workload is enabled on this VM."""
+    del vm  # Unused
     return False
 
   @staticmethod

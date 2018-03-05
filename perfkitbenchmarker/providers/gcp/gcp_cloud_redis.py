@@ -26,7 +26,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-STANDARD_TIER = 'STANDARD'
+STANDARD_TIER = 'STANDARD_HA'
 BASIC_TIER = 'BASIC'
 
 
