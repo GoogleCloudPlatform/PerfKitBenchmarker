@@ -111,6 +111,10 @@ def WarnAndTranslateDiskTypes(name, cloud):
 
 def WarnAndCopyFlag(old_name, new_name):
   """Copy a value from an old flag to a new one, warning the user.
+
+  Args:
+    old_name: old name of flag.
+    new_name: new name of flag.
   """
 
   if FLAGS[old_name].present:
@@ -286,7 +290,6 @@ class StripedDisk(BaseDisk):
     Args:
       disk_spec: A BaseDiskSpec containing the desired mount point.
       disks: A list of BaseDisk objects that constitute the StripedDisk.
-      device_path: The path of the striped device in a Linux VM.
     """
     super(StripedDisk, self).__init__(disk_spec)
     self.disks = disks

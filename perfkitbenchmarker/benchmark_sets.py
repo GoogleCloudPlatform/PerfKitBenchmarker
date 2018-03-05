@@ -304,7 +304,6 @@ def _AssertZipAxesHaveSameLength(axes):
       raise ValueError('flag_zip axes must all be the same length')
 
 
-
 def _AssertFlagMatrixAndZipDefsExist(benchmark_config,
                                      flag_matrix_name,
                                      flag_zip_name):
@@ -321,9 +320,9 @@ def _AssertFlagMatrixAndZipDefsExist(benchmark_config,
       specified in the benchmark_config, or None.
 
   Raises:
-    FlagMatrixNotFoundException if flag_matrix_name is not None, and is not
+    FlagMatrixNotFoundException: if flag_matrix_name is not None, and is not
       found in the flag_matrix_defs section of the benchmark_config.
-    FlagZipNotFoundException if flag_zip_name is not None, and is not
+    FlagZipNotFoundException: if flag_zip_name is not None, and is not
       found in the flag_zip_defs section of the benchmark_config.
   """
   if (flag_matrix_name and
@@ -344,6 +343,9 @@ def GetBenchmarksFromFlags():
   If no benchmarks (or sets) are specified, this will return the standard set.
   If multiple sets or mixes of sets and benchmarks are specified, this will
   return the union of all sets and individual benchmarks.
+
+  Raises:
+    ValueError: when benchmark_name is not valid for os_type supplied
   """
   user_config = configs.GetUserConfig()
   benchmark_config_list = _GetBenchmarksFromUserConfig(user_config)
@@ -363,13 +365,13 @@ def GetBenchmarksFromFlags():
   while did_expansion:
     did_expansion = False
     for benchmark_name in benchmark_names:
-      if (benchmark_name in BENCHMARK_SETS):
+      if benchmark_name in BENCHMARK_SETS:
         did_expansion = True
         benchmark_names.remove(benchmark_name)
-        if (benchmark_name not in expanded):
-            expanded.add(benchmark_name)
-            benchmark_names |= set(BENCHMARK_SETS[
-                benchmark_name][BENCHMARK_LIST])
+        if benchmark_name not in expanded:
+          expanded.add(benchmark_name)
+          benchmark_names |= set(BENCHMARK_SETS[
+              benchmark_name][BENCHMARK_LIST])
         break
 
   valid_benchmarks = _GetValidBenchmarks()
@@ -432,7 +434,7 @@ def GetBenchmarksFromFlags():
       config = _GetConfigForAxis(benchmark_config, flag_config)
       if (flag_matrix_filter and not eval(
           flag_matrix_filter, {}, config['flags'])):
-          continue
+        continue
       benchmark_config_list.append((benchmark_module, config))
 
   return benchmark_config_list
