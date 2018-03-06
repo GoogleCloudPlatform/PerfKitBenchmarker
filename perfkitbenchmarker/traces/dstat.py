@@ -22,6 +22,7 @@ import logging
 import numpy as np
 import os
 import posixpath
+import re
 import time
 import threading
 import uuid
@@ -44,7 +45,15 @@ flags.DEFINE_string('dstat_output', None,
                     'Only applicable when --dstat is specified. '
                     'Default: run temporary directory.')
 flags.DEFINE_boolean('dstat_publish', False,
-                     'Whether or not publish dstat statistics.')
+                     'Whether to publish average dstat statistics.')
+flags.DEFINE_string('dstat_publish_regex', None, 'Requires setting '
+                    'dstat_publish to true. If specified, any dstat statistic '
+                    'matching this regular expression will be published such '
+                    'that each individual statistic will be in a sample with '
+                    'the time since the epoch in the metadata. Examples. Use '
+                    '".*" to record all samples. Use "net" to record '
+                    'networking statistics.')
+FLAGS = flags.FLAGS
 
 
 class _DStatCollector(object):
@@ -156,6 +165,18 @@ class _DStatCollector(object):
       samples.extend([
           sample.Sample(label, avg[idx], '', metadata)
           for idx, label in enumerate(labels[1:])])
+
+      dstat_publish_regex = FLAGS.dstat_publish_regex
+      if dstat_publish_regex:
+        assert labels[0] == 'epoch__epoch'
+        for i, label in enumerate(labels[1:]):
+          metric_idx = i + 1  # Skipped first label for the epoch.
+          if re.search(dstat_publish_regex, label):
+            for sample_idx, value in enumerate(out[:, metric_idx]):
+              individual_sample_metadata = copy.deepcopy(metadata)
+              individual_sample_metadata['dstat_epoch'] = out[sample_idx, 0]
+              samples.append(
+                  sample.Sample(label, value, '', individual_sample_metadata))
 
     def _Analyze(role, file):
       with open(os.path.join(self.output_directory,
