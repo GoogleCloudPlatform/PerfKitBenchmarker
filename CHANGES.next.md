@@ -25,6 +25,8 @@
 - Added new version of HPCG, with CUDA 9 support
 - Added latest gen 'default_dual_core' machine type configuration for AWS, Azure and GCP.
 - Added memory as disk type for Linux only.
+- Added support for publishing individual dstat samples with
+  `--dstat_publish_regex`.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
