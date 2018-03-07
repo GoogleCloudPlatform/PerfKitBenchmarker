@@ -36,7 +36,6 @@ flags.DEFINE_string('dpb_job_classname', None, 'Classname of the job '
                                                'implementation in the jar file')
 
 
-_DPB_SERVICE_REGISTRY = {}
 FLAGS = flags.FLAGS
 
 
@@ -72,30 +71,15 @@ def GetDpbServiceClass(dpb_service_type):
   Raises:
     Exception: An invalid data processing backend service type was provided
   """
-  if dpb_service_type in _DPB_SERVICE_REGISTRY:
-    return _DPB_SERVICE_REGISTRY.get(dpb_service_type)
-  else:
-    # TODO(saksena): Make the exception specific to dpb service
-    raise Exception('No Data Processing Backend service found for {0}'.format(
-        dpb_service_type))
-
-
-class AutoRegisterDpbServiceMeta(abc.ABCMeta):
-  """Metaclass which allows DpbServices to register."""
-
-  def __init__(cls, name, bases, dct):
-    if hasattr(cls, 'SERVICE_TYPE') and cls.SERVICE_TYPE is not None:
-      _DPB_SERVICE_REGISTRY[cls.SERVICE_TYPE] = cls
-    else:
-      raise Exception('BaseDpbService concrete subclasses must have a '
-                      'SERVICE_TYPE attribute.')
+  return resource.GetResourceClass(BaseDpbService,
+                                   SERVICE_TYPE=dpb_service_type)
 
 
 class BaseDpbService(resource.BaseResource):
   """Object representing a Data Processing Backend Service."""
 
-  __metaclass__ = AutoRegisterDpbServiceMeta
-
+  REQUIRED_ATTRS = ['SERVICE_TYPE']
+  RESOURCE_TYPE = 'BaseDpbService'
   SERVICE_TYPE = 'abstract'
   HDFS_FS = 'hdfs'
   GCS_FS = 'gs'

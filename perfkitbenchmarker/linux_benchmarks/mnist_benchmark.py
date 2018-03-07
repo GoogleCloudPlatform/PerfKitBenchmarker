@@ -20,6 +20,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cloud_tpu_models
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import tensorflow
 
 FLAGS = flags.FLAGS
@@ -180,7 +181,7 @@ def Run(benchmark_spec):
   if benchmark_spec.model_dir:
     mnist_benchmark_cmd = '{cmd} --model_dir {model_dir}'.format(
         cmd=mnist_benchmark_cmd, model_dir=benchmark_spec.model_dir)
-  if FLAGS.tf_device == 'gpu':
+  if cuda_toolkit.CheckNvidiaGpuExists(vm):
     mnist_benchmark_cmd = '%s %s' % (tensorflow.GetEnvironmentVars(vm),
                                      mnist_benchmark_cmd)
   run_command = 'cd %s && %s' % (mnist_benchmark_dir, mnist_benchmark_cmd)

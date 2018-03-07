@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import abc
 import json
 import logging
 import re
@@ -30,7 +29,6 @@ from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
 from perfkitbenchmarker.configs import option_decoders
 
 FLAGS = flags.FLAGS
-_K8S_VOLUME_REGISTRY = {}
 
 
 def CreateDisks(disk_specs, vm_name):
@@ -88,15 +86,7 @@ class KubernetesDiskSpec(disk.BaseDiskSpec):
 
 
 def GetKubernetesDiskClass(volume_type):
-  return _K8S_VOLUME_REGISTRY[volume_type]
-
-
-class AutoRegisterKubernetesDiskMeta(abc.ABCMeta):
-  """Metaclass that registers Kubernetes disks by volume type."""
-
-  def __init__(cls, name, bases, dct):
-    super(AutoRegisterKubernetesDiskMeta, cls).__init__(name, bases, dct)
-    _K8S_VOLUME_REGISTRY[cls.K8S_VOLUME_TYPE] = cls
+  return resource.GetResourceClass(KubernetesDisk, K8S_VOLUME_TYPE=volume_type)
 
 
 class KubernetesDisk(disk.BaseDisk):
@@ -104,7 +94,7 @@ class KubernetesDisk(disk.BaseDisk):
   Base class for Kubernetes Disks.
   """
 
-  __metaclass__ = AutoRegisterKubernetesDiskMeta
+  RESOURCE_TYPE = 'KubernetesDisk'
   K8S_VOLUME_TYPE = None
 
   def __init__(self, disk_num, disk_spec, name):

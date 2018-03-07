@@ -92,7 +92,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         self.instance_id,
         '--quiet',
         '--format=json',
-        '--async',
         '--activation-policy=ALWAYS',
         '--assign-ip',
         '--authorized-networks=%s' % authorized_network,
@@ -140,7 +139,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         if engine does not support high availability.
     """
     if self.spec.engine == managed_relational_db.MYSQL:
-      return '--failover-replica-name=replica-' + self.instance_id
+      self.replica_instance_id = 'replica-' + self.instance_id
+      return '--failover-replica-name=' + self.replica_instance_id
     elif self.spec.engine == managed_relational_db.POSTGRES:
       return '--availability-type=REGIONAL'
     else:
@@ -212,6 +212,11 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
+    if hasattr(self, 'replica_instance_id'):
+      cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
+                               self.replica_instance_id, '--quiet')
+      cmd.Issue()
+
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                              self.instance_id, '--quiet')
     cmd.Issue()
@@ -285,8 +290,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _PostCreate(self):
     """Creates the PKB user and sets the password.
-
-    Also sets the password on the postgres user if this is a postgres database.
     """
 
     # The hostname '%' means unrestricted access from any host.
@@ -295,6 +298,16 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '%', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
     _, _, _ = cmd.Issue()
+
+    # this is a fix for b/71594701
+    # by default the empty password on 'postgres'
+    # is a security violation.  Change the password to a non-default value.
+    if self.spec.engine == managed_relational_db.POSTGRES:
+      cmd = util.GcloudCommand(
+          self, 'sql', 'users', 'set-password', 'postgres',
+          'dummy_host', '--instance={0}'.format(self.instance_id),
+          '--password={0}'.format(self.spec.database_password))
+      _, _, _ = cmd.Issue()
 
   @staticmethod
   def GetDefaultEngineVersion(engine):

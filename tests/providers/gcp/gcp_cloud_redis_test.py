@@ -15,6 +15,7 @@
 import unittest
 import mock
 
+from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gcp_cloud_redis
 from perfkitbenchmarker.providers.gcp import util
@@ -26,12 +27,14 @@ class GcpCloudRedisTestCase(unittest.TestCase):
   def setUp(self):
     mocked_flags = mock_flags.MockFlags()
     mocked_flags.project = 'project'
+    mocked_flags.redis_failover_style = cloud_redis.Failover.FAILOVER_NONE
     mock_spec = mock.Mock(
         spec=benchmark_config_spec._CloudRedisSpec)
     mock_spec.redis_name = 'foobar'
     mock_spec.redis_tier = 'tier'
     mock_spec.redis_size_gb = 5
     mock_spec.redis_version = 'version'
+    mock_spec.client_vm = mock.Mock()
     with mock_flags.PatchFlags(mocked_flags):
       self.redis = gcp_cloud_redis.CloudRedis(mock_spec)
 

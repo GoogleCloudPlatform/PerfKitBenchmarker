@@ -755,6 +755,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Performs Linux specific setup of local disks."""
     pass
 
+  def CreateRamDisk(self, disk_spec):
+    """Performs Linux specific setup of ram disk."""
+    assert disk_spec.mount_point
+    ramdisk = disk.RamDisk(disk_spec)
+    logging.info('Mounting and creating Ram Disk %s, %s',
+                 disk_spec.mount_point, disk_spec.disk_size)
+    mnt_cmd = ('sudo mkdir -p {0};sudo mount -t tmpfs -o size={1}g tmpfs {0};'
+               'sudo chown -R $USER:$USER {0};').format(
+                   disk_spec.mount_point, disk_spec.disk_size)
+    self.RemoteHostCommand(mnt_cmd)
+    self.scratch_disks.append(ramdisk)
+
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to prepare data disks.
 

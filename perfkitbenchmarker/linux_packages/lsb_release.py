@@ -17,10 +17,15 @@
 
 
 def YumInstall(vm):
-  """Installs the mdadm package on the VM."""
+  """Installs the lsb_release package on the VM."""
   vm.InstallPackages('redhat-lsb-core')
 
 
 def AptInstall(vm):
-  """Installs the mdadm package on the VM."""
+  """Installs the lsb_release package on the VM."""
+  vm.InstallPackages('lsb-release')
+
+
+def Install(vm):
+  """Installs the lsb_release package on the VM."""
   vm.InstallPackages('lsb-release')

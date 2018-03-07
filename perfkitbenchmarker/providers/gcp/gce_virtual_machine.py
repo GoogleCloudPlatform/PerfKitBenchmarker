@@ -62,8 +62,6 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
                     'potential stockout scenario.')
-_QUOTA_EXCEEDED_REGEX = re.compile('Quota \'.*\' exceeded.')
-QUOTA_EXCEEDED_MESSAGE = ('Creation failed due to quota exceeded: ')
 _GPU_TYPE_TO_INTERAL_NAME_MAP = {
     'k80': 'nvidia-tesla-k80',
     'p100': 'nvidia-tesla-p100',
@@ -403,10 +401,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         _INSUFFICIENT_HOST_CAPACITY in stderr):
       logging.error(STOCKOUT_MESSAGE)
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(STOCKOUT_MESSAGE)
-    if retcode and _QUOTA_EXCEEDED_REGEX.search(stderr):
-      message = QUOTA_EXCEEDED_MESSAGE + stderr
-      logging.error(message)
-      raise errors.Benchmarks.QuotaFailure(message)
+    util.CheckGcloudResponseForQuotaExceeded(stderr, retcode)
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
@@ -637,6 +632,7 @@ class Ubuntu1710BasedGceVirtualMachine(GceVirtualMachine,
 
 class WindowsGceVirtualMachine(GceVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
+  """Class supporting Windows GCE virtual machines."""
 
   DEFAULT_IMAGE = WINDOWS_IMAGE
   BOOT_DISK_SIZE_GB = 50

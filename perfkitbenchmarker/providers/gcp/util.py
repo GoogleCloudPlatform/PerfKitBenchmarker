@@ -13,10 +13,13 @@
 # limitations under the License.
 """Utilities for working with Google Cloud Platform resources."""
 
+from collections import OrderedDict
 import json
+import logging
+import re
 import functools32
 
-from collections import OrderedDict
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
@@ -128,3 +131,20 @@ class GcloudCommand(object):
     if hasattr(resource, 'zone') and resource.zone:
       self.flags['zone'] = resource.zone
     self.additional_flags.extend(FLAGS.additional_gcloud_flags or ())
+
+
+_QUOTA_EXCEEDED_REGEX = re.compile('Quota \'.*\' exceeded.')
+_QUOTA_EXCEEDED_MESSAGE = ('Creation failed due to quota exceeded: ')
+
+
+def CheckGcloudResponseForQuotaExceeded(stderr, retcode):
+  """Checks gcloud responses for quota exceeded errors.
+
+  Args:
+      stderr: The stderr from a gcloud command.
+      retcode: The return code from a gcloud command.
+  """
+  if retcode and _QUOTA_EXCEEDED_REGEX.search(stderr):
+    message = _QUOTA_EXCEEDED_MESSAGE + stderr
+    logging.error(message)
+    raise errors.Benchmarks.QuotaFailure(message)

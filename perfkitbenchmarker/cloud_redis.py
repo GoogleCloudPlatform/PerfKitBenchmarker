@@ -13,18 +13,27 @@
 # limitations under the License.
 """Module containing class for cloud Redis."""
 
-import abc
-
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 
 
-_CLOUD_REDIS_REGISTRY = {}
 FLAGS = flags.FLAGS
 
-# List of supported redis tiers
-STANDARD = 'STANDARD'
-BASIC = 'BASIC'
+
+class Failover(object):
+  """Enum for redis failover options."""
+  FAILOVER_NONE = 'failover_none'
+  FAILOVER_SAME_ZONE = 'failover_same_zone'
+  FAILOVER_SAME_REGION = 'failover_same_region'
+
+flags.DEFINE_enum(
+    'redis_failover_style',
+    Failover.FAILOVER_NONE,
+    [Failover.FAILOVER_NONE,
+     Failover.FAILOVER_SAME_ZONE,
+     Failover.FAILOVER_SAME_REGION],
+    'Failover behavior of cloud redis cluster. Acceptable values are:'
+    'failover_none, failover_same_zone, and failover_same_region')
 
 # List of redis versions
 REDIS_3_2 = 'REDIS_3_2'
@@ -43,28 +52,13 @@ def GetCloudRedisClass(cloud):
   Raises:
     Exception: An invalid cloud was provided
   """
-  if cloud not in _CLOUD_REDIS_REGISTRY:
-    raise Exception('No cloud redis found for {0}'.format(cloud))
-  return _CLOUD_REDIS_REGISTRY.get(cloud)
-
-
-class AutoRegisterCloudRedisMeta(abc.ABCMeta):
-  """Metaclass which allows Cloud Redis to register."""
-
-  def __init__(cls, name, bases, dct):
-    if hasattr(cls, 'CLOUD'):
-      if cls.CLOUD is None:
-        raise Exception('cloud Redis concrete subclasses must have a cloud '
-                        'attribute.')
-      else:
-        _CLOUD_REDIS_REGISTRY[cls.CLOUD] = cls
-    super(AutoRegisterCloudRedisMeta, cls).__init__(name, bases, dct)
+  return resource.GetResourceClass(BaseCloudRedis, CLOUD=cloud)
 
 
 class BaseCloudRedis(resource.BaseResource):
   """Object representing a cloud redis."""
 
-  __metaclass__ = AutoRegisterCloudRedisMeta
+  RESOURCE_TYPE = 'BaseCloudRedis'
 
   def __init__(self, cloud_redis_spec):
     """Initialize the cloud redis object.
@@ -74,3 +68,11 @@ class BaseCloudRedis(resource.BaseResource):
     """
     super(BaseCloudRedis, self).__init__()
     self.spec = cloud_redis_spec
+    self.failover_style = FLAGS.redis_failover_style
+
+  def GetResourceMetadata(self):
+    """Returns a dictionary of cluster metadata."""
+    metadata = {
+        'failover_style': self.failover_style
+    }
+    return metadata

@@ -416,13 +416,7 @@ class BenchmarkSpec(object):
             self.config.edw_service.subnet_id = network.subnet.id
       self.edw_service.Create()
     if self.cloud_redis:
-      # Redis needs to be created in the same subnet and vpc as the already
-      # created client vms
-      for network in networks:
-        if network.__class__.__name__ == 'AwsNetwork':
-          self.config.cloud_redis.subnet_id = network.subnet.id
-          self.config.cloud_redis.security_group_id = (
-              network.regional_network.vpc.default_security_group_id)
+      self.config.cloud_redis.client_vm = self.vms[0]
       self.cloud_redis.Create()
 
   def Delete(self):
@@ -525,7 +519,10 @@ class BenchmarkSpec(object):
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
-      vm.CreateScratchDisk(disk_spec)
+      if disk_spec.disk_type == disk.RAM:
+        vm.CreateRamDisk(disk_spec)
+      else:
+        vm.CreateScratchDisk(disk_spec)
 
     # This must come after Scratch Disk creation to support the
     # Containerized VM case

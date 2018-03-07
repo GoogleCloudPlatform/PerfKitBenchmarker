@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 import re
 import uuid
 
@@ -56,7 +56,6 @@ MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
 
-_MANAGED_RELATIONAL_DB_REGISTRY = {}
 FLAGS = flags.FLAGS
 
 # TODO: Implement DEFAULT BACKUP_START_TIME for instances.
@@ -81,29 +80,13 @@ def GetManagedRelationalDbClass(cloud):
   Args:
     cloud: name of cloud to get the class for
   """
-  if cloud in _MANAGED_RELATIONAL_DB_REGISTRY:
-    return _MANAGED_RELATIONAL_DB_REGISTRY.get(cloud)
-  raise NotImplementedError(('No ManagedRelationalDatabase implementation '
-                             'found for {0}'.format(cloud)))
-
-
-class AutoRegisterManagedRelationalDbMeta(ABCMeta):
-  """Metaclass which allows ManagedRelationalDb to register."""
-
-  def __init__(cls, name, bases, dct):
-    if hasattr(cls, 'CLOUD'):
-      if cls.CLOUD is None:
-        raise Exception('ManagedRelationalDb subclasses must '
-                        'have a CLOUD' 'attribute.')
-      else:
-        _MANAGED_RELATIONAL_DB_REGISTRY[cls.CLOUD] = cls
-    super(AutoRegisterManagedRelationalDbMeta, cls).__init__(name, bases, dct)
+  return resource.GetResourceClass(BaseManagedRelationalDb, CLOUD=cloud)
 
 
 class BaseManagedRelationalDb(resource.BaseResource):
   """Object representing a managed relational database Service."""
 
-  __metaclass__ = AutoRegisterManagedRelationalDbMeta
+  RESOURCE_TYPE = 'BaseManagedRelationalDb'
 
   def __init__(self, managed_relational_db_spec):
     """Initialize the managed relational database object

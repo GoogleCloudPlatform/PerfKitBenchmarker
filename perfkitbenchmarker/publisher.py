@@ -537,6 +537,7 @@ class BigQueryPublisher(SamplePublisher):
                          '--service_account_private_key_file=' +
                          self.service_account_private_key_file])
       load_cmd.extend(['load',
+                       '--autodetect',
                        '--source_format=NEWLINE_DELIMITED_JSON',
                        self.bigquery_table,
                        tf.name])

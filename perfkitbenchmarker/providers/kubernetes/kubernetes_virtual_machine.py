@@ -292,7 +292,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     # that the root user's environment is preserved when
     # running as sudo. Then run tail indefinitely so that
     # the container does not exit.
-    if self.image == 'nvidia/cuda:8.0-devel-ubuntu16.04':
+    if self.image.startswith('nvidia/cuda'):
       container_command = ' && '.join([
           'apt-get update',
           'apt-get install -y sudo',
@@ -418,7 +418,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     # Although ssh is not required to connect to the container, MPI
     # benchmarks require it.
     self.InstallPackages('ssh')
-    self.RemoteCommand('sudo /etc/init.d/ssh restart')
+    self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
     self.RemoteCommand('mkdir ~/.ssh')
     with open(self.ssh_public_key) as f:
       key = f.read()

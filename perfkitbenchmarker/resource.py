@@ -25,6 +25,46 @@ import time
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 
+_RESOURCE_REGISTRY = {}
+
+
+def GetResourceClass(base_class, **kwargs):
+  """Returns the subclass with the corresponding attributes.
+
+  Args:
+    base_class: The base class of the resource to return
+        (e.g. BaseVirtualMachine).
+    **kwargs: Every attribute/value of the subclass's REQUIRED_ATTRS that were
+        used to register the subclass.
+  Raises:
+    Exception: If no class could be found with matching attributes.
+  """
+  key = [base_class.__name__]
+  key += sorted(kwargs.items())
+  if tuple(key) not in _RESOURCE_REGISTRY:
+    raise Exception('No %s subclass defined with the attributes: %s' %
+                    (base_class.__name__, kwargs))
+  return _RESOURCE_REGISTRY.get(tuple(key))
+
+
+class AutoRegisterResourceMeta(abc.ABCMeta):
+  """Metaclass which allows resources to automatically be registered."""
+
+  def __init__(cls, name, bases, dct):
+    if (all(hasattr(cls, attr) for attr in cls.REQUIRED_ATTRS) and
+        cls.RESOURCE_TYPE):
+      unset_attrs = [
+          attr for attr in cls.REQUIRED_ATTRS if getattr(cls, attr) is None]
+      if unset_attrs:
+        raise Exception(
+            'Subclasses of %s must have the following attrs set: %s. The '
+            'following attrs were not set: %s.' %
+            (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, unset_attrs))
+      key = [cls.RESOURCE_TYPE]
+      key += sorted([(attr, getattr(cls, attr)) for attr in cls.REQUIRED_ATTRS])
+      _RESOURCE_REGISTRY[tuple(key)] = cls
+    super(AutoRegisterResourceMeta, cls).__init__(name, bases, dct)
+
 
 class BaseResource(object):
   """An object representing a cloud resource.
@@ -34,7 +74,14 @@ class BaseResource(object):
     pkb_managed: Whether the resource is managed (created and deleted) by PKB.
   """
 
-  __metaclass__ = abc.ABCMeta
+  # The name of the base class (e.g. BaseVirtualMachine) that will be extended
+  # with auto-registered subclasses.
+  RESOURCE_TYPE = None
+  # A list of attributes that are used to register Resource subclasses
+  # (e.g. CLOUD).
+  REQUIRED_ATTRS = ['CLOUD']
+
+  __metaclass__ = AutoRegisterResourceMeta
 
   def __init__(self, user_managed=False):
     super(BaseResource, self).__init__()

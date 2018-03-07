@@ -10,6 +10,7 @@
 - Changed default Tensorflow package when using CPUs to an Intel CPU-optimized
   build.
 - Renamed cuda_toolkit_8 to cuda_toolkit
+- Migrated cluster boot benchmark default machines to 'default_dual_core'.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers
@@ -22,6 +23,8 @@
 - Added support for CUDA Toolkit 9.0
 - Added MXNet support for CUDA Toolkit 9.0
 - Added new version of HPCG, with CUDA 9 support
+- Added latest gen 'default_dual_core' machine type configuration for AWS, Azure and GCP.
+- Added memory as disk type for Linux only.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -62,6 +65,13 @@
 - Cloud Spanner: Added --cloud_spanner_instance and --cloud_spanner_database to
   separate instance lifecycle from perfkit resource lifecycle. This allows
   reusing instances and databases for benchmark. (GH-1461)
+- Update configurable parameters for ycsb benchmarks.
+- Added tags to AWS kops instances and increased loadbalancer timeout.
+- Allow cassandra_ycsb to run on a single vm.
+- Adding support for using preprovisioned data for SPEC CPU 2006 benchmark.
+- Support negative numbers when parsing an integerlist.
+- Added float16 support for TensorFlow and MXNet Benchmarks.
+- Added flag --mx_key_value_store in MNXnet benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -94,3 +104,17 @@
   argument.
 - "nightly" now is not a valid argument in GCP TPU commands.
 - Make aerospike_ycsb runnable on Amazon AMI.
+- Fixed assumption that HOME was set.
+- Fixed issue with default K8s image setup.
+- Install the correct TensorFlow pip package based on whether VM has GPUs or
+  not.
+- Change to root for command "lspci".
+- Install package pciutils when install cuda_toolkit.
+- Update TensorFlow benchmark arguments.
+- Isolate Darwin OS pkb runs to fix Issue # 1563
+- Fixed YCSB so it pushes workload once to each VM even if they are repeated.
+- Simplified resource and spec registration.
+- Fixed a bug in which the PKB recorded reboot time could be low for AWS because
+  we would restart the creation timer for VMs that were reported as pending.
+- Increased timeout of GKE Cluster create command from 10 to 15 minutes.
+- Set ImageNet image shape as 3,224,224.

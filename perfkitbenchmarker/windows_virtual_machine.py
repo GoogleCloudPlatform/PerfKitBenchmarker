@@ -137,12 +137,19 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       RemoteCommandError: If there was a problem copying the file.
     """
     remote_path = remote_path or '~/'
-    home = os.environ['HOME']
+    # In order to expand "~" and "~user" we use ntpath.expanduser(),
+    # but it relies on environment variables being set. This modifies
+    # the HOME environment variable in order to use that function, and then
+    # restores it to its previous value.
+    home = os.environ.get('HOME')
     try:
       os.environ['HOME'] = self.home_dir
       remote_path = ntpath.expanduser(remote_path)
     finally:
-      os.environ['HOME'] = home
+      if home is None:
+        del os.environ['HOME']
+      else:
+        os.environ['HOME'] = home
 
     drive, remote_path = ntpath.splitdrive(remote_path)
     remote_drive = (drive or self.system_drive).rstrip(':')
@@ -329,7 +336,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     stdout, _ = self.RemoteCommand(
         'Get-WmiObject -class Win32_PhysicalMemory | '
         'select -exp Capacity')
-    return int(stdout) / 1024
+    result = sum(int(capacity) for capacity in stdout.split('\n') if capacity)
+    return result / 1024
 
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
@@ -369,8 +377,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     with vm_util.NamedTemporaryFile(prefix='diskpart') as tf:
       tf.write(script)
       tf.close()
-      self.RemoteCopy(tf.name, self.temp_dir)
       script_path = ntpath.join(self.temp_dir, os.path.basename(tf.name))
+      self.RemoteCopy(tf.name, script_path)
       self.RemoteCommand('diskpart /s {script_path}'.format(
           script_path=script_path))
 

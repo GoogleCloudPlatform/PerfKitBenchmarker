@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Archive a run directory to GCS or S3."""
+
 import datetime
 import logging
 import os
@@ -34,6 +36,10 @@ def ArchiveRun(run_temp_directory, target_bucket,
     prefix: str. prefix for the file.
     gsutil_path: str. Path to the gsutil tool.
     aws_path: str. Path to the aws command line tool.
+
+  Raises:
+    ValueError: when directory or target_bucket does not exist.
+    subprocess.CalledProcessError: subprocess call failed.
   """
   if not os.path.isdir(run_temp_directory):
     raise ValueError('{0} is not a directory.'.format(run_temp_directory))

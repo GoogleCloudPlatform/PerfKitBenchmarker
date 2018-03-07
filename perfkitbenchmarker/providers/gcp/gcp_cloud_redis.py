@@ -26,25 +26,32 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
+STANDARD_TIER = 'STANDARD_HA'
+BASIC_TIER = 'BASIC'
 
 
 class CloudRedis(cloud_redis.BaseCloudRedis):
-  """Object representing a GCP cloud redis instance.
-
-  Attributes:
-      name: instance name
-      project: the GCP project
-  """
+  """Object representing a GCP cloud redis instance."""
 
   CLOUD = providers.GCP
 
   def __init__(self, spec):
     super(CloudRedis, self).__init__(spec)
-    self.spec = spec
     self.project = FLAGS.project
-    self.tier = spec.redis_tier
-    self.size = spec.redis_size_gb
+    self.size = FLAGS.gcp_redis_gb
     self.version = spec.redis_version
+    self.redis_region = FLAGS.redis_region
+    self.failover_style = FLAGS.redis_failover_style
+    if self.failover_style == cloud_redis.Failover.FAILOVER_NONE:
+      self.tier = BASIC_TIER
+    elif self.failover_style == cloud_redis.Failover.FAILOVER_SAME_REGION:
+      self.tier = STANDARD_TIER
+
+  @staticmethod
+  def CheckPrerequisites(benchmark_config):
+    if FLAGS.redis_failover_style == cloud_redis.Failover.FAILOVER_SAME_ZONE:
+      raise errors.Config.InvalidValue(
+          'GCP cloud redis does not support same zone failover')
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the instance.
@@ -53,16 +60,18 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
       dict mapping string property key to value.
     """
     result = super(CloudRedis, self).GetResourceMetadata()
-    result['tier'] = self.tier
     result['size'] = self.size
     result['version'] = self.version
+    result['tier'] = self.tier
+    result['region'] = self.redis_region
     return result
 
   def _Create(self):
     """Creates the instance."""
     cmd = util.GcloudCommand(self, 'alpha', 'redis', 'instances', 'create',
                              self.spec.redis_name)
-    cmd.flags['region'] = FLAGS.redis_region
+    cmd.flags['region'] = self.redis_region
+    cmd.flags['zone'] = self.spec.client_vm.zone
     cmd.flags['network'] = FLAGS.gce_network_name
     cmd.flags['tier'] = self.tier
     cmd.flags['size'] = self.size
@@ -73,7 +82,7 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
     """Deletes the instance."""
     cmd = util.GcloudCommand(self, 'alpha', 'redis', 'instances', 'delete',
                              self.spec.redis_name)
-    cmd.flags['region'] = FLAGS.redis_region
+    cmd.flags['region'] = self.redis_region
     cmd.Issue()
 
   def _Exists(self):
@@ -89,7 +98,7 @@ class CloudRedis(cloud_redis.BaseCloudRedis):
     """
     cmd = util.GcloudCommand(self, 'alpha', 'redis', 'instances', 'describe',
                              self.spec.redis_name)
-    cmd.flags['region'] = FLAGS.redis_region
+    cmd.flags['region'] = self.redis_region
     stdout, stderr, retcode = cmd.Issue(suppress_warning=True)
     if retcode != 0:
       logging.info('Could not find redis instance %s', self.spec.redis_name)
