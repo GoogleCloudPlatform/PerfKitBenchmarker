@@ -72,6 +72,10 @@ EXECUTE_COMMAND = 'execute_command.py'
 # by EXECUTE_COMMAND.
 WAIT_FOR_COMMAND = 'wait_for_command.py'
 
+_DEFAULT_DISK_FS_TYPE = 'ext4'
+_DEFAULT_DISK_MOUNT_OPTIONS = 'discard'
+_DEFAULT_DISK_FSTAB_OPTIONS = 'defaults'
+
 flags.DEFINE_bool('setup_remote_firewall', False,
                   'Whether PKB should configure the firewall of each remote'
                   'VM to make sure it accepts all internal connections.')
@@ -450,12 +454,23 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def MountDisk(self, device_path, mount_path):
     """Mounts a formatted disk in the VM."""
-    mnt_cmd = ('sudo mkdir -p {1};sudo mount -o discard {0} {1};'
-               'sudo chown -R $USER:$USER {1};').format(device_path, mount_path)
+    mount_opts = _DEFAULT_DISK_MOUNT_OPTIONS
+    fs_type = _DEFAULT_DISK_FS_TYPE
+    fstab_opts = _DEFAULT_DISK_FSTAB_OPTIONS
+    mnt_cmd = ('sudo mkdir -p {mount_path};'
+               'sudo mount {mount_cmd_opts} {device_path} {mount_path};'
+               'sudo chown -R $USER:$USER {mount_path};').format(
+                   mount_path=mount_path,
+                   device_path=device_path,
+                   mount_cmd_opts='-o %s' % mount_opts)
     self.RemoteHostCommand(mnt_cmd)
     # add to /etc/fstab to mount on reboot
-    mnt_cmd = ('echo "{0} {1} ext4 defaults" '
-               '| sudo tee -a /etc/fstab').format(device_path, mount_path)
+    mnt_cmd = ('echo "{device_path} {mount_path} {fs_type} {fstab_opts}" '
+               '| sudo tee -a /etc/fstab').format(
+                   device_path=device_path,
+                   mount_path=mount_path,
+                   fs_type=fs_type,
+                   fstab_opts=fstab_opts)
     self.RemoteHostCommand(mnt_cmd)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
