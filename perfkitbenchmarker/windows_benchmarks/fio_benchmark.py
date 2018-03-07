@@ -34,17 +34,17 @@ _SIZE_EXPLANATION = ('This is the size of I/O for this job. fio will run until'
                      ' smaller.')
 
 _DEFAULT_SIZE_LARGE_EXPLANATION = _SIZE_EXPLANATION.format(
-    size=_FIO_LARGE_SIZE, max_size=(_MAX_SIZE/1000))
+    size=_FIO_LARGE_SIZE, max_size=(_MAX_SIZE / 1000))
 
 _DEFAULT_SIZE_MEDIUM_EXPLANATION = _SIZE_EXPLANATION.format(
-    size=_FIO_MEDIUM_SIZE, max_size=(_MAX_SIZE/1000))
+    size=_FIO_MEDIUM_SIZE, max_size=(_MAX_SIZE / 1000))
 
 flags.DEFINE_integer('fio_file_size', None,
                      ('"filesize" field of the global section of the '
                       'fio config. This is the size of the individual files. '
                       'Default is {large} * (System Memory) or {max_size}GB, '
                       'whichever is smaller.').format(
-                          large=_FIO_LARGE_SIZE, max_size=_MAX_SIZE/1000))
+                          large=_FIO_LARGE_SIZE, max_size=_MAX_SIZE / 1000))
 
 flags.DEFINE_integer('fio_sequential_write_size', None,
                      ('"size" field of the sequential_write section of the '

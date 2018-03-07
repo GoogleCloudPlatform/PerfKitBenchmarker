@@ -498,7 +498,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           '--multi-az',
           '--apply-immediately',
           '--region=%s' % self.region
-          ]
+      ]
       vm_util.IssueCommand(cmd)
 
       if not self._IsInstanceReady(self.instance_id, timeout=IS_READY_TIMEOUT):
