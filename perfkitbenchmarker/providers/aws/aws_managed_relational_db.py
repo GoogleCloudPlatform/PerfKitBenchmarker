@@ -302,21 +302,27 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
           '--engine-version=%s' % self.spec.engine_version,
           '--db-subnet-group-name=%s' % self.db_subnet_group_name,
           '--vpc-security-group-ids=%s' % self.security_group_id,
+          '--availability-zone=%s' % self.spec.vm_spec.zone
       ]
 
       if self.spec.disk_spec.disk_type == aws_disk.IO1:
         cmd.append('--iops=%s' % self.spec.disk_spec.iops)
-
-      if self.spec.high_availability:
-        cmd.append('--multi-az')
-      else:
-        cmd.append('--availability-zone=%s' % self.spec.vm_spec.zone)
-
       # TODO(ferneyhough): add backup_enabled and backup_window
 
       vm_util.IssueCommand(cmd)
 
     elif self.spec.engine == managed_relational_db.AURORA_POSTGRES:
+
+      zones_needed_for_high_availability = len(self.zones) > 1
+      if zones_needed_for_high_availability != self.spec.high_availability:
+        raise Exception('When managed_db_high_availability is true, multiple '
+                        'zones must be specified.  When '
+                        'managed_db_high_availability is false, one zone '
+                        'should be specified.   '
+                        'managed_db_high_availability: {0}  '
+                        'zone count: {1} '.format(
+                            zones_needed_for_high_availability,
+                            len(self.zones)))
 
       cluster_identifier = 'pkb-db-cluster-' + FLAGS.run_uri
       # Create the cluster.
@@ -474,7 +480,33 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _PostCreate(self):
     """Perform general post create operations on the cluster.
 
+    Raises:
+       Exception:  If could not ready the instance after modification to
+                   multi-az.
     """
+
+    need_ha_modification = (self.spec.engine == managed_relational_db.MYSQL or
+                            self.spec.engine == managed_relational_db.POSTGRES)
+
+    if self.spec.high_availability and need_ha_modification:
+      # When extending the database to be multi-az, the second region
+      # is picked by where the second subnet has been created.
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'modify-db-instance',
+          '--db-instance-identifier=%s' % self.instance_id,
+          '--multi-az',
+          '--apply-immediately',
+          '--region=%s' % self.region
+      ]
+      vm_util.IssueCommand(cmd)
+
+      if not self._IsInstanceReady(self.instance_id, timeout=IS_READY_TIMEOUT):
+        raise Exception('Instance could not be set to ready after '
+                        'modification for high availability')
+
+    json_output = self._DescribeInstance(self.instance_id)
+    self._SavePrimaryAndSecondaryZones(json_output)
     self._GetPortsForWriterInstance(self.all_instance_ids[0])
 
   def _IsInstanceReady(self, instance_id, timeout=IS_READY_TIMEOUT):
@@ -491,26 +523,21 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       True if the resource was ready in time, False if the wait timed out
         or an Exception occurred.
     """
-    cmd = util.AWS_PREFIX + [
-        'rds',
-        'describe-db-instances',
-        '--db-instance-identifier=%s' % instance_id,
-        '--region=%s' % self.region
-    ]
     start_time = datetime.datetime.now()
 
     while True:
       if (datetime.datetime.now() - start_time).seconds >= timeout:
         logging.exception('Timeout waiting for sql instance to be ready')
         return False
-      stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
-
+      json_output = self._DescribeInstance(instance_id)
       try:
-        json_output = json.loads(stdout)
         state = json_output['DBInstances'][0]['DBInstanceStatus']
-        logging.info('Instance state: {0}'.format(state))
-        if state == 'available':
-          self._SavePrimaryAndSecondaryZones(json_output)
+        pending_values = json_output['DBInstances'][0]['PendingModifiedValues']
+        logging.info('Instance state: %s', state)
+        if pending_values:
+          logging.info('Pending values: %s', (str(pending_values)))
+
+        if state == 'available' and not pending_values:
           break
       except:
         logging.exception('Error attempting to read stdout. Creation failure.')
@@ -519,19 +546,23 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     return True
 
-  def _GetPortsForWriterInstance(self, instance_id):
-    """Assigns the ports and endpoints from the instance_id to self.
-
-    These will be used to communicate with the data base, tje
-    """
+  def _DescribeInstance(self, instance_id):
     cmd = util.AWS_PREFIX + [
         'rds',
         'describe-db-instances',
         '--db-instance-identifier=%s' % instance_id,
         '--region=%s' % self.region
     ]
-    stdout, _, _ = vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
     json_output = json.loads(stdout)
+    return json_output
+
+  def _GetPortsForWriterInstance(self, instance_id):
+    """Assigns the ports and endpoints from the instance_id to self.
+
+    These will be used to communicate with the data base, tje
+    """
+    json_output = self._DescribeInstance(instance_id)
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = self._ParsePort(json_output)
 

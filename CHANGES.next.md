@@ -25,6 +25,8 @@
 - Added new version of HPCG, with CUDA 9 support
 - Added latest gen 'default_dual_core' machine type configuration for AWS, Azure and GCP.
 - Added memory as disk type for Linux only.
+- Added support for publishing individual dstat samples with
+  `--dstat_publish_regex`.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -115,3 +117,4 @@
   we would restart the creation timer for VMs that were reported as pending.
 - Increased timeout of GKE Cluster create command from 10 to 15 minutes.
 - Set ImageNet image shape as 3,224,224.
+- Updated MountDisk commands to use named parameters.

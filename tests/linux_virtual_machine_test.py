@@ -102,5 +102,21 @@ class TestSysctl(unittest.TestCase):
         [])
 
 
+class TestDiskOperations(unittest.TestCase):
+
+  @mock.patch.object(LinuxVM, 'RemoteHostCommandWithReturnCode')
+  def testMountDisk(self, mock_remote_cmd):
+    mock_remote_cmd.side_effect = [('', None, 0), ('', None, 0)]
+    vm = LinuxVM()
+    vm.MountDisk('dp', 'mp')
+    call_args = [args[0][0] for args in mock_remote_cmd.call_args_list]
+    self.assertEqual(('sudo mkdir -p mp;'
+                      'sudo mount -o discard dp mp;'
+                      'sudo chown -R $USER:$USER mp;'), call_args[0])
+    self.assertEqual(('echo "dp mp ext4 defaults" '
+                      '| sudo tee -a /etc/fstab'), call_args[1])
+    self.assertEqual(2, len(call_args))
+
+
 if __name__ == '__main__':
   unittest.main()
