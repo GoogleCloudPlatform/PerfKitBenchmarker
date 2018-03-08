@@ -339,9 +339,6 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     result = sum(int(capacity) for capacity in stdout.split('\n') if capacity)
     return result / 1024
 
-  def GetTotalMemoryMb(self):
-    return self._GetTotalMemoryKb() / 1024
-
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
     return self.TryRemoteCommand('ping -n 1 %s' % ip)
