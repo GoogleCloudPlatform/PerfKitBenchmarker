@@ -119,3 +119,4 @@
 - Set ImageNet image shape as 3,224,224.
 - Updated MountDisk commands to use named parameters.
 - Calling repr(IntegerList) returns a readable string.
+- Support installing azure-cli on RedHat systems.
