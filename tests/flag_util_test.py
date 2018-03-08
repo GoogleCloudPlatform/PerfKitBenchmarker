@@ -203,6 +203,9 @@ class TestIntegerListSerializer(unittest.TestCase):
 
     self.assertEqual(ser.serialize(il),
                      '1,2-5,9')
+    self.assertEqual(str(il), '1,2-5,9')
+    # previously was <perfkitbenchmarker.flag_util.IntegerList object at ...>
+    self.assertEqual(repr(il), 'IntegerList([1,2-5,9])')
 
   def testSerializeNegativeNumbers(self):
     ser = flag_util.IntegerListSerializer()

@@ -110,6 +110,9 @@ class IntegerList(object):
   def __str__(self):
     return IntegerListSerializer().serialize(self)
 
+  def __repr__(self):
+    return 'IntegerList([%s])' % self
+
   def _CreateXrangeFromTuple(self, input_tuple):
     start = input_tuple[0]
     step = 1 if len(input_tuple) == 2 else input_tuple[2]
