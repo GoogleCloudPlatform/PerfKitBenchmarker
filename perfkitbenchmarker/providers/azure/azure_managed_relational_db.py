@@ -135,16 +135,10 @@ class AzureManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     Raises:
       NotImplementedError: if unknown how to create self.spec.engine.
-      Exception:  if attempting to create a non high availability database.
 
     """
     if self.spec.engine == managed_relational_db.POSTGRES or (
         self.spec.engine == managed_relational_db.MYSQL):
-
-      if not self.spec.high_availability:
-        raise Exception('Azure databases can only be used in high '
-                        'availability.')
-
       cmd = [
           azure.AZURE_PATH,
           self.GetAzCommandForEngine(),
