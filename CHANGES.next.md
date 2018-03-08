@@ -42,7 +42,7 @@
 - Publishers can be extended through external modules.
 - Add `run_processes_delay` flag to stagger parallel runs.
 - Add support for SPECspeed.
-- Add new `os_types` Centos7, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
+- Add new `os_types` Centos7, Debian9, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
 - Make it easier to RDP to PKB VMs
 - Avoid setting up thread pool etc when run_processes is set
   to 1 to simplify debugging using --run_with_pdb flag

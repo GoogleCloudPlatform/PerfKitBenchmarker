@@ -39,8 +39,8 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
-from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -553,6 +553,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       login_shell: Run command in a login shell.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
+      timeout: The timeout for IssueCommand.
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -615,6 +616,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       login_shell: Run command in a login shell.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
+      timeout: The timeout for IssueCommand.
 
     Returns:
       A tuple of stdout, stderr from running the command.
@@ -627,7 +629,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         suppress_warning, timeout)[:2]
 
   def _Reboot(self):
-    """OS-specific implementation of reboot command"""
+    """OS-specific implementation of reboot command."""
     self.RemoteCommand('sudo reboot', ignore_failure=True)
 
   def _AfterReboot(self):
@@ -1118,7 +1120,7 @@ class DebianMixin(BaseLinuxMixin):
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
     super(DebianMixin, self).SetupProxy()
-    apt_proxy_file = "/etc/apt/apt.conf"
+    apt_proxy_file = '/etc/apt/apt.conf'
     commands = []
 
     if FLAGS.http_proxy:
@@ -1141,6 +1143,11 @@ class DebianMixin(BaseLinuxMixin):
     self.RemoteCommand(r'sudo sed -i -e "s/.*MaxStartups.*/MaxStartups {0}/" '
                        '/etc/ssh/sshd_config'.format(target))
     self.RemoteCommand('sudo service ssh restart')
+
+
+class Debian9Mixin(DebianMixin):
+  """Class holding Debian9 specific VM methods and attributes."""
+  OS_TYPE = os_types.DEBIAN9
 
 
 class Ubuntu1404Mixin(DebianMixin):

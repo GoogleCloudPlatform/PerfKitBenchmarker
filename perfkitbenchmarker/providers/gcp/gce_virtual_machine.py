@@ -584,6 +584,12 @@ class DebianBasedGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
+class Debian9BasedGceVirtualMachine(GceVirtualMachine,
+                                    linux_vm.Debian9Mixin):
+  DEFAULT_IMAGE_FAMILY = 'debian-9'
+  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+
+
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  linux_vm.RhelMixin):
   DEFAULT_IMAGE = RHEL_IMAGE
