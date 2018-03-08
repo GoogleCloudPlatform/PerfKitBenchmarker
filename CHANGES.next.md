@@ -118,3 +118,4 @@
 - Increased timeout of GKE Cluster create command from 10 to 15 minutes.
 - Set ImageNet image shape as 3,224,224.
 - Updated MountDisk commands to use named parameters.
+- Calling repr(IntegerList) returns a readable string.
