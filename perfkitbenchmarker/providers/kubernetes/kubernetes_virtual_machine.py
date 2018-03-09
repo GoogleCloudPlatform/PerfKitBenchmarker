@@ -391,7 +391,8 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       RemoteCommandError: If there was a problem copying the file.
     """
     if copy_to:
-      src_spec, dest_spec = file_path, '%s:%s' % (self.name, remote_path)
+      file_name = posixpath.basename(file_path)
+      src_spec, dest_spec = file_path, '%s:%s' % (self.name, file_name)
     else:
       remote_path, _ = self.RemoteCommand('readlink -f %s' % remote_path)
       remote_path = remote_path.strip()
