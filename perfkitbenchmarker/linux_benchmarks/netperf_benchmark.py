@@ -138,7 +138,7 @@ def Prepare(benchmark_spec):
   # Copy remote test script to client
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vms[0])
-  vms[0].PushFile(path)
+  vms[0].PushFile(path, REMOTE_SCRIPT)
   vms[0].RemoteCommand('sudo chmod 777 %s' % REMOTE_SCRIPT)
 
 
