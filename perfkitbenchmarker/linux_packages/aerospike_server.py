@@ -26,7 +26,7 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/aerospike-server.git'
-GIT_TAG = '3.7.5'
+GIT_TAG = '4.0.0.1'
 AEROSPIKE_DIR = '%s/aerospike-server' % INSTALL_DIR
 AEROSPIKE_CONF_PATH = '%s/as/etc/aerospike_dev.conf' % AEROSPIKE_DIR
 
