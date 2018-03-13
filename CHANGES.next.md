@@ -122,3 +122,4 @@
 - Calling repr(IntegerList) returns a readable string.
 - Support installing azure-cli on RedHat systems.
 - Fixed default behavior of using /usr/bin/time --quiet on all commands
+- Fixed ycsb failure when the same workload is ran more than once.
