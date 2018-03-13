@@ -120,3 +120,4 @@
 - Updated MountDisk commands to use named parameters.
 - Calling repr(IntegerList) returns a readable string.
 - Support installing azure-cli on RedHat systems.
+- Fixed ycsb failure when the same workload is ran more than once.
