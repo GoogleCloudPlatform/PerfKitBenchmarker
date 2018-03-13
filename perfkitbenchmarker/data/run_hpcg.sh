@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
 HPCG_DIR=`pwd`
 
 DATETIME=`hostname`.`date +"%Y%m%d.%H%M%S"`
