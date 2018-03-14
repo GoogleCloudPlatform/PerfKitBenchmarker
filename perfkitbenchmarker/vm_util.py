@@ -299,7 +299,7 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   runningOnWindows = RunningOnWindows()
   runningOnDarwin = RunningOnDarwin()
   should_time = (not (runningOnWindows or runningOnDarwin) and
-                 os.path.isfile(time_file_path))
+                 os.path.isfile(time_file_path) and FLAGS.time_commands)
   shell_value = runningOnWindows
   with tempfile.TemporaryFile() as tf_out, \
       tempfile.TemporaryFile() as tf_err, \
