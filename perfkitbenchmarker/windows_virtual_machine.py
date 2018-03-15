@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+import logging
 import ntpath
 import os
 import time
@@ -24,16 +26,39 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
 
+import winrm
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_bool(
+    'log_windows_password', False,
+    'Whether to log passwords for Windows machines. This can be useful in '
+    'the event of needing to manually RDP to the instance.')
+
 SMB_PORT = 445
-WINRM_PORT = 5985
-STARTUP_SCRIPT = ('powershell -Command "Enable-PSRemoting -force; '
-                  'Set-Item wsman:\\localhost\\client\\trustedhosts * -Force; '
-                  'Restart-Service WinRM; netsh advfirewall firewall add rule '
-                  'name=\'Port {port}\' dir=in action=allow protocol=TCP '
-                  'localport={port}"').format(port=WINRM_PORT)
+WINRM_PORT = 5986
+RDP_PORT = 3389
+# This startup script enables remote mangement of the instance. It does so
+# by creating a WinRM listener (using a self-signed cert) and opening
+# the WinRM port in the Windows firewall.
+# It also sets up RDP for manual debugging.
+_STARTUP_SCRIPT = """
+Enable-PSRemoting -Force
+$cert = New-SelfSignedCertificate -DnsName hostname -CertStoreLocation `
+    Cert:\\LocalMachine\\My\\
+New-Item WSMan:\\localhost\\Listener -Transport HTTPS -Address * `
+    -CertificateThumbPrint $cert.Thumbprint -Force
+Set-Item -Path 'WSMan:\\localhost\\Service\\Auth\\Basic' -Value $true
+netsh advfirewall firewall add rule name='Allow WinRM' dir=in action=allow `
+    protocol=TCP localport={winrm_port}
+Set-ItemProperty -Path `
+    "HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server" `
+    -Name "fDenyTSConnections" -Value 0
+netsh advfirewall firewall add rule name='Allow RDP' dir=in action=allow `
+    protocol=TCP localport={rdp_port}
+""".format(winrm_port=WINRM_PORT, rdp_port=RDP_PORT)
+STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
+    encoded_command=base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le')))
 
 
 class WindowsMixin(virtual_machine.BaseOsMixin):
@@ -44,12 +69,21 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     super(WindowsMixin, self).__init__()
     self.winrm_port = WINRM_PORT
     self.smb_port = SMB_PORT
-    self.remote_access_ports = [self.winrm_port, self.smb_port]
+    self.remote_access_ports = [self.winrm_port, self.smb_port, RDP_PORT]
     self.temp_dir = None
+    self.home_dir = None
+    self.system_drive = None
+
+  def RobustRemoteCommand(self, command, should_log=False, ignore_failure=False,
+                          suppress_warning=False, timeout=None):
+    logging.warning('RobustRemoteCommand not implemented for windows.'
+                    ' Using RemoteCommand instead.')
+    return self.RemoteCommand(command, should_log, ignore_failure,
+                              suppress_warning, timeout)
 
   def RemoteCommand(self, command, should_log=False, ignore_failure=False,
                     suppress_warning=False, timeout=None):
-    """Runs a command on the VM.
+    """Runs a powershell command on the VM.
 
     Args:
       command: A valid bash command.
@@ -59,6 +93,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       ignore_failure: Ignore any failure if set to true.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
+      timeout: A timeout in seconds for the command. This argument is currently
+          unused.
 
     Returns:
       A tuple of stdout and stderr from running the command.
@@ -66,34 +102,25 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem issuing the command.
     """
-    set_error_pref = '$ErrorActionPreference="Stop"'
+    logging.info('Running command on %s: %s', self, command)
+    s = winrm.Session('https://%s:%s' % (self.ip_address, self.winrm_port),
+                      auth=(self.user_name, self.password),
+                      server_cert_validation='ignore')
+    encoded_command = base64.b64encode(command.encode('utf_16_le'))
+    r = s.run_cmd('powershell -encodedcommand %s' % encoded_command)
+    retcode, stdout, stderr = r.status_code, r.std_out, r.std_err
 
-    password = self.password.replace("'", "''")
-    create_cred = (
-        '$pw = convertto-securestring -AsPlainText -Force \'%s\';'
-        '$cred = new-object -typename System.Management.Automation'
-        '.PSCredential -argumentlist %s,$pw' % (password, self.user_name))
-
-    create_session = (
-        '$session = New-PSSession -Credential $cred -Port %s -ComputerName %s' %
-        (self.winrm_port, self.ip_address))
-
-    invoke_command = (
-        'Invoke-Command -Session $session -ScriptBlock { %s };'
-        'exit Invoke-Command -Session $session -ScriptBlock '
-        '{ $LastExitCode }' % command)
-
-    cmd = ';'.join([set_error_pref, create_cred,
-                    create_session, invoke_command])
-
-    stdout, stderr, retcode = vm_util.IssueCommand(
-        ['powershell', '-Command', cmd], timeout=timeout,
-        suppress_warning=suppress_warning, force_info_log=should_log)
+    debug_text = ('Ran %s on %s. Return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
+                  (command, self, retcode, stdout, stderr))
+    if should_log or (retcode and not suppress_warning):
+      logging.info(debug_text)
+    else:
+      logging.debug(debug_text)
 
     if retcode and not ignore_failure:
       error_text = ('Got non-zero return code (%s) executing %s\n'
-                    'Full command: %s\nSTDOUT: %sSTDERR: %s' %
-                    (retcode, command, cmd, stdout, stderr))
+                    'STDOUT: %sSTDERR: %s' %
+                    (retcode, command, stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
     return stdout, stderr
@@ -109,9 +136,80 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem copying the file.
     """
-    drive, remote_path = ntpath.splitdrive(remote_path)
-    drive = (drive or self.system_drive).rstrip(':')
+    remote_path = remote_path or '~/'
+    # In order to expand "~" and "~user" we use ntpath.expanduser(),
+    # but it relies on environment variables being set. This modifies
+    # the HOME environment variable in order to use that function, and then
+    # restores it to its previous value.
+    home = os.environ.get('HOME')
+    try:
+      os.environ['HOME'] = self.home_dir
+      remote_path = ntpath.expanduser(remote_path)
+    finally:
+      if home is None:
+        del os.environ['HOME']
+      else:
+        os.environ['HOME'] = home
 
+    drive, remote_path = ntpath.splitdrive(remote_path)
+    remote_drive = (drive or self.system_drive).rstrip(':')
+    network_drive = '\\\\%s\\%s$' % (self.ip_address, remote_drive)
+
+    if vm_util.RunningOnWindows():
+      self._PsDriveRemoteCopy(local_path, remote_path, copy_to, network_drive)
+    else:
+      self._SmbclientRemoteCopy(local_path, remote_path, copy_to, network_drive)
+
+  def _SmbclientRemoteCopy(self, local_path, remote_path,
+                           copy_to, network_drive):
+    """Copies a file to or from the VM using smbclient.
+
+    Args:
+      local_path: Local path to file.
+      remote_path: Optional path of where to copy file on remote host.
+      copy_to: True to copy to vm, False to copy from vm.
+      network_drive: The smb specification for the remote drive
+          (//{ip_address}/{share_name}).
+
+    Raises:
+      RemoteCommandError: If there was a problem copying the file.
+    """
+    local_directory, local_file = os.path.split(local_path)
+    remote_directory, remote_file = ntpath.split(remote_path)
+
+    smb_command = 'cd %s; lcd %s; ' % (remote_directory, local_directory)
+    if copy_to:
+      smb_command += 'put %s %s' % (local_file, remote_file)
+    else:
+      smb_command += 'get %s %s' % (remote_file, local_file)
+    smb_copy = [
+        'smbclient', network_drive,
+        '--max-protocol', 'SMB3',
+        '--user', '%s%%%s' % (self.user_name, self.password),
+        '--port', str(self.smb_port),
+        '--command', smb_command
+    ]
+    stdout, stderr, retcode = vm_util.IssueCommand(smb_copy)
+    if retcode:
+      error_text = ('Got non-zero return code (%s) executing %s\n'
+                    'STDOUT: %sSTDERR: %s' %
+                    (retcode, smb_copy, stdout, stderr))
+      raise errors.VirtualMachine.RemoteCommandError(error_text)
+
+  def _PsDriveRemoteCopy(self, local_path, remote_path,
+                         copy_to, network_drive):
+    """Copies a file to or from the VM using New-PSDrive and Copy-Item.
+
+    Args:
+      local_path: Local path to file.
+      remote_path: Optional path of where to copy file on remote host.
+      copy_to: True to copy to vm, False to copy from vm.
+      network_drive: The smb specification for the remote drive
+          (//{ip_address}/{share_name}).
+
+    Raises:
+      RemoteCommandError: If there was a problem copying the file.
+    """
     set_error_pref = '$ErrorActionPreference="Stop"'
 
     password = self.password.replace("'", "''")
@@ -121,10 +219,9 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
         '.PSCredential -argumentlist %s,$pw' % (password, self.user_name))
 
     psdrive_name = self.name
-    root = '\\\\%s\\%s$' % (self.ip_address, drive)
     create_psdrive = (
         'New-PSDrive -Name %s -PSProvider filesystem -Root '
-        '%s -Credential $cred' % (psdrive_name, root))
+        '%s -Credential $cred' % (psdrive_name, network_drive))
 
     remote_path = '%s:%s' % (psdrive_name, remote_path)
     if copy_to:
@@ -134,7 +231,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
 
     copy_item = 'Copy-Item -Path %s -Destination %s' % (from_path, to_path)
 
-    delete_connection = 'net use %s /delete' % root
+    delete_connection = 'net use %s /delete' % network_drive
 
     cmd = ';'.join([set_error_pref, create_cred, create_psdrive,
                     copy_item, delete_connection])
@@ -156,17 +253,21 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
       self.bootable_time = time.time()
     if self.hostname is None:
       self.hostname = stdout.rstrip()
+    if FLAGS.log_windows_password:
+      logging.info('Password for %s: %s', self, self.password)
 
   def OnStartup(self):
     stdout, _ = self.RemoteCommand('echo $env:TEMP')
     self.temp_dir = ntpath.join(stdout.strip(), 'pkb')
+    stdout, _ = self.RemoteCommand('echo $env:USERPROFILE')
+    self.home_dir = stdout.strip()
     stdout, _ = self.RemoteCommand('echo $env:SystemDrive')
     self.system_drive = stdout.strip()
     self.RemoteCommand('mkdir %s' % self.temp_dir)
     self.DisableGuestFirewall()
 
   def _Reboot(self):
-    """OS-specific implementation of reboot command"""
+    """OS-specific implementation of reboot command."""
     self.RemoteCommand('shutdown -t 0 -r -f', ignore_failure=True)
 
   def VMLastBootTime(self):
@@ -235,7 +336,11 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     stdout, _ = self.RemoteCommand(
         'Get-WmiObject -class Win32_PhysicalMemory | '
         'select -exp Capacity')
-    return int(stdout) / 1024
+    result = sum(int(capacity) for capacity in stdout.split('\n') if capacity)
+    return result / 1024
+
+  def GetTotalMemoryMb(self):
+    return self._GetTotalMemoryKb() / 1024
 
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
@@ -244,8 +349,13 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
   def DownloadFile(self, url, dest):
     """Downloads the content at the url to the specified destination."""
 
-    command = 'Invoke-WebRequest {url} -OutFile {dest}'.format(
-        url=url, dest=dest)
+    # Allow more security protocols to make it easier to download from
+    # sites where we don't know the security protocol beforehand
+    command = ('[Net.ServicePointManager]::SecurityProtocol = '
+               '[System.Security.Authentication.SslProtocols] '
+               '"tls, tls11, tls12";'
+               'Invoke-WebRequest {url} -OutFile {dest}').format(
+                   url=url, dest=dest)
     self.RemoteCommand(command)
 
   def UnzipFile(self, zip_file, dest):
@@ -270,8 +380,8 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     with vm_util.NamedTemporaryFile(prefix='diskpart') as tf:
       tf.write(script)
       tf.close()
-      self.RemoteCopy(tf.name, self.temp_dir)
       script_path = ntpath.join(self.temp_dir, os.path.basename(tf.name))
+      self.RemoteCopy(tf.name, script_path)
       self.RemoteCommand('diskpart /s {script_path}'.format(
           script_path=script_path))
 
@@ -335,6 +445,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
 
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.
+
     Args:
       num_sectors: int. Number of sectors of read ahead.
       devices: list of strings. A list of block devices.

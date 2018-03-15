@@ -93,7 +93,7 @@ class AwsVpcExistsTestCase(unittest.TestCase):
 
 class AwsVirtualMachineTestCase(unittest.TestCase):
 
-  def openJsonData(self, filename):
+  def open_json_data(self, filename):
     path = os.path.join(os.path.dirname(__file__),
                         'data', filename)
     with open(path) as f:
@@ -135,13 +135,36 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
     network_mock.placement_group = placement_group
     self.vm.network = network_mock
 
-    self.response = self.openJsonData('aws-describe-instance.json')
-    self.sir_response =\
-        self.openJsonData('aws-describe-spot-instance-requests.json')
+    self.response = self.open_json_data('aws-describe-instance.json')
+    self.sir_response = self.open_json_data(
+        'aws-describe-spot-instance-requests.json')
 
   def testInstancePresent(self):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]
     self.assertTrue(self.vm._Exists())
+
+  def testInstanceStockedOutDuringCreate(self):
+    stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
+              'the RunInstances operation (reached max retries: 4): '
+              'Insufficient capacity.')
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    with self.assertRaises(
+        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+      self.vm._Create()
+    self.assertEqual(e.exception.message, stderr)
+
+  def testInstanceStockedOutAfterCreate(self):
+    """This tests when run-instances succeeds and returns a pending instance.
+
+    The instance then is not fulfilled and transitions to terminated.
+    """
+    response = self.open_json_data('aws-describe-instance-stockout.json')
+    util.IssueRetryableCommand.side_effect = [(response, None)]
+    with self.assertRaises(
+        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+      self.vm._Exists()
+    self.assertEqual(e.exception.message, 'Server.InsufficientInstanceCapacity:'
+                     ' Insufficient capacity to satisfy instance request')
 
   def testInstanceDeleted(self):
     response = json.loads(self.response)
@@ -188,8 +211,8 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
   def testCreateSpotLowPriceFails(self):
     response_low = json.loads(self.sir_response)
     response_low['SpotInstanceRequests'][0]['Status']['Code'] = 'price-too-low'
-    response_low['SpotInstanceRequests'][0]['Status']['Message'] = \
-        'Your price is too low.'
+    response_low['SpotInstanceRequests'][0]['Status']['Message'] = (
+        'Your price is too low.')
     response_cancel = (
         '{"CancelledSpotInstanceRequests":'
         '[{"State": "cancelled","SpotInstanceRequestId":"sir-2mcg43gk"}]}')
@@ -199,19 +222,19 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
 
     self.assertRaises(errors.Resource.CreationError, self.vm._CreateSpot)
 
-    def testDeleteCancelsSpotInstanceRequest(self):
-      self.vm.spot_instance_request_id = 'sir-abc'
+  def testDeleteCancelsSpotInstanceRequest(self):
+    self.vm.spot_instance_request_id = 'sir-abc'
 
-      self.vm._Delete()
+    self.vm._Delete()
 
-      vm_util.IssueCommand.assert_called_with(
-          ['aws',
-           '--output',
-           'json',
-           '--region=us-east-1',
-           'ec2',
-           'cancel-spot-instance-requests',
-           '--spot-instance-request-ids=sir-abc'])
+    vm_util.IssueCommand.assert_called_with(
+        ['aws',
+         '--output',
+         'json',
+         '--region=us-east-1',
+         'ec2',
+         'cancel-spot-instance-requests',
+         '--spot-instance-request-ids=sir-abc'])
 
 
 class AwsIsRegionTestCase(unittest.TestCase):
@@ -250,19 +273,20 @@ class AwsGetBlockDeviceMapTestCase(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'describe_image_output.txt')
     with open(path) as fp:
-      self.describeImageOutput = fp.read()
+      self.describe_image_output = fp.read()
 
   def testInvalidMachineType(self):
     self.assertEqual(aws_virtual_machine.GetBlockDeviceMap('invalid'), None)
 
   def testValidMachineTypeWithNoRootVolumeSize(self):
-    expected = [{"DeviceName": "/dev/xvdb",
-                 "VirtualName": "ephemeral0"}]
+    expected = [{'DeviceName': '/dev/xvdb',
+                 'VirtualName': 'ephemeral0'}]
     actual = json.loads(aws_virtual_machine.GetBlockDeviceMap('c1.medium'))
     self.assertEqual(actual, expected)
 
   def testValidMachineTypeWithSpecifiedRootVolumeSize(self):
-    util.IssueRetryableCommand.side_effect = [(self.describeImageOutput, None)]
+    util.IssueRetryableCommand.side_effect = [(self.describe_image_output,
+                                               None)]
     desired_root_volume_size_gb = 35
     machine_type = 'c1.medium'
     image_id = 'ami-a9d276c9'
@@ -289,10 +313,11 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'describe_image_output.txt')
     with open(path) as fp:
-      self.describeImageOutput = fp.read()
+      self.describe_image_output = fp.read()
 
   def testOk(self):
-    util.IssueRetryableCommand.side_effect = [(self.describeImageOutput, None)]
+    util.IssueRetryableCommand.side_effect = [(self.describe_image_output,
+                                               None)]
     image_id = 'ami-a9d276c9'
     region = 'us-west-2'
     expected = {

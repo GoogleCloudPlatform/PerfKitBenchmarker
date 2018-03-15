@@ -129,8 +129,8 @@ class DiskIOPSToCapacity(object):
   def _ValidateStorageType(self):
     """Validate storage type for given _provider, set to default if not given.
 
-       Raises:
-        InvalidStorageTypeError: Incorrect storage type given.
+    Raises:
+      InvalidStorageTypeError: Incorrect storage type given.
 
     TODO: When support other types of storage types (i.e. when this class
     supports ebs-piops for AWS or pd-hhd for gcp), will need to update
@@ -190,6 +190,7 @@ class DiskIOPSToCapacity(object):
 
   def _SetSize(self):
     """Set minimum size (GB) necessary to achieve _iops level.
+
     Rating performance levels as of May 2017, sources found below.
     GCP: ratings from https://cloud.google.com/compute/docs/disks/. Storage can
           go as high as 64TB per disk but IOPS maxes out at 30,000 iops/disk
@@ -214,6 +215,7 @@ class DiskIOPSToCapacity(object):
 
   def GetSize(self):
     """Return storage size.
+
     Returns:
       __size: Storage size (GB).
     """

@@ -27,10 +27,10 @@ category:
   a: Single byte object upload and download, measures latency.
   b: List-after-write and list-after-update consistency measurement.
   c: Single stream large object upload and download, measures throughput.
-
-Documentation: https://goto.google.com/perfkitbenchmarker-storage
 """
 
+import datetime
+import glob
 import json
 import logging
 import os
@@ -38,16 +38,17 @@ import posixpath
 import re
 import threading
 import time
+import uuid
 
 import numpy as np
 
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import object_storage_service
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
@@ -124,19 +125,31 @@ flags.DEFINE_enum('object_storage_object_naming_scheme', 'sequential_by_stream',
                   'different name prefixes. '
                   'approximately_sequential: object names from all '
                   'streams will roughly increase together.')
-flags.DEFINE_string('object_storage_objects_written_file', None,
+flags.DEFINE_string('object_storage_objects_written_file_prefix', None,
                     'If specified, the bucket and all of the objects will not '
                     'be deleted, and the list of object names will be written '
-                    'to the specified file in the following format: '
-                    '<bucket>/<object>. This file can be passed to this '
-                    'benchmark in a later run via via the '
-                    'object_storage_read_objects flag. Only valid for the '
-                    'api_multistream and api_multistream_writes scenarios.')
-flags.DEFINE_string('object_storage_read_objects', None,
+                    'to a file with the specified prefix in the following '
+                    'format: <bucket>/<object>. This prefix can be passed to '
+                    'this benchmark in a later run via via the '
+                    'object_storage_read_objects_prefix flag. Only valid for '
+                    'the api_multistream and api_multistream_writes scenarios. '
+                    'The filename is appended with the date and time so that '
+                    'later runs can be given a prefix and a minimum age of '
+                    'objects. The later run will then use the oldest objects '
+                    'available or fail if there is no file with an old enough '
+                    'date. The prefix is also appended with the region so that '
+                    'later runs will read objects from the same region.')
+flags.DEFINE_string('object_storage_read_objects_prefix', None,
                     'If specified, no new bucket or objects will be created. '
                     'Instead, the benchmark will read the objects listed in '
-                    'the specified file. Only valid for the '
-                    'api_multistream_reads scenario.')
+                    'a file with the specified prefix that was written some '
+                    'number of hours before (as specifed by '
+                    'object_storage_read_objects_min_hours). Only valid for '
+                    'the api_multistream_reads scenario.')
+flags.DEFINE_integer('object_storage_read_objects_min_hours', 72, 'The minimum '
+                     'number of hours from which to read objects that were '
+                     'written on a previous run. Used in combination with '
+                     'object_storage_read_objects_prefix.')
 flags.DEFINE_boolean('object_storage_dont_delete_bucket', False,
                      'If True, the storage bucket won\'t be deleted. Useful '
                      'for running the api_multistream_reads scenario multiple '
@@ -266,6 +279,8 @@ STORAGE_TO_API_SCRIPT_DICT = {
     providers.AWS: 'S3',
     providers.AZURE: 'AZURE'}
 
+_SECONDS_PER_HOUR = 60 * 60
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -275,11 +290,15 @@ def GetConfig(user_config):
 # TODO: add a new class of error "ObjectStorageError" to errors.py and remove
 # this one.
 class BucketRemovalError(Exception):
-    pass
+  pass
 
 
 class NotEnoughResultsError(Exception):
-    pass
+  pass
+
+
+class ColdDataError(Exception):
+  """Exception indicating that the cold object data does not exist."""
 
 
 def _JsonStringToPercentileResults(results, json_input, metric_name,
@@ -857,6 +876,48 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args, streams_per_vm):
   return output
 
 
+def _DatetimeNow():
+  """Returns datetime.datetime.now()."""
+  return datetime.datetime.now()
+
+
+def _ColdObjectsWrittenFilename():
+  """Generates a name for the objects_written_file.
+
+  Returns:
+    The name of the objects_written_file if it should be created, or None.
+  """
+  if FLAGS.object_storage_objects_written_file_prefix:
+    # Note this format is required by _ColdObjectsWrittenFileAgeHours.
+    datetime_suffix = _DatetimeNow().strftime('%Y%m%d-%H%M')
+    return '%s-%s-%s-%s' % (
+        FLAGS.object_storage_objects_written_file_prefix,
+        FLAGS.object_storage_region,
+        uuid.uuid4(),  # Add a UUID to support parallel runs that upload data.
+        datetime_suffix)
+  return None
+
+
+def _ColdObjectsWrittenFileAgeHours(filename):
+  """Determines the age in hours of an objects_written_file.
+
+  Args:
+    filename: The name of the file.
+
+  Returns:
+    The age of the file in hours (based on the name), or None.
+  """
+  # Parse the year, month, day, hour, and minute from the filename based on the
+  # way it is written in _ColdObjectsWrittenFilename.
+  match = re.search(r'(\d\d\d\d)(\d\d)(\d\d)-(\d\d)(\d\d)$', filename)
+  if not match:
+    return None
+  year, month, day, hour, minute = (int(item) for item in match.groups())
+  write_datetime = datetime.datetime(year, month, day, hour, minute)
+  write_timedelta = _DatetimeNow() - write_datetime
+  return write_timedelta.total_seconds() / _SECONDS_PER_HOUR
+
+
 def _MultiStreamOneWay(results, metadata, vms, command_builder,
                        service, bucket_name, operation):
   """Measures multi-stream latency and throughput in one direction.
@@ -921,7 +982,7 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder,
                              metadata=metadata)
 
   # Write the objects written file if the flag is set and this is an upload
-  objects_written_path_local = FLAGS.object_storage_objects_written_file
+  objects_written_path_local = _ColdObjectsWrittenFilename()
   if operation == 'upload' and objects_written_path_local is not None:
     # Get the objects written from all the VMs
     # Note these are JSON lists with the following format:
@@ -1025,16 +1086,16 @@ def MultiStreamReadBenchmark(results, metadata, vms, command_builder,
 
   logging.info('Starting multi-stream read test on %s VMs.', len(vms))
 
-  assert read_objects is not None, \
-      "api_multistream_reads scenario requires the " + \
-      "object_storage_read_objects flag to be set."
+  assert read_objects is not None, (
+      'api_multistream_reads scenario requires the '
+      'object_storage_read_objects_prefix flag to be set.')
 
   # Send over the objects written file
   try:
     # Write the per-VM objects-written-files
-    assert len(read_objects) == len(vms), \
-        "object_storage_read_objects file specified requires exactly %d " \
-        "VMs, but %d were provisioned." % (len(read_objects), len(vms))
+    assert len(read_objects) == len(vms), (
+        'object_storage_read_objects_prefix file specified requires exactly '
+        '%d VMs, but %d were provisioned.' % (len(read_objects), len(vms)))
     for vm, vm_objects_written in zip(vms, read_objects):
       # Note that each file is written with a unique name so that parallel runs
       # don't overwrite the same local file. They are pushed to the VM to a file
@@ -1226,28 +1287,61 @@ def Prepare(benchmark_spec):
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
-  """
 
+  Raises:
+    ColdDataError: If this benchmark is reading cold data, but the data isn't
+        cold enough (as configured by object_storage_read_objects_min_hours).
+  """
   # We would like to always cleanup server side states when exception happens.
   benchmark_spec.always_call_cleanup = True
 
   # Load the objects to read file if specified
   benchmark_spec.read_objects = None
-  if FLAGS.object_storage_read_objects is not None:
-    with open(FLAGS.object_storage_read_objects) as read_objects_file:
+  if FLAGS.object_storage_read_objects_prefix is not None:
+    # By taking a glob, we choose an arbitrary file that is old enough, assuming
+    # there is ever more than one.
+    search_prefix = '%s-%s*' % (
+        FLAGS.object_storage_read_objects_prefix,
+        FLAGS.object_storage_region)
+    read_objects_filenames = glob.glob(search_prefix)
+    logging.info('Considering object files %s*: %s', search_prefix,
+                 read_objects_filenames)
+    for filename in read_objects_filenames:
+      age_hours = _ColdObjectsWrittenFileAgeHours(filename)
+      if age_hours and age_hours > FLAGS.object_storage_read_objects_min_hours:
+        read_objects_filename = filename
+        break
+    else:
+      raise ColdDataError(
+          'Object data older than %d hours does not exist. Current cold data '
+          'files include the following: %s' % (
+              FLAGS.object_storage_read_objects_min_hours,
+              read_objects_filenames))
+
+    with open(read_objects_filename) as read_objects_file:
       # Format of json structure is:
       # {"bucket_name": <bucket_name>,
       #  ... any other provider-specific context needed
       #  "objects_written": <objects_written_array>}
       benchmark_spec.read_objects = json.loads(read_objects_file.read())
-    assert benchmark_spec.read_objects is not None, \
-        "Failed to read the file specified by --object_storag_read_objects"
+      benchmark_spec.read_objects_filename = read_objects_filename
+      benchmark_spec.read_objects_age_hours = age_hours
+
+    # When this benchmark reads these files, the data will be deleted. Delete
+    # the file that specifies the data too.
+    if not FLAGS.object_storage_dont_delete_bucket:
+      os.remove(read_objects_filename)
+
+    assert benchmark_spec.read_objects is not None, (
+        'Failed to read the file specified by '
+        '--object_storage_read_objects_prefix')
 
   # Load the provider and its object storage service
   providers.LoadProvider(FLAGS.storage)
 
   service = object_storage_service.GetObjectStorageClass(FLAGS.storage)()
-  if FLAGS.storage == 'Azure' and FLAGS.object_storage_read_objects is not None:
+  if (FLAGS.storage == 'Azure' and
+      FLAGS.object_storage_read_objects_prefix is not None):
     # Storage provider is azure and we are reading existing objects.
     # Need to prepare the ObjectStorageService with the existing storage
     # account and resource group associated with the bucket containing our
@@ -1349,6 +1443,8 @@ def Run(benchmark_spec):
 
   # MultiStreamRead has the additional 'read_objects' parameter
   if FLAGS.object_storage_scenario in {'api_multistream_reads', 'all'}:
+    metadata['cold_objects_filename'] = benchmark_spec.read_objects_filename
+    metadata['cold_objects_age_hours'] = benchmark_spec.read_objects_age_hours
     MultiStreamReadBenchmark(results, metadata, vms, command_builder,
                              benchmark_spec.service, bucket_name,
                              benchmark_spec.read_objects['objects_written'])
@@ -1356,7 +1452,7 @@ def Run(benchmark_spec):
   # Clear the bucket if we're not saving the objects for later
   # This is needed for long running tests, or else the objects would just pile
   # up after each run.
-  keep_bucket = (FLAGS.object_storage_objects_written_file is not None or
+  keep_bucket = (FLAGS.object_storage_objects_written_file_prefix is not None or
                  FLAGS.object_storage_dont_delete_bucket)
   if not keep_bucket:
     service.EmptyBucket(bucket_name)
@@ -1379,8 +1475,8 @@ def Cleanup(benchmark_spec):
   vm_util.RunThreaded(lambda vm: CleanupVM(vm, service), vms)
 
   # Only clean up bucket if we're not saving the objects for a later run
-  keep_bucket = FLAGS.object_storage_objects_written_file is not None or \
-      FLAGS.object_storage_dont_delete_bucket
+  keep_bucket = (FLAGS.object_storage_objects_written_file_prefix is not None or
+                 FLAGS.object_storage_dont_delete_bucket)
   if not keep_bucket:
     service.DeleteBucket(bucket_name)
     service.CleanupService()

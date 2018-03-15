@@ -22,15 +22,13 @@ Runs TCP_RR, TCP_CRR, and TCP_STREAM benchmarks from netperf across two
 machines.
 """
 
-import os
+from collections import Counter
 import csv
 import io
 import json
 import logging
+import os
 import re
-
-from collections import Counter
-
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flag_util
@@ -140,7 +138,7 @@ def Prepare(benchmark_spec):
   # Copy remote test script to client
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vms[0])
-  vms[0].PushFile(path)
+  vms[0].PushFile(path, REMOTE_SCRIPT)
   vms[0].RemoteCommand('sudo chmod 777 %s' % REMOTE_SCRIPT)
 
 
@@ -168,10 +166,11 @@ def _SetupHostFirewall(benchmark_spec):
 
 
 def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
-  """ Computes values at percentiles in a distribution as well as stddev.
+  """Computes values at percentiles in a distribution as well as stddev.
 
   Args:
     histogram: A dict mapping values to the number of samples with that value.
+    percentiles: An array of percentiles to calculate.
 
   Returns:
     A dict mapping stat names to their values.
@@ -342,9 +341,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                         thinktime_array_size=FLAGS.netperf_thinktime_array_size,
                         thinktime_run_length=FLAGS.netperf_thinktime_run_length)
 
-
   # Run all of the netperf processes and collect their stdout
-  # TODO: Record start times of netperf processes on the remote machine
+  # TODO: Record process start delta of netperf processes on the remote machine
 
   # Give the remote script the max possible test length plus 5 minutes to
   # complete
@@ -356,7 +354,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
                                       timeout=remote_cmd_timeout)
 
   # Decode stdouts, stderrs, and return codes from remote command's stdout
-  stdouts, stderrs, return_codes = json.loads(remote_stdout)
+  json_out = json.loads(remote_stdout)
+  stdouts = json_out[0]
 
   # Metadata to attach to samples
   metadata = {'netperf_test_length': FLAGS.netperf_test_length,

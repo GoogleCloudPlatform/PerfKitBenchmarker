@@ -18,6 +18,24 @@ import threading
 
 from perfkitbenchmarker import errors
 
+_SPEC_REGISTRY = {}
+
+
+def GetSpecClass(base_class, **kwargs):
+  """Returns the subclass with the corresponding attributes.
+
+  Args:
+    base_class: The base class of the resource to return
+        (e.g. BaseVmSpec).
+    **kwargs: Every attribute/value of the subclass's ATTRS that were
+        used to register the subclass.
+  Raises:
+    Exception: If no class could be found with matching attributes.
+  """
+  key = [base_class.__name__]
+  key += sorted(kwargs.items())
+  return _SPEC_REGISTRY.get(tuple(key), base_class)
+
 
 class BaseSpecMetaClass(type):
   """Metaclass that allows each BaseSpec derived class to have its own decoders.
@@ -28,12 +46,25 @@ class BaseSpecMetaClass(type):
     cls._init_decoders_lock = threading.Lock()
     cls._decoders = OrderedDict()
     cls._required_options = set()
+    if (all(hasattr(cls, attr) for attr in cls.SPEC_ATTRS) and
+        cls.SPEC_TYPE):
+      key = [cls.SPEC_TYPE]
+      key += sorted([(attr, getattr(cls, attr)) for attr in cls.SPEC_ATTRS])
+      if tuple(key) in _SPEC_REGISTRY:
+        raise Exception('Subclasses of %s must define unique values for the '
+                        'attrs: %s.' % (cls.SPEC_TYPE, cls.SPEC_ATTRS))
+      _SPEC_REGISTRY[tuple(key)] = cls
 
 
 class BaseSpec(object):
   """Object decoded from a YAML config."""
 
   __metaclass__ = BaseSpecMetaClass
+  # The name of the spec class that will be extended with auto-registered
+  # subclasses.
+  SPEC_TYPE = None
+  # A list of the attributes that are used to register the subclasses.
+  SPEC_ATTRS = ['CLOUD']
 
   # Each derived class has its own copy of the following three variables. They
   # are initialized by BaseSpecMetaClass.__init__ and later populated by

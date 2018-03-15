@@ -46,13 +46,16 @@ def EvaluateDynamicPipelineOptions(dynamic_options):
   """
   Takes the user's dynamic args and retrieves the information to fill them in.
 
-  dynamic_args is a python map of argument name -> {type, kubernetesSelector}
+  dynamic_args is a python map of argument name -> {type, kubernetesSelector, *format}
   returns a list of tuples containing (argName, argValue)
+
+  if optional format it passed, argValue is equal to format with "{{type}}" being replaced with actual value.
   """
   filledOptions = []
   for optionDescriptor in dynamic_options:
     fillType = optionDescriptor['type']
     optionName = optionDescriptor['name']
+    valueFormat = optionDescriptor.get('format')
 
     if not fillType:
       raise errors.Config.InvalidValue(
@@ -68,6 +71,8 @@ def EvaluateDynamicPipelineOptions(dynamic_options):
       raise errors.Config.InvalidValue(
           'Unknown dynamic argument type: %s' % (fillType))
 
+    if valueFormat:
+      argValue = valueFormat.replace("{{" + fillType + "}}", argValue)
     filledOptions.append((optionName, argValue))
 
   return filledOptions

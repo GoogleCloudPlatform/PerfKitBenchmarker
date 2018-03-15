@@ -30,6 +30,7 @@ import xml.etree.ElementTree
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import sample
@@ -47,12 +48,11 @@ flags.DEFINE_string(
 flags.DEFINE_enum(
     'specsfs2014_benchmark', 'VDI', ['VDI', 'DATABASE', 'SWBUILD', 'VDA'],
     'The SPEC SFS 2014 benchmark to run.')
-flags.DEFINE_integer(
-    'specsfs2014_load', 1,
+flag_util.DEFINE_integerlist(
+    'specsfs2014_load', [1],
     'The starting load in units of SPEC "business metrics". The meaning of '
     'business metric varies depending on the SPEC benchmark (e.g. VDI has '
-    'load measured in virtual desktops).',
-    lower_bound=1)
+    'load measured in virtual desktops).')
 flags.DEFINE_integer(
     'specsfs2014_incr_load', 1,
     'The amount to increment "load" by for each run.',
@@ -151,7 +151,7 @@ def _ConfigureSpec(prime_client, clients):
       'EXEC_PATH': exec_path.replace('/', '\/'),
       'CLIENT_MOUNTPOINTS': _MOUNTPOINTS_FILE,
       'BENCHMARK': FLAGS.specsfs2014_benchmark,
-      'LOAD': FLAGS.specsfs2014_load,
+      'LOAD': ' '.join([str(x) for x in FLAGS.specsfs2014_load]),
       'NUM_RUNS': FLAGS.specsfs2014_num_runs,
       'INCR_LOAD': FLAGS.specsfs2014_incr_load
   }

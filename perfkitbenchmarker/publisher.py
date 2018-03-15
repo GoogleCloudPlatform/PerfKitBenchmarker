@@ -130,18 +130,24 @@ DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
 GCS_OBJECT_NAME_LENGTH = 20
 
+# A list of SamplePublishers that can be extended to add support for publishing
+# types beyond those in this module. The classes should not require any
+# arguments to their __init__ methods. The SampleCollector will unconditionally
+# call PublishSamples using Publishers added via this method.
+EXTERNAL_PUBLISHERS = []
+
 
 def GetLabelsFromDict(metadata):
-  """Converts a metadata dictionary to a string of labels.
+  """Converts a metadata dictionary to a string of labels sorted by key.
 
   Args:
     metadata: a dictionary of string key value pairs.
 
   Returns:
-    A string of labels in the format that Perfkit uses.
+    A string of labels, sorted by key, in the format that Perfkit uses.
   """
   labels = []
-  for k, v in metadata.iteritems():
+  for k, v in sorted(metadata.iteritems()):
     labels.append('|%s:%s|' % (k, v))
   return ','.join(labels)
 
@@ -193,6 +199,11 @@ class DefaultMetadataProvider(MetadataProvider):
       for k, v in cloud_tpu.GetResourceMetadata().iteritems():
         metadata['cloud_tpu_' + k] = v
 
+    if benchmark_spec.cloud_redis:
+      cloud_redis = benchmark_spec.cloud_redis
+      for k, v in cloud_redis.GetResourceMetadata().iteritems():
+        metadata['cloud_redis_' + k] = v
+
     for name, vms in benchmark_spec.vm_groups.iteritems():
       if len(vms) == 0:
         continue
@@ -203,6 +214,8 @@ class DefaultMetadataProvider(MetadataProvider):
       for k, v in vm.GetResourceMetadata().iteritems():
         metadata[name_prefix + k] = v
       metadata[name_prefix + 'vm_count'] = len(vms)
+      for k, v in vm.GetOSResourceMetadata().iteritems():
+        metadata[name_prefix + k] = v
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
@@ -518,6 +531,7 @@ class BigQueryPublisher(SamplePublisher):
                          '--service_account_private_key_file=' +
                          self.service_account_private_key_file])
       load_cmd.extend(['load',
+                       '--autodetect',
                        '--source_format=NEWLINE_DELIMITED_JSON',
                        self.bigquery_table,
                        tf.name])
@@ -785,6 +799,8 @@ class SampleCollector(object):
       self.publishers.extend(SampleCollector._PublishersFromFlags())
     if add_default_publishers:
       self.publishers.extend(SampleCollector._DefaultPublishers())
+    for publisher_class in EXTERNAL_PUBLISHERS:
+      self.publishers.append(publisher_class())
 
     logging.debug('Using publishers: {0}'.format(self.publishers))
 
@@ -863,6 +879,9 @@ class SampleCollector(object):
 
   def PublishSamples(self):
     """Publish samples via all registered publishers."""
+    if not self.samples:
+      logging.warn('No samples to publish.')
+      return
     for publisher in self.publishers:
       publisher.PublishSamples(self.samples)
     self.samples = []

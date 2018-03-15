@@ -61,6 +61,7 @@ import itertools
 import json
 import logging
 import multiprocessing
+from os.path import isfile
 import re
 import sys
 import time
@@ -68,6 +69,7 @@ import uuid
 
 from perfkitbenchmarker import archive
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import benchmark_lookup
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import benchmark_status
@@ -76,8 +78,8 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
@@ -129,6 +131,15 @@ flags.DEFINE_list(
 flags.DEFINE_string('machine_type', None, 'Machine '
                     'types that will be created for benchmarks that don\'t '
                     'require a particular type.')
+flags.DEFINE_integer(
+    'gpu_count', None,
+    'Number of gpus to attach to the VM. Requires gpu_type to be '
+    'specified.')
+flags.DEFINE_enum(
+    'gpu_type', None,
+    ['k80', 'p100', 'v100'],
+    'Type of gpus to attach to the VM. Requires gpu_count to be '
+    'specified.')
 flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
                      'variable number of machines, the number of VMs to use.')
 flags.DEFINE_string('image', None, 'Default image that will be '
@@ -151,7 +162,9 @@ flags.DEFINE_integer('duration_in_seconds', None,
 flags.DEFINE_string('static_vm_file', None,
                     'The file path for the Static Machine file. See '
                     'static_virtual_machine.py for a description of this file.')
-flags.DEFINE_boolean('version', False, 'Display the version and exit.')
+flags.DEFINE_boolean('version', False, 'Display the version and exit.',
+                     allow_override_cpp=True)
+flags.DEFINE_boolean('time_commands', False, 'Times each command issued.')
 flags.DEFINE_enum(
     'scratch_disk_type', None,
     [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
@@ -200,10 +213,20 @@ flags.DEFINE_boolean(
     'each benchmark. This may be useful in scenarios where the PKB run time '
     'for all benchmarks is much greater than a single benchmark.')
 flags.DEFINE_integer(
+    'publish_period', None,
+    'The period in seconds to publish samples from repeated run stages. '
+    'This will only publish samples if publish_after_run is True.')
+flags.DEFINE_integer(
     'run_stage_time', 0,
     'PKB will run/re-run the run stage of each benchmark until it has spent '
     'at least this many seconds. It defaults to 0, so benchmarks will only '
-    'be run once unless some other value is specified.')
+    'be run once unless some other value is specified. This flag and '
+    'run_stage_iterations are mutually exclusive.')
+flags.DEFINE_integer(
+    'run_stage_iterations', 1,
+    'PKB will run/re-run the run stage of each benchmark this many times. '
+    'It defaults to 1, so benchmarks will only be run once unless some other '
+    'value is specified. This flag and run_stage_time are mutually exclusive.')
 flags.DEFINE_integer(
     'run_stage_retries', 0,
     'The number of allowable consecutive failures during the run stage. After '
@@ -217,6 +240,11 @@ flags.DEFINE_integer(
     'run_processes', 1,
     'The number of parallel processes to use to run benchmarks.',
     lower_bound=1)
+flags.DEFINE_float(
+    'run_processes_delay', None,
+    'The delay in seconds between parallel processes\' invocation. '
+    'Increasing this value may reduce provider throttling issues.',
+    lower_bound=0)
 flags.DEFINE_string(
     'completion_status_file', None,
     'If specified, this file will contain the completion status of each '
@@ -226,12 +254,13 @@ flags.DEFINE_string(
     '"status": <completion status> }')
 flags.DEFINE_string(
     'helpmatch', '',
-    'Shows only flags defined in a module whose name matches the given regex.')
+    'Shows only flags defined in a module whose name matches the given regex.',
+    allow_override_cpp=True)
 flags.DEFINE_boolean(
     'create_failed_run_samples', False,
     'If true, PKB will create a sample specifying that a run stage failed. '
     'This sample will include metadata specifying the run stage that '
-    'failed, the exception that occured, as well as all the flags that '
+    'failed, the exception that occurred, as well as all the flags that '
     'were provided to PKB on the command line.')
 flags.DEFINE_integer(
     'failed_run_samples_error_length', 10240,
@@ -242,6 +271,9 @@ flags.DEFINE_boolean(
     'If true, PKB will print the flags configurations to be run and exit. '
     'The configurations are generated from the command line flags, the '
     'flag_matrix, and flag_zip.')
+flags.DEFINE_string(
+    'skip_pending_runs_file', None,
+    'If file exists, any pending runs will be not be executed.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -298,7 +330,7 @@ def _PrintHelp(matches=None):
   """Prints help for flags defined in matching modules.
 
   Args:
-    matches regex string or None. Filters help to only those whose name
+    matches: regex string or None. Filters help to only those whose name
       matched the regex. If None then all flags are printed.
   """
   if not matches:
@@ -395,6 +427,8 @@ def _WriteCompletionStatusFile(benchmark_specs, status_file):
   {
     "name": <benchmark name>,
     "status": <completion status>,
+    "failed_substatus": <failed substatus>,
+    "status_detail": <descriptive string (if present)>,
     "flags": <flags dictionary>
   }
 
@@ -407,6 +441,10 @@ def _WriteCompletionStatusFile(benchmark_specs, status_file):
     status_dict = collections.OrderedDict()
     status_dict['name'] = spec.name
     status_dict['status'] = spec.status
+    if spec.failed_substatus:
+      status_dict['failed_substatus'] = spec.failed_substatus
+    if spec.status_detail:
+      status_dict['status_detail'] = spec.status_detail
     status_dict['flags'] = spec.config.flags
     status_file.write(json.dumps(status_dict) + '\n')
 
@@ -427,6 +465,8 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructManagedRelationalDb()
   spec.ConstructVirtualMachines()
   spec.ConstructCloudTpu()
+  spec.ConstructEdwService()
+  spec.ConstructCloudRedis()
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
@@ -469,6 +509,14 @@ def DoRunPhase(spec, collector, timer):
   deadline = time.time() + FLAGS.run_stage_time
   run_number = 0
   consecutive_failures = 0
+  last_publish_time = time.time()
+
+  def _IsRunStageFinished():
+    if FLAGS.run_stage_time > 0:
+      return time.time() > deadline
+    else:
+      return run_number >= FLAGS.run_stage_iterations
+
   while True:
     samples = []
     logging.info('Running benchmark %s', spec.name)
@@ -476,9 +524,6 @@ def DoRunPhase(spec, collector, timer):
     try:
       with timer.Measure('Benchmark Run'):
         samples = spec.BenchmarkRun(spec)
-      if (FLAGS.boot_samples or
-          spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
-        samples.extend(cluster_boot_benchmark.GetTimeToBoot(spec.vms))
     except Exception:
       consecutive_failures += 1
       if consecutive_failures > FLAGS.run_stage_retries:
@@ -491,14 +536,20 @@ def DoRunPhase(spec, collector, timer):
       events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
     events.samples_created.send(
         events.RUN_PHASE, benchmark_spec=spec, samples=samples)
-    if FLAGS.run_stage_time:
+    if FLAGS.run_stage_time or FLAGS.run_stage_iterations:
       for s in samples:
         s.metadata['run_number'] = run_number
     collector.AddSamples(samples, spec.name, spec)
-    if FLAGS.publish_after_run:
+    if (FLAGS.publish_after_run and FLAGS.publish_period is not None and
+        FLAGS.publish_period < (time.time() - last_publish_time)):
       collector.PublishSamples()
+      last_publish_time = time.time()
     run_number += 1
-    if time.time() > deadline:
+    if _IsRunStageFinished():
+      if (FLAGS.boot_samples or
+          spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
+        collector.AddSamples(
+            cluster_boot_benchmark.GetTimeToBoot(spec.vms), spec.name, spec)
       break
 
 
@@ -512,7 +563,7 @@ def DoCleanupPhase(spec, timer):
   """
   logging.info('Cleaning up benchmark %s', spec.name)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
-          spec.dpb_service is not None):
+      spec.dpb_service is not None):
     spec.StopBackgroundWorkload()
     with timer.Measure('Benchmark Cleanup'):
       spec.BenchmarkCleanup(spec)
@@ -522,7 +573,6 @@ def DoTeardownPhase(spec, timer):
   """Performs the Teardown phase of benchmark execution.
 
   Args:
-    name: A string containing the benchmark name.
     spec: The BenchmarkSpec created for the benchmark.
     timer: An IntervalTimer that measures the start and stop times of
       resource teardown.
@@ -540,6 +590,14 @@ def RunBenchmark(spec, collector):
     spec: The BenchmarkSpec object with run information.
     collector: The SampleCollector object to add samples to.
   """
+
+  # Since there are issues with the handling SIGINT/KeyboardInterrupt (see
+  # further dicussion in _BackgroundProcessTaskManager) this mechanism is
+  # provided for defense in depth to force skip pending runs after SIGINT.
+  if FLAGS.skip_pending_runs_file and isfile(FLAGS.skip_pending_runs_file):
+    logging.warning('%s exists.  Skipping benchmark.',
+                    FLAGS.skip_pending_runs_file)
+    return
   spec.status = benchmark_status.FAILED
   current_run_stage = stages.PROVISION
   # Modify the logger prompt for messages logged within this function.
@@ -582,6 +640,18 @@ def RunBenchmark(spec, collector):
               detailed_timer.GenerateSamples(), spec.name, spec)
 
       except Exception as e:
+        # Log specific type of failure, if known
+        # TODO(dlott) Move to exception chaining with Python3 support
+        if (isinstance(e, errors.Benchmarks.InsufficientCapacityCloudFailure)
+            or 'InsufficientCapacityCloudFailure' in str(e)):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY)
+          spec.status_detail = str(e)
+        elif (isinstance(e, errors.Benchmarks.QuotaFailure)
+              or 'QuotaFailure' in str(e)):
+          spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
+          spec.status_detail = str(e)
+
         # Resource cleanup (below) can take a long time. Log the error to give
         # immediate feedback, then re-throw.
         logging.exception('Error during benchmark %s', spec.name)
@@ -596,8 +666,12 @@ def RunBenchmark(spec, collector):
           DoCleanupPhase(spec, detailed_timer)
         raise
       finally:
+        # Deleting resources should happen first so any errors with publishing
+        # don't prevent teardown.
         if stages.TEARDOWN in FLAGS.run_stage:
           spec.Delete()
+        if FLAGS.publish_after_run:
+          collector.PublishSamples()
         events.benchmark_end.send(benchmark_spec=spec)
         # Pickle spec to save final resource state.
         spec.Pickle()
@@ -608,7 +682,7 @@ def MakeFailedRunSample(error_message, run_stage_that_failed):
   """Create a sample.Sample representing a failed run stage.
 
   The sample metric will have the name 'Run Failed';
-  the value will be 1 (has to be convertable to a float),
+  the value will be 1 (has to be convertible to a float),
   and the unit will be 'Run Failed' (for lack of a better idea).
 
   The sample metadata will include the error message from the
@@ -658,6 +732,7 @@ def RunBenchmarkTask(spec):
   try:
     RunBenchmark(spec, collector)
   except BaseException as e:
+    logging.exception('Exception running benchmark')
     msg = 'Benchmark {0}/{1} {2} (UID: {3}) failed.'.format(
         spec.sequence_number, spec.total_benchmarks, spec.name, spec.uid)
     if isinstance(e, KeyboardInterrupt) or FLAGS.stop_after_benchmark_failure:
@@ -713,15 +788,15 @@ def SetUpPKB():
   if not FLAGS.ignore_package_requirements:
     requirements.CheckBasicRequirements()
 
-  if FLAGS.os_type == os_types.WINDOWS and not vm_util.RunningOnWindows():
-    logging.error('In order to run benchmarks on Windows VMs, you must be '
-                  'running on Windows.')
-    sys.exit(1)
-
   for executable in REQUIRED_EXECUTABLES:
     if not vm_util.ExecutableOnPath(executable):
       raise errors.Setup.MissingExecutableError(
           'Could not find required executable "%s"', executable)
+
+  # Check mutually exclusive flags
+  if FLAGS.run_stage_iterations > 1 and FLAGS.run_stage_time > 0:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Flags run_stage_iterations and run_stage_time are mutually exclusive')
 
   vm_util.SSHKeyGen()
 
@@ -732,6 +807,20 @@ def SetUpPKB():
 
   events.initialization_complete.send(parsed_flags=FLAGS)
 
+  benchmark_lookup.SetBenchmarkModuleFunction(benchmark_sets.BenchmarkModule)
+
+
+def RunBenchmarkTasksInSeries(tasks):
+  """Runs benchmarks in series.
+
+  Arguments:
+    tasks: list of tuples of task: [(RunBenchmarkTask, (spec,), {}),]
+
+  Returns:
+    list of tuples of func results
+  """
+  return [func(*args, **kwargs) for func, args, kwargs in tasks]
+
 
 def RunBenchmarks():
   """Runs all benchmarks in PerfKitBenchmarker.
@@ -741,18 +830,21 @@ def RunBenchmarks():
   """
   benchmark_specs = _CreateBenchmarkSpecs()
   if FLAGS.dry_run:
-    print('PKB will run with the following configurations:')
+    print 'PKB will run with the following configurations:'
     for spec in benchmark_specs:
-      print(spec)
-      print('')
+      print spec
+      print ''
     return 0
 
   collector = SampleCollector()
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
-    spec_sample_tuples = background_tasks.RunParallelProcesses(
-        tasks, FLAGS.run_processes)
+    if FLAGS.run_processes == 1:
+      spec_sample_tuples = RunBenchmarkTasksInSeries(tasks)
+    else:
+      spec_sample_tuples = background_tasks.RunParallelProcesses(
+          tasks, FLAGS.run_processes, FLAGS.run_processes_delay)
     benchmark_specs, sample_lists = zip(*spec_sample_tuples)
     for sample_list in sample_lists:
       collector.samples.extend(sample_list)
@@ -768,7 +860,6 @@ def RunBenchmarks():
                  vm_util.PrependTempDir(LOG_FILE_NAME))
     logging.info('Completion statuses can be found at: %s',
                  vm_util.PrependTempDir(COMPLETION_STATUS_FILE_NAME))
-
 
   if stages.TEARDOWN not in FLAGS.run_stage:
     logging.info(

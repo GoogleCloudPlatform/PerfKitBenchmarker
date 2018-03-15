@@ -26,5 +26,9 @@ def _LoadBenchmarks():
 
 BENCHMARKS = _LoadBenchmarks()
 
-VALID_BENCHMARKS = {module.BENCHMARK_NAME: module
-                    for module in BENCHMARKS}
+VALID_BENCHMARKS = {}
+for module in BENCHMARKS:
+  if module.BENCHMARK_NAME in VALID_BENCHMARKS:
+    raise ValueError('There are multiple benchmarks with BENCHMARK_NAME "%s"' %
+                     (module.BENCHMARK_NAME))
+  VALID_BENCHMARKS[module.BENCHMARK_NAME] = module

@@ -22,9 +22,9 @@ added after installation.
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 
-def _Install(vm):
+def Install(vm, package_name='python-pip'):
   """Install pip on the VM."""
-  vm.InstallPackages('python-pip')
+  vm.InstallPackages(package_name)
   vm.RemoteCommand('sudo pip install -U pip')  # Make pip upgrade pip
   vm.RemoteCommand('mkdir -p {0} && pip freeze > {0}/requirements.txt'.format(
       INSTALL_DIR))
@@ -33,27 +33,13 @@ def _Install(vm):
 def YumInstall(vm):
   """Installs the pip package on the VM."""
   vm.InstallEpelRepo()
-  _Install(vm)
+  package_name = getattr(vm, 'python_pip_package_config', 'python27-pip')
+  Install(vm, package_name)
 
 
-def AptInstall(vm):
-  """Installs the pip package on the VM."""
-  _Install(vm)
-
-
-def _Uninstall(vm):
+def Uninstall(vm):
   """Uninstalls the pip package on the VM."""
   vm.RemoteCommand('pip freeze | grep --fixed-strings --line-regexp '
                    '--invert-match --file {0}/requirements.txt | '
                    'xargs --no-run-if-empty sudo pip uninstall -y'.format(
                        INSTALL_DIR))
-
-
-def YumUninstall(vm):
-  """Uninstalls the pip package on the VM."""
-  _Uninstall(vm)
-
-
-def AptUninstall(vm):
-  """Uninstalls the pip package on the VM."""
-  _Uninstall(vm)

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing class for cloud TPU."""
 
 import abc
 
@@ -39,7 +40,6 @@ flags.DEFINE_string('tpu_zone', None,
 flags.DEFINE_string('tpu_name', None,
                     'The name of the cloud TPU to create.')
 
-_CLOUD_TPU_REGISTRY = {}
 FLAGS = flags.FLAGS
 
 
@@ -55,29 +55,13 @@ def GetCloudTpuClass(cloud):
   Raises:
     Exception: An invalid cloud TPU was provided
   """
-  if cloud in _CLOUD_TPU_REGISTRY:
-    return _CLOUD_TPU_REGISTRY.get(cloud)
-  else:
-    raise Exception('No cloud TPU found for {0}'.format(cloud))
-
-
-class AutoRegisterCloudTpuMeta(abc.ABCMeta):
-  """Metaclass which allows Cloud TPU to register."""
-
-  def __init__(cls, name, bases, dct):
-    if hasattr(cls, 'CLOUD'):
-      if cls.CLOUD is None:
-        raise Exception('cloud TPU concrete subclasses must have a cloud '
-                        'attribute.')
-      else:
-        _CLOUD_TPU_REGISTRY[cls.CLOUD] = cls
-    super(AutoRegisterCloudTpuMeta, cls).__init__(name, bases, dct)
+  return resource.GetResourceClass(BaseCloudTpu, CLOUD=cloud)
 
 
 class BaseCloudTpu(resource.BaseResource):
   """Object representing a cloud TPU."""
 
-  __metaclass__ = AutoRegisterCloudTpuMeta
+  RESOURCE_TYPE = 'BaseCloudTpu'
 
   def __init__(self, cloud_tpu_spec):
     """Initialize the cloud TPU object.
@@ -99,6 +83,10 @@ class BaseCloudTpu(resource.BaseResource):
 
   @abc.abstractmethod
   def GetCloudTpuIp(self):
+    raise NotImplementedError()
+
+  @abc.abstractmethod
+  def GetCloudTpuPort(self):
     raise NotImplementedError()
 
   def GetResourceMetadata(self):

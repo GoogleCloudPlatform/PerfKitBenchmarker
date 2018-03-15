@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +14,7 @@
 
 """Run HPCG.
 
-Requires:
-* openmpi 1.10.2
-
-Binaries are provided which are statically linked to CUDA 8.0.44 and
-OpenMPI 1.10.2 and 1.6.5. If different versions of these libs are to be used,
-modify the HPCG package to build from source, located here:
-https://github.com/hpcg-benchmark/hpcg/
+Requires openmpi 1.10.2
 """
 
 import logging
@@ -33,7 +27,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import cuda_toolkit_8
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import hpcg
 
 FLAGS = flags.FLAGS
@@ -50,7 +44,7 @@ hpcg:
     default:
       vm_spec:
         GCP:
-          image: ubuntu-1604-xenial-v20170307
+          image: ubuntu-1604-xenial-v20180122
           image_project: ubuntu-os-cloud
           machine_type: n1-standard-4
           gpu_type: k80
@@ -58,7 +52,7 @@ hpcg:
           zone: us-east1-d
           boot_disk_size: 200
         AWS:
-          image: ami-d15a75c7
+          image: ami-41e0b93b
           machine_type: p2.xlarge
           zone: us-east-1
           boot_disk_size: 200
@@ -80,6 +74,11 @@ flag_util.DEFINE_integerlist(
     flag_util.IntegerList([256, 256, 256]),
     'three dimensional problem size for each node. Must contain '
     'three integers')
+
+flags.DEFINE_boolean(
+    'hpcg_run_as_root', False, 'If true, pass --allow-run-as-root '
+    'to mpirun.')
+
 
 
 class HpcgParseOutputException(Exception):
@@ -131,7 +130,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
     benchmark_spec: benchmark specification to update
   """
   gpus_per_node = (FLAGS.hpcg_gpus_per_node or
-                   cuda_toolkit_8.QueryNumberOfGpus(benchmark_spec.vms[0]))
+                   cuda_toolkit.QueryNumberOfGpus(benchmark_spec.vms[0]))
   cpus_per_rank = int(benchmark_spec.vms[0].num_cpus / gpus_per_node)
   num_vms = len(benchmark_spec.vms)
   total_gpus = gpus_per_node * num_vms
@@ -142,6 +141,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.total_gpus = total_gpus
   benchmark_spec.hpcg_problem_size = FLAGS.hpcg_problem_size
   benchmark_spec.hpcg_runtime = FLAGS.hpcg_runtime
+  benchmark_spec.run_as_root = FLAGS.hpcg_run_as_root
 
 
 def _CopyAndUpdateRunScripts(vm, benchmark_spec):
@@ -151,16 +151,24 @@ def _CopyAndUpdateRunScripts(vm, benchmark_spec):
     vm: vm to place and update run scripts on
     benchmark_spec: benchmark specification
   """
-  src_path = _LocalDataPath(CONFIG_FILE)
-  dest_path = os.path.join(hpcg.HPCG_DIR, CONFIG_FILE)
-  context = {
+  config_file_context = {
       'PROBLEM_SIZE': '%s %s %s' % (benchmark_spec.hpcg_problem_size[0],
                                     benchmark_spec.hpcg_problem_size[1],
                                     benchmark_spec.hpcg_problem_size[2]),
       'RUNTIME': benchmark_spec.hpcg_runtime
   }
-  vm.RenderTemplate(src_path, dest_path, context)
-  vm.PushDataFile(RUN_SCRIPT, os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT))
+  vm.RenderTemplate(_LocalDataPath(CONFIG_FILE),
+                    os.path.join(hpcg.HPCG_DIR, CONFIG_FILE),
+                    config_file_context)
+
+  run_script_context = {
+      'ALLOW_RUN_AS_ROOT': (
+          '--allow-run-as-root' if benchmark_spec.run_as_root else ''),
+  }
+  vm.RenderTemplate(_LocalDataPath(RUN_SCRIPT),
+                    os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT),
+                    run_script_context)
+  vm.RemoteCommand('chmod +x %s' % os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT))
 
 
 def _PrepareHpcg(vm):
@@ -172,7 +180,7 @@ def _PrepareHpcg(vm):
   logging.info('Installing HPCG on %s', vm)
   vm.Install('hpcg')
   vm.AuthenticateVm()
-  cuda_toolkit_8.SetAndConfirmGpuClocks(vm)
+  cuda_toolkit.SetAndConfirmGpuClocks(vm)
 
 
 def Prepare(benchmark_spec):
@@ -202,12 +210,13 @@ def _CreateMetadataDict(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   metadata = dict()
-  metadata.update(cuda_toolkit_8.GetMetadata(vm))
+  metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['num_nodes'] = len(benchmark_spec.vms)
   metadata['cpus_per_rank'] = int(benchmark_spec.cpus_per_rank)
   metadata['total_gpus'] = int(benchmark_spec.total_gpus)
   metadata['benchmark_version'] = BENCHMARK_VERSION
   metadata['runtime'] = int(benchmark_spec.hpcg_runtime)
+  metadata['run_as_root'] = benchmark_spec.run_as_root
   metadata['problem_size'] = '%s,%s,%s' % (benchmark_spec.hpcg_problem_size[0],
                                            benchmark_spec.hpcg_problem_size[1],
                                            benchmark_spec.hpcg_problem_size[2])

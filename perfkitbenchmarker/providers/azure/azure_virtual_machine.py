@@ -25,27 +25,94 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-import json
 import itertools
+import json
+import posixpath
 
+from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
-from perfkitbenchmarker import providers
+
+import yaml
 
 FLAGS = flags.FLAGS
 
 
+class AzureVmSpec(virtual_machine.BaseVmSpec):
+  """Object containing the information needed to create a AzureVirtualMachine.
+
+  Attributes:
+    tier: None or string. performance tier of the machine.
+    compute_units: int.  number of compute units for the machine.
+    accelerated_networking: boolean. True if supports accelerated_networking.
+  """
+
+  CLOUD = providers.AZURE
+
+  def __init__(self, *args, **kwargs):
+    super(AzureVmSpec, self).__init__(*args, **kwargs)
+    if isinstance(self.machine_type,
+                  custom_virtual_machine_spec.AzurePerformanceTierDecoder):
+      self.tier = self.machine_type.tier
+      self.compute_units = self.machine_type.compute_units
+      self.machine_type = None
+    else:
+      self.tier = None
+      self.compute_units = None
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(AzureVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['machine_type'].present:
+      config_values['machine_type'] = yaml.load(flag_values.machine_type)
+    if flag_values['azure_accelerated_networking'].present:
+      config_values['accelerated_networking'] = (
+          flag_values.azure_accelerated_networking)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(AzureVmSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'machine_type': (custom_virtual_machine_spec.AzureMachineTypeDecoder,
+                         {}),
+        'accelerated_networking': (
+            option_decoders.BooleanDecoder, {'default': False}),
+    })
+    return result
+
+
 # Per-VM resources are defined here.
 class AzurePublicIPAddress(resource.BaseResource):
+  """Class to represent an Azure Public IP Address."""
+
   def __init__(self, location, name):
     super(AzurePublicIPAddress, self).__init__()
     self.location = location
@@ -87,7 +154,9 @@ class AzurePublicIPAddress(resource.BaseResource):
 
 
 class AzureNIC(resource.BaseResource):
-  def __init__(self, subnet, name, public_ip):
+  """Class to represent an Azure NIC."""
+
+  def __init__(self, subnet, name, public_ip, accelerated_networking):
     super(AzureNIC, self).__init__()
     self.subnet = subnet
     self.name = name
@@ -96,15 +165,18 @@ class AzureNIC(resource.BaseResource):
     self.resource_group = azure_network.GetResourceGroup()
     self.location = self.subnet.vnet.location
     self.args = ['--nics', self.name]
+    self.accelerated_networking = accelerated_networking
 
   def _Create(self):
-    vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'network', 'nic', 'create',
-         '--location', self.location,
-         '--vnet-name', self.subnet.vnet.name,
-         '--subnet', self.subnet.name,
-         '--public-ip-address', self.public_ip,
-         '--name', self.name] + self.resource_group.args)
+    cmd = [azure.AZURE_PATH, 'network', 'nic', 'create',
+           '--location', self.location,
+           '--vnet-name', self.subnet.vnet.name,
+           '--subnet', self.subnet.name,
+           '--public-ip-address', self.public_ip,
+           '--name', self.name] + self.resource_group.args
+    if self.accelerated_networking:
+      cmd += ['--accelerated-networking', 'true']
+    vm_util.IssueCommand(cmd)
 
   def _Exists(self):
     if self._deleted:
@@ -136,18 +208,18 @@ class AzureNIC(resource.BaseResource):
     self._deleted = True
 
 
-class AzureVirtualMachineMetaClass(virtual_machine.AutoRegisterVmMeta):
+class AzureVirtualMachineMetaClass(resource.AutoRegisterResourceMeta):
   """Metaclass for AzureVirtualMachine.
 
   Registers default image pattern for each operating system.
   """
 
-  def __init__(cls, name, bases, dct):
-    super(AzureVirtualMachineMetaClass, cls).__init__(name, bases, dct)
-    if hasattr(cls, 'OS_TYPE'):
-      assert cls.OS_TYPE, '{0} did not override OS_TYPE'.format(cls.__name__)
-      assert cls.IMAGE_URN, (
-          '{0} did not override IMAGE_URN'.format(cls.__name__))
+  def __init__(self, name, bases, dct):
+    super(AzureVirtualMachineMetaClass, self).__init__(name, bases, dct)
+    if hasattr(self, 'OS_TYPE'):
+      assert self.OS_TYPE, '{0} did not override OS_TYPE'.format(self.__name__)
+      assert self.IMAGE_URN, (
+          '{0} did not override IMAGE_URN'.format(self.__name__))
 
 
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -162,7 +234,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Initialize an Azure virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
     super(AzureVirtualMachine, self).__init__(vm_spec)
     self.network = azure_network.AzureNetwork.GetNetwork(self)
@@ -174,7 +246,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.resource_group = azure_network.GetResourceGroup()
     self.public_ip = AzurePublicIPAddress(self.zone, self.name + '-public-ip')
     self.nic = AzureNIC(self.network.subnet,
-                        self.name + '-nic', self.public_ip.name)
+                        self.name + '-nic', self.public_ip.name,
+                        vm_spec.accelerated_networking)
     self.storage_account = self.network.storage_account
     self.image = vm_spec.image or self.IMAGE_URN
 
@@ -278,15 +351,76 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
+  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                          filename):
+    """Downloads a data file from Azure blob storage with pre-provisioned data.
+
+    Use --azure_preprovisioned_data_bucket to specify the name of the account.
+
+    Args:
+      install_path: The install path on this VM.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: The name of the file that was downloaded.
+    """
+    self.Install('azure_cli')
+    self.Install('azure_credentials')
+    destpath = posixpath.join(install_path, filename)
+    self.RemoteCommand('az storage blob download '
+                       '--account-name %s '
+                       '--container-name %s '
+                       '--name %s '
+                       '--file %s' % (
+                           FLAGS.azure_preprovisioned_data_bucket,
+                           benchmark_name,
+                           filename,
+                           destpath))
+
+  def GetResourceMetadata(self):
+    result = super(AzureVirtualMachine, self).GetResourceMetadata()
+    result['accelerated_networking'] = self.nic.accelerated_networking
+    return result
+
 
 class DebianBasedAzureVirtualMachine(AzureVirtualMachine,
                                      linux_virtual_machine.DebianMixin):
   IMAGE_URN = 'Canonical:UbuntuServer:14.04.4-LTS:latest'
 
 
+class Ubuntu1404BasedAzureVirtualMachine(AzureVirtualMachine,
+                                         linux_virtual_machine.Ubuntu1404Mixin):
+  IMAGE_URN = 'Canonical:UbuntuServer:14.04.4-LTS:latest'
+
+
+class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
+                                         linux_virtual_machine.Ubuntu1604Mixin):
+  IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'
+
+
+class Ubuntu1710BasedAzureVirtualMachine(AzureVirtualMachine,
+                                         linux_virtual_machine.Ubuntu1710Mixin):
+  IMAGE_URN = 'Canonical:UbuntuServer:17.10:latest'
+
+
 class RhelBasedAzureVirtualMachine(AzureVirtualMachine,
                                    linux_virtual_machine.RhelMixin):
   IMAGE_URN = 'RedHat:RHEL:7.2:latest'
+
+  def __init__(self, vm_spec):
+    super(RhelBasedAzureVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
+
+
+class CentosBasedAzureVirtualMachine(AzureVirtualMachine,
+                                     linux_virtual_machine.Centos7Mixin):
+  IMAGE_URN = 'OpenLogic:CentOS:7.4:latest'
+
+  def __init__(self, vm_spec):
+    super(CentosBasedAzureVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
 
 
 class WindowsAzureVirtualMachine(AzureVirtualMachine,
@@ -305,7 +439,7 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
     vm_util.IssueRetryableCommand(
         [azure.AZURE_PATH, 'vm', 'extension', 'set',
          '--vm-name', self.name,
-         'CustomScriptExtension',
-         'Microsoft.Compute',
-         '1.4',
-         '--public-config=%s' % config] + self.resource_group.args)
+         '--name', 'CustomScriptExtension',
+         '--publisher', 'Microsoft.Compute',
+         '--version', '1.4',
+         '--protected-settings=%s' % config] + self.resource_group.args)

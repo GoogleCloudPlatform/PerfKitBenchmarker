@@ -18,7 +18,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-MAX_NUM_WAITS_FOR_K8S_GET = 6
+MAX_NUM_WAITS_FOR_K8S_GET = 18
 
 
 def checkKubernetesFlags():

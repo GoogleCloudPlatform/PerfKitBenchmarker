@@ -42,7 +42,8 @@ GOOD_METADATA = {'runspec_config': 'linux64-x64-gcc47.cfg',
                  'num_cpus': 256,
                  'runspec_define': '',
                  'runspec_iterations': '3',
-                 'runspec_enable_32bit': 'False'}
+                 'runspec_enable_32bit': 'False',
+                 'runspec_metric': 'rate'}
 
 EXPECTED_RESULT_SPECINT = [
     sample.Sample(metric='400.perlbench', value=23.4, unit='',
@@ -275,6 +276,55 @@ EXPECTED_RESULT_EST = [
 ]
 
 
+SPEED_OUTPUT_SPECINT = """
+==============================================================================
+400.perlbench    9770        332       29.5 *
+401.bzip2        9650        557       17.3 *
+403.gcc          8050        342       23.5 *
+429.mcf          9120        479       19.0 *
+445.gobmk       10490        517       20.3 *
+456.hmmer        9330        393       23.8 *
+458.sjeng       12100        539       22.5 *
+462.libquantum  20720        525       39.5 *
+464.h264ref     22130        573       38.6 *
+471.omnetpp      6250        489       12.8 *
+473.astar        7020        504       13.9 *
+483.xalancbmk    6900        309       22.3 *
+ Est. SPECint(R)_base2006              22.3
+ Est. SPECint2006                                                   Not Run
+"""
+SPEED_METADATA = GOOD_METADATA.copy()
+SPEED_METADATA['runspec_metric'] = 'speed'
+EXPECTED_SPEED_RESULT_SPECINT = [
+    sample.Sample(metric='400.perlbench:speed', value=29.5, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='401.bzip2:speed', value=17.3, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='403.gcc:speed', value=23.5, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='429.mcf:speed', value=19.0, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='445.gobmk:speed', value=20.3, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='456.hmmer:speed', value=23.8, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='458.sjeng:speed', value=22.5, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='462.libquantum:speed', value=39.5, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='464.h264ref:speed', value=38.6, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='471.omnetpp:speed', value=12.8, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='473.astar:speed', value=13.9, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='483.xalancbmk:speed', value=22.3, unit='',
+                  metadata=SPEED_METADATA),
+    sample.Sample(metric='SPECint(R)_base2006:speed', value=22.3, unit='',
+                  metadata=SPEED_METADATA),
+]
+
+
 class DummyVM(object):
 
   def __init__(self):
@@ -319,3 +369,12 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_EST, vm,
                                                   True, True)
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_EST)
+
+  def testParseSpeedResults(self):
+    self.maxDiff = None
+    vm = DummyVM()
+    speccpu2006_benchmark.FLAGS.runspec_metric = 'speed'
+    samples = speccpu2006_benchmark._ExtractScore(SPEED_OUTPUT_SPECINT, vm,
+                                                  False, False)
+    self.assertSampleListsEqualUpToTimestamp(
+        samples, EXPECTED_SPEED_RESULT_SPECINT)

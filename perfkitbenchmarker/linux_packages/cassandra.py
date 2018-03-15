@@ -53,7 +53,7 @@ CLUSTER_START_SLEEP = 60
 NODE_START_SLEEP = 5
 
 FLAGS = flags.FLAGS
-
+flags.DEFINE_integer('cassandra_replication_factor', 3, 'Num of replicas.')
 flags.DEFINE_integer('cassandra_concurrent_reads', 32,
                      'Concurrent read requests each server accepts.')
 

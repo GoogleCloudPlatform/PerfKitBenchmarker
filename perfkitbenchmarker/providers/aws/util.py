@@ -14,6 +14,7 @@
 
 """Utilities for working with Amazon Web Services resources."""
 
+import json
 import re
 import string
 
@@ -39,6 +40,24 @@ def GetRegionFromZone(zone_or_region):
   if IsRegion(zone_or_region):
     return zone_or_region
   return zone_or_region[:-1]
+
+
+def GetRegionFromZones(zones):
+  """Returns the region a set of zones are in.
+
+  Raises:
+      Exception: if the zones are in different regions.
+  """
+  region = None
+  for zone in zones:
+    current_region = GetRegionFromZone(zone)
+    if region is None:
+      region = current_region
+    else:
+      if region != current_region:
+        raise Exception('Not All zones are in the same region %s not same as %s. zones: %s' %
+                        (region, current_region, ','.join(zones)))
+  return region
 
 
 def AddTags(resource_id, region, **kwargs):
@@ -76,6 +95,21 @@ def AddDefaultTags(resource_id, region):
   """
   tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
   AddTags(resource_id, region, **tags)
+
+
+def GetAccount():
+  """Retrieve details about the current IAM identity.
+
+  http://docs.aws.amazon.com/cli/latest/reference/sts/get-caller-identity.html
+
+  Returns:
+    A string of the AWS account ID number of the account that owns or contains
+    the calling entity.
+  """
+
+  cmd = AWS_PREFIX + ['sts', 'get-caller-identity']
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  return json.loads(stdout)['Account']
 
 
 @vm_util.Retry()

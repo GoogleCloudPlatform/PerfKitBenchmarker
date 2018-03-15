@@ -14,6 +14,7 @@
 
 """Tests for object storage service benchmark."""
 
+import datetime
 import time
 import unittest
 import mock
@@ -101,6 +102,28 @@ class TestDistributionToBackendFormat(unittest.TestCase):
 
     with self.assertRaises(ValueError):
       object_storage_service_benchmark._DistributionToBackendFormat(dist)
+
+
+class TestColdObjectsWrittenFiles(unittest.TestCase):
+
+  def testFilename(self):
+    """Tests the objects written filename can be parsed for an age."""
+    with mock_flags.PatchFlags() as mocked_flags:
+      mocked_flags.object_storage_region = 'us-central1-a'
+      mocked_flags.object_storage_objects_written_file_prefix = 'prefix'
+      write_time = datetime.datetime.now() - datetime.timedelta(hours=72)
+      with mock.patch.object(object_storage_service_benchmark, '_DatetimeNow',
+                             return_value=write_time):
+        filename = (
+            object_storage_service_benchmark._ColdObjectsWrittenFilename())
+      read_time = datetime.datetime.now()
+      with mock.patch.object(object_storage_service_benchmark, '_DatetimeNow',
+                             return_value=read_time):
+        age = object_storage_service_benchmark._ColdObjectsWrittenFileAgeHours(
+            filename)
+      # Verify that the age is between 72 and 73 hours.
+      self.assertLessEqual(72, age)
+      self.assertLessEqual(age, 73)
 
 
 if __name__ == '__main__':

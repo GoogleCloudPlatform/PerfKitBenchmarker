@@ -69,7 +69,10 @@ pgbench:
         machine_type: db.m4.4xlarge
         zone: us-west-1c
       Azure:
-        zone: westus
+        machine_type:
+          tier: Standard
+          compute_units: 800
+        zone: eastus
     disk_spec:
       GCP:
         disk_size: 1000
@@ -78,22 +81,20 @@ pgbench:
         disk_size: 6144
         disk_type: gp2
       Azure:
-        disk_size: 1000
+        #Valid storage sizes range from minimum of 128000 MB and additional increments of 128000 MB up to maximum of 1024000 MB.
+        disk_size: 128
   vm_groups:
     default:
+      os_type: ubuntu1604
       vm_spec:
         AWS:
           machine_type: m4.4xlarge
-          image: ami-09d2fb69
           zone: us-west-1c
         Azure:
           machine_type: Standard_A8m_v2
-          image: Canonical:UbuntuServer:16.04-LTS:latest
-          zone: westus
+          zone: eastus
         GCP:
           machine_type: n1-standard-16
-          image: ubuntu-1604-xenial-v20170815a
-          image_project: ubuntu-os-cloud
           zone: us-central1-c
 """
 

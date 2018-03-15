@@ -19,9 +19,9 @@ cloud TPU can be created and deleted.
 import json
 import logging
 
+from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -42,7 +42,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
   CLOUD = providers.GCP
   SERVICE_NAME = 'cloud_tpu'
   TPU_IP = '10.240.{}.2'
-  DEFAULT_CLOUD_TPU_VERSION = 'nightly'
+  DEFAULT_CLOUD_TPU_VERSION = '1.6'
 
   def __init__(self, cloud_tpu_spec):
     super(GcpCloudTpu, self).__init__(cloud_tpu_spec)
@@ -51,7 +51,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _Create(self):
     """Create Cloud TPU."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'create',
+    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'create',
                              self.spec.tpu_name)
     cmd.flags['range'] = self.spec.tpu_cidr_range
     if self.spec.tpu_accelerator_type:
@@ -71,7 +71,7 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
 
   def _Delete(self):
     """Deletes the cloud TPU."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'delete',
+    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'delete',
                              self.spec.tpu_name)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
@@ -82,33 +82,33 @@ class GcpCloudTpu(cloud_tpu.BaseCloudTpu):
     else:
       logging.info('Deleted GCP cloud TPU.')
 
-  def _Exists(self):
-    """Returns true if the cloud TPU exists."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'describe',
-                             self.spec.tpu_name)
-    if self.spec.tpu_zone:
-      cmd.flags['zone'] = self.spec.tpu_zone
-    cmd.flags['project'] = self.project
-    _, _, retcode = cmd.Issue()
-    if retcode != 0:
-      logging.info('Could not found GCP cloud TPU %s.',
-                   self.spec.tpu_name)
-      return False
-    return True
-
-  def GetCloudTpuIp(self):
-    """Gets the cloud TPU IP."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'tpus', 'describe',
+  def _GetCloudTpuDescription(self):
+    """Gets the cloud TPU description."""
+    cmd = util.GcloudCommand(self, 'beta', 'compute', 'tpus', 'describe',
                              self.spec.tpu_name)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
     cmd.flags['project'] = self.project
     stdout, _, retcode = cmd.Issue()
     if retcode != 0:
-      logging.error('Could not found GCP cloud TPU %s.',
-                    self.spec.tpu_name)
-    result = json.loads(stdout)
-    return result['ipAddress']
+      logging.info('Could not found GCP cloud TPU %s.',
+                   self.spec.tpu_name)
+    return stdout and json.loads(stdout), retcode
+
+  def _Exists(self):
+    """Returns true if the cloud TPU exists."""
+    _, retcode = self._GetCloudTpuDescription()
+    return retcode == 0
+
+  def GetCloudTpuIp(self):
+    """Gets the cloud TPU IP."""
+    result, _ = self._GetCloudTpuDescription()
+    return result.get('ipAddress')
+
+  def GetCloudTpuPort(self):
+    """Gets the cloud TPU port."""
+    result, _ = self._GetCloudTpuDescription()
+    return result.get('port')
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.

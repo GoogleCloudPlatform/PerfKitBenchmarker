@@ -15,7 +15,7 @@
 """Module containing mixin classes for linux virtual machines.
 
 These classes allow installation on both Debian and RHEL based linuxes.
-They also handle some intial setup (especially on RHEL based linuxes
+They also handle some initial setup (especially on RHEL based linuxes
 since by default sudo commands without a tty don't work) and
 can restore the VM to the state it was in before packages were
 installed.
@@ -34,23 +34,26 @@ import re
 import threading
 import time
 import uuid
-import yaml
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+
+import yaml
 
 FLAGS = flags.FLAGS
 
 EPEL6_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-             '6/x86_64/epel-release-6-8.noarch.rpm')
+             '6/x86_64/Packages/e/epel-release-6-8.noarch.rpm')
 EPEL7_RPM = ('http://dl.fedoraproject.org/pub/epel/'
-             '7/x86_64/e/epel-release-7-8.noarch.rpm')
+             '7/x86_64/Packages/e/epel-release-7-11.noarch.rpm')
 
+LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
 UPDATE_RETRIES = 5
 SSH_RETRIES = 10
 DEFAULT_SSH_PORT = 22
@@ -68,6 +71,10 @@ EXECUTE_COMMAND = 'execute_command.py'
 # then copies the stdout and stderr, exiting with the status of the command run
 # by EXECUTE_COMMAND.
 WAIT_FOR_COMMAND = 'wait_for_command.py'
+
+_DEFAULT_DISK_FS_TYPE = 'ext4'
+_DEFAULT_DISK_MOUNT_OPTIONS = 'discard'
+_DEFAULT_DISK_FSTAB_OPTIONS = 'defaults'
 
 flags.DEFINE_bool('setup_remote_firewall', False,
                   'Whether PKB should configure the firewall of each remote'
@@ -100,6 +107,11 @@ flags.DEFINE_bool('network_enable_BBR', False,
                   '"net.core.default_qdisc=fq, '
                   '"net.ipv4.tcp_congestion_control=bbr" '
                   'As with other sysctrls, will cause a reboot to happen.')
+
+flags.DEFINE_integer('num_disable_cpus', None,
+                     'Number of CPUs to disable on the virtual machine.'
+                     'If the VM has n CPUs, you can disable at most n-1.',
+                     lower_bound=1)
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -207,7 +219,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    env_file = "/etc/environment"
+    env_file = '/etc/environment'
     commands = []
 
     if FLAGS.http_proxy:
@@ -223,7 +235,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           FLAGS.ftp_proxy, env_file))
 
     if commands:
-      self.RemoteCommand(";".join(commands))
+      self.RemoteCommand(';'.join(commands))
 
   def SetupPackageManager(self):
     """Specific Linux flavors should override this."""
@@ -245,6 +257,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.DoSysctls()
     self.DoConfigureNetworkForBBR()
     self._RebootIfNecessary()
+    self._DisableCpus()
     self.RecordAdditionalMetadata()
     self.BurnCpu()
 
@@ -255,6 +268,36 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       path, value = pair.split('=')
       self.RemoteCommand('echo "%s" | sudo tee %s' %
                          (value, path))
+
+  def _DisableCpus(self):
+    """Apply num_disable_cpus to the VM.
+
+    This setting does not persist if the VM is rebooted.
+
+    Raises:
+      ValueError: if num_disable_cpus is outside of (0 ... num_cpus-1)
+                  inclusive
+    """
+    if not FLAGS.num_disable_cpus:
+      return
+
+    self.num_disable_cpus = FLAGS.num_disable_cpus
+
+    if (self.num_disable_cpus <= 0 or
+        self.num_disable_cpus >= self.num_cpus):
+      raise ValueError('num_disable_cpus must be between 1 and '
+                       '(num_cpus - 1) inclusive.  '
+                       'num_disable_cpus: %i, num_cpus: %i' %
+                       (self.num_disable_cpus, self.num_cpus))
+
+    # We can't disable cpu 0, but we want to disable a contiguous range
+    # of cpus for symmetry. So disable the last cpus in the range.
+    # e.g.  If num_cpus = 4 and num_disable_cpus = 2,
+    # then want cpus 0,1 active and 2,3 inactive.
+    for x in xrange(self.num_cpus - self.num_disable_cpus, self.num_cpus):
+      self.RemoteCommand('sudo bash -c '
+                         '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
+                         x)
 
   def ApplySysctlPersistent(self, key, value):
     """Apply "key=value" pair to /etc/sysctl.conf and reboot.
@@ -286,7 +329,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if not FLAGS.network_enable_BBR:
       return
 
-    if not self.CheckKernelVersion().AtLeast(4, 9):
+    if not KernelRelease(self.kernel_release).AtLeast(4, 9):
       raise flags.ValidationError(
           'BBR requires a linux image with kernel 4.9 or newer')
 
@@ -306,19 +349,36 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def TcpCongestionControl(self):
     """Return the congestion control used for tcp."""
-    resp, _ = self.RemoteCommand(
-        'cat /proc/sys/net/ipv4/tcp_congestion_control')
-    return resp.rstrip('\n')
-
-  def CheckKernelVersion(self):
-    """Return a KernelVersion from the host VM."""
-    uname, _ = self.RemoteCommand('uname -r')
-    return KernelVersion(uname)
+    try:
+      resp, _ = self.RemoteCommand(
+          'cat /proc/sys/net/ipv4/tcp_congestion_control')
+      return resp.rstrip('\n')
+    except errors.VirtualMachine.RemoteCommandError:
+      return 'unknown'
 
   def CheckLsCpu(self):
     """Returns a LsCpuResults from the host VM."""
     lscpu, _ = self.RemoteCommand('lscpu')
     return LsCpuResults(lscpu)
+
+  @property
+  def os_info(self):
+    """Get distribution-specific information."""
+    if self.os_metadata.get('os_info'):
+      return self.os_metadata['os_info']
+    else:
+      self.Install('lsb_release')
+      stdout, _ = self.RemoteCommand('lsb_release -d')
+      return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+
+  @property
+  def kernel_release(self):
+    """Return kernel release number."""
+    if self.os_metadata.get('kernel_release'):
+      return self.os_metadata.get('kernel_release')
+    else:
+      stdout, _ = self.RemoteCommand('uname -r')
+      return stdout.strip()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def WaitForBootCompletion(self):
@@ -335,6 +395,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.tcp_congestion_control = self.TcpCongestionControl()
     lscpu_results = self.CheckLsCpu()
     self.numa_node_count = lscpu_results.numa_node_count
+    self.os_metadata['os_info'] = self.os_info
+    self.os_metadata['kernel_release'] = self.kernel_release
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
@@ -392,8 +454,23 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def MountDisk(self, device_path, mount_path):
     """Mounts a formatted disk in the VM."""
-    mnt_cmd = ('sudo mkdir -p {1};sudo mount -o discard {0} {1};'
-               'sudo chown -R $USER:$USER {1};').format(device_path, mount_path)
+    mount_opts = _DEFAULT_DISK_MOUNT_OPTIONS
+    fs_type = _DEFAULT_DISK_FS_TYPE
+    fstab_opts = _DEFAULT_DISK_FSTAB_OPTIONS
+    mnt_cmd = ('sudo mkdir -p {mount_path};'
+               'sudo mount {mount_cmd_opts} {device_path} {mount_path};'
+               'sudo chown -R $USER:$USER {mount_path};').format(
+                   mount_path=mount_path,
+                   device_path=device_path,
+                   mount_cmd_opts='-o %s' % mount_opts)
+    self.RemoteHostCommand(mnt_cmd)
+    # add to /etc/fstab to mount on reboot
+    mnt_cmd = ('echo "{device_path} {mount_path} {fs_type} {fstab_opts}" '
+               '| sudo tee -a /etc/fstab').format(
+                   device_path=device_path,
+                   mount_path=mount_path,
+                   fs_type=fs_type,
+                   fstab_opts=fstab_opts)
     self.RemoteHostCommand(mnt_cmd)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
@@ -420,7 +497,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     remote_location = '%s@%s:%s' % (
         self.user_name, self.ip_address, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
-    scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key))
+    # An scp is not retried, so increase the connection timeout.
+    scp_cmd.extend(vm_util.GetSshOptions(self.ssh_private_key,
+                                         connect_timeout=30))
     if copy_to:
       scp_cmd.extend([file_path, remote_location])
     else:
@@ -474,6 +553,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       login_shell: Run command in a login shell.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
+      timeout: The timeout for IssueCommand.
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -536,6 +616,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       login_shell: Run command in a login shell.
       suppress_warning: Suppress the result logging from IssueCommand when the
           return code is non-zero.
+      timeout: The timeout for IssueCommand.
 
     Returns:
       A tuple of stdout, stderr from running the command.
@@ -548,7 +629,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         suppress_warning, timeout)[:2]
 
   def _Reboot(self):
-    """OS-specific implementation of reboot command"""
+    """OS-specific implementation of reboot command."""
     self.RemoteCommand('sudo reboot', ignore_failure=True)
 
   def _AfterReboot(self):
@@ -604,7 +685,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           'please make sure that %s can ssh into %s without supplying any '
           'arguments except the ip address.' % (self, peer))
 
-
   def CheckJavaVersion(self):
     """Check the version of java on remote machine.
 
@@ -620,7 +700,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Deletes a file on a remote machine.
 
     Args:
-      filename: Path to the the file to delete.
+      filename: Path to the file to delete.
     """
     self.RemoteCommand('sudo rm -rf %s' % filename)
 
@@ -691,6 +771,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def SetupLocalDisks(self):
     """Performs Linux specific setup of local disks."""
     pass
+
+  def CreateRamDisk(self, disk_spec):
+    """Performs Linux specific setup of ram disk."""
+    assert disk_spec.mount_point
+    ramdisk = disk.RamDisk(disk_spec)
+    logging.info('Mounting and creating Ram Disk %s, %s',
+                 disk_spec.mount_point, disk_spec.disk_size)
+    mnt_cmd = ('sudo mkdir -p {0};sudo mount -t tmpfs -o size={1}g tmpfs {0};'
+               'sudo chown -R $USER:$USER {0};').format(
+                   disk_spec.mount_point, disk_spec.disk_size)
+    self.RemoteHostCommand(mnt_cmd)
+    self.scratch_disks.append(ramdisk)
 
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to prepare data disks.
@@ -771,6 +863,20 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         'sudo blockdev --setra {0} {1}; sudo blockdev --setfra {0} {1};'.format(
             num_sectors, ' '.join(devices)))
 
+  def GetMd5sum(self, path, filename):
+    """Gets the md5sum hash for a filename in a path on the VM.
+
+    Args:
+      path: string; Path on the VM.
+      filename: string; Name of the file in the path.
+
+    Returns:
+      string; The md5sum hash.
+    """
+    stdout, _ = self.RemoteCommand('md5sum %s' % posixpath.join(path, filename))
+    md5sum, _ = stdout.split()
+    return md5sum
+
 
 class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
@@ -779,10 +885,10 @@ class RhelMixin(BaseLinuxMixin):
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
+    super(RhelMixin, self).OnStartup()
     self.RemoteHostCommand('echo \'Defaults:%s !requiretty\' | '
                            'sudo tee /etc/sudoers.d/pkb' % self.user_name,
                            login_shell=True)
-
 
   def InstallEpelRepo(self):
     """Installs the Extra Packages for Enterprise Linux repository."""
@@ -882,11 +988,16 @@ class RhelMixin(BaseLinuxMixin):
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
     super(RhelMixin, self).SetupProxy()
-    yum_proxy_file = "/etc/yum.conf"
+    yum_proxy_file = '/etc/yum.conf'
 
     if FLAGS.http_proxy:
       self.RemoteCommand("echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (
           FLAGS.http_proxy, yum_proxy_file))
+
+
+class Centos7Mixin(RhelMixin):
+  """Class holding Centos 7 specific VM methods and attributes."""
+  OS_TYPE = os_types.CENTOS7
 
 
 class DebianMixin(BaseLinuxMixin):
@@ -1009,7 +1120,7 @@ class DebianMixin(BaseLinuxMixin):
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
     super(DebianMixin, self).SetupProxy()
-    apt_proxy_file = "/etc/apt/apt.conf"
+    apt_proxy_file = '/etc/apt/apt.conf'
     commands = []
 
     if FLAGS.http_proxy:
@@ -1034,6 +1145,26 @@ class DebianMixin(BaseLinuxMixin):
     self.RemoteCommand('sudo service ssh restart')
 
 
+class Debian9Mixin(DebianMixin):
+  """Class holding Debian9 specific VM methods and attributes."""
+  OS_TYPE = os_types.DEBIAN9
+
+
+class Ubuntu1404Mixin(DebianMixin):
+  """Class holding Ubuntu1404 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1404
+
+
+class Ubuntu1604Mixin(DebianMixin):
+  """Class holding Ubuntu1604 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1604
+
+
+class Ubuntu1710Mixin(DebianMixin):
+  """Class holding Ubuntu1710 specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1710
+
+
 class ContainerizedDebianMixin(DebianMixin):
   """Class representing a Containerized Virtual Machine.
 
@@ -1054,7 +1185,7 @@ class ContainerizedDebianMixin(DebianMixin):
     """Returns whether docker is installed or not."""
     resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
                                      suppress_warning=True)
-    if resp.rstrip() == "":
+    if resp.rstrip() == '':
       return False
     return True
 
@@ -1124,7 +1255,7 @@ class ContainerizedDebianMixin(DebianMixin):
                                   ignore_failure, login_shell, suppress_warning)
 
   def ContainerCopy(self, file_name, container_path='', copy_to=True):
-    """Copies a file to and from container_path to the host's vm_util.VM_TMP_DIR.
+    """Copies a file to or from container_path to the host's vm_util.VM_TMP_DIR.
 
     Args:
       file_name: Name of the file in the host's vm_util.VM_TMP_DIR.
@@ -1210,7 +1341,7 @@ class ContainerizedDebianMixin(DebianMixin):
       self.RemoteHostCommand("docker stop %s" % (self.docker_id))
 
 
-class KernelVersion(object):
+class KernelRelease(object):
   """Holds the contents of the linux kernel version returned from uname -r."""
 
   def __init__(self, uname):
@@ -1221,9 +1352,10 @@ class KernelVersion(object):
     """
 
     # example format would be: "4.5.0-96-generic"
+    # or "3.10.0-514.26.2.el7.x86_64" for centos
     # major.minor.Rest
     # in this example, major = 4, minor = 5
-    major_string, minor_string, _ = uname.split('.')
+    major_string, minor_string, _ = uname.split('.', 2)
     self.major = int(major_string)
     self.minor = int(minor_string)
 

@@ -84,6 +84,36 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
         dpb_service.DATAFLOW, actual_mvn_command, testOptionVal)
     self.assertListEqual([], actual_mvn_command)
 
+  def test_extra_mvn_property_empty_property(self):
+    testOptionVal = ""
+    actual_mvn_command = []
+    beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+    self.assertListEqual([], actual_mvn_command)
+
+  def test_extra_mvn_property_single_property(self):
+    testOptionVal = "[key=value]"
+    actual_mvn_command = []
+    beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+    self.assertListEqual(["-Dkey=value"], actual_mvn_command)
+
+  def test_extra_mvn_property_single_property_quoted(self):
+    testOptionVal = "[\"key=value\"]"
+    actual_mvn_command = []
+    beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+    self.assertListEqual(["-Dkey=value"], actual_mvn_command)
+
+  def test_extra_mvn_property_multiple_properties(self):
+    testOptionVal = "[\"key=value\", \"key2=value2\"]"
+    actual_mvn_command = []
+    beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+    self.assertListEqual(["-Dkey=value", "-Dkey2=value2"], actual_mvn_command)
+
+  def test_integrationPipelineOptions_rejection(self):
+    testOptionVal = "[\"integrationTestPipelineOptions=...\"]"
+    actual_mvn_command = []
+    with self.assertRaises(ValueError):
+      beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+
 
 if __name__ == '__main__':
   unittest.main()

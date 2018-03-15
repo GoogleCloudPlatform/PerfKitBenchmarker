@@ -20,9 +20,15 @@ definitions below.
 Event handlers are run synchronously in an unspecified order; any exceptions
 raised will be propagated.
 """
-
+import logging
+import os
 from blinker import Namespace
+from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import sample
 
+
+FLAGS = flags.FLAGS
 _events = Namespace()
 
 
@@ -44,6 +50,13 @@ provisioned.
 
 Sender: None
 Payload: benchmark_spec.""")
+
+on_vm_startup = _events.signal('on-vm-startup', doc="""
+Signal sent on vm startup.
+
+Sender: None
+Payload: vm (VirtualMachine object).""")
+
 
 benchmark_end = _events.signal('benchmark-end', doc="""
 Signal sent at the end of a benchmark after any resources have been
@@ -116,3 +129,38 @@ def AddEvent(sender, event, start_timestamp, end_timestamp, metadata):
   """Record a TracingEvent."""
   TracingEvent.events.append(
       TracingEvent(sender, event, start_timestamp, end_timestamp, metadata))
+
+
+@on_vm_startup.connect
+def _RunStartupScript(unused_sender, vm):
+  """Run startup script if necessary."""
+  if FLAGS.startup_script:
+    vm.RemoteCopy(data.ResourcePath(FLAGS.startup_script))
+    vm.startup_script_output = vm.RemoteCommand(
+        './%s' % os.path.basename(FLAGS.startup_script))
+
+
+@samples_created.connect
+def _AddScriptSamples(unused_sender, benchmark_spec, samples):
+  def _ScriptResultToMetadata(out):
+    return {'stdout': out[0], 'stderr': out[1]}
+  for vm in benchmark_spec.vms:
+    if FLAGS.startup_script:
+      samples.append(sample.Sample(
+          'startup', 0, '', _ScriptResultToMetadata(vm.startup_script_output)))
+    if FLAGS.postrun_script:
+      samples.append(sample.Sample(
+          'postrun', 0, '', _ScriptResultToMetadata(vm.postrun_script_output)))
+
+
+@after_phase.connect
+def _RunPostRunScript(sender, benchmark_spec):
+  if sender != RUN_PHASE:
+    logging.info(
+        'Receive after_phase signal from :%s, not '
+        'triggering _RunPostRunScript.', sender)
+  if FLAGS.postrun_script:
+    for vm in benchmark_spec.vms:
+      vm.RemoteCopy(FLAGS.postrun_script)
+      vm.postrun_script_output = vm.RemoteCommand(
+          './%s' % os.path.basename(FLAGS.postrun_script))

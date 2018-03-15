@@ -26,6 +26,7 @@ from perfkitbenchmarker import units
 FLAGS = flags.FLAGS
 
 INTEGER_GROUP_REGEXP = re.compile(r'(\d+)(-(\d+))?(-(\d+))?$')
+INTEGER_GROUP_REGEXP_COLONS = re.compile(r'(-?\d+)(:(-?\d+))?(:(-?\d+))?$')
 
 
 class IntegerList(object):
@@ -46,6 +47,8 @@ class IntegerList(object):
   by the step size. (Ex: [5, (8,12)] represents the integer list
   5,8,9,10,11,12, and [(8-14-2)] represents the list 8,10,12,14.)
 
+  For negative number ranges use a colon seperator (ex: "-2:1" is the integer
+  list -2, -1, 0, 1).
   """
 
   def __init__(self, groups):
@@ -105,12 +108,15 @@ class IntegerList(object):
           yield val
 
   def __str__(self):
-      return IntegerListSerializer().serialize(self)
+    return IntegerListSerializer().serialize(self)
+
+  def __repr__(self):
+    return 'IntegerList([%s])' % self
 
   def _CreateXrangeFromTuple(self, input_tuple):
     start = input_tuple[0]
-    stop_inclusive = input_tuple[1] + 1
     step = 1 if len(input_tuple) == 2 else input_tuple[2]
+    stop_inclusive = input_tuple[1] + (1 if step > 0 else -1)
     return xrange(start, stop_inclusive, step)
 
 
@@ -130,10 +136,13 @@ class IntegerListParser(flags.ArgumentParser):
   As a special case, instead of a string, can pass a list of integers
   or an IntegerList. In these cases, the return value iterates over
   the same integers as were in the argument.
+
+  For negative number ranges use a colon seperator, for example "-3:4:2" parses
+  to [-3, -1, 1, 3].
   """
 
-  syntactic_help = ('A comma-separated list of nonnegative integers or integer '
-                    'ranges. Ex: 1,3,5-7 is read as 1,3,5,6,7.')
+  syntactic_help = ('A comma-separated list of integers or integer '
+                    'ranges. Ex: -1,3,5:7 is read as -1,3,5,6,7.')
 
   WARN = 'warn'
   EXCEPTION = 'exception'
@@ -153,7 +162,7 @@ class IntegerListParser(flags.ArgumentParser):
       An iterable of integers.
 
     Raises:
-      ValueError if inp doesn't follow a format it recognizes.
+      ValueError: if inp doesn't follow a format it recognizes.
     """
 
     if isinstance(inp, IntegerList):
@@ -173,7 +182,8 @@ class IntegerListParser(flags.ArgumentParser):
     result = []
 
     for group in groups:
-      match = INTEGER_GROUP_REGEXP.match(group)
+      match = INTEGER_GROUP_REGEXP.match(
+          group) or INTEGER_GROUP_REGEXP_COLONS.match(group)
       if match is None:
         raise ValueError('Invalid integer list %s', inp)
       elif match.group(2) is None:
@@ -187,6 +197,7 @@ class IntegerListParser(flags.ArgumentParser):
         low = int(match.group(1))
         high = int(match.group(3))
         step = int(match.group(5)) if match.group(5) is not None else 1
+        step = -step if step > 0 and low > high else step
 
         if high <= low or (len(result) > 0 and low <= result[-1]):
           HandleNonIncreasing()
@@ -202,9 +213,8 @@ class IntegerListParser(flags.ArgumentParser):
 class IntegerListSerializer(flags.ArgumentSerializer):
 
   def _SerializeRange(self, val):
-    if len(val) == 2:
-      return '%s-%s' % (val[0], val[1])
-    return '%s-%s-%s' % (val[0], val[1], val[2])
+    separator = ':' if any(item < 0 for item in val) else '-'
+    return separator.join(str(item) for item in val)
 
   def serialize(self, il):
     return ','.join([str(val) if isinstance(val, int) or isinstance(val, long)

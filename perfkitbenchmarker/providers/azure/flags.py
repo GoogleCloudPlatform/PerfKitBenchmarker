@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing flags applicable across benchmark run on Azure."""
 
 from perfkitbenchmarker import flags
 
@@ -33,6 +34,7 @@ RAGRS = 'Standard_RAGRS'
 
 STORAGE = 'Storage'
 BLOB_STORAGE = 'BlobStorage'
+VALID_TIERS = ['Basic', 'Standard']
 
 flags.DEFINE_enum(
     'azure_storage_type', LRS,
@@ -49,3 +51,20 @@ flags.DEFINE_enum(
     'The type of storage account to use for blob storage. Choosing Storage '
     'will let you use ZRS storage. Choosing BlobStorage will give you access '
     'to Hot and Cold storage tiers.')
+
+flags.DEFINE_string('azure_preprovisioned_data_bucket', None,
+                    'Azure blob storage account where pre-provisioned data '
+                    'has been copied.')
+
+flags.DEFINE_boolean('azure_accelerated_networking', False,
+                     'Enable Azure Accelerated Networking. See '
+                     'https://docs.microsoft.com/en-us/azure/virtual-network/'
+                     'create-vm-accelerated-networking-cli'
+                     'for more information.')
+
+flags.DEFINE_enum('azure_tier', None, VALID_TIERS,
+                  'Performance tier to use for the machine type.')
+
+flags.DEFINE_integer(
+    'azure_compute_units', None,
+    'Number of compute units to allocate for the machine type')

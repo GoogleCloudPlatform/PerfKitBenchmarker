@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Contains code related to lifecycle management of Kubernetes Pods."""
 
 import json
 import logging
@@ -42,13 +44,29 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Initialize a Kubernetes virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      vm_spec: KubernetesPodSpec object of the vm.
     """
     super(KubernetesVirtualMachine, self).__init__(vm_spec)
     self.num_scratch_disks = 0
     self.name = self.name.replace('_', '-')
     self.user_name = FLAGS.username
     self.image = self.image or UBUNTU_IMAGE
+    self.resource_limits = vm_spec.resource_limits
+    self.resource_requests = vm_spec.resource_requests
+
+  def GetResourceMetadata(self):
+    metadata = super(KubernetesVirtualMachine, self).GetResourceMetadata()
+    if self.resource_limits:
+      metadata.update({
+          'pod_cpu_limit': self.resource_limits.cpus,
+          'pod_memory_limit_mb': self.resource_limits.memory,
+      })
+    if self.resource_requests:
+      metadata.update({
+          'pod_cpu_request': self.resource_requests.cpus,
+          'pod_memory_request_mb': self.resource_requests.memory,
+      })
+    return metadata
 
   def _CreateDependencies(self):
     self._CheckPrerequisites()
@@ -90,6 +108,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     Creates a POD (Docker container with optional volumes).
     """
     create_rc_body = self._BuildPodBody()
+    logging.info('About to create a pod with the following configuration:')
+    logging.info(create_rc_body)
     kubernetes_helper.CreateResource(create_rc_body)
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
@@ -263,17 +283,75 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     for scratch_disk in self.scratch_disks:
       scratch_disk.AttachVolumeMountInfo(container['volumeMounts'])
 
+    resource_body = self._BuildResourceBody()
+    if resource_body:
+      container['resources'] = resource_body
+
+    # The nvidia/cuda image does not have sudo installed,
+    # so install it and configure the sudoers file such
+    # that the root user's environment is preserved when
+    # running as sudo. Then run tail indefinitely so that
+    # the container does not exit.
+    if self.image.startswith('nvidia/cuda'):
+      container_command = ' && '.join([
+          'apt-get update',
+          'apt-get install -y sudo',
+          'sed -i \'/env_reset/d\' /etc/sudoers',
+          'sed -i \'/secure_path/d\' /etc/sudoers',
+          'sudo ldconfig',
+          'tail -f /dev/null',
+      ])
+      container['command'] = ['bash', '-c', container_command]
+
     return container
+
+  def _BuildResourceBody(self):
+    """Constructs a dictionary that specifies resource limits and requests.
+
+    The syntax for including GPUs is specific to GKE and is likely to
+    change in the future.
+    See https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus
+
+    Returns:
+      kubernetes pod resource body containing pod limits and requests.
+    """
+    resources = {
+        'limits': {},
+        'requests': {},
+    }
+
+    if self.resource_requests:
+      resources['requests'].update({
+          'cpu': str(self.resource_requests.cpus),
+          'memory': '{0}Mi'.format(self.resource_requests.memory),
+      })
+
+    if self.resource_limits:
+      resources['limits'].update({
+          'cpu': str(self.resource_limits.cpus),
+          'memory': '{0}Mi'.format(self.resource_limits.memory),
+      })
+
+    if self.gpu_count:
+      gpu_dict = {
+          'nvidia.com/gpu': str(self.gpu_count)
+      }
+      resources['limits'].update(gpu_dict)
+      resources['requests'].update(gpu_dict)
+
+    result_with_empty_values_removed = (
+        {k: v for k, v in resources.iteritems() if v})
+    return result_with_empty_values_removed
 
 
 class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
                                           linux_virtual_machine.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
-  def RemoteHostCommand(self, command,
-                        should_log=False, retries=None,
-                        ignore_failure=False, login_shell=False,
-                        suppress_warning=False, timeout=None):
+  def RemoteHostCommandWithReturnCode(self, command,
+                                      should_log=False, retries=None,
+                                      ignore_failure=False, login_shell=False,
+                                      suppress_warning=False, timeout=None):
     """Runs a command in the Kubernetes container."""
     cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'exec', '-i',
            self.name, '--', '/bin/bash', '-c', command]
@@ -283,9 +361,10 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     if not ignore_failure and retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'Full command: %s\nSTDOUT: %sSTDERR: %s' %
-                    (retcode, command, ' '.join(cmd), stdout, stderr))
+                    (retcode, command, ' '.join(cmd),
+                     stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
-    return stdout, stderr
+    return stdout, stderr, retcode
 
   def MoveHostFile(self, target, source_path, remote_path=''):
     """Copies a file from one VM to a target VM.
@@ -300,7 +379,6 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     self.RemoteHostCopy(file_name, source_path, copy_to=False)
     target.RemoteHostCopy(file_name, remote_path)
 
-
   def RemoteHostCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.
 
@@ -313,7 +391,8 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       RemoteCommandError: If there was a problem copying the file.
     """
     if copy_to:
-      src_spec, dest_spec = file_path, '%s:' % (self.name,)
+      file_name = posixpath.basename(file_path)
+      src_spec, dest_spec = file_path, '%s:%s' % (self.name, file_name)
     else:
       remote_path, _ = self.RemoteCommand('readlink -f %s' % remote_path)
       remote_path = remote_path.strip()
@@ -332,8 +411,15 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       self.RemoteCommand('mv %s %s; chmod 777 %s' %
                          (file_name, remote_path, remote_path))
 
+  @vm_util.Retry(log_errors=False, poll_interval=1)
   def PrepareVMEnvironment(self):
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
+    # Don't rely on SSH being installed in Kubernetes containers,
+    # so install it and restart the service so that it is ready to go.
+    # Although ssh is not required to connect to the container, MPI
+    # benchmarks require it.
+    self.InstallPackages('ssh')
+    self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
     self.RemoteCommand('mkdir ~/.ssh')
     with open(self.ssh_public_key) as f:
       key = f.read()

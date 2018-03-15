@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,14 +28,15 @@ import collections
 import itertools
 import json
 import logging
+import posixpath
 import re
 import threading
-import yaml
 
+from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flags
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
@@ -43,10 +44,12 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
+
+import yaml
 
 FLAGS = flags.FLAGS
 
@@ -57,120 +60,13 @@ RHEL_IMAGE = 'rhel-7'
 WINDOWS_IMAGE = 'windows-2012-r2'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
-GPU_TYPE_K80 = 'k80'
-GPU_TYPE_P100 = 'p100'
-GPU_TYPE_TO_INTERAL_NAME_MAP = {
-    GPU_TYPE_K80: 'nvidia-tesla-k80',
-    GPU_TYPE_P100: 'nvidia-tesla-p100',
+STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
+                    'potential stockout scenario.')
+_GPU_TYPE_TO_INTERAL_NAME_MAP = {
+    'k80': 'nvidia-tesla-k80',
+    'p100': 'nvidia-tesla-p100',
+    'v100': 'nvidia-tesla-v100',
 }
-
-
-class MemoryDecoder(option_decoders.StringDecoder):
-  """Verifies and decodes a config option value specifying a memory size."""
-
-  _CONFIG_MEMORY_PATTERN = re.compile(r'([0-9.]+)([GM]iB)')
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Decodes memory size in MiB from a string.
-
-    The value specified in the config must be a string representation of the
-    memory size expressed in MiB or GiB. It must be an integer number of MiB
-    Examples: "1280MiB", "7.5GiB".
-
-    Args:
-      value: The value specified in the config.
-      component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
-      flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
-
-    Returns:
-      int. Memory size in MiB.
-
-    Raises:
-      errors.Config.InvalidValue upon invalid input value.
-    """
-    string = super(MemoryDecoder, self).Decode(value, component_full_name,
-                                               flag_values)
-    match = self._CONFIG_MEMORY_PATTERN.match(string)
-    if not match:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". Examples of valid values: "1280MiB", '
-          '"7.5GiB".'.format(self._GetOptionFullName(component_full_name),
-                             string))
-    try:
-      memory_value = float(match.group(1))
-    except ValueError:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". "{2}" is not a valid float.'.format(
-              self._GetOptionFullName(component_full_name), string,
-              match.group(1)))
-    memory_units = match.group(2)
-    if memory_units == 'GiB':
-      memory_value *= 1024
-    memory_mib_int = int(memory_value)
-    if memory_value != memory_mib_int:
-      raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". The specified size must be an integer '
-          'number of MiB.'.format(self._GetOptionFullName(component_full_name),
-                                  string))
-    return memory_mib_int
-
-
-class CustomMachineTypeSpec(spec.BaseSpec):
-  """Properties of a GCE custom machine type.
-
-  Attributes:
-    cpus: int. Number of vCPUs.
-    memory: string. Representation of the size of memory, expressed in MiB or
-        GiB. Must be an integer number of MiB (e.g. "1280MiB", "7.5GiB").
-  """
-
-  @classmethod
-  def _GetOptionDecoderConstructions(cls):
-    """Gets decoder classes and constructor args for each configurable option.
-
-    Returns:
-      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
-          The pair specifies a decoder class and its __init__() keyword
-          arguments to construct in order to decode the named option.
-    """
-    result = super(CustomMachineTypeSpec, cls)._GetOptionDecoderConstructions()
-    result.update({'cpus': (option_decoders.IntDecoder, {'min': 1}),
-                   'memory': (MemoryDecoder, {})})
-    return result
-
-
-class MachineTypeDecoder(option_decoders.TypeVerifier):
-  """Decodes the machine_type option of a GCE VM config."""
-
-  def __init__(self, **kwargs):
-    super(MachineTypeDecoder, self).__init__((basestring, dict), **kwargs)
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Decodes the machine_type option of a GCE VM config.
-
-    Args:
-      value: Either a string name of a GCE machine type or a dict containing
-          'cpu' and 'memory' keys describing a custom VM.
-      component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
-      flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
-
-    Returns:
-      If value is a string, returns it unmodified. Otherwise, returns the
-      decoded CustomMachineTypeSpec.
-
-    Raises:
-      errors.Config.InvalidValue upon invalid input value.
-    """
-    super(MachineTypeDecoder, self).Decode(value, component_full_name,
-                                           flag_values)
-    if isinstance(value, basestring):
-      return value
-    return CustomMachineTypeSpec(self._GetOptionFullName(component_full_name),
-                                 flag_values=flag_values, **value)
 
 
 class GceVmSpec(virtual_machine.BaseVmSpec):
@@ -181,11 +77,10 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     memory: None or string. For custom VMs, a string representation of the size
         of memory, expressed in MiB or GiB. Must be an integer number of MiB
         (e.g. "1280MiB", "7.5GiB").
-    gpu_count: None or int. Number of gpus to attach to the VM.
-    gpu_type: None or string. Type of gpus to attach to the VM.
     num_local_ssds: int. The number of local SSDs to attach to the instance.
     preemptible: boolean. True if the VM should be preemptible, False otherwise.
     project: string or None. The project to create the VM in.
+    image_family: string or None. The image family used to locate the image.
     image_project: string or None. The image project used to locate the
         specifed image.
     boot_disk_size: None or int. The size of the boot disk in GB.
@@ -196,7 +91,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
 
   def __init__(self, *args, **kwargs):
     super(GceVmSpec, self).__init__(*args, **kwargs)
-    if isinstance(self.machine_type, CustomMachineTypeSpec):
+    if isinstance(self.machine_type,
+                  custom_virtual_machine_spec.CustomMachineTypeSpec):
       self.cpus = self.machine_type.cpus
       self.memory = self.machine_type.memory
       self.machine_type = None
@@ -229,6 +125,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['machine_type'] = yaml.load(flag_values.machine_type)
     if flag_values['project'].present:
       config_values['project'] = flag_values.project
+    if flag_values['image_family'].present:
+      config_values['image_family'] = flag_values.image_family
     if flag_values['image_project'].present:
       config_values['image_project'] = flag_values.image_project
     if flag_values['gcp_host_type'].present:
@@ -236,18 +134,9 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     if flag_values['gcp_num_vms_per_host'].present:
       config_values['num_vms_per_host'] = flag_values.gcp_num_vms_per_host
     if flag_values['gcp_min_cpu_platform'].present:
-      config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
-    if flag_values['gcp_gpu_type'].present:
-      config_values['gpu_type'] = flag_values.gcp_gpu_type
-    if flag_values['gcp_gpu_count'].present:
-      config_values['gpu_count'] = flag_values.gcp_gpu_count
-
-    if 'gpu_count' in config_values and 'gpu_type' not in config_values:
-        raise errors.Config.MissingOption(
-            'gpu_type must be specified if gpu_count is set')
-    if 'gpu_type' in config_values and 'gpu_count' not in config_values:
-        raise errors.Config.MissingOption(
-            'gpu_count must be specified if gpu_type is set')
+      if (flag_values.gcp_min_cpu_platform !=
+          gcp_flags.GCP_MIN_CPU_PLATFORM_NONE):
+        config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -260,22 +149,19 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     """
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'machine_type': (MachineTypeDecoder, {}),
+        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder, {}),
         'num_local_ssds': (option_decoders.IntDecoder, {'default': 0,
                                                         'min': 0}),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
         'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
         'boot_disk_type': (option_decoders.StringDecoder, {'default': None}),
         'project': (option_decoders.StringDecoder, {'default': None}),
+        'image_family': (option_decoders.StringDecoder, {'default': None}),
         'image_project': (option_decoders.StringDecoder, {'default': None}),
         'host_type': (option_decoders.StringDecoder,
                       {'default': 'n1-host-64-416'}),
         'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
         'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
-        'gpu_type': (option_decoders.EnumDecoder, {
-            'valid_values': GPU_TYPE_TO_INTERAL_NAME_MAP.keys(),
-            'default': None}),
-        'gpu_count': (option_decoders.IntDecoder, {'min': 1, 'default': None})
     })
     return result
 
@@ -320,12 +206,39 @@ class GceSoleTenantHost(resource.BaseResource):
     cmd.Issue()
 
 
+def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
+  """Generates a string to be used to attach accelerators to a VM using gcloud.
+
+  This function takes a cloud-agnostic accelerator type (k80, p100, etc.) and
+  returns a gce-specific accelerator name (nvidia-tesla-k80, etc).
+
+  If FLAGS.gce_accelerator_type_override is specified, the value of said flag
+  will be used as the name of the accelerator.
+
+  Args:
+    accelerator_type: cloud-agnostic accelerator type (p100, k80, etc.)
+    accelerator_count: number of accelerators to attach to the VM
+
+  Returns:
+    String to be used by gcloud to attach accelerators to a VM.
+    Must be prepended by the flag '--accelerator'.
+  """
+  gce_accelerator_type = (FLAGS.gce_accelerator_type_override or
+                          _GPU_TYPE_TO_INTERAL_NAME_MAP[accelerator_type])
+  return 'type={0},count={1}'.format(
+      gce_accelerator_type,
+      accelerator_count)
+
+
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
   CLOUD = providers.GCP
-  # Subclasses should override the default image.
+  # Subclasses should override the default image OR
+  # both the image family and image_project.
   DEFAULT_IMAGE = None
+  DEFAULT_IMAGE_FAMILY = None
+  DEFAULT_IMAGE_PROJECT = None
   BOOT_DISK_SIZE_GB = 10
   BOOT_DISK_TYPE = gce_disk.PD_STANDARD
 
@@ -349,13 +262,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.boot_metadata = {}
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
-    self.gpu_count = vm_spec.gpu_count
-    self.gpu_type = vm_spec.gpu_type
     self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
     self.project = vm_spec.project or util.GetDefaultProject()
-    self.image_project = vm_spec.image_project
+    self.image_family = vm_spec.image_family or self.DEFAULT_IMAGE_FAMILY
+    self.image_project = vm_spec.image_project or self.DEFAULT_IMAGE_PROJECT
+    self.backfill_image = False
     self.network = gce_network.GceNetwork.GetNetwork(self)
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size
@@ -367,6 +280,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
+    self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
 
   @property
   def host_list(self):
@@ -383,10 +297,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
     args = []
-    # TODO: gcloud supports GPUs in the beta version, but we are using alpha
-    # here so that we can specify min_cpu_platform in addition to attaching
-    # gpus.
-    if self.host or self.min_cpu_platform or self.gpu_count:
+    if self.host:
       args = ['alpha']
     args.extend(['compute', 'instances', 'create', self.name])
 
@@ -395,10 +306,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['subnet'] = self.network.subnet_resource.name
     else:
       cmd.flags['network'] = self.network.network_resource.name
-    cmd.flags['image'] = self.image
-    cmd.flags['boot-disk-auto-delete'] = True
+    if self.image:
+      cmd.flags['image'] = self.image
+    elif self.image_family:
+      cmd.flags['image-family'] = self.image_family
     if self.image_project is not None:
       cmd.flags['image-project'] = self.image_project
+    cmd.flags['boot-disk-auto-delete'] = True
     cmd.flags['boot-disk-size'] = self.boot_disk_size or self.BOOT_DISK_SIZE_GB
     cmd.flags['boot-disk-type'] = self.boot_disk_type or self.BOOT_DISK_TYPE
     if self.machine_type is None:
@@ -407,9 +321,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       cmd.flags['machine-type'] = self.machine_type
     if self.gpu_count:
-      cmd.flags['accelerator'] = 'type={0},count={1}'.format(
-          GPU_TYPE_TO_INTERAL_NAME_MAP[self.gpu_type],
-          self.gpu_count)
+      cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
+                                                               self.gpu_count)
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
     if self.host:
@@ -442,7 +355,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['metadata'] = ','.join(
         ['%s=%s' % (k, v) for k, v in metadata.iteritems()])
 
-    # TODO: If GCE one day supports live migration on GPUs this can be revised.
+    # TODO(gareth-ferneyhough): If GCE one day supports live migration on GPUs
+    #                           this can be revised.
     if (FLAGS['gce_migrate_on_maintenance'].present and
         FLAGS.gce_migrate_on_maintenance and self.gpu_count):
       raise errors.Config.InvalidValue(
@@ -483,6 +397,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           host.Create()
         self.host = self.host_list[-1]
       raise errors.Resource.RetryableCreationError()
+    if (not self.use_dedicated_host and retcode and
+        _INSUFFICIENT_HOST_CAPACITY in stderr):
+      logging.error(STOCKOUT_MESSAGE)
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(STOCKOUT_MESSAGE)
+    util.CheckGcloudResponseForQuotaExceeded(stderr, retcode)
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
@@ -522,6 +441,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     network_interface = response['networkInterfaces'][0]
     self.internal_ip = network_interface['networkIP']
     self.ip_address = network_interface['accessConfigs'][0]['natIP']
+    if not self.image:
+      getdisk_cmd = util.GcloudCommand(
+          self, 'compute', 'disks', 'describe', self.name)
+      stdout, _, _ = getdisk_cmd.Issue()
+      response = json.loads(stdout)
+      self.image = response['sourceImage'].split('/')[-1]
+      self.backfill_image = True
 
   def _Delete(self):
     """Delete a GCE VM instance."""
@@ -584,7 +510,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.Issue()
 
   def AllowRemoteAccessPorts(self):
-    """Creates firewall rules for remote access if required. """
+    """Creates firewall rules for remote access if required."""
 
     # If gce_remote_access_firewall_rule is specified, access is already
     # granted by that rule.
@@ -604,12 +530,22 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       attr_value = getattr(self, attr_name)
       if attr_value:
         result[attr_name] = attr_value
+    # Only record image_family flag when it is used in vm creation command.
+    # Note, when using non-debian/ubuntu based custom images, user will need
+    # to use --os_type flag. In that case, we do not want to
+    # record image_family in metadata.
+    if self.backfill_image and self.image_family:
+      result['image_family'] = self.image_family
+    if self.image_project:
+      result['image_project'] = self.image_project
     if self.use_dedicated_host:
       result['host_type'] = self.host_type
       result['num_vms_per_host'] = self.num_vms_per_host
     if self.gpu_count:
       result['gpu_type'] = self.gpu_type
       result['gpu_count'] = self.gpu_count
+    if self.gce_accelerator_type_override:
+      result['accelerator_type_override'] = self.gce_accelerator_type_override
     return result
 
   def SimulateMaintenanceEvent(self):
@@ -620,6 +556,22 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if retcode:
       raise errors.VirtualMachine.VirtualMachineError(
           'Unable to simulate maintenance event.')
+
+  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                          filename):
+    """Downloads a data file from a GCS bucket with pre-provisioned data.
+
+    Use --gce_preprovisioned_data_bucket to specify the name of the bucket.
+
+    Args:
+      install_path: The install path on this VM.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: The name of the file that was downloaded.
+    """
+    # TODO(deitz): Add retry logic.
+    self.RemoteCommand('gsutil cp gs://%s/%s/%s %s' % (
+        FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
+        posixpath.join(install_path, filename)))
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
@@ -632,13 +584,56 @@ class DebianBasedGceVirtualMachine(GceVirtualMachine,
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
 
+class Debian9BasedGceVirtualMachine(GceVirtualMachine,
+                                    linux_vm.Debian9Mixin):
+  DEFAULT_IMAGE_FAMILY = 'debian-9'
+  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+
+
 class RhelBasedGceVirtualMachine(GceVirtualMachine,
                                  linux_vm.RhelMixin):
   DEFAULT_IMAGE = RHEL_IMAGE
 
+  def __init__(self, vm_spec):
+    super(RhelBasedGceVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
+
+
+class Centos7BasedGceVirtualMachine(GceVirtualMachine,
+                                    linux_vm.Centos7Mixin):
+  DEFAULT_IMAGE_FAMILY = 'centos-7'
+  DEFAULT_IMAGE_PROJECT = 'centos-cloud'
+
+  def __init__(self, vm_spec):
+    super(Centos7BasedGceVirtualMachine, self).__init__(vm_spec)
+    self.python_package_config = 'python'
+    self.python_dev_package_config = 'python-devel'
+    self.python_pip_package_config = 'python2-pip'
+
+
+class Ubuntu1404BasedGceVirtualMachine(GceVirtualMachine,
+                                       linux_vm.Ubuntu1404Mixin):
+  DEFAULT_IMAGE_FAMILY = 'ubuntu-1404-lts'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
+class Ubuntu1604BasedGceVirtualMachine(GceVirtualMachine,
+                                       linux_vm.Ubuntu1604Mixin):
+  DEFAULT_IMAGE_FAMILY = 'ubuntu-1604-lts'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
+class Ubuntu1710BasedGceVirtualMachine(GceVirtualMachine,
+                                       linux_vm.Ubuntu1710Mixin):
+  DEFAULT_IMAGE_FAMILY = 'ubuntu-1710'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
 
 class WindowsGceVirtualMachine(GceVirtualMachine,
                                windows_virtual_machine.WindowsMixin):
+  """Class supporting Windows GCE virtual machines."""
 
   DEFAULT_IMAGE = WINDOWS_IMAGE
   BOOT_DISK_SIZE_GB = 50

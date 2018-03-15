@@ -24,18 +24,18 @@ SPEC CPU2006 homepage: http://www.spec.org/cpu2006/
 
 import itertools
 import logging
+from operator import mul
 import os
 import posixpath
 import re
-import tarfile
 
-from operator import mul
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
+from perfkitbenchmarker.linux_packages import build_tools
 
 
 FLAGS = flags.FLAGS
@@ -54,6 +54,9 @@ flags.DEFINE_enum(
     _SPECFP_BENCHMARKS | _SPECINT_BENCHMARKS | _SPECCPU_SUBSETS,
     'Used by the PKB speccpu2006 benchmark. Specifies a subset of SPEC CPU2006 '
     'benchmarks to run.')
+flags.DEFINE_enum('runspec_metric', 'rate', ['rate', 'speed'],
+                  'SPEC test to run. Speed is time-based metric, rate is '
+                  'throughput-based metric.')
 flags.DEFINE_string(
     'runspec_config', 'linux64-x64-gcc47.cfg',
     'Used by the PKB speccpu2006 benchmark. Name of the cfg file to use as the '
@@ -62,6 +65,14 @@ flags.DEFINE_string(
     'cfg file must be placed in the local PKB data directory and will be '
     'copied to the remote machine prior to executing runspec. See README.md '
     'for instructions if running with a repackaged cpu2006v1.2.tgz file.')
+flags.DEFINE_string(
+    'runspec_build_tool_version', None,
+    'Version of gcc/g++/gfortran. This should match runspec_config. Note, if '
+    'neither runspec_config and runspec_build_tool_version is set, the test '
+    'install gcc/g++/gfortran-4.7, since that matches default config version. '
+    'If runspec_config is set, but not runspec_build_tool_version, default '
+    'version of build tools will be installed. Also this flag only works with '
+    'debian.')
 flags.DEFINE_integer(
     'runspec_iterations', 3,
     'Used by the PKB speccpu2006 benchmark. The number of benchmark iterations '
@@ -113,43 +124,33 @@ _SPECCPU2006_DIR = 'cpu2006'
 _SPECCPU2006_ISO = 'cpu2006-1.2.iso'
 _SPECCPU2006_TAR = 'cpu2006v1.2.tgz'
 _TAR_REQUIRED_MEMBERS = 'cpu2006', 'cpu2006/bin/runspec'
+# This benchmark can be run with an .iso file in the data directory, a tar file
+# in the data directory, or a tar file preprovisioned in cloud storage. To run
+# this benchmark with tar file preprovisioned in cloud storage, update the
+# following dict with md5sum of the file in cloud storage.
+BENCHMARK_DATA = {_SPECCPU2006_TAR: None}
 
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(benchmark_config):
-  """Verifies that the required input files are present."""
-  try:
-    # Peeking into the tar file is slow. If running in stages, it's
-    # reasonable to do this only once and assume that the contents of the
-    # tar file will not change between stages.
-    _CheckTarFile(FLAGS.runspec_config,
-                  examine_members=stages.PROVISION in FLAGS.run_stage)
-  except data.ResourceNotFound:
-    _CheckIsoAndCfgFile(FLAGS.runspec_config)
-
-
-def _CheckTarFile(runspec_config, examine_members):
-  """Searches for the tar file and performs preliminary checks on its format.
+def _CheckTarFile(vm, runspec_config, examine_members):
+  """Performs preliminary checks on the format of tar file downloaded on vm.
 
   Args:
+    vm: virtual machine
     runspec_config: string. User-specified name of the config file that is
         expected to be in the tar file.
     examine_members: boolean. If True, this function will examine the tar file's
         members to verify that certain required members are present.
 
   Raises:
-    data.ResourcePath: If the tar file cannot be found.
     errors.Benchmarks.PrepareException: If the tar file does not contain a
         required member.
     errors.Config.InvalidValue: If the tar file is found, and runspec_config is
         not a valid file name.
   """
-  tar_file_path = data.ResourcePath(_SPECCPU2006_TAR)
-  logging.info('Found tar file at %s. Skipping search for %s.', tar_file_path,
-               _SPECCPU2006_ISO)
   if posixpath.basename(runspec_config) != runspec_config:
     raise errors.Config.InvalidValue(
         'Invalid runspec_config value: {0}{1}When running speccpu2006 with a '
@@ -159,18 +160,24 @@ def _CheckTarFile(runspec_config, examine_members):
   if not examine_members:
     return
 
-  with tarfile.open(tar_file_path, 'r') as tf:
-    members = tf.getnames()
+  scratch_dir = vm.GetScratchDir()
   cfg_member = 'cpu2006/config/{0}'.format(runspec_config)
   required_members = itertools.chain(_TAR_REQUIRED_MEMBERS, [cfg_member])
-  missing_members = set(required_members).difference(members)
+  missing_members = []
+  for member in required_members:
+    stdout, _ = vm.RemoteCommand(
+        'cd {scratch_dir} && (test -f {member} || test -d {member}) ; echo $?'
+        .format(scratch_dir=scratch_dir, member=member))
+    if stdout.strip() != '0':
+      missing_members.append(member)
+
   if missing_members:
     raise errors.Benchmarks.PrepareException(
-        'The following files were not found within {tar}:{linesep}{members}'
+        'The following files were not found within tar file:{linesep}{members}'
         '{linesep}This is an indication that the tar file is formatted '
         'incorrectly. See README.md for information about the expected format '
         'of the tar file.'.format(
-            linesep=os.linesep, tar=tar_file_path,
+            linesep=os.linesep,
             members=os.linesep.join(sorted(missing_members))))
 
 
@@ -227,6 +234,7 @@ class _SpecCpu2006SpecificState(object):
         where the SPEC files are stored.
     tar_file_path: Optional string. Path of the tar file on the remote machine.
   """
+
   def __init__(self):
     self.cfg_file_path = None
     self.iso_file_path = None
@@ -246,8 +254,15 @@ def Prepare(benchmark_spec):
   speccpu_vm_state = _SpecCpu2006SpecificState()
   setattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR, speccpu_vm_state)
   vm.Install('wget')
-  vm.Install('build_tools')
   vm.Install('fortran')
+  vm.Install('build_tools')
+
+  # If using default config files and runspec_build_tool_version is not set,
+  # install 4.7 gcc/g++/gfortan. If either one of the flag is set, we assume
+  # user is smart
+  if not FLAGS['runspec_config'].present or FLAGS.runspec_build_tool_version:
+    build_tool_version = FLAGS.runspec_build_tool_version or '4.7'
+    build_tools.Reinstall(vm, version=build_tool_version)
   if FLAGS.runspec_enable_32bit:
     vm.Install('multilib')
   vm.Install('numactl')
@@ -256,8 +271,28 @@ def Prepare(benchmark_spec):
   speccpu_vm_state.spec_dir = posixpath.join(scratch_dir, _SPECCPU2006_DIR)
   try:
     _PrepareWithTarFile(vm, speccpu_vm_state)
+    _CheckTarFile(vm, FLAGS.runspec_config,
+                  examine_members=stages.PROVISION in FLAGS.run_stage)
   except data.ResourceNotFound:
-    _PrepareWithIsoFile(vm, speccpu_vm_state)
+    try:
+      _CheckIsoAndCfgFile(FLAGS.runspec_config)
+      _PrepareWithIsoFile(vm, speccpu_vm_state)
+    except data.ResourceNotFound:
+      _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state)
+      _CheckTarFile(vm, FLAGS.runspec_config,
+                    examine_members=stages.PROVISION in FLAGS.run_stage)
+
+
+def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
+  """Prepares the VM to run using tar file in preprovisioned cloud."""
+  scratch_dir = vm.GetScratchDir()
+  vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME,
+                                        [_SPECCPU2006_TAR],
+                                        scratch_dir)
+  vm.RemoteCommand('cd {dir} && tar xvfz {tar}'.format(dir=scratch_dir,
+                                                       tar=_SPECCPU2006_TAR))
+  speccpu_vm_state.cfg_file_path = posixpath.join(
+      speccpu_vm_state.spec_dir, 'config', FLAGS.runspec_config)
 
 
 def _PrepareWithTarFile(vm, speccpu_vm_state):
@@ -329,6 +364,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
     keep_partial_results: A boolean indicating whether partial results should
         be extracted in the event that not all benchmarks were successfully
         run. See the "runspec_keep_partial_results" flag for more info.
+    estimate_spec: A boolean indicating whether should we estimate spec score.
 
   Sample input for SPECint:
       ...
@@ -396,6 +432,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
     if match:
       assert in_result_section
       spec_name = str(match.group(1))
+      if FLAGS.runspec_metric == 'speed':
+        spec_name += ':speed'
       try:
         spec_score = float(match.group(2))
       except ValueError:
@@ -409,7 +447,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
               'runspec_config': FLAGS.runspec_config,
               'runspec_iterations': str(FLAGS.runspec_iterations),
               'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
-              'runspec_define': FLAGS.runspec_define}
+              'runspec_define': FLAGS.runspec_define,
+              'runspec_metric': FLAGS.runspec_metric}
 
   missing_results = []
   scores = []
@@ -423,6 +462,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
       continue
     # name, ref_time, time, score, misc
     name, _, _, score_str, _ = benchmark.split()
+    if FLAGS.runspec_metric == 'speed':
+      name += ':speed'
     score_float = float(score_str)
     scores.append(score_float)
     results.append(sample.Sample(str(name), score_float, '', metadata))
@@ -449,7 +490,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
 
 
 def _GeometricMean(arr):
-  "Calculates the geometric mean of the array."
+  """Calculates the geometric mean of the array."""
   return reduce(mul, arr) ** (1.0 / len(arr))
 
 
@@ -499,18 +540,20 @@ def Run(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
   speccpu_vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR)
-  num_cpus = vm.num_cpus
-
   runspec_flags = [
       ('config', posixpath.basename(speccpu_vm_state.cfg_file_path)),
-      ('tune', 'base'), ('size', 'ref'), ('rate', num_cpus),
+      ('tune', 'base'), ('size', 'ref'),
       ('iterations', FLAGS.runspec_iterations)]
   if FLAGS.runspec_define:
     for runspec_define in FLAGS.runspec_define.split(','):
       runspec_flags.append(('define', runspec_define))
+  fl = ' '.join('--{0}={1}'.format(k, v) for k, v in runspec_flags)
+  if FLAGS.runspec_metric == 'rate':
+    fl += ' --rate=%s' % vm.num_cpus
+  else:
+    fl += ' --speed'
   runspec_cmd = 'runspec --noreportable {flags} {subset}'.format(
-      flags=' '.join('--{0}={1}'.format(k, v) for k, v in runspec_flags),
-      subset=FLAGS.benchmark_subset)
+      flags=fl, subset=FLAGS.benchmark_subset)
 
   cmd = ' && '.join((
       'cd {0}'.format(speccpu_vm_state.spec_dir), '. ./shrc', './bin/relocate',

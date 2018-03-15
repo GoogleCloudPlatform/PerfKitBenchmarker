@@ -46,7 +46,7 @@ def AptInstall(vm):
     return
 
   vm.InstallPackages(APT_PACKAGES)
-  vm.Install('cuda_toolkit_8')
+  vm.Install('cuda_toolkit')
 
   vm.RemoteCommand('cd %s && git clone %s' % (INSTALL_DIR, SHOC_GIT_URL))
   vm.RemoteCommand(('cd %s && ./configure '

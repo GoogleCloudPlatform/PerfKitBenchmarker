@@ -40,6 +40,18 @@ class Setup(object):
     """Error raised when the given run_uri is invalid."""
     pass
 
+  class BadPreprovisionedDataError(Error):
+    """Error raised when the pre-provisioned data is invalid."""
+    pass
+
+  class InvalidSetupError(Error):
+    """Error raised when SetUpPKB was not called correctly."""
+    pass
+
+  class InvalidFlagConfigurationError(Error):
+    """Error raised when the set of command line flags is invalid."""
+    pass
+
 
 class VirtualMachine(object):
   """Errors raised by virtual_machine.py."""
@@ -145,6 +157,12 @@ class Benchmarks(object):
   class RunError(Error):
     pass
 
+  class InsufficientCapacityCloudFailure(Error):
+    pass
+
+  class QuotaFailure(Error):
+    pass
+
 
 class Resource(object):
   """Errors related to resource creation and deletion."""
@@ -157,6 +175,9 @@ class Resource(object):
     pass
 
   class RetryableDeletionError(Error):
+    pass
+
+  class RetryableGetError(Error):
     pass
 
 
@@ -182,6 +203,7 @@ class Config(object):
 
 class Juju(object):
   """Errors related to the Juju OS_TYPE."""
+
   class TimeoutException(Error):
     pass
 

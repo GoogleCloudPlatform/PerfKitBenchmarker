@@ -17,6 +17,7 @@
 import contextlib
 import logging
 import os
+import platform
 import random
 import re
 import string
@@ -54,6 +55,7 @@ FUZZ = .5
 MAX_RETRIES = -1
 
 WINDOWS = 'nt'
+DARWIN = 'Darwin'
 PASSWORD_LENGTH = 15
 
 OUTPUT_STDOUT = 0
@@ -172,7 +174,7 @@ def GetCertPath():
   return PrependTempDir(CERT_FILE)
 
 
-def GetSshOptions(ssh_key_filename):
+def GetSshOptions(ssh_key_filename, connect_timeout=5):
   """Return common set of SSH and SCP options."""
   options = [
       '-2',
@@ -181,7 +183,7 @@ def GetSshOptions(ssh_key_filename):
       '-o', 'IdentitiesOnly=yes',
       '-o', 'PreferredAuthentications=publickey',
       '-o', 'PasswordAuthentication=no',
-      '-o', 'ConnectTimeout=5',
+      '-o', 'ConnectTimeout=%d' % connect_timeout,
       '-o', 'GSSAPIAuthentication=no',
       '-o', 'ServerAliveInterval=30',
       '-o', 'ServerAliveCountMax=10',
@@ -286,14 +288,31 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
   """
-  logging.debug('Environment variables: %s' % env)
+  if env:
+    logging.debug('Environment variables: %s' % env)
 
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
-  shell_value = RunningOnWindows()
-  with tempfile.TemporaryFile() as tf_out, tempfile.TemporaryFile() as tf_err:
-    process = subprocess.Popen(cmd, env=env, shell=shell_value,
+  time_file_path = '/usr/bin/time'
+
+  runningOnWindows = RunningOnWindows()
+  runningOnDarwin = RunningOnDarwin()
+  should_time = (not (runningOnWindows or runningOnDarwin) and
+                 os.path.isfile(time_file_path) and FLAGS.time_commands)
+  shell_value = runningOnWindows
+  with tempfile.TemporaryFile() as tf_out, \
+      tempfile.TemporaryFile() as tf_err, \
+      tempfile.NamedTemporaryFile(mode='r') as tf_timing:
+
+    cmd_to_use = cmd
+    if should_time:
+      cmd_to_use = [time_file_path,
+                    '-o', tf_timing.name,
+                    '--quiet',
+                    '-f', ',  WallTime:%Es,  CPU:%Us,  MaxMemory:%Mkb '] + cmd
+
+    process = subprocess.Popen(cmd_to_use, env=env, shell=shell_value,
                                stdin=subprocess.PIPE, stdout=tf_out,
                                stderr=tf_err, cwd=cwd)
 
@@ -315,8 +334,12 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     tf_err.seek(0)
     stderr = tf_err.read().decode('ascii', 'ignore')
 
-  debug_text = ('Ran %s. Got return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
-                (full_cmd, process.returncode, stdout, stderr))
+    timing_output = ''
+    if should_time:
+      timing_output = tf_timing.read().rstrip('\n')
+
+  debug_text = ('Ran: {%s}  ReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' %
+                (full_cmd, process.returncode, timing_output, stdout, stderr))
   if force_info_log or (process.returncode and not suppress_warning):
     logging.info(debug_text)
   else:
@@ -486,6 +509,11 @@ def GenerateSSHConfig(vms, vm_groups):
 def RunningOnWindows():
   """Returns True if PKB is running on Windows."""
   return os.name == WINDOWS
+
+
+def RunningOnDarwin():
+    """Returns True if PKB is running on a Darwin OS machine."""
+    return os.name != WINDOWS and platform.system() == DARWIN
 
 
 def ExecutableOnPath(executable_name):

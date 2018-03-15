@@ -16,6 +16,7 @@
 import contextlib
 import copy
 import copy_reg
+import importlib
 import logging
 import os
 import pickle
@@ -29,12 +30,14 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -68,6 +71,10 @@ flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM. '
                     'Upon creation, these directories will have numbers '
                     'appended to them (for example /scratch0, /scratch1, etc).')
+flags.DEFINE_string('startup_script', None,
+                    'Script to run right after vm boot.')
+flags.DEFINE_string('postrun_script', None,
+                    'Script to run right after run stage.')
 # pyformat: disable
 flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
                   [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
@@ -100,6 +107,8 @@ class BenchmarkSpec(object):
     self.name = benchmark_module.BENCHMARK_NAME
     self.uid = benchmark_uid
     self.status = benchmark_status.SKIPPED
+    self.failed_substatus = None
+    self.status_detail = None
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
     self.vms = []
@@ -116,7 +125,8 @@ class BenchmarkSpec(object):
     self.container_cluster = None
     self.managed_relational_db = None
     self.cloud_tpu = None
-
+    self.edw_service = None
+    self.cloud_redis = None
     self._zone_index = 0
 
     # Modules can't be pickled, but functions can, so we store the functions
@@ -182,6 +192,31 @@ class BenchmarkSpec(object):
     providers.LoadProvider(cloud)
     cloud_tpu_class = cloud_tpu.GetCloudTpuClass(cloud)
     self.cloud_tpu = cloud_tpu_class(self.config.cloud_tpu)
+
+  def ConstructEdwService(self):
+    """Create the edw_service object."""
+    if self.config.edw_service is None:
+      return
+    # Load necessary modules from the provider to account for dependencies
+    providers.LoadProvider(
+        edw_service.TYPE_2_PROVIDER.get(self.config.edw_service.type))
+    # Load the module for the edw service based on type
+    edw_service_module = importlib.import_module(edw_service.TYPE_2_MODULE.get(
+        self.config.edw_service.type))
+    edw_service_class = getattr(edw_service_module,
+                                self.config.edw_service.type[0].upper() +
+                                self.config.edw_service.type[1:])
+    # Check if a new instance needs to be created or restored from snapshot
+    self.edw_service = edw_service_class(self.config.edw_service)
+
+  def ConstructCloudRedis(self):
+    """Create the cloud_redis object."""
+    if self.config.cloud_redis is None:
+      return
+    cloud = self.config.cloud_redis.cloud
+    providers.LoadProvider(cloud)
+    cloud_redis_class = cloud_redis.GetCloudRedisClass(cloud)
+    self.cloud_redis = cloud_redis_class(self.config.cloud_redis)
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
@@ -370,6 +405,17 @@ class BenchmarkSpec(object):
       self.managed_relational_db.Create()
     if self.cloud_tpu:
       self.cloud_tpu.Create()
+    if self.edw_service:
+      if not self.edw_service.user_managed:
+        # The benchmark creates the Redshift cluster's subnet group in the
+        # already provisioned virtual private cloud (vpc).
+        for network in networks:
+          if network.__class__.__name__ == 'AwsNetwork':
+            self.config.edw_service.subnet_id = network.subnet.id
+      self.edw_service.Create()
+    if self.cloud_redis:
+      self.config.cloud_redis.client_vm = self.vms[0]
+      self.cloud_redis.Create()
 
   def Delete(self):
     if self.deleted:
@@ -383,6 +429,8 @@ class BenchmarkSpec(object):
       self.managed_relational_db.Delete()
     if self.cloud_tpu:
       self.cloud_tpu.Delete()
+    if self.edw_service:
+      self.edw_service.Delete()
 
     if self.vms:
       try:
@@ -469,7 +517,10 @@ class BenchmarkSpec(object):
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()
     for disk_spec in vm.disk_specs:
-      vm.CreateScratchDisk(disk_spec)
+      if disk_spec.disk_type == disk.RAM:
+        vm.CreateRamDisk(disk_spec)
+      else:
+        vm.CreateScratchDisk(disk_spec)
 
     # This must come after Scratch Disk creation to support the
     # Containerized VM case
