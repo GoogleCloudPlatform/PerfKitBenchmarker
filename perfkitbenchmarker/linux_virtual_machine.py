@@ -991,7 +991,7 @@ class RhelMixin(BaseLinuxMixin):
     yum_proxy_file = '/etc/yum.conf'
 
     if FLAGS.http_proxy:
-      self.RemoteCommand("echo -e 'proxy= \"%s\";' | sudo tee -a %s" % (
+      self.RemoteCommand("echo -e 'proxy= %s' | sudo tee -a %s" % (
           FLAGS.http_proxy, yum_proxy_file))
 
 
