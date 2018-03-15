@@ -123,3 +123,4 @@
 - Support installing azure-cli on RedHat systems.
 - Fixed default behavior of using /usr/bin/time --quiet on all commands
 - Fixed ycsb failure when the same workload is ran more than once.
+- Fixed yum proxy config bug (GH-#1598 from @kopecpiotr)
