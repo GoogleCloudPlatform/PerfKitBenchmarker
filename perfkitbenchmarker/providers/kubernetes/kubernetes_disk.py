@@ -95,7 +95,7 @@ class KubernetesDisk(disk.BaseDisk):
   """
 
   RESOURCE_TYPE = 'KubernetesDisk'
-  K8S_VOLUME_TYPE = None
+  REQUIRED_ATTRS = ['K8S_VOLUME_TYPE']
 
   def __init__(self, disk_num, disk_spec, name):
     super(KubernetesDisk, self).__init__(disk_spec)
