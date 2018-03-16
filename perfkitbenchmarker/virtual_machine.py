@@ -407,6 +407,9 @@ class BaseVirtualMachine(resource.BaseResource):
     should be downloaded into the install path within a subdirectory with the
     benchmark name.
 
+    The downloaded file's parent directory will be created if it does not
+    exist.
+
     Args:
       install_path: The install path on this VM.
       benchmark_name: Name of the benchmark associated with this data file.
