@@ -26,6 +26,15 @@ def Install(vm, package_name='python-pip'):
   """Install pip on the VM."""
   vm.InstallPackages(package_name)
   vm.RemoteCommand('sudo pip install -U pip')  # Make pip upgrade pip
+
+  # Add a symbolic link to /usr/local/bin/pip if pip ends up there. This lets
+  # us run pip under sudo since /usr/local/bin is not typically available to
+  # sudo.
+  if not vm.TryRemoteCommand('sudo which pip'):
+    pip_location, _ = vm.RemoteCommand('which pip')
+    if pip_location.startswith('/usr/local/bin/pip'):
+      vm.RemoteCommand('sudo ln -s /usr/local/bin/pip /usr/bin/pip')
+
   vm.RemoteCommand('mkdir -p {0} && pip freeze > {0}/requirements.txt'.format(
       INSTALL_DIR))
 
