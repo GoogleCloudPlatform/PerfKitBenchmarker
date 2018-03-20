@@ -25,7 +25,6 @@ import json
 import logging
 import posixpath
 import threading
-import time
 import uuid
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -74,18 +73,17 @@ HOST_EXISTS_STATES = frozenset(
 HOST_RELEASED_STATES = frozenset(['released', 'released-permanent-failure'])
 KNOWN_HOST_STATES = HOST_EXISTS_STATES | HOST_RELEASED_STATES
 
-# See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-bid-status.html
-SPOT_INSTANCE_REQUEST_HOLDING_STATUSES = frozenset(
-    ['capacity-not-available', 'capacity-oversubscribed', 'price-too-low',
-     'not-scheduled-yet', 'launch-group-constraint', 'az-group-constraint',
-     'placement-group-constraint', 'constraint-not-fulfillable'])
-SPOT_INSTANCE_REQUEST_TERMINAL_STATUSES = frozenset(
-    ['schedule-expired', 'canceled-before-fulfillment', 'bad-parameters',
-     'system-error', 'request-canceled-and-instance-running',
-     'marked-for-termination', 'instance-terminated-by-price',
-     'instance-terminated-by-user', 'instance-terminated-no-capacity',
+AWS_INITIATED_SPOT_TERMINATING_TRANSITION_STATUSES = frozenset(
+    ['marked-for-termination', 'marked-for-stop'])
+
+AWS_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
+    ['instance-terminated-by-price', 'instance-terminated-by-service',
+     'instance-terminated-no-capacity',
      'instance-terminated-capacity-oversubscribed',
      'instance-terminated-launch-group-constraint'])
+
+USER_INITIATED_SPOT_TERMINAL_STATUSES = frozenset(
+    ['request-canceled-and-instance-running', 'instance-terminated-by-user'])
 
 
 class AwsTransitionalVmRetryableError(Exception):
@@ -284,7 +282,7 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
     result.update({
         'use_spot_instance': (option_decoders.BooleanDecoder,
                               {'default': False}),
-        'spot_price': (option_decoders.FloatDecoder, {'default': 0.0}),
+        'spot_price': (option_decoders.FloatDecoder, {'default': None}),
         'boot_disk_size': (option_decoders.IntDecoder, {'default': None})})
 
     return result
@@ -333,16 +331,17 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'spot_instance': self.use_spot_instance,
         'spot_price': self.spot_price,
     })
+    self.early_termination = False
+    self.spot_status_code = None
 
     if self.use_dedicated_host and util.IsRegion(self.zone):
       raise ValueError(
           'In order to use dedicated hosts, you must specify an availability '
           'zone, not a region ("zone" was %s).' % self.zone)
 
-    if self.use_spot_instance and self.spot_price <= 0.0:
+    if self.use_dedicated_host and self.use_spot_instance:
       raise ValueError(
-          'In order to use spot instances you must specify a spot price '
-          'greater than 0.0.')
+          'Tenancy=host is not supported for Spot Instances')
 
   @property
   def host_list(self):
@@ -484,13 +483,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a VM instance."""
-    if self.use_spot_instance:
-      self._CreateSpot()
-    else:
-      self._CreateOnDemand()
-
-  def _CreateOnDemand(self):
-    """Create an OnDemand VM instance."""
     placement = []
     if not util.IsRegion(self.zone):
       placement.append('AvailabilityZone=%s' % self.zone)
@@ -520,6 +512,17 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.append('--placement=%s' % placement)
     if self.user_data:
       create_cmd.append('--user-data=%s' % self.user_data)
+    if self.use_spot_instance:
+      instance_market_options = OrderedDict()
+      spot_options = OrderedDict()
+      spot_options['SpotInstanceType'] = 'one-time'
+      spot_options['InstanceInterruptionBehavior'] = 'terminate'
+      if self.spot_price:
+        spot_options['MaxPrice'] = str(self.spot_price)
+      instance_market_options['MarketType'] = 'spot'
+      instance_market_options['SpotOptions'] = spot_options
+      create_cmd.append(
+          '--instance-market-options=%s' % json.dumps(instance_market_options))
     _, stderr, _ = vm_util.IssueCommand(create_cmd)
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       logging.warning(
@@ -534,72 +537,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.client_token = str(uuid.uuid4())
       raise errors.Resource.RetryableCreationError()
     if 'InsufficientInstanceCapacity' in stderr:
+      if self.use_spot_instance:
+        self.spot_status_code = 'InsufficientSpotInstanceCapacity'
+        self.early_termination = True
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
-
-  def _CreateSpot(self):
-    """Create a Spot VM instance."""
-    placement = OrderedDict()
-    if not util.IsRegion(self.zone):
-      placement['AvailabilityZone'] = self.zone
-    if self.use_dedicated_host:
-      raise errors.Resource.CreationError(
-          'Tenancy=host is not supported for Spot Instances')
-    elif IsPlacementGroupCompatible(self.machine_type):
-      placement['GroupName'] = self.network.placement_group.name
-    block_device_map = GetBlockDeviceMap(self.machine_type,
-                                         self.boot_disk_size,
-                                         self.image,
-                                         self.region)
-    network_interface = [OrderedDict([
-        ('DeviceIndex', 0),
-        ('AssociatePublicIpAddress', True),
-        ('SubnetId', self.network.subnet.id)])]
-    launch_specification = OrderedDict([
-        ('ImageId', self.image),
-        ('InstanceType', self.machine_type),
-        ('KeyName', 'perfkit-key-%s' % FLAGS.run_uri),
-        ('Placement', placement)])
-    if block_device_map:
-      launch_specification['BlockDeviceMappings'] = json.loads(
-          block_device_map, object_pairs_hook=collections.OrderedDict)
-    launch_specification['NetworkInterfaces'] = network_interface
-    create_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'request-spot-instances',
-        '--region=%s' % self.region,
-        '--spot-price=%s' % self.spot_price,
-        '--client-token=%s' % self.client_token,
-        '--launch-specification=%s' % json.dumps(launch_specification,
-                                                 separators=(',', ':'))]
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
-    create_response = json.loads(stdout)
-    self.spot_instance_request_id = (
-        create_response['SpotInstanceRequests'][0]['SpotInstanceRequestId'])
-
-    util.AddDefaultTags(self.spot_instance_request_id, self.region)
-
-    while True:
-      describe_sir_cmd = util.AWS_PREFIX + [
-          '--region=%s' % self.region,
-          'ec2',
-          'describe-spot-instance-requests',
-          '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
-      stdout, _, _ = vm_util.IssueCommand(describe_sir_cmd)
-
-      sir_response = json.loads(stdout)['SpotInstanceRequests']
-      assert len(sir_response) == 1, 'Expected exactly 1 SpotInstanceRequest'
-
-      status_code = sir_response[0]['Status']['Code']
-
-      if (status_code in SPOT_INSTANCE_REQUEST_HOLDING_STATUSES or
-          status_code in SPOT_INSTANCE_REQUEST_TERMINAL_STATUSES):
-        message = sir_response[0]['Status']['Message']
-        raise errors.Resource.CreationError(message)
-      elif status_code == 'fulfilled':
-        self.id = sir_response[0]['InstanceId']
-        break
-
-      time.sleep(2)
+    if 'SpotMaxPriceTooLow' in stderr:
+      self.spot_status_code = 'SpotMaxPriceTooLow'
+      self.early_termination = True
+      raise errors.Resource.CreationError(stderr)
 
   def _Delete(self):
     """Delete a VM instance."""
@@ -618,6 +563,20 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
       vm_util.IssueCommand(cancel_cmd)
 
+  @vm_util.Retry(max_retries=5)
+  def UpdateInterruptibleVmStatus(self):
+    if hasattr(self, 'spot_instance_request_id'):
+      describe_cmd = util.AWS_PREFIX + [
+          '--region=%s' % self.region,
+          'ec2',
+          'describe-spot-instance-requests',
+          '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
+      stdout, _, _ = vm_util.IssueCommand(describe_cmd)
+      sir_response = json.loads(stdout)['SpotInstanceRequests']
+      self.spot_status_code = sir_response[0]['Status']['Code']
+      self.early_termination = (self.spot_status_code in
+                                AWS_INITIATED_SPOT_TERMINAL_STATUSES)
+
   @vm_util.Retry(poll_interval=1, log_errors=False,
                  retryable_exceptions=(AwsTransitionalVmRetryableError,))
   def _Exists(self):
@@ -635,16 +594,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-instances',
-        '--region=%s' % self.region]
-
-    if self.use_spot_instance:
-      if self.id:
-        describe_cmd.append('--instance-id=%s' % self.id)
-      else:
-        return False
-    else:
-      describe_cmd.append(
-          '--filter=Name=client-token,Values=%s' % self.client_token)
+        '--region=%s' % self.region,
+        '--filter=Name=client-token,Values=%s' % self.client_token]
 
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
@@ -656,6 +607,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     assert len(instances) == 1, 'Wrong number of instances.'
     status = instances[0]['State']['Name']
     self.id = instances[0]['InstanceId']
+    if self.use_spot_instance:
+      self.spot_instance_request_id = instances[0]['SpotInstanceRequestId']
+
     if status not in INSTANCE_KNOWN_STATUSES:
       raise AwsUnknownStatusError('Unknown status %s' % status)
     if status in INSTANCE_TRANSITIONAL_STATUSES:
@@ -702,6 +656,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
+    if self.use_spot_instance:
+      util.AddDefaultTags(self.spot_instance_request_id, self.region)
 
   def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
                                           filename):
@@ -720,6 +676,27 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.RemoteCommand('aws s3 cp s3://%s/%s/%s %s' % (
         FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
         posixpath.join(install_path, filename)))
+
+  def IsInterruptible(self):
+    """Returns whether this vm is an interruptible vm (spot vm).
+
+    Returns: True if this vm is an interruptible vm (spot vm).
+    """
+    return self.use_spot_instance
+
+  def WasInterrupted(self):
+    """Returns whether this spot vm was terminated early by AWS.
+
+    Returns: True if this vm was terminated early by AWS.
+    """
+    return self.early_termination
+
+  def GetVmStatusCode(self):
+    """Returns the early termination code if any.
+
+    Returns: Early termination code.
+    """
+    return self.spot_status_code
 
 
 class DebianBasedAwsVirtualMachine(AwsVirtualMachine,
