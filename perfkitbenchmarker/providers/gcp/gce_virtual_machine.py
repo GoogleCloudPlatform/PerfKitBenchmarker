@@ -569,7 +569,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       filename: The name of the file that was downloaded.
     """
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand('gsutil cp gs://%s/%s/%s %s' % (
+    self.RemoteCommand('gsutil -q cp gs://%s/%s/%s %s' % (
         FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
         posixpath.join(install_path, filename)))
 
