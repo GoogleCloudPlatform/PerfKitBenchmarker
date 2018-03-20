@@ -417,6 +417,44 @@ class BaseVirtualMachine(resource.BaseResource):
     """
     raise NotImplementedError()
 
+  def IsInterruptible(self):
+    """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
+
+    Caller must call UpdateInterruptibleVmStatus before calling this function
+    to make sure return value is up to date.
+
+    Returns:
+      True if this vm is a interruptible vm.
+    """
+    return False
+
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the status of the discounted vm.
+    """
+    pass
+
+  def WasInterrupted(self):
+    """Returns whether this interruptible vm was terminated early.
+
+    Caller must call UpdateInterruptibleVmStatus before calling this function
+    to make sure return value is up to date.
+
+    Returns:
+      True if this vm is a interruptible vm was terminated early.
+    """
+    return False
+
+  def GetVmStatusCode(self):
+    """Returns the vm status code if any.
+
+    Caller must call UpdateInterruptibleVmStatus before calling this function
+    to make sure return value is up to date.
+
+    Returns:
+      Vm status code.
+    """
+    return None
+
 
 class BaseOsMixin(object):
   """The base class for OS Mixin classes.
