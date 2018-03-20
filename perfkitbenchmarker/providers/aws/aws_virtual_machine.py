@@ -673,7 +673,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.Install('aws_credentials')
     self.Install('awscli')
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand('aws s3 cp s3://%s/%s/%s %s' % (
+    self.RemoteCommand('aws s3 cp --only-show-errors s3://%s/%s/%s %s' % (
         FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
         posixpath.join(install_path, filename)))
 
