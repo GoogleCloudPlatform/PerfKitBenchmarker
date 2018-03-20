@@ -14,9 +14,9 @@
 """Module containing cloud TPU models installation and cleanup functions."""
 from perfkitbenchmarker import flags
 FLAGS = flags.FLAGS
-CLOUD_TPU_MNIST_GIT = 'https://github.com/tensorflow/tpu-demos.git'
+CLOUD_TPU_MNIST_GIT = 'https://github.com/tensorflow/tpu.git'
 
-flags.DEFINE_string('cloud_tpu_mnist_commit_hash',
+flags.DEFINE_string('cloud_tpu_commit_hash',
                     'c44f52634e007694e7ccad1cffdf63f05b90c80e',
                     'git commit hash of desired cloud TPU models commit.')
 
@@ -25,16 +25,16 @@ def Install(vm):
   """Installs cloud TPU models on the VM."""
   vm.InstallPackages('git')
   vm.RemoteCommand('git clone %s' % CLOUD_TPU_MNIST_GIT, should_log=True)
-  vm.RemoteCommand('cd tpu-demos && git checkout %s' %
-                   FLAGS.cloud_tpu_mnist_commit_hash)
+  vm.RemoteCommand('cd tpu && git checkout %s' %
+                   FLAGS.cloud_tpu_commit_hash)
 
 
 def Uninstall(vm):
   """Uninstalls cloud TPU models on the VM."""
-  vm.RemoteCommand('rm -rf tpu-demos', should_log=True)
+  vm.RemoteCommand('rm -rf tpu', should_log=True)
 
 
 def GetCommit(vm):
-  stdout, _ = vm.RemoteCommand('cd tpu-demos && git rev-parse HEAD',
+  stdout, _ = vm.RemoteCommand('cd tpu && git rev-parse HEAD',
                                should_log=True)
   return stdout

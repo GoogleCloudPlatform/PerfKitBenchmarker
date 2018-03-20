@@ -122,6 +122,7 @@ BENCHMARK_SETS = {
             'hadoop_terasort',
             'hpcc',
             'hpcg',
+            'inception3',
             'iperf',
             'mesh_network',
             'mnist',
