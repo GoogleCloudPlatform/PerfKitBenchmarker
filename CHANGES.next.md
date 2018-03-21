@@ -134,3 +134,4 @@
 - Create destination directory for Azure blob storage downloads.
 - Made the pip package more robust by adding a symbolic link in /usr/bin if pip
   is installed in /usr/local/bin.
+  
