@@ -671,6 +671,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                           REMOTE_KEY_PATH)
       self.RemoteCommand(
           'echo "Host *\n  StrictHostKeyChecking no\n" > ~/.ssh/config')
+      self.RemoteCommand('chmod 600 ~/.ssh/config')
       self.has_private_key = True
 
   def TestAuthentication(self, peer):
