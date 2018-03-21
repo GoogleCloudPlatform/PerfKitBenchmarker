@@ -174,57 +174,55 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
     self.assertFalse(self.vm._Exists())
 
   def testCreateSpot(self):
-    vm_util.IssueCommand.side_effect = [(self.sir_response, None, None),
-                                        (self.sir_response, None, None)]
+    vm_util.IssueCommand.side_effect = [(None, '', None)]
 
-    self.vm._CreateSpot()
+    self.vm.use_spot_instance = True
+    self.vm._Create()
 
-    vm_util.IssueCommand.assert_any_call(
-        ['aws',
-         '--output',
-         'json',
-         'ec2',
-         'request-spot-instances',
-         '--region=us-east-1',
-         '--spot-price=123.45',
-         '--client-token=00000000-1111-2222-3333-444444444444',
-         '--launch-specification='
-         '{"ImageId":"ami-12345","InstanceType":"c3.large",'
-         '"KeyName":"perfkit-key-aaaaaa",'
-         '"Placement":{'
-         '"AvailabilityZone":"us-east-1a",'
-         '"GroupName":"placement_group_name"},'
-         '"BlockDeviceMappings":['
-         '{"VirtualName":"ephemeral0","DeviceName":"/dev/xvdb"},'
-         '{"VirtualName":"ephemeral1","DeviceName":"/dev/xvdc"}],'
-         '"NetworkInterfaces":[{"DeviceIndex":0,'
-         '"AssociatePublicIpAddress":true,"SubnetId":"subnet-id"}]}'])
     vm_util.IssueCommand.assert_called_with(
         ['aws',
          '--output',
          'json',
-         '--region=us-east-1',
          'ec2',
-         'describe-spot-instance-requests',
-         '--spot-instance-request-ids=sir-3wri5sgk'])
+         'run-instances',
+         '--region=us-east-1',
+         '--subnet-id=subnet-id',
+         '--associate-public-ip-address',
+         '--client-token=00000000-1111-2222-3333-444444444444',
+         '--image-id=ami-12345',
+         '--instance-type=c3.large',
+         '--key-name=perfkit-key-aaaaaa',
+         '--block-device-mappings=[{"VirtualName": "ephemeral0", '
+         '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
+         '"DeviceName": "/dev/xvdc"}]',
+         '--placement=AvailabilityZone=us-east-1a,'
+         'GroupName=placement_group_name',
+         '--instance-market-options={"MarketType": "spot", '
+         '"SpotOptions": {"SpotInstanceType": "one-time", '
+         '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
+         ]
+    )
+    self.vm.use_spot_instance = False
 
-  def testCreateSpotLowPriceFails(self):
-    response_low = json.loads(self.sir_response)
-    response_low['SpotInstanceRequests'][0]['Status']['Code'] = 'price-too-low'
-    response_low['SpotInstanceRequests'][0]['Status']['Message'] = (
-        'Your price is too low.')
-    response_cancel = (
-        '{"CancelledSpotInstanceRequests":'
-        '[{"State": "cancelled","SpotInstanceRequestId":"sir-2mcg43gk"}]}')
-    vm_util.IssueCommand.side_effect = [(self.sir_response, None, None),
-                                        (json.dumps(response_low), None, None),
-                                        (response_cancel, None, None)]
+  def testCreateSpotFailure(self):
+    stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
+              'the RunInstances operation (reached max retries: 4): '
+              'Insufficient capacity.')
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
 
-    self.assertRaises(errors.Resource.CreationError, self.vm._CreateSpot)
+    with self.assertRaises(
+        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+      self.vm.use_spot_instance = True
+      self.vm._Create()
+    self.assertEqual(e.exception.message, stderr)
+    self.assertEqual(self.vm.spot_status_code,
+                     'InsufficientSpotInstanceCapacity')
+    self.assertTrue(self.vm.early_termination)
+    self.vm.use_spot_instance = False
 
   def testDeleteCancelsSpotInstanceRequest(self):
     self.vm.spot_instance_request_id = 'sir-abc'
-
+    self.vm.use_spot_instance = True
     self.vm._Delete()
 
     vm_util.IssueCommand.assert_called_with(
@@ -235,6 +233,7 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
          'ec2',
          'cancel-spot-instance-requests',
          '--spot-instance-request-ids=sir-abc'])
+    self.vm.use_spot_instance = False
 
 
 class AwsIsRegionTestCase(unittest.TestCase):

@@ -365,7 +365,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.Install('azure_cli')
     self.Install('azure_credentials')
     destpath = posixpath.join(install_path, filename)
+    self.RemoteCommand('mkdir -p %s' % posixpath.dirname(destpath))
     self.RemoteCommand('az storage blob download '
+                       '--no-progress '
                        '--account-name %s '
                        '--container-name %s '
                        '--name %s '
