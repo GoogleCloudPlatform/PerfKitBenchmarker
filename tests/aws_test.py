@@ -200,7 +200,7 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
          '--instance-market-options={"MarketType": "spot", '
          '"SpotOptions": {"SpotInstanceType": "one-time", '
          '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
-        ]
+         ]
     )
     self.vm.use_spot_instance = False
 
