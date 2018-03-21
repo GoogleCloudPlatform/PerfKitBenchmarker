@@ -11,6 +11,7 @@
   build.
 - Renamed cuda_toolkit_8 to cuda_toolkit
 - Migrated cluster boot benchmark default machines to 'default_dual_core'.
+- Changed metric name in mnist and inception3.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers
@@ -27,6 +28,8 @@
 - Added memory as disk type for Linux only.
 - Added support for publishing individual dstat samples with
   `--dstat_publish_regex`.
+- Added Inception v3 benchmark that supports CPU, GPU and TPU. This benchmark is
+  the same as TensorFlow with inception3 for CPU and GPU.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -72,6 +75,10 @@
 - Added float16 support for TensorFlow and MXNet Benchmarks.
 - Added flag --mx_key_value_store in MNXnet benchmark.
 - Added `time_commands` flag to enable diagnostic timing of commands
+- Added image processing speed in mnist.
+- Updated cloud TPU model link.
+- Updated AWS spot instance creation and added
+  spot instance failure metadata support.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

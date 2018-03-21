@@ -14,10 +14,11 @@
 
 """Run MNIST benchmarks."""
 
+import copy
 import os
-import re
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cloud_tpu_models
 from perfkitbenchmarker.linux_packages import cuda_toolkit
@@ -49,14 +50,9 @@ mnist:
 flags.DEFINE_string('mnist_train_file',
                     'gs://tfrc-test-bucket/mnist-records/train.tfrecords',
                     'mnist train file for tensorflow')
-flags.DEFINE_bool('mnist_use_tpu', True, 'Use TPUs rather than plain CPUs')
 flags.DEFINE_string('mnist_model_dir', None, 'Estimator model directory')
-flags.DEFINE_integer('mnist_train_steps', 1000,
+flags.DEFINE_integer('mnist_train_steps', 2000,
                      'Total number of training steps')
-
-
-class MXParseOutputException(Exception):
-  pass
 
 
 def GetConfig(user_config):
@@ -76,13 +72,9 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
 
   Args:
     benchmark_spec: benchmark specification to update
-
-  Raises:
-    MXParseOutputException: Flag mnist_model_dir is empty.
-
   """
   benchmark_spec.train_file = FLAGS.mnist_train_file
-  benchmark_spec.use_tpu = FLAGS.mnist_use_tpu
+  benchmark_spec.use_tpu = benchmark_spec.cloud_tpu is not None
   benchmark_spec.model_dir = FLAGS.mnist_model_dir and os.path.join(
       FLAGS.mnist_model_dir, FLAGS.run_uri)
   benchmark_spec.train_steps = FLAGS.mnist_train_steps
@@ -127,34 +119,45 @@ def _CreateMetadataDict(benchmark_spec):
   return metadata
 
 
-def _ExtractThroughput(output):
+def _ExtractThroughput(regex, output, metadata, metric, unit):
   """Extract throughput from MNIST output.
 
   Args:
+    regex: string. Regular expression.
     output: MNIST output
+    metadata: dict. Additional metadata to include with the sample.
+    metric: string. Name of the metric within the benchmark.
+    unit: string. Units for 'value'.
 
   Returns:
-    throuput float
+    samples containing the throughput
   """
-  regex = r'INFO:tensorflow:global_step/sec: (\S+)'
-  match = re.findall(regex, str(output))
-  return sum(float(step) for step in match) / len(match)
+  matches = regex_util.ExtractAllMatches(regex, output)
+  samples = []
+  for index, value in enumerate(matches):
+    metadata_with_index = copy.deepcopy(metadata)
+    metadata_with_index['index'] = index
+    samples.append(sample.Sample(metric, float(value), unit,
+                                 metadata_with_index))
+  return samples
 
 
-def _MakeSamplesFromOutput(benchmark_spec, output):
+def MakeSamplesFromOutput(metadata, output):
   """Create a sample continaing the measured MNIST throughput.
 
   Args:
-    benchmark_spec: benchmark spec
+    metadata: dict contains all the metadata that reports.
     output: MNIST output
 
   Returns:
     a Sample containing the MNIST throughput
   """
-  metadata = _CreateMetadataDict(benchmark_spec)
-  global_step_sec = _ExtractThroughput(output)
-  return [sample.Sample('tensorflow', global_step_sec,
-                        'global_step/sec', metadata)]
+  samples = _ExtractThroughput(r'global_step/sec: (\S+)', output, metadata,
+                               'Global Steps Per Second', 'global_steps/sec')
+  if metadata['use_tpu']:
+    samples.extend(_ExtractThroughput(r'examples/sec: (\S+)', output, metadata,
+                                      'Examples Per Second', 'examples/sec'))
+  return samples
 
 
 def Run(benchmark_spec):
@@ -169,7 +172,7 @@ def Run(benchmark_spec):
   """
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
-  mnist_benchmark_dir = 'tpu-demos/cloud_tpu/models/mnist'
+  mnist_benchmark_dir = 'tpu/cloud_tpu/models/mnist'
   mnist_benchmark_cmd = (
       'python mnist.py --master={master} --train_file={train_file} '
       '--use_tpu={use_tpu} '
@@ -186,7 +189,8 @@ def Run(benchmark_spec):
                                      mnist_benchmark_cmd)
   run_command = 'cd %s && %s' % (mnist_benchmark_dir, mnist_benchmark_cmd)
   stdout, stderr = vm.RobustRemoteCommand(run_command, should_log=True)
-  return _MakeSamplesFromOutput(benchmark_spec, stdout + stderr)
+  return MakeSamplesFromOutput(_CreateMetadataDict(benchmark_spec),
+                               stdout + stderr)
 
 
 def Cleanup(unused_benchmark_spec):

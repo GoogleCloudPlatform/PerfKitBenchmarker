@@ -34,8 +34,9 @@ flags.DEFINE_string('s3_custom_endpoint', None,
                     'storage region.')
 flags.DEFINE_boolean('aws_spot_instances', False,
                      'Whether to use AWS spot instances for any AWS VMs.')
-flags.DEFINE_float('aws_spot_price', 0.0,
-                   'The spot price to bid for AWS spot instances.')
+flags.DEFINE_float('aws_spot_price', None,
+                   'The spot price to bid for AWS spot instances. Defaults '
+                   'to on-demand price when left as None.')
 flags.DEFINE_integer('aws_boot_disk_size', None,
                      'The boot disk size in GiB for AWS VMs.')
 flags.DEFINE_string('kops', 'kops',
