@@ -1323,6 +1323,25 @@ class ContainerizedDebianMixin(DebianMixin):
     # Copies the file to its final destination in the container
     target.ContainerCopy(file_name, remote_path)
 
+  def Install(self, package_name):
+    """Installs a PerfKit package on the VM."""
+    if not self.install_packages:
+      return
+
+    if not self._apt_updated:
+      super(ContainerizedDebianMixin, self).AptUpdate()
+      self._apt_updated = True
+
+    if package_name not in self._installed_packages:
+      package = linux_packages.PACKAGES[package_name]
+      # Check if there is a ContainerInstall method, then fallback to parent
+      # method
+      if hasattr(package, 'ContainerInstall'):
+        package.ContainerInstall(self)
+      else:
+        super(ContainerizedDebianMixin, self).Install(package_name)
+      self._installed_packages.add(package_name)
+
 
 class KernelRelease(object):
   """Holds the contents of the linux kernel version returned from uname -r."""

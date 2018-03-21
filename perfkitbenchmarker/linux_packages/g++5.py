@@ -32,3 +32,10 @@ def AptInstall(vm):
       'sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y; '
       'sudo apt-get update')
   vm.InstallPackages('g++-5')
+
+
+def ContainerInstall(vm):
+  """Installs the g++-5 package on the VM."""
+  # The ubuntu docker image used does not have apt-add-repository
+  vm.Install('apt-add-repository')
+  AptInstall(vm)

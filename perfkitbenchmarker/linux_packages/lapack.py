@@ -28,6 +28,7 @@ def _Install(vm):
   """Install LAPACK lib."""
   vm.Install('fortran')
   vm.Install('cmake')
+  vm.Install('wget')
   vm.RemoteCommand(
       'cd %s; wget %s; tar xf %s' % (
           vm_util.VM_TMP_DIR, LAPACK_URL, LAPACK_TAR))
