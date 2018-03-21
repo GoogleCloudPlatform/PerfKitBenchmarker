@@ -124,3 +124,6 @@
 - Fixed default behavior of using /usr/bin/time --quiet on all commands
 - Fixed ycsb failure when the same workload is ran more than once.
 - Fixed yum proxy config bug (GH-#1598 from @kopecpiotr)
+- Create destination directory for Azure blob storage downloads.
+- Made the pip package more robust by adding a symbolic link in /usr/bin if pip
+  is installed in /usr/local/bin.
