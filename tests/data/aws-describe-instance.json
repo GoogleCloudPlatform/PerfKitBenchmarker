@@ -18,8 +18,8 @@
                     },
                     "ClientToken": null,
                     "State": {
-                        "Name": "pending",
-                        "Code": 0
+                        "Code": 16,
+                        "Name": "running"
                     },
                     "RootDeviceType": "ebs",
                     "ImageId": "ami-acff23c4",

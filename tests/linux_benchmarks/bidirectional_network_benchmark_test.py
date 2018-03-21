@@ -76,7 +76,6 @@ class BidirectionalNetworkBenchmarkTestCase(unittest.TestCase):
     """Asserts results contains a sample matching metric/value/unit."""
     match = [r for r in results if (r.metric == metric and r.unit == unit and
                                     abs(r.value - value) < TOLERANCE)]
-    print metric + ',' + str(value) + ',' + unit
     self.assertEqual(1, len(match))
 
   def testRun(self):

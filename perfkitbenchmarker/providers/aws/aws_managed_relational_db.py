@@ -19,17 +19,16 @@ import json
 import logging
 import time
 from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.aws import util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
-
+from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 
 
-DEFAULT_MYSQL_VERSION = '5.7.11'
+DEFAULT_MYSQL_VERSION = '5.7.16'
 DEFAULT_POSTGRES_VERSION = '9.6.2'
 
 DEFAULT_MYSQL_PORT = 3306
@@ -85,8 +84,17 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     super(AwsManagedRelationalDb, self).__init__(managed_relational_db_spec)
     self.spec = managed_relational_db_spec
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
-    self.zone = self.spec.vm_spec.zone
-    self.region = util.GetRegionFromZone(self.zone)
+    self.cluster_id = None
+    self.all_instance_ids = []
+
+    if hasattr(self.spec, 'zones') and self.spec.zones is not None:
+      self.zones = self.spec.zones
+    else:
+      self.zones = [self.spec.vm_spec.zone]
+
+    self.region = util.GetRegionFromZones(self.zones)
+    self.subnets_owned_by_db = []
+    self.subnets_used_by_db = []
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
@@ -132,8 +140,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _GetNewZones(self):
     """Returns a list of zones, excluding the one that the client VM is in."""
-    zone = self.spec.vm_spec.zone
-    region = util.GetRegionFromZone(zone)
+    zones = self.zones
+    region = self.region
     get_zones_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-availability-zones',
@@ -143,8 +151,43 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     response = json.loads(stdout)
     all_zones = [item['ZoneName'] for item in response['AvailabilityZones']
                  if item['State'] == 'available']
-    all_zones.remove(zone)
+    for zone in zones:
+      all_zones.remove(zone)
     return all_zones
+
+  def _CreateSubnetInZone(self, new_subnet_zone):
+    """Creates a new subnet in the same region as the client VM.
+
+    Args:
+      new_subnet_zone: The zone for the subnet to be created.
+                       Must be in the same region as the client
+
+    Returns:
+      the new subnet resource
+    """
+    cidr = self.client_vm.network.regional_network.vpc.NextSubnetCidrBlock()
+    logging.info('Attempting to create a subnet in zone %s' % new_subnet_zone)
+    new_subnet = (
+        aws_network.AwsSubnet(
+            new_subnet_zone,
+            self.client_vm.network.regional_network.vpc.id,
+            cidr))
+    new_subnet.Create()
+    logging.info('Successfully created a new subnet, subnet id is: %s',
+                 new_subnet.id)
+
+    # save for cleanup
+    self.subnets_used_by_db.append(new_subnet)
+    self.subnets_owned_by_db.append(new_subnet)
+    return new_subnet
+
+  def _CreateSubnetInAllZonesAssumeClientZoneExists(self):
+    client_zone = self.client_vm.network.subnet.zone
+    for zone in self.zones:
+      if zone != client_zone:
+        self._CreateSubnetInZone(zone)
+      else:
+        self.subnets_used_by_db.append(self.client_vm.network.subnet)
 
   def _CreateSubnetInAdditionalZone(self):
     """Creates a new subnet in the same region as the client VM.
@@ -155,50 +198,38 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       the new subnet resource
 
     Raises:
-      Exception if unable to create a subnet in any zones in the region.
+      Exception: if unable to create a subnet in any zones in the region.
     """
     new_subnet_zones = self._GetNewZones()
     while len(new_subnet_zones) >= 1:
       try:
         new_subnet_zone = new_subnet_zones.pop()
-        logging.info('Attempting to create a second subnet in zone %s',
-                     new_subnet_zone)
-        new_subnet = (
-            aws_network.AwsSubnet(
-                new_subnet_zone,
-                self.client_vm.network.regional_network.vpc.id,
-                '10.0.1.0/24'))
-        new_subnet.Create()
-        logging.info('Successfully created a new subnet, subnet id is: %s',
-                     new_subnet.id)
-
-        # save for cleanup
-        self.extra_subnet_for_db = new_subnet
+        new_subnet = self._CreateSubnetInZone(new_subnet_zone)
         return new_subnet
       except:
         logging.info('Unable to create subnet in zone %s', new_subnet_zone)
     raise Exception('Unable to create subnet in any availability zones')
 
-  def _CreateDbSubnetGroup(self, new_subnet):
+  def _CreateDbSubnetGroup(self, subnets):
     """Creates a new db subnet group.
 
-    The db subnet group will consit of two zones: the client vm zone,
-    and another zone in the same region.
-
     Args:
-      new_subnet: a subnet in the same region as the client VM's subnet
+      subnets: a list of strings.
+               The db subnet group will consit of all subnets in this list.
     """
-    zone = self.spec.vm_spec.zone
-    region = util.GetRegionFromZone(zone)
     db_subnet_group_name = 'pkb-db-subnet-group-{0}'.format(FLAGS.run_uri)
+
     create_db_subnet_group_cmd = util.AWS_PREFIX + [
         'rds',
         'create-db-subnet-group',
         '--db-subnet-group-name', db_subnet_group_name,
         '--db-subnet-group-description', 'pkb_subnet_group_for_db',
-        '--subnet-ids', self.client_vm.network.subnet.id, new_subnet.id,
-        '--region', region]
-    stdout, stderr, _ = vm_util.IssueCommand(create_db_subnet_group_cmd)
+        '--region', self.region,
+        '--subnet-ids']
+    for subnet in subnets:
+      create_db_subnet_group_cmd.append(subnet.id)
+
+    vm_util.IssueCommand(create_db_subnet_group_cmd)
 
     # save for cleanup
     self.db_subnet_group_name = db_subnet_group_name
@@ -207,10 +238,17 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
   def _SetupNetworking(self):
     """Sets up the networking required for the RDS database."""
-    zone = self.spec.vm_spec.zone
-    region = util.GetRegionFromZone(zone)
-    new_subnet = self._CreateSubnetInAdditionalZone()
-    self._CreateDbSubnetGroup(new_subnet)
+    if (self.spec.engine == managed_relational_db.MYSQL or
+        self.spec.engine == managed_relational_db.POSTGRES):
+      self.subnets_used_by_db.append(self.client_vm.network.subnet)
+      self._CreateSubnetInAdditionalZone()
+    elif self.spec.engine == managed_relational_db.AURORA_POSTGRES:
+      self._CreateSubnetInAllZonesAssumeClientZoneExists()
+    else:
+      raise Exception('Unknown how to create network for {0}'.format(
+          self.spec.engine))
+
+    self._CreateDbSubnetGroup(self.subnets_used_by_db)
 
     open_port_cmd = util.AWS_PREFIX + [
         'ec2',
@@ -219,56 +257,116 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         '--source-group', self.security_group_id,
         '--protocol', 'tcp',
         '--port={0}'.format(DEFAULT_POSTGRES_PORT),
-        '--region', region]
+        '--region', self.region]
     stdout, stderr, _ = vm_util.IssueCommand(open_port_cmd)
     logging.info('Granted DB port ingress, stdout is:\n%s\nstderr is:\n%s',
                  stdout, stderr)
 
   def _TeardownNetworking(self):
     """Tears down all network resources that were created for the database."""
-    zone = self.spec.vm_spec.zone
-    region = util.GetRegionFromZone(zone)
     if hasattr(self, 'db_subnet_group_name'):
       delete_db_subnet_group_cmd = util.AWS_PREFIX + [
           'rds',
           'delete-db-subnet-group',
           '--db-subnet-group-name', self.db_subnet_group_name,
-          '--region', region]
-      stdout, stderr, _ = vm_util.IssueCommand(delete_db_subnet_group_cmd)
+          '--region', self.region]
+      vm_util.IssueCommand(delete_db_subnet_group_cmd)
 
-    if hasattr(self, 'extra_subnet_for_db'):
-      self.extra_subnet_for_db.Delete()
+    for subnet_for_db in self.subnets_owned_by_db:
+      subnet_for_db.Delete()
 
   def _Create(self):
-    """Creates the AWS RDS instance."""
-    cmd = util.AWS_PREFIX + [
-        'rds',
-        'create-db-instance',
-        '--db-instance-identifier=%s' % self.instance_id,
-        '--engine=%s' % self.spec.engine,
-        '--master-username=%s' % self.spec.database_username,
-        '--master-user-password=%s' % self.spec.database_password,
-        '--allocated-storage=%s' % self.spec.disk_spec.disk_size,
-        '--storage-type=%s' % self.spec.disk_spec.disk_type,
-        '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
-        '--no-auto-minor-version-upgrade',
-        '--region=%s' % self.region,
-        '--engine-version=%s' % self.spec.engine_version,
-        '--db-subnet-group-name=%s' % self.db_subnet_group_name,
-        '--vpc-security-group-ids=%s' % self.security_group_id,
-    ]
+    """Creates the AWS RDS instance.
 
-    if self.spec.disk_spec.disk_type == aws_disk.IO1:
-      cmd.append('--iops=%s' % self.spec.disk_spec.iops)
+    Raises:
+      Exception: if unknown how to create self.spec.engine.
 
-    if self.spec.high_availability:
-      cmd.append('--multi-az')
+    """
+    if (self.spec.engine == managed_relational_db.MYSQL or
+        self.spec.engine == managed_relational_db.POSTGRES):
+
+      instance_identifier = self.instance_id
+      self.all_instance_ids.append(instance_identifier)
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'create-db-instance',
+          '--db-instance-identifier=%s' % instance_identifier,
+          '--engine=%s' % self.spec.engine,
+          '--master-username=%s' % self.spec.database_username,
+          '--master-user-password=%s' % self.spec.database_password,
+          '--allocated-storage=%s' % self.spec.disk_spec.disk_size,
+          '--storage-type=%s' % self.spec.disk_spec.disk_type,
+          '--db-instance-class=%s' % self.spec.vm_spec.machine_type,
+          '--no-auto-minor-version-upgrade',
+          '--region=%s' % self.region,
+          '--engine-version=%s' % self.spec.engine_version,
+          '--db-subnet-group-name=%s' % self.db_subnet_group_name,
+          '--vpc-security-group-ids=%s' % self.security_group_id,
+          '--availability-zone=%s' % self.spec.vm_spec.zone
+      ]
+
+      if self.spec.disk_spec.disk_type == aws_disk.IO1:
+        cmd.append('--iops=%s' % self.spec.disk_spec.iops)
+      # TODO(ferneyhough): add backup_enabled and backup_window
+
+      vm_util.IssueCommand(cmd)
+
+    elif self.spec.engine == managed_relational_db.AURORA_POSTGRES:
+
+      zones_needed_for_high_availability = len(self.zones) > 1
+      if zones_needed_for_high_availability != self.spec.high_availability:
+        raise Exception('When managed_db_high_availability is true, multiple '
+                        'zones must be specified.  When '
+                        'managed_db_high_availability is false, one zone '
+                        'should be specified.   '
+                        'managed_db_high_availability: {0}  '
+                        'zone count: {1} '.format(
+                            zones_needed_for_high_availability,
+                            len(self.zones)))
+
+      cluster_identifier = 'pkb-db-cluster-' + FLAGS.run_uri
+      # Create the cluster.
+      cmd = util.AWS_PREFIX + [
+          'rds', 'create-db-cluster',
+          '--db-cluster-identifier=%s' % cluster_identifier,
+          '--engine=aurora-postgresql',
+          '--master-username=%s' % self.spec.database_username,
+          '--master-user-password=%s' % self.spec.database_password,
+          '--region=%s' % self.region,
+          '--db-subnet-group-name=%s' % self.db_subnet_group_name,
+          '--vpc-security-group-ids=%s' % self.security_group_id,
+          '--availability-zones=%s' % self.spec.zones[0]
+      ]
+      self.cluster_id = cluster_identifier
+      vm_util.IssueCommand(cmd)
+
+      for zone in self.zones:
+
+        # The first instance is assumed to be writer -
+        # and so use the instance_id  for that id.
+        if zone == self.zones[0]:
+          instance_identifier = self.instance_id
+        else:
+          instance_identifier = self.instance_id + '-' + zone
+
+        self.all_instance_ids.append(instance_identifier)
+
+        cmd = util.AWS_PREFIX + [
+            'rds',
+            'create-db-instance',
+            '--db-instance-identifier=%s' % instance_identifier,
+            '--db-cluster-identifier=%s' % cluster_identifier,
+            '--engine=aurora-postgresql',
+            '--no-auto-minor-version-upgrade',
+            '--db-instance-class=%s' % self.spec.machine_type,
+            '--region=%s' % self.region,
+            '--availability-zone=%s' % zone
+        ]
+        vm_util.IssueCommand(cmd)
+
     else:
-      cmd.append('--availability-zone=%s' % self.spec.vm_spec.zone)
-
-    # TODO(ferneyhough): add backup_enabled and backup_window
-
-    vm_util.IssueCommand(cmd)
+      raise Exception('Unknown how to create AWS data base engine {0}'.format(
+          self.spec.engine))
 
   def _Delete(self):
     """Deletes the underlying resource.
@@ -277,14 +375,25 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
-    cmd = util.AWS_PREFIX + [
-        'rds',
-        'delete-db-instance',
-        '--db-instance-identifier=%s' % self.instance_id,
-        '--skip-final-snapshot',
-        '--region', self.region,
-    ]
-    vm_util.IssueCommand(cmd)
+    for current_instance_id in self.all_instance_ids:
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'delete-db-instance',
+          '--db-instance-identifier=%s' % current_instance_id,
+          '--skip-final-snapshot',
+          '--region', self.region,
+      ]
+      vm_util.IssueCommand(cmd)
+
+    if self.cluster_id is not None:
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'delete-db-cluster',
+          '--db-cluster-identifier=%s' % self.cluster_id,
+          '--skip-final-snapshot',
+          '--region', self.region,
+      ]
+      vm_util.IssueCommand(cmd)
 
   def _Exists(self):
     """Returns true if the underlying resource exists.
@@ -293,14 +402,18 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     default is to assume success when _Create and _Delete do not raise
     exceptions.
     """
-    cmd = util.AWS_PREFIX + [
-        'rds',
-        'describe-db-instances',
-        '--db-instance-identifier=%s' % self.instance_id,
-        '--region=%s' % self.region
-    ]
-    _, _, retcode = vm_util.IssueCommand(cmd)
-    return retcode == 0
+    for current_instance_id in self.all_instance_ids:
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'describe-db-instances',
+          '--db-instance-identifier=%s' % current_instance_id,
+          '--region=%s' % self.region
+      ]
+      _, _, retcode = vm_util.IssueCommand(cmd)
+      if retcode != 0:
+        return False
+
+    return True
 
   def _ParseEndpoint(self, describe_instance_json):
     """Parses the json output from the CLI and returns the endpoint.
@@ -324,6 +437,8 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       port on which the server is listening, as an int
     """
+    if describe_instance_json is None:
+      return None
     return int(describe_instance_json['DBInstances'][0]['Endpoint']['Port'])
 
   def _SavePrimaryAndSecondaryZones(self, describe_instance_json):
@@ -342,7 +457,7 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
 
-    This method will query the instance every 5 seconds until
+    This method will query all of the instance every 5 seconds until
     its instance state is 'available', or until a timeout occurs.
 
     Args:
@@ -350,48 +465,115 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
 
     Returns:
       True if the resource was ready in time, False if the wait timed out
-        or an Exception occured.
+        or an Exception occurred.
     """
-    cmd = util.AWS_PREFIX + [
-        'rds',
-        'describe-db-instances',
-        '--db-instance-identifier=%s' % self.instance_id,
-        '--region=%s' % self.region
-    ]
+
+    if len(self.all_instance_ids) == 0:
+      return False
+
+    for instance_id in self.all_instance_ids:
+      if not self._IsInstanceReady(instance_id, timeout):
+        return False
+
+    return True
+
+  def _PostCreate(self):
+    """Perform general post create operations on the cluster.
+
+    Raises:
+       Exception:  If could not ready the instance after modification to
+                   multi-az.
+    """
+
+    need_ha_modification = (self.spec.engine == managed_relational_db.MYSQL or
+                            self.spec.engine == managed_relational_db.POSTGRES)
+
+    if self.spec.high_availability and need_ha_modification:
+      # When extending the database to be multi-az, the second region
+      # is picked by where the second subnet has been created.
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'modify-db-instance',
+          '--db-instance-identifier=%s' % self.instance_id,
+          '--multi-az',
+          '--apply-immediately',
+          '--region=%s' % self.region
+      ]
+      vm_util.IssueCommand(cmd)
+
+      if not self._IsInstanceReady(self.instance_id, timeout=IS_READY_TIMEOUT):
+        raise Exception('Instance could not be set to ready after '
+                        'modification for high availability')
+
+    json_output = self._DescribeInstance(self.instance_id)
+    self._SavePrimaryAndSecondaryZones(json_output)
+    self._GetPortsForWriterInstance(self.all_instance_ids[0])
+
+  def _IsInstanceReady(self, instance_id, timeout=IS_READY_TIMEOUT):
+    """Return true if the instance is ready.
+
+    This method will query the instance every 5 seconds until
+    its instance state is 'available', or until a timeout occurs.
+
+    Args:
+      instance_id: string of the instance to check is ready
+      timeout: timeout in seconds
+
+    Returns:
+      True if the resource was ready in time, False if the wait timed out
+        or an Exception occurred.
+    """
     start_time = datetime.datetime.now()
 
     while True:
       if (datetime.datetime.now() - start_time).seconds >= timeout:
         logging.exception('Timeout waiting for sql instance to be ready')
         return False
-      stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
-
+      json_output = self._DescribeInstance(instance_id)
       try:
-        json_output = json.loads(stdout)
         state = json_output['DBInstances'][0]['DBInstanceStatus']
-        logging.info('Instance state: {0}'.format(state))
-        if state == 'available':
-          self._SavePrimaryAndSecondaryZones(json_output)
+        pending_values = json_output['DBInstances'][0]['PendingModifiedValues']
+        logging.info('Instance state: %s', state)
+        if pending_values:
+          logging.info('Pending values: %s', (str(pending_values)))
+
+        if state == 'available' and not pending_values:
           break
       except:
         logging.exception('Error attempting to read stdout. Creation failure.')
         return False
       time.sleep(5)
 
+    return True
+
+  def _DescribeInstance(self, instance_id):
+    cmd = util.AWS_PREFIX + [
+        'rds',
+        'describe-db-instances',
+        '--db-instance-identifier=%s' % instance_id,
+        '--region=%s' % self.region
+    ]
+    stdout, _, _ = vm_util.IssueCommand(cmd, suppress_warning=True)
+    json_output = json.loads(stdout)
+    return json_output
+
+  def _GetPortsForWriterInstance(self, instance_id):
+    """Assigns the ports and endpoints from the instance_id to self.
+
+    These will be used to communicate with the data base, tje
+    """
+    json_output = self._DescribeInstance(instance_id)
     self.endpoint = self._ParseEndpoint(json_output)
     self.port = self._ParsePort(json_output)
-    return True
 
   def _AssertClientAndDbInSameRegion(self):
     """Asserts that the client vm is in the same region requested by the server.
 
     Raises:
-      AwsManagedRelationalDbCrossRegionException if the client vm is in a
+      AwsManagedRelationalDbCrossRegionException: if the client vm is in a
         different region that is requested by the server.
     """
-    client_region = self.client_vm.region
-    db_region = util.GetRegionFromZone(self.zone)
-    if client_region != db_region:
+    if self.client_vm.region != self.region:
       raise AwsManagedRelationalDbCrossRegionException((
           'client_vm and managed_relational_db server '
           'must be in the same region'))

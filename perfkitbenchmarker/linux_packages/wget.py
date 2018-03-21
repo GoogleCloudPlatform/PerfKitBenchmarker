@@ -16,16 +16,6 @@
 """Module containing wget installation and cleanup functions."""
 
 
-def _Install(vm):
+def Install(vm):
   """Installs the wget package on the VM."""
   vm.InstallPackages('wget')
-
-
-def YumInstall(vm):
-  """Installs the wget package on the VM."""
-  _Install(vm)
-
-
-def AptInstall(vm):
-  """Installs the wget package on the VM."""
-  _Install(vm)

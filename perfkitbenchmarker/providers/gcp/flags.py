@@ -11,8 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing flags applicable across benchmark run on GCP."""
 
 from perfkitbenchmarker import flags
+
+# Sentinel value for unspecified platform.
+GCP_MIN_CPU_PLATFORM_NONE = 'none'
 
 flags.DEFINE_string('gcloud_path',
                     'gcloud',
@@ -29,6 +33,10 @@ flags.DEFINE_boolean('gce_migrate_on_maintenance', True, 'If true, allow VM '
                      'migration on GCE host maintenance.')
 flags.DEFINE_boolean('gce_preemptible_vms', False, 'If true, use preemptible '
                      'VMs on GCE.')
+flags.DEFINE_string(
+    'image_family', None, 'The family of the image that the boot disk will be '
+    'initialized with. The --image flag will take priority over this flag. See:'
+    ' https://cloud.google.com/sdk/gcloud/reference/compute/instances/create')
 flags.DEFINE_string(
     'image_project', None, 'The project against which all image references will'
     ' be resolved. See: '
@@ -77,6 +85,15 @@ flags.DEFINE_string(
     'The host type of all sole tenant hosts that get created.')
 flags.DEFINE_enum(
     'gcp_min_cpu_platform', None,
-    ['sandybridge', 'ivybridge', 'haswell', 'broadwell', 'skylake'],
+    [GCP_MIN_CPU_PLATFORM_NONE, 'sandybridge', 'ivybridge', 'haswell', 'broadwell', 'skylake'],
     'When specified, the VM will have either the specified '
     'architecture or a newer one. Architecture availability is zone dependent.')
+flags.DEFINE_string(
+    'gce_accelerator_type_override', None,
+    'When specified, override the accelerator_type string passed to the gcloud '
+    'compute instance create command.')
+flags.DEFINE_string(
+    'gcp_preprovisioned_data_bucket', None,
+    'GCS bucket where pre-provisioned data has been copied.')
+flags.DEFINE_integer(
+    'gcp_redis_gb', 5, 'Size of redis cluster in gb')

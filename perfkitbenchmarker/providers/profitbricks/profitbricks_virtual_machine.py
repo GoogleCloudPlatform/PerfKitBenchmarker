@@ -139,6 +139,8 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
           flag_values.profitbricks_boot_volume_size
     if flag_values['availability_zone'].present:
       config_values['availability_zone'] = flag_values.availability_zone
+    if flag_values['profitbricks_image_alias'].present:
+      config_values['image_alias'] = flag_values.profitbricks_image_alias
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -153,6 +155,7 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
     result.update({
         'machine_type': (MachineTypeDecoder, {}),
         'location': (option_decoders.StringDecoder, {'default': 'us/las'}),
+        'image_alias': (option_decoders.StringDecoder, {'default': None}),
         'boot_volume_type': (option_decoders.StringDecoder, {'default': 'HDD'}),
         'boot_volume_size': (option_decoders.IntDecoder, {'default': 10,
                                                           'min': 10}),
@@ -194,6 +197,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.cores = vm_spec.cores
         self.machine_type = vm_spec.machine_type
         self.image = self.image or self.DEFAULT_IMAGE
+        self.image_alias = vm_spec.image_alias
         self.boot_volume_type = vm_spec.boot_volume_type
         self.boot_volume_size = vm_spec.boot_volume_size
         self.location = vm_spec.location
@@ -212,8 +216,9 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         with open(self.ssh_public_key) as f:
             public_key = f.read().rstrip('\n')
 
-        # Find an Ubuntu image that matches our location
-        self.image = util.ReturnImage(self.header, self.location)
+        if self.image_alias is None:
+            # Find an Ubuntu image that matches our location
+            self.image = util.ReturnImage(self.header, self.location)
 
         # Create server POST body
         new_server = {
@@ -231,6 +236,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
                                 'size': self.boot_volume_size,
                                 'name': 'boot volume',
                                 'image': self.image,
+                                'imageAlias': self.image_alias,
                                 'type': self.boot_volume_type,
                                 'sshKeys': [public_key],
                                 'availabilityZone': self.availability_zone

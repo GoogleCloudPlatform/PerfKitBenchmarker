@@ -21,15 +21,12 @@ without pre-provisioning container clusters. In the future, this may be
 expanded to support first-class container benchmarks.
 """
 
-import abc
-
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-_CLUSTER_REGISTRY = {}
 
 flags.DEFINE_string('kubeconfig', None,
                     'Path to kubeconfig to be used by kubectl. '
@@ -44,6 +41,10 @@ flags.DEFINE_string('container_cluster_cloud', None,
                     'This will override both the value set in the config and '
                     'the value set using the generic "cloud" flag.')
 
+flags.DEFINE_integer('container_cluster_num_vms', None,
+                     'Number of nodes in the cluster. Defaults to '
+                     'container_cluster.vm_count')
+
 
 @events.benchmark_start.connect
 def _SetKubeConfig(unused_sender, benchmark_spec):
@@ -56,27 +57,20 @@ def _SetKubeConfig(unused_sender, benchmark_spec):
 
 
 def GetContainerClusterClass(cloud):
-  return _CLUSTER_REGISTRY[cloud]
-
-
-class AutoRegisterContainerClusterMeta(abc.ABCMeta):
-  """Metaclass to auto register container cluster classes."""
-
-  def __init__(cls, name, bases, dct):
-    if cls.CLOUD:
-      _CLUSTER_REGISTRY[cls.CLOUD] = cls
+  return resource.GetResourceClass(BaseContainerCluster, CLOUD=cloud)
 
 
 class BaseContainerCluster(resource.BaseResource):
   """A cluster that can be used to schedule containers."""
 
-  __metaclass__ = AutoRegisterContainerClusterMeta
-  CLOUD = None
+  RESOURCE_TYPE = 'BaseContainerCluster'
 
   def __init__(self, spec):
     super(BaseContainerCluster, self).__init__()
     self.name = 'pkb-%s' % FLAGS.run_uri
     self.machine_type = spec.vm_spec.machine_type
+    self.gpu_count = spec.vm_spec.gpu_count
+    self.gpu_type = spec.vm_spec.gpu_type
     self.zone = spec.vm_spec.zone
     self.num_nodes = spec.vm_count
 
@@ -88,6 +82,11 @@ class BaseContainerCluster(resource.BaseResource):
         'zone': self.zone,
         'size': self.num_nodes,
     }
+    if self.gpu_count:
+      metadata.update({
+          'gpu_type': self.gpu_type,
+          'num_gpus': self.gpu_count,
+      })
     return metadata
 
 

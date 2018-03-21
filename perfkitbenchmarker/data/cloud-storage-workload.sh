@@ -29,4 +29,6 @@ if [ -z "$1" ] || [ "$1" == "normal" ]; then
   for i in {96..99}; do dd bs=1MB count=32 if=/dev/urandom of=file-$i.dat; done
 elif [ "$1" == "large" ]; then
   dd bs=1M count=3072 if=/dev/urandom of=file_large_3gib.dat
+elif [ "$1" == "single_file" ]; then
+  dd bs=1M count=$2 if=/dev/urandom of=single_file.dat
 fi

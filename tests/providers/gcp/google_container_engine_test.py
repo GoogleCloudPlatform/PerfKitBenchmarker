@@ -19,6 +19,7 @@ import unittest
 import contextlib2
 import mock
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import google_container_engine
@@ -27,6 +28,8 @@ from tests import mock_flags
 
 _COMPONENT = 'test_component'
 _RUN_URI = 'fake-urn-uri'
+_NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.9/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
+_NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 
 
 @contextlib2.contextmanager
@@ -35,6 +38,7 @@ def patch_critical_objects(stdout='', stderr='', return_code=0):
     flags = mock_flags.MockFlags()
     flags.gcloud_path = 'gcloud'
     flags.run_uri = _RUN_URI
+    flags.data_search_paths = ''
 
     stack.enter_context(mock_flags.PatchFlags(flags))
     stack.enter_context(mock.patch('__builtin__.open'))
@@ -50,25 +54,26 @@ def patch_critical_objects(stdout='', stderr='', return_code=0):
     yield issue_command
 
 
-def create_container_engine_spec():
-  container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
-      'NAME', **{
-          'cloud': 'GCP',
-          'os_type': 'debian',
-          'vm_spec': {
-              'GCP': {
-                  'machine_type': 'fake-machine-type'
-              },
-          },
-          'vm_count': 2,
-      })
-  return container_engine_spec
-
-
 class GoogleContainerEngineTestCase(unittest.TestCase):
 
+  @staticmethod
+  def create_container_engine_spec():
+    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'os_type': 'debian',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a'
+                },
+            },
+            'vm_count': 2,
+        })
+    return container_engine_spec
+
   def testCreate(self):
-    spec = create_container_engine_spec()
+    spec = self.create_container_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_container_engine.GkeCluster(spec)
       cluster._Create()
@@ -78,9 +83,10 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
       self.assertIn('gcloud container clusters create', command_string)
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
+      self.assertIn('--zone us-central1-a', command_string)
 
   def testPostCreate(self):
-    spec = create_container_engine_spec()
+    spec = self.create_container_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_container_engine.GkeCluster(spec)
       cluster._PostCreate()
@@ -93,7 +99,7 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
 
   def testDelete(self):
-    spec = create_container_engine_spec()
+    spec = self.create_container_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_container_engine.GkeCluster(spec)
       cluster._Delete()
@@ -102,9 +108,10 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud container clusters delete pkb-{0}'.format(_RUN_URI),
                     command_string)
+      self.assertIn('--zone us-central1-a', command_string)
 
   def testExists(self):
-    spec = create_container_engine_spec()
+    spec = self.create_container_engine_spec()
     with patch_critical_objects() as issue_command:
       cluster = google_container_engine.GkeCluster(spec)
       cluster._Exists()
@@ -116,5 +123,64 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
           command_string)
 
 
-if __name__ == '__main__':
-  unittest.main()
+class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
+
+  @staticmethod
+  def create_container_engine_spec():
+    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'os_type': 'debian',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'gpu_type': 'k80',
+                    'gpu_count': 2,
+                },
+            },
+            'vm_count': 2,
+        })
+    return container_engine_spec
+
+  def testCreate(self):
+    spec = self.create_container_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud beta container clusters create', command_string)
+      self.assertIn('--cluster-version 1.9.2-gke.1', command_string)
+      self.assertIn('--num-nodes 2', command_string)
+      self.assertIn('--machine-type fake-machine-type', command_string)
+      self.assertIn('--accelerator type=nvidia-tesla-k80,count=2',
+                    command_string)
+
+  @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')
+  def testPostCreate(self, create_from_file_patch):
+    spec = self.create_container_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      cluster._PostCreate()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn(
+          'gcloud container clusters get-credentials pkb-{0}'.format(_RUN_URI),
+          command_string)
+      self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
+
+      expected_args_to_create_from_file = (
+          _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT,
+          data.ResourcePath(
+              _NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET)
+      )
+      expected_calls = [mock.call(arg)
+                        for arg in expected_args_to_create_from_file]
+
+      # Assert that create_from_file was called twice,
+      # and that the args were as expected (should be the NVIDIA
+      # driver setup daemon set, followed by the
+      # NVIDIA unrestricted permissions daemon set.
+      create_from_file_patch.assert_has_calls(expected_calls)

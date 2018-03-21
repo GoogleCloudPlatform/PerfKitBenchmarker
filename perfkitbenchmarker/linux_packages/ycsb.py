@@ -98,8 +98,7 @@ flags.DEFINE_boolean('ycsb_reload_database', True,
                      'Reload database, othewise skip load stage. '
                      'Note, this flag is only used if the database '
                      'is already loaded.')
-flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.',
-                     lower_bound=1)
+flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.')
 flags.DEFINE_list('ycsb_workload_files', ['workloada', 'workloadb'],
                   'Path to YCSB workload file to use during *run* '
                   'stage only. Comma-separated list')
@@ -122,6 +121,8 @@ flags.DEFINE_integer('ycsb_operation_count', 1000000, 'Number of operations '
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination. Set to 0 for '
                      'unlimited time.')
+flags.DEFINE_integer('ycsb_field_count', 10, 'Number of fields in a record.')
+flags.DEFINE_integer('ycsb_field_length', 100, 'Size of each field.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -609,7 +610,7 @@ class YCSBExecutor(object):
 
     def PushWorkload(vm):
       vm.PushFile(workload_file, remote_path)
-    vm_util.RunThreaded(PushWorkload, vms)
+    vm_util.RunThreaded(PushWorkload, list(set(vms)))
 
     kwargs['parameter_files'] = [remote_path]
 
@@ -719,7 +720,9 @@ class YCSBExecutor(object):
     all_results = []
     for workload_index, workload_file in enumerate(workloads):
       parameters = {'operationcount': FLAGS.ycsb_operation_count,
-                    'recordcount': FLAGS.ycsb_record_count}
+                    'recordcount': FLAGS.ycsb_record_count,
+                    'fieldcount': FLAGS.ycsb_field_count,
+                    'fieldlength': FLAGS.ycsb_field_length}
       if FLAGS.ycsb_timelimit:
         parameters['maxexecutiontime'] = FLAGS.ycsb_timelimit
       parameters.update(kwargs)
@@ -733,9 +736,11 @@ class YCSBExecutor(object):
                              workload_index=workload_index,
                              stage='run')
 
-      def PushWorkload(vm):
+      def PushWorkload(vm, workload_file, remote_path):
+        vm.RemoteCommand('sudo rm -f ' + remote_path)
         vm.PushFile(workload_file, remote_path)
-      vm_util.RunThreaded(PushWorkload, vms)
+      vm_util.RunThreaded(PushWorkload, [((vm, workload_file, remote_path), {})
+                                         for vm in vms])
 
       parameters['parameter_files'] = [remote_path]
       for client_count in _GetThreadsPerLoaderList():
@@ -746,6 +751,7 @@ class YCSBExecutor(object):
             type(self).__name__, event='run', start_timestamp=start,
             end_timestamp=time.time(), metadata=copy.deepcopy(parameters))
         client_meta = workload_meta.copy()
+        client_meta.update(parameters)
         client_meta.update(clients=len(vms) * client_count,
                            threads_per_client_vm=client_count)
 

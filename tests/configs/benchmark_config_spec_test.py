@@ -430,6 +430,57 @@ class VmGroupsDecoderTestCase(unittest.TestCase):
         'test_component.default.static_vms[1]: fake_option.'))
 
 
+class CloudRedisDecoderTestCase(unittest.TestCase):
+
+  def setUp(self):
+    super(CloudRedisDecoderTestCase, self).setUp()
+    self._decoder = benchmark_config_spec._CloudRedisDecoder()
+    self.flags = mock_flags.MockFlags()
+    self.flags['cloud'].value = providers.GCP
+    self.flags['cloud'].present = True
+    self.flags['run_uri'].value = 'test'
+
+  def testNone(self):
+    with self.assertRaises(errors.Config.InvalidValue):
+      self._decoder.Decode(None, _COMPONENT, {})
+
+  def testValidInput(self):
+    result = self._decoder.Decode({
+        'redis_version': 'REDIS_3_2'}, _COMPONENT, self.flags)
+    self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
+    self.assertEqual(result.redis_version, 'REDIS_3_2')
+
+  def testInvalidInput(self):
+    with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
+      self._decoder.Decode(
+          {'foo': 'bar'}, _COMPONENT, self.flags)
+    self.assertEqual(str(cm.exception), (
+        'Unrecognized options were found in '
+        'test_component: foo.'))
+
+
+class CloudRedisSpecTestCase(unittest.TestCase):
+
+  def setUp(self):
+    super(CloudRedisSpecTestCase, self).setUp()
+    self._spec_class = benchmark_config_spec._CloudRedisSpec
+    self.flags = mock_flags.MockFlags()
+    self.flags['cloud'].value = providers.GCP
+    self.flags['cloud'].present = True
+    self.flags['run_uri'].value = 'test'
+
+  def testMissingValues(self):
+    with self.assertRaises(errors.Config.MissingOption) as cm:
+      self._spec_class(_COMPONENT)
+    self.assertEqual(str(cm.exception), (
+        'Required options were missing from test_component: cloud.'))
+
+  def testDefaults(self):
+    result = self._spec_class(_COMPONENT, flag_values=self.flags)
+    self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
+    self.assertEqual(result.redis_version, 'REDIS_3_2')
+
+
 class BenchmarkConfigSpecTestCase(unittest.TestCase):
 
   def setUp(self):

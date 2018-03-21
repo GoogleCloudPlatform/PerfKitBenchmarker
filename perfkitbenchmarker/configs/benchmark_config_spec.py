@@ -22,6 +22,7 @@ import copy
 import logging
 import os
 
+from perfkitbenchmarker import cloud_redis
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
@@ -346,7 +347,19 @@ class _EdwServiceSpec(spec.BaseSpec):
         'cluster_identifier': (option_decoders.StringDecoder, {
             'default': None,
             'none_ok': True}),
-        'username': (option_decoders.StringDecoder, {
+        'endpoint': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'concurrency': (option_decoders.IntDecoder, {
+            'default': 5,
+            'none_ok': True}),
+        'endpoint': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'db': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'user': (option_decoders.StringDecoder, {
             'default': None,
             'none_ok': True}),
         'password': (option_decoders.StringDecoder, {
@@ -359,6 +372,12 @@ class _EdwServiceSpec(spec.BaseSpec):
             'default': edw_service.DEFAULT_NUMBER_OF_NODES,
             'min': edw_service.DEFAULT_NUMBER_OF_NODES}),
         'snapshot': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'cluster_subnet_group': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True}),
+        'cluster_parameter_group': (option_decoders.StringDecoder, {
             'default': None,
             'none_ok': True})
     })
@@ -377,15 +396,22 @@ class _EdwServiceSpec(spec.BaseSpec):
       provided config values.
     """
     super(_EdwServiceSpec, cls)._ApplyFlags(config_values, flag_values)
-
+    # TODO(saksena): Add cluster_subnet_group and cluster_parameter_group flags
     # Restoring from a snapshot, so defer to the user supplied cluster details
     if flag_values['edw_service_cluster_snapshot'].present:
-      config_values['snapshot'] = flag_values[
-          'edw_service_cluster_snapshot']._value
-      config_values['username'] = flag_values[
-          'edw_service_cluster_user']._value
-      config_values['password'] = flag_values[
-          'edw_service_cluster_password']._value
+      config_values['snapshot'] = flag_values.edw_service_cluster_snapshot
+    if flag_values['edw_service_cluster_identifier'].present:
+      config_values['cluster_identifier'] = flag_values.edw_service_cluster_identifier
+    if flag_values['edw_service_endpoint'].present:
+      config_values['endpoint'] = flag_values.edw_service_endpoint
+    if flag_values['edw_service_cluster_concurrency'].present:
+      config_values['concurrency'] = flag_values.edw_service_cluster_concurrency
+    if flag_values['edw_service_cluster_db'].present:
+      config_values['db'] = flag_values.edw_service_cluster_db
+    if flag_values['edw_service_cluster_user'].present:
+      config_values['user'] = flag_values.edw_service_cluster_user
+    if flag_values['edw_service_cluster_password'].present:
+      config_values['password'] = flag_values.edw_service_cluster_password
 
 
 class _PerCloudConfigSpec(spec.BaseSpec):
@@ -550,6 +576,13 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
                 managed_relational_db.POSTGRES,
                 managed_relational_db.AURORA_POSTGRES,
             ]
+        }),
+        'zones': (option_decoders.ListDecoder, {
+            'item_decoder': option_decoders.StringDecoder(),
+            'default': None
+        }),
+        'machine_type': (option_decoders.StringDecoder, {
+            'default': None
         }),
         'engine_version': (option_decoders.StringDecoder, {
             'default': None
@@ -863,13 +896,23 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
 
 
 class _ContainerClusterSpec(_VmGroupSpec):
-  """Spec conntaining info needed to create a container cluster."""
+  """Spec containing info needed to create a container cluster."""
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     super(_ContainerClusterSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['container_cluster_cloud'].present:
       config_values['cloud'] = flag_values.container_cluster_cloud
+    if flag_values['container_cluster_num_vms'].present:
+      config_values['vm_count'] = flag_values.container_cluster_num_vms
+
+    # Need to apply the first zone in the zones flag, if specified,
+    # to the spec. ContainerClusters do not currently support
+    # running in multiple zones in a single PKB invocation.
+    if flag_values['zones'].present:
+      for cloud in config_values['vm_spec']:
+        config_values['vm_spec'][cloud]['zone'] = (
+            flag_values.zones[0])
 
 
 class _ContainerClusterSpecDecoder(option_decoders.TypeVerifier):
@@ -983,6 +1026,84 @@ class _CloudTpuDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _CloudRedisSpec(spec.BaseSpec):
+  """Specs needed to configure a cloud redis instance
+  """
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_CloudRedisSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
+    if not self.redis_name:
+      self.redis_name = 'pkb-cloudredis-{0}'.format(flag_values.run_uri)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments to
+      construct in order to decode the named option.
+    """
+    result = super(_CloudRedisSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'cloud': (option_decoders.EnumDecoder, {
+            'valid_values': providers.VALID_CLOUDS}),
+        'redis_name': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': False}),
+        'redis_version': (option_decoders.EnumDecoder, {
+            'default': cloud_redis.REDIS_3_2,
+            'valid_values': cloud_redis.REDIS_VERSIONS}),
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super(_CloudRedisSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
+
+
+class _CloudRedisDecoder(option_decoders.TypeVerifier):
+  """Validate the cloud_redis dictionary of a benchmark config object.
+  """
+
+  def __init__(self, **kwargs):
+    super(_CloudRedisDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify cloud_redis dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _CloudRedis built from the config passed in in value.
+
+    Raises:
+      errors.Config.InvalidateValue upon invalid input value.
+    """
+    cloud_redis_config = super(
+        _CloudRedisDecoder, self).Decode(value, component_full_name,
+                                         flag_values)
+    result = _CloudRedisSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **cloud_redis_config)
+    return result
+
+
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -1067,6 +1188,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'default': None
         }),
         'edw_service': (_EdwServiceDecoder, {
+            'default': None
+        }),
+        'cloud_redis': (_CloudRedisDecoder, {
             'default': None
         })
     })

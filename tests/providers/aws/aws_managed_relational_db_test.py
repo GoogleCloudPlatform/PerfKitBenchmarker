@@ -24,6 +24,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.managed_relational_db import MYSQL
+from perfkitbenchmarker.managed_relational_db import AURORA_POSTGRES
 from perfkitbenchmarker.providers.aws import aws_managed_relational_db
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws.aws_managed_relational_db import (
@@ -101,16 +102,18 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 
-  def createManagedDbFromSpec(self, additional_spec_items={}):
-    mock_spec = self.createMockSpec(additional_spec_items)
+  def createDbFromMockSpec(self, mock_spec):
     aws_db = AwsManagedRelationalDb(mock_spec)
 
     # Set necessary instance attributes that are not part of the spec
     aws_db.security_group_name = 'fake_security_group'
     aws_db.db_subnet_group_name = 'fake_db_subnet'
     aws_db.security_group_id = 'fake_security_group_id'
-
     return aws_db
+
+  def createManagedDbFromSpec(self, additional_spec_items={}):
+    mock_spec = self.createMockSpec(additional_spec_items)
+    return self.createDbFromMockSpec(mock_spec)
 
   def create(self, additional_spec_items={}):
     with self._PatchCriticalObjects() as issue_command:
@@ -128,6 +131,54 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     self.assertIn('--db-instance-class=db.t1.micro', command_string)
     self.assertIn('--engine=mysql', command_string)
     self.assertIn('--master-user-password=fakepassword', command_string)
+
+  def createAuroraMockSpec(self, additional_spec_items={}):
+
+    spec_dict = {
+        'engine': AURORA_POSTGRES,
+        'run_uri': '123',
+        'database_name': 'fakedbname',
+        'database_password': 'fakepassword',
+        'database_username': 'fakeusername',
+        'machine_type': 'db.r4.4xlarge',
+        'zones': ['us-east-1a', 'us-east-1d'],
+        'high_availability': True
+    }
+    spec_dict.update(additional_spec_items)
+
+    mock_db_spec = Mock(
+        spec=benchmark_config_spec._ManagedRelationalDbSpec)
+    mock_db_spec.configure_mock(**spec_dict)
+    return mock_db_spec
+
+  def createAuroraDbFromSpec(self, additional_spec_items={}):
+    mock_spec = self.createAuroraMockSpec(additional_spec_items)
+    return self.createDbFromMockSpec(mock_spec)
+
+  def createAurora(self, additional_spec_items={}):
+    with self._PatchCriticalObjects() as issue_command:
+      db = self.createAuroraDbFromSpec(additional_spec_items)
+      db._Create()
+      call_results = []
+      for call in issue_command.call_args_list:
+        call_results.append(' '.join(call[0][0]))
+      return call_results
+
+  def testCreateAurora(self):
+    command_strings = self.createAurora()
+
+    self.assertIn(
+        '%s rds create-db-cluster' % _AWS_PREFIX, command_strings[0])
+    self.assertIn('--db-cluster-identifier=pkb-db-cluster-123',
+                  command_strings[0])
+    self.assertIn('--engine=aurora-postgresql', command_strings[0])
+    self.assertIn('--master-user-password=fakepassword', command_strings[0])
+
+    self.assertIn(
+        '%s rds create-db-instance' % _AWS_PREFIX, command_strings[1])
+    self.assertIn('--db-cluster-identifier=pkb-db-cluster-123',
+                  command_strings[1])
+    self.assertIn('--engine=aurora-postgresql', command_strings[1])
 
   def testNoHighAvailability(self):
     spec_dict = {
@@ -177,6 +228,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     test_data = readTestDataFile('aws-describe-db-instances-creating.json')
     with self._PatchCriticalObjects(stdout=test_data):
       db = self.createManagedDbFromSpec()
+      db.all_instance_ids.append('pkb-db-instance-123')
 
       self.assertEqual(False, db._IsReady(timeout=0))
 
@@ -184,6 +236,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
     test_data = readTestDataFile('aws-describe-db-instances-available.json')
     with self._PatchCriticalObjects(stdout=test_data):
       db = self.createManagedDbFromSpec()
+      db.all_instance_ids.append('pkb-db-instance-123')
 
       self.assertEqual(True, db._IsReady())
 
@@ -206,6 +259,7 @@ class AwsManagedRelationalDbTestCase(unittest.TestCase):
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
       db = self.createManagedDbFromSpec()
+      db.all_instance_ids.append('pkb-db-instance-123')
       db._Delete()
       command_string = ' '.join(issue_command.call_args[0][0])
 

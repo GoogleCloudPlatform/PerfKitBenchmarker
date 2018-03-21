@@ -41,6 +41,8 @@ PIOPS = 'piops'  # Provisioned IOPS (SSD) in AWS and Alicloud
 # until that changes, 'local' is a special disk type.
 LOCAL = 'local'
 
+RAM = 'ram'
+
 # Map old disk type names to new disk type names
 DISK_TYPE_MAPS = dict()
 
@@ -75,24 +77,9 @@ def RegisterDiskTypeMap(provider_name, type_map):
   DISK_TYPE_MAPS[provider_name] = type_map
 
 
-_DISK_SPEC_REGISTRY = {}
-
-
 def GetDiskSpecClass(cloud):
   """Get the DiskSpec class corresponding to 'cloud'."""
-  return _DISK_SPEC_REGISTRY.get(cloud, BaseDiskSpec)
-
-
-class AutoRegisterDiskSpecMeta(spec.BaseSpecMetaClass):
-  """Metaclass which automatically registers DiskSpecs."""
-
-  def __init__(cls, name, bases, dct):
-    super(AutoRegisterDiskSpecMeta, cls).__init__(name, bases, dct)
-    if cls.CLOUD in _DISK_SPEC_REGISTRY:
-      raise Exception('BaseDiskSpec subclasses must have a CLOUD attribute.')
-    else:
-      _DISK_SPEC_REGISTRY[cls.CLOUD] = cls
-    super(AutoRegisterDiskSpecMeta, cls).__init__(name, bases, dct)
+  return spec.GetSpecClass(BaseDiskSpec, CLOUD=cloud)
 
 
 def WarnAndTranslateDiskTypes(name, cloud):
@@ -124,6 +111,10 @@ def WarnAndTranslateDiskTypes(name, cloud):
 
 def WarnAndCopyFlag(old_name, new_name):
   """Copy a value from an old flag to a new one, warning the user.
+
+  Args:
+    old_name: old name of flag.
+    new_name: new name of flag.
   """
 
   if FLAGS[old_name].present:
@@ -172,7 +163,7 @@ class BaseDiskSpec(spec.BaseSpec):
         1, it means no striping will occur. This must be >= 1.
   """
 
-  __metaclass__ = AutoRegisterDiskSpecMeta
+  SPEC_TYPE = 'BaseDiskSpec'
   CLOUD = None
 
   @classmethod
@@ -299,7 +290,6 @@ class StripedDisk(BaseDisk):
     Args:
       disk_spec: A BaseDiskSpec containing the desired mount point.
       disks: A list of BaseDisk objects that constitute the StripedDisk.
-      device_path: The path of the striped device in a Linux VM.
     """
     super(StripedDisk, self).__init__(disk_spec)
     self.disks = disks
@@ -322,3 +312,35 @@ class StripedDisk(BaseDisk):
   def Detach(self):
     for disk in self.disks:
       disk.Detach()
+
+
+class RamDisk(BaseDisk):
+  """Object representing a Ram Disk."""
+
+  def Attach(self, vm):
+    """Attaches the disk to a VM.
+
+    Args:
+      vm: The BaseVirtualMachine instance to which the disk will be attached.
+    """
+    pass
+
+  def Detach(self):
+    """Detaches the disk from a VM."""
+    pass
+
+  def GetDevicePath(self):
+    """Returns the path to the device inside a Linux VM."""
+    return None
+
+  def GetDeviceId(self):
+    """Return the Windows DeviceId of this disk."""
+    return None
+
+  def _Create(self):
+    """Creates the disk."""
+    pass
+
+  def _Delete(self):
+    """Deletes the disk."""
+    pass

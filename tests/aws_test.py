@@ -93,7 +93,7 @@ class AwsVpcExistsTestCase(unittest.TestCase):
 
 class AwsVirtualMachineTestCase(unittest.TestCase):
 
-  def openJsonData(self, filename):
+  def open_json_data(self, filename):
     path = os.path.join(os.path.dirname(__file__),
                         'data', filename)
     with open(path) as f:
@@ -135,13 +135,36 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
     network_mock.placement_group = placement_group
     self.vm.network = network_mock
 
-    self.response = self.openJsonData('aws-describe-instance.json')
-    self.sir_response =\
-        self.openJsonData('aws-describe-spot-instance-requests.json')
+    self.response = self.open_json_data('aws-describe-instance.json')
+    self.sir_response = self.open_json_data(
+        'aws-describe-spot-instance-requests.json')
 
   def testInstancePresent(self):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]
     self.assertTrue(self.vm._Exists())
+
+  def testInstanceStockedOutDuringCreate(self):
+    stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
+              'the RunInstances operation (reached max retries: 4): '
+              'Insufficient capacity.')
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    with self.assertRaises(
+        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+      self.vm._Create()
+    self.assertEqual(e.exception.message, stderr)
+
+  def testInstanceStockedOutAfterCreate(self):
+    """This tests when run-instances succeeds and returns a pending instance.
+
+    The instance then is not fulfilled and transitions to terminated.
+    """
+    response = self.open_json_data('aws-describe-instance-stockout.json')
+    util.IssueRetryableCommand.side_effect = [(response, None)]
+    with self.assertRaises(
+        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+      self.vm._Exists()
+    self.assertEqual(e.exception.message, 'Server.InsufficientInstanceCapacity:'
+                     ' Insufficient capacity to satisfy instance request')
 
   def testInstanceDeleted(self):
     response = json.loads(self.response)
@@ -151,67 +174,66 @@ class AwsVirtualMachineTestCase(unittest.TestCase):
     self.assertFalse(self.vm._Exists())
 
   def testCreateSpot(self):
-    vm_util.IssueCommand.side_effect = [(self.sir_response, None, None),
-                                        (self.sir_response, None, None)]
+    vm_util.IssueCommand.side_effect = [(None, '', None)]
 
-    self.vm._CreateSpot()
+    self.vm.use_spot_instance = True
+    self.vm._Create()
 
-    vm_util.IssueCommand.assert_any_call(
+    vm_util.IssueCommand.assert_called_with(
         ['aws',
          '--output',
          'json',
          'ec2',
-         'request-spot-instances',
+         'run-instances',
          '--region=us-east-1',
-         '--spot-price=123.45',
+         '--subnet-id=subnet-id',
+         '--associate-public-ip-address',
          '--client-token=00000000-1111-2222-3333-444444444444',
-         '--launch-specification='
-         '{"ImageId":"ami-12345","InstanceType":"c3.large",'
-         '"KeyName":"perfkit-key-aaaaaa",'
-         '"Placement":{'
-         '"AvailabilityZone":"us-east-1a",'
-         '"GroupName":"placement_group_name"},'
-         '"BlockDeviceMappings":['
-         '{"VirtualName":"ephemeral0","DeviceName":"/dev/xvdb"},'
-         '{"VirtualName":"ephemeral1","DeviceName":"/dev/xvdc"}],'
-         '"NetworkInterfaces":[{"DeviceIndex":0,'
-         '"AssociatePublicIpAddress":true,"SubnetId":"subnet-id"}]}'])
+         '--image-id=ami-12345',
+         '--instance-type=c3.large',
+         '--key-name=perfkit-key-aaaaaa',
+         '--block-device-mappings=[{"VirtualName": "ephemeral0", '
+         '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
+         '"DeviceName": "/dev/xvdc"}]',
+         '--placement=AvailabilityZone=us-east-1a,'
+         'GroupName=placement_group_name',
+         '--instance-market-options={"MarketType": "spot", '
+         '"SpotOptions": {"SpotInstanceType": "one-time", '
+         '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
+         ]
+    )
+    self.vm.use_spot_instance = False
+
+  def testCreateSpotFailure(self):
+    stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
+              'the RunInstances operation (reached max retries: 4): '
+              'Insufficient capacity.')
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+
+    with self.assertRaises(
+        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+      self.vm.use_spot_instance = True
+      self.vm._Create()
+    self.assertEqual(e.exception.message, stderr)
+    self.assertEqual(self.vm.spot_status_code,
+                     'InsufficientSpotInstanceCapacity')
+    self.assertTrue(self.vm.early_termination)
+    self.vm.use_spot_instance = False
+
+  def testDeleteCancelsSpotInstanceRequest(self):
+    self.vm.spot_instance_request_id = 'sir-abc'
+    self.vm.use_spot_instance = True
+    self.vm._Delete()
+
     vm_util.IssueCommand.assert_called_with(
         ['aws',
          '--output',
          'json',
          '--region=us-east-1',
          'ec2',
-         'describe-spot-instance-requests',
-         '--spot-instance-request-ids=sir-3wri5sgk'])
-
-  def testCreateSpotLowPriceFails(self):
-    response_low = json.loads(self.sir_response)
-    response_low['SpotInstanceRequests'][0]['Status']['Code'] = 'price-too-low'
-    response_low['SpotInstanceRequests'][0]['Status']['Message'] = \
-        'Your price is too low.'
-    response_cancel = (
-        '{"CancelledSpotInstanceRequests":'
-        '[{"State": "cancelled","SpotInstanceRequestId":"sir-2mcg43gk"}]}')
-    vm_util.IssueCommand.side_effect = [(self.sir_response, None, None),
-                                        (json.dumps(response_low), None, None),
-                                        (response_cancel, None, None)]
-
-    self.assertRaises(errors.Resource.CreationError, self.vm._CreateSpot)
-
-    def testDeleteCancelsSpotInstanceRequest(self):
-      self.vm.spot_instance_request_id = 'sir-abc'
-
-      self.vm._Delete()
-
-      vm_util.IssueCommand.assert_called_with(
-          ['aws',
-           '--output',
-           'json',
-           '--region=us-east-1',
-           'ec2',
-           'cancel-spot-instance-requests',
-           '--spot-instance-request-ids=sir-abc'])
+         'cancel-spot-instance-requests',
+         '--spot-instance-request-ids=sir-abc'])
+    self.vm.use_spot_instance = False
 
 
 class AwsIsRegionTestCase(unittest.TestCase):
@@ -250,19 +272,20 @@ class AwsGetBlockDeviceMapTestCase(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'describe_image_output.txt')
     with open(path) as fp:
-      self.describeImageOutput = fp.read()
+      self.describe_image_output = fp.read()
 
   def testInvalidMachineType(self):
     self.assertEqual(aws_virtual_machine.GetBlockDeviceMap('invalid'), None)
 
   def testValidMachineTypeWithNoRootVolumeSize(self):
-    expected = [{"DeviceName": "/dev/xvdb",
-                 "VirtualName": "ephemeral0"}]
+    expected = [{'DeviceName': '/dev/xvdb',
+                 'VirtualName': 'ephemeral0'}]
     actual = json.loads(aws_virtual_machine.GetBlockDeviceMap('c1.medium'))
     self.assertEqual(actual, expected)
 
   def testValidMachineTypeWithSpecifiedRootVolumeSize(self):
-    util.IssueRetryableCommand.side_effect = [(self.describeImageOutput, None)]
+    util.IssueRetryableCommand.side_effect = [(self.describe_image_output,
+                                               None)]
     desired_root_volume_size_gb = 35
     machine_type = 'c1.medium'
     image_id = 'ami-a9d276c9'
@@ -289,10 +312,11 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'describe_image_output.txt')
     with open(path) as fp:
-      self.describeImageOutput = fp.read()
+      self.describe_image_output = fp.read()
 
   def testOk(self):
-    util.IssueRetryableCommand.side_effect = [(self.describeImageOutput, None)]
+    util.IssueRetryableCommand.side_effect = [(self.describe_image_output,
+                                               None)]
     image_id = 'ami-a9d276c9'
     region = 'us-west-2'
     expected = {

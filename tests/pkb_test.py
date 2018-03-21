@@ -12,32 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for pkb.py"""
+"""Tests for pkb.py."""
 
-from perfkitbenchmarker import pkb
-from perfkitbenchmarker import stages
 import unittest
 import mock
+from perfkitbenchmarker import pkb
+from perfkitbenchmarker import stages
 
 
 class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
-  def patchPkbFunction(self, function_name):
+  def PatchPkbFunction(self, function_name):
     patcher = mock.patch(pkb.__name__ + '.' + function_name)
     mock_function = patcher.start()
     self.addCleanup(patcher.stop)
     return mock_function
 
   def setUp(self):
-    self.flags_mock = self.patchPkbFunction('FLAGS')
-    self.provision_mock = self.patchPkbFunction('DoProvisionPhase')
-    self.prepare_mock = self.patchPkbFunction('DoPreparePhase')
-    self.run_mock = self.patchPkbFunction('DoRunPhase')
-    self.cleanup_mock = self.patchPkbFunction('DoCleanupPhase')
-    self.teardown_mock = self.patchPkbFunction('DoTeardownPhase')
-    self.make_failed_run_sample_mock = self.patchPkbFunction(
+    self.flags_mock = self.PatchPkbFunction('FLAGS')
+    self.provision_mock = self.PatchPkbFunction('DoProvisionPhase')
+    self.prepare_mock = self.PatchPkbFunction('DoPreparePhase')
+    self.run_mock = self.PatchPkbFunction('DoRunPhase')
+    self.cleanup_mock = self.PatchPkbFunction('DoCleanupPhase')
+    self.teardown_mock = self.PatchPkbFunction('DoTeardownPhase')
+    self.make_failed_run_sample_mock = self.PatchPkbFunction(
         'MakeFailedRunSample')
 
+    self.flags_mock.skip_pending_runs_file = None
     self.flags_mock.run_stage = [
         stages.PROVISION, stages.PREPARE, stages.RUN, stages.CLEANUP,
         stages.TEARDOWN
@@ -53,7 +54,7 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
-        error_msg, stages.PROVISION)
+        self.spec, error_msg, stages.PROVISION)
 
   def testCreatePrepareFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
@@ -62,7 +63,7 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
-        error_msg, stages.PREPARE)
+        self.spec, error_msg, stages.PREPARE)
 
   def testCreateRunFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
@@ -71,7 +72,7 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
-        error_msg, stages.RUN)
+        self.spec, error_msg, stages.RUN)
 
   def testCreateCleanupFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
@@ -80,7 +81,7 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
-        error_msg, stages.CLEANUP)
+        self.spec, error_msg, stages.CLEANUP)
 
   def testCreateTeardownFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
@@ -89,7 +90,7 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.make_failed_run_sample_mock.assert_called_once_with(
-        error_msg, stages.TEARDOWN)
+        self.spec, error_msg, stages.TEARDOWN)
 
   def testDontCreateFailedRunSample(self):
     self.flags_mock.create_failed_run_samples = False
@@ -104,7 +105,9 @@ class TestMakeFailedRunSample(unittest.TestCase):
   @mock.patch('perfkitbenchmarker.sample.Sample')
   def testMakeFailedRunSample(self, sample_mock):
     error_msg = 'error'
-    pkb.MakeFailedRunSample(error_msg, stages.PROVISION)
+    spec = mock.MagicMock()
+    spec.vms = []
+    pkb.MakeFailedRunSample(spec, error_msg, stages.PROVISION)
 
     sample_mock.assert_called_once()
     sample_mock.assert_called_with('Run Failed', 1, 'Run Failed', {
@@ -116,13 +119,15 @@ class TestMakeFailedRunSample(unittest.TestCase):
   @mock.patch('perfkitbenchmarker.sample.Sample')
   def testMakeFailedRunSampleWithTruncation(self, sample_mock):
     error_msg = 'This is a long error message that should be truncated.'
+    spec = mock.MagicMock()
+    spec.vms = []
     pkb.FLAGS.failed_run_samples_error_length = 7
 
-    pkb.MakeFailedRunSample(error_msg, stages.PROVISION)
+    pkb.MakeFailedRunSample(spec, error_msg, stages.PROVISION)
 
     sample_mock.assert_called_once()
     sample_mock.assert_called_with('Run Failed', 1, 'Run Failed', {
-        'error_message': "This is",
+        'error_message': 'This is',
         'run_stage': stages.PROVISION,
         'flags': '{}'
     })

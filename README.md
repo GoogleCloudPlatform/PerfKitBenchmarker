@@ -162,6 +162,17 @@ $ cd /path/to/PerfKitBenchmarker
 $ sudo pip install -r requirements.txt
 ```
 
+## Preprovisioned data
+
+Some benchmarks may require data to be preprovisioned in a cloud. To
+preprovision data, you will need to obtain the data and then upload it to that
+cloud. See more information below about which benchmarks require preprovisioned
+data and how to upload it to different clouds.
+
+Note. Before we start to switch over to preprovisioned data, we should support
+a fallback strategy of downloading files to the data/ directory on the machine
+used to run PerfKitBenchmarker (as is done today for CoreMark and SPEC CPU2006).
+
 ## Cloud account setup
 
 This section describes the setup steps needed for each cloud system. Note that you only need to perform setup steps on the clouds you wish to test. If you only want to test Google Cloud, you only need to install and configure `gcloud`.
@@ -592,7 +603,7 @@ $ ./pkb.py --project=<GCP project ID> --benchmarks=iperf --machine_type=f1-micro
 
 ```bash
 $ cd PerfKitBenchmarker
-$ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t1.micro
+$ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t2.micro
 ```
 
 ## Example run on Azure
@@ -623,7 +634,7 @@ $ ./pkb.py --cloud=OpenStack --machine_type=m1.medium \
 ## Example run on Kubernetes
 
 ```bash
-$ ./pkb.py --cloud=Kubernetes --benchmarks=iperf --kubectl=/path/to/kubectl --kubeconfig=/path/to/kubeconfig --image=image-with-ssh-server  --ceph_monitors=10.20.30.40:6789,10.20.30.41:6789 --kubernetes_nodes=10.20.30.42,10.20.30.43
+$ ./pkb.py --cloud=Kubernetes --benchmarks=iperf --kubectl=/path/to/kubectl --kubeconfig=/path/to/kubeconfig --image=image-with-ssh-server  --ceph_monitors=10.20.30.40:6789,10.20.30.41:6789
 ```
 
 ## Example run on Mesos
@@ -768,6 +779,49 @@ Flag | Notes
 `--http_proxy`       | Needed for package manager on Guest OS and for some Perfkit packages
 `--https_proxy`      | Needed for package manager or Ubuntu guest and for from github downloaded packages
 `--ftp_proxy`       | Needed for some Perfkit packages
+
+
+## Preprovisioned Data
+
+As mentioned above, some benchmarks require preprovisioned data. This section
+describes how to preprovision this data.
+
+### Benchmarks with Preprovisioned Data
+
+#### Sample Preprovision Benchmark
+
+This benchmark demonstrates the use of preprovisioned data. Create the following
+file to upload using the command line:
+```bash
+echo "1234567890" > preprovisioned_data.txt
+```
+To upload, follow the instructions below with a filename of
+`preprovisioned_data.txt` and a benchmark name of `sample`.
+
+### Clouds with Preprovisioned Data
+
+#### Google Cloud
+
+To preprovision data on Google Cloud, you will need to upload each file to
+Google Cloud Storage using gsutil. First, you will need to create a storage
+bucket that is accessible from VMs created in Google Cloud by PKB. Then copy
+each file to this bucket using the command
+```bash
+gsutil cp <filename> gs://<bucket>/<benchmark-name>/<filename>
+```
+To run a benchmark on Google Cloud that uses the preprovisioned data, use the
+flag `--gcp_preprovisioned_data_bucket=<bucket>`.
+
+#### AWS
+
+To preprovision data on AWS, you will need to upload each file to S3 using the
+AWS CLI. First, you will need to create a storage bucket that is accessible from
+VMs created in AWS by PKB. Then copy each file to this bucket using the command
+```bash
+aws s3 cp <filename> s3://<bucket>/<benchmark-name>/<filename>
+```
+To run a benchmark on AWS that uses the preprovisioned data, use the flag
+`--aws_preprovisioned_data_bucket=<bucket>`.
 
 Configurations and Configuration Overrides
 ==================

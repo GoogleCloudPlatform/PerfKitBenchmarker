@@ -25,11 +25,10 @@ import datetime
 import json
 import logging
 import time
-
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import providers
-from perfkitbenchmarker import managed_relational_db
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -51,6 +50,10 @@ MIN_CUSTOM_MACHINE_MEM_MB = 3840
 IS_READY_TIMEOUT = 600  # 10 minutes
 
 
+class UnsupportedDatabaseEngineException(Exception):
+  pass
+
+
 class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
   """A GCP CloudSQL database resource.
 
@@ -67,10 +70,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     self.spec = managed_relational_db_spec
     self.project = FLAGS.project or util.GetDefaultProject()
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
-    if (self.spec.engine == managed_relational_db.POSTGRES and
-        self.spec.high_availability):
-      raise Exception(('High availability configuration is not supported on '
-                       'CloudSQL PostgreSQL'))
 
   def _Create(self):
     """Creates the Cloud SQL instance and authorizes traffic from anywhere."""
@@ -93,7 +92,6 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
         self.instance_id,
         '--quiet',
         '--format=json',
-        '--async',
         '--activation-policy=ALWAYS',
         '--assign-ip',
         '--authorized-networks=%s' % authorized_network,
@@ -116,12 +114,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       cmd_string.append('--cpu={}'.format(cpus))
       cmd_string.append('--memory={}MiB'.format(memory))
 
-    # High availability only supported on MySQL. A check is done in
-    # __init__ to ensure that a Postgres HA configuration is not requested.
-    if (self.spec.high_availability and
-        self.spec.engine == managed_relational_db.MYSQL):
-        ha_flag = '--failover-replica-name=replica-' + self.instance_id
-        cmd_string.append(ha_flag)
+    if self.spec.high_availability:
+      cmd_string.append(self._GetHighAvailabilityFlag())
 
     if self.spec.backup_enabled:
       cmd_string.append('--backup')
@@ -133,6 +127,26 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     cmd.flags['project'] = self.project
 
     _, _, _ = cmd.Issue()
+
+  def _GetHighAvailabilityFlag(self):
+    """Returns a flag that enables high-availability for the specified engine.
+
+    Returns:
+      Flag (as string) to be appended to the gcloud sql create command.
+
+    Raises:
+      UnsupportedDatabaseEngineException:
+        if engine does not support high availability.
+    """
+    if self.spec.engine == managed_relational_db.MYSQL:
+      self.replica_instance_id = 'replica-' + self.instance_id
+      return '--failover-replica-name=' + self.replica_instance_id
+    elif self.spec.engine == managed_relational_db.POSTGRES:
+      return '--availability-type=REGIONAL'
+    else:
+      raise UnsupportedDatabaseEngineException(
+          'High availability not supported on engine {0}'.format(
+              self.spec.engine))
 
   def _ValidateSpec(self):
     """Validates PostgreSQL spec for CPU and memory.
@@ -198,6 +212,11 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
+    if hasattr(self, 'replica_instance_id'):
+      cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
+                               self.replica_instance_id, '--quiet')
+      cmd.Issue()
+
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                              self.instance_id, '--quiet')
     cmd.Issue()
@@ -260,6 +279,8 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     Returns:
       public IP address (string)
     """
+    if describe_instance_json is None:
+      return ''
     try:
       selflink = describe_instance_json['ipAddresses'][0]['ipAddress']
     except:
@@ -268,12 +289,25 @@ class GCPManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
     return selflink
 
   def _PostCreate(self):
-    """Creates the user and set password."""
+    """Creates the PKB user and sets the password.
+    """
+
+    # The hostname '%' means unrestricted access from any host.
     cmd = util.GcloudCommand(
         self, 'sql', 'users', 'create', self.spec.database_username,
-        'dummy_host', '--instance={0}'.format(self.instance_id),
+        '%', '--instance={0}'.format(self.instance_id),
         '--password={0}'.format(self.spec.database_password))
-    stdout, _, _ = cmd.Issue()
+    _, _, _ = cmd.Issue()
+
+    # this is a fix for b/71594701
+    # by default the empty password on 'postgres'
+    # is a security violation.  Change the password to a non-default value.
+    if self.spec.engine == managed_relational_db.POSTGRES:
+      cmd = util.GcloudCommand(
+          self, 'sql', 'users', 'set-password', 'postgres',
+          'dummy_host', '--instance={0}'.format(self.instance_id),
+          '--password={0}'.format(self.spec.database_password))
+      _, _, _ = cmd.Issue()
 
   @staticmethod
   def GetDefaultEngineVersion(engine):

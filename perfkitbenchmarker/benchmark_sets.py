@@ -56,7 +56,7 @@ BENCHMARK_SETS = {
             'ping',
             'redis',
             'speccpu2006',
-            'sysbench_oltp',
+            'sysbench',
             'unixbench',
         ]
     },
@@ -87,7 +87,7 @@ BENCHMARK_SETS = {
             'mongodb_ycsb',
             'ping',
             'redis',
-            'sysbench_oltp',
+            'sysbench',
             'unixbench',
         ]
     },
@@ -122,11 +122,13 @@ BENCHMARK_SETS = {
             'hadoop_terasort',
             'hpcc',
             'hpcg',
+            'inception3',
             'iperf',
             'mesh_network',
             'mnist',
             'mongodb_ycsb',
             'multichase',
+            'mxnet',
             'netperf',
             'object_storage_service',
             'oldisim',
@@ -135,7 +137,7 @@ BENCHMARK_SETS = {
             'redis_ycsb',
             'stencil2d',
             'speccpu2006',
-            'sysbench_oltp',
+            'sysbench',
             'tensorflow',
             'tomcat_wrk',
             'unixbench',
@@ -152,7 +154,7 @@ BENCHMARK_SETS = {
             'redis',
             'cassandra_stress',
             'object_storage_service',
-            'sysbench_oltp',
+            'sysbench',
         ]
     },
     'kubernetes_set': {
@@ -168,7 +170,7 @@ BENCHMARK_SETS = {
             'mongodb_ycsb',
             'netperf',
             'redis',
-            'sysbench_oltp',
+            'sysbench',
         ]
     },
     'mellanox_set': {
@@ -201,7 +203,7 @@ BENCHMARK_SETS = {
             'ping',
             'redis',
             'silo',
-            'sysbench_oltp',
+            'sysbench',
             'unixbench',
         ]
     },
@@ -255,6 +257,19 @@ def _GetValidBenchmarks():
   return linux_benchmarks.VALID_BENCHMARKS
 
 
+def BenchmarkModule(benchmark_name):
+  """Finds the module for a benchmark by name.
+
+  Args:
+    benchmark_name: The name of the benchmark.
+
+  Returns:
+    The benchmark's module, or None if the benchmark is invalid.
+  """
+  valid_benchmarks = _GetValidBenchmarks()
+  return valid_benchmarks.get(benchmark_name)
+
+
 def _GetBenchmarksFromUserConfig(user_config):
   """Returns a list of benchmark module, config tuples."""
   benchmarks = user_config.get('benchmarks', [])
@@ -290,7 +305,6 @@ def _AssertZipAxesHaveSameLength(axes):
       raise ValueError('flag_zip axes must all be the same length')
 
 
-
 def _AssertFlagMatrixAndZipDefsExist(benchmark_config,
                                      flag_matrix_name,
                                      flag_zip_name):
@@ -307,9 +321,9 @@ def _AssertFlagMatrixAndZipDefsExist(benchmark_config,
       specified in the benchmark_config, or None.
 
   Raises:
-    FlagMatrixNotFoundException if flag_matrix_name is not None, and is not
+    FlagMatrixNotFoundException: if flag_matrix_name is not None, and is not
       found in the flag_matrix_defs section of the benchmark_config.
-    FlagZipNotFoundException if flag_zip_name is not None, and is not
+    FlagZipNotFoundException: if flag_zip_name is not None, and is not
       found in the flag_zip_defs section of the benchmark_config.
   """
   if (flag_matrix_name and
@@ -330,6 +344,9 @@ def GetBenchmarksFromFlags():
   If no benchmarks (or sets) are specified, this will return the standard set.
   If multiple sets or mixes of sets and benchmarks are specified, this will
   return the union of all sets and individual benchmarks.
+
+  Raises:
+    ValueError: when benchmark_name is not valid for os_type supplied
   """
   user_config = configs.GetUserConfig()
   benchmark_config_list = _GetBenchmarksFromUserConfig(user_config)
@@ -349,13 +366,13 @@ def GetBenchmarksFromFlags():
   while did_expansion:
     did_expansion = False
     for benchmark_name in benchmark_names:
-      if (benchmark_name in BENCHMARK_SETS):
+      if benchmark_name in BENCHMARK_SETS:
         did_expansion = True
         benchmark_names.remove(benchmark_name)
-        if (benchmark_name not in expanded):
-            expanded.add(benchmark_name)
-            benchmark_names |= set(BENCHMARK_SETS[
-                benchmark_name][BENCHMARK_LIST])
+        if benchmark_name not in expanded:
+          expanded.add(benchmark_name)
+          benchmark_names |= set(BENCHMARK_SETS[
+              benchmark_name][BENCHMARK_LIST])
         break
 
   valid_benchmarks = _GetValidBenchmarks()
@@ -418,7 +435,7 @@ def GetBenchmarksFromFlags():
       config = _GetConfigForAxis(benchmark_config, flag_config)
       if (flag_matrix_filter and not eval(
           flag_matrix_filter, {}, config['flags'])):
-          continue
+        continue
       benchmark_config_list.append((benchmark_module, config))
 
   return benchmark_config_list

@@ -26,7 +26,7 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/aerospike-server.git'
-GIT_TAG = '3.7.5'
+GIT_TAG = '4.0.0.1'
 AEROSPIKE_DIR = '%s/aerospike-server' % INSTALL_DIR
 AEROSPIKE_CONF_PATH = '%s/as/etc/aerospike_dev.conf' % AEROSPIKE_DIR
 
@@ -90,8 +90,16 @@ def _WaitForServerUp(server):
 
   logging.info("Trying to connect to Aerospike at %s:%s" % (address, port))
   try:
+    def _NetcatPrefix():
+      _, stderr = server.RemoteCommand('nc -h', ignore_failure=True)
+      if '-q' in stderr:
+        return 'nc -q 1'
+      else:
+        return 'nc -i 1'
+
     out, _ = server.RemoteCommand(
-        '(echo -e "status\n" ; sleep 1)| netcat -q 1 %s %s' % (address, port))
+        '(echo -e "status\n" ; sleep 1)| %s %s %s' % (
+            _NetcatPrefix(), address, port))
     if out.startswith('ok'):
       logging.info("Aerospike server status is OK. Server up and running.")
       return

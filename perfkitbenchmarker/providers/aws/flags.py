@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Module containing flags applicable across benchmark run on AWS."""
 
 from perfkitbenchmarker import flags
 
@@ -33,9 +34,20 @@ flags.DEFINE_string('s3_custom_endpoint', None,
                     'storage region.')
 flags.DEFINE_boolean('aws_spot_instances', False,
                      'Whether to use AWS spot instances for any AWS VMs.')
-flags.DEFINE_float('aws_spot_price', 0.0,
-                   'The spot price to bid for AWS spot instances.')
+flags.DEFINE_float('aws_spot_price', None,
+                   'The spot price to bid for AWS spot instances. Defaults '
+                   'to on-demand price when left as None.')
 flags.DEFINE_integer('aws_boot_disk_size', None,
                      'The boot disk size in GiB for AWS VMs.')
 flags.DEFINE_string('kops', 'kops',
                     'The path to the kops binary.')
+flags.DEFINE_string('aws_image_name_filter', None,
+                    'The filter to use when searching for an image for a VM.')
+flags.DEFINE_string('aws_preprovisioned_data_bucket', None,
+                    'AWS bucket where pre-provisioned data has been copied.')
+flags.DEFINE_string('redis_node_type',
+                    'cache.m4.large',
+                    'The AWS node type to use for cloud redis')
+flags.DEFINE_string('aws_elasticache_failover_zone',
+                    None,
+                    'AWS elasticache failover zone')

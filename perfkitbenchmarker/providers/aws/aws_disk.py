@@ -82,6 +82,8 @@ LOCAL_HDD_METADATA = {
 }
 
 LOCAL_HDD_PREFIXES = ['d2', 'hs']
+EBS_NVME_TYPES = ['c5', 'm5']
+LOCAL_NVME_TYPES = ['i3', 'f1']
 
 
 def LocalDiskIsHDD(machine_type):
@@ -92,7 +94,12 @@ def LocalDiskIsHDD(machine_type):
 
 def LocalDriveIsNvme(machine_type):
   """Check if the machine type uses NVMe driver."""
-  return machine_type[:2].lower() == 'i3'
+  return machine_type[:2].lower() in LOCAL_NVME_TYPES
+
+
+def EbsDriveIsNvme(machine_type):
+  """Check if the machine type uses NVMe driver."""
+  return machine_type[:2].lower() in EBS_NVME_TYPES
 
 
 AWS = 'AWS'
@@ -222,13 +229,14 @@ class AwsDisk(disk.BaseDisk):
       self.device_letter = min(AwsDisk.vm_devices[self.attached_vm_id])
       AwsDisk.vm_devices[self.attached_vm_id].remove(self.device_letter)
 
+    device_name = '/dev/xvdb%s' % self.device_letter
     attach_cmd = util.AWS_PREFIX + [
         'ec2',
         'attach-volume',
         '--region=%s' % self.region,
         '--instance-id=%s' % self.attached_vm_id,
         '--volume-id=%s' % self.id,
-        '--device=%s' % self.GetDevicePath()]
+        '--device=%s' % device_name]
     logging.info('Attaching AWS volume %s. This may fail if the disk is not '
                  'ready, but will be retried.', self.id)
     util.IssueRetryableCommand(attach_cmd)
@@ -256,4 +264,7 @@ class AwsDisk(disk.BaseDisk):
         return '/dev/nvme%sn1' % str(ord(self.device_letter) - ord('b'))
       return '/dev/xvd%s' % self.device_letter
     else:
-      return '/dev/xvdb%s' % self.device_letter
+      if EbsDriveIsNvme(self.machine_type):
+        return '/dev/nvme%sn1' % (1 + ord(self.device_letter) - ord('a'))
+      else:
+        return '/dev/xvdb%s' % self.device_letter

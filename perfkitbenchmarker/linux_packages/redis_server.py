@@ -22,6 +22,8 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 flags.DEFINE_integer('redis_total_num_processes', 1,
                      'Total number of redis server processes.',
                      lower_bound=1)
+flags.DEFINE_boolean('redis_enable_aof', False,
+                     'Enable append-only file (AOF) with appendfsync always.')
 
 
 REDIS_VERSION = '2.8.9'
@@ -56,9 +58,22 @@ def AptInstall(vm):
 
 def Configure(vm):
   """Configure redis server."""
-  sed_cmd = (r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
-             "{0}/redis.conf").format(REDIS_DIR)
+  sed_cmd = (
+      r"sed -i -e '/^save /d' -e 's/# *save \"\"/save \"\"/' "
+      "{0}/redis.conf").format(REDIS_DIR)
   vm.RemoteCommand(sed_cmd)
+  if FLAGS.redis_enable_aof:
+    vm.RemoteCommand(
+        r'sed -i -e "s/appendonly no/appendonly yes/g" {0}/redis.conf'.format(
+            REDIS_DIR))
+    vm.RemoteCommand((
+        r'sed -i -e "s/appendfsync everysec/# appendfsync everysec/g" '
+        r'{0}/redis.conf'
+    ).format(REDIS_DIR))
+    vm.RemoteCommand((
+        r'sed -i -e "s/# appendfsync always/appendfsync always/g" '
+        r'{0}/redis.conf'
+    ).format(REDIS_DIR))
   for i in range(FLAGS.redis_total_num_processes):
     port = REDIS_FIRST_PORT + i
     vm.RemoteCommand(

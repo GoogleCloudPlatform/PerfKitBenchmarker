@@ -13,9 +13,44 @@
 # limitations under the License.
 
 
-"""Module containing TensorFlow 1.3 installation and cleanup functions."""
+"""Module containing TensorFlow installation and cleanup functions."""
+import posixpath
 from perfkitbenchmarker import flags
+from perfkitbenchmarker.linux_packages import cuda_toolkit
+
+
 FLAGS = flags.FLAGS
+flags.DEFINE_string('tf_cpu_pip_package',
+                    'https://anaconda.org/intel/tensorflow/1.4.0/download/'
+                    'tensorflow-1.4.0-cp27-cp27mu-linux_x86_64.whl',
+                    'TensorFlow CPU pip package to install. By default, PKB '
+                    'will install an Intel-optimized CPU build when using CPUs.')
+flags.DEFINE_string('tf_gpu_pip_package', 'tensorflow-gpu==1.3',
+                    'TensorFlow GPU pip package to install. By default, PKB '
+                    'will install tensorflow-gpu==1.3 when using GPUs.')
+
+
+def GetEnvironmentVars(vm):
+  """Return a string containing TensorFlow-related environment variables.
+
+  Args:
+    vm: vm to get environment varibles
+
+  Returns:
+    string of environment variables
+  """
+  if not cuda_toolkit.CheckNvidiaGpuExists(vm):
+    return ''
+  output, _ = vm.RemoteCommand('getconf LONG_BIT', should_log=True)
+  long_bit = output.strip()
+  lib_name = 'lib' if long_bit == '32' else 'lib64'
+  return ' '.join([
+      'PATH=%s${PATH:+:${PATH}}' %
+      posixpath.join(FLAGS.cuda_toolkit_installation_dir, 'bin'),
+      'CUDA_HOME=%s' % FLAGS.cuda_toolkit_installation_dir,
+      'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
+      posixpath.join(FLAGS.cuda_toolkit_installation_dir, lib_name),
+  ])
 
 
 def GetTensorFlowVersion(vm):
@@ -28,25 +63,28 @@ def GetTensorFlowVersion(vm):
     installed python tensorflow version as a string
   """
   stdout, _ = vm.RemoteCommand(
-      'echo -e "import tensorflow\nprint(tensorflow.__version__)" | python'
+      ('echo -e "import tensorflow\nprint(tensorflow.__version__)" | {0} python'
+       .format(GetEnvironmentVars(vm)))
   )
   return stdout.strip()
 
 
 def Install(vm):
   """Installs TensorFlow on the VM."""
-  vm.Install('pip')
-  if FLAGS.tf_device == 'gpu':
-    vm.Install('cuda_toolkit_8')
+  has_gpu = cuda_toolkit.CheckNvidiaGpuExists(vm)
+  tf_pip_package = (FLAGS.tf_gpu_pip_package if has_gpu else
+                    FLAGS.tf_cpu_pip_package)
+
+  if has_gpu:
+    vm.Install('cuda_toolkit')
     vm.Install('cudnn')
-    vm.RemoteCommand('sudo pip install --upgrade tensorflow-gpu==1.3',
-                     should_log=True)
-  elif FLAGS.tf_device == 'cpu':
-    vm.RemoteCommand('sudo pip install --upgrade tensorflow==1.3',
-                     should_log=True)
+
+  vm.Install('pip')
+  vm.RemoteCommand('sudo pip install --upgrade %s' % tf_pip_package,
+                   should_log=True)
 
 
 def Uninstall(vm):
   """Uninstalls TensorFlow on the VM."""
-  vm.RemoteCommand('sudo pip uninstall --upgrade tensorflow',
+  vm.RemoteCommand('sudo pip uninstall tensorflow',
                    should_log=True)
