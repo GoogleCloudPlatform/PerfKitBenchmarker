@@ -1177,6 +1177,10 @@ class ContainerizedDebianMixin(DebianMixin):
   OS_TYPE = os_types.UBUNTU_CONTAINER
   BASE_DOCKER_IMAGE = 'ubuntu:trusty-20161006'
 
+  def __init__(self, *args, **kwargs):
+    super(ContainerizedDebianMixin, self).__init__(*args, **kwargs)
+    self.docker_id = None
+
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
     resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
@@ -1206,6 +1210,7 @@ class ContainerizedDebianMixin(DebianMixin):
   def InitDocker(self):
     """Initializes the docker container daemon."""
     init_docker_cmd = ['sudo docker run -d '
+                       '--rm '
                        '--net=host '
                        '--workdir=%s '
                        '-v %s:%s ' % (CONTAINER_WORK_DIR,
@@ -1322,6 +1327,18 @@ class ContainerizedDebianMixin(DebianMixin):
 
     # Copies the file to its final destination in the container
     target.ContainerCopy(file_name, remote_path)
+
+  def SnapshotPackages(self):
+    """Grabs a snapshot of the currently installed packages."""
+    pass
+
+  def PackageCleanup(self):
+    """Cleans up all installed packages.
+
+    Stop the docker container launched with --rm.
+    """
+    if self.docker_id:
+      self.RemoteHostCommand("docker stop %s" % (self.docker_id))
 
 
 class KernelRelease(object):
