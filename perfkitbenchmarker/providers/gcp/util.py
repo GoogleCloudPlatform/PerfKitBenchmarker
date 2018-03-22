@@ -136,8 +136,12 @@ class GcloudCommand(object):
 _QUOTA_EXCEEDED_REGEX = re.compile('Quota \'.*\' exceeded.')
 _QUOTA_EXCEEDED_MESSAGE = ('Creation failed due to quota exceeded: ')
 
+_NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
+                                'fulfill the request.')
+_NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
-def CheckGcloudResponseForQuotaExceeded(stderr, retcode):
+
+def CheckGcloudResponseKnownFailures(stderr, retcode):
   """Checks gcloud responses for quota exceeded errors.
 
   Args:
@@ -148,3 +152,7 @@ def CheckGcloudResponseForQuotaExceeded(stderr, retcode):
     message = _QUOTA_EXCEEDED_MESSAGE + stderr
     logging.error(message)
     raise errors.Benchmarks.QuotaFailure(message)
+  if retcode and _NOT_ENOUGH_RESOURCES_STDERR in stderr:
+    message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
+    logging.error(message)
+    raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
