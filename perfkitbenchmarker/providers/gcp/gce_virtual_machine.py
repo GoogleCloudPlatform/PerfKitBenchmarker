@@ -401,7 +401,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         _INSUFFICIENT_HOST_CAPACITY in stderr):
       logging.error(STOCKOUT_MESSAGE)
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(STOCKOUT_MESSAGE)
-    util.CheckGcloudResponseForQuotaExceeded(stderr, retcode)
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
