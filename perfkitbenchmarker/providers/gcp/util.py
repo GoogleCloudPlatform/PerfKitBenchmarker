@@ -41,7 +41,7 @@ def GetRegionFromZone(zone):
 
 def GetMultiRegionFromRegion(region):
   """Gets the closest multi-region location to the region."""
-  if (region.startswith('us')  or
+  if (region.startswith('us') or
       region.startswith('northamerica') or
       region.startswith('southamerica')):
     return 'us'
