@@ -77,11 +77,14 @@ def Prepare(benchmark_spec):
   ycsb_vms = benchmark_spec.vm_groups['clients']
   vm_util.RunThreaded(_Install, ycsb_vms)
   instance_details = benchmark_spec.cloud_redis.GetInstanceDetails()
-  benchmark_spec.executor = ycsb.YCSBExecutor(
-      'redis', **{
-          'shardkeyspace': True,
-          'redis.host': instance_details['host'],
-          'redis.port': instance_details['port']})
+  redis_args = {
+      'shardkeyspace': True,
+      'redis.host': instance_details['host'],
+      'redis.port': instance_details['port']
+  }
+  if 'password' in instance_details:
+    redis_args['redis.password'] = instance_details['password']
+  benchmark_spec.executor = ycsb.YCSBExecutor('redis', **redis_args)
 
 
 def Run(benchmark_spec):
