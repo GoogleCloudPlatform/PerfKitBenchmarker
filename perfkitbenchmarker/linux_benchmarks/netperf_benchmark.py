@@ -207,8 +207,8 @@ def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
   return stats
 
 
-def _ParseNetperfOutput(stdout, metadata, benchmark_name,
-                        enable_latency_histograms):
+def ParseNetperfOutput(stdout, metadata, benchmark_name,
+                       enable_latency_histograms):
   """Parses the stdout of a single netperf process.
 
   Args:
@@ -362,8 +362,8 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
               'max_iter': FLAGS.netperf_max_iter or 1,
               'sending_thread_count': num_streams}
 
-  parsed_output = [_ParseNetperfOutput(stdout, metadata, benchmark_name,
-                                       enable_latency_histograms)
+  parsed_output = [ParseNetperfOutput(stdout, metadata, benchmark_name,
+                                      enable_latency_histograms)
                    for stdout in stdouts]
 
   if len(parsed_output) == 1:

@@ -61,7 +61,6 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
     container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
-            'os_type': 'debian',
             'vm_spec': {
                 'GCP': {
                     'machine_type': 'fake-machine-type',
@@ -130,7 +129,6 @@ class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
     container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
-            'os_type': 'debian',
             'vm_spec': {
                 'GCP': {
                     'machine_type': 'fake-machine-type',

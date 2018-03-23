@@ -25,6 +25,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import mock_flags
@@ -106,7 +107,7 @@ class PerCloudConfigSpecTestCase(unittest.TestCase):
 
   def setUp(self):
     super(PerCloudConfigSpecTestCase, self).setUp()
-    self._spec_class = benchmark_config_spec._PerCloudConfigSpec
+    self._spec_class = option_decoders._PerCloudConfigSpec
 
   def testDefaults(self):
     spec = self._spec_class(_COMPONENT)
@@ -137,26 +138,26 @@ class PerCloudConfigDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
     super(PerCloudConfigDecoderTestCase, self).setUp()
-    self._decoder = benchmark_config_spec._PerCloudConfigDecoder(option=_OPTION)
+    self._decoder = option_decoders.PerCloudConfigDecoder(option=_OPTION)
 
   def testRejectNone(self):
     with self.assertRaises(errors.Config.InvalidValue):
       self._decoder.Decode(None, _COMPONENT, {})
 
   def testAcceptNone(self):
-    decoder = benchmark_config_spec._PerCloudConfigDecoder(none_ok=True,
-                                                           option=_OPTION)
+    decoder = option_decoders.PerCloudConfigDecoder(none_ok=True,
+                                                    option=_OPTION)
     self.assertIsNone(decoder.Decode(None, _COMPONENT, {}))
 
   def testEmptyDict(self):
     result = self._decoder.Decode({}, _COMPONENT, {})
-    self.assertIsInstance(result, benchmark_config_spec._PerCloudConfigSpec)
+    self.assertIsInstance(result, option_decoders._PerCloudConfigSpec)
     self.assertEqual(result.__dict__, {
         cloud: None for cloud in providers.VALID_CLOUDS})
 
   def testNonEmptyDict(self):
     result = self._decoder.Decode(_GCP_ONLY_VM_CONFIG, _COMPONENT, {})
-    self.assertIsInstance(result, benchmark_config_spec._PerCloudConfigSpec)
+    self.assertIsInstance(result, option_decoders._PerCloudConfigSpec)
     expected_attributes = {cloud: None for cloud in providers.VALID_CLOUDS}
     expected_attributes['GCP'] = {'machine_type': 'n1-standard-1'}
     self.assertEqual(result.__dict__, expected_attributes)
