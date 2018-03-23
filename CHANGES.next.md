@@ -35,6 +35,7 @@
 - Added netperf container benchmark.
 - Added AWS container registry (ECR).
 - Added Azure container registry (ACR).
+- Added Google container registry (GCR) and added GKE autoscaling.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
