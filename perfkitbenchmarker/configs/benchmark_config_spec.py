@@ -23,6 +23,7 @@ import logging
 import os
 
 from perfkitbenchmarker import cloud_redis
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
@@ -414,57 +415,6 @@ class _EdwServiceSpec(spec.BaseSpec):
       config_values['password'] = flag_values.edw_service_cluster_password
 
 
-class _PerCloudConfigSpec(spec.BaseSpec):
-  """Contains one config dict attribute per cloud provider.
-
-  The name of each attribute is the name of the cloud provider.
-  """
-
-  @classmethod
-  def _GetOptionDecoderConstructions(cls):
-    """Gets decoder classes and constructor args for each configurable option.
-
-    Returns:
-      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
-      The pair specifies a decoder class and its __init__() keyword arguments
-      to construct in order to decode the named option.
-    """
-    result = super(_PerCloudConfigSpec, cls)._GetOptionDecoderConstructions()
-    for cloud in providers.VALID_CLOUDS:
-      result[cloud] = option_decoders.TypeVerifier, {
-          'default': None,
-          'valid_types': (dict,)
-      }
-    return result
-
-
-class _PerCloudConfigDecoder(option_decoders.TypeVerifier):
-  """Decodes the disk_spec or vm_spec option of a VM group config object."""
-
-  def __init__(self, **kwargs):
-    super(_PerCloudConfigDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Decodes the disk_spec or vm_spec option of a VM group config object.
-
-    Args:
-      value: None or dict mapping cloud provider name string to a dict.
-      component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
-      flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
-
-    Returns:
-      _PerCloudConfigSpec decoded from the input dict.
-    """
-    input_dict = super(_PerCloudConfigDecoder, self).Decode(
-        value, component_full_name, flag_values)
-    return None if input_dict is None else _PerCloudConfigSpec(
-        self._GetOptionFullName(component_full_name),
-        flag_values=flag_values,
-        **input_dict)
-
-
 class _StaticVmDecoder(option_decoders.TypeVerifier):
   """Decodes an item of the static_vms list of a VM group config object."""
 
@@ -605,8 +555,8 @@ class _ManagedRelationalDbSpec(spec.BaseSpec):
         'backup_start_time': (option_decoders.StringDecoder, {
             'default': '07:00'
         }),
-        'vm_spec': (_PerCloudConfigDecoder, {}),
-        'disk_spec': (_PerCloudConfigDecoder, {})
+        'vm_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        'disk_spec': (option_decoders.PerCloudConfigDecoder, {})
     })
     return result
 
@@ -793,7 +743,7 @@ class _VmGroupSpec(spec.BaseSpec):
             'min': 0,
             'none_ok': True
         }),
-        'disk_spec': (_PerCloudConfigDecoder, {
+        'disk_spec': (option_decoders.PerCloudConfigDecoder, {
             'default': None,
             'none_ok': True
         }),
@@ -805,7 +755,7 @@ class _VmGroupSpec(spec.BaseSpec):
             'default': _DEFAULT_VM_COUNT,
             'min': 0
         }),
-        'vm_spec': (_PerCloudConfigDecoder, {})
+        'vm_spec': (option_decoders.PerCloudConfigDecoder, {})
     })
     return result
 
@@ -894,15 +844,140 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
         flag_values=flag_values,
         **vm_group_config)
 
+class _ContainerRegistryDecoder(option_decoders.TypeVerifier):
+  """Validates the container_registry dictionary of a benchmark config."""
 
-class _ContainerClusterSpec(_VmGroupSpec):
+  def __init__(self, **kwargs):
+    super(_ContainerRegistryDecoder, self).__init__(valid_types=(dict,),
+                                                    **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies container_registry dictionary of a benchmark config object.
+
+    Args:
+      value: dict mapping VM group name string to the corresponding container
+          spec config dict.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+
+    Returns:
+      dict mapping container spec name string to ContainerSpec.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    vm_group_config = super(_ContainerRegistryDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    return container_service.ContainerRegistrySpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **vm_group_config)
+
+
+class _ContainerSpecsDecoder(option_decoders.TypeVerifier):
+  """Validates the container_specs dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super(_ContainerSpecsDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies container_specs dictionary of a benchmark config object.
+
+    Args:
+      value: dict mapping VM group name string to the corresponding container
+          spec config dict.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+
+    Returns:
+      dict mapping container spec name string to ContainerSpec.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    container_spec_configs = super(_ContainerSpecsDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    result = {}
+    for spec_name, spec_config in container_spec_configs.iteritems():
+      result[spec_name] = container_service.ContainerSpec(
+          '{0}.{1}'.format(
+              self._GetOptionFullName(component_full_name), spec_name),
+          flag_values=flag_values,
+          **spec_config)
+    return result
+
+
+class _ContainerClusterSpec(spec.BaseSpec):
   """Spec containing info needed to create a container cluster."""
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_ContainerClusterSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
+    ignore_package_requirements = (getattr(flag_values,
+                                           'ignore_package_requirements', True)
+                                   if flag_values else True)
+    providers.LoadProvider(self.cloud, ignore_package_requirements)
+    vm_config = getattr(self.vm_spec, self.cloud, None)
+    if vm_config is None:
+      raise errors.Config.MissingOption(
+          '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
+          'configuration for "{1}".'.format(component_full_name, self.cloud))
+    vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
+    self.vm_spec = vm_spec_class(
+        '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
+        flag_values=flag_values,
+        **vm_config)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments
+      to construct in order to decode the named option.
+    """
+    result = super(_ContainerClusterSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'cloud': (option_decoders.EnumDecoder, {
+            'valid_values': providers.VALID_CLOUDS
+        }),
+        'type': (option_decoders.EnumDecoder, {
+            'valid_values': container_service.CLUSTER_TYPES,
+            'default': 'Kubernetes',
+        }),
+        'vm_count': (option_decoders.IntDecoder, {
+            'default': _DEFAULT_VM_COUNT,
+            'min': 0
+        }),
+        'enable_autoscaling': (option_decoders.BooleanDecoder, {
+            'default': False
+        }),
+        'min_vm_count': (option_decoders.IntDecoder, {
+            'default': _DEFAULT_VM_COUNT,
+            'min': 0
+        }),
+        'max_vm_count': (option_decoders.IntDecoder, {
+            'default': _DEFAULT_VM_COUNT,
+            'min': 0
+        }),
+        'vm_spec': (option_decoders.PerCloudConfigDecoder, {})
+    })
+    return result
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     super(_ContainerClusterSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
     if flag_values['container_cluster_cloud'].present:
       config_values['cloud'] = flag_values.container_cluster_cloud
+    if flag_values['container_cluster_type'].present:
+      config_values['type'] = flag_values.container_cluster_type
     if flag_values['container_cluster_num_vms'].present:
       config_values['vm_count'] = flag_values.container_cluster_num_vms
 
@@ -1176,6 +1251,12 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'default': None
         }),
         'container_cluster': (_ContainerClusterSpecDecoder, {
+            'default': None
+        }),
+        'container_registry': (_ContainerRegistryDecoder, {
+            'default': None
+        }),
+        'container_specs': (_ContainerSpecsDecoder, {
             'default': None
         }),
         'dpb_service': (_DpbServiceDecoder, {

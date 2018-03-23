@@ -18,6 +18,7 @@ import json
 import logging
 import posixpath
 
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -270,8 +271,14 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     Constructs containers-related part of POST request to create POD.
     """
+    registry = getattr(context.GetThreadBenchmarkSpec(), 'registry', None)
+    if (not FLAGS.static_container_image and
+        registry is not None):
+      image = registry.GetFullRegistryTag(self.image)
+    else:
+      image = self.image
     container = {
-        "image": self.image,
+        "image": image,
         "name": self.name,
         "securityContext": {
             "privileged": FLAGS.docker_in_privileged_mode
