@@ -33,6 +33,7 @@
 - Added container image building.
 - Added netperf container benchmark.
 - Added AWS container registry (ECR).
+- Added Azure container registry (ACR).
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
