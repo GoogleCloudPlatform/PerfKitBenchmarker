@@ -95,12 +95,11 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
     Returns:
       stdout, stderr and retcode.
     """
-    stdout, stderr, retcode = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'redis', 'show',
-         '--resource-group', self.resource_group.name,
-         '--name', self.name,
-        ]
-    )
+    stdout, stderr, retcode = vm_util.IssueCommand([
+        azure.AZURE_PATH, 'redis', 'show',
+        '--resource-group', self.resource_group.name,
+        '--name', self.name,
+    ])
     return stdout, stderr, retcode
 
   def _Exists(self):
@@ -144,12 +143,11 @@ class AzureRedisCache(cloud_redis.BaseCloudRedis):
     instance_details['host'] = response['hostName']
     instance_details['port'] = response['port']
 
-    stdout, _, retcode = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'redis', 'list-keys',
-         '--resource-group', self.resource_group.name,
-         '--name', self.name,
-        ]
-    )
+    stdout, _, retcode = vm_util.IssueCommand([
+        azure.AZURE_PATH, 'redis', 'list-keys',
+        '--resource-group', self.resource_group.name,
+        '--name', self.name,
+    ])
     if retcode != 0:
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on %s.', self.name)

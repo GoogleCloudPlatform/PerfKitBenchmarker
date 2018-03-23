@@ -480,7 +480,7 @@ class KubernetesContainer(BaseContainer):
         self.name,
         '--image=%s' % self.image,
         '--restart=Never',
-        '--limits=cpu=%sm,memory=%sMi' % (int(1000*self.cpus), self.memory),
+        '--limits=cpu=%sm,memory=%sMi' % (int(1000 * self.cpus), self.memory),
     ]
     if self.command:
       run_cmd.extend(['--command', '--'])
@@ -535,7 +535,7 @@ class KubernetesContainerService(BaseContainerService):
         'run',
         self.name,
         '--image=%s' % self.image,
-        '--limits=cpu=%sm,memory=%sMi' % (int(1000*self.cpus), self.memory),
+        '--limits=cpu=%sm,memory=%sMi' % (int(1000 * self.cpus), self.memory),
         '--port', str(self.port)
     ]
     if self.command:
@@ -602,4 +602,3 @@ class KubernetesCluster(BaseContainerCluster):
     service = KubernetesContainerService(container_spec, name)
     self.containers[name] = service
     service.Create()
-
