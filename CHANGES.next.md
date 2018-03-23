@@ -30,6 +30,8 @@
   `--dstat_publish_regex`.
 - Added Inception v3 benchmark that supports CPU, GPU and TPU. This benchmark is
   the same as TensorFlow with inception3 for CPU and GPU.
+- Added container image building.
+- Added netperf container benchmark.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

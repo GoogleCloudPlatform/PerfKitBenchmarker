@@ -459,6 +459,7 @@ def DoProvisionPhase(spec, timer):
   """
   logging.info('Provisioning resources for benchmark %s', spec.name)
   spec.ConstructContainerCluster()
+  spec.ConstructContainerRegistry()
   # spark service needs to go first, because it adds some vms.
   spec.ConstructSparkService()
   spec.ConstructDpbService()
@@ -638,6 +639,9 @@ def RunBenchmark(spec, collector):
         if timing_util.RuntimeMeasurementsEnabled():
           collector.AddSamples(
               detailed_timer.GenerateSamples(), spec.name, spec)
+
+        # Add resource related samples.
+        collector.AddSamples(spec.GetSamples(), spec.name, spec)
 
       except Exception as e:
         # Log specific type of failure, if known

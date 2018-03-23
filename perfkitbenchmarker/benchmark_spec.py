@@ -117,6 +117,8 @@ class BenchmarkSpec(object):
     self.networks_lock = threading.Lock()
     self.firewalls_lock = threading.Lock()
     self.vm_groups = {}
+    self.container_specs = benchmark_config.container_specs
+    self.container_registry = None
     self.deleted = False
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
     self.always_call_cleanup = False
@@ -159,10 +161,23 @@ class BenchmarkSpec(object):
     if self.config.container_cluster is None:
       return
     cloud = self.config.container_cluster.cloud
+    cluster_type = self.config.container_cluster.type
     providers.LoadProvider(cloud)
-    container_cluster_class = container_service.GetContainerClusterClass(cloud)
+    container_cluster_class = container_service.GetContainerClusterClass(
+        cloud, cluster_type)
     self.container_cluster = container_cluster_class(
         self.config.container_cluster)
+
+  def ConstructContainerRegistry(self):
+    """Create the container registry."""
+    if self.config.container_registry is None:
+      return
+    cloud = self.config.container_registry.cloud
+    providers.LoadProvider(cloud)
+    container_registry_class = container_service.GetContainerRegistryClass(
+        cloud)
+    self.container_registry = container_registry_class(
+        self.config.container_registry)
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""
@@ -384,6 +399,14 @@ class BenchmarkSpec(object):
     networks = [self.networks[key] for key in sorted(self.networks.iterkeys())]
     vm_util.RunThreaded(lambda net: net.Create(), networks)
 
+    if self.container_registry:
+      self.container_registry.Create()
+      for container_spec in self.container_specs.itervalues():
+        if container_spec.static_image:
+          continue
+        container_spec.image = self.container_registry.GetOrBuild(
+            container_spec.image)
+
     if self.container_cluster:
       self.container_cluster.Create()
 
@@ -421,6 +444,8 @@ class BenchmarkSpec(object):
     if self.deleted:
       return
 
+    if self.container_registry:
+      self.container_registry.Delete()
     if self.spark_service:
       self.spark_service.Delete()
     if self.dpb_service:
@@ -456,6 +481,15 @@ class BenchmarkSpec(object):
       self.container_cluster.Delete()
 
     self.deleted = True
+
+  def GetSamples(self):
+    """Returns samples created from benchmark resources."""
+    samples = []
+    if self.container_cluster:
+      samples.extend(self.container_cluster.GetSamples())
+    if self.container_registry:
+      samples.extend(self.container_registry.GetSamples())
+    return samples
 
   def StartBackgroundWorkload(self):
     targets = [(vm.StartBackgroundWorkload, (), {}) for vm in self.vms]

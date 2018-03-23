@@ -17,6 +17,8 @@ import abc
 import types
 
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import providers
+from perfkitbenchmarker.configs import spec
 
 
 class ConfigOptionDecoder(object):
@@ -322,3 +324,54 @@ class ListDecoder(TypeVerifier):
       result.append(self._item_decoder.Decode(input_item, item_full_name,
                                               flag_values))
     return result
+
+
+class _PerCloudConfigSpec(spec.BaseSpec):
+  """Contains one config dict attribute per cloud provider.
+
+  The name of each attribute is the name of the cloud provider.
+  """
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments
+      to construct in order to decode the named option.
+    """
+    result = super(_PerCloudConfigSpec, cls)._GetOptionDecoderConstructions()
+    for cloud in providers.VALID_CLOUDS:
+      result[cloud] = TypeVerifier, {
+          'default': None,
+          'valid_types': (dict,)
+      }
+    return result
+
+
+class PerCloudConfigDecoder(TypeVerifier):
+  """Decodes the disk_spec or vm_spec option of a VM group config object."""
+
+  def __init__(self, **kwargs):
+    super(PerCloudConfigDecoder, self).__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Decodes the disk_spec or vm_spec option of a VM group config object.
+
+    Args:
+      value: None or dict mapping cloud provider name string to a dict.
+      component_full_name: string. Fully qualified name of the configurable
+          component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+          BaseSpec constructors.
+
+    Returns:
+      _PerCloudConfigSpec decoded from the input dict.
+    """
+    input_dict = super(PerCloudConfigDecoder, self).Decode(
+        value, component_full_name, flag_values)
+    return None if input_dict is None else _PerCloudConfigSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **input_dict)
