@@ -36,6 +36,7 @@
 - Added AWS container registry (ECR).
 - Added Azure container registry (ACR).
 - Added Google container registry (GCR) and added GKE autoscaling.
+- Added `create_time` to VM metadata.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
