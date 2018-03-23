@@ -39,6 +39,20 @@ def GetRegionFromZone(zone):
   return zone[:-2]
 
 
+def GetMultiRegionFromRegion(region):
+  """Gets the closest multi-region location to the region."""
+  if (region.startswith('us')  or
+      region.startswith('northamerica') or
+      region.startswith('southamerica')):
+    return 'us'
+  elif region.startswith('europe'):
+    return 'eu'
+  elif region.startswith('asia') or region.startswith('australia'):
+    return 'asia'
+  else:
+    raise Exception('Unknown region "%s".' % region)
+
+
 class GcloudCommand(object):
   """A gcloud command.
 

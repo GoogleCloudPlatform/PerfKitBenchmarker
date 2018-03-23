@@ -21,6 +21,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 
@@ -28,6 +29,50 @@ FLAGS = flags.FLAGS
 
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.9/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
+
+
+class GoogleContainerRegistry(container_service.BaseContainerRegistry):
+  """Class for building and storing container images on GCP."""
+
+  CLOUD = providers.GCP
+
+  def __init__(self, registry_spec):
+    super(GoogleContainerRegistry, self).__init__(registry_spec)
+    self.project = self.project or util.GetDefaultProject()
+
+  def GetFullRegistryTag(self, image):
+    """Gets the full tag of the image."""
+    region = util.GetMultiRegionFromRegion(util.GetRegionFromZone(self.zone))
+    hostname = '{region}.gcr.io'.format(region=region)
+    full_tag = '{hostname}/{project}/{name}'.format(
+        hostname=hostname, project=self.project, name=image)
+    return full_tag
+
+  def Login(self):
+    """No-op because Push() handles its own auth."""
+    pass
+
+  def Push(self, image):
+    """Push a locally built image to the registry."""
+    full_tag = self.GetFullRegistryTag(image.name)
+    tag_cmd = ['docker', 'tag', image.name, full_tag]
+    vm_util.IssueCommand(tag_cmd)
+    # vm_util.IssueCommand() is used here instead of util.GcloudCommand()
+    # because gcloud flags cannot be appended to the command since they
+    # are interpreted as docker args instead.
+    push_cmd = [
+        FLAGS.gcloud_path, '--project', self.project,
+        'docker', '--', 'push', full_tag
+    ]
+    vm_util.IssueCommand(push_cmd)
+
+  def RemoteBuild(self, image):
+    """Build the image remotely."""
+    full_tag = self.GetFullRegistryTag(image.name)
+    build_cmd = util.GcloudCommand(self, 'container', 'builds', 'submit',
+                                   '--tag', full_tag, image.directory)
+    del build_cmd.flags['zone']
+    build_cmd.Issue()
 
 
 class GkeCluster(container_service.KubernetesCluster):
@@ -44,6 +89,7 @@ class GkeCluster(container_service.KubernetesCluster):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
+    self.cluster_version = '1.9.2-gke.1'
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -63,8 +109,7 @@ class GkeCluster(container_service.KubernetesCluster):
       # to be specified in the spec (this will require a new spec class
       # for google_container_engine however).
       cmd = util.GcloudCommand(
-          self, 'beta', 'container', 'clusters', 'create', self.name,
-          '--cluster-version', '1.9.2-gke.1')
+          self, 'beta', 'container', 'clusters', 'create', self.name)
 
       cmd.flags['accelerator'] = (gce_virtual_machine.
                                   GenerateAcceleratorSpecString(self.gpu_type,
@@ -72,6 +117,14 @@ class GkeCluster(container_service.KubernetesCluster):
     else:
       cmd = util.GcloudCommand(
           self, 'container', 'clusters', 'create', self.name)
+
+    cmd.flags['cluster-version'] = self.cluster_version
+    cmd.flags['scopes'] = 'cloud-platform'
+
+    if self.enable_autoscaling:
+      cmd.args.append('--enable-autoscaling')
+      cmd.flags['max-nodes'] = self.max_nodes
+      cmd.flags['min-nodes'] = self.min_nodes
 
     cmd.flags['num-nodes'] = self.num_nodes
     cmd.flags['machine-type'] = self.machine_type
