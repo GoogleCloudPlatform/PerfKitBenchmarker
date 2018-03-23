@@ -14,18 +14,110 @@
 
 """Contains classes/functions related to AWS container clusters."""
 
+import json
 import os
 import uuid
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 import yaml
 
 FLAGS = flags.FLAGS
+
+
+class EcrRepository(resource.BaseResource):
+  """Class representing an Elastic Container Registry image repository."""
+
+  def __init__(self, name, region):
+    super(EcrRepository, self).__init__()
+    self.name = name
+    self.region = region
+
+  def _Create(self):
+    """Creates the image repository."""
+    if self._Exists():
+      self.user_managed = True
+      return
+    create_cmd = util.AWS_PREFIX + [
+        'ecr', 'create-repository',
+        '--region', self.region,
+        '--repository-name', self.name
+    ]
+    vm_util.IssueCommand(create_cmd)
+
+  def _Exists(self):
+    """Returns True if the repository exists."""
+    describe_cmd = util.AWS_PREFIX + [
+        'ecr', 'describe-repositories',
+        '--region', self.region,
+        '--repository-names', self.name
+    ]
+    stdout, _, _ = vm_util.IssueCommand(describe_cmd, suppress_warning=True)
+    if not stdout or not json.loads(stdout)['repositories']:
+      return False
+    return True
+
+  def _Delete(self):
+    """Deletes the repository."""
+    delete_cmd = util.AWS_PREFIX + [
+        'ecr', 'delete-repository',
+        '--region', self.region,
+        '--repository-name', self.name,
+        '--force'
+    ]
+    vm_util.IssueCommand(delete_cmd)
+
+
+class ElasticContainerRegistry(container_service.BaseContainerRegistry):
+  """Class for building and storing container images on AWS."""
+
+  CLOUD = providers.AWS
+
+  def __init__(self, registry_spec):
+    super(ElasticContainerRegistry, self).__init__(registry_spec)
+    self.account = self.project or util.GetAccount()
+    self.region = util.GetRegionFromZone(self.zone)
+    self.repositories = []
+
+  def _Delete(self):
+    """Deletes the repositories."""
+    for repository in self.repositories:
+      repository.Delete()
+
+  def Push(self, image):
+    """Push a locally built image to the registry."""
+    repository_name = '{namespace}/{name}'.format(
+        namespace=self.name, name=image.name)
+    repository = EcrRepository(repository_name, self.region)
+    self.repositories.append(repository)
+    repository.Create()
+    super(ElasticContainerRegistry, self).Push(image)
+
+  def GetFullRegistryTag(self, image):
+    """Gets the full tag of the image."""
+    tag = '{account}.dkr.ecr.{region}.amazonaws.com/{namespace}/{name}'.format(
+        account=self.account, region=self.region, namespace=self.name,
+        name=image)
+    return tag
+
+  def Login(self):
+    """Logs in to the registry."""
+    get_login_cmd = util.AWS_PREFIX + [
+        'ecr', 'get-login', '--no-include-email'
+    ]
+    stdout, _, _ = vm_util.IssueCommand(get_login_cmd)
+    login_cmd = stdout.split()
+    vm_util.IssueCommand(login_cmd)
+
+  def RemoteBuild(self, image):
+    """Build the image remotely."""
+    # TODO(ehankland) use AWS codebuild to build the image.
+    raise NotImplementedError()
 
 
 class AwsKopsCluster(container_service.KubernetesCluster):
