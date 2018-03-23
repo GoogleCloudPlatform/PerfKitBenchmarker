@@ -32,6 +32,7 @@
   the same as TensorFlow with inception3 for CPU and GPU.
 - Added container image building.
 - Added netperf container benchmark.
+- Added AWS container registry (ECR).
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
