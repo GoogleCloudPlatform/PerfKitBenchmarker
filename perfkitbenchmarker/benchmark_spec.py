@@ -13,6 +13,7 @@
 # limitations under the License.
 """Container for all data required for a benchmark to run."""
 
+import datetime
 import contextlib
 import copy
 import copy_reg
@@ -532,7 +533,8 @@ class BenchmarkSpec(object):
     vm_metadata = {
         'benchmark': self.name,
         'perfkit_uuid': self.uuid,
-        'benchmark_uid': self.uid
+        'benchmark_uid': self.uid,
+        'create_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     }
     for item in FLAGS.vm_metadata:
       if ':' not in item:
