@@ -844,6 +844,7 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
         flag_values=flag_values,
         **vm_group_config)
 
+
 class _ContainerRegistryDecoder(option_decoders.TypeVerifier):
   """Validates the container_registry dictionary of a benchmark config."""
 
