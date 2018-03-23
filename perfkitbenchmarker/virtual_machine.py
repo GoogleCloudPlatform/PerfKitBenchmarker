@@ -407,12 +407,53 @@ class BaseVirtualMachine(resource.BaseResource):
     should be downloaded into the install path within a subdirectory with the
     benchmark name.
 
+    The downloaded file's parent directory will be created if it does not
+    exist.
+
     Args:
       install_path: The install path on this VM.
       benchmark_name: Name of the benchmark associated with this data file.
       filename: The name of the file that was downloaded.
     """
     raise NotImplementedError()
+
+  def IsInterruptible(self):
+    """Returns whether this vm is a interruptible vm (e.g. spot, preemptible).
+
+    Caller must call UpdateInterruptibleVmStatus before calling this function
+    to make sure return value is up to date.
+
+    Returns:
+      True if this vm is a interruptible vm.
+    """
+    return False
+
+  def UpdateInterruptibleVmStatus(self):
+    """Updates the status of the discounted vm.
+    """
+    pass
+
+  def WasInterrupted(self):
+    """Returns whether this interruptible vm was terminated early.
+
+    Caller must call UpdateInterruptibleVmStatus before calling this function
+    to make sure return value is up to date.
+
+    Returns:
+      True if this vm is a interruptible vm was terminated early.
+    """
+    return False
+
+  def GetVmStatusCode(self):
+    """Returns the vm status code if any.
+
+    Caller must call UpdateInterruptibleVmStatus before calling this function
+    to make sure return value is up to date.
+
+    Returns:
+      Vm status code.
+    """
+    return None
 
 
 class BaseOsMixin(object):

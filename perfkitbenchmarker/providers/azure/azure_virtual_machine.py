@@ -281,7 +281,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.extend(['--admin-password', self.password])
     else:
       create_cmd.extend(['--ssh-key-value', self.ssh_public_key])
-    vm_util.IssueCommand(create_cmd)
+
+    # Uses a custom default because create for larger sizes sometimes times out.
+    azure_vm_create_timeout = 600
+    vm_util.IssueCommand(create_cmd, timeout=azure_vm_create_timeout)
 
   def _Exists(self):
     """Returns True if the VM exists."""
@@ -365,7 +368,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.Install('azure_cli')
     self.Install('azure_credentials')
     destpath = posixpath.join(install_path, filename)
+    self.RemoteCommand('mkdir -p %s' % posixpath.dirname(destpath))
     self.RemoteCommand('az storage blob download '
+                       '--no-progress '
                        '--account-name %s '
                        '--container-name %s '
                        '--name %s '

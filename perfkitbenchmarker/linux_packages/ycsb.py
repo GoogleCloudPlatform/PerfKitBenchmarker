@@ -736,9 +736,11 @@ class YCSBExecutor(object):
                              workload_index=workload_index,
                              stage='run')
 
-      def PushWorkload(vm):
+      def PushWorkload(vm, workload_file, remote_path):
+        vm.RemoteCommand('sudo rm -f ' + remote_path)
         vm.PushFile(workload_file, remote_path)
-      vm_util.RunThreaded(PushWorkload, list(set(vms)))
+      vm_util.RunThreaded(PushWorkload, [((vm, workload_file, remote_path), {})
+                                         for vm in vms])
 
       parameters['parameter_files'] = [remote_path]
       for client_count in _GetThreadsPerLoaderList():
