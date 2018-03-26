@@ -143,3 +143,6 @@
   is installed in /usr/local/bin.
 - Make ~/.ssh/config only readable by the owner.
 - Increased timeout for Azure `az vm create` commands.
+- Replace all underscores in the benchmark name with dashes when downloading
+  preprovisioned benchmark data from Azure. This is because Azure blob storage
+  container names cannot contain underscores.
