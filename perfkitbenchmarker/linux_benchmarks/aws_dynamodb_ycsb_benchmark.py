@@ -58,6 +58,7 @@ flags.DEFINE_string('aws_dynamodb_ycsb_requestdistribution',
                     'uniform',
                     'Type of request distribution.')
 
+
 def GetConfig(user_config):
     config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
     if FLAGS['ycsb_client_vms'].present:
