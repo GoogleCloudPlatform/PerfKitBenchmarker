@@ -14,8 +14,8 @@
 
 """Run YCSB benchmark against AWS DynamoDB.
 
-This benchmark does not provision VMs for the corresponding DynamboDB database. The only VM group is client group that sends requests to specified
-DB.
+This benchmark does not provision VMs for the corresponding DynamboDB database.
+The only VM group is client group that sends requests to specifiedDB.
 
 Before running this benchmark, you have to manually create `usertable` with primaryKey 'user01'.
 
@@ -66,8 +66,11 @@ def GetConfig(user_config):
 
 
 def CheckPrerequisites(benchmark_config):
-    # Before YCSB Cloud Datastore supports Application Default Credential,
-    # we should always make sure valid credential flags are set.
+    """Verifies that the required resources are present.
+
+    Raises:
+    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+    """
     if not FLAGS.aws_dynamodb_ycsb_awscredentials_properties:
         raise ValueError('"aws_dynamodb_ycsb_awscredentials_properties" must be set')
     if not FLAGS.aws_dynamodb_ycsb_dynamodb_primarykey:
@@ -77,6 +80,12 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
+    """Install YCSB on the target vm.
+
+    Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+    """
     benchmark_spec.always_call_cleanup = True
     vms = benchmark_spec.vms
 
@@ -86,6 +95,15 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
+    """Run YCSB on the target vm.
+
+    Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+    required to run the benchmark.
+
+    Returns:
+    A list of sample.Sample objects.
+    """
     vms = benchmark_spec.vms
 
     run_kwargs = {
@@ -103,11 +121,18 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
+    """Cleanup YCSB on the target vm.
+
+    Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+    required to run the benchmark.
+    """
     logging.warning(
         "Manual cleanup only currently.")
 
 
 def _Install(vm):
+    """Install YCSB on client 'vm'."""
     vm.Install('ycsb')
 
     # copy AWS creds
