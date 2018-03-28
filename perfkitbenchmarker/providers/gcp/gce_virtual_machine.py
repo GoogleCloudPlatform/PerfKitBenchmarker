@@ -62,6 +62,7 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
                     'potential stockout scenario.')
+_GCE_VM_CREATE_TIMEOUT = 600
 _GPU_TYPE_TO_INTERAL_NAME_MAP = {
     'k80': 'nvidia-tesla-k80',
     'p100': 'nvidia-tesla-p100',
@@ -336,7 +337,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     for key, value in parsed_metadata_from_file.iteritems():
       if key in metadata_from_file:
         logging.warning('Metadata "%s" is set internally. Cannot be overridden '
-                        'from command line.' % key)
+                        'from command line.', key)
         continue
       metadata_from_file[key] = value
     cmd.flags['metadata-from-file'] = ','.join([
@@ -349,7 +350,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     for key, value in parsed_metadata.iteritems():
       if key in metadata:
         logging.warning('Metadata "%s" is set internally. Cannot be overridden '
-                        'from command line.' % key)
+                        'from command line.', key)
         continue
       metadata[key] = value
     cmd.flags['metadata'] = ','.join(
@@ -383,7 +384,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       tf.write('%s:%s\n' % (self.user_name, public_key))
       tf.close()
       create_cmd = self._GenerateCreateCommand(tf.name)
-      _, stderr, retcode = create_cmd.Issue()
+      _, stderr, retcode = create_cmd.Issue(timeout=_GCE_VM_CREATE_TIMEOUT)
 
     if (self.use_dedicated_host and retcode and
         _INSUFFICIENT_HOST_CAPACITY in stderr and not self.num_vms_per_host):
