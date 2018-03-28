@@ -55,7 +55,7 @@
 - Add new `os_types` Centos7, Debian9, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
 - Make it easier to RDP to PKB VMs
 - Avoid setting up thread pool etc when run_processes is set
-  to 1 to simplify debugging using --run_with_pdb flag
+  to 1 and using --run_with_pdb flag to simplify debugging.
 - Added a sample benchmark for descriptive purposes.
 - Added GPU peer to peer topology information to metadata.
 - Added a flag, `hpcg_run_as_root` which allows OpenMPI to run HPCG in the case
