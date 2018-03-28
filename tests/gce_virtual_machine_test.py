@@ -66,7 +66,9 @@ _FAKE_DISK_METADATA = {
 def PatchCriticalObjects(retvals=None):
   """A context manager that patches a few critical objects with mocks."""
 
-  def ReturnVal(*unused_arg):
+  def ReturnVal(*unused_arg, **unused_kwargs):
+    del unused_arg
+    del unused_kwargs
     return ('', '', 0) if retvals is None else retvals.pop(0)
 
   with mock.patch(vm_util.__name__ + '.IssueCommand',
