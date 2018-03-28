@@ -865,7 +865,7 @@ def RunBenchmarks():
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
-    if FLAGS.run_processes == 1:
+    if FLAGS.run_with_pdb and FLAGS.run_processes == 1:
       spec_sample_tuples = RunBenchmarkTasksInSeries(tasks)
     else:
       spec_sample_tuples = background_tasks.RunParallelProcesses(
