@@ -37,6 +37,7 @@
 - Added Azure container registry (ACR).
 - Added Google container registry (GCR) and added GKE autoscaling.
 - Added `create_time` to VM metadata.
+- Added new ycsb workload where each payload is 1mb versus the default 1kb.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

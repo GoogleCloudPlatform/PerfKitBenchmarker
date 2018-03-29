@@ -129,8 +129,10 @@ flags.DEFINE_integer('ycsb_operation_count', 1000000, 'Number of operations '
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination. Set to 0 for '
                      'unlimited time.')
-flags.DEFINE_integer('ycsb_field_count', 10, 'Number of fields in a record.')
-flags.DEFINE_integer('ycsb_field_length', 100, 'Size of each field.')
+flags.DEFINE_integer('ycsb_field_count', None, 'Number of fields in a record. '
+                     'Defaults to None which uses the ycsb default of 10.')
+flags.DEFINE_integer('ycsb_field_length', None, 'Size of each field. Defaults '
+                     'to None which uses the ycsb default of 100.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -754,9 +756,11 @@ class YCSBExecutor(object):
     all_results = []
     for workload_index, workload_file in enumerate(workloads):
       parameters = {'operationcount': FLAGS.ycsb_operation_count,
-                    'recordcount': FLAGS.ycsb_record_count,
-                    'fieldcount': FLAGS.ycsb_field_count,
-                    'fieldlength': FLAGS.ycsb_field_length}
+                    'recordcount': FLAGS.ycsb_record_count}
+      if FLAGS.ycsb_field_count:
+        parameters['fieldcount'] = FLAGS.ycsb_field_count
+      if FLAGS.ycsb_field_length:
+        parameters['fieldlength'] = FLAGS.ycsb_field_length
       if FLAGS.ycsb_timelimit:
         parameters['maxexecutiontime'] = FLAGS.ycsb_timelimit
       parameters.update(kwargs)
