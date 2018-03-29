@@ -12,6 +12,7 @@
 - Renamed cuda_toolkit_8 to cuda_toolkit
 - Migrated cluster boot benchmark default machines to 'default_dual_core'.
 - Changed metric name in mnist and inception3.
+- Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers
@@ -89,6 +90,7 @@
   spot instance failure metadata support.
 - Added flags `ycsb_version` and `ycsb_measurement_type` to support
   user-specified ycsb versions and measurement types.
+- Added support to tensorflow_benchmark for running multiple batch sizes per run.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
