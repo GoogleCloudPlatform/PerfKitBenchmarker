@@ -58,6 +58,8 @@ flags.DEFINE_integer('num_threads', 16,
 flags.DEFINE_integer('rpc_timeout', DEFAULT_TIMEOUT,
                      'Number of seconds to set the rpc timeout to.')
 
+tf.logging.set_verbosity(tf.logging.ERROR)
+
 
 def get_files_in_directory_sorted(directory):
   """Returns a list of files in directory, sorted alphabetically."""
