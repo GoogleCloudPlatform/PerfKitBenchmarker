@@ -93,7 +93,7 @@ class DetailedResultParserTestCase(unittest.TestCase):
                         'ycsb-test-run-2.dat')
     with open(path) as fp:
       self.contents = fp.read()
-    self.results = ycsb.ParseResults(self.contents)
+    self.results = ycsb.ParseResults(self.contents, 'histogram')
 
   def testPercentilesFromHistogram_read(self):
     hist = self.results['groups']['read']['histogram']
