@@ -78,9 +78,9 @@ flags.register_validator('tf_models',
                          + ', '.join(MODELS))
 flags.DEFINE_enum('tf_data_name', 'imagenet', ['imagenet', 'flowers'],
                   'Name of dataset: imagenet or flowers.')
-flags.DEFINE_integer('tf_batch_size', None, 'batch size per compute device. '
-                     'If not provided, the suggested batch size is used for '
-                     'the given model')
+flags.DEFINE_list('tf_batch_sizes', None, 'batch sizes per compute device. '
+                  'If not provided, the suggested batch size is used for '
+                  'the given model')
 flags.DEFINE_enum('tf_variable_update', 'parameter_server',
                   ['parameter_server', 'replicated',
                    'distributed_replicated', 'independent'],
@@ -149,8 +149,8 @@ def _GetDefaultBatchSizeByModel(model):
   return DEFAULT_BATCH_SIZES_BY_MODEL.get(model, DEFAULT_BATCH_SIZE)
 
 
-def _GetBatchSize(model):
-  return FLAGS.tf_batch_size or _GetDefaultBatchSizeByModel(model)
+def _GetBatchSizes(model):
+  return FLAGS.tf_batch_sizes or [_GetDefaultBatchSizeByModel(model)]
 
 
 def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
@@ -295,12 +295,13 @@ def _MakeSamplesFromOutput(benchmark_spec, output, model, batch_size, num_gpus):
                        'images/sec', metadata)
 
 
-def _RunModelOnVm(vm, model, benchmark_spec, args='', job_name=''):
+def _RunModelOnVm(vm, model, batch_size, benchmark_spec, args='', job_name=''):
   """Runs a TensorFlow benchmark on a single VM.
 
   Args:
     vm: VM to run on
     model: string, the name of model to run
+    batch_size: int, training batch size
     benchmark_spec: BenchmarkSpec object
     args: string, distributed arguments
     job_name: string, distributed job name
@@ -310,7 +311,6 @@ def _RunModelOnVm(vm, model, benchmark_spec, args='', job_name=''):
     number from TensorFlow parameter server.
   """
   tf_cnn_benchmark_dir = 'benchmarks/scripts/tf_cnn_benchmarks'
-  batch_size = _GetBatchSize(model)
   benchmark_spec.local_parameter_device = FLAGS.tf_local_parameter_device
   benchmark_spec.device = FLAGS.tf_device
   benchmark_spec.data_format = FLAGS.tf_data_format
@@ -371,7 +371,11 @@ def _RunOnVm(vm, benchmark_spec):
   Returns:
     A list of samples containing the TensorFlow throughput from different models
   """
-  return [_RunModelOnVm(vm, model, benchmark_spec) for model in FLAGS.tf_models]
+  samples = []
+  for model in FLAGS.tf_models:
+    for batch_size in _GetBatchSizes(model):
+      samples.append(_RunModelOnVm(vm, model, batch_size, benchmark_spec))
+  return samples
 
 
 def _GetHostsArgs(hosts):
