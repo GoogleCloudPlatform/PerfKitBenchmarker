@@ -86,6 +86,8 @@
 - Updated cloud TPU model link.
 - Updated AWS spot instance creation and added
   spot instance failure metadata support.
+- Added flags `ycsb_version` and `ycsb_measurement_type` to support
+  user-specified ycsb versions and measurement types.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
