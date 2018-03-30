@@ -23,6 +23,7 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 REDIS_VERSION_MAPPING = {'REDIS_3_2': '3.2.10'}
@@ -105,7 +106,9 @@ class ElastiCacheRedis(cloud_redis.BaseCloudRedis):
 
   def _Create(self):
     """Creates the cluster."""
+    tags = util.FormatTags(util.MakeDefaultTags())
     cmd = ['aws', 'elasticache', 'create-replication-group',
+           '--tags', tags,
            '--engine', 'redis',
            '--engine-version', self.version,
            '--replication-group-id', self.cluster_name,
