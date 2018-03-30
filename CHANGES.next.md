@@ -100,7 +100,7 @@
 - Fix ProfitBricks volume availability zone issue
 - Bulk AllowPort restored.
 - Moved CustomMachineTypeSpec and related decoders to their own module
-- Updated GKE engine version to 1.8.6-gke.0 when using a GPU-accelerated cluster
+- Updated GKE engine version to 1.9.6-gke.0 when using a GPU-accelerated cluster
 - Update python and pip package names used when installed with Yum.
 - Don't try to publish samples if there aren't any
 - Disallow overwriting of benchmarks using the same benchmark name.
