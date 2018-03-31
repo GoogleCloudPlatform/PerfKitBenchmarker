@@ -12,6 +12,7 @@
 - Renamed cuda_toolkit_8 to cuda_toolkit
 - Migrated cluster boot benchmark default machines to 'default_dual_core'.
 - Changed metric name in mnist and inception3.
+- Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers
@@ -37,6 +38,9 @@
 - Added Azure container registry (ACR).
 - Added Google container registry (GCR) and added GKE autoscaling.
 - Added `create_time` to VM metadata.
+- Added new ycsb workload where each payload is 1mb versus the default 1kb.
+- Added Tensorflow Serving benchmark which tests the throughput and latency of the
+  standard model-server using a pre-trained inception3 model.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -55,7 +59,7 @@
 - Add new `os_types` Centos7, Debian9, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
 - Make it easier to RDP to PKB VMs
 - Avoid setting up thread pool etc when run_processes is set
-  to 1 to simplify debugging using --run_with_pdb flag
+  to 1 and using --run_with_pdb flag to simplify debugging.
 - Added a sample benchmark for descriptive purposes.
 - Added GPU peer to peer topology information to metadata.
 - Added a flag, `hpcg_run_as_root` which allows OpenMPI to run HPCG in the case
@@ -86,6 +90,9 @@
 - Updated cloud TPU model link.
 - Updated AWS spot instance creation and added
   spot instance failure metadata support.
+- Added flags `ycsb_version` and `ycsb_measurement_type` to support
+  user-specified ycsb versions and measurement types.
+- Added support to tensorflow_benchmark for running multiple batch sizes per run.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -143,6 +150,7 @@
   is installed in /usr/local/bin.
 - Make ~/.ssh/config only readable by the owner.
 - Increased timeout for Azure `az vm create` commands.
+- Increased timeout for GCP `gcloud compute instances create` commands.
 - Replace all underscores in the benchmark name with dashes when downloading
   preprovisioned benchmark data from Azure. This is because Azure blob storage
   container names cannot contain underscores.
