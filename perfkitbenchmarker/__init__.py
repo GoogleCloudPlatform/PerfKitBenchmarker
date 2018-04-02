@@ -14,3 +14,4 @@
 """Import flags."""
 
 from absl import flags  # NOQA
+from absl import app    # NOQA
