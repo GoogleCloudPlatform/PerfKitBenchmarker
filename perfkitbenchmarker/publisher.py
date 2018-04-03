@@ -675,7 +675,7 @@ class ElasticsearchPublisher(SamplePublisher):
       else:
         es.indices.create(index=self.es_index, body=self.mapping_old)
         logging.info('Create index %s and default mappings for'
-                     ' elasticsearch version < 5.0.0', 
+                     ' elasticsearch version < 5.0.0',
                      self.es_index)
     for s in samples:
       sample = copy.deepcopy(s)
