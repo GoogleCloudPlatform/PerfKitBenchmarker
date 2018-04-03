@@ -89,7 +89,7 @@ class GkeCluster(container_service.KubernetesCluster):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
-    self.cluster_version = '1.9.2-gke.1'
+    self.cluster_version = '1.9.6-gke.0'
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
