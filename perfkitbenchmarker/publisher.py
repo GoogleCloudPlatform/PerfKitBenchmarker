@@ -667,7 +667,7 @@ class ElasticsearchPublisher(SamplePublisher):
     if not es.indices.exists(index=self.es_index):
       # choose whether to use old or new mapings based on
       # the version of elasticsearch that is being used
-      if int(es.info()['version']['number'][0]) >= 5:
+      if int(es.info()['version']['number'].split('.')[0]) >= 5:
         es.indices.create(index=self.es_index, body=self.mapping)
         logging.info('Create index %s and default mappings for'
                      ' elasticsearch version > 5.0.0',
