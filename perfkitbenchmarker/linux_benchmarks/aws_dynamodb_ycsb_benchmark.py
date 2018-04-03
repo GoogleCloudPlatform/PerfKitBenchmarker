@@ -18,6 +18,7 @@ This benchmark does not provision VMs for the corresponding DynamboDB database.
 The only VM group is client group that sends requests to specifiedDB.
 
 Before running this benchmark, you have to manually create `usertable` with primaryKey 'user01'.
+TODO: add DynamoDB provider.
 
 """
 
