@@ -658,6 +658,37 @@ class ElasticsearchPublisher(SamplePublisher):
                     "strings": {
                         "match_mapping_type": "string",
                         "mapping": {
+                            "type": "text",
+                            "fields": {
+                                "raw": {
+                                    "type": "keyword",
+                                    "ignore_above": 256
+                                }
+                            }
+                        }
+                    }
+                }]
+            }
+        }
+    }
+
+    self.mapping_old = {
+        "mappings": {
+            "result": {
+                "numeric_detection": True,
+                "properties": {
+                    "timestamp": {
+                        "type": "date",
+                        "format": "yyyy-MM-dd HH:mm:ss.SSSSSS"
+                    },
+                    "value": {
+                        "type": "double"
+                    }
+                },
+                "dynamic_templates": [{
+                    "strings": {
+                        "match_mapping_type": "string",
+                        "mapping": {
                             "type": "string",
                             "fields": {
                                 "raw": {
