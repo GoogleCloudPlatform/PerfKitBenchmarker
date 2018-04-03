@@ -149,7 +149,7 @@ class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud beta container clusters create', command_string)
-      self.assertIn('--cluster-version 1.9.2-gke.1', command_string)
+      self.assertIn('--cluster-version 1.9.6-gke.0', command_string)
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn('--accelerator type=nvidia-tesla-k80,count=2',
