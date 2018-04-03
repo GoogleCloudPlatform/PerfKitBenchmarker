@@ -609,6 +609,37 @@ class ElasticsearchPublisher(SamplePublisher):
                     "strings": {
                         "match_mapping_type": "string",
                         "mapping": {
+                            "type": "text",
+                            "fields": {
+                                "raw": {
+                                    "type": "keyword",
+                                    "ignore_above": 256
+                                }
+                            }
+                        }
+                    }
+                }]
+            }
+        }
+    }
+
+    self.mapping_old = {
+        "mappings": {
+            "result": {
+                "numeric_detection": True,
+                "properties": {
+                    "timestamp": {
+                        "type": "date",
+                        "format": "yyyy-MM-dd HH:mm:ss.SSSSSS"
+                    },
+                    "value": {
+                        "type": "double"
+                    }
+                },
+                "dynamic_templates": [{
+                    "strings": {
+                        "match_mapping_type": "string",
+                        "mapping": {
                             "type": "string",
                             "fields": {
                                 "raw": {
@@ -634,8 +665,18 @@ class ElasticsearchPublisher(SamplePublisher):
 
     es = Elasticsearch([self.es_uri])
     if not es.indices.exists(index=self.es_index):
-      es.indices.create(index=self.es_index, body=self.mapping)
-      logging.info('Create index %s and default mappings', self.es_index)
+      # choose whether to use old or new mapings based on
+      # the version of elasticsearch that is being used
+      if int(es.info()['version']['number'][0]) >= 5:
+        es.indices.create(index=self.es_index, body=self.mapping)
+        logging.info('Create index %s and default mappings for'
+                     ' elasticsearch version > 5.0.0',
+                     self.es_index)
+      else:
+        es.indices.create(index=self.es_index, body=self.mapping_old)
+        logging.info('Create index %s and default mappings for'
+                     ' elasticsearch version < 5.0.0', 
+                     self.es_index)
     for s in samples:
       sample = copy.deepcopy(s)
       # Make timestamp understandable by ES and human.
