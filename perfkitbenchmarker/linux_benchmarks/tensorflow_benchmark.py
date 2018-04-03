@@ -70,8 +70,8 @@ FP32 = 'float32'
 
 flags.DEFINE_boolean('tf_forward_only', False, '''whether use forward-only or
                      training for benchmarking''')
-flags.DEFINE_list('tf_models', ['inception3', 'vgg16', 'alexnet', 'resnet50'],
-                  'name of the models to run')
+flags.DEFINE_list('tf_models', ['inception3', 'vgg16', 'alexnet', 'resnet50',
+                                'resnet152'], 'name of the models to run')
 flags.register_validator('tf_models',
                          lambda models: models and set(models).issubset(MODELS),
                          'Invalid models list. tf_models must be a subset of '
