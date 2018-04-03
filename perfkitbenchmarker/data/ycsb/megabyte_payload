@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Requirements for running PerfKitBenchmarker on OpenStack.
--r../../../requirements.txt
-openstacksdk>=0.9.10
-python-openstackclient>=3.6.0
+# Yahoo! Cloud System Benchmark
+#   This is a workload where each payload is 1mb in size (10 * 100000).
+#   Read/update ratio: 50/50
+#   Request distribution: zipfian
+
+workload=com.yahoo.ycsb.workloads.CoreWorkload
+
+readallfields=true
+operationcount=1000
+
+fieldlength = 100000
+fieldcount = 10
+
+readproportion=0.5
+updateproportion=0.5
+scanproportion=0
+insertproportion=0
+
+requestdistribution=zipfian
+

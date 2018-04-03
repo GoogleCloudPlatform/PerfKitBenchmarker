@@ -609,7 +609,7 @@ $ ./pkb.py --cloud=AWS --benchmarks=iperf --machine_type=t2.micro
 ## Example run on Azure
 
 ```bash
-$ ./pkb.py --cloud=Azure --machine_type=ExtraSmall --benchmarks=iperf
+$ ./pkb.py --cloud=Azure --machine_type=Standard_A0 --benchmarks=iperf
 ```
 
 ## Example run on AliCloud

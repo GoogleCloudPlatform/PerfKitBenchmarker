@@ -1,0 +1,8 @@
+Completed requests: 1
+Failed requests: 2
+Runtime: 3.3
+Throughput: 5.2
+Latency:
+1.1
+2.2
+3.3

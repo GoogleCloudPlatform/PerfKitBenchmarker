@@ -1,3 +1,16 @@
+# Copyright 2018 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Runs the YCSB benchmark against managed Redis services.
 
 Spins up a cloud redis instance, runs YCSB against it, then spins it down.
@@ -64,11 +77,14 @@ def Prepare(benchmark_spec):
   ycsb_vms = benchmark_spec.vm_groups['clients']
   vm_util.RunThreaded(_Install, ycsb_vms)
   instance_details = benchmark_spec.cloud_redis.GetInstanceDetails()
-  benchmark_spec.executor = ycsb.YCSBExecutor(
-      'redis', **{
-          'shardkeyspace': True,
-          'redis.host': instance_details['host'],
-          'redis.port': instance_details['port']})
+  redis_args = {
+      'shardkeyspace': True,
+      'redis.host': instance_details['host'],
+      'redis.port': instance_details['port']
+  }
+  if 'password' in instance_details:
+    redis_args['redis.password'] = instance_details['password']
+  benchmark_spec.executor = ycsb.YCSBExecutor('redis', **redis_args)
 
 
 def Run(benchmark_spec):

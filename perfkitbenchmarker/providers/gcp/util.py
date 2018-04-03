@@ -39,6 +39,20 @@ def GetRegionFromZone(zone):
   return zone[:-2]
 
 
+def GetMultiRegionFromRegion(region):
+  """Gets the closest multi-region location to the region."""
+  if (region.startswith('us') or
+      region.startswith('northamerica') or
+      region.startswith('southamerica')):
+    return 'us'
+  elif region.startswith('europe'):
+    return 'eu'
+  elif region.startswith('asia') or region.startswith('australia'):
+    return 'asia'
+  else:
+    raise Exception('Unknown region "%s".' % region)
+
+
 class GcloudCommand(object):
   """A gcloud command.
 
@@ -136,8 +150,12 @@ class GcloudCommand(object):
 _QUOTA_EXCEEDED_REGEX = re.compile('Quota \'.*\' exceeded.')
 _QUOTA_EXCEEDED_MESSAGE = ('Creation failed due to quota exceeded: ')
 
+_NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
+                                'fulfill the request.')
+_NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
-def CheckGcloudResponseForQuotaExceeded(stderr, retcode):
+
+def CheckGcloudResponseKnownFailures(stderr, retcode):
   """Checks gcloud responses for quota exceeded errors.
 
   Args:
@@ -148,3 +166,7 @@ def CheckGcloudResponseForQuotaExceeded(stderr, retcode):
     message = _QUOTA_EXCEEDED_MESSAGE + stderr
     logging.error(message)
     raise errors.Benchmarks.QuotaFailure(message)
+  if retcode and _NOT_ENOUGH_RESOURCES_STDERR in stderr:
+    message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
+    logging.error(message)
+    raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)

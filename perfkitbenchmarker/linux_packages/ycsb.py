@@ -41,15 +41,16 @@ import copy
 import csv
 import io
 import itertools
-import math
-import re
 import logging
+import math
 import operator
 import os
 import posixpath
+import re
 import time
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import sample
@@ -58,13 +59,15 @@ from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
 FLAGS = flags.FLAGS
 
-YCSB_VERSION = '0.9.0'
-YCSB_TAR_URL = ('https://github.com/brianfrankcooper/YCSB/releases/'
-                'download/{0}/ycsb-{0}.tar.gz').format(YCSB_VERSION)
 YCSB_DIR = posixpath.join(INSTALL_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 
 _DEFAULT_PERCENTILES = 50, 75, 90, 95, 99, 99.9
+
+HISTOGRAM = 'histogram'
+HDRHISTOGRAM = 'hdrhistogram'
+TIMESERIES = 'timeseries'
+YCSB_MEASUREMENT_TYPES = [HISTOGRAM, HDRHISTOGRAM, TIMESERIES]
 
 # Binary operators to aggregate reported statistics.
 # Statistics with operator 'None' will be dropped.
@@ -86,6 +89,11 @@ AGGREGATE_OPERATORS = {
     'MaxLatency(ms)': max}
 
 
+flags.DEFINE_string('ycsb_version', '0.9.0', 'YCSB version to use. Defaults to '
+                    'version 0.9.0.')
+flags.DEFINE_enum('ycsb_measurement_type', HISTOGRAM,
+                  YCSB_MEASUREMENT_TYPES,
+                  'Measurement type to use for ycsb. Defaults to histogram.')
 flags.DEFINE_boolean('ycsb_histogram', False, 'Include individual '
                      'histogram results from YCSB (will increase sample '
                      'count).')
@@ -121,8 +129,10 @@ flags.DEFINE_integer('ycsb_operation_count', 1000000, 'Number of operations '
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
                      'each workload / client count combination. Set to 0 for '
                      'unlimited time.')
-flags.DEFINE_integer('ycsb_field_count', 10, 'Number of fields in a record.')
-flags.DEFINE_integer('ycsb_field_length', 100, 'Size of each field.')
+flags.DEFINE_integer('ycsb_field_count', None, 'Number of fields in a record. '
+                     'Defaults to None which uses the ycsb default of 10.')
+flags.DEFINE_integer('ycsb_field_length', None, 'Size of each field. Defaults '
+                     'to None which uses the ycsb default of 100.')
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -149,15 +159,21 @@ def CheckPrerequisites():
   for workload_file in _GetWorkloadFileList():
     if not os.path.exists(workload_file):
       raise IOError('Missing workload file: {0}'.format(workload_file))
+  if FLAGS.ycsb_measurement_type == HDRHISTOGRAM:
+    if FLAGS.ycsb_version < '0.11.0':
+      raise errors.Config.InvalidValue('hdrhistogram not supported on earlier '
+                                       'ycsb versions.')
 
 
 def _Install(vm):
   """Installs the YCSB package on the VM."""
   vm.Install('openjdk')
   vm.Install('curl')
+  ycsb_url = ('https://github.com/brianfrankcooper/YCSB/releases/'
+              'download/{0}/ycsb-{0}.tar.gz').format(FLAGS.ycsb_version)
   vm.RemoteCommand(('mkdir -p {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
-                        YCSB_DIR, YCSB_TAR_URL))
+                        YCSB_DIR, ycsb_url))
 
 
 def YumInstall(vm):
@@ -173,7 +189,7 @@ def AptInstall(vm):
 def ParseResults(ycsb_result_string, data_type='histogram'):
   """Parse YCSB results.
 
-  Example input:
+  Example input for histogram datatype:
 
     YCSB Client 0.1
     Command line: -db com.yahoo.ycsb.db.HBaseClient -P /tmp/pkb/workloada
@@ -191,9 +207,27 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
     [UPDATE], 2, 532078
     ...
 
+  Example input for hdrhistogram datatype:
+
+    YCSB Client 0.12.0
+    Command line: -db com.yahoo.ycsb.db.RedisClient -P /opt/pkb/workloadb
+    [OVERALL], RunTime(ms), 29770.0
+    [OVERALL], Throughput(ops/sec), 33590.86328518643
+    [UPDATE], Operations, 49856.0
+    [UPDATE], AverageLatency(us), 1478.0115532734276
+    [UPDATE], MinLatency(us), 312.0
+    [UPDATE], MaxLatency(us), 24623.0
+    [UPDATE], 95thPercentileLatency(us), 3501.0
+    [UPDATE], 99thPercentileLatency(us), 6747.0
+    [UPDATE], Return=OK, 49856
+    ...
+
   Args:
     ycsb_result_string: str. Text output from YCSB.
-    data_type: Either 'histogram' or 'timeseries'.
+    data_type: Either 'histogram' or 'timeseries' or 'hdrhistogram'.
+      'histogram' and 'hdrhistogram' datasets are in the same format, with the
+      difference being lacking the (millisec, count) histogram component. Hence
+      are parsed similarly.
 
   Returns:
     A dictionary with keys:
@@ -535,6 +569,7 @@ class YCSBExecutor(object):
     # are not passed to ycsb commands
     self.perclientparam = self.parameters.pop('perclientparam', None)
     self.shardkeyspace = self.parameters.pop('shardkeyspace', False)
+    self.measurement_type = FLAGS.ycsb_measurement_type
 
   def _BuildCommand(self, command_name, parameter_files=None, **kwargs):
     command = [YCSB_EXE, command_name, self.database]
@@ -555,7 +590,7 @@ class YCSBExecutor(object):
     for parameter, value in parameters.iteritems():
       command.extend(('-p', '{0}={1}'.format(parameter, value)))
 
-    command.append('-p measurementtype=histogram')
+    command.append('-p measurementtype=%s' % self.measurement_type)
     return 'cd %s; %s' % (YCSB_DIR, ' '.join(command))
 
   @property
@@ -574,7 +609,7 @@ class YCSBExecutor(object):
       kwargs[param] = value
     command = self._BuildCommand('load', **kwargs)
     stdout, stderr = vm.RobustRemoteCommand(command)
-    return ParseResults(str(stderr + stdout))
+    return ParseResults(str(stderr + stdout), self.measurement_type)
 
   def _LoadThreaded(self, vms, workload_file, **kwargs):
     """Runs "Load" in parallel for each VM in VMs.
@@ -642,7 +677,8 @@ class YCSBExecutor(object):
             include_histogram=FLAGS.ycsb_histogram,
             **workload_meta))
 
-    combined = _CombineResults(results)
+    combine_histogram = (self.measurement_type == HISTOGRAM)
+    combined = _CombineResults(results, combine_histogram)
     samples.extend(_CreateSamples(
         combined, result_type='combined',
         include_histogram=FLAGS.ycsb_histogram,
@@ -660,7 +696,7 @@ class YCSBExecutor(object):
     # info we need to stderr. So we have to combine these 2
     # output to get expected results.
     stdout, stderr = vm.RobustRemoteCommand(command)
-    return ParseResults(str(stderr + stdout))
+    return ParseResults(str(stderr + stdout), self.measurement_type)
 
   def _RunThreaded(self, vms, **kwargs):
     """Run a single workload using `vms`."""
@@ -720,9 +756,11 @@ class YCSBExecutor(object):
     all_results = []
     for workload_index, workload_file in enumerate(workloads):
       parameters = {'operationcount': FLAGS.ycsb_operation_count,
-                    'recordcount': FLAGS.ycsb_record_count,
-                    'fieldcount': FLAGS.ycsb_field_count,
-                    'fieldlength': FLAGS.ycsb_field_length}
+                    'recordcount': FLAGS.ycsb_record_count}
+      if FLAGS.ycsb_field_count:
+        parameters['fieldcount'] = FLAGS.ycsb_field_count
+      if FLAGS.ycsb_field_length:
+        parameters['fieldlength'] = FLAGS.ycsb_field_length
       if FLAGS.ycsb_timelimit:
         parameters['maxexecutiontime'] = FLAGS.ycsb_timelimit
       parameters.update(kwargs)
@@ -736,9 +774,11 @@ class YCSBExecutor(object):
                              workload_index=workload_index,
                              stage='run')
 
-      def PushWorkload(vm):
+      def PushWorkload(vm, workload_file, remote_path):
+        vm.RemoteCommand('sudo rm -f ' + remote_path)
         vm.PushFile(workload_file, remote_path)
-      vm_util.RunThreaded(PushWorkload, list(set(vms)))
+      vm_util.RunThreaded(PushWorkload, [((vm, workload_file, remote_path), {})
+                                         for vm in vms])
 
       parameters['parameter_files'] = [remote_path]
       for client_count in _GetThreadsPerLoaderList():
@@ -762,7 +802,8 @@ class YCSBExecutor(object):
                 include_histogram=FLAGS.ycsb_histogram,
                 **client_meta))
 
-        combined = _CombineResults(results)
+        combine_histogram = (self.measurement_type == HISTOGRAM)
+        combined = _CombineResults(results, combine_histogram)
         all_results.extend(_CreateSamples(
             combined, result_type='combined',
             include_histogram=FLAGS.ycsb_histogram,

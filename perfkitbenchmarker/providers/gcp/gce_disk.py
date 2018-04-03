@@ -78,7 +78,7 @@ class GceDisk(disk.BaseDisk):
     if self.image_project:
       cmd.flags['image-project'] = self.image_project
     _, stderr, retcode = cmd.Issue()
-    util.CheckGcloudResponseForQuotaExceeded(stderr, retcode)
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _Delete(self):
     """Deletes the disk."""

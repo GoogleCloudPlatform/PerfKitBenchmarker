@@ -77,7 +77,8 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'centurylinkcloud_set': {
-        MESSAGE: 'This benchmark set is supported on CenturyLink Cloud.',
+        MESSAGE:
+            'This benchmark set is supported on CenturyLink Cloud.',
         BENCHMARK_LIST: [
             'cassandra_stress',
             'copy_throughput',
@@ -122,6 +123,7 @@ BENCHMARK_SETS = {
             'hadoop_terasort',
             'hpcc',
             'hpcg',
+            'inception3',
             'iperf',
             'mesh_network',
             'mnist',
@@ -138,12 +140,14 @@ BENCHMARK_SETS = {
             'speccpu2006',
             'sysbench',
             'tensorflow',
+            'tensorflow_serving',
             'tomcat_wrk',
             'unixbench',
         ]
     },
     'intel_set': {
-        MESSAGE: 'Intel benchmark set.',
+        MESSAGE:
+            'Intel benchmark set.',
         BENCHMARK_LIST: [
             'fio',
             'iperf',
@@ -157,7 +161,8 @@ BENCHMARK_SETS = {
         ]
     },
     'kubernetes_set': {
-        MESSAGE: 'Kubernetes benchmark set.',
+        MESSAGE:
+            'Kubernetes benchmark set.',
         BENCHMARK_LIST: [
             'block_storage_workload',
             'cassandra_ycsb',
@@ -185,7 +190,8 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: [STANDARD_SET]
     },
     'rackspace_set': {
-        MESSAGE: 'Rackspace benchmark set.',
+        MESSAGE:
+            'Rackspace benchmark set.',
         BENCHMARK_LIST: [
             'aerospike',
             'block_storage_workload',
@@ -227,7 +233,8 @@ BENCHMARK_SETS = {
         BENCHMARK_LIST: [STANDARD_SET, 'silo']
     },
     'cloudsuite_set': {
-        MESSAGE: 'CloudSuite benchmark set.',
+        MESSAGE:
+            'CloudSuite benchmark set.',
         BENCHMARK_LIST: [
             'cloudsuite_data_analytics',
             'cloudsuite_data_caching',

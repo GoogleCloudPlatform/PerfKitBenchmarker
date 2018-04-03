@@ -45,8 +45,10 @@ def GetRegionFromZone(zone_or_region):
 def GetRegionFromZones(zones):
   """Returns the region a set of zones are in.
 
+  Args:
+    zones: A set of zones.
   Raises:
-      Exception: if the zones are in different regions.
+    Exception: if the zones are in different regions.
   """
   region = None
   for zone in zones:
@@ -55,9 +57,22 @@ def GetRegionFromZones(zones):
       region = current_region
     else:
       if region != current_region:
-        raise Exception('Not All zones are in the same region %s not same as %s. zones: %s' %
+        raise Exception('Not All zones are in the same region %s not same as '
+                        '%s. zones: %s' %
                         (region, current_region, ','.join(zones)))
   return region
+
+
+def FormatTags(tags_dict):
+  """Format a dict of tags into arguments for 'tag' parameter.
+
+  Args:
+    tags_dict: Tags to be formatted.
+
+  Returns:
+    A list of tags formatted as arguments for 'tag' parameter.
+  """
+  return ['Key=%s,Value=%s' % (k, v) for k, v in tags_dict.iteritems()]
 
 
 def AddTags(resource_id, region, **kwargs):
@@ -76,10 +91,17 @@ def AddTags(resource_id, region, **kwargs):
       'create-tags',
       '--region=%s' % region,
       '--resources', resource_id,
-      '--tags']
-  for key, value in kwargs.iteritems():
-    tag_cmd.append('Key={0},Value={1}'.format(key, value))
+      '--tags'] + FormatTags(kwargs)
   IssueRetryableCommand(tag_cmd)
+
+
+def MakeDefaultTags():
+  """Default tags for an AWS resource created by PerfKitBenchmarker.
+
+  Returns:
+    Dict of default tags with owner and run_uri.
+  """
+  return {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
 
 
 def AddDefaultTags(resource_id, region):
@@ -93,7 +115,7 @@ def AddDefaultTags(resource_id, region):
     resource_id: An extant AWS resource to operate on.
     region: The AWS region 'resource_id' was created in.
   """
-  tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
+  tags = MakeDefaultTags()
   AddTags(resource_id, region, **tags)
 
 

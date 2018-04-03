@@ -164,6 +164,7 @@ flags.DEFINE_string('static_vm_file', None,
                     'static_virtual_machine.py for a description of this file.')
 flags.DEFINE_boolean('version', False, 'Display the version and exit.',
                      allow_override_cpp=True)
+flags.DEFINE_boolean('time_commands', False, 'Times each command issued.')
 flags.DEFINE_enum(
     'scratch_disk_type', None,
     [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
@@ -458,6 +459,7 @@ def DoProvisionPhase(spec, timer):
   """
   logging.info('Provisioning resources for benchmark %s', spec.name)
   spec.ConstructContainerCluster()
+  spec.ConstructContainerRegistry()
   # spark service needs to go first, because it adds some vms.
   spec.ConstructSparkService()
   spec.ConstructDpbService()
@@ -638,6 +640,9 @@ def RunBenchmark(spec, collector):
           collector.AddSamples(
               detailed_timer.GenerateSamples(), spec.name, spec)
 
+        # Add resource related samples.
+        collector.AddSamples(spec.GetSamples(), spec.name, spec)
+
       except Exception as e:
         # Log specific type of failure, if known
         # TODO(dlott) Move to exception chaining with Python3 support
@@ -655,7 +660,7 @@ def RunBenchmark(spec, collector):
         # immediate feedback, then re-throw.
         logging.exception('Error during benchmark %s', spec.name)
         if FLAGS.create_failed_run_samples:
-          collector.AddSamples(MakeFailedRunSample(str(e),
+          collector.AddSamples(MakeFailedRunSample(spec, str(e),
                                                    current_run_stage),
                                spec.name,
                                spec)
@@ -677,7 +682,7 @@ def RunBenchmark(spec, collector):
   spec.status = benchmark_status.SUCCEEDED
 
 
-def MakeFailedRunSample(error_message, run_stage_that_failed):
+def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
   """Create a sample.Sample representing a failed run stage.
 
   The sample metric will have the name 'Run Failed';
@@ -689,6 +694,7 @@ def MakeFailedRunSample(error_message, run_stage_that_failed):
   command line flags that were passed in.
 
   Args:
+    spec: benchmark_spec
     error_message: error message that was caught, resulting in the
       run stage failure.
     run_stage_that_failed: run stage that failed by raising an Exception
@@ -704,6 +710,26 @@ def MakeFailedRunSample(error_message, run_stage_that_failed):
       'run_stage': run_stage_that_failed,
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
+
+  def UpdateVmStatus(vm):
+    vm.UpdateInterruptibleVmStatus()
+  vm_util.RunThreaded(UpdateVmStatus, spec.vms)
+
+  interruptible_vm_count = 0
+  interrupted_vm_count = 0
+  vm_status_codes = []
+  for vm in spec.vms:
+    # discounted vm metadata
+    if vm.IsInterruptible():
+      interruptible_vm_count += 1
+      if vm.WasInterrupted():
+        interrupted_vm_count += 1
+        vm_status_codes.append(vm.GetVmStatusCode())
+
+  if interruptible_vm_count:
+    metadata.update({'interruptible_vms': interruptible_vm_count,
+                     'interrupted_vms': interrupted_vm_count,
+                     'vm_status_codes': vm_status_codes})
   return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
 
 
@@ -839,7 +865,7 @@ def RunBenchmarks():
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
-    if FLAGS.run_processes == 1:
+    if FLAGS.run_with_pdb and FLAGS.run_processes == 1:
       spec_sample_tuples = RunBenchmarkTasksInSeries(tasks)
     else:
       spec_sample_tuples = background_tasks.RunParallelProcesses(

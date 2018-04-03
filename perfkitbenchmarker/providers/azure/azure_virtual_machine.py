@@ -281,7 +281,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.extend(['--admin-password', self.password])
     else:
       create_cmd.extend(['--ssh-key-value', self.ssh_public_key])
-    vm_util.IssueCommand(create_cmd)
+
+    # Uses a custom default because create for larger sizes sometimes times out.
+    azure_vm_create_timeout = 600
+    vm_util.IssueCommand(create_cmd, timeout=azure_vm_create_timeout)
 
   def _Exists(self):
     """Returns True if the VM exists."""
@@ -357,21 +360,31 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Use --azure_preprovisioned_data_bucket to specify the name of the account.
 
+    Note: Azure blob storage does not allow underscores in the container name,
+    so this method replaces any underscores in benchmark_name with dashes.
+    Make sure that the same convention is used when uploading the data
+    to Azure blob storage. For example: when uploading data for
+    'benchmark_name' to Azure, create a container named 'benchmark-name'.
+
     Args:
       install_path: The install path on this VM.
       benchmark_name: Name of the benchmark associated with this data file.
       filename: The name of the file that was downloaded.
     """
+    benchmark_name_with_underscores_removed = benchmark_name.replace(
+        '_', '-')
     self.Install('azure_cli')
     self.Install('azure_credentials')
     destpath = posixpath.join(install_path, filename)
+    self.RemoteCommand('mkdir -p %s' % posixpath.dirname(destpath))
     self.RemoteCommand('az storage blob download '
+                       '--no-progress '
                        '--account-name %s '
                        '--container-name %s '
                        '--name %s '
                        '--file %s' % (
                            FLAGS.azure_preprovisioned_data_bucket,
-                           benchmark_name,
+                           benchmark_name_with_underscores_removed,
                            filename,
                            destpath))
 
