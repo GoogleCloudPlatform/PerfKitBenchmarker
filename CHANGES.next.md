@@ -156,3 +156,4 @@
 - Replace all underscores in the benchmark name with dashes when downloading
   preprovisioned benchmark data from Azure. This is because Azure blob storage
   container names cannot contain underscores.
+- Fixed the bug of running distributed TensorFlow on multiple batch sizes.
