@@ -228,7 +228,6 @@ def Run(benchmark_spec):
     if fanout > 1 and fanout < FLAGS.oldisim_num_leaves:
       fanout_list.add(fanout)
 
-  metadata = {'num_cpus': vm.num_cpus}
   for fanout in sorted(fanout_list):
     qps = RunLoadTest(benchmark_spec, fanout)[2]
     qps_dict[fanout] = qps
@@ -236,6 +235,7 @@ def Run(benchmark_spec):
       base_qps = qps
     name = 'Scaling efficiency of %s leaves' % fanout
     scaling_efficiency = round(min(qps_dict[fanout] / base_qps, 1), 2)
+    metadata = {}
     results.append(sample.Sample(name, scaling_efficiency, '', metadata))
 
   return results

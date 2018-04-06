@@ -343,6 +343,14 @@ class BaseVirtualMachine(resource.BaseResource):
       result['numa_node_count'] = self.numa_node_count
     if self.num_disable_cpus is not None:
       result['num_disable_cpus'] = self.num_disable_cpus
+    # Hack: Silently fail if we have no num_cpus attribute.
+    # This property is defined in BaseOsMixin and should always
+    # be available during regular PKB usage because virtual machines
+    # always have a mixin. However, in testing virtual machine objects
+    # are often instantiated without a mixin, so the line below was
+    # failing because the attribute didn't exist.
+    if getattr(self, 'num_cpus', None):
+      result['num_cpus'] = self.num_cpus
 
     return result
 
