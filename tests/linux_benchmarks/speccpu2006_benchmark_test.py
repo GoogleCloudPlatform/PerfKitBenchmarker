@@ -39,7 +39,6 @@ TEST_OUTPUT_SPECINT = """
 """
 
 GOOD_METADATA = {'runspec_config': 'linux64-x64-gcc47.cfg',
-                 'num_cpus': 256,
                  'runspec_define': '',
                  'runspec_iterations': '3',
                  'runspec_enable_32bit': 'False',
@@ -200,8 +199,7 @@ TEST_OUTPUT_BAD2 = """
 EXPECTED_BAD2_METADATA = GOOD_METADATA.copy()
 EXPECTED_BAD2_METADATA.update({
     'partial': 'true',
-    'missing_results': '400.perlbench,401.bzip2,403.gcc,429.mcf,483.xalancbmk',
-    'num_cpus': 256})
+    'missing_results': '400.perlbench,401.bzip2,403.gcc,429.mcf,483.xalancbmk'})
 
 EXPECTED_RESULT_BAD2 = [
     sample.Sample(metric='445.gobmk', value=15.8, unit='',
@@ -242,8 +240,7 @@ TEST_OUTPUT_EST = """
 EXPECTED_EST_METADATA = GOOD_METADATA.copy()
 EXPECTED_EST_METADATA.update({
     'partial': 'true',
-    'missing_results': 'SPECint(R)_rate_base2006',
-    'num_cpus': 256})
+    'missing_results': 'SPECint(R)_rate_base2006'})
 
 EXPECTED_RESULT_EST = [
     sample.Sample(metric='400.perlbench', value=27.3, unit='',
@@ -328,7 +325,7 @@ EXPECTED_SPEED_RESULT_SPECINT = [
 class DummyVM(object):
 
   def __init__(self):
-    self.num_cpus = 256
+    pass
 
 
 class Speccpu2006BenchmarkTestCase(unittest.TestCase,

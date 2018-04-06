@@ -443,12 +443,13 @@ def _ExtractScore(stdout, vm, keep_partial_results, estimate_spec):
       # remove the final SPEC(int|fp) score, which has only 2 columns.
       result_section.pop()
 
-  metadata = {'num_cpus': vm.num_cpus,
-              'runspec_config': FLAGS.runspec_config,
-              'runspec_iterations': str(FLAGS.runspec_iterations),
-              'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
-              'runspec_define': FLAGS.runspec_define,
-              'runspec_metric': FLAGS.runspec_metric}
+  metadata = {
+      'runspec_config': FLAGS.runspec_config,
+      'runspec_iterations': str(FLAGS.runspec_iterations),
+      'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
+      'runspec_define': FLAGS.runspec_define,
+      'runspec_metric': FLAGS.runspec_metric
+  }
 
   missing_results = []
   scores = []

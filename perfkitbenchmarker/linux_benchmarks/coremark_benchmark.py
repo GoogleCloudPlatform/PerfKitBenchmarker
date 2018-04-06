@@ -101,7 +101,7 @@ def Run(benchmark_spec):
   stdout, _ = vm.RemoteCommand(
       'cat %s/run1.log' % COREMARK_DIR, should_log=True)
   value = regex_util.ExtractFloat(r'CoreMark 1.0 : ([0-9]*\.[0-9]*)', stdout)
-  metadata = {'num_cpus': vm.num_cpus}
+  metadata = {}
   return [sample.Sample('Coremark Score', value, '', metadata)]
 
 
