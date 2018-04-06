@@ -226,6 +226,10 @@ class GceVirtualMachineOsTypesTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
     self.spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                               machine_type='fake-machine-type')
+    p = mock.patch(gce_virtual_machine.__name__ +
+                   '.linux_vm.BaseLinuxMixin._GetNumCpus')
+    self.mock_get_num_cpus = p.start()
+    self.addCleanup(p.stop)
 
   def _CreateFakeReturnValues(self, fake_image=''):
     fake_rets = [('', '', 0), (json.dumps(_FAKE_INSTANCE_METADATA), '', 0)]
