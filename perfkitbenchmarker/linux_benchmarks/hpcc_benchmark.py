@@ -190,7 +190,7 @@ def ParseOutput(hpcc_output, benchmark_spec):
   """
   results = []
   metadata = dict()
-  match = re.search('HPLMaxProcs=([0-9]*)', hpcc_output)
+  re.search('HPLMaxProcs=([0-9]*)', hpcc_output)
   metadata['num_machines'] = len(benchmark_spec.vms)
   UpdateMetadata(metadata)
 
