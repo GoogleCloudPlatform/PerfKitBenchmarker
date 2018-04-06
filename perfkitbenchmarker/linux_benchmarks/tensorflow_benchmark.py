@@ -70,8 +70,8 @@ FP32 = 'float32'
 
 flags.DEFINE_boolean('tf_forward_only', False, '''whether use forward-only or
                      training for benchmarking''')
-flags.DEFINE_list('tf_models', ['inception3', 'vgg16', 'alexnet', 'resnet50'],
-                  'name of the models to run')
+flags.DEFINE_list('tf_models', ['inception3', 'vgg16', 'alexnet', 'resnet50',
+                                'resnet152'], 'name of the models to run')
 flags.register_validator('tf_models',
                          lambda models: models and set(models).issubset(MODELS),
                          'Invalid models list. tf_models must be a subset of '
@@ -402,25 +402,27 @@ def _RunDistributedTf(benchmark_spec):
   flattened_results = []
   vm_pid = collections.namedtuple('vm_pid', 'vm pid')
   for model in FLAGS.tf_models:
-    ps_pids = []
-    for task_index, vm in enumerate(ps_hosts):
-      dist_ps_args = ('{args} --task_index={index} &\n'
-                      'echo {pid} $!').format(args=dist_args,
-                                              index=task_index,
-                                              pid=PID_PREFIX)
-      pid = _RunModelOnVm(vm, model, benchmark_spec, dist_ps_args, 'ps')
-      ps_pids.append(vm_pid(vm=vm, pid=pid))
-    args = []
-    for task_index, vm in enumerate(worker_hosts):
-      dist_worker_args = ('{args} --job_name=worker '
-                          '--task_index={index}').format(args=dist_args,
-                                                         index=task_index)
-      args.append(((vm, model, benchmark_spec, dist_worker_args, 'worker'),
-                   {}))
-    result = vm_util.RunThreaded(_RunModelOnVm, args)
-    for ps_pid in ps_pids:
-      ps_pid.vm.RemoteCommand('kill -9 %s' % ps_pid.pid)
-    flattened_results.extend(vm_result for vm_result in result)
+    for batch_size in _GetBatchSizes(model):
+      ps_pids = []
+      for task_index, vm in enumerate(ps_hosts):
+        dist_ps_args = ('{args} --task_index={index} &\n'
+                        'echo {pid} $!').format(args=dist_args,
+                                                index=task_index,
+                                                pid=PID_PREFIX)
+        pid = _RunModelOnVm(vm, model, batch_size, benchmark_spec, dist_ps_args,
+                            'ps')
+        ps_pids.append(vm_pid(vm=vm, pid=pid))
+      args = []
+      for task_index, vm in enumerate(worker_hosts):
+        dist_worker_args = ('{args} --job_name=worker '
+                            '--task_index={index}').format(args=dist_args,
+                                                           index=task_index)
+        args.append(((vm, model, batch_size, benchmark_spec, dist_worker_args,
+                      'worker'), {}))
+      result = vm_util.RunThreaded(_RunModelOnVm, args)
+      for ps_pid in ps_pids:
+        ps_pid.vm.RemoteCommand('kill -9 %s' % ps_pid.pid)
+      flattened_results.extend(vm_result for vm_result in result)
   return flattened_results
 
 

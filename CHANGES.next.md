@@ -93,6 +93,8 @@
 - Added flags `ycsb_version` and `ycsb_measurement_type` to support
   user-specified ycsb versions and measurement types.
 - Added support to tensorflow_benchmark for running multiple batch sizes per run.
+- Added resnet152 in TensorFlow benchmark default models.
+- Added 50kb per payload ycsb workload.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -154,3 +156,4 @@
 - Replace all underscores in the benchmark name with dashes when downloading
   preprovisioned benchmark data from Azure. This is because Azure blob storage
   container names cannot contain underscores.
+- Fixed the bug of running distributed TensorFlow on multiple batch sizes.
