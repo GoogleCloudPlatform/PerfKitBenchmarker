@@ -95,6 +95,7 @@
 - Added support to tensorflow_benchmark for running multiple batch sizes per run.
 - Added resnet152 in TensorFlow benchmark default models.
 - Added 50kb per payload ycsb workload.
+- Added `num_cpus` to virtual_machine published metadata.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
