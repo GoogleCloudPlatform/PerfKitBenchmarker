@@ -220,8 +220,6 @@ def Run(benchmark_spec):
   """
   results = []
   qps_dict = dict()
-  vms = benchmark_spec.vms
-  vm = vms[0]
 
   fanout_list = set([1, FLAGS.oldisim_num_leaves])
   for fanout in map(int, FLAGS.oldisim_fanout):
