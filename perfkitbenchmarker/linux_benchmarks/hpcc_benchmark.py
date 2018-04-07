@@ -39,7 +39,6 @@ http://www.netlib.org/benchmark/hpl/faqs.html
 
 import logging
 import math
-import re
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
