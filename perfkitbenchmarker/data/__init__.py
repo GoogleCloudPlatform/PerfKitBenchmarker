@@ -215,3 +215,26 @@ def ResourcePath(resource_name, search_user_paths=True):
 
   raise ResourceNotFound(
       '{0} (Searched: {1})'.format(resource_name, loaders))
+
+
+def ResourceExists(resource_name, search_user_paths=True):
+  """Returns True if a resource exists.
+
+  Loaders are searched in order until the resource is found.
+  If no loader provides 'resource_name', returns False.
+
+  If 'search_user_paths' is true, the directories specified by
+  "--data_search_paths" are consulted before the default paths.
+
+  Args:
+    resource_name: string. Name of a resource.
+    search_user_paths: boolean. Whether paths from "--data_search_paths" should
+      be searched before the default paths.
+  Returns:
+    Whether the resource exists.
+  """
+  try:
+    ResourcePath(resource_name, search_user_paths)
+    return True
+  except ResourceNotFound:
+    return False

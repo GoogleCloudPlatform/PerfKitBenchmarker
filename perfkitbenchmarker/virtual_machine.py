@@ -372,6 +372,11 @@ class BaseVirtualMachine(resource.BaseResource):
     preprovisioned data, follow the instructions for that benchmark to download
     and store the data so that it may be accessed by a VM via this method.
 
+    Before installing from preprovisioned data in the cloud, this function looks
+    for files in the local data directory. If found, they are pushed to the VM.
+    Otherwise, this function attempts to download them from their preprovisioned
+    location onto the VM.
+
     Args:
       benchmark_name: The name of the benchmark defining the preprovisioned
           data. The benchmark's module must define the dict BENCHMARK_DATA
@@ -397,15 +402,22 @@ class BaseVirtualMachine(resource.BaseResource):
           'Benchmark %s does not define a BENCHMARK_DATA dict with '
           'preprovisioned data.' % benchmark_name)
     for filename in filenames:
+      if data.ResourceExists(filename):
+        local_tar_file_path = data.ResourcePath(filename)
+        self.PushFile(local_tar_file_path, install_path)
+        continue
       md5sum = benchmark_data.get(filename)
-      if not md5sum:
-        raise errors.Setup.BadPreprovisionedDataError(
-            'Cannot find md5sum hash for file %s in benchmark %s.' %
-            (filename, benchmark_name))
-      self.DownloadPreprovisionedBenchmarkData(install_path, benchmark_name,
-                                               filename)
-      self.CheckPreprovisionedBenchmarkData(install_path, benchmark_name,
-                                            filename, md5sum)
+      if md5sum:
+        self.DownloadPreprovisionedBenchmarkData(install_path, benchmark_name,
+                                                 filename)
+        self.CheckPreprovisionedBenchmarkData(install_path, benchmark_name,
+                                              filename, md5sum)
+        continue
+      raise errors.Setup.BadPreprovisionedDataError(
+          'Cannot find md5sum hash for file %s in benchmark %s. See README.md '
+          'for information about preprovisioned data. '
+          'Cannot find file in /data directory either, fail to upload from '
+          'local directory.' % (filename, benchmark_name))
 
   def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
                                           filename):
