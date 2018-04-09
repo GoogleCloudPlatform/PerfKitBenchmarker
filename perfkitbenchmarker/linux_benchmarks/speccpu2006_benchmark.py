@@ -270,17 +270,12 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand('chmod 777 {0}'.format(scratch_dir))
   speccpu_vm_state.spec_dir = posixpath.join(scratch_dir, _SPECCPU2006_DIR)
   try:
-    _PrepareWithTarFile(vm, speccpu_vm_state)
+    _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state)
     _CheckTarFile(vm, FLAGS.runspec_config,
                   examine_members=stages.PROVISION in FLAGS.run_stage)
-  except data.ResourceNotFound:
-    try:
-      _CheckIsoAndCfgFile(FLAGS.runspec_config)
-      _PrepareWithIsoFile(vm, speccpu_vm_state)
-    except data.ResourceNotFound:
-      _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state)
-      _CheckTarFile(vm, FLAGS.runspec_config,
-                    examine_members=stages.PROVISION in FLAGS.run_stage)
+  except errors.Setup.BadPreprovisionedDataError:
+    _CheckIsoAndCfgFile(FLAGS.runspec_config)
+    _PrepareWithIsoFile(vm, speccpu_vm_state)
 
 
 def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
@@ -289,24 +284,6 @@ def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
   vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME,
                                         [_SPECCPU2006_TAR],
                                         scratch_dir)
-  vm.RemoteCommand('cd {dir} && tar xvfz {tar}'.format(dir=scratch_dir,
-                                                       tar=_SPECCPU2006_TAR))
-  speccpu_vm_state.cfg_file_path = posixpath.join(
-      speccpu_vm_state.spec_dir, 'config', FLAGS.runspec_config)
-
-
-def _PrepareWithTarFile(vm, speccpu_vm_state):
-  """Prepares the VM to run using the tar file.
-
-  Args:
-    vm: BaseVirtualMachine. Recipient of the tar file.
-    speccpu_vm_state: _SpecCpu2006SpecificState. Modified by this function to
-        reflect any changes to the VM that may need to be cleaned up.
-  """
-  scratch_dir = vm.GetScratchDir()
-  local_tar_file_path = data.ResourcePath(_SPECCPU2006_TAR)
-  speccpu_vm_state.tar_file_path = posixpath.join(scratch_dir, _SPECCPU2006_TAR)
-  vm.PushFile(local_tar_file_path, scratch_dir)
   vm.RemoteCommand('cd {dir} && tar xvfz {tar}'.format(dir=scratch_dir,
                                                        tar=_SPECCPU2006_TAR))
   speccpu_vm_state.cfg_file_path = posixpath.join(

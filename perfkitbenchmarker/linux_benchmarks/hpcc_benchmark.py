@@ -39,7 +39,6 @@ http://www.netlib.org/benchmark/hpl/faqs.html
 
 import logging
 import math
-import re
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -190,7 +189,6 @@ def ParseOutput(hpcc_output, benchmark_spec):
   """
   results = []
   metadata = dict()
-  re.search('HPLMaxProcs=([0-9]*)', hpcc_output)
   metadata['num_machines'] = len(benchmark_spec.vms)
   UpdateMetadata(metadata)
 
