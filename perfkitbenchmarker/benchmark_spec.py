@@ -472,14 +472,17 @@ class BenchmarkSpec(object):
         logging.exception('Got an exception disabling firewalls. '
                           'Attempting to continue tearing down.')
 
+    if self.container_cluster:
+      self.container_cluster.DeleteServices()
+      self.container_cluster.DeleteContainers()
+      self.container_cluster.Delete()
+
     for net in self.networks.itervalues():
       try:
         net.Delete()
       except Exception:
         logging.exception('Got an exception deleting networks. '
                           'Attempting to continue tearing down.')
-    if self.container_cluster:
-      self.container_cluster.Delete()
 
     self.deleted = True
 
