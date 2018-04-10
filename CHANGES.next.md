@@ -42,6 +42,7 @@
 - Added new ycsb workload where each payload is 1mb versus the default 1kb.
 - Added Tensorflow Serving benchmark which tests the throughput and latency of the
   standard model-server using a pre-trained inception3 model.
+- Added AWS Fargate support.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
