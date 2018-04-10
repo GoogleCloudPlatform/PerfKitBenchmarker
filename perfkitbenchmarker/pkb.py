@@ -101,6 +101,7 @@ LOG_FILE_NAME = 'pkb.log'
 COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
+MAX_RUN_URI_LENGTH = 8
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
@@ -145,8 +146,8 @@ flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
 flags.DEFINE_string('image', None, 'Default image that will be '
                     'linked to the VM')
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
-                    'should be alphanumeric and less than or equal to 10 '
-                    'characters in length.')
+                    'should be alphanumeric and less than or equal to %d '
+                    'characters in length.' % MAX_RUN_URI_LENGTH)
 flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
                     'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
@@ -286,8 +287,6 @@ flags.DEFINE_string('ftp_proxy', '',
                     'Specify a proxy for FTP in the form '
                     '[user:passwd@]proxy.server:port.')
 
-MAX_RUN_URI_LENGTH = 8
-
 _TEARDOWN_EVENT = multiprocessing.Event()
 
 events.initialization_complete.connect(traces.RegisterAll)
@@ -370,8 +369,8 @@ def _InitializeRunUri():
             ', '.join(FLAGS.run_stage))
   elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
     raise errors.Setup.BadRunURIError('run_uri must be alphanumeric and less '
-                                      'than or equal to 8 characters in '
-                                      'length.')
+                                      'than or equal to %d characters in '
+                                      'length.' % MAX_RUN_URI_LENGTH)
 
 
 def _CreateBenchmarkSpecs():
