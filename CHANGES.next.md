@@ -159,3 +159,4 @@
   preprovisioned benchmark data from Azure. This is because Azure blob storage
   container names cannot contain underscores.
 - Fixed the bug of running distributed TensorFlow on multiple batch sizes.
+- Updated `gcloud compute networks create` to use `subnet-mode`.
