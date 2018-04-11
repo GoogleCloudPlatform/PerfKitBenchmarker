@@ -192,7 +192,7 @@ class TaskDefinition(resource.BaseResource):
                 'awslogs-stream-prefix': 'pkb'
             }
         }
-    },]
+    }]
     return json.dumps(definitions)
 
 
