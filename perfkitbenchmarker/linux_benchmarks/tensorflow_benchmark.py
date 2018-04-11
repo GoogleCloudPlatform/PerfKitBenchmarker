@@ -98,7 +98,7 @@ flags.DEFINE_boolean('tf_distortions', True,
                      '''Enable/disable distortions during image preprocessing.
                      These include bbox and color distortions.''')
 flags.DEFINE_string('tf_benchmarks_commit_hash',
-                    'abe3c808933c85e6db1719cdb92fcbbd9eac6dec',
+                    'bab8a61aaca3d2b94072ae2b87f0aafe1797b165',
                     'git commit hash of desired tensorflow benchmark commit.')
 flags.DEFINE_boolean('tf_distributed', False, 'Run TensorFlow distributed')
 flags.DEFINE_string('tf_distributed_port', '2222',
