@@ -161,3 +161,8 @@
   container names cannot contain underscores.
 - Fixed the bug of running distributed TensorFlow on multiple batch sizes.
 - Updated `gcloud compute networks create` to use `subnet-mode`.
+- Changed default CUDA version from 8.0 to 9.0.
+- Updated default Tensorflow version to 1.7 when using GPUs.
+- Updated default Tensorflow tf_cnn_benchmarks version to a commit dated April
+  2, 2018.
+ 
