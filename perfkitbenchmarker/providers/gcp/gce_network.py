@@ -149,7 +149,7 @@ class GceNetworkResource(resource.BaseResource):
   def _Create(self):
     """Creates the Network resource."""
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'create', self.name)
-    cmd.flags['mode'] = self.mode
+    cmd.flags['subnet-mode'] = self.mode
     cmd.Issue()
 
   def _Delete(self):
