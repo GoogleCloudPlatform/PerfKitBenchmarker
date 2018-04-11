@@ -124,6 +124,7 @@ class ContainerSpec(spec.BaseSpec):
         'cpus': (option_decoders.FloatDecoder, {'default': 1.0}),
         'memory': (custom_virtual_machine_spec.MemoryDecoder, {}),
         'command': (_CommandDecoder, {}),
+        'container_port': (option_decoders.IntDecoder, {'default': 8080}),
     })
     return result
 
@@ -167,6 +168,7 @@ class BaseContainerService(resource.BaseResource):
     self.memory = container_spec.memory
     self.command = container_spec.command
     self.image = container_spec.image
+    self.container_port = container_spec.container_port
     self.ip_address = None
     self.port = None
     self.host_header = None
@@ -403,6 +405,16 @@ class BaseContainerCluster(resource.BaseResource):
     self.containers = collections.defaultdict(list)
     self.services = {}
 
+  def DeleteContainers(self):
+    """Delete containers belonging to the cluster."""
+    for container in itertools.chain(*self.containers.values()):
+      container.Delete()
+
+  def DeleteServices(self):
+    """Delete services belonging to the cluster."""
+    for service in self.services.values():
+      service.Delete()
+
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
     metadata = {
@@ -433,11 +445,9 @@ class BaseContainerCluster(resource.BaseResource):
     samples.append(sample.Sample(
         'Cluster Creation Time',
         self.resource_ready_time - self.create_start_time,
-        'seconds',
-        self.GetResourceMetadata()))
+        'seconds'))
     for container in itertools.chain(*self.containers.values()):
-      metadata = self.GetResourceMetadata()
-      metadata.update({'image': container.image.split('/')[-1]})
+      metadata = {'image': container.image.split('/')[-1]}
       if container.resource_ready_time and container.create_start_time:
         samples.append(sample.Sample(
             'Container Deployment Time',
@@ -449,8 +459,7 @@ class BaseContainerCluster(resource.BaseResource):
             container.delete_end_time - container.delete_start_time,
             'seconds', metadata))
     for service in self.services.values():
-      metadata = self.GetResourceMetadata()
-      metadata.update({'image': service.image.split('/')[-1]})
+      metadata = {'image': service.image.split('/')[-1]}
       if service.resource_ready_time and service.create_start_time:
         samples.append(sample.Sample(
             'Service Deployment Time',

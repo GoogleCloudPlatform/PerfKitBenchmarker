@@ -23,11 +23,16 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_load_balancer
+from perfkitbenchmarker.providers.aws import aws_logs
+from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
+import requests
 import yaml
 
 FLAGS = flags.FLAGS
+_ECS_NOT_READY = frozenset(['PROVISIONING', 'PENDING'])
 
 
 class EcrRepository(resource.BaseResource):
@@ -118,6 +123,364 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
     """Build the image remotely."""
     # TODO(ehankland) use AWS codebuild to build the image.
     raise NotImplementedError()
+
+
+class TaskDefinition(resource.BaseResource):
+  """Class representing an AWS task definition."""
+
+  def __init__(self, name, container_spec, cluster):
+    super(TaskDefinition, self).__init__()
+    self.name = name
+    self.cpus = container_spec.cpus
+    self.memory = container_spec.memory
+    self.image = container_spec.image
+    self.container_port = container_spec.container_port
+    self.region = cluster.region
+    self.arn = None
+    self.log_group = aws_logs.LogGroup(self.region, 'pkb')
+
+  def _CreateDependencies(self):
+    """Create the log group if it doesn't exist."""
+    if not self.log_group.Exists():
+      self.log_group.Create()
+
+  def _Create(self):
+    """Create the task definition."""
+    register_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'register-task-definition',
+        '--family', self.name,
+        '--execution-role-arn', 'ecsTaskExecutionRole',
+        '--network-mode', 'awsvpc',
+        '--requires-compatibilities=FARGATE',
+        '--cpu', str(int(1024 * self.cpus)),
+        '--memory', str(self.memory),
+        '--container-definitions', self._GetContainerDefinitions()
+    ]
+    stdout, _, _ = vm_util.IssueCommand(register_cmd)
+    response = json.loads(stdout)
+    self.arn = response['taskDefinition']['taskDefinitionArn']
+
+  def _Delete(self):
+    """Deregister the task definition."""
+    if self.arn is None:
+      return
+    deregister_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'deregister-task-definition',
+        '--task-definition', self.arn
+    ]
+    vm_util.IssueCommand(deregister_cmd)
+
+  def _GetContainerDefinitions(self):
+    """Returns a JSON representation of the container definitions."""
+    definitions = [{
+        'name': self.name,
+        'image': self.image,
+        'essential': True,
+        'portMappings': [
+            {
+                'containerPort': self.container_port,
+                'protocol': 'TCP'
+            }
+        ],
+        'logConfiguration': {
+            'logDriver': 'awslogs',
+            'options': {
+                'awslogs-group': 'pkb',
+                'awslogs-region': self.region,
+                'awslogs-stream-prefix': 'pkb'
+            }
+        }
+    }]
+    return json.dumps(definitions)
+
+
+class EcsTask(container_service.BaseContainer):
+  """Class representing an ECS/Fargate task."""
+
+  def __init__(self, name, container_spec, cluster):
+    super(EcsTask, self).__init__(container_spec)
+    self.name = name
+    self.task_def = cluster.task_defs[name]
+    self.arn = None
+    self.region = cluster.region
+    self.cluster_name = cluster.name
+    self.subnet_id = cluster.network.subnet.id
+    self.ip_address = None
+    self.security_group_id = (
+        cluster.network.regional_network.vpc.default_security_group_id)
+
+  def _GetNetworkConfig(self):
+    network_config = {
+        'awsvpcConfiguration': {
+            'subnets': [self.subnet_id],
+            'securityGroups': [self.security_group_id],
+            'assignPublicIp': 'ENABLED',
+        }
+    }
+    return json.dumps(network_config)
+
+  def _GetOverrides(self):
+    """Returns a JSON representaion of task overrides.
+
+    While the container level resources can be overridden, they have no
+    effect on task level resources for Fargate tasks. This means
+    that modifying a container spec will only affect the command of any
+    new containers launched from it and not cpu/memory.
+    """
+    overrides = {
+        'containerOverrides': [
+            {
+                'name': self.name,
+            }
+        ]
+    }
+    if self.command:
+      overrides['containerOverrides'][0]['command'] = self.command
+    return json.dumps(overrides)
+
+  def _Create(self):
+    """Creates the task."""
+    run_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'run-task',
+        '--cluster', self.cluster_name,
+        '--task-definition', self.task_def.arn,
+        '--launch-type', 'FARGATE',
+        '--network-configuration', self._GetNetworkConfig(),
+        '--overrides', self._GetOverrides()
+    ]
+    stdout, _, _ = vm_util.IssueCommand(run_cmd)
+    response = json.loads(stdout)
+    self.arn = response['tasks'][0]['taskArn']
+
+  def _PostCreate(self):
+    """Gets the tasks IP address."""
+    container = self._GetTask()['containers'][0]
+    self.ip_address = container['networkInterfaces'][0]['privateIpv4Address']
+
+  def _DeleteDependencies(self):
+    """Delete the task def."""
+    self.task_def.Delete()
+
+  def _Delete(self):
+    """Deletes the task."""
+    if self.arn is None:
+      return
+    stop_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'stop-task',
+        '--cluster', self.cluster_name,
+        '--task', self.arn
+    ]
+    vm_util.IssueCommand(stop_cmd)
+
+  def _GetTask(self):
+    """Returns a dictionary representation of the task."""
+    describe_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'describe-tasks',
+        '--cluster', self.cluster_name,
+        '--tasks', self.arn
+    ]
+    stdout, _, _ = vm_util.IssueCommand(describe_cmd)
+    response = json.loads(stdout)
+    return response['tasks'][0]
+
+  def _IsReady(self):
+    """Returns true if the task has stopped pending."""
+    return self._GetTask()['lastStatus'] not in _ECS_NOT_READY
+
+  def WaitForExit(self, timeout=None):
+    """Waits until the task has finished running."""
+    @vm_util.Retry(timeout=timeout)
+    def _WaitForExit():
+      status = self._GetTask()['lastStatus']
+      if status != 'STOPPED':
+        raise Exception('Task is not STOPPED.')
+    _WaitForExit()
+
+  def GetLogs(self):
+    """Returns the logs from the container."""
+    task_id = self.arn.split('/')[-1]
+    log_stream = 'pkb/{name}/{task_id}'.format(name=self.name, task_id=task_id)
+    return unicode(
+        aws_logs.GetLogStreamAsString(self.region, log_stream, 'pkb'))
+
+
+class EcsService(container_service.BaseContainerService):
+  """Class representing an ECS/Fargate service."""
+
+  def __init__(self, name, container_spec, cluster):
+    super(EcsService, self).__init__(container_spec)
+    self.client_token = str(uuid.uuid4())[:32]
+    self.name = name
+    self.task_def = cluster.task_defs[name]
+    self.arn = None
+    self.region = cluster.region
+    self.cluster_name = cluster.name
+    self.subnet_id = cluster.network.subnet.id
+    self.security_group_id = (
+        cluster.network.regional_network.vpc.default_security_group_id)
+    self.load_balancer = aws_load_balancer.LoadBalancer([
+        cluster.network.subnet])
+    self.target_group = aws_load_balancer.TargetGroup(
+        cluster.network.regional_network.vpc, self.container_port)
+    self.port = 80
+
+  def _CreateDependencies(self):
+    """Creates the load balancer for the service."""
+    self.load_balancer.Create()
+    self.target_group.Create()
+    listener = aws_load_balancer.Listener(
+        self.load_balancer, self.target_group, self.port)
+    listener.Create()
+    self.ip_address = self.load_balancer.dns_name
+
+  def _DeleteDependencies(self):
+    """Deletes the service's load balancer."""
+    self.task_def.Delete()
+    self.load_balancer.Delete()
+    self.target_group.Delete()
+
+  def _Create(self):
+    """Creates the service."""
+    create_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'create-service',
+        '--desired-count', '1',
+        '--client-token', self.client_token,
+        '--cluster', self.cluster_name,
+        '--service-name', self.name,
+        '--task-definition', self.task_def.arn,
+        '--launch-type', 'FARGATE',
+        '--network-configuration', self._GetNetworkConfig(),
+        '--load-balancers', self._GetLoadBalancerConfig(),
+    ]
+    vm_util.IssueCommand(create_cmd)
+
+  def _Delete(self):
+    """Deletes the service."""
+    update_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'update-service',
+        '--cluster', self.cluster_name,
+        '--service', self.name,
+        '--desired-count', '0'
+    ]
+    vm_util.IssueCommand(update_cmd)
+    delete_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'delete-service',
+        '--cluster', self.cluster_name,
+        '--service', self.name
+    ]
+    vm_util.IssueCommand(delete_cmd)
+
+  def _GetNetworkConfig(self):
+    network_config = {
+        'awsvpcConfiguration': {
+            'subnets': [self.subnet_id],
+            'securityGroups': [self.security_group_id],
+            'assignPublicIp': 'ENABLED',
+        }
+    }
+    return json.dumps(network_config)
+
+  def _GetLoadBalancerConfig(self):
+    """Returns the JSON representation of the service load balancers."""
+    load_balancer_config = [{
+        'targetGroupArn': self.target_group.arn,
+        'containerName': self.name,
+        'containerPort': self.container_port,
+    }]
+    return json.dumps(load_balancer_config)
+
+  def _IsReady(self):
+    """Returns True if the Service is ready."""
+    url = 'http://%s' % self.ip_address
+    try:
+      r = requests.get(url)
+    except requests.ConnectionError:
+      return False
+    if r.status_code == 200:
+      return True
+    return False
+
+
+class FargateCluster(container_service.BaseContainerCluster):
+  """Class representing an AWS Fargate cluster."""
+
+  CLOUD = providers.AWS
+  CLUSTER_TYPE = container_service.SERVERLESS
+
+  def __init__(self, cluster_spec):
+    super(FargateCluster, self).__init__(cluster_spec)
+    self.region = util.GetRegionFromZone(self.zone)
+    self.network = aws_network.AwsNetwork.GetNetwork(self)
+    self.firewall = aws_network.AwsFirewall.GetFirewall()
+    self.name = 'pkb-%s' % FLAGS.run_uri
+    self.task_defs = {}
+    self.arn = None
+
+  def _Create(self):
+    """Creates the cluster."""
+    create_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'create-cluster',
+        '--cluster-name', self.name
+    ]
+    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    response = json.loads(stdout)
+    self.arn = response['cluster']['clusterArn']
+
+  def _Exists(self):
+    """Returns True if the cluster exists."""
+    if not self.arn:
+      return False
+    describe_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'describe-clusters',
+        '--clusters', self.arn
+    ]
+    stdout, _, _ = vm_util.IssueCommand(describe_cmd)
+    response = json.loads(stdout)
+    clusters = response['clusters']
+    if not clusters or clusters[0]['status'] == 'INACTIVE':
+      return False
+    return True
+
+  def _Delete(self):
+    """Deletes the cluster."""
+    delete_cmd = util.AWS_PREFIX + [
+        '--region', self.region,
+        'ecs', 'delete-cluster',
+        '--cluster', self.name
+    ]
+    vm_util.IssueCommand(delete_cmd)
+
+  def DeployContainer(self, name, container_spec):
+    """Deploys the container according to the spec."""
+    if name not in self.task_defs:
+      task_def = TaskDefinition(name, container_spec, self)
+      self.task_defs[name] = task_def
+      task_def.Create()
+    task = EcsTask(name, container_spec, self)
+    self.containers[name].append(task)
+    task.Create()
+
+  def DeployContainerService(self, name, container_spec):
+    """Deploys the container service according to the spec."""
+    if name not in self.task_defs:
+      task_def = TaskDefinition(name, container_spec, self)
+      self.task_defs[name] = task_def
+      task_def.Create()
+    service = EcsService(name, container_spec, self)
+    self.services[name] = service
+    self.firewall.AllowPortInSecurityGroup(
+        service.region, service.security_group_id, service.container_port)
+    service.Create()
 
 
 class AwsKopsCluster(container_service.KubernetesCluster):
