@@ -43,6 +43,8 @@ flags.DEFINE_integer('nuttcp_udp_stream_seconds', 10,
 flags.DEFINE_integer('nuttcp_udp_packet_size', 1420,
                      'The size of each UDP packet sent in the UDP stream.')
 
+flags.DEFINE_bool('nuttcp_udp_run_both_directions', False,
+                  'Run the test twice, using each VM as a source.')
 
 NUTTCP_DIR = 'nuttcp-8.1.4.win64'
 NUTTCP_ZIP = NUTTCP_DIR + '.zip'
