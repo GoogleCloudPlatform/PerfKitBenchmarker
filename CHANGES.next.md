@@ -43,6 +43,8 @@
 - Added Tensorflow Serving benchmark which tests the throughput and latency of the
   standard model-server using a pre-trained inception3 model.
 - Added AWS Fargate support.
+- Added the ability to pass arbitrary parameters to tf_cnn_benchmarks.py in the
+  Tensorflow benchmark, through the `benchmark_args` flag.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
