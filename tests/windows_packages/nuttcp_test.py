@@ -38,7 +38,7 @@ class NuttcpTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
     result_sample = [
         nuttcp.GetUDPStreamSample(nuttcp_results, client, server, bandwidth,
-                                  'external')
+                                  'external', 1)
     ]
 
     expected_metadata = {
@@ -48,7 +48,8 @@ class NuttcpTestCase(unittest.TestCase, test_util.SamplesTestMixin):
         'sending_zone': 'cZ',
         'packet_loss': packet_loss,
         'bandwidth_requested': bandwidth,
-        'network_type': 'external'
+        'network_type': 'external',
+        'iteration': 1
     }
 
     expected_sample = [
