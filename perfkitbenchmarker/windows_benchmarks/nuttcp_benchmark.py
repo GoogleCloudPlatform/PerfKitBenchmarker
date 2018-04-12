@@ -67,7 +67,8 @@ def RunNuttcp(vms, exec_path):
 
   # run in both directions just for completeness
   _RunNuttcpTest(vms[0], vms[1])
-  _RunNuttcpTest(vms[1], vms[0])
+  if FLAGS.nuttcp_udp_run_both_directions:
+    _RunNuttcpTest(vms[1], vms[0])
 
   return results
 
