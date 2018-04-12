@@ -1,0 +1,34 @@
+# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Yahoo! Cloud System Benchmark
+#   This is a workload where each payload is 50kb in size (10 * 5000).
+#   Read/update ratio: 50/50
+#   Request distribution: zipfian
+
+workload=com.yahoo.ycsb.workloads.CoreWorkload
+
+readallfields=true
+operationcount=1000
+
+fieldlength = 5000
+fieldcount = 10
+
+readproportion=0.5
+updateproportion=0.5
+scanproportion=0
+insertproportion=0
+
+requestdistribution=zipfian
+

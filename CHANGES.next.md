@@ -17,7 +17,8 @@
 ### New features:
 - Windows benchmarks can now be run from linux controllers
 - MXNet benchmarks can now be run from linux controllers
-- Added initial support for preprovisioning benchmark binaries in the cloud.
+- Added initial support for preprovisioning benchmark binaries in the cloud,
+  if binaries are not located in local /data directory.
 - YCSB benchmark for Cloud Redis in GCP, Elasticache Redis in AWS, and
   Redis Cache in Azure.
 - Added a flag, `run_stage_iterations`, which causes a benchmark's run stage to be
@@ -41,6 +42,7 @@
 - Added new ycsb workload where each payload is 1mb versus the default 1kb.
 - Added Tensorflow Serving benchmark which tests the throughput and latency of the
   standard model-server using a pre-trained inception3 model.
+- Added AWS Fargate support.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -93,6 +95,9 @@
 - Added flags `ycsb_version` and `ycsb_measurement_type` to support
   user-specified ycsb versions and measurement types.
 - Added support to tensorflow_benchmark for running multiple batch sizes per run.
+- Added resnet152 in TensorFlow benchmark default models.
+- Added 50kb per payload ycsb workload.
+- Added `num_cpus` to virtual_machine published metadata.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -154,3 +159,10 @@
 - Replace all underscores in the benchmark name with dashes when downloading
   preprovisioned benchmark data from Azure. This is because Azure blob storage
   container names cannot contain underscores.
+- Fixed the bug of running distributed TensorFlow on multiple batch sizes.
+- Updated `gcloud compute networks create` to use `subnet-mode`.
+- Changed default CUDA version from 8.0 to 9.0.
+- Updated default Tensorflow version to 1.7 when using GPUs.
+- Updated default Tensorflow tf_cnn_benchmarks version to a commit dated April
+  2, 2018.
+ 
