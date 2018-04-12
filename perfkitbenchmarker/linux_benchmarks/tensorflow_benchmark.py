@@ -238,7 +238,7 @@ def _GetMetadataFromBenchmarkArgs(tf_cnn_benchmark_args):
   Returns:
     A dictionary mapping argument names to their values.
   """
-  args = benchmark_args.split(' ')
+  args = tf_cnn_benchmark_args.split(' ')
   args_dict = {arg.split('=')[0].replace('--', ''): arg.split('=')[1]
                for arg in args}
   if 'use_fp16' in args_dict:
@@ -370,13 +370,13 @@ def _GetTfCnnBenchmarkCommand(vm, model, batch_size, benchmark_spec,
     with the desired arguments.
   """
   num_gpus = (cuda_toolkit.QueryNumberOfGpus(vm) if
-      cuda_toolkit.CheckNvidiaGpuExists(vm) else 0)
+              cuda_toolkit.CheckNvidiaGpuExists(vm) else 0)
 
   if benchmark_spec.benchmark_args is not None:
     cmd = 'python tf_cnn_benchmarks.py ' + benchmark_spec.benchmark_args
     # If the user didn't specify num_gpus in the benchmark_args string,
     # use all the GPUs on the system.
-    if not '--num_gpus' in benchmark_spec.benchmark_args and num_gpus:
+    if '--num_gpus' not in benchmark_spec.benchmark_args and num_gpus:
       cmd = '{cmd} --num_gpus={num_gpus}'.format(cmd=cmd, num_gpus=num_gpus)
     return cmd
 
@@ -413,7 +413,7 @@ def _GetTfCnnBenchmarkCommand(vm, model, batch_size, benchmark_spec,
   if benchmark_spec.device == GPU:
     cmd = '{env} {cmd} --num_gpus={gpus}'.format(
         env=tensorflow.GetEnvironmentVars(vm),
-        cmd=tf_cnn_benchmark_cmd,
+        cmd=cmd,
         gpus=num_gpus)
   if args:
     cmd = '{cmd} --job_name={job} {args}'.format(
