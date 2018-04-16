@@ -45,6 +45,7 @@
 - Added AWS Fargate support.
 - Added the ability to pass arbitrary parameters to tf_cnn_benchmarks.py in the
   Tensorflow benchmark, through the `benchmark_args` flag.
+- Added hdrhistogram support to ycsb package.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
