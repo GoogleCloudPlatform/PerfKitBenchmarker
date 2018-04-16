@@ -147,7 +147,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                                             os.path.basename(f)))
         self._has_remote_command_script = True
 
-  def RobustRemoteCommand(self, command, should_log=False):
+  def RobustRemoteCommand(self, command, should_log=False, timeout=None):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     Executes a command via a pair of scripts on the VM:
@@ -160,8 +160,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Temporary SSH failures (where ssh returns a 255) while waiting for the
     command to complete will be tolerated and safely retried.
 
-    If should_log is True, log the command's output at the info
-    level. If False, log the command's output at the debug level.
+    Args:
+      command: The command to run.
+      should_log: Whether to log the command's output at the info level. The
+          output is always logged at the debug level.
+      timeout: The timeout for the command.
+
+    Returns:
+      A tuple of stdout, stderr, return_code from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection, or
+          the command fails.
     """
     self._PushRobustCommandScripts()
 
@@ -185,6 +195,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                      '--stderr', stderr_file,
                      '--status', status_file,
                      '--command', pipes.quote(command)]
+    if timeout:
+      start_command.extend(['--timeout', str(timeout)])
 
     start_command = '%s 1> %s 2>&1 &' % (' '.join(start_command),
                                          wrapper_log)
