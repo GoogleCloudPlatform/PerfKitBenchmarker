@@ -19,10 +19,9 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('k8s_get_retry_count', 18,
-                    'Maximum number of waits for getting LoadBalancer external IP')
+                     'Maximum number of waits for getting LoadBalancer external IP')
 flags.DEFINE_integer('k8s_get_wait_interval', 10,
-                    'Wait interval for getting LoadBalancer external IP')
-
+                     'Wait interval for getting LoadBalancer external IP')
 
 
 def checkKubernetesFlags():
