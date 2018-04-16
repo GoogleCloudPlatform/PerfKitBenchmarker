@@ -206,7 +206,7 @@ class CombineResultsTestCase(unittest.TestCase):
             }
         }
     }
-    combined = ycsb._CombineResults([r1, r2])
+    combined = ycsb._CombineResults([r1, r2], 'histogram', {})
     self.assertItemsEqual(['read', 'update'], combined['groups'])
     self.assertItemsEqual(['Operations', 'Return=0', 'Return=-1'],
                           combined['groups']['read']['statistics'])
@@ -229,7 +229,27 @@ class CombineResultsTestCase(unittest.TestCase):
 
     r_copy = copy.deepcopy(r)
     self.assertEqual(r, r_copy)
-    combined = ycsb._CombineResults([r])
+    combined = ycsb._CombineResults([r], 'histogram', {})
     self.assertEqual(r, r_copy)
     r['groups']['read']['statistics'] = {}
     self.assertEqual(r, combined)
+
+
+class HdrLogsParserTestCase(unittest.TestCase):
+
+  def testParseHdrLogFile(self):
+    rawlog = """
+      #[StartTime: 1523565997 (seconds since epoch), Thu Apr 12 20:46:37 UTC 2018]
+         Value     Percentile TotalCount 1/(1-Percentile)
+
+         314.000 0.000000000000          2           1.00
+         853.000 0.100000000000      49955           1.11
+         949.000 0.200000000000     100351           1.25
+         1033.000 0.300000000000     150110           1.43
+      #[Mean    =     1651.145, StdDeviation   =      851.707]
+      #[Max     =   203903.000, Total count    =       499019]
+      #[Buckets =            8, SubBuckets     =         2048]
+    """
+    actual = ycsb.ParseHdrLogFile(rawlog)
+    expected = [(0.0, 0.314), (10.0, 0.853), (20.0, 0.949), (30.0, 1.033)]
+    self.assertEqual(actual, expected)
