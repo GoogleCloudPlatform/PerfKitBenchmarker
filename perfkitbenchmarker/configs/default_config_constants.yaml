@@ -10,6 +10,10 @@ default_single_core: &default_single_core
     machine_type: Standard_A1
     zone: eastus2
     image: null
+  AzureStack:
+    machine_type: Standard_A1
+    zone: frn00006
+    image: null
   AWS:
     machine_type: m3.medium
     zone: us-east-1
@@ -53,6 +57,10 @@ default_dual_core: &default_dual_core
     machine_type: Standard_D2_v3
     zone: eastus2
     image: null
+  AzureStack:
+    machine_type: Standard_A1
+    zone: frn00006
+    image: null
   AWS:
     machine_type: m5.large
     zone: us-east-1
@@ -70,6 +78,10 @@ default_500_gb: &default_500_gb
     disk_type: Standard_LRS
     disk_size: 500
     mount_point: /scratch
+  AzureStack:
+    disk_type: Standard_LRS
+    disk_size: 500
+    mount_point: /scratc
   AWS:
     disk_type: standard
     disk_size: 500
@@ -118,6 +130,10 @@ default_50_gb: &default_50_gb
     disk_type: Standard_LRS
     disk_size: 50
     mount_point: /scratch
+  AzureStack:
+    disk_type: Standard_LRS
+    disk_size: 500
+    mount_point: /scratc
   AWS:
     disk_type: standard
     disk_size: 50

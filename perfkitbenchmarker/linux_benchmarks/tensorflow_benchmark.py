@@ -97,6 +97,9 @@ flags.DEFINE_enum('tf_data_format', NCHW, [NCHW, NHWC], '''Data layout to
 flags.DEFINE_boolean('tf_distortions', True,
                      '''Enable/disable distortions during image preprocessing.
                      These include bbox and color distortions.''')
+flags.DEFINE_string('tf_benchmarks_commit_hash',
+                    'bab8a61aaca3d2b94072ae2b87f0aafe1797b165',
+                    'git commit hash of desired tensorflow benchmark commit.')
 flags.DEFINE_boolean('tf_distributed', False, 'Run TensorFlow distributed')
 flags.DEFINE_string('tf_distributed_port', '2222',
                     'The port to use in TensorFlow distributed job')
@@ -193,8 +196,14 @@ def _PrepareVm(vm):
   Args:
     vm: virtual machine on which to install TensorFlow
   """
+  commit_hash = FLAGS.tf_benchmarks_commit_hash
   vm.Install('tensorflow')
   vm.InstallPackages('git')
+  vm.RemoteCommand(
+      'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
+  vm.RemoteCommand(
+      'cd benchmarks && git checkout {}'.format(commit_hash)
+  )
 
 
 def Prepare(benchmark_spec):

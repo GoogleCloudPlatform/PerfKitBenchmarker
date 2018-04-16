@@ -34,10 +34,6 @@ import logging
 import optparse
 import sys
 import subprocess
-import threading
-
-# By default, set a timeout of 100 years to mimic no timeout.
-_DEFAULT_NEAR_ETERNAL_TIMEOUT = 60 * 60 * 24 * 365 * 100
 
 
 def main():
@@ -53,10 +49,6 @@ def main():
                     until this process exits. Required.""", metavar='FILE')
   parser.add_option('-c', '--command', dest='command', help="""Shell command to
                     execute. Required.""")
-  parser.add_option('-t', '--timeout', dest='timeout',
-                    default=_DEFAULT_NEAR_ETERNAL_TIMEOUT,
-                    type='int', help="""Timeout in seconds before killing
-                    the command.""")
   options, args = parser.parse_args()
   if args:
     sys.stderr.write('Unexpected arguments: {0}\n'.format(args))
@@ -90,18 +82,8 @@ def main():
           with open(options.pid, 'w') as pid:
             pid.write(str(p.pid))
 
-        def _KillProcess():
-          logging.error('ExecuteCommand timed out after %d seconds. Killing '
-                        'command.', options.timeout)
-          p.kill()
-
-        timer = threading.Timer(options.timeout, _KillProcess)
-        timer.start()
         logging.info('Waiting on PID %s', p.pid)
-        try:
-          return_code = p.wait()
-        finally:
-          timer.cancel()
+        return_code = p.wait()
         logging.info('Return code: %s', return_code)
         status.truncate()
         status.write(str(return_code))

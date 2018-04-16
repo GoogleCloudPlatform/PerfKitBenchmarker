@@ -583,26 +583,6 @@ def DoTeardownPhase(spec, timer):
     spec.Delete()
 
 
-def _SkipPendingRunsFile():
-  if FLAGS.skip_pending_runs_file and isfile(FLAGS.skip_pending_runs_file):
-    logging.warning('%s exists.  Skipping benchmark.',
-                    FLAGS.skip_pending_runs_file)
-    return True
-  else:
-    return False
-
-_SKIP_PENDING_RUNS_CHECKS = []
-
-
-def RegisterSkipPendingRunsCheck(func):
-  """Registers a function to skip pending runs.
-
-  Args:
-    func: A function which returns True if pending runs should be skipped.
-  """
-  _SKIP_PENDING_RUNS_CHECKS.append(func)
-
-
 def RunBenchmark(spec, collector):
   """Runs a single benchmark and adds the results to the collector.
 
@@ -614,11 +594,10 @@ def RunBenchmark(spec, collector):
   # Since there are issues with the handling SIGINT/KeyboardInterrupt (see
   # further dicussion in _BackgroundProcessTaskManager) this mechanism is
   # provided for defense in depth to force skip pending runs after SIGINT.
-  for f in _SKIP_PENDING_RUNS_CHECKS:
-    if f():
-      logging.warning('Skipping benchmark.')
-      return
-
+  if FLAGS.skip_pending_runs_file and isfile(FLAGS.skip_pending_runs_file):
+    logging.warning('%s exists.  Skipping benchmark.',
+                    FLAGS.skip_pending_runs_file)
+    return
   spec.status = benchmark_status.FAILED
   current_run_stage = stages.PROVISION
   # Modify the logger prompt for messages logged within this function.
@@ -828,9 +807,6 @@ def SetUpPKB():
   # Translate deprecated flags and log all provided flag values.
   disk.WarnAndTranslateDiskFlags()
   _LogCommandLineFlags()
-
-  # Register skip pending runs functionality.
-  RegisterSkipPendingRunsCheck(_SkipPendingRunsFile)
 
   # Check environment.
   if not FLAGS.ignore_package_requirements:

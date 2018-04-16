@@ -19,7 +19,7 @@
 def _Install(vm):
   """Installs the GCS boto plugin on the VM."""
   vm.Install('pip')
-  vm.RemoteCommand('sudo pip install --ignore-installed gcs-oauth2-boto-plugin')
+  vm.RemoteCommand('sudo pip install gcs-oauth2-boto-plugin')
 
 
 def YumInstall(vm):

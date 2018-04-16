@@ -19,7 +19,7 @@ import re
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
-from perfkitbenchmarker.providers.azure import flags as azure_flags
+from perfkitbenchmarker.providers.azure import flags as azurestack_flags
 
 
 class MemoryDecoder(option_decoders.StringDecoder):
