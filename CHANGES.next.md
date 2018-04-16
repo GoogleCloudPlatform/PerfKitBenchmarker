@@ -168,3 +168,4 @@
 - Updated default Tensorflow version to 1.7 when using GPUs.
 - Updated default Tensorflow tf_cnn_benchmarks version to a commit dated April
   2, 2018.
+- Fixed a bug in which boto could not be uninstalled on newer GCE images.
