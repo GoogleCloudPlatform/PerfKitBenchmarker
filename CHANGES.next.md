@@ -101,6 +101,7 @@
 - Added resnet152 in TensorFlow benchmark default models.
 - Added 50kb per payload ycsb workload.
 - Added `num_cpus` to virtual_machine published metadata.
+- Added a timeout to RobustRemoteCommand.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
