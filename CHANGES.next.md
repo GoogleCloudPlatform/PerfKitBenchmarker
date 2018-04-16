@@ -56,7 +56,7 @@
 - Add MNIST benchmark support for TPU, CPU and GPU
 - Created KubernetesPodSpec which allows the user to specify kubernetes resource
   requests and limits, including fractional CPUs.
-- Add `skip_pending_runs_file` flag to workaround SIGINT issues.
+- Add `skip_pending_runs_file` flag and extension hooks to workaround SIGINT issues.
 - Add support for `specsfs2014_load` parameter as an integer list.
 - Publishers can be extended through external modules.
 - Add `run_processes_delay` flag to stagger parallel runs.
