@@ -28,6 +28,9 @@ flags.DEFINE_string('tf_cpu_pip_package',
 flags.DEFINE_string('tf_gpu_pip_package', 'tensorflow-gpu==1.7',
                     'TensorFlow GPU pip package to install. By default, PKB '
                     'will install tensorflow-gpu==1.7 when using GPUs.')
+flags.DEFINE_string('tf_benchmarks_commit_hash',
+                    'bab8a61aaca3d2b94072ae2b87f0aafe1797b165',
+                    'git commit hash of desired tensorflow benchmark commit.')
 
 
 def GetEnvironmentVars(vm):
@@ -74,6 +77,7 @@ def Install(vm):
   has_gpu = cuda_toolkit.CheckNvidiaGpuExists(vm)
   tf_pip_package = (FLAGS.tf_gpu_pip_package if has_gpu else
                     FLAGS.tf_cpu_pip_package)
+  commit_hash = FLAGS.tf_benchmarks_commit_hash
 
   if has_gpu:
     vm.Install('cuda_toolkit')
@@ -83,6 +87,11 @@ def Install(vm):
   vm.RemoteCommand('sudo pip install --upgrade absl-py')
   vm.RemoteCommand('sudo pip install --upgrade %s' % tf_pip_package,
                    should_log=True)
+  vm.RemoteCommand(
+      'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
+  vm.RemoteCommand(
+      'cd benchmarks && git checkout {}'.format(commit_hash)
+  )
 
 
 def Uninstall(vm):

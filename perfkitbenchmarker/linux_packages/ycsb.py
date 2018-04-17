@@ -61,6 +61,10 @@ FLAGS = flags.FLAGS
 
 YCSB_DIR = posixpath.join(INSTALL_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
+HDRHISTOGRAM_DIR = posixpath.join(INSTALL_DIR, 'hdrhistogram')
+HDRHISTOGRAM_TAR_URL = ('https://github.com/HdrHistogram/HdrHistogram/archive/'
+                        'HdrHistogram-2.1.10.tar.gz')
+HDRHISTOGRAM_GROUPS = ['READ', 'UPDATE']
 
 _DEFAULT_PERCENTILES = 50, 75, 90, 95, 99, 99.9
 
@@ -166,14 +170,18 @@ def CheckPrerequisites():
 
 
 def _Install(vm):
-  """Installs the YCSB package on the VM."""
+  """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
   vm.Install('openjdk')
   vm.Install('curl')
   ycsb_url = ('https://github.com/brianfrankcooper/YCSB/releases/'
               'download/{0}/ycsb-{0}.tar.gz').format(FLAGS.ycsb_version)
-  vm.RemoteCommand(('mkdir -p {0} && curl -L {1} | '
-                    'tar -C {0} --strip-components=1 -xzf -').format(
-                        YCSB_DIR, ycsb_url))
+  install_cmd = ('mkdir -p {0} && curl -L {1} | '
+                 'tar -C {0} --strip-components=1 -xzf -')
+  vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
+  if FLAGS.ycsb_measurement_type == HDRHISTOGRAM:
+    vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
+    vm.RemoteCommand('sudo apt-get --assume-yes install maven')
+    vm.RemoteCommand('cd {0}; mvn install'.format(HDRHISTOGRAM_DIR))
 
 
 def YumInstall(vm):
@@ -314,6 +322,65 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
   return result
 
 
+def ParseHdrLogFile(logfile):
+  """Parse a hdrhistogram log file into a list of (percentile, latency) value.
+
+  Example decrypted hdrhistogram logfile (value measures latency in microsec):
+
+  #[StartTime: 1523565997 (seconds since epoch), Thu Apr 12 20:46:37 UTC 2018]
+       Value     Percentile TotalCount 1/(1-Percentile)
+
+     314.000 0.000000000000          2           1.00
+     853.000 0.100000000000      49955           1.11
+     949.000 0.200000000000     100351           1.25
+     1033.000 0.300000000000     150110           1.43
+     ...
+     134271.000 0.999998664856    1000008      748982.86
+     134271.000 0.999998855591    1000008      873813.33
+     201983.000 0.999999046326    1000009     1048576.00
+  #[Mean    =     1287.159, StdDeviation   =      667.560]
+  #[Max     =   201983.000, Total count    =      1000009]
+  #[Buckets =            8, SubBuckets     =         2048]
+
+  Example of output: [(0, 0.314), (10, 0.853), (20, 0.949), ...]
+
+  Args:
+    logfile: Hdrhistogram log file.
+
+  Returns:
+    List of (percent, value) tuples
+  """
+  result = []
+  last_percent_value = -1
+  for row in logfile.split('\n'):
+    if re.match(r'( *)(\d|\.)( *)', row):
+      row_vals = row.split()
+      # convert percentile to 100 based and round up to 3 decimal places
+      percentile = math.floor(float(row_vals[1]) * 100000) / 1000.0
+      if percentile > last_percent_value:
+        # convert latency to millisec based and percentile to 100 based.
+        latency = float(row_vals[0]) / 1000
+        result.append((percentile, latency))
+        last_percent_value = percentile
+  return result
+
+
+def ParseHdrLogs(hdrlogs):
+  """Parse a dict of group to hdr logs into a dict of group to histogram tuples.
+
+  Args:
+    hdrlogs: Dict of group (read or update) to hdr logs for that group.
+
+  Returns:
+    Dict of group to histogram tuples of reportable percentile values.
+  """
+  parsed_hdr_histograms = {}
+  for group, logfile in hdrlogs.iteritems():
+    values_at_percent = ParseHdrLogFile(logfile)
+    parsed_hdr_histograms[group] = values_at_percent
+  return parsed_hdr_histograms
+
+
 def _CumulativeSum(xs):
   total = 0
   for x in xs:
@@ -380,7 +447,7 @@ def _PercentilesFromHistogram(ycsb_histogram, percentiles=_DEFAULT_PERCENTILES):
   return result
 
 
-def _CombineResults(result_list, combine_histograms=True):
+def _CombineResults(result_list, measurement_type, combined_hdr):
   """Combine results from multiple YCSB clients.
 
   Reduces a list of YCSB results (the output of ParseResults)
@@ -389,8 +456,10 @@ def _CombineResults(result_list, combine_histograms=True):
 
   Args:
     result_list: List of ParseResults outputs.
-    combine_histograms: If true, histogram bins are summed across results. If
-      not, no histogram will be returned. Defaults to True.
+    measurement_type: Measurement type used. If measurement type is histogram,
+      histogram bins are summed across results. If measurement type is
+      hdrhistogram, an aggregated hdrhistogram (combined_hdr) is expected.
+    combined_hdr: Dict of already aggregated histogram.
   Returns:
     A dictionary, as returned by ParseResults.
   """
@@ -443,12 +512,15 @@ def _CombineResults(result_list, combine_histograms=True):
         result['groups'][group_name]['statistics'][k] = (
             op(result['groups'][group_name]['statistics'][k], v))
 
-      if combine_histograms:
-        result['groups'][group_name]['histogram'] = CombineHistograms(
-            result['groups'][group_name]['histogram'],
-            group['histogram'])
+      if measurement_type == HISTOGRAM:
+        result['groups'][group_name][HISTOGRAM] = CombineHistograms(
+            result['groups'][group_name][HISTOGRAM],
+            group[HISTOGRAM])
+      elif measurement_type == HDRHISTOGRAM:
+        result['groups'][group_name][HDRHISTOGRAM] = combined_hdr.get(
+            group_name, [])
       else:
-        result['groups'][group_name].pop('histogram', None)
+        result['groups'][group_name].pop(HISTOGRAM, None)
     result['client'] = ' '.join((result['client'], indiv['client']))
     result['command_line'] = ';'.join((result['command_line'],
                                        indiv['command_line']))
@@ -513,10 +585,16 @@ def _CreateSamples(ycsb_result, include_histogram=True, **kwargs):
         unit = m.group(2)
       yield sample.Sample(' '.join([group_name, statistic]), value, unit, meta)
 
-    if group['histogram']:
-      percentiles = _PercentilesFromHistogram(group['histogram'])
+    if group.get(HISTOGRAM, []):
+      percentiles = _PercentilesFromHistogram(group[HISTOGRAM])
       for label, value in percentiles.iteritems():
         yield sample.Sample(' '.join([group_name, label, 'latency']),
+                            value, 'ms', meta)
+    if group.get(HDRHISTOGRAM, []):
+      for percentile, value in group[HDRHISTOGRAM]:
+        yield sample.Sample(' '.join([group_name,
+                                      'p' + str(percentile),
+                                      'latency']),
                             value, 'ms', meta)
 
     if include_histogram:
@@ -570,6 +648,7 @@ class YCSBExecutor(object):
     self.perclientparam = self.parameters.pop('perclientparam', None)
     self.shardkeyspace = self.parameters.pop('shardkeyspace', False)
     self.measurement_type = FLAGS.ycsb_measurement_type
+    self.hdr_dir = HDRHISTOGRAM_DIR
 
   def _BuildCommand(self, command_name, parameter_files=None, **kwargs):
     command = [YCSB_EXE, command_name, self.database]
@@ -677,8 +756,8 @@ class YCSBExecutor(object):
             include_histogram=FLAGS.ycsb_histogram,
             **workload_meta))
 
-    combine_histogram = (self.measurement_type == HISTOGRAM)
-    combined = _CombineResults(results, combine_histogram)
+    # hdr histograms not collected upon load, only upon run
+    combined = _CombineResults(results, self.measurement_type, {})
     samples.extend(_CreateSamples(
         combined, result_type='combined',
         include_histogram=FLAGS.ycsb_histogram,
@@ -695,6 +774,9 @@ class YCSBExecutor(object):
     # YCSB version greater than 0.7.0 output some of the
     # info we need to stderr. So we have to combine these 2
     # output to get expected results.
+    hdr_files_dir = kwargs.get('hdrhistogram.output.path', None)
+    if hdr_files_dir:
+      vm.RemoteCommand('mkdir -p {0}'.format(hdr_files_dir))
     stdout, stderr = vm.RobustRemoteCommand(command)
     return ParseResults(str(stderr + stdout), self.measurement_type)
 
@@ -763,6 +845,10 @@ class YCSBExecutor(object):
         parameters['fieldlength'] = FLAGS.ycsb_field_length
       if FLAGS.ycsb_timelimit:
         parameters['maxexecutiontime'] = FLAGS.ycsb_timelimit
+      hdr_files_dir = posixpath.join(self.hdr_dir, str(workload_index))
+      if FLAGS.ycsb_measurement_type == HDRHISTOGRAM:
+        parameters['hdrhistogram.fileoutput'] = True
+        parameters['hdrhistogram.output.path'] = hdr_files_dir
       parameters.update(kwargs)
       remote_path = posixpath.join(INSTALL_DIR,
                                    os.path.basename(workload_file))
@@ -802,14 +888,52 @@ class YCSBExecutor(object):
                 include_histogram=FLAGS.ycsb_histogram,
                 **client_meta))
 
-        combine_histogram = (self.measurement_type == HISTOGRAM)
-        combined = _CombineResults(results, combine_histogram)
+        if self.measurement_type == HDRHISTOGRAM:
+          combined_log = self.CombineHdrHistogramLogFiles(hdr_files_dir, vms)
+          parsed_hdr = ParseHdrLogs(combined_log)
+          combined = _CombineResults(results, self.measurement_type, parsed_hdr)
+        else:
+          combined = _CombineResults(results, self.measurement_type, {})
         all_results.extend(_CreateSamples(
             combined, result_type='combined',
             include_histogram=FLAGS.ycsb_histogram,
             **client_meta))
 
     return all_results
+
+  def CombineHdrHistogramLogFiles(self, hdr_files_dir, vms):
+    """Combine multiple hdr histograms by group type.
+
+    Combine multiple hdr histograms in hdr log files format into 1 human
+    readable hdr histogram log file.
+    This is done by
+    1) copying hdrhistogram log files to a single file on a worker vm;
+    2) aggregating file containing multiple %-tile histogram into
+       a single %-tile histogram using HistogramLogProcessor from the
+       hdrhistogram package that is installed on the vms. Refer to https://
+       github.com/HdrHistogram/HdrHistogram/blob/master/HistogramLogProcessor
+
+    Args:
+      hdr_files_dir: directory on the remote vms where hdr files are stored.
+      vms: remote vms
+
+    Returns:
+      dict of hdrhistograms keyed by group type
+    """
+    hdrhistograms = {}
+    for grouptype in HDRHISTOGRAM_GROUPS:
+      worker_vm = vms[0]
+      for vm in vms[1:]:
+        hdr, _ = vm.RemoteCommand(
+            'tail -1 {0}{1}.hdr'.format(hdr_files_dir, grouptype))
+        worker_vm.RemoteCommand(
+            'sudo chmod 777 {1}{2}.hdr && echo "{0}" >> {1}{2}.hdr'.format(
+                hdr[:-1], hdr_files_dir, grouptype))
+      hdrhistogram, _ = worker_vm.RemoteCommand(
+          'cd {0}; ./HistogramLogProcessor -i {1}{2}.hdr -outputValueUnitRatio '
+          '1'.format(self.hdr_dir, hdr_files_dir, grouptype))
+      hdrhistograms[grouptype.lower()] = hdrhistogram
+    return hdrhistograms
 
   def Load(self, vms, workloads=None, load_kwargs=None):
     """Load data using YCSB."""
