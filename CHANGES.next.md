@@ -170,3 +170,5 @@
 - Updated default Tensorflow tf_cnn_benchmarks version to a commit dated April
   2, 2018.
 - Fixed a bug in which boto could not be uninstalled on newer GCE images.
+- Update each ycsb workload to have its own recordcount configuration if
+  ycsb_record_count is not set.
