@@ -568,7 +568,8 @@ def _CreateSamples(ycsb_result, include_histogram=True, **kwargs):
   """
   stage = 'load' if ycsb_result['command_line'].endswith('-load') else 'run'
   base_metadata = {'command_line': ycsb_result['command_line'],
-                   'stage': stage}
+                   'stage': stage,
+                   'ycsb_version': FLAGS.ycsb_version}
   base_metadata.update(kwargs)
 
   for group_name, group in ycsb_result['groups'].iteritems():
