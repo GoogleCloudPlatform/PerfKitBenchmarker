@@ -180,8 +180,9 @@ def _Install(vm):
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
   if FLAGS.ycsb_measurement_type == HDRHISTOGRAM:
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
-    vm.RemoteCommand('sudo apt-get --assume-yes install maven')
-    vm.RemoteCommand('cd {0}; mvn install'.format(HDRHISTOGRAM_DIR))
+    vm.RemoteCommand('sudo apt-get --assume-yes install maven > /dev/null 2>&1')
+    vm.RemoteCommand('cd {0}; mvn install > /dev/null 2>&1'.format(
+        HDRHISTOGRAM_DIR))
 
 
 def YumInstall(vm):
