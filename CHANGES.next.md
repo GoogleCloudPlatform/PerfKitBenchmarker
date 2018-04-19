@@ -43,6 +43,9 @@
 - Added Tensorflow Serving benchmark which tests the throughput and latency of the
   standard model-server using a pre-trained inception3 model.
 - Added AWS Fargate support.
+- Added the ability to pass arbitrary parameters to tf_cnn_benchmarks.py in the
+  Tensorflow benchmark, through the `benchmark_args` flag.
+- Added hdrhistogram support to ycsb package.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -53,7 +56,7 @@
 - Add MNIST benchmark support for TPU, CPU and GPU
 - Created KubernetesPodSpec which allows the user to specify kubernetes resource
   requests and limits, including fractional CPUs.
-- Add `skip_pending_runs_file` flag to workaround SIGINT issues.
+- Add `skip_pending_runs_file` flag and extension hooks to workaround SIGINT issues.
 - Add support for `specsfs2014_load` parameter as an integer list.
 - Publishers can be extended through external modules.
 - Add `run_processes_delay` flag to stagger parallel runs.
@@ -98,6 +101,7 @@
 - Added resnet152 in TensorFlow benchmark default models.
 - Added 50kb per payload ycsb workload.
 - Added `num_cpus` to virtual_machine published metadata.
+- Added a timeout to RobustRemoteCommand.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -165,4 +169,6 @@
 - Updated default Tensorflow version to 1.7 when using GPUs.
 - Updated default Tensorflow tf_cnn_benchmarks version to a commit dated April
   2, 2018.
- 
+- Fixed a bug in which boto could not be uninstalled on newer GCE images.
+- Update each ycsb workload to have its own recordcount configuration if
+  ycsb_record_count is not set.
