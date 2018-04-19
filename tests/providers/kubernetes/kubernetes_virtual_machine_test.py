@@ -19,6 +19,9 @@ import json
 import unittest
 import contextlib2
 import mock
+from perfkitbenchmarker import os_types
+from perfkitbenchmarker import providers
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
 from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine
@@ -99,7 +102,7 @@ _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE = """
         "containers": [{
             "name": "fake_name",
             "volumeMounts": [],
-            "image": "nvidia/cuda:8.0-devel-ubuntu16.04",
+            "image": "nvidia/cuda:9.0-devel-ubuntu16.04",
             "securityContext": {
                 "privileged": null
             },
@@ -236,6 +239,61 @@ class KubernetesResourcesTestCase(
       self.assertDictContainsSubset(subset_of_expected_metadata, actual)
 
 
+class KubernetesVirtualMachineOsTypesTestCase(
+    BaseKubernetesVirtualMachineTestCase):
+
+  @staticmethod
+  def create_kubernetes_vm(os_type):
+    spec = kubernetes_pod_spec.KubernetesPodSpec(
+        _COMPONENT)
+    vm_class = virtual_machine.GetVmClass(providers.KUBERNETES,
+                                          os_type)
+    kub_vm = vm_class(spec)
+    kub_vm._WaitForPodBootCompletion = lambda: None
+    kub_vm._Create()
+
+  def testUbuntuImagesInstallSudo(self):
+    with patch_critical_objects() as (_, temp_file):
+      self.create_kubernetes_vm(os_types.UBUNTU1404)
+
+      write_mock = get_write_mock_from_temp_file_mock(temp_file)
+      create_json = json.loads(write_mock.call_args[0][0])
+      command = create_json['spec']['containers'][0]['command']
+      self.assertEqual(command,
+                       [u'bash', u'-c',
+                        (u'apt-get update && apt-get install -y sudo && '
+                         'sed -i \'/env_reset/d\' /etc/sudoers && '
+                         'sed -i \'/secure_path/d\' /etc/sudoers && '
+                         'sudo ldconfig && tail -f /dev/null')])
+
+  def testCreateUbuntu1404(self):
+    with patch_critical_objects() as (_, temp_file):
+      self.create_kubernetes_vm(os_types.UBUNTU1404)
+
+      write_mock = get_write_mock_from_temp_file_mock(temp_file)
+      create_json = json.loads(write_mock.call_args[0][0])
+      self.assertEqual(create_json['spec']['containers'][0]['image'],
+                       'ubuntu:14.04')
+
+  def testCreateUbuntu1604(self):
+    with patch_critical_objects() as (_, temp_file):
+      self.create_kubernetes_vm(os_types.UBUNTU1604)
+
+      write_mock = get_write_mock_from_temp_file_mock(temp_file)
+      create_json = json.loads(write_mock.call_args[0][0])
+      self.assertEqual(create_json['spec']['containers'][0]['image'],
+                       'ubuntu:16.04')
+
+  def testCreateUbuntu1710(self):
+    with patch_critical_objects() as (_, temp_file):
+      self.create_kubernetes_vm(os_types.UBUNTU1710)
+
+      write_mock = get_write_mock_from_temp_file_mock(temp_file)
+      create_json = json.loads(write_mock.call_args[0][0])
+      self.assertEqual(create_json['spec']['containers'][0]['image'],
+                       'ubuntu:17.10')
+
+
 class KubernetesVirtualMachineTestCase(
     BaseKubernetesVirtualMachineTestCase):
 
@@ -335,7 +393,6 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
   def create_virtual_machine_spec():
     spec = kubernetes_pod_spec.KubernetesPodSpec(
         _COMPONENT,
-        image='nvidia/cuda:8.0-devel-ubuntu16.04',
         install_packages=False,
         machine_type='test_machine_type',
         zone='test_zone')
@@ -343,8 +400,10 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
 
   def testCreatePodBodyWrittenCorrectly(self):
     spec = self.create_virtual_machine_spec()
+    vm_class = virtual_machine.GetVmClass(providers.KUBERNETES,
+                                          os_types.UBUNTU1604_CUDA9)
     with patch_critical_objects() as (_, temp_file):
-      kub_vm = kubernetes_virtual_machine.KubernetesVirtualMachine(spec)
+      kub_vm = vm_class(spec)
       # Need to set the name explicitly on the instance because the test
       # running is currently using a single PKB instance, so the BaseVm
       # instance counter is at an unpredictable number at this stage, and it is
