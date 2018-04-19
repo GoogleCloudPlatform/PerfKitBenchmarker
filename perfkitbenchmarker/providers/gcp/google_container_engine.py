@@ -88,6 +88,7 @@ class GkeCluster(container_service.KubernetesCluster):
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
+    self.min_cpu_platform = spec.vm_spec.min_cpu_platform
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.cluster_version = '1.9.6-gke.0'
 
@@ -125,6 +126,9 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
+
+    if self.min_cpu_platform:
+      cmd.flags['min-cpu-platform'] = self.min_cpu_platform
 
     cmd.flags['num-nodes'] = self.num_nodes
     cmd.flags['machine-type'] = self.machine_type
