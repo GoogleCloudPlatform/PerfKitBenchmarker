@@ -413,7 +413,7 @@ $ azure provider register Microsoft.Compute
 $ azure provider register Microsoft.Network
 ```
 
-### Azure Stack - Windows Azure Stack CLI and credentials
+### Windows Azure Stack CLI and credentials
 
 You first need to install node.js and NPM.  This version of Perfkit Benchmarker
 is known to be compatible with Azure CLI version 0.10.4, and will likely work
