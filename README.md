@@ -183,6 +183,7 @@ This section describes the setup steps needed for each cloud system. Note that y
 * [Cloudstack](#cloudstack-install-dependencies-and-set-the-api-keys)
 * [AWS](#install-aws-cli-and-setup-authentication)
 * [Azure](#windows-azure-cli-and-credentials)
+* [AzureStack](#windows-azure-stack-cli-and-credentials)
 * [AliCloud](#install-alicloud-cli-and-setup-authentication)
 * [DigitalOcean](#digitalocean-configuration-and-credentials)
 * [RackSpace](#installing-clis-and-credentials-for-rackspace)
@@ -410,6 +411,42 @@ authorized to allocate VMs and networks from Azure:
 $ azure config mode arm
 $ azure provider register Microsoft.Compute
 $ azure provider register Microsoft.Network
+```
+
+### Azure Stack - Windows Azure Stack CLI and credentials
+
+You first need to install node.js and NPM.  This version of Perfkit Benchmarker
+is known to be compatible with Azure CLI version 0.10.4, and will likely work
+with any version newer than that.
+Go [here](https://nodejs.org/download/), and follow the setup instructions.
+
+Next, run the following (omit the `sudo` on Windows):
+
+```bash
+$ sudo npm install azure-cli -g
+$ az cloud register -n AzureStack --endpoint-resource-manager "https://management.location.azure.domain.com" --suffix-storage-endpoint "location.azure.domain.com" --suffix-keyvault-dns ".vault.location.azure.domain.com" --endpoint-active-directory-graph-resource-id "https://graph.windows.net/"
+$ az cloud set -n AzureStack
+$ az cloud update --profile 2017-03-09-profile
+$ az login -u username@domain.com # Enter in password when prompted
+```
+Test that `az cli` is installed correctly:
+
+```bash
+$ az vm list
+```
+
+Make sure that your account is authorized to allocate VMs and networks from Azure:
+
+```bash
+$ az provider register -n Microsoft.Compute
+$ az provider register -n Microsoft.Network
+```
+
+Finally perform a simple test such as creating and removing a resource group:
+
+```bash
+$ az group create --name testgroup --location location
+$ az group delete --yes --name testgroup
 ```
 
 ### Install AliCloud CLI and setup authentication
