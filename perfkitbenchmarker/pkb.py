@@ -534,11 +534,17 @@ def DoRunPhase(spec, collector, timer):
       consecutive_failures = 0
     finally:
       events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
-    events.samples_created.send(
-        events.RUN_PHASE, benchmark_spec=spec, samples=samples)
     if FLAGS.run_stage_time or FLAGS.run_stage_iterations:
       for s in samples:
         s.metadata['run_number'] = run_number
+
+    # Add boot time metrics on the first run iteration.
+    if run_number == 0 and (FLAGS.boot_samples or
+                            spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
+      samples.extend(cluster_boot_benchmark.GetTimeToBoot(spec.vms))
+
+    events.samples_created.send(
+        events.RUN_PHASE, benchmark_spec=spec, samples=samples)
     collector.AddSamples(samples, spec.name, spec)
     if (FLAGS.publish_after_run and FLAGS.publish_period is not None and
         FLAGS.publish_period < (time.time() - last_publish_time)):
@@ -546,10 +552,6 @@ def DoRunPhase(spec, collector, timer):
       last_publish_time = time.time()
     run_number += 1
     if _IsRunStageFinished():
-      if (FLAGS.boot_samples or
-          spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
-        collector.AddSamples(
-            cluster_boot_benchmark.GetTimeToBoot(spec.vms), spec.name, spec)
       break
 
 

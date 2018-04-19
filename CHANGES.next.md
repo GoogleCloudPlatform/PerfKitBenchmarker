@@ -174,3 +174,5 @@
 - Fixed a bug in which boto could not be uninstalled on newer GCE images.
 - Update each ycsb workload to have its own recordcount configuration if
   ycsb_record_count is not set.
+- Fixed treatment of the boot time metric so that it is more like any other run
+  stage metric.
