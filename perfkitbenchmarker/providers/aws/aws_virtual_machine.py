@@ -602,7 +602,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     reservations = response['Reservations']
     assert len(reservations) < 2, 'Too many reservations.'
     if not reservations:
-      return False
+      logging.info('No reservation returned by describe-instances. This '
+                   'sometimes shows up immediately after a successful '
+                   'run-instances command. Retrying describe-instances '
+                   'command.')
+      raise AwsTransitionalVmRetryableError()
     instances = reservations[0]['Instances']
     assert len(instances) == 1, 'Wrong number of instances.'
     status = instances[0]['State']['Name']

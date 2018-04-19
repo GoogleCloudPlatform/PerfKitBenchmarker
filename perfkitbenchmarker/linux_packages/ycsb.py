@@ -180,8 +180,9 @@ def _Install(vm):
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
   if FLAGS.ycsb_measurement_type == HDRHISTOGRAM:
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
-    vm.RemoteCommand('sudo apt-get --assume-yes install maven')
-    vm.RemoteCommand('cd {0}; mvn install'.format(HDRHISTOGRAM_DIR))
+    vm.RemoteCommand('sudo apt-get --assume-yes install maven > /dev/null 2>&1')
+    vm.RemoteCommand('cd {0}; mvn install > /dev/null 2>&1'.format(
+        HDRHISTOGRAM_DIR))
 
 
 def YumInstall(vm):
@@ -568,7 +569,8 @@ def _CreateSamples(ycsb_result, include_histogram=True, **kwargs):
   """
   stage = 'load' if ycsb_result['command_line'].endswith('-load') else 'run'
   base_metadata = {'command_line': ycsb_result['command_line'],
-                   'stage': stage}
+                   'stage': stage,
+                   'ycsb_version': FLAGS.ycsb_version}
   base_metadata.update(kwargs)
 
   for group_name, group in ycsb_result['groups'].iteritems():
