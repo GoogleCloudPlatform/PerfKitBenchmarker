@@ -476,4 +476,3 @@ class Ubuntu1604Cuda9BasedKubernetesVirtualMachine(
   # Image is from https://hub.docker.com/r/nvidia/cuda/
   DEFAULT_IMAGE = 'nvidia/cuda:9.0-devel-ubuntu16.04'
   CONTAINER_COMMAND = _install_sudo_command()
-
