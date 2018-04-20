@@ -176,3 +176,4 @@
   ycsb_record_count is not set.
 - Fixed treatment of the boot time metric so that it is more like any other run
   stage metric.
+- Fixed bug of modifying the providers/aws/util.AWS_PREFIX value.
