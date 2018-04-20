@@ -40,6 +40,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   Object representing a Kubernetes POD.
   """
   CLOUD = providers.KUBERNETES
+  DEFAULT_IMAGE = None
+  CONTAINER_COMMAND = None
 
   def __init__(self, vm_spec):
     """Initialize a Kubernetes virtual machine.
@@ -51,7 +53,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.num_scratch_disks = 0
     self.name = self.name.replace('_', '-')
     self.user_name = FLAGS.username
-    self.image = self.image or UBUNTU_IMAGE
+    self.image = self.image or self.DEFAULT_IMAGE
     self.resource_limits = vm_spec.resource_limits
     self.resource_requests = vm_spec.resource_requests
 
@@ -294,21 +296,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     if resource_body:
       container['resources'] = resource_body
 
-    # The nvidia/cuda image does not have sudo installed,
-    # so install it and configure the sudoers file such
-    # that the root user's environment is preserved when
-    # running as sudo. Then run tail indefinitely so that
-    # the container does not exit.
-    if self.image.startswith('nvidia/cuda'):
-      container_command = ' && '.join([
-          'apt-get update',
-          'apt-get install -y sudo',
-          'sed -i \'/env_reset/d\' /etc/sudoers',
-          'sed -i \'/secure_path/d\' /etc/sudoers',
-          'sudo ldconfig',
-          'tail -f /dev/null',
-      ])
-      container['command'] = ['bash', '-c', container_command]
+    if self.CONTAINER_COMMAND:
+      container['command'] = self.CONTAINER_COMMAND
 
     return container
 
@@ -431,3 +420,59 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     with open(self.ssh_public_key) as f:
       key = f.read()
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
+
+
+def _install_sudo_command():
+  """Return a bash command that installs sudo and runs tail indefinitely.
+
+  This is useful for some docker images that don't have sudo installed.
+
+  Returns:
+    a sequence of arguments that use bash to install sudo and never run
+    tail indefinitely.
+  """
+  # The canonical ubuntu images as well as the nvidia/cuda
+  # image do not have sudo installed so install it and configure
+  # the sudoers file such that the root user's environment is
+  # preserved when running as sudo. Then run tail indefinitely so that
+  # the container does not exit.
+  container_command = ' && '.join([
+      'apt-get update',
+      'apt-get install -y sudo',
+      'sed -i \'/env_reset/d\' /etc/sudoers',
+      'sed -i \'/secure_path/d\' /etc/sudoers',
+      'sudo ldconfig',
+      'tail -f /dev/null',
+  ])
+  return ['bash', '-c', container_command]
+
+
+class Ubuntu1404BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1404Mixin):
+  # All Ubuntu images below are from https://hub.docker.com/_/ubuntu/
+  # Note that they do not include all packages that are typically
+  # included with Ubuntu. For example, sudo is not installed.
+  # KubernetesVirtualMachine takes care of this by installing
+  # sudo in the container startup script.
+  DEFAULT_IMAGE = 'ubuntu:14.04'
+  CONTAINER_COMMAND = _install_sudo_command()
+
+
+class Ubuntu1604BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
+  DEFAULT_IMAGE = 'ubuntu:16.04'
+  CONTAINER_COMMAND = _install_sudo_command()
+
+
+class Ubuntu1710BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1710Mixin):
+  DEFAULT_IMAGE = 'ubuntu:17.10'
+  CONTAINER_COMMAND = _install_sudo_command()
+
+
+class Ubuntu1604Cuda9BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine,
+    linux_virtual_machine.Ubuntu1604Cuda9Mixin):
+  # Image is from https://hub.docker.com/r/nvidia/cuda/
+  DEFAULT_IMAGE = 'nvidia/cuda:9.0-devel-ubuntu16.04'
+  CONTAINER_COMMAND = _install_sudo_command()

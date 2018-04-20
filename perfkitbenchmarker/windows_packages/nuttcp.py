@@ -49,6 +49,9 @@ flags.DEFINE_bool('nuttcp_udp_run_both_directions', False,
 flags.DEFINE_integer('nuttcp_udp_iterations', 1,
                      'The number of consecutive tests to run.')
 
+flags.DEFINE_bool('nuttcp_udp_unlimited_bandwidth', False,
+                  'Run an "unlimited bandwidth" test')
+
 NUTTCP_DIR = 'nuttcp-8.1.4.win64'
 NUTTCP_ZIP = NUTTCP_DIR + '.zip'
 NUTTCP_URL = 'http://nuttcp.net/nuttcp/nuttcp-8.1.4/binaries/' + NUTTCP_ZIP
@@ -90,9 +93,14 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
 
   samples = []
 
-  bandwidths = ['{b}m'.format(b=b) for b in xrange(
-      FLAGS.nuttcp_min_bandwidth_mb, FLAGS.nuttcp_max_bandwidth_mb,
-      FLAGS.nuttcp_bandwidth_step_mb)] + ['u']
+  bandwidths = [
+      '{b}m'.format(b=b)
+      for b in xrange(FLAGS.nuttcp_min_bandwidth_mb, FLAGS.
+                      nuttcp_max_bandwidth_mb, FLAGS.nuttcp_bandwidth_step_mb)
+  ]
+
+  if FLAGS.nuttcp_udp_unlimited_bandwidth:
+    bandwidths.append('u')
 
   for bandwidth in bandwidths:
 
