@@ -13,6 +13,8 @@
 - Migrated cluster boot benchmark default machines to 'default_dual_core'.
 - Changed metric name in mnist and inception3.
 - Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
+- Updated GCP sole tenancy support.  Removed `gcp_host_type` added
+  `gcp_node_type`.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers
