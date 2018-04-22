@@ -18,18 +18,20 @@
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import provider_info
 
+
 class DockerProviderInfo(provider_info.BaseProviderInfo):
   SUPPORTED_BENCHMARKS = ['iperf', 'netperf']
 
   UNSUPPORTED_BENCHMARKS = ['bonnieplusplus', 'sysbench']
 
-  CLOUD = providers.DOCKER 
+  CLOUD = providers.DOCKER
 
   @classmethod
-    def IsBenchmarkSupported(cls, benchmark):
-      if benchmark in cls.SUPPORTED_BENCHMARKS:
-        return True
-      elif benchmark in cls.UNSUPPORTED_BENCHMARKS:
-        return False
-      else:
-        return None
+  def IsBenchmarkSupported(cls, benchmark):
+    if benchmark in cls.SUPPORTED_BENCHMARKS:
+      return True
+    elif benchmark in cls.UNSUPPORTED_BENCHMARKS:
+      return False
+    else:
+      return None
+      
