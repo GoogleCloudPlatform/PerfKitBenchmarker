@@ -13,7 +13,8 @@
 # limitations under the License.
 
 # Yahoo! Cloud System Benchmark
-#   This is a workload where each payload is 1mb in size (10 * 100000).
+#   This is a workload where each payload is 1mb in size (10 * 100000),
+#     total payloads are 5GB (1mb * 5000) in size.
 #   Read/update ratio: 50/50
 #   Request distribution: zipfian
 
@@ -24,6 +25,7 @@ operationcount=1000
 
 fieldlength = 100000
 fieldcount = 10
+recordcount = 5000
 
 readproportion=0.5
 updateproportion=0.5

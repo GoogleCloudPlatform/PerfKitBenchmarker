@@ -126,8 +126,11 @@ flags.DEFINE_list('ycsb_threads_per_client', ['32'], 'Number of threads per '
 flags.DEFINE_integer('ycsb_preload_threads', None, 'Number of threads per '
                      'loader during the initial data population stage. '
                      'Default value depends on the target DB.')
-flags.DEFINE_integer('ycsb_record_count', 1000000, 'Pre-load with a total '
-                     'dataset of records total.')
+flags.DEFINE_integer('ycsb_record_count', None, 'Pre-load with a total '
+                     'dataset of records total. Overrides recordcount value in '
+                     'all workloads of this run. Defaults to None, where '
+                     'recordcount value in each workload is used. If neither '
+                     'is not set, ycsb default of 0 is used.')
 flags.DEFINE_integer('ycsb_operation_count', 1000000, 'Number of operations '
                      '*per client VM*.')
 flags.DEFINE_integer('ycsb_timelimit', 1800, 'Maximum amount of time to run '
@@ -684,7 +687,8 @@ class YCSBExecutor(object):
   def _Load(self, vm, **kwargs):
     """Execute 'ycsb load' on 'vm'."""
     kwargs.setdefault('threads', self._default_preload_threads)
-    kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
+    if FLAGS.ycsb_record_count:
+      kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
     for pv in FLAGS.ycsb_load_parameters:
       param, value = pv.split('=', 1)
       kwargs[param] = value
@@ -708,7 +712,8 @@ class YCSBExecutor(object):
     remote_path = posixpath.join(INSTALL_DIR,
                                  os.path.basename(workload_file))
     kwargs.setdefault('threads', self._default_preload_threads)
-    kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
+    if FLAGS.ycsb_record_count:
+      kwargs.setdefault('recordcount', FLAGS.ycsb_record_count)
 
     with open(workload_file) as fp:
       workload_meta = _ParseWorkload(fp.read())
@@ -839,8 +844,9 @@ class YCSBExecutor(object):
     """
     all_results = []
     for workload_index, workload_file in enumerate(workloads):
-      parameters = {'operationcount': FLAGS.ycsb_operation_count,
-                    'recordcount': FLAGS.ycsb_record_count}
+      parameters = {'operationcount': FLAGS.ycsb_operation_count}
+      if FLAGS.ycsb_record_count:
+        parameters['recordcount'] = FLAGS.ycsb_record_count
       if FLAGS.ycsb_field_count:
         parameters['fieldcount'] = FLAGS.ycsb_field_count
       if FLAGS.ycsb_field_length:

@@ -63,6 +63,7 @@
 - Add support for SPECspeed.
 - Add new `os_types` Centos7, Debian9, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
 - Make it easier to RDP to PKB VMs
+- Add `os_type` support to KubernetesVirtualMachine.
 - Avoid setting up thread pool etc when run_processes is set
   to 1 and using --run_with_pdb flag to simplify debugging.
 - Added a sample benchmark for descriptive purposes.
@@ -102,6 +103,7 @@
 - Added 50kb per payload ycsb workload.
 - Added `num_cpus` to virtual_machine published metadata.
 - Added a timeout to RobustRemoteCommand.
+- Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -170,3 +172,7 @@
 - Updated default Tensorflow tf_cnn_benchmarks version to a commit dated April
   2, 2018.
 - Fixed a bug in which boto could not be uninstalled on newer GCE images.
+- Update each ycsb workload to have its own recordcount configuration if
+  ycsb_record_count is not set.
+- Fixed treatment of the boot time metric so that it is more like any other run
+  stage metric.

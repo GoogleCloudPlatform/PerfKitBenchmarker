@@ -87,6 +87,7 @@ def Install(vm):
   vm.RemoteCommand('sudo pip install --upgrade absl-py')
   vm.RemoteCommand('sudo pip install --upgrade %s' % tf_pip_package,
                    should_log=True)
+  vm.InstallPackages('git')
   vm.RemoteCommand(
       'git clone https://github.com/tensorflow/benchmarks.git', should_log=True)
   vm.RemoteCommand(
