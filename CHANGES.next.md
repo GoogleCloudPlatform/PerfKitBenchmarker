@@ -179,3 +179,4 @@
 - Fixed treatment of the boot time metric so that it is more like any other run
   stage metric.
 - Fixed bug of modifying the providers/aws/util.AWS_PREFIX value.
+- Made failures of 'aws ec2 run-instances' fail PKB quickly.
