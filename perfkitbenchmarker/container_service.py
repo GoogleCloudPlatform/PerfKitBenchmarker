@@ -84,6 +84,16 @@ flags.DEFINE_string('container_cluster_version', None,
                     'command. If not specified, the cloud-specific container '
                     'implementation will chose an appropriate default.')
 
+
+##### DOCKER STUFF HERE
+
+flags.DEFINE_string('docker_cli', 'docker',
+                    'Path to docker')
+
+#####
+
+
+
 _K8S_FINISHED_PHASES = frozenset(['Succeeded', 'Failed'])
 _K8S_INGRESS = """
 apiVersion: extensions/v1beta1
@@ -638,3 +648,66 @@ class KubernetesCluster(BaseContainerCluster):
     service = KubernetesContainerService(container_spec, name)
     self.services[name] = service
     service.Create()
+
+
+
+
+#DOCKER STUFF HERE
+
+class DockerContainer(BaseContainer):
+  """A Docker flavor of Container."""
+
+  def __init__(self, container_spec, name):
+    super(DockerContainer, self).__init__(container_spec)
+    self.name = name
+
+  def _Create(self):
+    """Creates the container."""
+
+    #docker run --detach --memory <bytes>
+
+    run_cmd = [
+        FLAGS.docker_cli,
+        'run',
+        self.name,
+        '--image=%s' % self.image,
+        '--limits=cpu=%sm,memory=%sMi' % (int(1000 * self.cpus), self.memory),
+        '--port', str(self.port)
+    ]
+    if self.command:
+      run_cmd.extend(['--command', '--'])
+      run_cmd.extend(self.command)
+    vm_util.IssueCommand(run_cmd)
+
+  def _Delete(self):
+    """Deletes the container."""
+    pass
+
+  def _IsReady(self):
+    """Returns true if the container has stopped pending."""
+    return self._GetPod()['status']['phase'] != 'Pending'
+
+  # def _GetPod(self):
+  #   """Gets a representation of the POD and returns it."""
+  #   stdout, _, _ = vm_util.IssueCommand([
+  #       FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+  #       'get', 'pod', self.name, '-o', 'yaml'])
+  #   pod = yaml.load(stdout)
+  #   if pod:
+  #     self.ip_address = pod.get('status', {}).get('podIP', None)
+  #   return pod
+
+  def WaitForExit(self, timeout=None):
+    """Waits until the container has finished running."""
+    @vm_util.Retry(timeout=timeout)
+    def _WaitForExit():
+      phase = self._GetPod()['status']['phase']
+      if phase not in _K8S_FINISHED_PHASES:
+        raise Exception('POD phase (%s) not in finished phases.' % phase)
+    _WaitForExit()
+
+  def GetLogs(self):
+    """Returns the logs from the container."""
+    stdout, _, _ = vm_util.IssueCommand([
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'logs', self.name])
+    return stdout
