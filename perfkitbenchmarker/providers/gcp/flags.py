@@ -81,11 +81,12 @@ flags.DEFINE_integer(
     'single host until no more can be packed at which point a new host will '
     'be created.')
 flags.DEFINE_string(
-    'gcp_host_type', None,
-    'The host type of all sole tenant hosts that get created.')
+    'gcp_node_type', None,
+    'The node type of all sole tenant hosts that get created.')
 flags.DEFINE_enum(
     'gcp_min_cpu_platform', None,
-    [GCP_MIN_CPU_PLATFORM_NONE, 'sandybridge', 'ivybridge', 'haswell', 'broadwell', 'skylake'],
+    [GCP_MIN_CPU_PLATFORM_NONE, 'sandybridge', 'ivybridge',
+     'haswell', 'broadwell', 'skylake'],
     'When specified, the VM will have either the specified '
     'architecture or a newer one. Architecture availability is zone dependent.')
 flags.DEFINE_string(
