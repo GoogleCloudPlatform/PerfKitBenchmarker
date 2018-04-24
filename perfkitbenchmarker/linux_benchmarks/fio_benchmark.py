@@ -476,8 +476,10 @@ def PrepareWithExec(benchmark_spec, exec_path):
   # without fill, it was never unmounted (see GetConfig()).
   if FLAGS.fio_target_mode == AGAINST_FILE_WITH_FILL_MODE:
     disk.mount_point = FLAGS.scratch_dir or MOUNT_POINT
-    vm.FormatDisk(disk.GetDevicePath())
-    vm.MountDisk(disk.GetDevicePath(), disk.mount_point)
+    disk_spec = vm.disk_specs[0]
+    vm.FormatDisk(disk.GetDevicePath(), disk_spec.disk_type)
+    vm.MountDisk(disk.GetDevicePath(), disk.mount_point,
+                 disk_spec.disk_type, disk.mount_options, disk.fstab_options)
 
 
 def Run(benchmark_spec):
