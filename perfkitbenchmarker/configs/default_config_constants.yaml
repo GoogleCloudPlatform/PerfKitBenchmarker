@@ -36,6 +36,8 @@ default_single_core: &default_single_core
     image: null
   Kubernetes:
     image: null
+  Docker:
+    image: null
   Mesos:
     image: null
   ProfitBricks:
