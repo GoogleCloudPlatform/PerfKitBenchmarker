@@ -106,6 +106,7 @@
 - Added `num_cpus` to virtual_machine published metadata.
 - Added a timeout to RobustRemoteCommand.
 - Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
+- Preliminary support for NFS file systems
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

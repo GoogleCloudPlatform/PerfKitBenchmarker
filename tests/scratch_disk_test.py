@@ -113,9 +113,10 @@ class ScratchDiskTestMixin(object):
     scratch_disk = vm.scratch_disks[0]
 
     scratch_disk.Create.assert_called_once_with()
-    vm.FormatDisk.assert_called_once_with(scratch_disk.GetDevicePath())
+    vm.FormatDisk.assert_called_once_with(scratch_disk.GetDevicePath(), None)
     vm.MountDisk.assert_called_once_with(
-        scratch_disk.GetDevicePath(), '/mountpoint0')
+        scratch_disk.GetDevicePath(), '/mountpoint0',
+        None, scratch_disk.mount_options, scratch_disk.fstab_options)
 
     disk_spec = disk.BaseDiskSpec(_COMPONENT, mount_point='/mountpoint1')
     vm.CreateScratchDisk(disk_spec)
@@ -133,9 +134,10 @@ class ScratchDiskTestMixin(object):
     scratch_disk = vm.scratch_disks[1]
 
     scratch_disk.Create.assert_called_once_with()
-    vm.FormatDisk.assert_called_with(scratch_disk.GetDevicePath())
+    vm.FormatDisk.assert_called_with(scratch_disk.GetDevicePath(), None)
     vm.MountDisk.assert_called_with(
-        scratch_disk.GetDevicePath(), '/mountpoint1')
+        scratch_disk.GetDevicePath(), '/mountpoint1',
+        None, scratch_disk.mount_options, scratch_disk.fstab_options)
 
     vm.DeleteScratchDisks()
 
