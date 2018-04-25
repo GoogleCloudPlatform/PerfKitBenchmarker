@@ -275,7 +275,7 @@ Bugfixes and maintanence updates:
 - Allow flag_util.ParseKeyValuePairs values to have colons in them (GH-1117)
 - Add ycsb to data directory (GH-1116)
 - Fix bug in mongodb_ycsb_benchmark cleanup (GH-1115)
-- Fix bug where static VM disk specs were overriden (GH-1105)
+- Fix bug where static VM disk specs were overridden (GH-1105)
 - Use string formatting instead of addition to concatenate (GH-1103)
 - Fixed regression with fio flag (GH-1097)
 - Fix flags in static vm files (GH-1093)
