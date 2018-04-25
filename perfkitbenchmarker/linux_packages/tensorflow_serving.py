@@ -66,6 +66,7 @@ def BuildAndInstallPipPackage(vm):
 
 def BuildTfServing(vm):
   """Builds the Tensorflow Serving r1.4 from source."""
+  vm.InstallPackages('git')
   vm.RemoteCommand('cd {0} && git clone -b r1.4 --recurse-submodules '
                    'https://github.com/tensorflow/serving'.format(INSTALL_DIR))
   # Run the configure script using default for all prompts.
