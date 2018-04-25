@@ -48,6 +48,7 @@
 - Added the ability to pass arbitrary parameters to tf_cnn_benchmarks.py in the
   Tensorflow benchmark, through the `benchmark_args` flag.
 - Added hdrhistogram support to ycsb package.
+- Added support for custom machine types on GKE.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:

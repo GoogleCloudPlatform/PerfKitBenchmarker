@@ -108,7 +108,6 @@ class GkeCluster(container_service.KubernetesCluster):
     if self.min_cpu_platform or self.gpu_count:
       cmd = util.GcloudCommand(
           self, 'beta', 'container', 'clusters', 'create', self.name)
-
     else:
       cmd = util.GcloudCommand(
           self, 'container', 'clusters', 'create', self.name)
@@ -130,7 +129,12 @@ class GkeCluster(container_service.KubernetesCluster):
 
 
     cmd.flags['num-nodes'] = self.num_nodes
-    cmd.flags['machine-type'] = self.machine_type
+
+    if self.machine_type is None:
+      cmd.flags['machine-type'] = "custom-{0}-{1}".format(
+          self.cpus, self.memory)
+    else:
+      cmd.flags['machine-type'] = self.machine_type
 
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.

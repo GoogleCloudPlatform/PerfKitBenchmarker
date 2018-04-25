@@ -83,6 +83,36 @@ class GoogleContainerEngineMinCpuPlatformTestCase(unittest.TestCase):
       self.assertIn('--min-cpu-platform skylake', command_string)
 
 
+class GoogleContainerEngineCustomMachineTypeTestCase(unittest.TestCase):
+
+  @staticmethod
+  def create_container_engine_spec():
+    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': {
+                        'cpus': 4,
+                        'memory': '1024MiB',
+                    },
+                },
+            },
+        })
+    return container_engine_spec
+
+  def testCreate(self):
+    spec = self.create_container_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud container clusters create', command_string)
+      self.assertIn('--machine-type custom-4-1024', command_string)
+
+
 class GoogleContainerEngineTestCase(unittest.TestCase):
 
   @staticmethod
