@@ -18,7 +18,10 @@ from perfkitbenchmarker import flags
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-MAX_NUM_WAITS_FOR_K8S_GET = 18
+flags.DEFINE_integer('k8s_get_retry_count', 18,
+                     'Maximum number of waits for getting LoadBalancer external IP')
+flags.DEFINE_integer('k8s_get_wait_interval', 10,
+                     'Wait interval for getting LoadBalancer external IP')
 
 
 def checkKubernetesFlags():
@@ -71,9 +74,9 @@ def Get(resource, resourceInstanceName, labelFilter, jsonSelector):
 
 def GetWithWaitForContents(resource, resourceInstanceName, filter, jsonFilter):
   ret = Get(resource, resourceInstanceName, filter, jsonFilter)
-  numWaitsLeft = MAX_NUM_WAITS_FOR_K8S_GET
+  numWaitsLeft = FLAGS.k8s_get_retry_count
   while len(ret) == 0 and numWaitsLeft > 0:
-    time.sleep(10)
+    time.sleep(FLAGS.k8s_get_wait_interval)
     ret = Get(resource, resourceInstanceName, filter, jsonFilter)
     numWaitsLeft -= 1
   return ret

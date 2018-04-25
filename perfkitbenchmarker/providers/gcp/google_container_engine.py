@@ -105,16 +105,10 @@ class GkeCluster(container_service.KubernetesCluster):
 
   def _Create(self):
     """Creates the cluster."""
-    if self.gpu_count:
-      # TODO(ferneyhough): Make cluster version a flag, and allow it
-      # to be specified in the spec (this will require a new spec class
-      # for google_container_engine however).
+    if self.min_cpu_platform or self.gpu_count:
       cmd = util.GcloudCommand(
           self, 'beta', 'container', 'clusters', 'create', self.name)
 
-      cmd.flags['accelerator'] = (gce_virtual_machine.
-                                  GenerateAcceleratorSpecString(self.gpu_type,
-                                                                self.gpu_count))
     else:
       cmd = util.GcloudCommand(
           self, 'container', 'clusters', 'create', self.name)
@@ -122,13 +116,18 @@ class GkeCluster(container_service.KubernetesCluster):
     cmd.flags['cluster-version'] = self.cluster_version
     cmd.flags['scopes'] = 'cloud-platform'
 
+    if self.gpu_count:
+      cmd.flags['accelerator'] = (gce_virtual_machine.
+                                  GenerateAcceleratorSpecString(self.gpu_type,
+                                                                self.gpu_count))
+    if self.min_cpu_platform:
+      cmd.flags['min-cpu-platform'] = self.min_cpu_platform
+
     if self.enable_autoscaling:
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
 
-    if self.min_cpu_platform:
-      cmd.flags['min-cpu-platform'] = self.min_cpu_platform
 
     cmd.flags['num-nodes'] = self.num_nodes
     cmd.flags['machine-type'] = self.machine_type
