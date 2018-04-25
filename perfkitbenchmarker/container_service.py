@@ -395,6 +395,12 @@ class BaseContainerCluster(resource.BaseResource):
     super(BaseContainerCluster, self).__init__()
     self.name = 'pkb-%s' % FLAGS.run_uri
     self.machine_type = cluster_spec.vm_spec.machine_type
+    if self.machine_type is None: # custom machine type
+      self.cpus = cluster_spec.vm_spec.cpus
+      self.memory = cluster_spec.vm_spec.memory
+    else:
+      self.cpus = None
+      self.memory = None
     self.gpu_count = cluster_spec.vm_spec.gpu_count
     self.gpu_type = cluster_spec.vm_spec.gpu_type
     self.zone = cluster_spec.vm_spec.zone
