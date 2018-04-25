@@ -52,7 +52,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   CONTAINER_COMMAND = None
 
   def __init__(self, vm_spec):
-    """Initialize a Kubernetes virtual machine.
+    """Initialize a Docker Container.
 
     Args:
       vm_spec: KubernetesPodSpec object of the vm.
@@ -66,19 +66,19 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #self.resource_limits = vm_spec.resource_limits
     #self.resource_requests = vm_spec.resource_requests
 
-  def GetResourceMetadata(self):
-    metadata = super(DockerVirtualMachine, self).GetResourceMetadata()
-    if self.resource_limits:
-      metadata.update({
-          'pod_cpu_limit': self.resource_limits.cpus,
-          'pod_memory_limit_mb': self.resource_limits.memory,
-      })
-    if self.resource_requests:
-      metadata.update({
-          'pod_cpu_request': self.resource_requests.cpus,
-          'pod_memory_request_mb': self.resource_requests.memory,
-      })
-    return metadata
+  # def GetResourceMetadata(self):
+  #   metadata = super(DockerVirtualMachine, self).GetResourceMetadata()
+  #   if self.resource_limits:
+  #     metadata.update({
+  #         'pod_cpu_limit': self.resource_limits.cpus,
+  #         'pod_memory_limit_mb': self.resource_limits.memory,
+  #     })
+  #   if self.resource_requests:
+  #     metadata.update({
+  #         'pod_cpu_request': self.resource_requests.cpus,
+  #         'pod_memory_request_mb': self.resource_requests.memory,
+  #     })
+  #   return metadata
 
   #def _CreateDependencies(self):
     #self._CheckPrerequisites()
@@ -143,9 +143,19 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #self._ConfigureProxy()
     #self._SetupDevicesPaths()
 
+  #TODO add checks to see if Delete fails
   def _Delete(self):
     """Delete Docker Instance"""
-    pass
+
+    delete_command = ['docker', 'kill', self.name]
+    output = vm_util.IssueCommand(delete_command)
+    logging.info(output[STDOUT].rstrip())
+
+    remove_command = ['docker', 'rm', self.name]
+    output = vm_util.IssueCommand(remove_command)
+    logging.info(output[STDOUT].rstrip())
+
+    return
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
   def _WaitForContainerBootCompletion(self):
@@ -162,15 +172,15 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     info, _, _ = vm_util.IssueCommand(exists_cmd)
     
     #print(info)
-
+    info = json.loads(info)
     if len(info) > 0:
-      info = json.loads(info)
+      
       status = info[0]['State']['Running']
       self.internal_ip = info[0]['NetworkSettings']['IPAddress'].encode('ascii')
       self.ip_address = self.internal_ip
       print(status)
       if status == "true" or status == True:
-        logging.info("DOCKER CONTAINER is up and running.")
+        logging.info("Docker Container %s is up and running.", self.name)
         return
       raise Exception("Container %s is not running. Retrying to check status." %
                     self.container_id)
@@ -184,17 +194,19 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     POD should have been already created but this is a double check.
     """
-
+    logging.info("Checking if Docker Container Exists")
     exists_cmd = ['docker', 'inspect', self.name]
     info, _, _ = vm_util.IssueCommand(exists_cmd)
 
+    info = json.loads(info)
     if len(info) > 0:
-      info = json.loads(info)
       status = info[0]['State']['Running']
       print(status)
       if status == "true" or status == True:
-        logging.info("DOCKER CONTAINER is up and running.")
+        logging.info("Docker Container %s is up and running.", self.name)
         return True
+      else:
+        return False
       raise Exception("Container %s is not running. Retrying to check status." %
                     self.container_id)
 
@@ -274,204 +286,19 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   #   return volumes
 
-  def _BuildContainerBody(self):
-    """
-    Constructs containers-related part of POST request to create POD.
-    """
-    registry = getattr(context.GetThreadBenchmarkSpec(), 'registry', None)
-    if (not FLAGS.static_container_image and
-        registry is not None):
-      image = registry.GetFullRegistryTag(self.image)
-    else:
-      image = self.image
-    container = {
-        "image": image,
-        "name": self.name,
-        "securityContext": {
-            "privileged": FLAGS.docker_in_privileged_mode
-        },
-        "volumeMounts": [
-        ]
-    }
-
-    for scratch_disk in self.scratch_disks:
-      scratch_disk.AttachVolumeMountInfo(container['volumeMounts'])
-
-    resource_body = self._BuildResourceBody()
-    if resource_body:
-      container['resources'] = resource_body
-
-    if self.CONTAINER_COMMAND:
-      container['command'] = self.CONTAINER_COMMAND
-
-    return container
-
-  def _BuildResourceBody(self):
-    """Constructs a dictionary that specifies resource limits and requests.
-
-    The syntax for including GPUs is specific to GKE and is likely to
-    change in the future.
-    See https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus
-
-    Returns:
-      kubernetes pod resource body containing pod limits and requests.
-    """
-    resources = {
-        'limits': {},
-        'requests': {},
-    }
-
-    if self.resource_requests:
-      resources['requests'].update({
-          'cpu': str(self.resource_requests.cpus),
-          'memory': '{0}Mi'.format(self.resource_requests.memory),
-      })
-
-    if self.resource_limits:
-      resources['limits'].update({
-          'cpu': str(self.resource_limits.cpus),
-          'memory': '{0}Mi'.format(self.resource_limits.memory),
-      })
-
-    if self.gpu_count:
-      gpu_dict = {
-          'nvidia.com/gpu': str(self.gpu_count)
-      }
-      resources['limits'].update(gpu_dict)
-      resources['requests'].update(gpu_dict)
-
-    result_with_empty_values_removed = (
-        {k: v for k, v in resources.iteritems() if v})
-    return result_with_empty_values_removed
-
 
 class DebianBasedDockerVirtualMachine(DockerVirtualMachine,
                                           linux_virtual_machine.DebianMixin):
   DEFAULT_IMAGE = UBUNTU_IMAGE
 
-  # def RemoteHostCommandWithReturnCode(self, command,
-  #                                     should_log=False, retries=None,
-  #                                     ignore_failure=False, login_shell=False,
-  #                                     suppress_warning=False, timeout=None):
-   
-
-  #   """Runs a command in the Kubernetes container."""
-  #   cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'exec', '-i',
-  #          self.name, '--', '/bin/bash', '-c', command]
-  #   stdout, stderr, retcode = vm_util.IssueCommand(
-  #       cmd, force_info_log=should_log,
-  #       suppress_warning=suppress_warning, timeout=timeout)
-  #   if not ignore_failure and retcode:
-  #     error_text = ('Got non-zero return code (%s) executing %s\n'
-  #                   'Full command: %s\nSTDOUT: %sSTDERR: %s' %
-  #                   (retcode, command, ' '.join(cmd),
-  #                    stdout, stderr))
-  #     raise errors.VirtualMachine.RemoteCommandError(error_text)
-  #   return stdout, stderr, retcode
-
-  def MoveHostFile(self, target, source_path, remote_path=''):
-    """Copies a file from one VM to a target VM.
-
-    Args:
-      target: The target BaseVirtualMachine object.
-      source_path: The location of the file on the REMOTE machine.
-      remote_path: The destination of the file on the TARGET machine, default
-          is the home directory.
-    """
-    # file_name = vm_util.PrependTempDir(posixpath.basename(source_path))
-    # self.RemoteHostCopy(file_name, source_path, copy_to=False)
-    # target.RemoteHostCopy(file_name, remote_path)
-
-  def RemoteHostCopy(self, file_path, remote_path='', copy_to=True):
-    """Copies a file to or from the VM.
-
-    Args:
-      file_path: Local path to file.
-      remote_path: Optional path of where to copy file on remote host.
-      copy_to: True to copy to vm, False to copy from vm.
-
-    Raises:
-      RemoteCommandError: If there was a problem copying the file.
-    """
-    # if copy_to:
-    #   file_name = posixpath.basename(file_path)
-    #   src_spec, dest_spec = file_path, '%s:%s' % (self.name, file_name)
-    # else:
-    #   remote_path, _ = self.RemoteCommand('readlink -f %s' % remote_path)
-    #   remote_path = remote_path.strip()
-    #   src_spec, dest_spec = '%s:%s' % (self.name, remote_path), file_path
-    # cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-    #        'cp', src_spec, dest_spec]
-    # stdout, stderr, retcode = vm_util.IssueCommand(cmd)
-    # if retcode:
-    #   error_text = ('Got non-zero return code (%s) executing %s\n'
-    #                 'STDOUT: %sSTDERR: %s' %
-    #                 (retcode, ' '.join(cmd), stdout, stderr))
-    #   raise errors.VirtualMachine.RemoteCommandError(error_text)
-    # if copy_to:
-    #   file_name = posixpath.basename(file_path)
-    #   remote_path = remote_path or file_name
-    #   self.RemoteCommand('mv %s %s; chmod 777 %s' %
-    #                      (file_name, remote_path, remote_path))
-
-  # @vm_util.Retry(log_errors=False, poll_interval=1)
-  # def PrepareVMEnvironment(self):
-  #   super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
-  #   # Don't rely on SSH being installed in Kubernetes containers,
-  #   # so install it and restart the service so that it is ready to go.
-  #   # Although ssh is not required to connect to the container, MPI
-  #   # benchmarks require it.
-  #   self.InstallPackages('ssh')
-  #   self.RemoteCommand('sudo /etc/init.d/ssh restart', ignore_failure=True)
-  #   self.RemoteCommand('mkdir ~/.ssh')
-  #   with open(self.ssh_public_key) as f:
-  #     key = f.read()
-  #     self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
-
-
-def _install_sudo_command():
-  """Return a bash command that installs sudo and runs tail indefinitely.
-
-  This is useful for some docker images that don't have sudo installed.
-
-  Returns:
-    a sequence of arguments that use bash to install sudo and never run
-    tail indefinitely.
-  """
-  # The canonical ubuntu images as well as the nvidia/cuda
-  # image do not have sudo installed so install it and configure
-  # the sudoers file such that the root user's environment is
-  # preserved when running as sudo. Then run tail indefinitely so that
-  # the container does not exit.
-  container_command = ' && '.join([
-      'apt-get update',
-      'apt-get install -y sudo',
-      'sed -i \'/env_reset/d\' /etc/sudoers',
-      'sed -i \'/secure_path/d\' /etc/sudoers',
-      'sudo ldconfig',
-      'tail -f /dev/null',
-  ])
-  return ['bash', '-c', container_command]
-
-
 class Ubuntu1404BasedDockerVirtualMachine(
     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1404Mixin):
-  # All Ubuntu images below are from https://hub.docker.com/_/ubuntu/
-  # Note that they do not include all packages that are typically
-  # included with Ubuntu. For example, sudo is not installed.
-  # KubernetesVirtualMachine takes care of this by installing
-  # sudo in the container startup script.
   DEFAULT_IMAGE = 'ubuntu:14.04'
-  CONTAINER_COMMAND = _install_sudo_command()
-
 
 class Ubuntu1604BasedDockerVirtualMachine(
     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
   DEFAULT_IMAGE = 'ubuntu:16.04'
-  CONTAINER_COMMAND = _install_sudo_command()
-
 
 class Ubuntu1710BasedDockerVirtualMachine(
     DebianBasedDockerVirtualMachine, linux_virtual_machine.Ubuntu1710Mixin):
   DEFAULT_IMAGE = 'ubuntu:17.10'
-  CONTAINER_COMMAND = _install_sudo_command()
