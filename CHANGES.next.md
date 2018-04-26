@@ -186,3 +186,4 @@
 - Fix Kubernetes StorageClass deletion
 - Added `git` installation to `tensorflow_serving` package.
 - MountDisk throws exception if mounting the disk fails.
+- Added support for preprovisioned benchmark data on KubernetesVirtualMachines.
