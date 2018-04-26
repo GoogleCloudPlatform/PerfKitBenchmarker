@@ -80,6 +80,11 @@ flags.DEFINE_integer('container_cluster_num_vms', None,
 flags.DEFINE_enum('container_cluster_type', KUBERNETES, CLUSTER_TYPES,
                   'The type of container cluster.')
 
+flags.DEFINE_string('container_cluster_version', None,
+                    'Optional version flag to pass to the cluster create '
+                    'command. If not specified, the cloud-specific container '
+                    'implementation will chose an appropriate default.')
+
 _K8S_FINISHED_PHASES = frozenset(['Succeeded', 'Failed'])
 _K8S_INGRESS = """
 apiVersion: extensions/v1beta1

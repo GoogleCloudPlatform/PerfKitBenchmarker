@@ -344,6 +344,7 @@ class EcsService(container_service.BaseContainerService):
     self.load_balancer.Delete()
     self.target_group.Delete()
 
+  # TODO(ferneyhough): Consider supporting the flag container_cluster_version.
   def _Create(self):
     """Creates the service."""
     create_cmd = util.AWS_PREFIX + [
