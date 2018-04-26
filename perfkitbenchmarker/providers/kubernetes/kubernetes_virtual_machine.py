@@ -26,6 +26,9 @@ from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.azure import azure_virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
@@ -420,6 +423,79 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     with open(self.ssh_public_key) as f:
       key = f.read()
       self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
+
+    # Don't assume the relevant CLI is installed in the Kubernetes environment.
+    if FLAGS.container_cluster_cloud == 'GCP':
+      self.InstallGcloudCli()
+    elif FLAGS.container_cluster_cloud == 'AWS':
+      self.InstallAwsCli()
+    elif FLAGS.container_cluster_cloud == 'Azure':
+      self.InstallAzureCli()
+
+  def InstallAwsCli(self):
+    """Installs the AWS CLI; used for downloading preprovisioned data."""
+    self.Install('aws_credentials')
+    self.Install('awscli')
+
+  def InstallAzureCli(self):
+    """Installs the Azure CLI; used for downloading preprovisioned data."""
+    self.Install('azure_cli')
+    self.Install('azure_credentials')
+
+  # TODO(ferneyhough): Consider making this a package.
+  def InstallGcloudCli(self):
+    """Installs the Gcloud CLI; used for downloading preprovisioned data."""
+    self.InstallPackages('curl')
+    self.RemoteCommand('echo "deb http://packages.cloud.google.com/apt '
+                       'cloud-sdk-$(lsb_release -c -s) main" | sudo tee -a '
+                       '/etc/apt/sources.list.d/google-cloud-sdk.list')
+    self.RemoteCommand('curl https://packages.cloud.google.com/apt/doc/'
+                       'apt-key.gpg | sudo apt-key add -')
+    self.RemoteCommand('sudo apt-get update && sudo apt-get install '
+                       '-y google-cloud-sdk')
+
+  def DownloadPreprovisionedBenchmarkData(self, install_path, benchmark_name,
+                                          filename):
+    """Downloads a preprovisioned data file.
+
+    This function works by looking up the VirtualMachine class which matches
+    the cloud we are running on (defined by FLAGS.container_cluster_cloud).
+
+    Then we look for a module-level function defined in the same module as
+    the VirtualMachine class which generates a string used to download
+    preprovisioned data for the given cloud.
+
+    Note that this implementation is specific to debian os types.
+    Windows support will need to be handled in
+    WindowsBasedKubernetesVirtualMachine.
+
+    Args:
+      install_path: The install path on this VM.
+      benchmark_name: Name of the benchmark associated with this data file.
+      filename: The name of the file that was downloaded.
+
+    Raises:
+      NotImplementedError: if this method does not support the specified cloud.
+      AttributeError: if the VirtualMachine class does not implement
+        GenerateDownloadPreprovisionedBenchmarkDataCommand.
+    """
+    cloud = FLAGS.container_cluster_cloud
+    if cloud == 'GCP':
+      download_function = (gce_virtual_machine.
+                           GenerateDownloadPreprovisionedBenchmarkDataCommand)
+    elif cloud == 'AWS':
+      download_function = (aws_virtual_machine.
+                           GenerateDownloadPreprovisionedBenchmarkDataCommand)
+    elif cloud == 'Azure':
+      download_function = (azure_virtual_machine.
+                           GenerateDownloadPreprovisionedBenchmarkDataCommand)
+    else:
+      raise NotImplementedError(
+          'Cloud {0} does not support downloading preprovisioned '
+          'data on Kubernetes VMs.'.format(cloud))
+
+    self.RemoteCommand(
+        download_function(install_path, benchmark_name, filename))
 
 
 def _install_sudo_command():
