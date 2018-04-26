@@ -184,3 +184,4 @@
 - Made failures of 'aws ec2 run-instances' fail PKB quickly.
 - Fix Kubernetes StorageClass deletion
 - Added `git` installation to `tensorflow_serving` package.
+- MountDisk throws exception if mounting the disk fails.
