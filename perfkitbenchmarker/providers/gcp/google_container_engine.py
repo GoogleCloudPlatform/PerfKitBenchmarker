@@ -29,6 +29,7 @@ FLAGS = flags.FLAGS
 
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.9/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
+DEFAULT_CONTAINER_VERSION = 'latest'
 
 
 class GoogleContainerRegistry(container_service.BaseContainerRegistry):
@@ -90,7 +91,8 @@ class GkeCluster(container_service.KubernetesCluster):
     self.project = spec.vm_spec.project
     self.min_cpu_platform = spec.vm_spec.min_cpu_platform
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
-    self.cluster_version = '1.9.6-gke.0'
+    self.cluster_version = (FLAGS.container_cluster_version or
+                            DEFAULT_CONTAINER_VERSION)
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -101,6 +103,7 @@ class GkeCluster(container_service.KubernetesCluster):
     result = super(GkeCluster, self).GetResourceMetadata()
     if self.gce_accelerator_type_override:
       result['accelerator_type_override'] = self.gce_accelerator_type_override
+    result['container_cluster_version'] = self.cluster_version
     return result
 
   def _Create(self):
