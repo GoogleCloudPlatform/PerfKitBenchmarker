@@ -680,9 +680,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.Install('aws_credentials')
     self.Install('awscli')
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand('aws s3 cp --only-show-errors s3://%s/%s/%s %s' % (
-        FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
-        posixpath.join(install_path, filename)))
+    self.RemoteCommand(GenerateDownloadPreprovisionedBenchmarkDataCommand(
+        install_path, benchmark_name, filename))
 
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
@@ -826,3 +825,12 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
                      vm_util.GetPrivateKeyPath()]
       password, _ = vm_util.IssueRetryableCommand(decrypt_cmd)
       self.password = password
+
+
+def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
+                                                       benchmark_name,
+                                                       filename):
+  """Returns a string used to download preprovisioned data."""
+  return 'aws s3 cp --only-show-errors s3://%s/%s/%s %s' % (
+      FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
+      posixpath.join(install_path, filename))

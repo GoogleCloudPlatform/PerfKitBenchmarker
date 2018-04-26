@@ -142,17 +142,17 @@ def get_write_mock_from_temp_file_mock(temp_file_mock):
 
 
 @contextlib2.contextmanager
-def patch_critical_objects(stdout='', stderr='', return_code=0):
+def patch_critical_objects(stdout='', stderr='', return_code=0,
+                           flags=mock_flags.MockFlags()):
   with contextlib2.ExitStack() as stack:
     retval = (stdout, stderr, return_code)
 
-    mflags = mock_flags.MockFlags()
-    mflags.gcloud_path = 'gcloud'
-    mflags.run_uri = _RUN_URI
-    mflags.kubectl = _KUBECTL
-    mflags.kubeconfig = _KUBECONFIG
+    flags.gcloud_path = 'gcloud'
+    flags.run_uri = _RUN_URI
+    flags.kubectl = _KUBECTL
+    flags.kubeconfig = _KUBECONFIG
 
-    stack.enter_context(mock_flags.PatchFlags(mflags))
+    stack.enter_context(mock_flags.PatchFlags(flags))
     stack.enter_context(mock.patch('__builtin__.open'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
 
@@ -337,6 +337,45 @@ class KubernetesVirtualMachineTestCase(
           write_mock.call_args[0][0],
           _EXPECTED_CALL_BODY_WITHOUT_GPUS
       )
+
+  def testDownloadPreprovisionedBenchmarkDataAws(self):
+    spec = self.create_virtual_machine_spec()
+    flags = mock_flags.MockFlags()
+    flags.container_cluster_cloud = 'AWS'
+    with patch_critical_objects(flags=flags) as (issue_command, _):
+      kub_vm = (
+          kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
+      kub_vm.DownloadPreprovisionedBenchmarkData('path', 'name', 'filename')
+
+      command = issue_command.call_args[0][0]
+      command_string = ' '.join(command)
+      self.assertIn('s3', command_string)
+
+  def testDownloadPreprovisionedBenchmarkDataAzure(self):
+    spec = self.create_virtual_machine_spec()
+    flags = mock_flags.MockFlags()
+    flags.container_cluster_cloud = 'Azure'
+    with patch_critical_objects(flags=flags) as (issue_command, _):
+      kub_vm = (
+          kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
+      kub_vm.DownloadPreprovisionedBenchmarkData('path', 'name', 'filename')
+
+      command = issue_command.call_args[0][0]
+      command_string = ' '.join(command)
+      self.assertIn('az storage blob download', command_string)
+
+  def testDownloadPreprovisionedBenchmarkDataGcp(self):
+    spec = self.create_virtual_machine_spec()
+    flags = mock_flags.MockFlags()
+    flags.container_cluster_cloud = 'GCP'
+    with patch_critical_objects(flags=flags) as (issue_command, _):
+      kub_vm = (
+          kubernetes_virtual_machine.DebianBasedKubernetesVirtualMachine(spec))
+      kub_vm.DownloadPreprovisionedBenchmarkData('path', 'name', 'filename')
+
+      command = issue_command.call_args[0][0]
+      command_string = ' '.join(command)
+      self.assertIn('gsutil', command_string)
 
 
 class KubernetesVirtualMachineWithGpusTestCase(

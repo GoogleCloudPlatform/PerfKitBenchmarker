@@ -629,9 +629,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       filename: The name of the file that was downloaded.
     """
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand('gsutil -q cp gs://%s/%s/%s %s' % (
-        FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
-        posixpath.join(install_path, filename)))
+    self.RemoteCommand(GenerateDownloadPreprovisionedBenchmarkDataCommand(
+        install_path, benchmark_name, filename))
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
@@ -727,3 +726,12 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = reset_password_cmd.IssueRetryable()
     response = json.loads(stdout)
     self.password = response['password']
+
+
+def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
+                                                       benchmark_name,
+                                                       filename):
+  """Returns a string used to download preprovisioned data."""
+  return 'gsutil -q cp gs://%s/%s/%s %s' % (
+      FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
+      posixpath.join(install_path, filename))

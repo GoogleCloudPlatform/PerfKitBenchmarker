@@ -371,22 +371,12 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       benchmark_name: Name of the benchmark associated with this data file.
       filename: The name of the file that was downloaded.
     """
-    benchmark_name_with_underscores_removed = benchmark_name.replace(
-        '_', '-')
     self.Install('azure_cli')
     self.Install('azure_credentials')
-    destpath = posixpath.join(install_path, filename)
-    self.RemoteCommand('mkdir -p %s' % posixpath.dirname(destpath))
-    self.RemoteCommand('az storage blob download '
-                       '--no-progress '
-                       '--account-name %s '
-                       '--container-name %s '
-                       '--name %s '
-                       '--file %s' % (
-                           FLAGS.azure_preprovisioned_data_bucket,
-                           benchmark_name_with_underscores_removed,
-                           filename,
-                           destpath))
+    self.RemoteCommand(
+        GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
+                                                           benchmark_name,
+                                                           filename))
 
   def GetResourceMetadata(self):
     result = super(AzureVirtualMachine, self).GetResourceMetadata()
@@ -456,3 +446,26 @@ class WindowsAzureVirtualMachine(AzureVirtualMachine,
          '--publisher', 'Microsoft.Compute',
          '--version', '1.4',
          '--protected-settings=%s' % config] + self.resource_group.args)
+
+
+def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
+                                                       benchmark_name,
+                                                       filename):
+  """Returns a string used to download preprovisioned data."""
+  benchmark_name_with_underscores_removed = benchmark_name.replace(
+      '_', '-')
+  destpath = posixpath.join(install_path, filename)
+  # TODO(ferneyhough): Refactor this so that this mkdir command
+  # is run on all clouds, and is os-agnostic (this is linux specific).
+  mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
+  download_command = ('az storage blob download '
+                      '--no-progress '
+                      '--account-name %s '
+                      '--container-name %s '
+                      '--name %s '
+                      '--file %s' % (
+                          FLAGS.azure_preprovisioned_data_bucket,
+                          benchmark_name_with_underscores_removed,
+                          filename,
+                          destpath))
+  return '{0} && {1}'.format(mkdir_command, download_command)
