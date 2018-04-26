@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains code related to lifecycle management of Kubernetes Pods."""
+"""Contains code related to lifecycle management of Docker Containers."""
 
 
 #TODO
-#REMOVE THESE
-#STEPS
-#1)_Create
-#2)_Check if exists
-#3)_PostCreate
+
 
 import json
 import logging
 import posixpath
+import os
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -34,6 +32,7 @@ from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine, linux_virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
 from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
@@ -107,6 +106,24 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #logging.info(self.ssh_public_key)
     #logging.info(public_key)
     #docker_command = "docker run -d dphanekham/ssh_server"
+
+    ##Try to build container here
+    ##create container object
+    ##build local
+    #containerImage = container_service._ContainerImage("ubuntu_simple")
+    
+    directory = os.path.dirname(
+      data.ResourcePath(os.path.join('docker', "ubuntu_simple", 'Dockerfile')))
+    self.image_name = "ubuntu_simple"
+
+    build_cmd = [
+        'docker', 'build', '--no-cache',
+        '-t', self.image_name, directory
+    ]
+
+    #TODO check if container built correctly
+
+    vm_util.IssueCommand(build_cmd)
 
     create_command = ['docker', 'run', '-d', '--name', self.name, 'ubuntu_ssh:latest', '/usr/sbin/sshd', '-D']
 
