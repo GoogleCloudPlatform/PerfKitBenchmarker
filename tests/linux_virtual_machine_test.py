@@ -111,7 +111,7 @@ class TestDiskOperations(unittest.TestCase):
     vm.MountDisk('dp', 'mp')
     call_args = [args[0][0] for args in mock_remote_cmd.call_args_list]
     self.assertEqual(('sudo mkdir -p mp;'
-                      'sudo mount -o discard dp mp;'
+                      'sudo mount -o discard dp mp && '
                       'sudo chown -R $USER:$USER mp;'), call_args[0])
     self.assertEqual(('echo "dp mp ext4 defaults" '
                       '| sudo tee -a /etc/fstab'), call_args[1])
