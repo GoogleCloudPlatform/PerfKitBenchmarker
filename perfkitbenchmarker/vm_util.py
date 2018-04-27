@@ -289,18 +289,18 @@ def IssueCommand(cmd, force_info_log=False, suppress_warning=False,
     A tuple of stdout, stderr, and retcode from running the provided command.
   """
   if env:
-    logging.debug('Environment variables: %s' % env)
+    logging.debug('Environment variables: %s', env)
 
   full_cmd = ' '.join(cmd)
   logging.info('Running: %s', full_cmd)
 
   time_file_path = '/usr/bin/time'
 
-  runningOnWindows = RunningOnWindows()
-  runningOnDarwin = RunningOnDarwin()
-  should_time = (not (runningOnWindows or runningOnDarwin) and
+  running_on_windows = RunningOnWindows()
+  running_on_darwin = RunningOnDarwin()
+  should_time = (not (running_on_windows or running_on_darwin) and
                  os.path.isfile(time_file_path) and FLAGS.time_commands)
-  shell_value = runningOnWindows
+  shell_value = running_on_windows
   with tempfile.TemporaryFile() as tf_out, \
       tempfile.TemporaryFile() as tf_err, \
       tempfile.NamedTemporaryFile(mode='r') as tf_timing:
@@ -358,7 +358,7 @@ def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
     env: A dict of key/value strings, such as is given to the subprocess.Popen()
         constructor, that contains environment variables to be injected.
   """
-  logging.debug('Environment variables: %s' % env)
+  logging.debug('Environment variables: %s', env)
 
   full_cmd = ' '.join(cmd)
   logging.info('Spawning: %s', full_cmd)
@@ -404,7 +404,6 @@ def ParseTimeCommandResult(command_result):
   time_data = re.findall(r'real\s+(\d+)m(\d+.\d+)', command_result)
   time_in_seconds = 60 * float(time_data[0][0]) + float(time_data[0][1])
   return time_in_seconds
-
 
 
 def ShouldRunOnExternalIpAddress():
@@ -512,8 +511,8 @@ def RunningOnWindows():
 
 
 def RunningOnDarwin():
-    """Returns True if PKB is running on a Darwin OS machine."""
-    return os.name != WINDOWS and platform.system() == DARWIN
+  """Returns True if PKB is running on a Darwin OS machine."""
+  return os.name != WINDOWS and platform.system() == DARWIN
 
 
 def ExecutableOnPath(executable_name):
