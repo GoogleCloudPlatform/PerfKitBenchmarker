@@ -102,8 +102,7 @@ class EdwService(resource.BaseResource):
     basic_data = {'edw_service_type': self.spec.type,
                   'edw_cluster_identifier': self.cluster_identifier,
                   'edw_cluster_node_type': self.node_type,
-                  'edw_cluster_node_count': self.node_count
-                 }
+                  'edw_cluster_node_count': self.node_count}
     return basic_data
 
   def RunCommandHelper(self):
@@ -114,4 +113,3 @@ class EdwService(resource.BaseResource):
       runner.
     """
     raise NotImplementedError
-
