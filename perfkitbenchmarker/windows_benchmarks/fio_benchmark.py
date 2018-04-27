@@ -59,17 +59,17 @@ flags.DEFINE_integer('fio_sequential_read_size', None,
 flags.DEFINE_integer('fio_random_write_size', None,
                      ('"size" field of the random_write section of the '
                       'fio config. {explanation}').format(
-                          explanation=_DEFAULT_SIZE_LARGE_EXPLANATION))
+                          explanation=_DEFAULT_SIZE_MEDIUM_EXPLANATION))
 
 flags.DEFINE_integer('fio_random_read_size', None,
                      ('"size" field of the random_read section of the '
                       'fio config. {explanation}').format(
-                          explanation=_DEFAULT_SIZE_LARGE_EXPLANATION))
+                          explanation=_DEFAULT_SIZE_MEDIUM_EXPLANATION))
 
 flags.DEFINE_integer('fio_random_read_parallel_size', None,
                      ('"size" field of the random_read_parallel section of the '
                       'fio config. {explanation}').format(
-                          explanation=_DEFAULT_SIZE_LARGE_EXPLANATION))
+                          explanation=_DEFAULT_SIZE_MEDIUM_EXPLANATION))
 
 BENCHMARK_NAME = 'fio'
 BENCHMARK_CONFIG = """
@@ -147,7 +147,7 @@ def GetConfig(user_config):
 def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
   exec_path = fio.GetFioExec(vm)
-  return linux_fio.PrepareWithExec(benchmark_spec, exec_path)
+  linux_fio.PrepareWithExec(benchmark_spec, exec_path)
 
 
 def Run(benchmark_spec):
