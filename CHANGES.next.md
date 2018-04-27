@@ -110,6 +110,7 @@
 - Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
 - Preliminary support for NFS file systems
 - Added BigQuery provider implementation to extend the edw benchmarking in Perfkitbenchmarker.
+- Added support for authorizing gcloud to access Cloud Platform with a Google service account.
 
 
 ### Bug fixes and maintenance updates:
