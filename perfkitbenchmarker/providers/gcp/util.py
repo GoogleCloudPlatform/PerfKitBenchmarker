@@ -190,4 +190,3 @@ def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud'):
                   .format(vm_gcloud_path, FLAGS.gcp_service_account,
                           FLAGS.gcp_service_account_key_file.split('/')[-1]))
   vm.RemoteCommand(activate_cmd)
-

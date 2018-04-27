@@ -19,7 +19,6 @@ configuration files.
 
 import contextlib
 import copy
-import logging
 import os
 
 from perfkitbenchmarker import cloud_redis
