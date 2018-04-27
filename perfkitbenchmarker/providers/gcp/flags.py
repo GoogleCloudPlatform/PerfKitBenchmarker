@@ -98,3 +98,8 @@ flags.DEFINE_string(
     'GCS bucket where pre-provisioned data has been copied.')
 flags.DEFINE_integer(
     'gcp_redis_gb', 5, 'Size of redis cluster in gb')
+flags.DEFINE_string('gcp_service_account', None, 'Service account to use for '
+                                                 'authorization.')
+flags.DEFINE_string('gcp_service_account_key_file', None,
+                    'Local path to file that contains a private authorization '
+                    'key, used to activate gcloud.')
