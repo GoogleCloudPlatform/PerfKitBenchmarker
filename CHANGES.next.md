@@ -192,3 +192,4 @@
 - Refactored speccpu2006 benchmark to use common elements for both
   speccpu2006 and speccpu2017.
 - Use flags['key'].parse(...) to set mocked flags in linux_virtual_machine_test
+- Cleanup some redundant logging and duplicate decoder statements.
