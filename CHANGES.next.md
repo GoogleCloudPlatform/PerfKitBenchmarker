@@ -109,6 +109,8 @@
 - Added a timeout to RobustRemoteCommand.
 - Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
 - Preliminary support for NFS file systems
+- Added BigQuery provider implementation to extend the edw benchmarking in Perfkitbenchmarker.
+
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
