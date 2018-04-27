@@ -63,7 +63,7 @@ flags.DEFINE_string('cuda_toolkit_installation_dir', '/usr/local/cuda',
                     'here. If it is already installed, the installation at '
                     'this path will be used.')
 
-flags.DEFINE_enum('cuda_toolkit_version', '8.0', ['8.0', '9.0'],
+flags.DEFINE_enum('cuda_toolkit_version', '9.0', ['8.0', '9.0'],
                   'Version of CUDA Toolkit to install')
 
 FLAGS = flags.FLAGS

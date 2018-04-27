@@ -13,11 +13,14 @@
 - Migrated cluster boot benchmark default machines to 'default_dual_core'.
 - Changed metric name in mnist and inception3.
 - Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
+- Updated GCP sole tenancy support.  Removed `gcp_host_type` added
+  `gcp_node_type`.
 
 ### New features:
 - Windows benchmarks can now be run from linux controllers
 - MXNet benchmarks can now be run from linux controllers
-- Added initial support for preprovisioning benchmark binaries in the cloud.
+- Added initial support for preprovisioning benchmark binaries in the cloud,
+  if binaries are not located in local /data directory.
 - YCSB benchmark for Cloud Redis in GCP, Elasticache Redis in AWS, and
   Redis Cache in Azure.
 - Added a flag, `run_stage_iterations`, which causes a benchmark's run stage to be
@@ -41,6 +44,12 @@
 - Added new ycsb workload where each payload is 1mb versus the default 1kb.
 - Added Tensorflow Serving benchmark which tests the throughput and latency of the
   standard model-server using a pre-trained inception3 model.
+- Added AWS Fargate support.
+- Added the ability to pass arbitrary parameters to tf_cnn_benchmarks.py in the
+  Tensorflow benchmark, through the `benchmark_args` flag.
+- Added hdrhistogram support to ycsb package.
+- Added support for custom machine types on GKE.
+- Added `container_cluster_version` flag to container_service.py.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -51,13 +60,14 @@
 - Add MNIST benchmark support for TPU, CPU and GPU
 - Created KubernetesPodSpec which allows the user to specify kubernetes resource
   requests and limits, including fractional CPUs.
-- Add `skip_pending_runs_file` flag to workaround SIGINT issues.
+- Add `skip_pending_runs_file` flag and extension hooks to workaround SIGINT issues.
 - Add support for `specsfs2014_load` parameter as an integer list.
 - Publishers can be extended through external modules.
 - Add `run_processes_delay` flag to stagger parallel runs.
 - Add support for SPECspeed.
 - Add new `os_types` Centos7, Debian9, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
 - Make it easier to RDP to PKB VMs
+- Add `os_type` support to KubernetesVirtualMachine.
 - Avoid setting up thread pool etc when run_processes is set
   to 1 and using --run_with_pdb flag to simplify debugging.
 - Added a sample benchmark for descriptive purposes.
@@ -93,6 +103,12 @@
 - Added flags `ycsb_version` and `ycsb_measurement_type` to support
   user-specified ycsb versions and measurement types.
 - Added support to tensorflow_benchmark for running multiple batch sizes per run.
+- Added resnet152 in TensorFlow benchmark default models.
+- Added 50kb per payload ycsb workload.
+- Added `num_cpus` to virtual_machine published metadata.
+- Added a timeout to RobustRemoteCommand.
+- Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
+- Preliminary support for NFS file systems
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -154,3 +170,19 @@
 - Replace all underscores in the benchmark name with dashes when downloading
   preprovisioned benchmark data from Azure. This is because Azure blob storage
   container names cannot contain underscores.
+- Fixed the bug of running distributed TensorFlow on multiple batch sizes.
+- Updated `gcloud compute networks create` to use `subnet-mode`.
+- Changed default CUDA version from 8.0 to 9.0.
+- Updated default Tensorflow version to 1.7 when using GPUs.
+- Updated default Tensorflow tf_cnn_benchmarks version to a commit dated April
+  2, 2018.
+- Fixed a bug in which boto could not be uninstalled on newer GCE images.
+- Update each ycsb workload to have its own recordcount configuration if
+  ycsb_record_count is not set.
+- Fixed treatment of the boot time metric so that it is more like any other run
+  stage metric.
+- Fixed bug of modifying the providers/aws/util.AWS_PREFIX value.
+- Made failures of 'aws ec2 run-instances' fail PKB quickly.
+- Fix Kubernetes StorageClass deletion
+- Added `git` installation to `tensorflow_serving` package.
+- MountDisk throws exception if mounting the disk fails.

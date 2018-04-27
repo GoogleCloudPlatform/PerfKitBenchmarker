@@ -523,7 +523,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       instance_market_options['SpotOptions'] = spot_options
       create_cmd.append(
           '--instance-market-options=%s' % json.dumps(instance_market_options))
-    _, stderr, _ = vm_util.IssueCommand(create_cmd)
+    _, stderr, retcode = vm_util.IssueCommand(create_cmd)
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       logging.warning(
           'Creation failed due to insufficient host capacity. A new host will '
@@ -545,6 +545,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.spot_status_code = 'SpotMaxPriceTooLow'
       self.early_termination = True
       raise errors.Resource.CreationError(stderr)
+    if retcode:
+      raise errors.Resource.CreationError(
+          '%s return code: %s' % (retcode, stderr))
 
   def _Delete(self):
     """Delete a VM instance."""
@@ -602,7 +605,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     reservations = response['Reservations']
     assert len(reservations) < 2, 'Too many reservations.'
     if not reservations:
-      return False
+      logging.info('No reservation returned by describe-instances. This '
+                   'sometimes shows up immediately after a successful '
+                   'run-instances command. Retrying describe-instances '
+                   'command.')
+      raise AwsTransitionalVmRetryableError()
     instances = reservations[0]['Instances']
     assert len(instances) == 1, 'Wrong number of instances.'
     status = instances[0]['State']['Name']

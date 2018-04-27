@@ -43,6 +43,14 @@ flags.DEFINE_integer('nuttcp_udp_stream_seconds', 10,
 flags.DEFINE_integer('nuttcp_udp_packet_size', 1420,
                      'The size of each UDP packet sent in the UDP stream.')
 
+flags.DEFINE_bool('nuttcp_udp_run_both_directions', False,
+                  'Run the test twice, using each VM as a source.')
+
+flags.DEFINE_integer('nuttcp_udp_iterations', 1,
+                     'The number of consecutive tests to run.')
+
+flags.DEFINE_bool('nuttcp_udp_unlimited_bandwidth', False,
+                  'Run an "unlimited bandwidth" test')
 
 NUTTCP_DIR = 'nuttcp-8.1.4.win64'
 NUTTCP_ZIP = NUTTCP_DIR + '.zip'
@@ -60,7 +68,8 @@ def GetExecPath():
   return 'nuttcp-8.1.4.exe'
 
 
-def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type):
+def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
+              iteration):
   """Run nuttcp tests.
 
   Args:
@@ -69,6 +78,7 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type):
     exec_path: path to the nuttcp executable.
     dest_ip: the IP of the receiver.
     network_type: string representing the type of the network.
+    iteration: the run number of the test.
 
   Returns:
     list of samples from the results of the nuttcp tests.
@@ -83,9 +93,14 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type):
 
   samples = []
 
-  bandwidths = ['{b}m'.format(b=b) for b in xrange(
-      FLAGS.nuttcp_min_bandwidth_mb, FLAGS.nuttcp_max_bandwidth_mb,
-      FLAGS.nuttcp_bandwidth_step_mb)] + ['u']
+  bandwidths = [
+      '{b}m'.format(b=b)
+      for b in xrange(FLAGS.nuttcp_min_bandwidth_mb, FLAGS.
+                      nuttcp_max_bandwidth_mb, FLAGS.nuttcp_bandwidth_step_mb)
+  ]
+
+  if FLAGS.nuttcp_udp_unlimited_bandwidth:
+    bandwidths.append('u')
 
   for bandwidth in bandwidths:
 
@@ -109,8 +124,9 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type):
         nuttcp_exec_dir=sending_vm.temp_dir,
         out_file=NUTTCP_OUT_FILE)
     command_out, _ = sending_vm.RemoteCommand(cat_command)
-    samples.append(GetUDPStreamSample(command_out, sending_vm, receiving_vm,
-                                      bandwidth, network_type))
+    samples.append(
+        GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
+                           network_type, iteration))
   return samples
 
 # 1416.3418 MB /  10.00 sec = 1188.1121 Mbps 85 %TX 26 %RX 104429 / 1554763
@@ -118,7 +134,7 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type):
 
 
 def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
-                       network_type):
+                       network_type, iteration):
   """Get a sample from the nuttcp string results.
 
   Args:
@@ -127,6 +143,7 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
     receiving_vm: vm receiving the UDP packets.
     bandwidth: the requested bandwidth in the nuttcp sample.
     network_type: the type of the network, external or internal.
+    iteration: the run number of the test.
 
   Returns:
     sample from the results of the nuttcp tests.
@@ -145,7 +162,8 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
       'sending_zone': sending_vm.zone,
       'packet_loss': packet_loss,
       'bandwidth_requested': bandwidth,
-      'network_type': network_type
+      'network_type': network_type,
+      'iteration': iteration
   }
 
   return sample.Sample('bandwidth', bandwidth, units, metadata)

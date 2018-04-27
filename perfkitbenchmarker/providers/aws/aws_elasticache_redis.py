@@ -106,9 +106,7 @@ class ElastiCacheRedis(cloud_redis.BaseCloudRedis):
 
   def _Create(self):
     """Creates the cluster."""
-    tags = util.FormatTags(util.MakeDefaultTags())
     cmd = ['aws', 'elasticache', 'create-replication-group',
-           '--tags', tags,
            '--engine', 'redis',
            '--engine-version', self.version,
            '--replication-group-id', self.cluster_name,
@@ -128,6 +126,8 @@ class ElastiCacheRedis(cloud_redis.BaseCloudRedis):
       cmd += ['--automatic-failover-enabled',
               '--num-cache-clusters', '2']
 
+    cmd += ['--tags']
+    cmd += util.FormatTags(util.MakeDefaultTags())
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):

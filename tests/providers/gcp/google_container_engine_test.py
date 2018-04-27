@@ -33,9 +33,9 @@ _NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_d
 
 
 @contextlib2.contextmanager
-def patch_critical_objects(stdout='', stderr='', return_code=0):
+def patch_critical_objects(stdout='', stderr='', return_code=0,
+                           flags=mock_flags.MockFlags()):
   with contextlib2.ExitStack() as stack:
-    flags = mock_flags.MockFlags()
     flags.gcloud_path = 'gcloud'
     flags.run_uri = _RUN_URI
     flags.data_search_paths = ''
@@ -52,6 +52,65 @@ def patch_critical_objects(stdout='', stderr='', return_code=0):
     issue_command = stack.enter_context(
         mock.patch(vm_util.__name__ + '.IssueCommand', return_value=retval))
     yield issue_command
+
+
+class GoogleContainerEngineMinCpuPlatformTestCase(unittest.TestCase):
+
+  @staticmethod
+  def create_container_engine_spec():
+    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'min_cpu_platform': 'skylake',
+                },
+            },
+        })
+    return container_engine_spec
+
+  def testCreate(self):
+    spec = self.create_container_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud beta container clusters create', command_string)
+      self.assertIn('--machine-type fake-machine-type', command_string)
+      self.assertIn('--min-cpu-platform skylake', command_string)
+
+
+class GoogleContainerEngineCustomMachineTypeTestCase(unittest.TestCase):
+
+  @staticmethod
+  def create_container_engine_spec():
+    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': {
+                        'cpus': 4,
+                        'memory': '1024MiB',
+                    },
+                },
+            },
+        })
+    return container_engine_spec
+
+  def testCreate(self):
+    spec = self.create_container_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud container clusters create', command_string)
+      self.assertIn('--machine-type custom-4-1024', command_string)
 
 
 class GoogleContainerEngineTestCase(unittest.TestCase):
@@ -122,6 +181,44 @@ class GoogleContainerEngineTestCase(unittest.TestCase):
           command_string)
 
 
+class GoogleContainerEngineVersionFlagTestCase(unittest.TestCase):
+
+  @staticmethod
+  def create_container_engine_spec():
+    container_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                },
+            },
+        })
+    return container_engine_spec
+
+  def testCreateCustomVersion(self):
+    spec = self.create_container_engine_spec()
+    flags = mock_flags.MockFlags()
+    flags.container_cluster_version = 'fake-version'
+    with patch_critical_objects(flags=flags) as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('--cluster-version fake-version', command_string)
+
+  def testCreateDefaultVersion(self):
+    spec = self.create_container_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_container_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('--cluster-version latest', command_string)
+
+
 class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
 
   @staticmethod
@@ -149,7 +246,6 @@ class GoogleContainerEngineWithGpusTestCase(unittest.TestCase):
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud beta container clusters create', command_string)
-      self.assertIn('--cluster-version 1.9.6-gke.0', command_string)
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn('--accelerator type=nvidia-tesla-k80,count=2',

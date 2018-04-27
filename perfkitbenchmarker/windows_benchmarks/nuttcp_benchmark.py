@@ -57,17 +57,21 @@ def RunNuttcp(vms, exec_path):
 
   results = []
 
-  def _RunNuttcpTest(sending_vm, receiving_vm):
+  def _RunNuttcpTest(sending_vm, receiving_vm, iteration):
     if vm_util.ShouldRunOnExternalIpAddress():
-      results.extend(nuttcp.RunNuttcp(sending_vm, receiving_vm, exec_path,
-                                      receiving_vm.ip_address, 'external'))
+      results.extend(
+          nuttcp.RunNuttcp(sending_vm, receiving_vm, exec_path,
+                           receiving_vm.ip_address, 'external', iteration))
     if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
-      results.extend(nuttcp.RunNuttcp(sending_vm, receiving_vm, exec_path,
-                                      receiving_vm.internal_ip, 'internal'))
+      results.extend(
+          nuttcp.RunNuttcp(sending_vm, receiving_vm, exec_path,
+                           receiving_vm.internal_ip, 'internal', iteration))
 
   # run in both directions just for completeness
-  _RunNuttcpTest(vms[0], vms[1])
-  _RunNuttcpTest(vms[1], vms[0])
+  for iteration in xrange(FLAGS.nuttcp_udp_iterations):
+    _RunNuttcpTest(vms[0], vms[1], iteration)
+    if FLAGS.nuttcp_udp_run_both_directions:
+      _RunNuttcpTest(vms[1], vms[0], iteration)
 
   return results
 

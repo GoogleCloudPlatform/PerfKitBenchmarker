@@ -159,7 +159,7 @@ class Redshift(edw_service.EdwService):
     super(Redshift, self).__init__(edw_service_spec)
     # pkb setup attribute
     self.project = None
-    self.cmd_prefix = util.AWS_PREFIX
+    self.cmd_prefix = list(util.AWS_PREFIX)
     if FLAGS.zones:
       self.zone = FLAGS.zones[0]
       self.region = util.GetRegionFromZone(self.zone)

@@ -56,6 +56,9 @@ NONE = 'none'
 ZONE = 'zone'
 REGION = 'region'
 
+DEFAULT_MOUNT_OPTIONS = 'discard'
+DEFAULT_FSTAB_OPTIONS = 'defaults'
+
 
 # TODO(nlavine): remove this function when we remove the deprecated
 # flags and disk type names.
@@ -251,6 +254,27 @@ class BaseDisk(resource.BaseResource):
     # numbers are used in diskpart scripts in order to identify the disks
     # that we want to operate on.
     self.disk_number = disk_spec.disk_number
+
+  @property
+  def mount_options(self):
+    """Returns options to mount a disk.
+
+    The default value 'discard' is from the linux VM's MountDisk method.
+
+    See `man 8 mount` for usage.  For example, returning "ro" will cause the
+    mount command to be "mount ... -o ro ..." mounting the disk as read only.
+    """
+    return DEFAULT_MOUNT_OPTIONS
+
+  @property
+  def fstab_options(self):
+    """Returns options to use in the /etc/fstab entry for this drive.
+
+    The default value 'defaults' is from the linux VM's MountDisk method.
+
+    See `man fstab` for usage.
+    """
+    return DEFAULT_FSTAB_OPTIONS
 
   @abc.abstractmethod
   def Attach(self, vm):

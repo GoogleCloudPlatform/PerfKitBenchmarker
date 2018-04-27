@@ -101,6 +101,7 @@ LOG_FILE_NAME = 'pkb.log'
 COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
+MAX_RUN_URI_LENGTH = 8
 FLAGS = flags.FLAGS
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
@@ -145,8 +146,8 @@ flags.DEFINE_integer('num_vms', 1, 'For benchmarks which can make use of a '
 flags.DEFINE_string('image', None, 'Default image that will be '
                     'linked to the VM')
 flags.DEFINE_string('run_uri', None, 'Name of the Run. If provided, this '
-                    'should be alphanumeric and less than or equal to 10 '
-                    'characters in length.')
+                    'should be alphanumeric and less than or equal to %d '
+                    'characters in length.' % MAX_RUN_URI_LENGTH)
 flags.DEFINE_string('owner', getpass.getuser(), 'Owner name. '
                     'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
@@ -286,8 +287,6 @@ flags.DEFINE_string('ftp_proxy', '',
                     'Specify a proxy for FTP in the form '
                     '[user:passwd@]proxy.server:port.')
 
-MAX_RUN_URI_LENGTH = 8
-
 _TEARDOWN_EVENT = multiprocessing.Event()
 
 events.initialization_complete.connect(traces.RegisterAll)
@@ -370,8 +369,8 @@ def _InitializeRunUri():
             ', '.join(FLAGS.run_stage))
   elif not FLAGS.run_uri.isalnum() or len(FLAGS.run_uri) > MAX_RUN_URI_LENGTH:
     raise errors.Setup.BadRunURIError('run_uri must be alphanumeric and less '
-                                      'than or equal to 8 characters in '
-                                      'length.')
+                                      'than or equal to %d characters in '
+                                      'length.' % MAX_RUN_URI_LENGTH)
 
 
 def _CreateBenchmarkSpecs():
@@ -535,11 +534,17 @@ def DoRunPhase(spec, collector, timer):
       consecutive_failures = 0
     finally:
       events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
-    events.samples_created.send(
-        events.RUN_PHASE, benchmark_spec=spec, samples=samples)
     if FLAGS.run_stage_time or FLAGS.run_stage_iterations:
       for s in samples:
         s.metadata['run_number'] = run_number
+
+    # Add boot time metrics on the first run iteration.
+    if run_number == 0 and (FLAGS.boot_samples or
+                            spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
+      samples.extend(cluster_boot_benchmark.GetTimeToBoot(spec.vms))
+
+    events.samples_created.send(
+        events.RUN_PHASE, benchmark_spec=spec, samples=samples)
     collector.AddSamples(samples, spec.name, spec)
     if (FLAGS.publish_after_run and FLAGS.publish_period is not None and
         FLAGS.publish_period < (time.time() - last_publish_time)):
@@ -547,10 +552,6 @@ def DoRunPhase(spec, collector, timer):
       last_publish_time = time.time()
     run_number += 1
     if _IsRunStageFinished():
-      if (FLAGS.boot_samples or
-          spec.name == cluster_boot_benchmark.BENCHMARK_NAME):
-        collector.AddSamples(
-            cluster_boot_benchmark.GetTimeToBoot(spec.vms), spec.name, spec)
       break
 
 
@@ -584,6 +585,26 @@ def DoTeardownPhase(spec, timer):
     spec.Delete()
 
 
+def _SkipPendingRunsFile():
+  if FLAGS.skip_pending_runs_file and isfile(FLAGS.skip_pending_runs_file):
+    logging.warning('%s exists.  Skipping benchmark.',
+                    FLAGS.skip_pending_runs_file)
+    return True
+  else:
+    return False
+
+_SKIP_PENDING_RUNS_CHECKS = []
+
+
+def RegisterSkipPendingRunsCheck(func):
+  """Registers a function to skip pending runs.
+
+  Args:
+    func: A function which returns True if pending runs should be skipped.
+  """
+  _SKIP_PENDING_RUNS_CHECKS.append(func)
+
+
 def RunBenchmark(spec, collector):
   """Runs a single benchmark and adds the results to the collector.
 
@@ -595,10 +616,11 @@ def RunBenchmark(spec, collector):
   # Since there are issues with the handling SIGINT/KeyboardInterrupt (see
   # further dicussion in _BackgroundProcessTaskManager) this mechanism is
   # provided for defense in depth to force skip pending runs after SIGINT.
-  if FLAGS.skip_pending_runs_file and isfile(FLAGS.skip_pending_runs_file):
-    logging.warning('%s exists.  Skipping benchmark.',
-                    FLAGS.skip_pending_runs_file)
-    return
+  for f in _SKIP_PENDING_RUNS_CHECKS:
+    if f():
+      logging.warning('Skipping benchmark.')
+      return
+
   spec.status = benchmark_status.FAILED
   current_run_stage = stages.PROVISION
   # Modify the logger prompt for messages logged within this function.
@@ -808,6 +830,9 @@ def SetUpPKB():
   # Translate deprecated flags and log all provided flag values.
   disk.WarnAndTranslateDiskFlags()
   _LogCommandLineFlags()
+
+  # Register skip pending runs functionality.
+  RegisterSkipPendingRunsCheck(_SkipPendingRunsFile)
 
   # Check environment.
   if not FLAGS.ignore_package_requirements:
