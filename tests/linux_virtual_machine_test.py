@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for linux_virtual_machine.py"""
+"""Tests for linux_virtual_machine.py."""
 
 import unittest
 
@@ -25,6 +25,7 @@ from tests import mock_flags
 # Need to provide implementations for all of the abstract methods in
 # order to instantiate linux_virtual_machine.BaseLinuxMixin.
 class LinuxVM(linux_virtual_machine.BaseLinuxMixin):
+
   def Install(self):
     pass
 
@@ -33,6 +34,7 @@ class LinuxVM(linux_virtual_machine.BaseLinuxMixin):
 
 
 class TestSetFiles(unittest.TestCase):
+
   def runTest(self, set_files, calls):
     """Run a SetFiles test.
 
@@ -43,7 +45,7 @@ class TestSetFiles(unittest.TestCase):
     """
 
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags.set_files = set_files
+    self.mocked_flags['set_files'].parse(set_files)
 
     vm = LinuxVM()
 
@@ -73,33 +75,28 @@ class TestSetFiles(unittest.TestCase):
 
 
 class TestSysctl(unittest.TestCase):
-  def testSysctl(self):
+
+  def runTest(self, sysctl, calls):
     self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags.sysctl = ['vm.dirty_background_ratio=10',
-                                'vm.dirty_ratio=25']
+    self.mocked_flags['sysctl'].parse(sysctl)
     vm = LinuxVM()
 
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.DoSysctls()
 
-    self.assertEqual(
-        remote_command.call_args_list,
+    self.assertEqual(remote_command.call_args_list, calls)
+
+  def testSysctl(self):
+    self.runTest(
+        ['vm.dirty_background_ratio=10', 'vm.dirty_ratio=25'],
         [mock.call('sudo bash -c \'echo "vm.dirty_background_ratio=10" >> '
                    '/etc/sysctl.conf\''),
          mock.call('sudo bash -c \'echo "vm.dirty_ratio=25" >> '
                    '/etc/sysctl.conf\'')])
 
   def testNoSysctl(self):
-    self.mocked_flags = mock_flags.PatchTestCaseFlags(self)
-    self.mocked_flags.sysctl = []
-    vm = LinuxVM()
-
-    with mock.patch.object(vm, 'RemoteCommand') as remote_command:
-      vm.DoSysctls()
-
-    self.assertEqual(
-        remote_command.call_args_list,
-        [])
+    self.runTest([],
+                 [])
 
 
 class TestDiskOperations(unittest.TestCase):
