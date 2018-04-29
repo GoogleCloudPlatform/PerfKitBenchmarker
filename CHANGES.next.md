@@ -17,8 +17,8 @@
   `gcp_node_type`.
 
 ### New features:
-- Windows benchmarks can now be run from linux controllers
-- MXNet benchmarks can now be run from linux controllers
+- Windows benchmarks can now be run from linux controllers.
+- MXNet benchmarks can now be run from linux controllers.
 - Added initial support for preprovisioning benchmark binaries in the cloud,
   if binaries are not located in local /data directory.
 - YCSB benchmark for Cloud Redis in GCP, Elasticache Redis in AWS, and
@@ -109,6 +109,9 @@
 - Added a timeout to RobustRemoteCommand.
 - Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
 - Preliminary support for NFS file systems
+- Added BigQuery provider implementation to extend the edw benchmarking in Perfkitbenchmarker.
+- Added support for authorizing gcloud to access Cloud Platform with a Google service account.
+
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -186,3 +189,8 @@
 - Fix Kubernetes StorageClass deletion
 - Added `git` installation to `tensorflow_serving` package.
 - MountDisk throws exception if mounting the disk fails.
+- Added support for preprovisioned benchmark data on KubernetesVirtualMachines.
+- Refactored speccpu2006 benchmark to use common elements for both
+  speccpu2006 and speccpu2017.
+- Use flags['key'].parse(...) to set mocked flags in linux_virtual_machine_test
+- Cleanup some redundant logging and duplicate decoder statements.
