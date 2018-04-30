@@ -61,7 +61,7 @@ flags.DEFINE_integer('copy_benchmark_single_file_mb', None, 'If set, a '
                      'single file of the specified number of MB is used '
                      'instead of the normal cloud-storage-workload.sh basket '
                      'of files.  Not supported when copy_benchmark_mode is dd')
-flags.DEFINE_integer('copy_benchmark_disk_size', None,
+flags.DEFINE_integer('copy_benchmark_disk_size_gb', None,
                      'If set, creates PVC of specific size')
 
 FLAGS = flags.FLAGS
@@ -104,8 +104,8 @@ def GetConfig(user_config):
     config['vm_groups']['default']['disk_count'] = 1
   if FLAGS.copy_benchmark_single_file_mb:
     config['data_size_in_mb'] = FLAGS.copy_benchmark_single_file_mb
-  if FLAGS.copy_benchmark_disk_size:
-    config['vm_groups']['default']['disk_spec'] = "*default_{0}_gb".format(FLAGS.copy_benchmark_single_file_mb)
+  if FLAGS.copy_benchmark_disk_size_gb:
+    config['vm_groups']['default']['disk_spec'] = "*default_{0}_gb".format(FLAGS.copy_benchmark_disk_size_gb)
 
   return config
 
