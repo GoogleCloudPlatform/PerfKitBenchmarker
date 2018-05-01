@@ -194,3 +194,4 @@
   speccpu2006 and speccpu2017.
 - Use flags['key'].parse(...) to set mocked flags in linux_virtual_machine_test
 - Cleanup some redundant logging and duplicate decoder statements.
+- Fixed build_tools package re-installation for speccpu2006.
