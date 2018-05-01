@@ -197,3 +197,4 @@
 - Fixed build_tools package re-installation for speccpu2006.
 - Fixed fio job parsing, section parameters should always overrides global
   job parameters.
+- Refactored StaticVirtualMachines to use GetResourceClass() pattern.
