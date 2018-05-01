@@ -67,7 +67,6 @@ class StaticVirtualMachineTest(unittest.TestCase):
     mocked_flags.image = 'test_image'
     mocked_flags.os_type = 'debian'
 
-
   def tearDown(self):
     StaticVirtualMachine.vm_pool = self._initial_pool
 
