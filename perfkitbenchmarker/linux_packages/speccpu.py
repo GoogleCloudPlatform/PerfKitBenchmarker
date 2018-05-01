@@ -223,6 +223,21 @@ def Install(vm, speccpu_vm_state):
     speccpu_vm_state: SpecInstallConfigurations. Install configuration for spec.
   """
   setattr(vm, _VM_STATE_ATTR, speccpu_vm_state)
+  scratch_dir = vm.GetScratchDir()
+  vm.RemoteCommand('chmod 777 {0}'.format(scratch_dir))
+  speccpu_vm_state.spec_dir = posixpath.join(scratch_dir,
+                                             speccpu_vm_state.base_spec_dir)
+  try:
+    # Since this will override 'build_tools' installation, install this
+    # before we install 'build_tools' package
+    _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state)
+    _CheckTarFile(vm, FLAGS.runspec_config,
+                  stages.PROVISION in FLAGS.run_stage,
+                  speccpu_vm_state)
+  except errors.Setup.BadPreprovisionedDataError:
+    _CheckIsoAndCfgFile(FLAGS.runspec_config, speccpu_vm_state.iso_dir)
+    _PrepareWithIsoFile(vm, speccpu_vm_state)
+
   vm.Install('wget')
   vm.Install('fortran')
   vm.Install('build_tools')
@@ -236,18 +251,6 @@ def Install(vm, speccpu_vm_state):
   if FLAGS.runspec_enable_32bit:
     vm.Install('multilib')
   vm.Install('numactl')
-  scratch_dir = vm.GetScratchDir()
-  vm.RemoteCommand('chmod 777 {0}'.format(scratch_dir))
-  speccpu_vm_state.spec_dir = posixpath.join(scratch_dir,
-                                             speccpu_vm_state.base_spec_dir)
-  try:
-    _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state)
-    _CheckTarFile(vm, FLAGS.runspec_config,
-                  stages.PROVISION in FLAGS.run_stage,
-                  speccpu_vm_state)
-  except errors.Setup.BadPreprovisionedDataError:
-    _CheckIsoAndCfgFile(FLAGS.runspec_config, speccpu_vm_state.iso_dir)
-    _PrepareWithIsoFile(vm, speccpu_vm_state)
 
 
 def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
