@@ -73,17 +73,13 @@ flags.DEFINE_string('beam_filesystem', None, 'Defines filesystem which will be u
 
 FLAGS = flags.FLAGS
 
-SUPPORTED_RUNNERS = [
-  dpb_service.DATAFLOW,
-]
+SUPPORTED_RUNNERS = [dpb_service.DATAFLOW]
 
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
 GRADLE_INSTALL_COMMAND_ARGS = ['clean', 'install', '-xcheck', '--stacktrace']
 
 
-def AddRunnerArgument(command):
-  runner_name = FLAGS.beam_runner
-
+def AddRunnerArgument(command, runner_name):
   if runner_name is None or runner_name == 'direct':
     command.append('-DintegrationTestRunner=direct')
 
@@ -91,9 +87,7 @@ def AddRunnerArgument(command):
     command.append('-DintegrationTestRunner=dataflow')
 
 
-def AddRunnerPipelineOption(beam_pipeline_options):
-  runner_name = FLAGS.beam_runner
-  runner_option_override = FLAGS.beam_runner_option
+def AddRunnerPipelineOption(beam_pipeline_options, runner_name, runner_option_override):
   runner_pipeline_option = ''
 
   if runner_name == 'dataflow':
@@ -102,22 +96,20 @@ def AddRunnerPipelineOption(beam_pipeline_options):
   if runner_name == 'direct':
     runner_pipeline_option = ('"--runner=DirectRunner"')
 
-  if runner_option_override is not None:
-    runner_pipeline_option = runner_option_override
+  if runner_option_override:
+    runner_pipeline_option = '--runner=' + runner_option_override
 
   if len(runner_pipeline_option) > 0:
     beam_pipeline_options.append(runner_pipeline_option)
 
 
-def AddFilesystemArgument(command):
-  filesystem_name = FLAGS.beam_filesystem
+def AddFilesystemArgument(command, filesystem_name):
 
   if filesystem_name == 'hdfs':
     command.append('-Dfilesystem=hdfs')
 
 
-def AddExtraProperties(command):
-  extra_properties = FLAGS.beam_extra_properties
+def AddExtraProperties(command, extra_properties):
 
   # TODO: For backwards compatibility only. Delete when beam_extra_mvn_properties is not used.
   if extra_properties is None:
@@ -157,9 +149,7 @@ def InitializeBeamRepo(benchmark_spec):
     vm_util.IssueCommand(git_clone_command, cwd=vm_util.GetTempDir())
 
   elif not os.path.exists(FLAGS.beam_location):
-    raise errors.Config.InvalidValue(
-      'Directory indicated by beam_location does not exist: {}.'.format(FLAGS.beam_location)
-    )
+    raise errors.Config.InvalidValue('Directory indicated by beam_location does not exist: {}.'.format(FLAGS.beam_location))
 
   _PrebuildBeam()
 
@@ -170,9 +160,9 @@ def _PrebuildBeam():
     build_command = [_GetGradleCommand()]
     build_command.extend(GRADLE_INSTALL_COMMAND_ARGS)
 
-    AddRunnerArgument(build_command)
-    AddFilesystemArgument(build_command)
-    AddExtraProperties(build_command)
+    AddRunnerArgument(build_command, FLAGS.beam_runner)
+    AddFilesystemArgument(build_command, FLAGS.beam_filesystem)
+    AddExtraProperties(build_command, FLAGS.beam_extra_properties)
 
     vm_util.IssueCommand(build_command, timeout=1500, cwd=_GetBeamDir())
 
@@ -220,8 +210,7 @@ def _BuildGradleCommand(classname, job_arguments):
   gradle_executable = _GetGradleCommand()
 
   if not vm_util.ExecutableOnPath(gradle_executable):
-    raise errors.Setup.MissingExecutableError(
-      'Could not find required executable "%s"' % gradle_executable)
+    raise errors.Setup.MissingExecutableError('Could not find required executable "%s"' % gradle_executable)
 
   cmd.append(gradle_executable)
   cmd.append('integrationTest')
@@ -233,10 +222,10 @@ def _BuildGradleCommand(classname, job_arguments):
 
   beam_args = job_arguments if job_arguments else []
 
-  AddRunnerArgument(cmd)
-  AddRunnerPipelineOption(beam_args)
-  AddFilesystemArgument(cmd)
-  AddExtraProperties(cmd)
+  AddRunnerArgument(cmd, FLAGS.beam_runner)
+  AddRunnerPipelineOption(beam_args, FLAGS.beam_runner, FLAGS.beam_runner_option)
+  AddFilesystemArgument(cmd, FLAGS.beam_filesystem)
+  AddExtraProperties(cmd, FLAGS.beam_extra_properties)
 
   cmd.append('-DintegrationTestPipelineOptions='
              '[{}]'.format(','.join(beam_args)))
@@ -263,8 +252,7 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
 
   python_executable = FLAGS.python_binary
   if not vm_util.ExecutableOnPath(python_executable):
-    raise errors.Setup.MissingExecutableError(
-      'Could not find required executable "%s"' % python_executable)
+    raise errors.Setup.MissingExecutableError('Could not find required executable "%s"' % python_executable)
   cmd.append(python_executable)
 
   cmd.append('setup.py')
@@ -291,6 +279,7 @@ def _BuildPythonCommand(benchmark_spec, modulename, job_arguments):
 
 def _GetGradleCommand():
   return FLAGS.gradle_binary or os.path.join(_GetBeamDir(), 'gradlew')
+
 
 def _GetBeamDir():
   # TODO: This is temporary, find a better way.
