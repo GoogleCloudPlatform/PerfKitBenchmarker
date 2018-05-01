@@ -195,3 +195,5 @@
 - Use flags['key'].parse(...) to set mocked flags in linux_virtual_machine_test
 - Cleanup some redundant logging and duplicate decoder statements.
 - Fixed build_tools package re-installation for speccpu2006.
+- Fixed fio job parsing, section parameters should always overrides global
+  job parameters.
