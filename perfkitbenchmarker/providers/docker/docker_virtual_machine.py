@@ -111,49 +111,48 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     ##create container object
     ##build local
     #containerImage = container_service._ContainerImage("ubuntu_simple")
-    
-    directory = os.path.dirname(
-      data.ResourcePath(os.path.join('docker', "ubuntu_simple", 'Dockerfile')))
-    self.image_name = "ubuntu_simple"
 
-    build_cmd = [
-        'docker', 'build', '--no-cache',
-        '-t', self.image_name, directory
-    ]
+    #TODO, replace this with removeIfExists type of command
+    #self._Delete()
+    
+    buildImage = False
+
+    if buildImage == True:
+      directory = os.path.dirname(
+        data.ResourcePath(os.path.join('docker', "ubuntu_simple", 'Dockerfile')))
+
+      self.image_name = "ubuntu_simple"
+
+      build_cmd = [
+          'docker', 'build', '--no-cache',
+          '-t', self.image_name, directory
+      ]
+
+      vm_util.IssueCommand(build_cmd)
 
     #TODO check if container built correctly
 
-    vm_util.IssueCommand(build_cmd)
-
-    create_command = ['docker', 'run', '-d', '--name', self.name, 'ubuntu_ssh:latest', '/usr/sbin/sshd', '-D']
-
+    create_command = ['docker', 'run', '-d', '--name', self.name, 
+                      'ubuntu_ssh:latest', '/usr/sbin/sshd', '-D']
     container_info, _, _ = vm_util.IssueCommand(create_command)
 
     self.container_id = container_info.encode("ascii")
-    logging.info(type(self.container_id))
+    logging.info("Container ID: %s", self.container_id)
 
-    
-
-    logging.info(container_info)
-
-    # exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-    #               'pod', '-o=json', self.name]
-    # pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
-    self._WaitForContainerBootCompletion()
-
-
-
-
+    #self._WaitForContainerBootCompletion()
 
   @vm_util.Retry()
   def _PostCreate(self):
+
+    self._GetIpAddresses()
 
     copy_ssh_command = ['docker', 'cp', self.ssh_public_key,
                          '%s:/root/.ssh/authorized_keys' % self.name]
 
     vm_util.IssueCommand(copy_ssh_command)
 
-    chown_command = ['docker', 'exec', self.name, 'chown', 'root:root', '/root/.ssh/authorized_keys']
+    chown_command = ['docker', 'exec', self.name, 'chown',
+                     'root:root', '/root/.ssh/authorized_keys']
 
     vm_util.IssueCommand(chown_command)
 
@@ -174,58 +173,53 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return
 
-  @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
-  def _WaitForContainerBootCompletion(self):
-    """
-    Need to wait for the PODs to get up  - PODs are created with a little delay.
-    """
-    #exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-    #              'pod', '-o=json', self.name]
-    logging.info("Waiting for Container %s" % self.name)
-    #container_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
+  # @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
+  # def _WaitForContainerBootCompletion(self):
+  #   """
+  #   Need to wait for the Containers to spin up
+  #   """
+
+  #   #TODO Get this to work with container ID
+  #   exists_cmd = ['docker', 'inspect', self.name]
+  #   info, _, returnCode = vm_util.IssueCommand(exists_cmd)
     
-    #TODO Get this to work with container ID
-    exists_cmd = ['docker', 'inspect', self.name]
-    info, _, _ = vm_util.IssueCommand(exists_cmd)
-    
-    #print(info)
-    info = json.loads(info)
-    if len(info) > 0:
+  #   logging.info("RETURN CODE: " + str(returnCode))
+  #   #print(info)
+  #   info = json.loads(info)
+  #   if len(info) > 0:
       
-      status = info[0]['State']['Running']
-      self.internal_ip = info[0]['NetworkSettings']['IPAddress'].encode('ascii')
-      self.ip_address = self.internal_ip
-      print(status)
-      if status == "true" or status == True:
-        logging.info("Docker Container %s is up and running.", self.name)
-        return
-      raise Exception("Container %s is not running. Retrying to check status." %
-                    self.container_id)
+  #     status = info[0]['State']['Running']
+  #     self.internal_ip = info[0]['NetworkSettings']['IPAddress'].encode('ascii')
+  #     self.ip_address = self.internal_ip
+  #     print(status)
+  #     if status == "true" or status == True:
+  #       logging.info("Docker Container %s is up and running.", self.name)
+  #       return
+  #     raise Exception("Container %s is not running. Retrying to check status." %
+  #                   self.container_id)
 
-    else:
-      logging.warning("Info not found")
+  #   else:
+  #     logging.warning("Info not found")
 
 
-  @vm_util.Retry(poll_interval=10, max_retries=20)
+  @vm_util.Retry(poll_interval=10, max_retries=10)
   def _Exists(self):
     """
-    POD should have been already created but this is a double check.
+    Checks if Container has successful been created an is running
     """
     logging.info("Checking if Docker Container Exists")
     exists_cmd = ['docker', 'inspect', self.name]
-    info, _, _ = vm_util.IssueCommand(exists_cmd)
+    info, _, returnCode = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
+
+    #logging.info("RETURN CODE: " + str(returnCode))
 
     info = json.loads(info)
-    if len(info) > 0:
+    if len(info) > 0 and returnCode == 0:
       status = info[0]['State']['Running']
-      print(status)
-      if status == "true" or status == True:
+
+      if status == "True" or status == True:
         logging.info("Docker Container %s is up and running.", self.name)
         return True
-      else:
-        return False
-      raise Exception("Container %s is not running. Retrying to check status." %
-                    self.container_id)
 
     return False
 
@@ -250,20 +244,47 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
   def DeleteScratchDisks(self):
     pass
 
-  def _GetInternalIp(self):
+  def _GetIpAddresses(self):
     
     """
-    Gets the Internal ip address.
+    Sets the internal and external IP address for the Container.
     """
-    #pod_ip = kubernetes_helper.Get(
-    #    'pods', self.name, '', '.status.podIP')
+    
+    #TODO Get this to work with container ID
+    getIP_cmd = ['docker', 'inspect', self.name]
+    info, _, returnCode = vm_util.IssueCommand(getIP_cmd)
+    
+    #print(info)
+    info = json.loads(info)
+    ip = False
 
+    if len(info) > 0 and returnCode == 0:
 
-    pod_ip = False
-    if not pod_ip:
-      raise Exception("Internal POD IP address not found. Retrying.")
+      ip = info[0]['NetworkSettings']['IPAddress'].encode('ascii')
+      logging.info("IP: " + str(ip))
+      self.ip_address = ip
+      self.internal_ip = ip
+      #print(status)
 
-    self.internal_ip = pod_ip
+    else:
+      logging.warning("Info not found")
+
+  def _RemoveIfExists(self):
+    if self._Exists():
+      self._Delete()
+
+  def _GetContainerInfo(self):
+    """
+    Gets Container information from Docker Inspect. Returns the information, 
+    if there is any and a return code. 0  
+    """
+    logging.info("Finding Container Information")
+    inspect_cmd = ['docker', 'inspect', self.name]
+    info, _, returnCode = vm_util.IssueCommand(inspect_cmd, suppress_warning=True)
+
+    info = json.loads(info)
+
+    return info, returnCode
 
   def _ConfigureProxy(self):
     """
