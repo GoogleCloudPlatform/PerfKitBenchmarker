@@ -899,6 +899,7 @@ class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL
+  BASE_OS_TYPE = os_types.RHEL
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -1021,6 +1022,7 @@ class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
   OS_TYPE = os_types.DEBIAN
+  BASE_OS_TYPE = os_types.DEBIAN
 
   def __init__(self, *args, **kwargs):
     super(DebianMixin, self).__init__(*args, **kwargs)

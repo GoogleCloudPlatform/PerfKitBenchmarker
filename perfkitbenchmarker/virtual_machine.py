@@ -31,6 +31,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flags
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -492,6 +493,7 @@ class BaseOsMixin(object):
 
   __metaclass__ = abc.ABCMeta
   OS_TYPE = None
+  BASE_OS_TYPE = None
 
   def __init__(self):
     super(BaseOsMixin, self).__init__()
@@ -509,6 +511,8 @@ class BaseOsMixin(object):
     self._total_memory_kb = None
     self._num_cpus = None
     self.os_metadata = {}
+    if self.OS_TYPE:
+      assert self.BASE_OS_TYPE in os_types.BASE_OS_TYPES
 
   def GetOSResourceMetadata(self):
     """Returns a dict containing VM OS metadata.
