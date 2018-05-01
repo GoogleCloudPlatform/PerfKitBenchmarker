@@ -57,9 +57,9 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
           attr for attr in cls.REQUIRED_ATTRS if getattr(cls, attr) is None]
       if unset_attrs:
         raise Exception(
-            'Subclasses of %s must have the following attrs set: %s. The '
-            'following attrs were not set: %s.' %
-            (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, unset_attrs))
+            'Subclasses of %s must have the following attrs set: %s. For %s '
+            'the following attrs were not set: %s.' %
+            (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, cls.__name__, unset_attrs))
       key = [cls.RESOURCE_TYPE]
       key += sorted([(attr, getattr(cls, attr)) for attr in cls.REQUIRED_ATTRS])
       _RESOURCE_REGISTRY[tuple(key)] = cls
