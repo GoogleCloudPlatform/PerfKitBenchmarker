@@ -111,7 +111,7 @@
 - Preliminary support for NFS file systems
 - Added BigQuery provider implementation to extend the edw benchmarking in Perfkitbenchmarker.
 - Added support for authorizing gcloud to access Cloud Platform with a Google service account.
-
+- Added support for specification of resource specific ready timeouts.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
