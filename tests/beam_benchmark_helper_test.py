@@ -17,103 +17,82 @@
 import unittest
 
 from perfkitbenchmarker import beam_benchmark_helper
-from perfkitbenchmarker import dpb_service
 
 
 class BeamBenchmarkHelperTestCase(unittest.TestCase):
-  def test_runner_option_override_non_dataflow(self):
-    # This is documenting the current behavior - when we add an EMR
-    # service_type, this test should change.
-    actual_options = []
-    beam_benchmark_helper.AddRunnerOptionMvnArgument(
-        dpb_service.EMR, actual_options, None)
-    self.assertListEqual([], actual_options)
-
-
-  def test_runner_option_override_dataflow(self):
-    actual_options = []
-    beam_benchmark_helper.AddRunnerOptionMvnArgument(
-        dpb_service.DATAFLOW, actual_options, None)
-    self.assertListEqual(['"--runner=TestDataflowRunner"'], actual_options)
-
 
   def test_runner_option_override_use_override(self):
-    testOptionVal = "--runner=TestVal"
+    testOptionVal = "TestVal"
     actual_options = []
-    beam_benchmark_helper.AddRunnerOptionMvnArgument(
-        dpb_service.DATAFLOW, actual_options, testOptionVal)
-    self.assertListEqual([testOptionVal], actual_options)
-
+    beam_benchmark_helper.AddRunnerPipelineOption(actual_options, None, testOptionVal)
+    self.assertListEqual(["--runner=" + testOptionVal], actual_options)
 
   def test_runner_option_override_empty_override(self):
     testOptionVal = ""
     actual_options = []
-    beam_benchmark_helper.AddRunnerOptionMvnArgument(
-        dpb_service.DATAFLOW, actual_options, testOptionVal)
+    beam_benchmark_helper.AddRunnerPipelineOption(actual_options, None, testOptionVal)
     self.assertListEqual([], actual_options)
 
+  def test_dataflow_runner_name_added(self):
+    testOptionVal = "dataflow"
+    actual_command = []
+    beam_benchmark_helper.AddRunnerArgument(actual_command, testOptionVal)
+    self.assertListEqual(["-DintegrationTestRunner=" + testOptionVal], actual_command)
 
-  def test_runner_profile_override_dataflow(self):
-    actual_mvn_command = []
-    beam_benchmark_helper.AddRunnerProfileMvnArgument(
-        dpb_service.DATAFLOW, actual_mvn_command, None)
-    self.assertListEqual(['-Pdataflow-runner'], actual_mvn_command)
-
-
-  def test_runner_profile_override_non_dataflow(self):
-    # This is documenting the current behavior - when we add an EMR
-    # service_type, this test should change.
-    actual_mvn_command = []
-    beam_benchmark_helper.AddRunnerProfileMvnArgument(
-        dpb_service.EMR, actual_mvn_command, None)
-    self.assertListEqual([], actual_mvn_command)
+  def test_direct_runner_name_added(self):
+    testOptionVal = "direct"
+    actual_command = []
+    beam_benchmark_helper.AddRunnerArgument(actual_command, testOptionVal)
+    self.assertListEqual(["-DintegrationTestRunner=" + testOptionVal], actual_command)
 
 
-  def test_runner_profile_override_use_override(self):
-    testOptionVal = "testval"
-    actual_mvn_command = []
-    beam_benchmark_helper.AddRunnerProfileMvnArgument(
-        dpb_service.DATAFLOW, actual_mvn_command, testOptionVal)
-    self.assertListEqual(['-P' + testOptionVal], actual_mvn_command)
-
-
-  def test_runner_profile_override_empty_override(self):
+  def test_runner_name_empty(self):
     testOptionVal = ""
-    actual_mvn_command = []
-    beam_benchmark_helper.AddRunnerProfileMvnArgument(
-        dpb_service.DATAFLOW, actual_mvn_command, testOptionVal)
-    self.assertListEqual([], actual_mvn_command)
+    actual_command = []
+    beam_benchmark_helper.AddRunnerArgument(actual_command, testOptionVal)
+    self.assertListEqual([], actual_command)
 
-  def test_extra_mvn_property_empty_property(self):
+  def test_extra_property_empty_property(self):
     testOptionVal = ""
-    actual_mvn_command = []
-    beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
-    self.assertListEqual([], actual_mvn_command)
+    actual_command = []
+    beam_benchmark_helper.AddExtraProperties(actual_command, testOptionVal)
+    self.assertListEqual([], actual_command)
 
-  def test_extra_mvn_property_single_property(self):
+  def test_extra_property_single_property(self):
     testOptionVal = "[key=value]"
     actual_mvn_command = []
-    beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+    beam_benchmark_helper.AddExtraProperties(actual_mvn_command, testOptionVal)
     self.assertListEqual(["-Dkey=value"], actual_mvn_command)
 
-  def test_extra_mvn_property_single_property_quoted(self):
+  def test_extra_property_single_property_quoted(self):
     testOptionVal = "[\"key=value\"]"
     actual_mvn_command = []
-    beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+    beam_benchmark_helper.AddExtraProperties(actual_mvn_command, testOptionVal)
     self.assertListEqual(["-Dkey=value"], actual_mvn_command)
 
-  def test_extra_mvn_property_multiple_properties(self):
+  def test_extra_property_multiple_properties(self):
     testOptionVal = "[\"key=value\", \"key2=value2\"]"
     actual_mvn_command = []
-    beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+    beam_benchmark_helper.AddExtraProperties(actual_mvn_command, testOptionVal)
     self.assertListEqual(["-Dkey=value", "-Dkey2=value2"], actual_mvn_command)
 
   def test_integrationPipelineOptions_rejection(self):
     testOptionVal = "[\"integrationTestPipelineOptions=...\"]"
     actual_mvn_command = []
     with self.assertRaises(ValueError):
-      beam_benchmark_helper.AddExtraMvnProperties(actual_mvn_command, testOptionVal)
+      beam_benchmark_helper.AddExtraProperties(actual_mvn_command, testOptionVal)
 
+  def test_hdfs_filesystem_addition(self):
+    testOptionVal = "hdfs"
+    actual_command = []
+    beam_benchmark_helper.AddFilesystemArgument(actual_command, testOptionVal)
+    self.assertListEqual(["-Dfilesystem=hdfs"], actual_command)
+
+  def test_empty_filesystem(self):
+    testOptionVal = ""
+    actual_command = []
+    beam_benchmark_helper.AddFilesystemArgument(actual_command, testOptionVal)
+    self.assertListEqual([], actual_command)
 
 if __name__ == '__main__':
   unittest.main()
