@@ -19,7 +19,6 @@ configuration files.
 
 import contextlib
 import copy
-import logging
 import os
 
 from perfkitbenchmarker import cloud_redis
@@ -291,7 +290,6 @@ class _EdwServiceDecoder(option_decoders.TypeVerifier):
   def __init__(self, **kwargs):
     super(_EdwServiceDecoder, self).__init__(
         valid_types=(dict,), **kwargs)
-    logging.info('Initializing the edw service decoder')
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies edw service dictionary of a benchmark config object
@@ -353,9 +351,6 @@ class _EdwServiceSpec(spec.BaseSpec):
             'none_ok': True}),
         'concurrency': (option_decoders.IntDecoder, {
             'default': 5,
-            'none_ok': True}),
-        'endpoint': (option_decoders.StringDecoder, {
-            'default': None,
             'none_ok': True}),
         'db': (option_decoders.StringDecoder, {
             'default': None,

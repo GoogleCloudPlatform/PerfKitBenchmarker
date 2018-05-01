@@ -455,7 +455,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     pass
 
   @vm_util.Retry()
-  def FormatDisk(self, device_path):
+  def FormatDisk(self, device_path, disk_type=None):
     """Formats a disk attached to the VM."""
     # Some images may automount one local disk, but we don't
     # want to fail if this wasn't the case.
@@ -464,25 +464,27 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                '^has_journal -t ext4 -b 4096 %s' % device_path)
     self.RemoteHostCommand(fmt_cmd)
 
-  def MountDisk(self, device_path, mount_path):
+  def MountDisk(self, device_path, mount_path, disk_type=None,
+                mount_options=disk.DEFAULT_MOUNT_OPTIONS,
+                fstab_options=disk.DEFAULT_FSTAB_OPTIONS):
     """Mounts a formatted disk in the VM."""
-    mount_opts = _DEFAULT_DISK_MOUNT_OPTIONS
+    mount_options = '-o %s' % mount_options if mount_options else ''
+    fstab_options = fstab_options or ''
     fs_type = _DEFAULT_DISK_FS_TYPE
-    fstab_opts = _DEFAULT_DISK_FSTAB_OPTIONS
     mnt_cmd = ('sudo mkdir -p {mount_path};'
-               'sudo mount {mount_cmd_opts} {device_path} {mount_path};'
+               'sudo mount {mount_options} {device_path} {mount_path} && '
                'sudo chown -R $USER:$USER {mount_path};').format(
                    mount_path=mount_path,
                    device_path=device_path,
-                   mount_cmd_opts='-o %s' % mount_opts)
+                   mount_options=mount_options)
     self.RemoteHostCommand(mnt_cmd)
     # add to /etc/fstab to mount on reboot
-    mnt_cmd = ('echo "{device_path} {mount_path} {fs_type} {fstab_opts}" '
+    mnt_cmd = ('echo "{device_path} {mount_path} {fs_type} {fstab_options}" '
                '| sudo tee -a /etc/fstab').format(
                    device_path=device_path,
                    mount_path=mount_path,
                    fs_type=fs_type,
-                   fstab_opts=fstab_opts)
+                   fstab_options=fstab_options)
     self.RemoteHostCommand(mnt_cmd)
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
@@ -831,8 +833,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.StripeDisks(device_paths, data_disk.GetDevicePath())
 
     if disk_spec.mount_point:
-      self.FormatDisk(data_disk.GetDevicePath())
-      self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point)
+      self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)
+      self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point,
+                     disk_spec.disk_type, data_disk.mount_options,
+                     data_disk.fstab_options)
 
   def StripeDisks(self, devices, striped_device):
     """Raids disks together using mdadm.
@@ -895,6 +899,7 @@ class RhelMixin(BaseLinuxMixin):
   """Class holding RHEL specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL
+  BASE_OS_TYPE = os_types.RHEL
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -1017,6 +1022,7 @@ class DebianMixin(BaseLinuxMixin):
   """Class holding Debian specific VM methods and attributes."""
 
   OS_TYPE = os_types.DEBIAN
+  BASE_OS_TYPE = os_types.DEBIAN
 
   def __init__(self, *args, **kwargs):
     super(DebianMixin, self).__init__(*args, **kwargs)
@@ -1176,6 +1182,11 @@ class Ubuntu1604Mixin(DebianMixin):
 class Ubuntu1710Mixin(DebianMixin):
   """Class holding Ubuntu1710 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1710
+
+
+class Ubuntu1604Cuda9Mixin(DebianMixin):
+  """Class holding NVIDIA CUDA specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1604_CUDA9
 
 
 class ContainerizedDebianMixin(DebianMixin):

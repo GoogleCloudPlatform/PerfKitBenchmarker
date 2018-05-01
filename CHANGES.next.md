@@ -13,10 +13,12 @@
 - Migrated cluster boot benchmark default machines to 'default_dual_core'.
 - Changed metric name in mnist and inception3.
 - Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
+- Updated GCP sole tenancy support.  Removed `gcp_host_type` added
+  `gcp_node_type`.
 
 ### New features:
-- Windows benchmarks can now be run from linux controllers
-- MXNet benchmarks can now be run from linux controllers
+- Windows benchmarks can now be run from linux controllers.
+- MXNet benchmarks can now be run from linux controllers.
 - Added initial support for preprovisioning benchmark binaries in the cloud,
   if binaries are not located in local /data directory.
 - YCSB benchmark for Cloud Redis in GCP, Elasticache Redis in AWS, and
@@ -46,6 +48,8 @@
 - Added the ability to pass arbitrary parameters to tf_cnn_benchmarks.py in the
   Tensorflow benchmark, through the `benchmark_args` flag.
 - Added hdrhistogram support to ycsb package.
+- Added support for custom machine types on GKE.
+- Added `container_cluster_version` flag to container_service.py.
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -63,6 +67,7 @@
 - Add support for SPECspeed.
 - Add new `os_types` Centos7, Debian9, Ubuntu1404, Ubuntu1604, and Ubuntu1710.
 - Make it easier to RDP to PKB VMs
+- Add `os_type` support to KubernetesVirtualMachine.
 - Avoid setting up thread pool etc when run_processes is set
   to 1 and using --run_with_pdb flag to simplify debugging.
 - Added a sample benchmark for descriptive purposes.
@@ -102,6 +107,11 @@
 - Added 50kb per payload ycsb workload.
 - Added `num_cpus` to virtual_machine published metadata.
 - Added a timeout to RobustRemoteCommand.
+- Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
+- Preliminary support for NFS file systems
+- Added BigQuery provider implementation to extend the edw benchmarking in Perfkitbenchmarker.
+- Added support for authorizing gcloud to access Cloud Platform with a Google service account.
+
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -170,3 +180,18 @@
 - Updated default Tensorflow tf_cnn_benchmarks version to a commit dated April
   2, 2018.
 - Fixed a bug in which boto could not be uninstalled on newer GCE images.
+- Update each ycsb workload to have its own recordcount configuration if
+  ycsb_record_count is not set.
+- Fixed treatment of the boot time metric so that it is more like any other run
+  stage metric.
+- Fixed bug of modifying the providers/aws/util.AWS_PREFIX value.
+- Made failures of 'aws ec2 run-instances' fail PKB quickly.
+- Fix Kubernetes StorageClass deletion
+- Added `git` installation to `tensorflow_serving` package.
+- MountDisk throws exception if mounting the disk fails.
+- Added support for preprovisioned benchmark data on KubernetesVirtualMachines.
+- Refactored speccpu2006 benchmark to use common elements for both
+  speccpu2006 and speccpu2017.
+- Use flags['key'].parse(...) to set mocked flags in linux_virtual_machine_test
+- Cleanup some redundant logging and duplicate decoder statements.
+- Fixed build_tools package re-installation for speccpu2006.

@@ -64,6 +64,7 @@ STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
 class WindowsMixin(virtual_machine.BaseOsMixin):
 
   OS_TYPE = os_types.WINDOWS
+  BASE_OS_TYPE = os_types.WINDOWS
 
   def __init__(self):
     super(WindowsMixin, self).__init__()

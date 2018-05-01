@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for speccpu2006_benchmark."""
+"""Tests for speccpu."""
 
 import unittest
+import mock
 
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
-from perfkitbenchmarker.linux_benchmarks import speccpu2006_benchmark
+from perfkitbenchmarker.linux_packages import speccpu
 
 TEST_OUTPUT_SPECINT = """
 =============================================
@@ -322,56 +324,58 @@ EXPECTED_SPEED_RESULT_SPECINT = [
 ]
 
 
-class DummyVM(object):
-
-  def __init__(self):
-    pass
-
-
 class Speccpu2006BenchmarkTestCase(unittest.TestCase,
                                    test_util.SamplesTestMixin):
 
   def testParseResultsC(self):
     self.maxDiff = None
 
-    vm = DummyVM()
+    vm = mock.Mock(vm=linux_virtual_machine.DebianMixin)
+    spec_test_config = speccpu.SpecInstallConfigurations()
+    spec_test_config.benchmark_name = 'speccpu2006'
+    spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
+    vm.speccpu_vm_state = spec_test_config
 
-    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_SPECINT, vm,
-                                                  False, False)
+    samples = speccpu._ExtractScore(TEST_OUTPUT_SPECINT, vm,
+                                    False, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_SPECINT)
 
-    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_SPECFP, vm,
-                                                  False, False)
+    samples = speccpu._ExtractScore(TEST_OUTPUT_SPECFP, vm,
+                                    False, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_SPECFP)
 
     # By default, incomplete results result in error.
     with self.assertRaises(errors.Benchmarks.RunError):
-      samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD1, vm,
-                                                    False, False)
+      samples = speccpu._ExtractScore(TEST_OUTPUT_BAD1, vm,
+                                      False, 'rate')
 
     with self.assertRaises(errors.Benchmarks.RunError):
-      samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD2, vm,
-                                                    False, False)
+      samples = speccpu._ExtractScore(TEST_OUTPUT_BAD2, vm,
+                                      False, 'rate')
 
     # Now use keep_partial_results
-    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD1, vm,
-                                                  True, False)
+    samples = speccpu._ExtractScore(TEST_OUTPUT_BAD1, vm,
+                                    True, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_BAD1)
 
-    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_BAD2, vm,
-                                                  True, False)
+    samples = speccpu._ExtractScore(TEST_OUTPUT_BAD2, vm,
+                                    True, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_BAD2)
 
     # Estimate scores
-    samples = speccpu2006_benchmark._ExtractScore(TEST_OUTPUT_EST, vm,
-                                                  True, True)
+    speccpu.FLAGS.runspec_estimate_spec = True
+    samples = speccpu._ExtractScore(TEST_OUTPUT_EST, vm,
+                                    True, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_EST)
 
   def testParseSpeedResults(self):
     self.maxDiff = None
-    vm = DummyVM()
-    speccpu2006_benchmark.FLAGS.runspec_metric = 'speed'
-    samples = speccpu2006_benchmark._ExtractScore(SPEED_OUTPUT_SPECINT, vm,
-                                                  False, False)
+    vm = mock.Mock(vm=linux_virtual_machine.DebianMixin)
+    spec_test_config = speccpu.SpecInstallConfigurations()
+    spec_test_config.benchmark_name = 'speccpu2006'
+    spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
+    vm.speccpu_vm_state = spec_test_config
+    samples = speccpu._ExtractScore(SPEED_OUTPUT_SPECINT, vm,
+                                    False, 'speed')
     self.assertSampleListsEqualUpToTimestamp(
         samples, EXPECTED_SPEED_RESULT_SPECINT)
