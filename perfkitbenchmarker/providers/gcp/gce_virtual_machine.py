@@ -239,7 +239,8 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
                              'node-groups', 'create', self.name)
     cmd.flags['node-template'] = self.node_template.name
     cmd.flags['target-size'] = 1
-    cmd.Issue()
+    _, stderr, retcode = cmd.Issue()
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _CreateDependencies(self):
     super(GceSoleTenantNodeGroup, self)._CreateDependencies()
