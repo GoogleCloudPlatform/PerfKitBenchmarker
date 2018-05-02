@@ -25,6 +25,7 @@ except that this can target TPU.
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
+from perfkitbenchmarker.linux_packages import cloud_tpu_models
 from perfkitbenchmarker.linux_packages import tensorflow
 
 FLAGS = flags.FLAGS
@@ -67,8 +68,6 @@ flags.DEFINE_integer('inception3_train_steps_per_eval', 2000,
 flags.DEFINE_string('inception3_data_dir',
                     'gs://cloud-tpu-test-datasets/fake_imagenet',
                     'Directory where input data is stored')
-flags.DEFINE_string('inception3_model_dir', None,
-                    'Directory where model output is stored')
 flags.DEFINE_integer('inception3_save_checkpoints_secs', 0, 'Interval (in '
                      'seconds) at which the model data should be checkpointed. '
                      'Set to 0 to disable.')
@@ -104,7 +103,6 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.mode = FLAGS.inception3_mode
   benchmark_spec.train_steps_per_eval = FLAGS.inception3_train_steps_per_eval
   benchmark_spec.data_dir = FLAGS.inception3_data_dir
-  benchmark_spec.model_dir = FLAGS.inception3_model_dir
   benchmark_spec.save_checkpoints_secs = FLAGS.inception3_save_checkpoints_secs
   benchmark_spec.train_batch_size = FLAGS.inception3_train_batch_size
   benchmark_spec.eval_batch_size = FLAGS.inception3_eval_batch_size
@@ -112,6 +110,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
       ip=benchmark_spec.cloud_tpu.GetCloudTpuIp(),
       port=benchmark_spec.cloud_tpu.GetCloudTpuPort()
   ) if benchmark_spec.use_tpu else ''
+  benchmark_spec.commit = cloud_tpu_models.GetCommit(benchmark_spec.vms[0])
 
 
 def Prepare(benchmark_spec):
@@ -120,15 +119,8 @@ def Prepare(benchmark_spec):
   Args:
     benchmark_spec: The benchmark specification
   """
-  benchmark_spec.always_call_cleanup = True
+  mnist_benchmark.Prepare(benchmark_spec)
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
-  vm = benchmark_spec.vms[0]
-  # Use ml-images if you want to use TPU. ml-image has pre-installed TensorFlow
-  # and TPU models, which includes MNIST, Inception, ResNet etc. Those models
-  # can be run on CPU, GPU and TPU.
-  if not benchmark_spec.use_tpu:
-    vm.Install('tensorflow')
-    vm.Install('cloud_tpu_models')
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -154,7 +146,8 @@ def _CreateMetadataDict(benchmark_spec):
       'model_dir': benchmark_spec.model_dir,
       'save_checkpoints_secs': benchmark_spec.save_checkpoints_secs,
       'train_batch_size': benchmark_spec.train_batch_size,
-      'eval_batch_size': benchmark_spec.eval_batch_size
+      'eval_batch_size': benchmark_spec.eval_batch_size,
+      'commit': benchmark_spec.commit
   }
   return metadata
 
@@ -172,8 +165,6 @@ def Run(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
   inception3_benchmark_script = (
-      '/usr/share/tpu/models/experimental/inception/inception_v3.py' if
-      benchmark_spec.use_tpu else
       'tpu/models/experimental/inception/inception_v3.py')
   inception3_benchmark_cmd = (
       'python {script} '
@@ -213,6 +204,12 @@ def Run(benchmark_spec):
       _CreateMetadataDict(benchmark_spec), stdout + stderr)
 
 
-def Cleanup(unused_benchmark_spec):
-  """Cleanup Inception V3 on the cluster."""
-  pass
+def Cleanup(benchmark_spec):
+  """Cleanup Inception V3 on the cluster.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+  """
+  mnist_benchmark.Cleanup(benchmark_spec)
+
