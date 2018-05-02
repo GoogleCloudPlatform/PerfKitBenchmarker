@@ -836,12 +836,12 @@ class SampleCollector(object):
       self.metadata_providers = DEFAULT_METADATA_PROVIDERS
 
     self.publishers = publishers[:] if publishers else []
+    for publisher_class in EXTERNAL_PUBLISHERS:
+      self.publishers.append(publisher_class())
     if publishers_from_flags:
       self.publishers.extend(SampleCollector._PublishersFromFlags())
     if add_default_publishers:
       self.publishers.extend(SampleCollector._DefaultPublishers())
-    for publisher_class in EXTERNAL_PUBLISHERS:
-      self.publishers.append(publisher_class())
 
     logging.debug('Using publishers: {0}'.format(self.publishers))
 
