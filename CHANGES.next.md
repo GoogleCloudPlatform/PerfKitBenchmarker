@@ -201,3 +201,4 @@
 - Fixing the Redshift provider implementation to extend the edw benchmarking in pkb.
 - Support using --gcp_min_cpu_platform=none to clear --min-cpu-platform. This
   lets the flag override a benchmark spec.
+- Fix windows security protocol casting.
