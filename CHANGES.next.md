@@ -113,6 +113,8 @@
 - Added support for authorizing gcloud to access Cloud Platform with a Google service account.
 - Added support for specification of resource specific ready timeouts.
 - Adding runner utilities to execute multiple sql scripts on edw clusters.
+- TPU checkpoints and summaries are now stored in GCS.
+- Updated cloud TPU models version.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -203,3 +205,6 @@
 - Support using --gcp_min_cpu_platform=none to clear --min-cpu-platform. This
   lets the flag override a benchmark spec.
 - Fix windows security protocol casting.
+- Added '--iteration' to MNIST benchmark. The default value of 50 is too small
+  and can result in excessive communication overhead which negatively impacts
+  performance.
