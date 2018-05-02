@@ -309,7 +309,6 @@ class StorageClass(resource.BaseResource):
     :return: True or False
     """
 
-    body = self._BuildBody()
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'sc', '-o=json', self.name]
 
