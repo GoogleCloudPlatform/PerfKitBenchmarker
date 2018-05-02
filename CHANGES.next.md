@@ -88,6 +88,9 @@
 - Add more granularity to FAILED benchmarks with FailedSubstatus (GCP and AWS).
 - Update sysbench benchmark to version 1.0. (deprecate 0.4 and 0.5 versions)
 - Change GCP TPU command from alpha to beta.
+- Cloud Spanner: Added --cloud_spanner_instance and --cloud_spanner_database to
+  separate instance lifecycle from perfkit resource lifecycle. This allows
+  reusing instances and databases for benchmark. (GH-1461)
 - Update configurable parameters for ycsb benchmarks.
 - Added tags to AWS kops instances and increased loadbalancer timeout.
 - Allow cassandra_ycsb to run on a single vm.

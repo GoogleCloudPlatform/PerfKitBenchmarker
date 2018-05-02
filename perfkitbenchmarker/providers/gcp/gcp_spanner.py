@@ -81,7 +81,6 @@ class GcpSpannerInstance(resource.BaseResource):
     _, _, retcode = cmd.Issue()
     if retcode != 0:
       logging.error('Create GCP Spanner instance failed.')
-      return
 
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
                              self._database)
