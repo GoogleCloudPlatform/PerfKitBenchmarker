@@ -324,18 +324,18 @@ class StorageClass(resource.BaseResource):
         return False
 
   def _Create(self):
-    """Creates the PVC."""
+    """Creates the StorageClass."""
     body = self._BuildBody()
     if not self._CheckStorageClassExists():
       kubernetes_helper.CreateResource(body)
 
   def _Delete(self):
-    """Deletes the PVC."""
+    """Deletes the StorageClass."""
     body = self._BuildBody()
     kubernetes_helper.DeleteResource(body)
 
   def _BuildBody(self):
-    """Builds JSOM representing the StorageClass."""
+    """Builds JSON representing the StorageClass."""
     body = {
         'kind': 'StorageClass',
         'apiVersion': 'storage.k8s.io/v1',
