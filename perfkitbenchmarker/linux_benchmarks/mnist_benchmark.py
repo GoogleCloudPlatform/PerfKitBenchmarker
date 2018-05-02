@@ -15,7 +15,6 @@
 """Run MNIST benchmarks."""
 
 import copy
-import os
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
@@ -23,6 +22,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cloud_tpu_models
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import tensorflow
+from perfkitbenchmarker.providers.gcp import gcs
 
 FLAGS = flags.FLAGS
 
@@ -50,9 +50,10 @@ mnist:
 flags.DEFINE_string('mnist_train_file',
                     'gs://tfrc-test-bucket/mnist-records/train.tfrecords',
                     'mnist train file for tensorflow')
-flags.DEFINE_string('mnist_model_dir', None, 'Estimator model directory')
 flags.DEFINE_integer('mnist_train_steps', 2000,
                      'Total number of training steps')
+flags.DEFINE_integer('tpu_iterations', 500,
+                     'Number of iterations per TPU training loop.')
 
 
 def GetConfig(user_config):
@@ -75,13 +76,13 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   """
   benchmark_spec.train_file = FLAGS.mnist_train_file
   benchmark_spec.use_tpu = benchmark_spec.cloud_tpu is not None
-  benchmark_spec.model_dir = FLAGS.mnist_model_dir and os.path.join(
-      FLAGS.mnist_model_dir, FLAGS.run_uri)
   benchmark_spec.train_steps = FLAGS.mnist_train_steps
   benchmark_spec.master = 'grpc://{ip}:{port}'.format(
       ip=benchmark_spec.cloud_tpu.GetCloudTpuIp(),
       port=benchmark_spec.cloud_tpu.GetCloudTpuPort()
   ) if benchmark_spec.use_tpu else ''
+  benchmark_spec.iterations = FLAGS.tpu_iterations
+  benchmark_spec.gcp_service_account = FLAGS.gcp_service_account
 
 
 def Prepare(benchmark_spec):
@@ -96,6 +97,23 @@ def Prepare(benchmark_spec):
   if not benchmark_spec.use_tpu:
     vm.Install('tensorflow')
   vm.Install('cloud_tpu_models')
+  if benchmark_spec.use_tpu:
+    storage_service = gcs.GoogleCloudStorageService()
+    storage_service.PrepareVM(vm)
+    benchmark_spec.storage_service = storage_service
+    model_dir = 'gs://{}'.format(FLAGS.run_uri)
+    benchmark_spec.model_dir = model_dir
+    vm.RemoteCommand(
+        '{gsutil} mb {model_dir}'.format(
+            gsutil=vm.gsutil_path,
+            model_dir=benchmark_spec.model_dir), should_log=True)
+    vm.RemoteCommand(
+        '{gsutil} acl ch -u {service_account}:W {model_dir}'.format(
+            gsutil=vm.gsutil_path,
+            service_account=benchmark_spec.gcp_service_account,
+            model_dir=benchmark_spec.model_dir), should_log=True)
+  else:
+    benchmark_spec.model_dir = '/tmp'
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -108,15 +126,15 @@ def _CreateMetadataDict(benchmark_spec):
   Returns:
     metadata dict
   """
-  metadata = dict()
-  metadata['train_file'] = benchmark_spec.train_file
-  metadata['use_tpu'] = benchmark_spec.use_tpu
-  metadata['model_dir'] = benchmark_spec.model_dir
-  metadata['train_steps'] = benchmark_spec.train_steps
-  metadata['master'] = benchmark_spec.master
-  vm = benchmark_spec.vms[0]
-  metadata['commit'] = cloud_tpu_models.GetCommit(vm)
-  return metadata
+  return {
+      'train_file': benchmark_spec.train_file,
+      'use_tpu': benchmark_spec.use_tpu,
+      'model_dir': benchmark_spec.model_dir,
+      'train_steps': benchmark_spec.train_steps,
+      'master': benchmark_spec.master,
+      'commit': cloud_tpu_models.GetCommit(benchmark_spec.vms[0]),
+      'iterations': benchmark_spec.iterations
+  }
 
 
 def _ExtractThroughput(regex, output, metadata, metric, unit):
@@ -172,27 +190,42 @@ def Run(benchmark_spec):
   """
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
-  mnist_benchmark_dir = 'tpu/cloud_tpu/models/mnist'
+  mnist_benchmark_script = 'tpu/cloud_tpu/models/mnist/mnist.py'
   mnist_benchmark_cmd = (
-      'python mnist.py --master={master} --train_file={train_file} '
+      'python {script} '
+      '--master={master} '
+      '--train_file={train_file} '
       '--use_tpu={use_tpu} '
-      '--train_steps={train_steps}'.format(
+      '--train_steps={train_steps} '
+      '--iterations={iterations} '
+      '--model_dir={model_dir}'.format(
+          script=mnist_benchmark_script,
           master=benchmark_spec.master,
           train_file=benchmark_spec.train_file,
           use_tpu=benchmark_spec.use_tpu,
-          train_steps=benchmark_spec.train_steps))
-  if benchmark_spec.model_dir:
-    mnist_benchmark_cmd = '{cmd} --model_dir {model_dir}'.format(
-        cmd=mnist_benchmark_cmd, model_dir=benchmark_spec.model_dir)
+          train_steps=benchmark_spec.train_steps,
+          iterations=benchmark_spec.iterations,
+          model_dir=benchmark_spec.model_dir))
   if cuda_toolkit.CheckNvidiaGpuExists(vm):
-    mnist_benchmark_cmd = '%s %s' % (tensorflow.GetEnvironmentVars(vm),
-                                     mnist_benchmark_cmd)
-  run_command = 'cd %s && %s' % (mnist_benchmark_dir, mnist_benchmark_cmd)
-  stdout, stderr = vm.RobustRemoteCommand(run_command, should_log=True)
+    mnist_benchmark_cmd = '{env} {cmd}'.format(
+        env=tensorflow.GetEnvironmentVars(vm), cmd=mnist_benchmark_cmd)
+  stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_cmd,
+                                          should_log=True)
   return MakeSamplesFromOutput(_CreateMetadataDict(benchmark_spec),
                                stdout + stderr)
 
 
-def Cleanup(unused_benchmark_spec):
-  """Cleanup MNIST on the cluster."""
-  pass
+def Cleanup(benchmark_spec):
+  """Cleanup MNIST on the cluster.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+  """
+  if benchmark_spec.use_tpu:
+    vm = benchmark_spec.vms[0]
+    vm.RemoteCommand(
+        '{gsutil} rm -r {model_dir}'.format(
+            gsutil=vm.gsutil_path,
+            model_dir=benchmark_spec.model_dir), should_log=True)
+    benchmark_spec.storage_service.CleanupVM(vm)
