@@ -303,18 +303,39 @@ class StorageClass(resource.BaseResource):
     self.provisioner = provisioner
     self.parameters = parameters
 
+  def _CheckStorageClassExists(self):
+    """
+    Prevent duplicated StorageClass creation If the StorageClass with the same name and parameters exists
+    :return: True or False
+    """
+
+    exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
+                  'sc', '-o=json', self.name]
+
+    sc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
+    if sc_info:
+      sc_info = json.loads(sc_info)
+      sc_name = sc_info['metadata']['name']
+      if sc_name == self.name:
+        logging.info("StorageClass already exists.")
+        return True
+      else:
+        logging.info("About to create new StorageClass: {0}".format(self.name))
+        return False
+
   def _Create(self):
-    """Creates the PVC."""
+    """Creates the StorageClass."""
     body = self._BuildBody()
-    kubernetes_helper.CreateResource(body)
+    if not self._CheckStorageClassExists():
+      kubernetes_helper.CreateResource(body)
 
   def _Delete(self):
-    """Deletes the PVC."""
+    """Deletes the StorageClass."""
     body = self._BuildBody()
     kubernetes_helper.DeleteResource(body)
 
   def _BuildBody(self):
-    """Builds JSOM representing the StorageClass."""
+    """Builds JSON representing the StorageClass."""
     body = {
         'kind': 'StorageClass',
         'apiVersion': 'storage.k8s.io/v1',
