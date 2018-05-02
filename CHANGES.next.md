@@ -112,6 +112,7 @@
 - Added BigQuery provider implementation to extend the edw benchmarking in Perfkitbenchmarker.
 - Added support for authorizing gcloud to access Cloud Platform with a Google service account.
 - Added support for specification of resource specific ready timeouts.
+- Adding runner utilities to execute multiple sql scripts on edw clusters.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
