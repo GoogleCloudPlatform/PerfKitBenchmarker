@@ -198,3 +198,4 @@
 - Fixed fio job parsing, section parameters should always overrides global
   job parameters.
 - Refactored StaticVirtualMachines to use GetResourceClass() pattern.
+- Fixing the Redshift provider implementation to extend the edw benchmarking in pkb.
