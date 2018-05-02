@@ -332,4 +332,3 @@ class Redshift(edw_service.EdwService):
     """Redshift specific run script command components."""
     return '--host={} --database={} --user={} --password={}'.format(
         self.endpoint, self.db, self.user, self.password)
-
