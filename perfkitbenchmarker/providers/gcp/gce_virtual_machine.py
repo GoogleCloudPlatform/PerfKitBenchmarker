@@ -138,6 +138,9 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       if (flag_values.gcp_min_cpu_platform !=
           gcp_flags.GCP_MIN_CPU_PLATFORM_NONE):
         config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
+      else:
+        # Specifying gcp_min_cpu_platform explicitly removes any config.
+        config_values.pop('min_cpu_platform', None)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
