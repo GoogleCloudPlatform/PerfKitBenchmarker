@@ -212,4 +212,3 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   mnist_benchmark.Cleanup(benchmark_spec)
-
