@@ -238,6 +238,24 @@ class CephDisk(KubernetesDisk):
 class PersistentVolumeClaim(resource.BaseResource):
   """Object representing a K8s PVC."""
 
+  @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
+  def _WaitForPVCBoundCompletion(self):
+    """
+    Need to wait for the PVC to get up  - PVC may take some time to be ready(Bound).
+    """
+    exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
+                  'pvc', '-o=json', self.name]
+    logging.info("Waiting for PVC %s" % self.name)
+    pvc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
+    if pvc_info:
+      pvc_info = json.loads(pvc_info)
+      pvc = pvc_info['status']['phase']
+      if pvc == "Bound":
+        logging.info("PVC is ready.")
+        return
+    raise Exception("PVC %s is not ready. Retrying to check status." %
+                    self.name)
+
   def __init__(self, name, storage_class, size):
     super(PersistentVolumeClaim, self).__init__()
     self.name = name
@@ -248,6 +266,7 @@ class PersistentVolumeClaim(resource.BaseResource):
     """Creates the PVC."""
     body = self._BuildBody()
     kubernetes_helper.CreateResource(body)
+    self._WaitForPVCBoundCompletion()
 
   def _Delete(self):
     """Deletes the PVC."""
