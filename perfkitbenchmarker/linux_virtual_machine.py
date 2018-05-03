@@ -459,6 +459,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Formats a disk attached to the VM."""
     # Some images may automount one local disk, but we don't
     # want to fail if this wasn't the case.
+    if disk.NFS == disk_type:
+      return
     fmt_cmd = ('[[ -d /mnt ]] && sudo umount /mnt; '
                'sudo mke2fs -F -E lazy_itable_init=0,discard -O '
                '^has_journal -t ext4 -b 4096 %s' % device_path)
@@ -469,8 +471,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                 fstab_options=disk.DEFAULT_FSTAB_OPTIONS):
     """Mounts a formatted disk in the VM."""
     mount_options = '-o %s' % mount_options if mount_options else ''
+    if disk.NFS == disk_type:
+      mount_options = '-t nfs %s' % mount_options
+      fs_type = 'nfs'
+    else:
+      fs_type = _DEFAULT_DISK_FS_TYPE
     fstab_options = fstab_options or ''
-    fs_type = _DEFAULT_DISK_FS_TYPE
     mnt_cmd = ('sudo mkdir -p {mount_path};'
                'sudo mount {mount_options} {device_path} {mount_path} && '
                'sudo chown -R $USER:$USER {mount_path};').format(
