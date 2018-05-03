@@ -429,7 +429,7 @@ class NfsDisk(BaseDisk):
         'hard' if self.nfs_timeout_hard else 'soft': None,
         'rsize': self.nfs_rsize,
         'wsize': self.nfs_wsize,
-        'timeo': self.nfs_timeout * 10,  #  in decaseconds
+        'timeo': self.nfs_timeout * 10,  # in decaseconds
         'retrans': self.nfs_retries
     }
     # the client doesn't have to specify an NFS version to use (but should)
