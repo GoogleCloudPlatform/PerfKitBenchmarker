@@ -13,9 +13,6 @@ flags.DEFINE_string('host', None, 'Redshift host.')
 flags.DEFINE_string('database', None, 'Redshift Database.')
 flags.DEFINE_string('user', None, 'Redshift User.')
 flags.DEFINE_string('password', None, 'Redshift Password.')
-flags.DEFINE_string('script', None, 'SQL script which contains the query.')
-flags.DEFINE_string('logfile_suffix', 'log', 'Suffix to use for the output and '
-                                             'error files.')
 
 flags.mark_flags_as_required(['host', 'database', 'user', 'password'])
 
