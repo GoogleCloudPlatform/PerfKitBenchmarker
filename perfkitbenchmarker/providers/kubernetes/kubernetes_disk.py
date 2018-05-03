@@ -301,7 +301,6 @@ class StorageClass(resource.BaseResource):
     # If the StorageClass with the same name and parameters exists
     # :return: True or False
 
-
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'sc', '-o=json', self.name]
 
