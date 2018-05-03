@@ -84,7 +84,8 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #self._CreateVolumes()
 
   def _DeleteDependencies(self):
-    self._DeleteVolumes()
+    #self._DeleteVolumes()
+    pass
 
   def _Create(self):
     """Create a Docker instance"""
@@ -139,24 +140,23 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.container_id = container_info.encode("ascii")
     logging.info("Container ID: %s", self.container_id)
 
-    #self._WaitForContainerBootCompletion()
 
   @vm_util.Retry()
   def _PostCreate(self):
 
     self._GetIpAddresses()
 
+    #Copy ssh key to container to enable ssh login
     copy_ssh_command = ['docker', 'cp', self.ssh_public_key,
                          '%s:/root/.ssh/authorized_keys' % self.name]
-
     vm_util.IssueCommand(copy_ssh_command)
 
+    #change ownership of authorized_key file to root in container
     chown_command = ['docker', 'exec', self.name, 'chown',
                      'root:root', '/root/.ssh/authorized_keys']
-
     vm_util.IssueCommand(chown_command)
 
-    #self._ConfigureProxy()
+    self._ConfigureProxy()
     #self._SetupDevicesPaths()
 
   #TODO add checks to see if Delete fails
@@ -173,47 +173,16 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return
 
-  # @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
-  # def _WaitForContainerBootCompletion(self):
-  #   """
-  #   Need to wait for the Containers to spin up
-  #   """
-
-  #   #TODO Get this to work with container ID
-  #   exists_cmd = ['docker', 'inspect', self.name]
-  #   info, _, returnCode = vm_util.IssueCommand(exists_cmd)
-    
-  #   logging.info("RETURN CODE: " + str(returnCode))
-  #   #print(info)
-  #   info = json.loads(info)
-  #   if len(info) > 0:
-      
-  #     status = info[0]['State']['Running']
-  #     self.internal_ip = info[0]['NetworkSettings']['IPAddress'].encode('ascii')
-  #     self.ip_address = self.internal_ip
-  #     print(status)
-  #     if status == "true" or status == True:
-  #       logging.info("Docker Container %s is up and running.", self.name)
-  #       return
-  #     raise Exception("Container %s is not running. Retrying to check status." %
-  #                   self.container_id)
-
-  #   else:
-  #     logging.warning("Info not found")
-
 
   @vm_util.Retry(poll_interval=10, max_retries=10)
   def _Exists(self):
     """
     Checks if Container has successful been created an is running
     """
+    
+    info, returnCode = self._GetContainerInfo()
+
     logging.info("Checking if Docker Container Exists")
-    exists_cmd = ['docker', 'inspect', self.name]
-    info, _, returnCode = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
-
-    #logging.info("RETURN CODE: " + str(returnCode))
-
-    info = json.loads(info)
     if len(info) > 0 and returnCode == 0:
       status = info[0]['State']['Running']
 
@@ -230,16 +199,19 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     BEFORE containers creation because Kubernetes doesn't allow to attach
     volume to currently running containers.
     """
-    self.scratch_disks = kubernetes_disk.CreateDisks(self.disk_specs, self.name)
+    #self.scratch_disks = docker_disk.CreateDisks(self.disk_specs, self.name)
+    pass
+
 
   @vm_util.Retry(poll_interval=10, max_retries=20, log_errors=False)
   def _DeleteVolumes(self):
     """
     Deletes volumes.
     """
-    for scratch_disk in self.scratch_disks[:]:
-      scratch_disk.Delete()
-      self.scratch_disks.remove(scratch_disk)
+    # for scratch_disk in self.scratch_disks[:]:
+    #   scratch_disk.Delete()
+    #   self.scratch_disks.remove(scratch_disk)
+    pass
 
   def DeleteScratchDisks(self):
     pass
@@ -249,13 +221,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     Sets the internal and external IP address for the Container.
     """
-    
-    #TODO Get this to work with container ID
-    getIP_cmd = ['docker', 'inspect', self.name]
-    info, _, returnCode = vm_util.IssueCommand(getIP_cmd)
-    
-    #print(info)
-    info = json.loads(info)
+    info, returnCode = self._GetContainerInfo()
     ip = False
 
     if len(info) > 0 and returnCode == 0:
@@ -264,14 +230,15 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
       logging.info("IP: " + str(ip))
       self.ip_address = ip
       self.internal_ip = ip
-      #print(status)
 
     else:
-      logging.warning("Info not found")
+      logging.warning("IP address information not found")
+
 
   def _RemoveIfExists(self):
     if self._Exists():
       self._Delete()
+
 
   def _GetContainerInfo(self):
     """
@@ -286,6 +253,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return info, returnCode
 
+
   def _ConfigureProxy(self):
     """
     In Docker containers environment variables from /etc/environment
@@ -294,7 +262,6 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     solves the problem. Note: APPENDING to bashrc will not work because
     the script exits when it is NOT executed in interactive shell.
     """
-
     if FLAGS.http_proxy:
       http_proxy = "sed -i '1i export http_proxy=%s' /etc/bash.bashrc"
       self.RemoteCommand(http_proxy % FLAGS.http_proxy)
