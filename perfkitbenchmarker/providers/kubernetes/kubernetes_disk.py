@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Contains code related Kubernetes disk."""
+
 import json
 import logging
 import re
@@ -296,8 +298,8 @@ class StorageClass(resource.BaseResource):
 
   def _CheckStorageClassExists(self):
     """Prevent duplicated StorageClass creation."""
-#    If the StorageClass with the same name and parameters exists
-#    :return: True or False
+    # If the StorageClass with the same name and parameters exists
+    # :return: True or False
 
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'sc', '-o=json', self.name]
