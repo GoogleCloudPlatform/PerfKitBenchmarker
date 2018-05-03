@@ -17,25 +17,24 @@ import logging
 import re
 
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import flags
-from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import kubernetes_helper
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags
+from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
-from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT,\
-    OUTPUT_STDERR as STDERR, OUTPUT_EXIT_CODE as EXIT_CODE
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.vm_util import OUTPUT_EXIT_CODE as EXIT_CODE
+from perfkitbenchmarker.vm_util import OUTPUT_STDERR as STDERR
+from perfkitbenchmarker.vm_util import OUTPUT_STDOUT as STDOUT
 
 FLAGS = flags.FLAGS
 
 
 def CreateDisks(disk_specs, vm_name):
-  """
-  Creates instances of KubernetesDisk child classes depending on
-  scratch disk type.
-  """
+  """Creates instances of KubernetesDisk child classes."""
+  # Depending on scratch disk type.
   scratch_disks = []
   for disk_num, disk_spec in enumerate(disk_specs):
     disk_class = GetKubernetesDiskClass(disk_spec.disk_type)
@@ -46,7 +45,7 @@ def CreateDisks(disk_specs, vm_name):
 
 
 class KubernetesDiskSpec(disk.BaseDiskSpec):
-
+  """Kubernetes disk Spec class."""
   CLOUD = providers.KUBERNETES
 
   @classmethod
@@ -118,8 +117,8 @@ class KubernetesDisk(disk.BaseDisk):
 
   def AttachVolumeMountInfo(self, volume_mounts):
     volume_mount = {
-        "mountPath": self.mount_point,
-        "name": self.name
+        'mountPath': self.mount_point,
+        'name': self.name
     }
     volume_mounts.append(volume_mount)
 
@@ -132,17 +131,16 @@ class EmptyDirDisk(KubernetesDisk):
   K8S_VOLUME_TYPE = 'emptyDir'
 
   def GetDevicePath(self):
-    """
-    In case of LocalDisk, host's disk is mounted (empty directory from the
-    host is mounted to the docker instance) and we intentionally
-    prevent from formatting the device.
-    """
+    """Get device path."""
+    # In case of LocalDisk, host's disk is mounted (empty directory from the
+    # host is mounted to the docker instance) and we intentionally
+    # prevent from formatting the device.
     raise errors.Error('GetDevicePath not supported for Kubernetes local disk')
 
   def AttachVolumeInfo(self, volumes):
     local_volume = {
-        "name": self.name,
-        "emptyDir": {}
+        'name': self.name,
+        'emptyDir': {}
     }
     volumes.append(local_volume)
 
@@ -159,19 +157,17 @@ class CephDisk(KubernetesDisk):
     self.ceph_secret = FLAGS.ceph_secret
 
   def _Create(self):
-    """
-    Creates Rados Block Device volumes and installs filesystem on them.
-    """
+    """Creates Rados Block Device volumes and installs filesystem on them."""
     cmd = ['rbd', '-p', FLAGS.rbd_pool, 'create', self.name, '--size',
            str(1024 * self.disk_size)]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
-      raise Exception("Creating RBD image failed: %s" % output[STDERR])
+      raise Exception('Creating RBD image failed: %s' % output[STDERR])
 
     cmd = ['rbd', 'map', FLAGS.rbd_pool + '/' + self.name]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
-      raise Exception("Mapping RBD image failed: %s" % output[STDERR])
+      raise Exception('Mapping RBD image failed: %s' % output[STDERR])
     rbd_device = output[STDOUT].rstrip()
     if '/dev/rbd' not in rbd_device:
       # Sometimes 'rbd map' command doesn't return any output.
@@ -180,7 +176,7 @@ class CephDisk(KubernetesDisk):
       output = vm_util.IssueCommand(cmd)
       for image_device in output[STDOUT].split('\n'):
         if self.name in image_device:
-          pattern = re.compile("/dev/rbd.*")
+          pattern = re.compile('/dev/rbd.*')
           output = pattern.findall(image_device)
           rbd_device = output[STDOUT].rstrip()
           break
@@ -188,45 +184,41 @@ class CephDisk(KubernetesDisk):
     cmd = ['/sbin/mkfs.ext4', rbd_device]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
-      raise Exception("Formatting partition failed: %s" % output[STDERR])
+      raise Exception('Formatting partition failed: %s' % output[STDERR])
 
     cmd = ['rbd', 'unmap', rbd_device]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
-      raise Exception("Unmapping block device failed: %s" % output[STDERR])
+      raise Exception('Unmapping block device failed: %s' % output[STDERR])
 
   def _Delete(self):
-    """
-    Deletes RBD image.
-    """
+    """Deletes RBD image."""
     cmd = ['rbd', 'rm', FLAGS.rbd_pool + '/' + self.name]
     output = vm_util.IssueCommand(cmd)
     if output[EXIT_CODE] != 0:
-      msg = "Removing RBD image failed. Reattempting."
+      msg = 'Removing RBD image failed. Reattempting.'
       logging.warning(msg)
       raise Exception(msg)
 
   def AttachVolumeInfo(self, volumes):
     ceph_volume = {
-        "name": self.name,
-        "rbd": {
-            "monitors": FLAGS.ceph_monitors,
-            "pool": FLAGS.rbd_pool,
-            "image": self.name,
-            "keyring": FLAGS.ceph_keyring,
-            "user": FLAGS.rbd_user,
-            "fsType": "ext4",
-            "readOnly": False
+        'name': self.name,
+        'rbd': {
+            'monitors': FLAGS.ceph_monitors,
+            'pool': FLAGS.rbd_pool,
+            'image': self.name,
+            'keyring': FLAGS.ceph_keyring,
+            'user': FLAGS.rbd_user,
+            'fsType': 'ext4',
+            'readOnly': False
         }
     }
     if FLAGS.ceph_secret:
-      ceph_volume["rbd"]["secretRef"] = {"name": FLAGS.ceph_secret}
+      ceph_volume['rbd']['secretRef'] = {'name': FLAGS.ceph_secret}
     volumes.append(ceph_volume)
 
   def SetDevicePath(self, vm):
-    """
-    Retrieves the path to scratch disk device.
-    """
+    """Retrieves the path to scratch disk device."""
     cmd = "mount | grep %s | tr -s ' ' | cut -f 1 -d ' '" % self.mount_point
     device, _ = vm.RemoteCommand(cmd)
     self.device_path = device.rstrip()
@@ -240,20 +232,19 @@ class PersistentVolumeClaim(resource.BaseResource):
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
   def _WaitForPVCBoundCompletion(self):
-    """
-    Need to wait for the PVC to get up  - PVC may take some time to be ready(Bound).
-    """
+    """Need to wait for the PVC to get up."""
+    # PVC may take some time to be ready(Bound).
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pvc', '-o=json', self.name]
-    logging.info("Waiting for PVC %s" % self.name)
+    logging.info('Waiting for PVC %s', self.name)
     pvc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
     if pvc_info:
       pvc_info = json.loads(pvc_info)
       pvc = pvc_info['status']['phase']
-      if pvc == "Bound":
-        logging.info("PVC is ready.")
+      if pvc == 'Bound':
+        logging.info('PVC is ready.')
         return
-    raise Exception("PVC %s is not ready. Retrying to check status." %
+    raise Exception('PVC %s is not ready. Retrying to check status.' %
                     self.name)
 
   def __init__(self, name, storage_class, size):
@@ -303,18 +294,38 @@ class StorageClass(resource.BaseResource):
     self.provisioner = provisioner
     self.parameters = parameters
 
+  def _CheckStorageClassExists(self):
+    """Prevent duplicated StorageClass creation."""
+#    If the StorageClass with the same name and parameters exists
+#    :return: True or False
+
+    exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
+                  'sc', '-o=json', self.name]
+
+    sc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True)
+    if sc_info:
+      sc_info = json.loads(sc_info)
+      sc_name = sc_info['metadata']['name']
+      if sc_name == self.name:
+        logging.info('StorageClass already exists.')
+        return True
+      else:
+        logging.info('About to create new StorageClass: %s', self.name)
+        return False
+
   def _Create(self):
-    """Creates the PVC."""
+    """Creates the StorageClass."""
     body = self._BuildBody()
-    kubernetes_helper.CreateResource(body)
+    if not self._CheckStorageClassExists():
+      kubernetes_helper.CreateResource(body)
 
   def _Delete(self):
-    """Deletes the PVC."""
+    """Deletes the StorageClass."""
     body = self._BuildBody()
     kubernetes_helper.DeleteResource(body)
 
   def _BuildBody(self):
-    """Builds JSOM representing the StorageClass."""
+    """Builds JSON representing the StorageClass."""
     body = {
         'kind': 'StorageClass',
         'apiVersion': 'storage.k8s.io/v1',

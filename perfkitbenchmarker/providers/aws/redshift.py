@@ -87,7 +87,7 @@ class RedshiftClusterSubnetGroup(object):
                              self.subnet_id]
     vm_util.IssueCommand(cmd)
 
-  def _Delete(self):
+  def Delete(self):
     """Delete a redshift cluster subnet group."""
     cmd = self.cmd_prefix + ['redshift',
                              'delete-cluster-subnet-group',
@@ -134,7 +134,7 @@ class RedshiftClusterParameterGroup(object):
                                              wlm_concurrency_parameter_postfix)]
     vm_util.IssueCommand(cmd)
 
-  def _Delete(self):
+  def Delete(self):
     """Delete a redshift cluster parameter group."""
     cmd = self.cmd_prefix + ['redshift',
                              'delete-cluster-parameter-group',
@@ -316,8 +316,8 @@ class Redshift(edw_service.EdwService):
 
   def _DeleteDependencies(self):
     """Delete dependencies of a redshift cluster."""
-    self.cluster_subnet_group._Delete()
-    self.cluster_parameter_group._Delete()
+    self.cluster_subnet_group.Delete()
+    self.cluster_parameter_group.Delete()
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
@@ -332,4 +332,3 @@ class Redshift(edw_service.EdwService):
     """Redshift specific run script command components."""
     return '--host={} --database={} --user={} --password={}'.format(
         self.endpoint, self.db, self.user, self.password)
-
