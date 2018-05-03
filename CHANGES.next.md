@@ -208,3 +208,4 @@
 - Added '--iteration' to MNIST benchmark. The default value of 50 is too small
   and can result in excessive communication overhead which negatively impacts
   performance.
+- Added support for more AWS regions in the object storage benchmark.
