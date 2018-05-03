@@ -115,6 +115,7 @@
 - Adding runner utilities to execute multiple sql scripts on edw clusters.
 - TPU checkpoints and summaries are now stored in GCS.
 - Updated cloud TPU models version.
+- Support for cloud NFS services (no implementation).
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec

@@ -129,6 +129,20 @@ class TestDiskOperations(unittest.TestCase):
     self.vm.FormatDisk('dp')
     self.assertRemoteHostCalled(expected_command)
 
+  def testNfsMountDisk(self):
+    mkdir_cmd = ('sudo mkdir -p mp;'
+                 'sudo mount -t nfs -o hard,ro dp mp && '
+                 'sudo chown -R $USER:$USER mp;')
+    fstab_cmd = 'echo "dp mp nfs ro" | sudo tee -a /etc/fstab'
+    self.vm.MountDisk('dp', 'mp',
+                      disk_type='nfs', mount_options='hard,ro',
+                      fstab_options='ro')
+    self.assertRemoteHostCalled(mkdir_cmd, fstab_cmd)
+
+  def testNfsFormatDisk(self):
+    self.vm.FormatDisk('dp', disk_type='nfs')
+    self.assertRemoteHostCalled()  # no format disk command executed
+
 
 if __name__ == '__main__':
   unittest.main()
