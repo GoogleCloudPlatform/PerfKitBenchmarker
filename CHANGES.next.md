@@ -209,3 +209,4 @@
   and can result in excessive communication overhead which negatively impacts
   performance.
 - Added support for more AWS regions in the object storage benchmark.
+- Add ability to skip known failing scripts when running edw profiles.
