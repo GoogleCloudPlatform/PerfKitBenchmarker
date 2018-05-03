@@ -35,6 +35,7 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import managed_relational_db
+from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
@@ -130,6 +131,7 @@ class BenchmarkSpec(object):
     self.cloud_tpu = None
     self.edw_service = None
     self.cloud_redis = None
+    self.nfs_service = None
     self._zone_index = 0
 
     # Modules can't be pickled, but functions can, so we store the functions
@@ -233,6 +235,27 @@ class BenchmarkSpec(object):
     providers.LoadProvider(cloud)
     cloud_redis_class = cloud_redis.GetCloudRedisClass(cloud)
     self.cloud_redis = cloud_redis_class(self.config.cloud_redis)
+
+  def ConstructNfsService(self):
+    """Construct the NFS service object.
+
+    Creates an NFS Service only if an NFS disk is found in the disk_specs.
+    """
+    if self.nfs_service:
+      logging.info('NFS service already created: %s', self.nfs_service)
+      return
+    for group_spec in self.config.vm_groups.values():
+      if not group_spec.disk_spec:
+        continue
+      disk_spec = group_spec.disk_spec
+      if disk_spec.disk_type != disk.NFS:
+        continue
+      cloud = group_spec.cloud
+      providers.LoadProvider(cloud)
+      nfs_class = nfs_service.GetNfsServiceClass(cloud)
+      self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)
+      logging.info('NFS service %s', self.nfs_service)
+      break
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
@@ -411,6 +434,10 @@ class BenchmarkSpec(object):
     if self.container_cluster:
       self.container_cluster.Create()
 
+    # do after network setup but before VM created
+    if self.nfs_service:
+      self.nfs_service.Create()
+
     if self.vms:
       vm_util.RunThreaded(self.PrepareVm, self.vms)
       sshable_vms = [vm for vm in self.vms if vm.OS_TYPE != os_types.WINDOWS]
@@ -457,6 +484,8 @@ class BenchmarkSpec(object):
       self.cloud_tpu.Delete()
     if self.edw_service:
       self.edw_service.Delete()
+    if self.nfs_service:
+      self.nfs_service.Delete()
 
     if self.vms:
       try:
