@@ -120,9 +120,9 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if buildImage == True:
       directory = os.path.dirname(
-        data.ResourcePath(os.path.join('docker', "ubuntu_simple", 'Dockerfile')))
+        data.ResourcePath(os.path.join('docker', "ubuntu_ssh", 'Dockerfile')))
 
-      self.image_name = "ubuntu_simple"
+      self.image_name = "ubuntu_ssh"
 
       build_cmd = [
           'docker', 'build', '--no-cache',
@@ -134,7 +134,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
     #TODO check if container built correctly
 
     create_command = ['docker', 'run', '-d', '--name', self.name, 
-                      'ubuntu_ssh:latest', '/usr/sbin/sshd', '-D']
+                      'ubuntu_ssh:test', '/usr/sbin/sshd', '-D']
     container_info, _, _ = vm_util.IssueCommand(create_command)
 
     self.container_id = container_info.encode("ascii")
@@ -161,7 +161,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   #TODO add checks to see if Delete fails
   def _Delete(self):
-    """Delete Docker Instance"""
+    """Kill and Remove Docker Container"""
 
     delete_command = ['docker', 'kill', self.name]
     output = vm_util.IssueCommand(delete_command)
