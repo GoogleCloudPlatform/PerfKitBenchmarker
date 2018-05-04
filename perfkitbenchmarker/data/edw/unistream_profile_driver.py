@@ -40,7 +40,7 @@ def execute_profile(profile):
   for script_index in tpc_profile_details.profile_dictionary[profile]:
     logfile_suffix = '{}_{}'.format(profile, str(script_index))
     script = '{}.sql'.format(str(script_index))
-    script_performance = script_driver.one_script(script, logfile_suffix)
+    script_performance = script_driver.execute_script(script, logfile_suffix)
     execution_times.update(script_performance)
   execution_times['wall_time'] = round((time.time() - start_time), 2)
   return execution_times
