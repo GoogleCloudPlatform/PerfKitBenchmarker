@@ -24,13 +24,14 @@ import re
 import time
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import INSTALL_DIR
 
-HADOOP_VERSION = '2.8.1'
-HADOOP_URL = ('http://www.us.apache.org/dist/hadoop/common/hadoop-{0}/'
-              'hadoop-{0}.tar.gz').format(HADOOP_VERSION)
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string('hadoop_version', '2.8.3', 'Version of hadoop.')
 
 DATA_FILES = ['hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
               'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml',
@@ -57,9 +58,11 @@ def CheckPrerequisites():
 def _Install(vm):
   vm.Install('openjdk')
   vm.Install('curl')
+  hadoop_url = ('http://www.us.apache.org/dist/hadoop/common/hadoop-{0}/'
+                'hadoop-{0}.tar.gz').format(FLAGS.hadoop_version)
   vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
                     'tar -C {0} --strip-components=1 -xzf -').format(
-                        HADOOP_DIR, HADOOP_URL))
+                        HADOOP_DIR, hadoop_url))
 
 
 def YumInstall(vm):

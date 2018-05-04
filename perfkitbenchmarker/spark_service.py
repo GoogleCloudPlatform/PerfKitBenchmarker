@@ -207,6 +207,6 @@ class PkbSparkService(BaseSparkService):
     if job_type == HADOOP_JOB_TYPE:
       return posixpath.join(
           hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
-          'hadoop-mapreduce-examples-{0}.jar'.format(hadoop.HADOOP_VERSION))
+          'hadoop-mapreduce-examples-{0}.jar'.format(FLAGS.hadoop_version))
     else:
       raise NotImplemented()
