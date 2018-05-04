@@ -410,9 +410,11 @@ class NfsDisk(BaseDisk):
   Args:
     disk_spec: The disk spec.
     remote_mount_address: The host_address:/volume path to the NFS drive.
+    nfs_tier: The NFS tier / performance level of the server.
   """
 
-  def __init__(self, disk_spec, remote_mount_address, default_nfs_version=None):
+  def __init__(self, disk_spec, remote_mount_address, default_nfs_version=None,
+               nfs_tier=None):
     super(NfsDisk, self).__init__(disk_spec)
     self.nfs_version = disk_spec.nfs_version or default_nfs_version
     self.nfs_timeout_hard = disk_spec.nfs_timeout_hard
@@ -421,7 +423,10 @@ class NfsDisk(BaseDisk):
     self.nfs_timeout = disk_spec.nfs_timeout
     self.nfs_retries = disk_spec.nfs_retries
     self.device_path = remote_mount_address
-    self.metadata.update(self._GetNfsMountOptionsDict())
+    for key, value in self._GetNfsMountOptionsDict().iteritems():
+      self.metadata['nfs_{}'.format(key)] = value
+    if nfs_tier:
+      self.metadata['nfs_tier'] = nfs_tier
 
   def _GetNfsMountOptionsDict(self):
     """Default NFS mount options as a dict."""

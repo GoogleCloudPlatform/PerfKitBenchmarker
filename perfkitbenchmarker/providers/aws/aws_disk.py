@@ -162,7 +162,7 @@ class AwsDisk(disk.BaseDisk):
     self.attached_vm_id = None
     self.machine_type = machine_type
     if self.disk_type != disk.LOCAL:
-      self.metadata.update(DISK_METADATA[self.disk_type])
+      self.metadata.update(DISK_METADATA.get(self.disk_type, {}))
     else:
       self.metadata.update((LOCAL_HDD_METADATA
                             if LocalDiskIsHDD(machine_type)
