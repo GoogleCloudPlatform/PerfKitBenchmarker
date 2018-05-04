@@ -326,7 +326,7 @@ class AwsEfsCommandsTest(BaseTest):
 
   def assertCalled(self, *args):
     cmd = ['aws', '--output', 'json', '--region', _AWS_REGION, 'efs'
-          ] + list(args)
+           ] + list(args)
     self.issue_cmd.assert_called_with(cmd)
 
   def testCreateFilerNoTier(self):
