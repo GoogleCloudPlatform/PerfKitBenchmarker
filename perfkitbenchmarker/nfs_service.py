@@ -76,13 +76,14 @@ class BaseNfsService(resource.BaseResource):
   NFS_TIERS = None
   RESOURCE_TYPE = 'BaseNfsService'
   DEFAULT_NFS_VERSION = None
+  DEFAULT_TIER = None
   VOLUME_NAME = ''
 
   def __init__(self, disk_spec, zone):
     super(BaseNfsService, self).__init__()
     self.disk_spec = disk_spec
     self.zone = zone
-    self.nfs_tier = FLAGS.nfs_tier
+    self.nfs_tier = FLAGS.nfs_tier or self.DEFAULT_TIER
     if self.nfs_tier and self.NFS_TIERS and self.nfs_tier not in self.NFS_TIERS:
       # NFS service does not have to have a list of nfs_tiers nor does it have
       # to be implemented by a provider
@@ -95,7 +96,8 @@ class BaseNfsService(resource.BaseResource):
 
   def CreateNfsDisk(self):
     mount_point = '%s:/%s' % (self.GetRemoteAddress(), self.VOLUME_NAME)
-    return disk.NfsDisk(self.disk_spec, mount_point, self.DEFAULT_NFS_VERSION)
+    return disk.NfsDisk(self.disk_spec, mount_point, self.DEFAULT_NFS_VERSION,
+                        self.nfs_tier)
 
   @abc.abstractmethod
   def _IsReady(self):

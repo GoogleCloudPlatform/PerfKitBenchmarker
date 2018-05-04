@@ -50,6 +50,7 @@
 - Added hdrhistogram support to ycsb package.
 - Added support for custom machine types on GKE.
 - Added `container_cluster_version` flag to container_service.py.
+- AWS EFS support via "disk_type: nfs"
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
