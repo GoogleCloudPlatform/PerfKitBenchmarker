@@ -33,7 +33,7 @@ def default_logfile_names(script, suffix):
   return output_logfile, error_logfile
 
 
-def one_script(script, logfile_suffix):
+def execute_script(script, logfile_suffix):
   """Method to execute a sql script on a EDW cluster.
 
   Arguments:
@@ -58,7 +58,7 @@ def one_script(script, logfile_suffix):
 
 def main(argv):
   del argv
-  print one_script(FLAGS.script, FLAGS.logfile_suffix)
+  print execute_script(FLAGS.script, FLAGS.logfile_suffix)
 
 
 if __name__ == '__main__':
