@@ -39,9 +39,9 @@ export OUTPUT_TABLE=$7
 pid=""
 
 if [ "$COLLECT_OUTPUT" = true ] ; then
-    cat $SCRIPT | bq --project_id=$BQ_PROJECT_ID --dataset_id=$BQ_DATASET_ID query --nouse_cache --nouse_legacy_sql --destination_table=$OUTPUT_TABLE 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
+    cat $SCRIPT | bq --project_id=$BQ_PROJECT_ID --dataset_id=$BQ_DATASET_ID --quiet query --nouse_cache --nouse_legacy_sql --destination_table=$OUTPUT_TABLE 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
 else
-    cat $SCRIPT | bq --project_id=$BQ_PROJECT_ID --dataset_id=$BQ_DATASET_ID query --nouse_cache --nouse_legacy_sql 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
+    cat $SCRIPT | bq --project_id=$BQ_PROJECT_ID --dataset_id=$BQ_DATASET_ID --quiet query --nouse_cache --nouse_legacy_sql 1>${SCRIPT_OUTPUT} 2>${SCRIPT_ERROR} &
 fi
 
 pid=$!
