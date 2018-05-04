@@ -26,6 +26,7 @@ import logging
 import posixpath
 import threading
 import uuid
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -637,11 +638,21 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
+
+    Raises:
+      CreationError: If an NFS disk is listed but the NFS service not created.
     """
     # Instantiate the disk(s) that we want to create.
     disks = []
     for _ in range(disk_spec.num_striped_disks):
-      data_disk = aws_disk.AwsDisk(disk_spec, self.zone, self.machine_type)
+      if disk_spec.disk_type == disk.NFS:
+        nfs = getattr(context.GetThreadBenchmarkSpec(), 'nfs_service')
+        if nfs is None:
+          raise errors.Resource.CreationError(
+              'Have an NFS disk but no NFS service created')
+        data_disk = nfs.CreateNfsDisk()
+      else:
+        data_disk = aws_disk.AwsDisk(disk_spec, self.zone, self.machine_type)
       if disk_spec.disk_type == disk.LOCAL:
         data_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
                                       self.local_disk_counter)
@@ -650,6 +661,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.local_disk_counter += 1
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
+      elif disk_spec.disk_type == disk.NFS:
+        pass
       else:
         # Remote disk numbers start at 1 + max_local disks (0 is the system disk
         # and local disks occupy [1, max_local_disks]).

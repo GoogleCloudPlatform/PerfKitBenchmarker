@@ -158,8 +158,11 @@ class NfsDiskTestCase(unittest.TestCase):
     self.assertEqual(self.MountOptions(),
                      self.MountOptionsAsDict(nfs_disk.mount_options))
     self.assertEqual(nfs_disk.mount_options, nfs_disk.fstab_options)
-    mount_options = self.MountOptions(num_stripes=1, size=None, type=None)
-    self.assertEqual(mount_options, nfs_disk.metadata)
+    disk_meta = {}
+    for key, value in self.MountOptions().iteritems():
+      disk_meta['nfs_{}'.format(key)] = value
+    disk_meta.update({'num_stripes': 1, 'size': None, 'type': None})
+    self.assertEqual(disk_meta, nfs_disk.metadata)
     self.assertTrue(nfs_disk._IsReady())
 
   def testNfsFlags(self):
