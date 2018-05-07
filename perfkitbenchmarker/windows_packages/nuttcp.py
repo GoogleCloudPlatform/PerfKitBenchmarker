@@ -23,6 +23,7 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 
 CONTROL_PORT = 5000
+UDP_PORT = 5001
 NUTTCP_OUT_FILE = 'nuttcp_results'
 
 flags.DEFINE_integer('nuttcp_max_bandwidth_mb', 10000,
@@ -104,15 +105,19 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
 
   for bandwidth in bandwidths:
 
-    sender_args = ('-u -R{bandwidth} -T{time} -l{packet_size} {dest_ip}'
-                   ' > {out_file}').format(
+    sender_args = ('-u -p{data_port} -P{control_port} -R{bandwidth} '
+                   '-T{time} -l{packet_size} {dest_ip} > {out_file}').format(
+                       data_port=UDP_PORT,
+                       control_port=CONTROL_PORT,
                        bandwidth=bandwidth,
                        time=FLAGS.nuttcp_udp_stream_seconds,
                        packet_size=FLAGS.nuttcp_udp_packet_size,
                        dest_ip=dest_ip,
                        out_file=NUTTCP_OUT_FILE)
 
-    receiver_args = '-1'
+    receiver_args = '-p{data_port} -P{control_port} -1'.format(
+        data_port=UDP_PORT,
+        control_port=CONTROL_PORT)
 
     threaded_args = [((receiving_vm, receiver_args), {}),
                      ((sending_vm, sender_args), {})]
