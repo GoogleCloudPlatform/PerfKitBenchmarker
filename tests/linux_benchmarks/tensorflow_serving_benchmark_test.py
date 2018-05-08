@@ -27,9 +27,7 @@ class TensorflowServingBenchmarkTestCase(unittest.TestCase):
         'tf_serving_client_thread_count': 12,
         'tf_serving_runtime': 60,
     }
-
     p = mock.patch(tensorflow_serving_benchmark.__name__ + '.FLAGS')
-    p.start()
     flags_mock = p.start()
     flags_mock.configure_mock(**flag_values)
     self.addCleanup(p.stop)
