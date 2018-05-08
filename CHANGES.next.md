@@ -117,6 +117,8 @@
 - TPU checkpoints and summaries are now stored in GCS.
 - Updated cloud TPU models version.
 - Support for cloud NFS services (no implementation).
+- Added support for default batch sizes given a certain GPU type and model in
+  the Tensorflow benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
