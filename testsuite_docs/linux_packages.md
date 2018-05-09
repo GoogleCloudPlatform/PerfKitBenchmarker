@@ -1,4 +1,4 @@
-### [perfkitbenchmarker.linux_packages.aerospike_server ](perfkitbenchmarker/linux_packages/aerospike_server.py)
+### [perfkitbenchmarker.linux_packages.aerospike_server ](../perfkitbenchmarker/linux_packages/aerospike_server.py)
 
 #### Description:
 
@@ -19,7 +19,7 @@ Module containing aerospike server installation and cleanup functions.
     (default: '4')
     (an integer)
 
-### [perfkitbenchmarker.linux_packages.azure_sdk ](perfkitbenchmarker/linux_packages/azure_sdk.py)
+### [perfkitbenchmarker.linux_packages.azure_sdk ](../perfkitbenchmarker/linux_packages/azure_sdk.py)
 
 #### Description:
 
@@ -30,7 +30,7 @@ Package for installing the Azure SDK.
 `--azure_lib_version`: Use a particular version of azure client lib, e.g.: 1.0.2
     (default: '1.0.3')
 
-### [perfkitbenchmarker.linux_packages.cassandra ](perfkitbenchmarker/linux_packages/cassandra.py)
+### [perfkitbenchmarker.linux_packages.cassandra ](../perfkitbenchmarker/linux_packages/cassandra.py)
 
 #### Description:
 
@@ -51,7 +51,7 @@ Cassandra homepage: http://cassandra.apache.org
     (default: '3')
     (an integer)
 
-### [perfkitbenchmarker.linux_packages.ch_block_storage ](perfkitbenchmarker/linux_packages/ch_block_storage.py)
+### [perfkitbenchmarker.linux_packages.ch_block_storage ](../perfkitbenchmarker/linux_packages/ch_block_storage.py)
 
 #### Description:
 
@@ -64,7 +64,7 @@ Contains cloudharmony block storage benchmark installation functions.
     (default: '')
     (a comma separated list)
 
-### [perfkitbenchmarker.linux_packages.cloud_tpu_models ](perfkitbenchmarker/linux_packages/cloud_tpu_models.py)
+### [perfkitbenchmarker.linux_packages.cloud_tpu_models ](../perfkitbenchmarker/linux_packages/cloud_tpu_models.py)
 
 #### Description:
 
@@ -75,7 +75,7 @@ Module containing cloud TPU models installation and cleanup functions.
 `--cloud_tpu_commit_hash`: git commit hash of desired cloud TPU models commit.
     (default: 'c44f52634e007694e7ccad1cffdf63f05b90c80e')
 
-### [perfkitbenchmarker.linux_packages.cuda_toolkit ](perfkitbenchmarker/linux_packages/cuda_toolkit.py)
+### [perfkitbenchmarker.linux_packages.cuda_toolkit ](../perfkitbenchmarker/linux_packages/cuda_toolkit.py)
 
 #### Description:
 
@@ -99,7 +99,7 @@ type of gpu per system.
 
 `--[no]gpu_autoboost_enabled`: whether gpu autoboost is enabled
 
-### [perfkitbenchmarker.linux_packages.cudnn ](perfkitbenchmarker/linux_packages/cudnn.py)
+### [perfkitbenchmarker.linux_packages.cudnn ](../perfkitbenchmarker/linux_packages/cudnn.py)
 
 #### Description:
 
@@ -111,7 +111,7 @@ Module containing CUDA Deep Neural Network library installation functions.
     directory and specify the name
     (default: 'libcudnn7_7.0.5.15-1+cuda9.0_amd64.deb')
 
-### [perfkitbenchmarker.linux_packages.gluster ](perfkitbenchmarker/linux_packages/gluster.py)
+### [perfkitbenchmarker.linux_packages.gluster ](../perfkitbenchmarker/linux_packages/gluster.py)
 
 #### Description:
 
@@ -127,7 +127,7 @@ Module containing GlusterFS installation and cleanup functions.
     (default: '1')
     (an integer)
 
-### [perfkitbenchmarker.linux_packages.memcached_server ](perfkitbenchmarker/linux_packages/memcached_server.py)
+### [perfkitbenchmarker.linux_packages.memcached_server ](../perfkitbenchmarker/linux_packages/memcached_server.py)
 
 #### Description:
 
@@ -139,7 +139,7 @@ Module containing memcached server installation and cleanup functions.
     (default: '64')
     (an integer)
 
-### [perfkitbenchmarker.linux_packages.mxnet_cnn ](perfkitbenchmarker/linux_packages/mxnet_cnn.py)
+### [perfkitbenchmarker.linux_packages.mxnet_cnn ](../perfkitbenchmarker/linux_packages/mxnet_cnn.py)
 
 #### Description:
 
@@ -150,7 +150,7 @@ Module containing MXNet CNN installation and cleanup functions.
 `--mxnet_commit_hash`: git commit hash of desired mxnet commit.
     (default: '2700ddbbeef212879802f7f0c0812192ec5c2b77')
 
-### [perfkitbenchmarker.linux_packages.netperf ](perfkitbenchmarker/linux_packages/netperf.py)
+### [perfkitbenchmarker.linux_packages.netperf ](../perfkitbenchmarker/linux_packages/netperf.py)
 
 #### Description:
 
@@ -167,7 +167,7 @@ Module containing netperf installation and cleanup functions.
     (default: '100')
     (an integer)
 
-### [perfkitbenchmarker.linux_packages.openjdk ](perfkitbenchmarker/linux_packages/openjdk.py)
+### [perfkitbenchmarker.linux_packages.openjdk ](../perfkitbenchmarker/linux_packages/openjdk.py)
 
 #### Description:
 
@@ -178,7 +178,7 @@ Module containing OpenJDK installation and cleanup functions.
 `--openjdk_version`: Version of openjdk to use. By default, the version of
     openjdk is automatically detected.
 
-### [perfkitbenchmarker.linux_packages.redis_server ](perfkitbenchmarker/linux_packages/redis_server.py)
+### [perfkitbenchmarker.linux_packages.redis_server ](../perfkitbenchmarker/linux_packages/redis_server.py)
 
 #### Description:
 
@@ -193,7 +193,7 @@ Module containing redis installation and cleanup functions.
     (default: '1')
     (a positive integer)
 
-### [perfkitbenchmarker.linux_packages.tensorflow ](perfkitbenchmarker/linux_packages/tensorflow.py)
+### [perfkitbenchmarker.linux_packages.tensorflow ](../perfkitbenchmarker/linux_packages/tensorflow.py)
 
 #### Description:
 
@@ -215,7 +215,7 @@ Module containing TensorFlow installation and cleanup functions.
     will install tensorflow-gpu==1.7 when using GPUs.
     (default: 'tensorflow-gpu==1.7')
 
-### [perfkitbenchmarker.linux_packages.tomcat ](perfkitbenchmarker/linux_packages/tomcat.py)
+### [perfkitbenchmarker.linux_packages.tomcat ](../perfkitbenchmarker/linux_packages/tomcat.py)
 
 #### Description:
 
@@ -236,7 +236,7 @@ https://tomcat.apache.org/
     (default: 'https://archive.apache.org/dist/tomcat/tomcat-8/v8.0.28/bin
     /apache-tomcat-8.0.28.tar.gz')
 
-### [perfkitbenchmarker.linux_packages.ycsb ](perfkitbenchmarker/linux_packages/ycsb.py)
+### [perfkitbenchmarker.linux_packages.ycsb ](../perfkitbenchmarker/linux_packages/ycsb.py)
 
 #### Description:
 

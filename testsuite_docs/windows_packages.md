@@ -1,4 +1,4 @@
-### [perfkitbenchmarker.windows_packages.iperf3 ](perfkitbenchmarker/windows_packages/iperf3.py)
+### [perfkitbenchmarker.windows_packages.iperf3 ](../perfkitbenchmarker/windows_packages/iperf3.py)
 
 #### Description:
 
@@ -40,7 +40,7 @@ Module containing Iperf3 windows installation and cleanup functions.
     (default: '3')
     (an integer)
 
-### [perfkitbenchmarker.windows_packages.ntttcp ](perfkitbenchmarker/windows_packages/ntttcp.py)
+### [perfkitbenchmarker.windows_packages.ntttcp ](../perfkitbenchmarker/windows_packages/ntttcp.py)
 
 #### Description:
 
@@ -63,7 +63,7 @@ https://gallery.technet.microsoft.com/NTttcp-Version-528-Now-f8b12769
     (default: '60')
     (an integer)
 
-### [perfkitbenchmarker.windows_packages.nuttcp ](perfkitbenchmarker/windows_packages/nuttcp.py)
+### [perfkitbenchmarker.windows_packages.nuttcp ](../perfkitbenchmarker/windows_packages/nuttcp.py)
 
 #### Description:
 
@@ -105,7 +105,7 @@ Module containing nuttcp installation and cleanup functions.
 `--[no]nuttcp_udp_unlimited_bandwidth`: Run an "unlimited bandwidth" test
     (default: 'false')
 
-### [perfkitbenchmarker.windows_packages.psping ](perfkitbenchmarker/windows_packages/psping.py)
+### [perfkitbenchmarker.windows_packages.psping ](../perfkitbenchmarker/windows_packages/psping.py)
 
 #### Description:
 
