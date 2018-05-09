@@ -51,3 +51,9 @@ flags.DEFINE_string('redis_node_type',
 flags.DEFINE_string('aws_elasticache_failover_zone',
                     None,
                     'AWS elasticache failover zone')
+flags.DEFINE_string('aws_efs_token', None,
+                    'The creation token used to create the EFS resource. '
+                    'If the file system already exists, it will use that '
+                    'instead of creating a new one.')
+flags.DEFINE_boolean('aws_delete_file_system', True,
+                     'Whether to delete the EFS file system.')
