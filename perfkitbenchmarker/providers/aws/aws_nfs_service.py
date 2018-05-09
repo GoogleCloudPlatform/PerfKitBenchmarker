@@ -101,6 +101,8 @@ class AwsNfsService(nfs_service.BaseNfsService):
   def _Delete(self):
     # deletes on the file-system and mount-target are immediate
     self._DeleteMount()
+    if not FLAGS.aws_delete_file_system:
+      return
     self._DeleteFiler()
 
   def GetRemoteAddress(self):
@@ -117,8 +119,12 @@ class AwsNfsService(nfs_service.BaseNfsService):
     if self.filer_id:
       logging.warn('_CreateFiler() already called for %s', self.filer_id)
       return
-    self.filer_id = self.aws_commands.CreateFiler(
-        'nfs-token-%s' % FLAGS.run_uri, self.nfs_tier)
+    if FLAGS.aws_efs_token:
+      self.filer_id = self.aws_commands.GetFilerId(FLAGS.aws_efs_token)
+      if self.filer_id:
+        return
+    token = FLAGS.aws_efs_token or 'nfs-token-%s' % FLAGS.run_uri
+    self.filer_id = self.aws_commands.CreateFiler(token, self.nfs_tier)
     self.aws_commands.AddTagsToFiler(self.filer_id, FLAGS.owner, FLAGS.run_uri,
                                      ' '.join(FLAGS.benchmarks))
     logging.info('Created filer %s with address %s', self.filer_id,
@@ -171,6 +177,16 @@ class AwsEfsCommands(object):
 
   def __init__(self, region):
     self.efs_prefix = util.AWS_PREFIX + ['--region', region, 'efs']
+
+  def GetFilerId(self, token):
+    """Returns the filer id using the creation token or None."""
+    args = ['describe-file-systems', '--creation-token', token]
+    response = self._IssueAwsCommand(args)
+    file_systems = response['FileSystems']
+    if not file_systems:
+      return None
+    assert len(file_systems) < 2, 'Too many file systems.'
+    return file_systems[0]['FileSystemId']
 
   def CreateFiler(self, token, nfs_tier=None):
     args = ['create-file-system', '--creation-token', token]

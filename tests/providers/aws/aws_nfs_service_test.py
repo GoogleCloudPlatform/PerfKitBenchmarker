@@ -126,6 +126,8 @@ class BaseTest(unittest.TestCase):
     self.mock_flags['run_uri'].parse(_RUN_URI)
     self.mock_flags['nfs_version'].parse('4.1')
     self.mock_flags['temp_dir'].parse('/non/existent/temp/dir')
+    self.mock_flags['aws_efs_token'].parse(None)
+    self.mock_flags['aws_delete_file_system'].parse(True)
     for key, value in kwargs.iteritems():
       self.mock_flags[key].parse(value)
 
