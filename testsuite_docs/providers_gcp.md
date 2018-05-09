@@ -1,4 +1,4 @@
-### [perfkitbenchmarker.providers.gcp.flags ](perfkitbenchmarker/providers/gcp/flags.py)
+### [perfkitbenchmarker.providers.gcp.flags ](../perfkitbenchmarker/providers/gcp/flags.py)
 
 #### Description:
 
@@ -98,7 +98,7 @@ Module containing flags applicable across benchmark run on GCP.
     resolved. See:
     https://cloud.google.com/sdk/gcloud/reference/compute/disks/create
 
-### [perfkitbenchmarker.providers.gcp.gcp_dpb_dataflow ](perfkitbenchmarker/providers/gcp/gcp_dpb_dataflow.py)
+### [perfkitbenchmarker.providers.gcp.gcp_dpb_dataflow ](../perfkitbenchmarker/providers/gcp/gcp_dpb_dataflow.py)
 
 #### Description:
 
@@ -119,7 +119,7 @@ See details at: https://cloud.google.com/dataflow/
     stage the binary and any temporary files. You must create this bucket ahead
     of time, before running your pipeline.
 
-### [perfkitbenchmarker.providers.gcp.gcp_dpb_dataproc ](perfkitbenchmarker/providers/gcp/gcp_dpb_dataproc.py)
+### [perfkitbenchmarker.providers.gcp.gcp_dpb_dataproc ](../perfkitbenchmarker/providers/gcp/gcp_dpb_dataproc.py)
 
 #### Description:
 
@@ -136,7 +136,7 @@ at https://cloud.google.com/dataproc/
 
 `--dpb_dataproc_image_version`: The image version to use for the cluster.
 
-### [perfkitbenchmarker.providers.gcp.gcp_spanner ](perfkitbenchmarker/providers/gcp/gcp_spanner.py)
+### [perfkitbenchmarker.providers.gcp.gcp_spanner ](../perfkitbenchmarker/providers/gcp/gcp_spanner.py)
 
 #### Description:
 
@@ -157,7 +157,7 @@ Instances can be created and deleted.
 `--cloud_spanner_project`: The project for the Cloud Spanner instance. Use
     default project if unset.
 
-### [perfkitbenchmarker.providers.gcp.gcs ](perfkitbenchmarker/providers/gcp/gcs.py)
+### [perfkitbenchmarker.providers.gcp.gcs ](../perfkitbenchmarker/providers/gcp/gcs.py)
 
 #### Description:
 
