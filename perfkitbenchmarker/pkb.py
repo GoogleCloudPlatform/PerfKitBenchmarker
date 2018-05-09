@@ -402,7 +402,9 @@ def _PrintHelpMD(matches=None):
     regex = re.compile(matches)
     for module_name in modules:
       if regex.search(module_name):
-          # matches module name
+        # where are we relative to pkb home?
+        BASE_RELATIVE = '../'
+        # matches module name
         module_regex = r'^\s+?(.*?):.*'
         # matches each flag
         flags_regex = r'(^\s\s--.*?(?=^\s\s--|\Z))+?'
@@ -436,7 +438,7 @@ def _PrintHelpMD(matches=None):
               docstring = dsm.group(1)
            # print docstring
         # format output
-        print '### [' + module, '](' + module_link + ')\n'
+        print '### [' + module, '](' + BASE_RELATIVE + module_link + ')\n'
         print '#### Description:\n\n' + docstring + '\n\n#### Flags:\n'
         print '\n'.join(flags) + '\n'
 
