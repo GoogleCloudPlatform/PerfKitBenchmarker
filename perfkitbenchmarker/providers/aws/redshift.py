@@ -332,3 +332,14 @@ class Redshift(edw_service.EdwService):
     """Redshift specific run script command components."""
     return '--host={} --database={} --user={} --password={}'.format(
         self.endpoint, self.db, self.user, self.password)
+
+  def InstallAndAuthenticateRunner(self, vm):
+    """Method to perform installation and authentication of redshift runner.
+
+    psql, a terminal-based front end from PostgreSQL, used as client
+    https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-from-psql.html
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    vm.Install('pgbench')

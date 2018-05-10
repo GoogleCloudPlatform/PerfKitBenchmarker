@@ -113,3 +113,11 @@ class EdwService(resource.BaseResource):
       runner.
     """
     raise NotImplementedError
+
+  def InstallAndAuthenticateRunner(self, vm):
+    """Method to perform installation and authentication of runner utilities.
+
+    Args:
+      vm: Client vm on which the script will be run.
+    """
+    raise NotImplementedError
