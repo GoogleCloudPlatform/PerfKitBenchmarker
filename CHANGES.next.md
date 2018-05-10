@@ -51,6 +51,7 @@
 - Added support for custom machine types on GKE.
 - Added `container_cluster_version` flag to container_service.py.
 - AWS EFS support via "disk_type: nfs"
+- Added disk_fill_size and prepare_sleep_time flags
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
