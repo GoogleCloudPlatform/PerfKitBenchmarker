@@ -6,6 +6,7 @@ time taken to execute the script in seconds or -1 if the script fails.
 
 __author__ = 'p3rf@google.com'
 
+import json
 import logging
 from subprocess import call
 import time
@@ -53,7 +54,9 @@ def execute_script(script, logfile_suffix):
     response_status = call(cmd)
   execution_time = -1 if (response_status != 0) else round((time.time() -
                                                             start_time), 2)
-  return {script: execution_time}
+  results = {}
+  results[script] = execution_time
+  return json.dumps(results)
 
 
 def main(argv):

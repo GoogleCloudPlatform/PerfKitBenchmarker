@@ -6,6 +6,7 @@ profile_details module.
 
 __author__ = 'p3rf@google.com'
 
+import json
 import logging
 from multiprocessing import Process
 from multiprocessing import Queue
@@ -71,11 +72,11 @@ def manage_streams():
   while num_profiles:
     temp_performance_response = profile_performance.get()
     profile = temp_performance_response[0]
-    overall_performance[profile] = temp_performance_response[1]
+    overall_performance[profile] = json.loads(temp_performance_response[1])
     num_profiles -= 1
 
   overall_performance['wall_time'] = execution_time
-  return overall_performance
+  return json.dumps(overall_performance)
 
 
 def main(argv):
