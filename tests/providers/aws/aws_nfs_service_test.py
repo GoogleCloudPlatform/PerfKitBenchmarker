@@ -345,10 +345,13 @@ class AwsEfsCommandsTest(BaseTest):
   def testAddTags(self):
     self._SetResponse()
     self.aws.AddTagsToFiler(_FILE_ID, _OWNER, _RUN_URI, _BENCHMARK)
-    tags = ('Key=owner,Value=joe Key=perfkitbenchmarker-run,Value=fb810a9b '
-            'Key=benchmark,Value=fio')
+    tags = [
+        'Key=owner,Value=joe',
+        'Key=perfkitbenchmarker-run,Value=fb810a9b',
+        'Key=benchmark,Value=fio'
+    ]
     self.assertCalled('create-tags', '--file-system-id', _FILE_ID, '--tags',
-                      tags)
+                      *tags)
 
   def testFilerAvailable(self):
     self._SetResponse(_FILER.describe)

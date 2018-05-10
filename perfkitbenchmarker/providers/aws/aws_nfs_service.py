@@ -196,13 +196,13 @@ class AwsEfsCommands(object):
 
   def AddTagsToFiler(self, filer_id, owner, run_uri, benchmark):
     tag_fmt = 'Key={0},Value={1}'
-    tags = ' '.join([
+    tags = [
         tag_fmt.format('owner', owner),
         tag_fmt.format('perfkitbenchmarker-run', run_uri),
         tag_fmt.format('benchmark', benchmark)
-    ])
-    self._IssueAwsCommand(
-        ['create-tags', '--file-system-id', filer_id, '--tags', tags], False)
+    ]
+    args = ['create-tags', '--file-system-id', filer_id, '--tags'] + tags
+    self._IssueAwsCommand(args, False)
 
   @vm_util.Retry()
   def WaitUntilFilerAvailable(self, filer_id):
@@ -211,9 +211,13 @@ class AwsEfsCommands(object):
       raise errors.Resource.RetryableCreationError(
           '{} not ready'.format(filer_id))
 
+  @vm_util.Retry()
   def DeleteFiler(self, file_system_id):
-    self._IssueAwsCommand(
-        ['delete-file-system', '--file-system-id', file_system_id], False)
+    args = self.efs_prefix + [
+        'delete-file-system', '--file-system-id', file_system_id]
+    _, stderr, retcode = vm_util.IssueCommand(args)
+    if retcode and 'FileSystemInUse' in stderr:
+      raise Exception('Mount Point hasn\'t finished deleting.')
 
   def CreateMount(self, file_system_id, subnet_id, security_group=None):
     args = [
