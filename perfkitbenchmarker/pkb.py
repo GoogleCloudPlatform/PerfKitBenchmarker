@@ -275,6 +275,10 @@ flags.DEFINE_boolean(
 flags.DEFINE_string(
     'skip_pending_runs_file', None,
     'If file exists, any pending runs will be not be executed.')
+flags.DEFINE_integer(
+    'prepare_sleep_time', 0,
+    'The time in seconds to sleep after the prepare phase. This can be useful '
+    'for letting burst tokens accumulate.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
@@ -496,6 +500,10 @@ def DoPreparePhase(spec, timer):
   with timer.Measure('Benchmark Prepare'):
     spec.BenchmarkPrepare(spec)
   spec.StartBackgroundWorkload()
+  if FLAGS.prepare_sleep_time:
+    logging.info('Sleeping %s seconds after the prepare phase.',
+                 FLAGS.prepare_sleep_time)
+    time.sleep(FLAGS.prepare_sleep_time)
 
 
 def DoRunPhase(spec, collector, timer):
