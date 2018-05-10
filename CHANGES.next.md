@@ -215,3 +215,4 @@
 - Added support for more AWS regions in the object storage benchmark.
 - Add ability to skip known failing scripts when running edw profiles.
 - Set the control port and data port for nuttcp benchmark.
+- Fix overwriting of bandwidth variable in nuttcp benchmark.
