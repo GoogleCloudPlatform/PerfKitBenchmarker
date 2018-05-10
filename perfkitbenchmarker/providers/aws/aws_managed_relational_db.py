@@ -448,11 +448,17 @@ class AwsManagedRelationalDb(managed_relational_db.BaseManagedRelationalDb):
       describe_instance_json: output in json format from calling
         'aws rds describe-db-instances'
     """
-    self.primary_zone = (
-        describe_instance_json['DBInstances'][0]['AvailabilityZone'])
-    if self.spec.high_availability:
-      self.secondary_zone = (describe_instance_json['DBInstances'][0]
-                             ['SecondaryAvailabilityZone'])
+
+    if self.spec.engine == managed_relational_db.AURORA_POSTGRES:
+      self.primary_zone = self.zones[0]
+      if len(self.zones) > 1:
+        self.secondary_zone = ','.join(self.zones[1:])
+    else:
+      self.primary_zone = (
+          describe_instance_json['DBInstances'][0]['AvailabilityZone'])
+      if self.spec.high_availability:
+        self.secondary_zone = (describe_instance_json['DBInstances'][0]
+                               ['SecondaryAvailabilityZone'])
 
   def _IsReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the underlying resource is ready.
