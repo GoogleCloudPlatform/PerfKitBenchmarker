@@ -112,6 +112,8 @@ flags.DEFINE_integer('num_disable_cpus', None,
                      'Number of CPUs to disable on the virtual machine.'
                      'If the VM has n CPUs, you can disable at most n-1.',
                      lower_bound=1)
+flags.DEFINE_integer('disk_fill_size', 0,
+                     'Size of file to create in GBs.')
 
 
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
@@ -272,6 +274,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._DisableCpus()
     self.RecordAdditionalMetadata()
     self.BurnCpu()
+    self.FillDisk()
 
   def SetFiles(self):
     """Apply --set_files to the VM."""
@@ -310,6 +313,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand('sudo bash -c '
                          '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
                          x)
+
+  def FillDisk(self):
+    """Fills the primary scratch disk with a zeros file."""
+    if FLAGS.disk_fill_size:
+      out_file = posixpath.join(self.scratch_disks[0].mount_point, 'fill_file')
+      self.RobustRemoteCommand(
+          'dd if=/dev/zero of={out_file} bs=1G count={fill_size}'.format(
+              out_file=out_file, fill_size=FLAGS.disk_fill_size))
 
   def ApplySysctlPersistent(self, key, value):
     """Apply "key=value" pair to /etc/sysctl.conf and reboot.
