@@ -17,7 +17,6 @@
 
 #TODO
 
-
 import json
 import logging
 import posixpath
@@ -130,6 +129,7 @@ class DockerVirtualMachine(virtual_machine.BaseVirtualMachine):
       ]
 
       vm_util.IssueCommand(build_cmd)
+      
 
     #TODO check if container built correctly
 
