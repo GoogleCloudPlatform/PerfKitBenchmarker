@@ -18,13 +18,12 @@ and deleted.
 """
 
 import json
-import util
-
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+import util
 
 
 FLAGS = flags.FLAGS
@@ -88,7 +87,7 @@ class RedshiftClusterSubnetGroup(object):
                              self.subnet_id]
     vm_util.IssueCommand(cmd)
 
-  def _Delete(self):
+  def Delete(self):
     """Delete a redshift cluster subnet group."""
     cmd = self.cmd_prefix + ['redshift',
                              'delete-cluster-subnet-group',
@@ -135,7 +134,7 @@ class RedshiftClusterParameterGroup(object):
                                              wlm_concurrency_parameter_postfix)]
     vm_util.IssueCommand(cmd)
 
-  def _Delete(self):
+  def Delete(self):
     """Delete a redshift cluster parameter group."""
     cmd = self.cmd_prefix + ['redshift',
                              'delete-cluster-parameter-group',
@@ -155,11 +154,13 @@ class Redshift(edw_service.EdwService):
   CLOUD = providers.AWS
   SERVICE_TYPE = 'redshift'
 
+  READY_TIMEOUT = 7200
+
   def __init__(self, edw_service_spec):
     super(Redshift, self).__init__(edw_service_spec)
     # pkb setup attribute
     self.project = None
-    self.cmd_prefix = util.AWS_PREFIX
+    self.cmd_prefix = list(util.AWS_PREFIX)
     if FLAGS.zones:
       self.zone = FLAGS.zones[0]
       self.region = util.GetRegionFromZone(self.zone)
@@ -243,7 +244,7 @@ class Redshift(edw_service.EdwService):
                                '--cluster-subnet-group-name',
                                self.cluster_subnet_group.name,
                                '--cluster-parameter-group-name',
-                               self.cluster_subnet_group.name,
+                               self.cluster_parameter_group.name,
                                '--publicly-accessible',
                                '--automated-snapshot-retention-period=0']
       stdout, stderr, _ = vm_util.IssueCommand(cmd)
@@ -315,8 +316,8 @@ class Redshift(edw_service.EdwService):
 
   def _DeleteDependencies(self):
     """Delete dependencies of a redshift cluster."""
-    self.cluster_subnet_group._Delete()
-    self.cluster_parameter_group._Delete()
+    self.cluster_subnet_group.Delete()
+    self.cluster_parameter_group.Delete()
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
@@ -326,3 +327,8 @@ class Redshift(edw_service.EdwService):
     if self.snapshot is not None:
       basic_data['snapshot'] = self.snapshot
     return basic_data
+
+  def RunCommandHelper(self):
+    """Redshift specific run script command components."""
+    return '--host={} --database={} --user={} --password={}'.format(
+        self.endpoint, self.db, self.user, self.password)

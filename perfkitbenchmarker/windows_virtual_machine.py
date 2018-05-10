@@ -64,6 +64,7 @@ STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
 class WindowsMixin(virtual_machine.BaseOsMixin):
 
   OS_TYPE = os_types.WINDOWS
+  BASE_OS_TYPE = os_types.WINDOWS
 
   def __init__(self):
     super(WindowsMixin, self).__init__()
@@ -352,7 +353,7 @@ class WindowsMixin(virtual_machine.BaseOsMixin):
     # Allow more security protocols to make it easier to download from
     # sites where we don't know the security protocol beforehand
     command = ('[Net.ServicePointManager]::SecurityProtocol = '
-               '[System.Security.Authentication.SslProtocols] '
+               '[System.Net.SecurityProtocolType] '
                '"tls, tls11, tls12";'
                'Invoke-WebRequest {url} -OutFile {dest}').format(
                    url=url, dest=dest)

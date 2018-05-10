@@ -26,6 +26,7 @@ import logging
 import posixpath
 import threading
 import uuid
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -523,7 +524,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       instance_market_options['SpotOptions'] = spot_options
       create_cmd.append(
           '--instance-market-options=%s' % json.dumps(instance_market_options))
-    _, stderr, _ = vm_util.IssueCommand(create_cmd)
+    _, stderr, retcode = vm_util.IssueCommand(create_cmd)
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       logging.warning(
           'Creation failed due to insufficient host capacity. A new host will '
@@ -545,6 +546,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.spot_status_code = 'SpotMaxPriceTooLow'
       self.early_termination = True
       raise errors.Resource.CreationError(stderr)
+    if retcode:
+      raise errors.Resource.CreationError(
+          '%s return code: %s' % (retcode, stderr))
 
   def _Delete(self):
     """Delete a VM instance."""
@@ -634,11 +638,21 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
+
+    Raises:
+      CreationError: If an NFS disk is listed but the NFS service not created.
     """
     # Instantiate the disk(s) that we want to create.
     disks = []
     for _ in range(disk_spec.num_striped_disks):
-      data_disk = aws_disk.AwsDisk(disk_spec, self.zone, self.machine_type)
+      if disk_spec.disk_type == disk.NFS:
+        nfs = getattr(context.GetThreadBenchmarkSpec(), 'nfs_service')
+        if nfs is None:
+          raise errors.Resource.CreationError(
+              'Have an NFS disk but no NFS service created')
+        data_disk = nfs.CreateNfsDisk()
+      else:
+        data_disk = aws_disk.AwsDisk(disk_spec, self.zone, self.machine_type)
       if disk_spec.disk_type == disk.LOCAL:
         data_disk.device_letter = chr(ord(DRIVE_START_LETTER) +
                                       self.local_disk_counter)
@@ -647,6 +661,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.local_disk_counter += 1
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
+      elif disk_spec.disk_type == disk.NFS:
+        pass
       else:
         # Remote disk numbers start at 1 + max_local disks (0 is the system disk
         # and local disks occupy [1, max_local_disks]).
@@ -677,9 +693,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.Install('aws_credentials')
     self.Install('awscli')
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand('aws s3 cp --only-show-errors s3://%s/%s/%s %s' % (
-        FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
-        posixpath.join(install_path, filename)))
+    self.RemoteCommand(GenerateDownloadPreprovisionedBenchmarkDataCommand(
+        install_path, benchmark_name, filename))
 
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
@@ -823,3 +838,12 @@ class WindowsAwsVirtualMachine(AwsVirtualMachine,
                      vm_util.GetPrivateKeyPath()]
       password, _ = vm_util.IssueRetryableCommand(decrypt_cmd)
       self.password = password
+
+
+def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
+                                                       benchmark_name,
+                                                       filename):
+  """Returns a string used to download preprovisioned data."""
+  return 'aws s3 cp --only-show-errors s3://%s/%s/%s %s' % (
+      FLAGS.aws_preprovisioned_data_bucket, benchmark_name, filename,
+      posixpath.join(install_path, filename))

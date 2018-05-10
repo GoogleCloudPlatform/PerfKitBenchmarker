@@ -104,8 +104,8 @@ def ParseJobFile(job_file):
   for section in config.sections():
     if section != GLOBAL:
       metadata = {}
-      metadata.update(dict(config.items(section)))
       metadata.update(global_metadata)
+      metadata.update(dict(config.items(section)))
       if JOB_STONEWALL_PARAMETER in metadata:
         del metadata[JOB_STONEWALL_PARAMETER]
       section_metadata[section] = metadata

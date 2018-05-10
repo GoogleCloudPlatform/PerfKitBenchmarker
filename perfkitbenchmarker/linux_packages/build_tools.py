@@ -40,7 +40,8 @@ def Reinstall(vm, version='4.7'):
     vm: VirtualMachine object.
     version: string. GCC version.
   """
-  if vm.OS_TYPE != os_types.DEBIAN:
+  # TODO(user): Make this work on yum based systems.
+  if vm.BASE_OS_TYPE != os_types.DEBIAN:
     return
   for pkg in ('gcc', 'gfortran', 'g++'):
     version_string = _GetVersion(vm, pkg)

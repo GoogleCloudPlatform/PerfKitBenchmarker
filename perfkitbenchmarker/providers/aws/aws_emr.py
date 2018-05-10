@@ -103,7 +103,7 @@ class AwsEMR(spark_service.BaseSparkService):
     # TODO(hildrum) use availability zone when appropriate
     worker_machine_type = self.spec.worker_group.vm_spec.machine_type
     leader_machine_type = self.spec.master_group.vm_spec.machine_type
-    self.cmd_prefix = util.AWS_PREFIX
+    self.cmd_prefix = list(util.AWS_PREFIX)
 
     if self.zone:
       region = util.GetRegionFromZone(self.zone)

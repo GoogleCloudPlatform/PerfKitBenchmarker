@@ -130,14 +130,17 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['image_family'] = flag_values.image_family
     if flag_values['image_project'].present:
       config_values['image_project'] = flag_values.image_project
-    if flag_values['gcp_host_type'].present:
-      config_values['host_type'] = flag_values.gcp_host_type
+    if flag_values['gcp_node_type'].present:
+      config_values['node_type'] = flag_values.gcp_node_type
     if flag_values['gcp_num_vms_per_host'].present:
       config_values['num_vms_per_host'] = flag_values.gcp_num_vms_per_host
     if flag_values['gcp_min_cpu_platform'].present:
       if (flag_values.gcp_min_cpu_platform !=
           gcp_flags.GCP_MIN_CPU_PLATFORM_NONE):
         config_values['min_cpu_platform'] = flag_values.gcp_min_cpu_platform
+      else:
+        # Specifying gcp_min_cpu_platform explicitly removes any config.
+        config_values.pop('min_cpu_platform', None)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -159,51 +162,109 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'project': (option_decoders.StringDecoder, {'default': None}),
         'image_family': (option_decoders.StringDecoder, {'default': None}),
         'image_project': (option_decoders.StringDecoder, {'default': None}),
-        'host_type': (option_decoders.StringDecoder,
-                      {'default': 'n1-host-64-416'}),
+        'node_type': (option_decoders.StringDecoder,
+                      {'default': 'n1-node-96-624'}),
         'num_vms_per_host': (option_decoders.IntDecoder, {'default': None}),
         'min_cpu_platform': (option_decoders.StringDecoder, {'default': None}),
     })
     return result
 
 
-class GceSoleTenantHost(resource.BaseResource):
-  """Object representing a GCE sole tenant host.
+class GceSoleTenantNodeTemplate(resource.BaseResource):
+  """Object representing a GCE sole tenant node template.
 
   Attributes:
-    name: string. The name of the sole tenant host.
-    host_type: string. The host type of the host.
-    zone: string. The zone of the host.
+    name: string. The name of the node template.
+    node_type: string. The node type of the node template.
+    zone: string. The zone of the node template, converted to region.
   """
 
+  def __init__(self, name, node_type, zone, project):
+    super(GceSoleTenantNodeTemplate, self).__init__()
+    self.name = name
+    self.node_type = node_type
+    self.region = util.GetRegionFromZone(zone)
+    self.project = project
+
+  def _Create(self):
+    """Creates the node template."""
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+                             'node-templates', 'create', self.name)
+    cmd.flags['node-type'] = self.node_type
+    cmd.flags['region'] = self.region
+    cmd.Issue()
+
+  def _Exists(self):
+    """Returns True if the node template exists."""
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+                             'node-templates', 'describe', self.name)
+    cmd.flags['region'] = self.region
+    _, _, retcode = cmd.Issue(suppress_warning=True)
+    return not retcode
+
+  def _Delete(self):
+    """Deletes the node template."""
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+                             'node-templates', 'delete', self.name)
+    cmd.flags['region'] = self.region
+    cmd.Issue()
+
+
+class GceSoleTenantNodeGroup(resource.BaseResource):
+  """Object representing a GCE sole tenant node group.
+
+  Attributes:
+    name: string. The name of the node group.
+    node_template: string. The note template of the node group.
+    zone: string. The zone of the node group.
+  """
+
+  _counter_lock = threading.Lock()
   _counter = itertools.count()
 
-  def __init__(self, host_type, zone, project):
-    super(GceSoleTenantHost, self).__init__()
-    self.name = 'pkb-host-%s-%s' % (FLAGS.run_uri, self._counter.next())
-    self.host_type = host_type
+  def __init__(self, node_type, zone, project):
+    super(GceSoleTenantNodeGroup, self).__init__()
+    with self._counter_lock:
+      self.instance_number = self._counter.next()
+    self.name = 'pkb-node-group-%s-%s' % (FLAGS.run_uri, self.instance_number)
+    self.node_type = node_type
+    self.node_template = None
     self.zone = zone
     self.project = project
     self.fill_fraction = 0.0
 
   def _Create(self):
     """Creates the host."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy', 'hosts',
-                             'create', self.name)
-    cmd.flags['host-type'] = self.host_type
-    cmd.Issue()
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+                             'node-groups', 'create', self.name)
+    cmd.flags['node-template'] = self.node_template.name
+    cmd.flags['target-size'] = 1
+    _, stderr, retcode = cmd.Issue()
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
+
+  def _CreateDependencies(self):
+    super(GceSoleTenantNodeGroup, self)._CreateDependencies()
+    node_template_name = self.name.replace('group', 'template')
+    node_template = GceSoleTenantNodeTemplate(
+        node_template_name, self.node_type, self.zone, self.project)
+    node_template.Create()
+    self.node_template = node_template
+
+  def _DeleteDependencies(self):
+    if self.node_template:
+      self.node_template.Delete()
 
   def _Exists(self):
     """Returns True if the host exists."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy', 'hosts',
-                             'describe', self.name)
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+                             'node-groups', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True)
     return not retcode
 
   def _Delete(self):
     """Deletes the host."""
-    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy', 'hosts',
-                             'delete', self.name)
+    cmd = util.GcloudCommand(self, 'alpha', 'compute', 'sole-tenancy',
+                             'node-groups', 'delete', self.name)
     cmd.Issue()
 
 
@@ -251,7 +312,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Initialize a GCE virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      vm_spec: virtual_machine.BaseVmSpec object of the vm.
 
     Raises:
       errors.Config.MissingOption: If the spec does not include a "machine_type"
@@ -275,9 +336,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.boot_disk_size = vm_spec.boot_disk_size
     self.boot_disk_type = vm_spec.boot_disk_type
     self.id = None
-    self.host = None
+    self.node_type = vm_spec.node_type
+    self.node_group = None
     self.use_dedicated_host = vm_spec.use_dedicated_host
-    self.host_type = vm_spec.host_type
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
@@ -298,7 +359,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
     args = []
-    if self.host:
+    if self.node_group:
       args = ['alpha']
     args.extend(['compute', 'instances', 'create', self.name])
 
@@ -326,8 +387,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                                                                self.gpu_count)
     cmd.flags['tags'] = 'perfkitbenchmarker'
     cmd.flags['no-restart-on-failure'] = True
-    if self.host:
-      cmd.flags['sole-tenancy-host'] = self.host.name
+    if self.node_group:
+      cmd.flags['node-group'] = self.node_group.name
     if self.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = self.min_cpu_platform
 
@@ -393,10 +454,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           'be created and instance creation will be retried.')
       with self._host_lock:
         if num_hosts == len(self.host_list):
-          host = GceSoleTenantHost(self.host_type, self.zone, self.project)
+          host = GceSoleTenantNodeGroup(self.node_template,
+                                        self.zone, self.project)
           self.host_list.append(host)
           host.Create()
-        self.host = self.host_list[-1]
+        self.node_group = self.host_list[-1]
       raise errors.Resource.RetryableCreationError()
     if (not self.use_dedicated_host and retcode and
         _INSUFFICIENT_HOST_CAPACITY in stderr):
@@ -415,21 +477,22 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         if (not self.host_list or (self.num_vms_per_host and
                                    self.host_list[-1].fill_fraction +
                                    1.0 / self.num_vms_per_host > 1.0)):
-          host = GceSoleTenantHost(self.host_type, self.zone, self.project)
+          host = GceSoleTenantNodeGroup(self.node_type,
+                                        self.zone, self.project)
           self.host_list.append(host)
           host.Create()
-        self.host = self.host_list[-1]
+        self.node_group = self.host_list[-1]
         if self.num_vms_per_host:
-          self.host.fill_fraction += 1.0 / self.num_vms_per_host
+          self.node_group.fill_fraction += 1.0 / self.num_vms_per_host
 
   def _DeleteDependencies(self):
-    if self.host:
+    if self.node_group:
       with self._host_lock:
-        if self.host in self.host_list:
-          self.host_list.remove(self.host)
-        if self.host not in self.deleted_hosts:
-          self.host.Delete()
-          self.deleted_hosts.add(self.host)
+        if self.node_group in self.host_list:
+          self.host_list.remove(self.node_group)
+        if self.node_group not in self.deleted_hosts:
+          self.node_group.Delete()
+          self.deleted_hosts.add(self.node_group)
 
   @vm_util.Retry()
   def _PostCreate(self):
@@ -540,7 +603,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.image_project:
       result['image_project'] = self.image_project
     if self.use_dedicated_host:
-      result['host_type'] = self.host_type
+      result['node_type'] = self.node_type
       result['num_vms_per_host'] = self.num_vms_per_host
     if self.gpu_count:
       result['gpu_type'] = self.gpu_type
@@ -570,9 +633,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       filename: The name of the file that was downloaded.
     """
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand('gsutil -q cp gs://%s/%s/%s %s' % (
-        FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
-        posixpath.join(install_path, filename)))
+    self.RemoteCommand(GenerateDownloadPreprovisionedBenchmarkDataCommand(
+        install_path, benchmark_name, filename))
 
 
 class ContainerizedGceVirtualMachine(GceVirtualMachine,
@@ -644,7 +706,7 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     """Initialize a Windows GCE virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+      vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
     super(WindowsGceVirtualMachine, self).__init__(vm_spec)
     self.boot_metadata[
@@ -668,3 +730,12 @@ class WindowsGceVirtualMachine(GceVirtualMachine,
     stdout, _ = reset_password_cmd.IssueRetryable()
     response = json.loads(stdout)
     self.password = response['password']
+
+
+def GenerateDownloadPreprovisionedBenchmarkDataCommand(install_path,
+                                                       benchmark_name,
+                                                       filename):
+  """Returns a string used to download preprovisioned data."""
+  return 'gsutil -q cp gs://%s/%s/%s %s' % (
+      FLAGS.gcp_preprovisioned_data_bucket, benchmark_name, filename,
+      posixpath.join(install_path, filename))

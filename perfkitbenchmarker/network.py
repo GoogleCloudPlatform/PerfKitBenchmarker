@@ -120,11 +120,25 @@ class BaseNetwork(object):
     Args:
       vm: The VM for which the Network is being created.
     """
+    return cls.GetNetworkFromNetworkSpec(cls._GetNetworkSpecFromVm(vm))
+
+  @classmethod
+  def GetNetworkFromNetworkSpec(cls, spec):
+    """Returns a BaseNetwork.
+
+    This method is used instead of directly calling the class's constructor.
+    It creates BaseNetwork instances and registers them. If a BaseNetwork
+    object has already been registered with the same key, that object
+    will be returned rather than creating a new one. This enables multiple
+    VMs to call this method and all share the same BaseNetwork object.
+
+    Args:
+      spec: The network spec for the network.
+    """
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
-    spec = cls._GetNetworkSpecFromVm(vm)
     key = cls._GetKeyFromNetworkSpec(spec)
     with benchmark_spec.networks_lock:
       if key not in benchmark_spec.networks:

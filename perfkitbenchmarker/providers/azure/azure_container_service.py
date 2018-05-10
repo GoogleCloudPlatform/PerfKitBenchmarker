@@ -100,6 +100,8 @@ class AcsKubernetesCluster(container_service.KubernetesCluster):
     self.name = 'pkbcluster%s' % FLAGS.run_uri
     self._deleted = False
 
+  # TODO(ferneyhough): Consider adding
+  # --api-version=FLAGS.container_cluster_version.
   def _Create(self):
     """Creates the ACS cluster."""
     vm_util.IssueCommand([

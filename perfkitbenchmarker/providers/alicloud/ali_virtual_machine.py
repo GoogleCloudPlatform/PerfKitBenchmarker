@@ -369,8 +369,10 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     data_disk.WaitForDiskStatus(['In_use'])
 
-    self.FormatDisk(data_disk.GetDevicePath())
-    self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point)
+    self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)
+    self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point,
+                   disk_spec.disk_type, data_disk.mount_options,
+                   data_disk.fstab_options)
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""

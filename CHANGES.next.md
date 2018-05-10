@@ -13,10 +13,12 @@
 - Migrated cluster boot benchmark default machines to 'default_dual_core'.
 - Changed metric name in mnist and inception3.
 - Renamed the `tf_batch_size` flag in tensorflow_benchmark to `tf_batch_sizes`.
+- Updated GCP sole tenancy support.  Removed `gcp_host_type` added
+  `gcp_node_type`.
 
 ### New features:
-- Windows benchmarks can now be run from linux controllers
-- MXNet benchmarks can now be run from linux controllers
+- Windows benchmarks can now be run from linux controllers.
+- MXNet benchmarks can now be run from linux controllers.
 - Added initial support for preprovisioning benchmark binaries in the cloud,
   if binaries are not located in local /data directory.
 - YCSB benchmark for Cloud Redis in GCP, Elasticache Redis in AWS, and
@@ -46,6 +48,9 @@
 - Added the ability to pass arbitrary parameters to tf_cnn_benchmarks.py in the
   Tensorflow benchmark, through the `benchmark_args` flag.
 - Added hdrhistogram support to ycsb package.
+- Added support for custom machine types on GKE.
+- Added `container_cluster_version` flag to container_service.py.
+- AWS EFS support via "disk_type: nfs"
 
 ### Enhancements:
 - Support for ProfitBricks API v4:
@@ -104,6 +109,16 @@
 - Added `num_cpus` to virtual_machine published metadata.
 - Added a timeout to RobustRemoteCommand.
 - Added support for the `gcp_min_cpu_platform` flag on GKE clusters.
+- Preliminary support for NFS file systems
+- Added BigQuery provider implementation to extend the edw benchmarking in Perfkitbenchmarker.
+- Added support for authorizing gcloud to access Cloud Platform with a Google service account.
+- Added support for specification of resource specific ready timeouts.
+- Adding runner utilities to execute multiple sql scripts on edw clusters.
+- TPU checkpoints and summaries are now stored in GCS.
+- Updated cloud TPU models version.
+- Support for cloud NFS services (no implementation).
+- Added support for default batch sizes given a certain GPU type and model in
+  the Tensorflow benchmark.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
@@ -176,3 +191,27 @@
   ycsb_record_count is not set.
 - Fixed treatment of the boot time metric so that it is more like any other run
   stage metric.
+- Fixed bug of modifying the providers/aws/util.AWS_PREFIX value.
+- Made failures of 'aws ec2 run-instances' fail PKB quickly.
+- Fix Kubernetes StorageClass deletion
+- Added `git` installation to `tensorflow_serving` package.
+- MountDisk throws exception if mounting the disk fails.
+- Added support for preprovisioned benchmark data on KubernetesVirtualMachines.
+- Refactored speccpu2006 benchmark to use common elements for both
+  speccpu2006 and speccpu2017.
+- Use flags['key'].parse(...) to set mocked flags in linux_virtual_machine_test
+- Cleanup some redundant logging and duplicate decoder statements.
+- Fixed build_tools package re-installation for speccpu2006.
+- Fixed fio job parsing, section parameters should always overrides global
+  job parameters.
+- Refactored StaticVirtualMachines to use GetResourceClass() pattern.
+- Fixing the Redshift provider implementation to extend the edw benchmarking in pkb.
+- Support using --gcp_min_cpu_platform=none to clear --min-cpu-platform. This
+  lets the flag override a benchmark spec.
+- Fix windows security protocol casting.
+- Added '--iteration' to MNIST benchmark. The default value of 50 is too small
+  and can result in excessive communication overhead which negatively impacts
+  performance.
+- Added support for more AWS regions in the object storage benchmark.
+- Add ability to skip known failing scripts when running edw profiles.
+- Set the control port and data port for nuttcp benchmark.

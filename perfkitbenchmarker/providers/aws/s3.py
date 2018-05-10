@@ -22,22 +22,10 @@ FLAGS = flags.FLAGS
 
 AWS_CREDENTIAL_LOCATION = '.aws'
 DEFAULT_AWS_REGION = 'us-east-1'
-# The endpoints in this table are subdomains of 'amazonaws.com'. So
-# where the table says 's3-us-west-2', you should connect to
-# 's3-us-west-2.amazonaws.com'. This table comes from
-# http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
-AWS_S3_REGION_TO_ENDPOINT_TABLE = {
-    'us-east-1': 's3-external-1',
-    'us-west-2': 's3-us-west-2',
-    'us-west-1': 's3-us-west-1',
-    'eu-west-1': 's3-eu-west-1',
-    'eu-central-1': 's3-eu-central-1',
-    'ap-southeast-1': 's3-ap-southeast-1',
-    'ap-southeast-2': 's3-ap-southeast-2',
-    'ap-northeast-1': 's3-ap-northeast-1',
-    'ap-northeast-2': 's3-ap-northeast-2',
-    'sa-east-1': 's3-sa-east-1'
-}
+
+# S3 endpoints for a given region can be formed by prefixing the region with
+# 's3.' and suffixing it with '.amazonaws.com'.
+AWS_S3_ENDPOINT_PREFIX = 's3.'
 AWS_S3_ENDPOINT_SUFFIX = '.amazonaws.com'
 
 
@@ -100,8 +88,8 @@ class S3Service(object_storage_service.ObjectStorageService):
     if FLAGS.s3_custom_endpoint:
       return ['--host=' + FLAGS.s3_custom_endpoint]
     else:
-      hostname = AWS_S3_REGION_TO_ENDPOINT_TABLE[self.region]
-      return ['--host=' + hostname + AWS_S3_ENDPOINT_SUFFIX]
+      return ['--host=%s%s%s' % (AWS_S3_ENDPOINT_PREFIX, self.region,
+                                 AWS_S3_ENDPOINT_SUFFIX)]
 
   @classmethod
   def APIScriptFiles(cls):
