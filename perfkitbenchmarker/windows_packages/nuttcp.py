@@ -138,7 +138,7 @@ def RunNuttcp(sending_vm, receiving_vm, exec_path, dest_ip, network_type,
 #  drop/pkt 6.72 %loss
 
 
-def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
+def GetUDPStreamSample(command_out, sending_vm, receiving_vm, request_bandwidth,
                        network_type, iteration):
   """Get a sample from the nuttcp string results.
 
@@ -146,7 +146,7 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
     command_out: the nuttcp output.
     sending_vm: vm sending the UDP packets.
     receiving_vm: vm receiving the UDP packets.
-    bandwidth: the requested bandwidth in the nuttcp sample.
+    request_bandwidth: the requested bandwidth in the nuttcp sample.
     network_type: the type of the network, external or internal.
     iteration: the run number of the test.
 
@@ -156,7 +156,7 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
   data_line = command_out.split('\n')[0].split(' ')
   data_line = [val for val in data_line if val]
 
-  bandwidth = float(data_line[6])
+  actual_bandwidth = float(data_line[6])
   units = data_line[7]
   packet_loss = data_line[16]
 
@@ -166,9 +166,9 @@ def GetUDPStreamSample(command_out, sending_vm, receiving_vm, bandwidth,
       'sending_machine_type': sending_vm.machine_type,
       'sending_zone': sending_vm.zone,
       'packet_loss': packet_loss,
-      'bandwidth_requested': bandwidth,
+      'bandwidth_requested': request_bandwidth,
       'network_type': network_type,
       'iteration': iteration
   }
 
-  return sample.Sample('bandwidth', bandwidth, units, metadata)
+  return sample.Sample('bandwidth', actual_bandwidth, units, metadata)
