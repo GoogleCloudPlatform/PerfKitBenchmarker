@@ -126,8 +126,8 @@ def Run(benchmark_spec):
   results = []
   script_metadata = copy.copy(edw_service_instance.GetMetadata())
   script_metadata['script'] = script_name
-  script_performance_sample = sample.Sample('script_runtime', script_performance
-                                            , 'seconds', script_metadata)
+  script_performance_sample = sample.Sample('script_runtime', script_performance,
+                                            'seconds', script_metadata)
   results.append(script_performance_sample)
   return results
 
