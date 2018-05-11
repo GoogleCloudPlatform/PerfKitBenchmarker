@@ -606,6 +606,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     reservations = response['Reservations']
     assert len(reservations) < 2, 'Too many reservations.'
     if not reservations:
+      if not self.create_start_time:
+        return False
       logging.info('No reservation returned by describe-instances. This '
                    'sometimes shows up immediately after a successful '
                    'run-instances command. Retrying describe-instances '
