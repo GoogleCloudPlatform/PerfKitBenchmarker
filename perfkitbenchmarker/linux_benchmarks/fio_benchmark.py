@@ -442,7 +442,7 @@ def Prepare(benchmark_spec):
 def GetFileAsString(file_path):
   if not file_path:
     return None
-  with open(file_path, 'r') as jobfile:
+  with open(data.ResourcePath(file_path), 'r') as jobfile:
     return jobfile.read()
 
 
