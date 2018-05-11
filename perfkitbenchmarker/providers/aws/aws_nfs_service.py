@@ -120,8 +120,10 @@ class AwsNfsService(nfs_service.BaseNfsService):
       logging.warn('_CreateFiler() already called for %s', self.filer_id)
       return
     if FLAGS.aws_efs_token:
-      self.filer_id = self.aws_commands.GetFilerId(FLAGS.aws_efs_token)
-      if self.filer_id:
+      filer = self.aws_commands.GetFiler(FLAGS.aws_efs_token)
+      if filer:
+        self.nfs_tier = filer['PerformanceMode']
+        self.filer_id = filer['FileSystemId']
         return
     token = FLAGS.aws_efs_token or 'nfs-token-%s' % FLAGS.run_uri
     self.filer_id = self.aws_commands.CreateFiler(token, self.nfs_tier)
@@ -178,15 +180,15 @@ class AwsEfsCommands(object):
   def __init__(self, region):
     self.efs_prefix = util.AWS_PREFIX + ['--region', region, 'efs']
 
-  def GetFilerId(self, token):
-    """Returns the filer id using the creation token or None."""
+  def GetFiler(self, token):
+    """Returns the filer using the creation token or None."""
     args = ['describe-file-systems', '--creation-token', token]
     response = self._IssueAwsCommand(args)
     file_systems = response['FileSystems']
     if not file_systems:
       return None
     assert len(file_systems) < 2, 'Too many file systems.'
-    return file_systems[0]['FileSystemId']
+    return file_systems[0]
 
   def CreateFiler(self, token, nfs_tier=None):
     args = ['create-file-system', '--creation-token', token]
