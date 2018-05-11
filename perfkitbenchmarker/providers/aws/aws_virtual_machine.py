@@ -26,7 +26,7 @@ import logging
 import posixpath
 import threading
 import uuid
-from perfkitbenchmarker import context
+
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -646,11 +646,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     disks = []
     for _ in range(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.NFS:
-        nfs = getattr(context.GetThreadBenchmarkSpec(), 'nfs_service')
-        if nfs is None:
-          raise errors.Resource.CreationError(
-              'Have an NFS disk but no NFS service created')
-        data_disk = nfs.CreateNfsDisk()
+        data_disk = self._GetNfsService().CreateNfsDisk()
       else:
         data_disk = aws_disk.AwsDisk(disk_spec, self.zone, self.machine_type)
       if disk_spec.disk_type == disk.LOCAL:
