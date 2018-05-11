@@ -35,6 +35,7 @@ import threading
 import time
 import uuid
 
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags
@@ -910,6 +911,23 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     stdout, _ = self.RemoteCommand('md5sum %s' % posixpath.join(path, filename))
     md5sum, _ = stdout.split()
     return md5sum
+
+  def _GetNfsService(self):
+    """Returns the NfsService created in the benchmark spec.
+
+    Before calling this method check that the disk.disk_type is equal to
+    disk.NFS or else an exception will be raised.
+
+    Returns:
+      The nfs_service.BaseNfsService service for this cloud.
+
+    Raises:
+      CreationError: If no NFS service was created.
+    """
+    nfs = getattr(context.GetThreadBenchmarkSpec(), 'nfs_service')
+    if nfs is None:
+      raise errors.Resource.CreationError('No NFS Service created')
+    return nfs
 
 
 class RhelMixin(BaseLinuxMixin):
