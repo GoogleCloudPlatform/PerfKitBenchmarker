@@ -121,6 +121,7 @@
 - Added support for default batch sizes given a certain GPU type and model in
   the Tensorflow benchmark.
 - Added method to get the NfsService from the linux_virtual_machine.
+- Added support for fio job files in the data directory.
 
 ### Bug fixes and maintenance updates:
 - Moved GPU-related specs from GceVmSpec to BaseVmSpec
