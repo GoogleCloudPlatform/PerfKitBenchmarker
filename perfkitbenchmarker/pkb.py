@@ -279,6 +279,11 @@ flags.DEFINE_integer(
     'prepare_sleep_time', 0,
     'The time in seconds to sleep after the prepare phase. This can be useful '
     'for letting burst tokens accumulate.')
+flags.DEFINE_integer(
+    'timeout_minutes', 240,
+    'An upper bound on the time in minutes that the benchmark is expected to '
+    'run. This time is annotated or tagged on the resources of cloud '
+    'providers.')
 
 # Support for using a proxy in the cloud environment.
 flags.DEFINE_string('http_proxy', '',
